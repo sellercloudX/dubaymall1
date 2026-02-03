@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { imageBase64, productName, productDescription } = await req.json();
+    const { imageBase64, productName, productDescription, category } = await req.json();
 
     if (!imageBase64) {
       return new Response(
@@ -25,22 +25,99 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    console.log("Generating enhanced product image for:", productName);
+    console.log("Generating infographic product image for:", productName, "category:", category);
 
-    // Generate an enhanced, professional product image
-    const prompt = `Create a professional, high-quality e-commerce product photo for: "${productName}". 
-${productDescription ? `Description: ${productDescription}.` : ''}
+    // Category-specific infographic styles
+    const categoryPrompts: Record<string, string> = {
+      // Cosmetics & Beauty
+      "cosmetics": `Create a MARKETPLACE INFOGRAPHIC image for cosmetics product "${productName}".
+STYLE: Like Wildberries/Ozon/Uzum marketplace product cards
+MUST INCLUDE:
+- Large lifestyle photo showing product in use (lips, face, skin application)
+- Product packaging prominently displayed
+- 3-4 key benefits with checkmark icons (e.g., "✓ Long-lasting", "✓ Moisturizing")
+- "100% Original" or quality badge
+- Soft pink/purple gradient background
+- Product name and variant number
+- Brand logo placement
+AESTHETIC: Feminine, luxurious, clean typography`,
 
-Requirements:
-- Clean white or gradient background suitable for online marketplace
-- Professional studio lighting with soft shadows
-- Product centered and prominent
-- High resolution, crisp details
-- Attractive presentation that increases sales appeal
-- Modern, minimalist aesthetic
-- No text or watermarks on the image
+      // Electronics
+      "electronics": `Create a MARKETPLACE INFOGRAPHIC image for electronics product "${productName}".
+STYLE: Like Wildberries/Ozon/Uzum marketplace product cards
+MUST INCLUDE:
+- Product from multiple angles or with key feature callouts
+- Technical specs highlighted (battery life, screen size, etc.)
+- 3-4 key features with icons
+- "Original" quality badge
+- Dark/tech-inspired gradient background (blue, black, silver)
+- Clean modern typography
+AESTHETIC: Premium tech, professional, feature-focused`,
 
-Style: Professional product photography for Uzbekistan e-commerce marketplace, similar to Amazon or Uzum product photos.`;
+      // Clothing & Fashion
+      "clothing": `Create a MARKETPLACE INFOGRAPHIC image for fashion product "${productName}".
+STYLE: Like Wildberries/Ozon/Uzum marketplace product cards
+MUST INCLUDE:
+- Product worn by model or displayed elegantly
+- Material/fabric callouts
+- Size range indicator
+- 3-4 key features (breathable, cotton, etc.)
+- Lifestyle context
+- Clean neutral or brand-colored background
+AESTHETIC: Stylish, aspirational, clear product details`,
+
+      // Food & Beverages
+      "food": `Create a MARKETPLACE INFOGRAPHIC image for food product "${productName}".
+STYLE: Like Wildberries/Ozon/Uzum marketplace product cards
+MUST INCLUDE:
+- Appetizing product presentation
+- Ingredients or nutrition highlights
+- "Natural", "Halal", "Fresh" badges as relevant
+- 3-4 key benefits with icons
+- Warm, appetizing color palette
+- Product packaging clearly visible
+AESTHETIC: Fresh, appetizing, trustworthy`,
+
+      // Home & Kitchen
+      "home": `Create a MARKETPLACE INFOGRAPHIC image for home product "${productName}".
+STYLE: Like Wildberries/Ozon/Uzum marketplace product cards
+MUST INCLUDE:
+- Product in home context/lifestyle setting
+- Dimensions or size comparison
+- 3-4 key features with icons
+- Quality/durability badges
+- Clean, modern background
+- Multiple product views if helpful
+AESTHETIC: Cozy, practical, quality-focused`,
+
+      // Default for any category
+      "default": `Create a MARKETPLACE INFOGRAPHIC image for product "${productName}".
+STYLE: Professional Wildberries/Ozon/Uzum marketplace product card
+MUST INCLUDE:
+- Product prominently displayed with lifestyle context
+- 3-4 key benefits/features with checkmark or bullet icons
+- "100% Original" quality badge
+- Clean professional background with subtle gradient
+- Clear product presentation from best angle
+- Space for key selling points
+AESTHETIC: Professional, trustworthy, sales-optimized`
+    };
+
+    // Determine which prompt to use based on category
+    const categoryKey = category?.toLowerCase() || "default";
+    const categoryPrompt = categoryPrompts[categoryKey] || categoryPrompts["default"];
+
+    const prompt = `${categoryPrompt}
+
+Product: "${productName}"
+${productDescription ? `Description: ${productDescription}` : ''}
+
+CRITICAL RULES:
+- This must look like a professional MARKETPLACE INFOGRAPHIC, not just a product photo
+- Include text overlays with features/benefits in Russian or Uzbek
+- Add visual badges and icons
+- Make it sales-optimized for e-commerce
+- The final image should make customers want to buy immediately`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",

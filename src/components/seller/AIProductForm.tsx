@@ -68,7 +68,7 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
   const getStepText = () => {
     switch (processingStep) {
       case 'analyzing': return 'Mahsulot tahlil qilinmoqda...';
-      case 'enhancing': return 'Rasm sifati yaxshilanmoqda...';
+      case 'enhancing': return 'Infografik rasm yaratilmoqda...';
       case 'uploading': return 'Rasm yuklanmoqda...';
       case 'done': return 'Tayyor!';
       default: return '';
@@ -133,13 +133,43 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
         setFormData(prev => ({ ...prev, category_id: matchedCategory.id }));
       }
 
-      // Step 2: Enhance the image
+      // Step 2: Generate infographic-style marketplace image
       setProcessingStep('enhancing');
+      
+      // Map category name to infographic style
+      const categoryMapping: Record<string, string> = {
+        'elektronika': 'electronics',
+        'electronics': 'electronics',
+        'texnika': 'electronics',
+        'telefonlar': 'electronics',
+        'kosmetika': 'cosmetics',
+        'cosmetics': 'cosmetics',
+        'go\'zallik': 'cosmetics',
+        'beauty': 'cosmetics',
+        'parfyumeriya': 'cosmetics',
+        'kiyim': 'clothing',
+        'clothing': 'clothing',
+        'fashion': 'clothing',
+        'poyabzal': 'clothing',
+        'oziq-ovqat': 'food',
+        'food': 'food',
+        'ichimliklar': 'food',
+        'uy': 'home',
+        'home': 'home',
+        'mebel': 'home',
+        'oshxona': 'home',
+      };
+      
+      const categoryStyle = matchedCategory 
+        ? categoryMapping[matchedCategory.name.toLowerCase()] || analysisData.category.toLowerCase()
+        : analysisData.category.toLowerCase();
+      
       const { data: enhanceData, error: enhanceError } = await supabase.functions.invoke('enhance-product-image', {
         body: { 
           imageBase64: originalImage,
           productName: analysisData.name,
-          productDescription: analysisData.description
+          productDescription: analysisData.description,
+          category: categoryStyle
         },
       });
 
@@ -151,7 +181,7 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
       }
 
       setProcessingStep('done');
-      toast.success('AI tahlil va rasm yaxshilash tayyor!');
+      toast.success('AI tahlil va infografik rasm tayyor!');
     } catch (error: any) {
       console.error('AI processing error:', error);
       toast.error('AI ishlov berishda xatolik yuz berdi');
@@ -239,7 +269,7 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
                 </div>
                 <div className="relative">
                   <p className="text-xs text-muted-foreground mb-2 text-center">
-                    {enhancedImage ? 'AI yaxshilangan' : 'AI yaxshilaydi'}
+                    {enhancedImage ? 'AI infografik' : 'AI infografik yaratadi'}
                   </p>
                   <div className="rounded-lg overflow-hidden border">
                     {enhancedImage ? (
@@ -312,7 +342,7 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
           disabled={isProcessing}
         >
           <Sparkles className="mr-2 h-4 w-4" />
-          AI bilan tahlil qilish va rasmni yaxshilash
+          AI bilan tahlil qilish va infografik yaratish
         </Button>
       )}
 
