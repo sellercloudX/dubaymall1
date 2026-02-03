@@ -1,6 +1,7 @@
 import { ReactNode } from 'react';
 import { Navbar } from '@/components/Navbar';
 import { Footer } from '@/components/Footer';
+import { AIChat } from '@/components/chat/AIChat';
 
 interface LayoutProps {
   children: ReactNode;
@@ -13,6 +14,7 @@ export function Layout({ children, showFooter = true }: LayoutProps) {
       <Navbar />
       <main className="flex-1">{children}</main>
       {showFooter && <Footer />}
+      <AIChat />
     </div>
   );
 }
