@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AdminStats } from '@/components/admin/AdminStats';
+import { AdminAnalytics } from '@/components/admin/AdminAnalytics';
 import { UsersManagement } from '@/components/admin/UsersManagement';
 import { ProductsModeration } from '@/components/admin/ProductsModeration';
 import { ShopsManagement } from '@/components/admin/ShopsManagement';
@@ -89,8 +90,12 @@ export default function AdminDashboard() {
         </div>
 
         {/* Management Tabs */}
-        <Tabs defaultValue="users" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
+        <Tabs defaultValue="analytics" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
+            <TabsTrigger value="analytics" className="gap-2">
+              <BarChart3 className="h-4 w-4" />
+              <span className="hidden sm:inline">Analitika</span>
+            </TabsTrigger>
             <TabsTrigger value="users" className="gap-2">
               <Users className="h-4 w-4" />
               <span className="hidden sm:inline">Foydalanuvchilar</span>
@@ -108,6 +113,10 @@ export default function AdminDashboard() {
               <span className="hidden sm:inline">Buyurtmalar</span>
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="analytics">
+            <AdminAnalytics />
+          </TabsContent>
 
           <TabsContent value="users">
             <UsersManagement />

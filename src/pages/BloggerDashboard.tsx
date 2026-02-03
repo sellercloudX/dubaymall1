@@ -3,15 +3,14 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { DollarSign, Link2, MousePointer, ShoppingCart, TrendingUp, Wallet } from 'lucide-react';
+import { DollarSign, MousePointer, ShoppingCart, Wallet, BarChart3 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import AffiliateProducts from '@/components/blogger/AffiliateProducts';
 import MyAffiliateLinks from '@/components/blogger/MyAffiliateLinks';
 import CommissionsHistory from '@/components/blogger/CommissionsHistory';
 import WithdrawalSection from '@/components/blogger/WithdrawalSection';
+import { BloggerAnalytics } from '@/components/blogger/BloggerAnalytics';
 import useBloggerStats from '@/hooks/useBloggerStats';
 
 export default function BloggerDashboard() {
@@ -117,13 +116,21 @@ export default function BloggerDashboard() {
         </div>
 
         {/* Main Content Tabs */}
-        <Tabs defaultValue="products" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-flex">
+        <Tabs defaultValue="analytics" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-flex">
+            <TabsTrigger value="analytics" className="gap-2">
+              <BarChart3 className="h-4 w-4" />
+              <span className="hidden sm:inline">Analitika</span>
+            </TabsTrigger>
             <TabsTrigger value="products">Mahsulotlar</TabsTrigger>
             <TabsTrigger value="links">Havolalarim</TabsTrigger>
             <TabsTrigger value="commissions">Komissiyalar</TabsTrigger>
             <TabsTrigger value="withdraw">Yechib olish</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="analytics">
+            <BloggerAnalytics />
+          </TabsContent>
 
           <TabsContent value="products">
             <AffiliateProducts />
