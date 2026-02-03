@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
+import { SEOHead, StructuredData } from '@/components/SEOHead';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -141,8 +142,53 @@ export default function ProductPage() {
 
   const images = product.images || [];
 
+  // Product structured data for SEO
+  const productStructuredData = {
+    name: product.name,
+    description: product.description || '',
+    image: images[0] || '/placeholder.svg',
+    sku: product.id,
+    brand: {
+      '@type': 'Brand',
+      name: product.shop?.name || 'SuperEshop',
+    },
+    offers: {
+      '@type': 'Offer',
+      url: `https://supereshop.uz/product/${product.id}`,
+      priceCurrency: 'UZS',
+      price: product.price,
+      availability: product.stock_quantity > 0 
+        ? 'https://schema.org/InStock' 
+        : 'https://schema.org/OutOfStock',
+      seller: {
+        '@type': 'Organization',
+        name: product.shop?.name || 'SuperEshop Hub',
+      },
+    },
+    aggregateRating: ratingData?.total_reviews ? {
+      '@type': 'AggregateRating',
+      ratingValue: ratingData.average_rating || 0,
+      reviewCount: Number(ratingData.total_reviews),
+    } : undefined,
+  };
+
   return (
     <Layout>
+      <SEOHead
+        title={`${product.name} - SuperEshop Hub`}
+        description={product.description?.slice(0, 155) || `${product.name} - eng yaxshi narxlarda SuperEshop Hub'da xarid qiling`}
+        image={images[0]}
+        url={`https://supereshop.uz/product/${product.id}`}
+        type="product"
+        product={{
+          price: product.price,
+          currency: 'UZS',
+          availability: product.stock_quantity > 0 ? 'in_stock' : 'out_of_stock',
+          brand: product.shop?.name,
+        }}
+      />
+      <StructuredData type="Product" data={productStructuredData} />
+      
       <div className="container mx-auto px-4 py-8">
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
