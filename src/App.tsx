@@ -23,6 +23,7 @@ const CartPage = lazy(() => import("./pages/CartPage"));
 const CheckoutPage = lazy(() => import("./pages/CheckoutPage"));
 const BloggerDashboard = lazy(() => import("./pages/BloggerDashboard"));
 const FavoritesPage = lazy(() => import("./pages/FavoritesPage"));
+const Partnership = lazy(() => import("./pages/Partnership"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 function App() {
@@ -61,6 +62,7 @@ function App() {
                     <Route path="/checkout" element={<CheckoutPage />} />
                     <Route path="/blogger" element={<BloggerDashboard />} />
                     <Route path="/favorites" element={<FavoritesPage />} />
+                    <Route path="/partnership" element={<Partnership />} />
                     <Route path="*" element={<NotFound />} />
                   </Routes>
                 </Suspense>
