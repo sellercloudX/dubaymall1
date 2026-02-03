@@ -1,1 +1,13 @@
 project_id = "idcshubgqrzdvkttnslz"
+
+[functions.ai-chat]
+verify_jwt = false
+
+[functions.analyze-dropshipping-url]
+verify_jwt = false
+
+[functions.analyze-product-image]
+verify_jwt = false
+
+[functions.enhance-product-image]
+verify_jwt = false
