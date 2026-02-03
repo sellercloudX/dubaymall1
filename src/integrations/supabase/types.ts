@@ -347,6 +347,10 @@ export type Database = {
       orders: {
         Row: {
           created_at: string
+          delivery_confirmed_at: string | null
+          delivery_confirmed_by: string | null
+          delivery_otp: string | null
+          delivery_otp_expires_at: string | null
           id: string
           notes: string | null
           order_number: string
@@ -360,6 +364,10 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          delivery_confirmed_at?: string | null
+          delivery_confirmed_by?: string | null
+          delivery_otp?: string | null
+          delivery_otp_expires_at?: string | null
           id?: string
           notes?: string | null
           order_number: string
@@ -373,6 +381,10 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          delivery_confirmed_at?: string | null
+          delivery_confirmed_by?: string | null
+          delivery_otp?: string | null
+          delivery_otp_expires_at?: string | null
           id?: string
           notes?: string | null
           order_number?: string
@@ -784,6 +796,7 @@ export type Database = {
     }
     Functions: {
       generate_affiliate_code: { Args: never; Returns: string }
+      generate_delivery_otp: { Args: { p_order_id: string }; Returns: string }
       generate_order_number: { Args: never; Returns: string }
       get_product_rating: {
         Args: { p_product_id: string }
@@ -802,6 +815,10 @@ export type Database = {
       track_affiliate_click: {
         Args: { p_link_code: string }
         Returns: undefined
+      }
+      verify_delivery_otp: {
+        Args: { p_order_id: string; p_otp: string }
+        Returns: Json
       }
     }
     Enums: {

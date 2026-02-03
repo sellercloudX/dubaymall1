@@ -5,17 +5,20 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useAdminOrders } from '@/hooks/useAdminStats';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Search, ShoppingCart, Package, Truck, CheckCircle } from 'lucide-react';
+import { Search, ShoppingCart, Package, Truck, CheckCircle, Key, Copy } from 'lucide-react';
 import { format } from 'date-fns';
+import { DeliveryOTPGenerator } from '@/components/delivery/DeliveryOTPGenerator';
 
 const statusConfig: Record<string, { color: string; label: string; icon: any }> = {
   pending: { color: 'bg-yellow-500', label: 'Kutilmoqda', icon: ShoppingCart },
   processing: { color: 'bg-blue-500', label: 'Tayyorlanmoqda', icon: Package },
   shipped: { color: 'bg-purple-500', label: "Jo'natildi", icon: Truck },
+  out_for_delivery: { color: 'bg-orange-500', label: 'Yetkazilmoqda', icon: Truck },
   delivered: { color: 'bg-green-500', label: 'Yetkazildi', icon: CheckCircle },
   cancelled: { color: 'bg-red-500', label: 'Bekor qilindi', icon: ShoppingCart },
 };
@@ -24,6 +27,7 @@ export function OrdersManagement() {
   const { data: orders, isLoading } = useAdminOrders();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const queryClient = useQueryClient();
 
   const filteredOrders = orders?.filter(order => {
@@ -45,6 +49,11 @@ export function OrdersManagement() {
     } catch (err) {
       toast.error('Xatolik yuz berdi');
     }
+  };
+
+  const handleOTPGenerated = () => {
+    queryClient.invalidateQueries({ queryKey: ['admin-orders'] });
+    setSelectedOrder(null);
   };
 
   if (isLoading) {
@@ -77,6 +86,7 @@ export function OrdersManagement() {
               <SelectItem value="pending">Kutilmoqda</SelectItem>
               <SelectItem value="processing">Tayyorlanmoqda</SelectItem>
               <SelectItem value="shipped">Jo'natildi</SelectItem>
+              <SelectItem value="out_for_delivery">Yetkazilmoqda</SelectItem>
               <SelectItem value="delivered">Yetkazildi</SelectItem>
               <SelectItem value="cancelled">Bekor qilindi</SelectItem>
             </SelectContent>
@@ -92,13 +102,17 @@ export function OrdersManagement() {
               <TableHead>Summa</TableHead>
               <TableHead>To'lov</TableHead>
               <TableHead>Holat</TableHead>
+              <TableHead>OTP</TableHead>
               <TableHead>Sana</TableHead>
-              <TableHead>Holatni o'zgartirish</TableHead>
+              <TableHead>Amallar</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredOrders?.map((order) => {
               const StatusIcon = statusConfig[order.status]?.icon || ShoppingCart;
+              const hasOTP = order.delivery_otp && order.status === 'out_for_delivery';
+              const isDelivered = order.delivery_confirmed_at;
+              
               return (
                 <TableRow key={order.id}>
                   <TableCell className="font-mono font-medium">{order.order_number}</TableCell>
@@ -115,20 +129,61 @@ export function OrdersManagement() {
                       {statusConfig[order.status]?.label || order.status}
                     </Badge>
                   </TableCell>
+                  <TableCell>
+                    {isDelivered ? (
+                      <Badge variant="outline" className="text-green-600 border-green-600">
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        Tasdiqlangan
+                      </Badge>
+                    ) : hasOTP ? (
+                      <Badge variant="outline" className="font-mono">
+                        <Key className="h-3 w-3 mr-1" />
+                        {order.delivery_otp}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">-</span>
+                    )}
+                  </TableCell>
                   <TableCell>{format(new Date(order.created_at), 'dd.MM.yyyy HH:mm')}</TableCell>
                   <TableCell>
-                    <Select value={order.status} onValueChange={(value) => updateOrderStatus(order.id, value)}>
-                      <SelectTrigger className="w-[150px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pending">Kutilmoqda</SelectItem>
-                        <SelectItem value="processing">Tayyorlanmoqda</SelectItem>
-                        <SelectItem value="shipped">Jo'natildi</SelectItem>
-                        <SelectItem value="delivered">Yetkazildi</SelectItem>
-                        <SelectItem value="cancelled">Bekor qilindi</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="flex items-center gap-2">
+                      <Select value={order.status} onValueChange={(value) => updateOrderStatus(order.id, value)}>
+                        <SelectTrigger className="w-[140px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pending">Kutilmoqda</SelectItem>
+                          <SelectItem value="processing">Tayyorlanmoqda</SelectItem>
+                          <SelectItem value="shipped">Jo'natildi</SelectItem>
+                          <SelectItem value="out_for_delivery">Yetkazilmoqda</SelectItem>
+                          <SelectItem value="delivered">Yetkazildi</SelectItem>
+                          <SelectItem value="cancelled">Bekor qilindi</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      
+                      {!isDelivered && order.status !== 'cancelled' && (
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              <Key className="h-4 w-4" />
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>OTP Yetkazib berish tasdiqi</DialogTitle>
+                            </DialogHeader>
+                            <DeliveryOTPGenerator
+                              orderId={order.id}
+                              orderNumber={order.order_number}
+                              currentOTP={order.delivery_otp}
+                              otpExpiresAt={order.delivery_otp_expires_at}
+                              isDelivered={!!order.delivery_confirmed_at}
+                              onOTPGenerated={handleOTPGenerated}
+                            />
+                          </DialogContent>
+                        </Dialog>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               );
