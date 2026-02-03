@@ -1,16 +1,15 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useCategories } from '@/hooks/useCategories';
 import { supabase } from '@/integrations/supabase/client';
 import { ProductCard } from '@/components/marketplace/ProductCard';
-import { Input } from '@/components/ui/input';
+import { SearchAutocomplete } from '@/components/marketplace/SearchAutocomplete';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
-  Search, 
-  Filter, 
   Package,
   X,
   SlidersHorizontal
@@ -37,16 +36,26 @@ type Product = Tables<'products'> & { shop?: { name: string; slug: string } };
 export default function Marketplace() {
   const { t } = useLanguage();
   const { categories } = useCategories();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQueryState] = useState(searchParams.get('search') || '');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [priceRange, setPriceRange] = useState([0, 10000000]);
   const [sortBy, setSortBy] = useState('newest');
 
+  const setSearchQuery = (query: string) => {
+    setSearchQueryState(query);
+    if (query) {
+      setSearchParams({ search: query });
+    } else {
+      setSearchParams({});
+    }
+  };
+
   useEffect(() => {
     fetchProducts();
-  }, [selectedCategory, sortBy]);
+  }, [selectedCategory, sortBy, searchQuery]);
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -61,6 +70,11 @@ export default function Marketplace() {
 
     if (selectedCategory && selectedCategory !== 'all') {
       query = query.eq('category_id', selectedCategory);
+    }
+
+    // Search in database
+    if (searchQuery) {
+      query = query.ilike('name', `%${searchQuery}%`);
     }
 
     // Sorting
@@ -88,9 +102,8 @@ export default function Marketplace() {
   };
 
   const filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesPrice = product.price >= priceRange[0] && product.price <= priceRange[1];
-    return matchesSearch && matchesPrice;
+    return matchesPrice;
   });
 
   const formatPrice = (price: number) => {
@@ -119,15 +132,10 @@ export default function Marketplace() {
 
         {/* Search and Filters */}
         <div className="flex flex-col lg:flex-row gap-4 mb-8">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder={t.search + '...'}
-              className="pl-10"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
+          <SearchAutocomplete 
+            className="flex-1"
+            onSearch={(q) => setSearchQuery(q)}
+          />
           
           <div className="flex gap-2">
             <Select value={sortBy} onValueChange={setSortBy}>
