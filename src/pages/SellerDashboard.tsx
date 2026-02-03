@@ -14,6 +14,7 @@ import { ProductList } from '@/components/seller/ProductList';
 import { ProductForm } from '@/components/seller/ProductForm';
 import { DropshippingImport } from '@/components/seller/DropshippingImport';
 import { DropshippingProducts } from '@/components/seller/DropshippingProducts';
+import { SellerAnalytics } from '@/components/seller/SellerAnalytics';
 import {
   Sheet,
   SheetContent,
@@ -22,7 +23,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { toast } from 'sonner';
-import { Store, Package, TrendingUp, Eye, ExternalLink, Loader2, Truck } from 'lucide-react';
+import { Store, Package, TrendingUp, Eye, ExternalLink, Loader2, Truck, BarChart3 } from 'lucide-react';
 import type { Tables, TablesInsert } from '@/integrations/supabase/types';
 
 type Product = Tables<'products'>;
@@ -129,8 +130,54 @@ export default function SellerDashboard() {
           </Button>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+        {/* Main Content */}
+        <Tabs defaultValue="analytics" className="space-y-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <TabsList>
+              <TabsTrigger value="analytics" className="gap-2">
+                <BarChart3 className="h-4 w-4" />
+                <span className="hidden sm:inline">Analitika</span>
+              </TabsTrigger>
+              <TabsTrigger value="products" className="gap-2">
+                <Package className="h-4 w-4" />
+                <span className="hidden sm:inline">{t.products}</span>
+              </TabsTrigger>
+              <TabsTrigger value="dropshipping" className="gap-2">
+                <Truck className="h-4 w-4" />
+                <span className="hidden sm:inline">Dropshipping</span>
+              </TabsTrigger>
+            </TabsList>
+            <AddProductDialog shopId={shop.id} onSubmit={handleCreateProduct} />
+          </div>
+
+          <TabsContent value="analytics">
+            <SellerAnalytics shopId={shop.id} />
+          </TabsContent>
+
+          <TabsContent value="products">
+            <ProductList
+              products={products}
+              loading={productsLoading}
+              onEdit={setEditingProduct}
+              onDelete={handleDeleteProduct}
+              onRefresh={refetchProducts}
+            />
+          </TabsContent>
+
+          <TabsContent value="dropshipping" className="space-y-6">
+            <DropshippingImport 
+              shopId={shop.id} 
+              onProductImported={handleDropshippingImported} 
+            />
+            <DropshippingProducts 
+              shopId={shop.id} 
+              refreshTrigger={dropshippingRefresh} 
+            />
+          </TabsContent>
+        </Tabs>
+
+        {/* Old Stats - Keeping as quick reference */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-8">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -197,51 +244,6 @@ export default function SellerDashboard() {
             </CardContent>
           </Card>
         </div>
-
-        {/* Main Content */}
-        <Tabs defaultValue="products" className="space-y-4">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <TabsList>
-              <TabsTrigger value="products">{t.products}</TabsTrigger>
-              <TabsTrigger value="dropshipping">Dropshipping</TabsTrigger>
-              <TabsTrigger value="settings">{t.shopSettings}</TabsTrigger>
-            </TabsList>
-            <AddProductDialog shopId={shop.id} onSubmit={handleCreateProduct} />
-          </div>
-
-          <TabsContent value="products">
-            <ProductList
-              products={products}
-              loading={productsLoading}
-              onEdit={setEditingProduct}
-              onDelete={handleDeleteProduct}
-              onRefresh={refetchProducts}
-            />
-          </TabsContent>
-
-          <TabsContent value="dropshipping" className="space-y-6">
-            <DropshippingImport 
-              shopId={shop.id} 
-              onProductImported={handleDropshippingImported} 
-            />
-            <DropshippingProducts 
-              shopId={shop.id} 
-              refreshTrigger={dropshippingRefresh} 
-            />
-          </TabsContent>
-
-          <TabsContent value="settings">
-            <Card>
-              <CardHeader>
-                <CardTitle>{t.shopSettings}</CardTitle>
-                <CardDescription>Do'kon sozlamalarini tahrirlash</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">Tez orada...</p>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
 
         {/* Edit Product Sheet */}
         <Sheet open={!!editingProduct} onOpenChange={() => setEditingProduct(null)}>
