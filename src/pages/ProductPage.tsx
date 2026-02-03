@@ -9,6 +9,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ProductReviews } from '@/components/reviews/ProductReviews';
+import { StarRating } from '@/components/reviews/StarRating';
+import { useProductRating } from '@/hooks/useReviews';
 import { 
   ShoppingCart, 
   Heart, 
@@ -36,6 +39,7 @@ export default function ProductPage() {
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [currentImage, setCurrentImage] = useState(0);
+  const { data: ratingData } = useProductRating(id || '');
 
   useEffect(() => {
     if (id) {
@@ -185,6 +189,16 @@ export default function ProductPage() {
                 <Badge className="bg-destructive mb-2">-{discount}%</Badge>
               )}
               <h1 className="text-3xl font-bold">{product.name}</h1>
+              
+              {/* Rating */}
+              <div className="flex items-center gap-2 mt-2">
+                <StarRating 
+                  rating={ratingData?.average_rating || 0} 
+                  showValue 
+                  totalReviews={Number(ratingData?.total_reviews) || 0}
+                />
+              </div>
+
               {product.shop && (
                 <Link 
                   to={`/shop/${product.shop.slug}`}
@@ -267,6 +281,11 @@ export default function ProductPage() {
               </CardContent>
             </Card>
           </div>
+        </div>
+
+        {/* Reviews Section */}
+        <div className="mt-12">
+          <ProductReviews productId={product.id} />
         </div>
       </div>
     </Layout>
