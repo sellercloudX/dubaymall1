@@ -3,6 +3,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { NotificationsDropdown } from '@/components/notifications/NotificationsDropdown';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ShoppingBag, ShoppingCart, User, LogOut, Menu, X, Shield, Heart } from 'lucide-react';
@@ -80,11 +81,14 @@ export function Navbar() {
             <LanguageSwitcher />
             
             {user && (
-              <Link to="/favorites">
-                <Button variant="ghost" size="icon">
-                  <Heart className="h-5 w-5" />
-                </Button>
-              </Link>
+              <>
+                <NotificationsDropdown />
+                <Link to="/favorites">
+                  <Button variant="ghost" size="icon">
+                    <Heart className="h-5 w-5" />
+                  </Button>
+                </Link>
+              </>
             )}
             
             <Link to="/cart" className="relative">
