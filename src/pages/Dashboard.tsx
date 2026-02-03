@@ -155,7 +155,7 @@ export default function Dashboard() {
                   </Button>
                 )}
                 {isSeller && (
-                  <Button variant="outline" className="w-full">
+                  <Button variant="outline" className="w-full" onClick={() => navigate('/seller')}>
                     Do'konni boshqarish
                   </Button>
                 )}
