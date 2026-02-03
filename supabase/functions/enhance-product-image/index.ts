@@ -25,82 +25,81 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    console.log("Generating infographic product image for:", productName, "category:", category);
+    console.log("Generating visual infographic product image for:", productName, "category:", category);
 
-    // Category-specific infographic styles
+    // Category-specific visual infographic styles - NO TEXT to avoid spelling errors
     const categoryPrompts: Record<string, string> = {
       // Cosmetics & Beauty
-      "cosmetics": `Create a MARKETPLACE INFOGRAPHIC image for cosmetics product "${productName}".
-STYLE: Like Wildberries/Ozon/Uzum marketplace product cards
-MUST INCLUDE:
-- Large lifestyle photo showing product in use (lips, face, skin application)
-- Product packaging prominently displayed
-- 3-4 key benefits with checkmark icons (e.g., "✓ Long-lasting", "✓ Moisturizing")
-- "100% Original" or quality badge
-- Soft pink/purple gradient background
-- Product name and variant number
-- Brand logo placement
-AESTHETIC: Feminine, luxurious, clean typography`,
+      "cosmetics": `Create a VISUAL MARKETPLACE INFOGRAPHIC for cosmetics product.
+COMPOSITION (NO TEXT - VISUAL ONLY):
+- Main: Product bottle/packaging on elegant white pedestal or platform
+- Background: Soft gradient (pink/peach/cream) with bokeh effects
+- Decorative elements: Fresh fruits (oranges, lemons), flower petals, water droplets, leaves
+- Show product ingredients visually: citrus slices, vitamin capsules, honey drops
+- Add lifestyle element: Beautiful model face/lips/skin in corner using the product
+- Include: Glass serum droplets, golden particles, sparkles for luxury feel
+- NO TEXT, NO WORDS, NO LETTERS - pure visual storytelling
+AESTHETIC: Luxurious, feminine, fresh, natural ingredients visible`,
 
       // Electronics
-      "electronics": `Create a MARKETPLACE INFOGRAPHIC image for electronics product "${productName}".
-STYLE: Like Wildberries/Ozon/Uzum marketplace product cards
-MUST INCLUDE:
-- Product from multiple angles or with key feature callouts
-- Technical specs highlighted (battery life, screen size, etc.)
-- 3-4 key features with icons
-- "Original" quality badge
-- Dark/tech-inspired gradient background (blue, black, silver)
-- Clean modern typography
-AESTHETIC: Premium tech, professional, feature-focused`,
+      "electronics": `Create a VISUAL MARKETPLACE INFOGRAPHIC for electronics product.
+COMPOSITION (NO TEXT - VISUAL ONLY):
+- Main: Product displayed on sleek platform with dramatic lighting
+- Background: Dark gradient (deep blue, black, silver) with tech glow effects
+- Show multiple angles of the product in composition
+- Add: Light trails, circuit patterns, neon accents, reflection effects
+- Include visual size comparison if relevant (coin, hand silhouette)
+- Add: Charging lightning bolt icon, battery visual, signal waves
+- NO TEXT, NO WORDS, NO LETTERS - pure visual demonstration
+AESTHETIC: Premium tech, futuristic, professional, high-end`,
 
       // Clothing & Fashion
-      "clothing": `Create a MARKETPLACE INFOGRAPHIC image for fashion product "${productName}".
-STYLE: Like Wildberries/Ozon/Uzum marketplace product cards
-MUST INCLUDE:
-- Product worn by model or displayed elegantly
-- Material/fabric callouts
-- Size range indicator
-- 3-4 key features (breathable, cotton, etc.)
-- Lifestyle context
-- Clean neutral or brand-colored background
-AESTHETIC: Stylish, aspirational, clear product details`,
+      "clothing": `Create a VISUAL MARKETPLACE INFOGRAPHIC for fashion product.
+COMPOSITION (NO TEXT - VISUAL ONLY):
+- Main: Product displayed elegantly or worn by model
+- Background: Clean neutral tones or lifestyle setting
+- Show fabric texture close-up in corner
+- Add: Hangers, fashion accessories, styling elements
+- Include lifestyle context (outfit combination ideas)
+- Multiple views: front, detail, styling suggestion
+- NO TEXT, NO WORDS, NO LETTERS - pure visual presentation
+AESTHETIC: Stylish, aspirational, editorial fashion photography`,
 
       // Food & Beverages
-      "food": `Create a MARKETPLACE INFOGRAPHIC image for food product "${productName}".
-STYLE: Like Wildberries/Ozon/Uzum marketplace product cards
-MUST INCLUDE:
-- Appetizing product presentation
-- Ingredients or nutrition highlights
-- "Natural", "Halal", "Fresh" badges as relevant
-- 3-4 key benefits with icons
-- Warm, appetizing color palette
-- Product packaging clearly visible
-AESTHETIC: Fresh, appetizing, trustworthy`,
+      "food": `Create a VISUAL MARKETPLACE INFOGRAPHIC for food product.
+COMPOSITION (NO TEXT - VISUAL ONLY):
+- Main: Product packaging with appetizing presentation
+- Background: Warm, inviting colors with natural elements
+- Show ingredients: fresh fruits, vegetables, grains around product
+- Add: Steam effects, water droplets for freshness
+- Include: Serving suggestion, recipe idea visualization
+- Natural elements: wooden surface, leaves, raw ingredients
+- NO TEXT, NO WORDS, NO LETTERS - pure appetite appeal
+AESTHETIC: Fresh, organic, appetizing, trustworthy`,
 
       // Home & Kitchen
-      "home": `Create a MARKETPLACE INFOGRAPHIC image for home product "${productName}".
-STYLE: Like Wildberries/Ozon/Uzum marketplace product cards
-MUST INCLUDE:
-- Product in home context/lifestyle setting
-- Dimensions or size comparison
-- 3-4 key features with icons
-- Quality/durability badges
-- Clean, modern background
-- Multiple product views if helpful
-AESTHETIC: Cozy, practical, quality-focused`,
+      "home": `Create a VISUAL MARKETPLACE INFOGRAPHIC for home product.
+COMPOSITION (NO TEXT - VISUAL ONLY):
+- Main: Product in beautiful home/lifestyle setting
+- Background: Cozy interior, natural light
+- Show product in use scenario
+- Add: Complementary home decor elements
+- Include size reference (hand, common objects)
+- Multiple angles or before/after visual
+- NO TEXT, NO WORDS, NO LETTERS - pure lifestyle visualization
+AESTHETIC: Cozy, practical, aspirational home style`,
 
       // Default for any category
-      "default": `Create a MARKETPLACE INFOGRAPHIC image for product "${productName}".
-STYLE: Professional Wildberries/Ozon/Uzum marketplace product card
-MUST INCLUDE:
-- Product prominently displayed with lifestyle context
-- 3-4 key benefits/features with checkmark or bullet icons
-- "100% Original" quality badge
-- Clean professional background with subtle gradient
-- Clear product presentation from best angle
-- Space for key selling points
-AESTHETIC: Professional, trustworthy, sales-optimized`
+      "default": `Create a VISUAL MARKETPLACE INFOGRAPHIC for product.
+COMPOSITION (NO TEXT - VISUAL ONLY):
+- Main: Product prominently displayed on elegant platform/pedestal
+- Background: Clean gradient with professional lighting
+- Add lifestyle context and usage scenario
+- Include decorative elements related to product category
+- Show product from best angle with detail shots
+- Add: Sparkles, light effects, reflections for premium feel
+- NO TEXT, NO WORDS, NO LETTERS - pure visual selling
+AESTHETIC: Professional, premium, sales-optimized visual`
     };
 
     // Determine which prompt to use based on category
@@ -109,16 +108,14 @@ AESTHETIC: Professional, trustworthy, sales-optimized`
 
     const prompt = `${categoryPrompt}
 
-Product: "${productName}"
-${productDescription ? `Description: ${productDescription}` : ''}
-
 CRITICAL RULES:
-- This must look like a professional MARKETPLACE INFOGRAPHIC, not just a product photo
-- Include text overlays with features/benefits - USE CORRECT SPELLING in Russian or Uzbek (no typos!)
-- Add visual badges and icons
-- Make it sales-optimized for e-commerce
-- The final image should make customers want to buy immediately
-- IMPORTANT: Double-check all text for spelling accuracy before generating`;
+- ABSOLUTELY NO TEXT, NO WORDS, NO LETTERS, NO NUMBERS on the image
+- DO NOT add any text overlays, labels, badges with text, or typography
+- Focus ONLY on beautiful visual composition
+- Use icons/symbols ONLY if they have no text
+- Make it look like a premium marketplace product photo collage
+- The visual elements should tell the product story without any words
+- Final image must be 100% text-free`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
