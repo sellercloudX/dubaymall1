@@ -8,6 +8,7 @@ import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { CartProvider } from "@/contexts/CartContext";
 import { PageLoader } from "@/components/PageLoader";
+import { InstallPWA } from "@/components/InstallPWA";
 
 // Lazy load pages for code splitting
 const Index = lazy(() => import("./pages/Index"));
@@ -44,6 +45,7 @@ function App() {
             <TooltipProvider>
               <Toaster />
               <Sonner />
+              <InstallPWA />
               <BrowserRouter>
                 <Suspense fallback={<PageLoader />}>
                   <Routes>

@@ -2,12 +2,19 @@
 <html lang="uz">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>SuperEshop Hub - O'zbekiston onlayn bozori</title>
     <meta name="description" content="O'zbekistonning eng yirik onlayn savdo platformasi. Minglab mahsulotlar, ishonchli sotuvchilar va tez yetkazib berish. Payme, Click, Uzcard orqali to'lang." />
     <meta name="author" content="SuperEshop Hub" />
     <meta name="robots" content="index, follow" />
     <meta name="keywords" content="online shopping, e-commerce, uzbekistan, onlayn savdo, internet do'kon, mahsulotlar, sotuvchi, xaridor" />
+    
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="SuperEshop" />
     
     <!-- Canonical URL -->
     <link rel="canonical" href="https://supereshop.uz" />
@@ -41,5 +48,19 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Register Service Worker
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((registration) => {
+              console.log('SW registered:', registration.scope);
+            })
+            .catch((error) => {
+              console.log('SW registration failed:', error);
+            });
+        });
+      }
+    </script>
   </body>
 </html>
