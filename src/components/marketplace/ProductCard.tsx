@@ -2,11 +2,13 @@ import { Link } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useFavorites } from '@/hooks/useFavorites';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ShoppingCart, Heart, Package } from 'lucide-react';
+import { ShoppingCart, Heart, Package, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useState } from 'react';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Product = Tables<'products'>;
@@ -19,6 +21,8 @@ export function ProductCard({ product }: ProductCardProps) {
   const { t } = useLanguage();
   const { addToCart } = useCart();
   const { user } = useAuth();
+  const { isFavorite, toggleFavorite } = useFavorites();
+  const [favoriteLoading, setFavoriteLoading] = useState(false);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('uz-UZ').format(price) + " so'm";
@@ -37,9 +41,30 @@ export function ProductCard({ product }: ProductCardProps) {
     toast.success(t.addedToCart || 'Savatchaga qo\'shildi');
   };
 
+  const handleToggleFavorite = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!user) {
+      toast.error('Sevimlilarga qo\'shish uchun tizimga kiring');
+      return;
+    }
+
+    setFavoriteLoading(true);
+    const isCurrentlyFavorite = isFavorite(product.id);
+    const success = await toggleFavorite(product.id);
+    
+    if (success) {
+      toast.success(isCurrentlyFavorite ? 'Sevimlilardan o\'chirildi' : 'Sevimlilarga qo\'shildi');
+    }
+    setFavoriteLoading(false);
+  };
+
   const discount = product.original_price && product.original_price > product.price
     ? Math.round((1 - product.price / product.original_price) * 100)
     : null;
+
+  const isProductFavorite = isFavorite(product.id);
 
   return (
     <Link to={`/product/${product.id}`}>
@@ -66,13 +91,17 @@ export function ProductCard({ product }: ProductCardProps) {
           <Button
             variant="ghost"
             size="icon"
-            className="absolute top-2 right-2 bg-background/80 hover:bg-background"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-            }}
+            className={`absolute top-2 right-2 bg-background/80 hover:bg-background ${
+              isProductFavorite ? 'text-destructive' : ''
+            }`}
+            onClick={handleToggleFavorite}
+            disabled={favoriteLoading}
           >
-            <Heart className="h-4 w-4" />
+            {favoriteLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Heart className={`h-4 w-4 ${isProductFavorite ? 'fill-current' : ''}`} />
+            )}
           </Button>
         </CardHeader>
         <CardContent className="p-4">

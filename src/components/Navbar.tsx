@@ -5,7 +5,7 @@ import { useCart } from '@/contexts/CartContext';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ShoppingBag, ShoppingCart, User, LogOut, Menu, X, Shield } from 'lucide-react';
+import { ShoppingBag, ShoppingCart, User, LogOut, Menu, X, Shield, Heart } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -78,6 +78,15 @@ export function Navbar() {
           {/* Right Side */}
           <div className="hidden md:flex items-center gap-4">
             <LanguageSwitcher />
+            
+            {/* Favorites */}
+            {user && (
+              <Link to="/favorites">
+                <Button variant="ghost" size="icon">
+                  <Heart className="h-5 w-5" />
+                </Button>
+              </Link>
+            )}
             
             {/* Cart */}
             <Link to="/cart" className="relative">
@@ -179,6 +188,18 @@ export function Navbar() {
               
               <div className="border-t pt-4 flex flex-col gap-2">
                 <LanguageSwitcher />
+                
+                {/* Mobile Favorites */}
+                {user && (
+                  <Link 
+                    to="/favorites" 
+                    className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <Heart className="h-4 w-4" />
+                    Sevimlilar
+                  </Link>
+                )}
                 
                 {/* Mobile Cart */}
                 <Link 
