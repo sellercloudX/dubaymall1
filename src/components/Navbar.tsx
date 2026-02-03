@@ -40,13 +40,13 @@ export function Navbar() {
   };
 
   return (
-    <nav className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <nav className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 safe-area-top">
       <div className="container mx-auto px-4">
-        <div className="flex h-16 items-center justify-between">
+        <div className="flex h-14 md:h-16 items-center justify-between">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2">
-            <ShoppingBag className="h-8 w-8 text-primary" />
-            <span className="text-xl font-bold text-foreground">{t.appName}</span>
+            <ShoppingBag className="h-7 w-7 md:h-8 md:w-8 text-primary" />
+            <span className="text-lg md:text-xl font-bold text-foreground">{t.appName}</span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -75,11 +75,10 @@ export function Navbar() {
             )}
           </div>
 
-          {/* Right Side */}
+          {/* Right Side - Desktop */}
           <div className="hidden md:flex items-center gap-4">
             <LanguageSwitcher />
             
-            {/* Favorites */}
             {user && (
               <Link to="/favorites">
                 <Button variant="ghost" size="icon">
@@ -88,7 +87,6 @@ export function Navbar() {
               </Link>
             )}
             
-            {/* Cart */}
             <Link to="/cart" className="relative">
               <Button variant="ghost" size="icon">
                 <ShoppingCart className="h-5 w-5" />
@@ -126,108 +124,69 @@ export function Navbar() {
             )}
           </div>
 
-          {/* Mobile Menu Button */}
-          <button
-            className="md:hidden p-2"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          >
-            {mobileMenuOpen ? (
-              <X className="h-6 w-6" />
-            ) : (
-              <Menu className="h-6 w-6" />
-            )}
-          </button>
+          {/* Mobile - Right side */}
+          <div className="flex md:hidden items-center gap-2">
+            <LanguageSwitcher />
+            <button
+              className="p-2"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            >
+              {mobileMenuOpen ? (
+                <X className="h-5 w-5" />
+              ) : (
+                <Menu className="h-5 w-5" />
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
           <div className="md:hidden py-4 border-t animate-fade-in">
-            <div className="flex flex-col gap-4">
-              <Link
-                to="/"
-                className="text-muted-foreground hover:text-foreground transition-colors"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                {t.home}
-              </Link>
-              <Link
-                to="/marketplace"
-                className="text-muted-foreground hover:text-foreground transition-colors"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                {t.marketplace}
-              </Link>
+            <div className="flex flex-col gap-3">
               {user && (
                 <>
                   <Link
                     to="/seller"
-                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     {t.myShop}
                   </Link>
                   <Link
                     to="/blogger"
-                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    Blogger
+                    Blogger Panel
                   </Link>
                   {isAdmin && (
                     <Link
                       to="/admin"
-                      className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+                      className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2 py-2"
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       <Shield className="h-4 w-4" />
-                      Admin
+                      Admin Panel
                     </Link>
                   )}
                 </>
               )}
               
-              <div className="border-t pt-4 flex flex-col gap-2">
-                <LanguageSwitcher />
-                
-                {/* Mobile Favorites */}
-                {user && (
-                  <Link 
-                    to="/favorites" 
-                    className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <Heart className="h-4 w-4" />
-                    Sevimlilar
-                  </Link>
-                )}
-                
-                {/* Mobile Cart */}
-                <Link 
-                  to="/cart" 
-                  className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <ShoppingCart className="h-4 w-4" />
-                  {t.cart}
-                  {totalItems > 0 && (
-                    <Badge className="ml-auto">{totalItems}</Badge>
-                  )}
-                </Link>
-                
+              <div className="border-t pt-3 mt-2">
                 {user ? (
-                  <>
-                    <Button variant="ghost" size="sm" asChild>
-                      <Link to="/dashboard" onClick={() => setMobileMenuOpen(false)}>
-                        {t.dashboard}
-                      </Link>
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={handleSignOut}>
-                      {t.logout}
-                    </Button>
-                  </>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => { handleSignOut(); setMobileMenuOpen(false); }}
+                    className="w-full justify-start gap-2 text-destructive"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    {t.logout}
+                  </Button>
                 ) : (
-                  <>
-                    <Button variant="ghost" size="sm" asChild>
+                  <div className="flex flex-col gap-2">
+                    <Button variant="outline" size="sm" asChild>
                       <Link to="/auth" onClick={() => setMobileMenuOpen(false)}>
                         {t.login}
                       </Link>
@@ -237,7 +196,7 @@ export function Navbar() {
                         {t.register}
                       </Link>
                     </Button>
-                  </>
+                  </div>
                 )}
               </div>
             </div>
