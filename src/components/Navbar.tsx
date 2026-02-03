@@ -5,8 +5,9 @@ import { useCart } from '@/contexts/CartContext';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ShoppingBag, ShoppingCart, User, LogOut, Menu, X } from 'lucide-react';
-import { useState } from 'react';
+import { ShoppingBag, ShoppingCart, User, LogOut, Menu, X, Shield } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 
 export function Navbar() {
   const { t } = useLanguage();
@@ -14,6 +15,24 @@ export function Navbar() {
   const { totalItems } = useCart();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    const checkAdmin = async () => {
+      if (!user) {
+        setIsAdmin(false);
+        return;
+      }
+      const { data } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .maybeSingle();
+      setIsAdmin(!!data);
+    };
+    checkAdmin();
+  }, [user]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -46,6 +65,12 @@ export function Navbar() {
                 <Link to="/blogger" className="text-muted-foreground hover:text-foreground transition-colors">
                   Blogger
                 </Link>
+                {isAdmin && (
+                  <Link to="/admin" className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+                    <Shield className="h-4 w-4" />
+                    Admin
+                  </Link>
+                )}
               </>
             )}
           </div>
@@ -139,6 +164,16 @@ export function Navbar() {
                   >
                     Blogger
                   </Link>
+                  {isAdmin && (
+                    <Link
+                      to="/admin"
+                      className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <Shield className="h-4 w-4" />
+                      Admin
+                    </Link>
+                  )}
                 </>
               )}
               

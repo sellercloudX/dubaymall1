@@ -12,6 +12,7 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Marketplace from "./pages/Marketplace";
 import SellerDashboard from "./pages/SellerDashboard";
+import AdminDashboard from "./pages/AdminDashboard";
 import ShopPage from "./pages/ShopPage";
 import ProductPage from "./pages/ProductPage";
 import CartPage from "./pages/CartPage";
@@ -36,6 +37,7 @@ function App() {
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/seller" element={<SellerDashboard />} />
+                  <Route path="/admin" element={<AdminDashboard />} />
                   <Route path="/shop/:slug" element={<ShopPage />} />
                   <Route path="/marketplace" element={<Marketplace />} />
                   <Route path="/product/:id" element={<ProductPage />} />
