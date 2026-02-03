@@ -116,6 +116,17 @@ export default function CheckoutPage() {
 
       if (itemsError) throw itemsError;
 
+      // Calculate order financials (platform commission, seller net, etc.)
+      try {
+        await supabase.rpc('calculate_order_financials', {
+          p_order_id: order.id,
+          p_platform_commission_percent: 5 // Default 5%, can be dynamic from platform_settings
+        });
+      } catch (finError) {
+        console.error('Financial calculation error:', finError);
+        // Don't fail order if financial calc fails
+      }
+
       // If online payment, show payment modal
       if (isOnlinePayment) {
         setPendingOrder({ id: order.id, orderNumber: orderNum });
