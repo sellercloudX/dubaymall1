@@ -5,6 +5,18 @@ export const translations = {
     // Common
     appName: 'SuperEshop Hub',
     tagline: 'O\'zbekiston va Markaziy Osiyo uchun e-commerce platforma',
+    save: 'Saqlash',
+    cancel: 'Bekor qilish',
+    delete: 'O\'chirish',
+    edit: 'Tahrirlash',
+    add: 'Qo\'shish',
+    search: 'Qidirish',
+    filter: 'Filtr',
+    loading: 'Yuklanmoqda...',
+    noData: 'Ma\'lumot topilmadi',
+    success: 'Muvaffaqiyatli!',
+    error: 'Xatolik yuz berdi',
+    required: 'Majburiy maydon',
     
     // Navigation
     home: 'Bosh sahifa',
@@ -14,6 +26,8 @@ export const translations = {
     logout: 'Chiqish',
     dashboard: 'Boshqaruv paneli',
     profile: 'Profil',
+    myShop: 'Mening do\'konim',
+    myProducts: 'Mahsulotlarim',
     
     // Auth
     email: 'Email',
@@ -56,12 +70,71 @@ export const translations = {
     // Footer
     allRightsReserved: 'Barcha huquqlar himoyalangan',
     
+    // Shop
+    createShop: 'Do\'kon yaratish',
+    shopName: 'Do\'kon nomi',
+    shopDescription: 'Do\'kon haqida',
+    shopSlug: 'Do\'kon URL manzili',
+    shopLogo: 'Do\'kon logosi',
+    shopCreated: 'Do\'kon muvaffaqiyatli yaratildi!',
+    manageShop: 'Do\'konni boshqarish',
+    viewShop: 'Do\'konni ko\'rish',
+    shopSettings: 'Do\'kon sozlamalari',
+    noShop: 'Sizda hali do\'kon yo\'q',
+    createShopDesc: 'Do\'kon yarating va mahsulotlar sotishni boshlang',
+    
+    // Products
+    products: 'Mahsulotlar',
+    addProduct: 'Mahsulot qo\'shish',
+    productName: 'Mahsulot nomi',
+    productDescription: 'Mahsulot ta\'rifi',
+    productPrice: 'Narxi',
+    productOriginalPrice: 'Asl narxi',
+    productStock: 'Omborda',
+    productCategory: 'Kategoriya',
+    productImages: 'Rasmlar',
+    productStatus: 'Holati',
+    productCreated: 'Mahsulot qo\'shildi!',
+    productUpdated: 'Mahsulot yangilandi!',
+    productDeleted: 'Mahsulot o\'chirildi!',
+    
+    // Product Status
+    statusDraft: 'Qoralama',
+    statusActive: 'Faol',
+    statusInactive: 'Faol emas',
+    statusOutOfStock: 'Tugagan',
+    
+    // Product Source
+    sourceManual: 'Qo\'lda',
+    sourceAI: 'AI orqali',
+    sourceDropshipping: 'Dropshipping',
+    
+    // Add Product Methods
+    addManually: 'Qo\'lda qo\'shish',
+    addWithAI: 'AI orqali qo\'shish',
+    addDropshipping: 'Dropshipping import',
+    uploadImage: 'Rasm yuklash',
+    analyzeImage: 'Rasmni tahlil qilish',
+    aiSuggestion: 'AI tavsiyasi',
+    
+    // Affiliate
+    enableAffiliate: 'Affiliate rejimini yoqish',
+    commissionPercent: 'Komissiya foizi',
+    
+    // Stats
+    totalProducts: 'Jami mahsulotlar',
+    totalSales: 'Jami sotuvlar',
+    totalViews: 'Ko\'rishlar',
+    
     // Errors
     emailRequired: 'Email kiritish shart',
     passwordRequired: 'Parol kiritish shart',
     passwordMismatch: 'Parollar mos kelmadi',
     invalidEmail: 'Noto\'g\'ri email format',
     passwordTooShort: 'Parol kamida 6 ta belgidan iborat bo\'lishi kerak',
+    shopNameRequired: 'Do\'kon nomi kiritish shart',
+    productNameRequired: 'Mahsulot nomi kiritish shart',
+    priceRequired: 'Narx kiritish shart',
     
     // Success
     registrationSuccess: 'Ro\'yxatdan muvaffaqiyatli o\'tdingiz! Email tasdiqlang.',
@@ -71,6 +144,18 @@ export const translations = {
     // Common
     appName: 'SuperEshop Hub',
     tagline: 'E-commerce платформа для Узбекистана и Центральной Азии',
+    save: 'Сохранить',
+    cancel: 'Отмена',
+    delete: 'Удалить',
+    edit: 'Редактировать',
+    add: 'Добавить',
+    search: 'Поиск',
+    filter: 'Фильтр',
+    loading: 'Загрузка...',
+    noData: 'Данные не найдены',
+    success: 'Успешно!',
+    error: 'Произошла ошибка',
+    required: 'Обязательное поле',
     
     // Navigation
     home: 'Главная',
@@ -80,6 +165,8 @@ export const translations = {
     logout: 'Выход',
     dashboard: 'Панель управления',
     profile: 'Профиль',
+    myShop: 'Мой магазин',
+    myProducts: 'Мои товары',
     
     // Auth
     email: 'Email',
@@ -122,12 +209,71 @@ export const translations = {
     // Footer
     allRightsReserved: 'Все права защищены',
     
+    // Shop
+    createShop: 'Создать магазин',
+    shopName: 'Название магазина',
+    shopDescription: 'Описание магазина',
+    shopSlug: 'URL адрес магазина',
+    shopLogo: 'Логотип магазина',
+    shopCreated: 'Магазин успешно создан!',
+    manageShop: 'Управление магазином',
+    viewShop: 'Просмотр магазина',
+    shopSettings: 'Настройки магазина',
+    noShop: 'У вас пока нет магазина',
+    createShopDesc: 'Создайте магазин и начните продавать товары',
+    
+    // Products
+    products: 'Товары',
+    addProduct: 'Добавить товар',
+    productName: 'Название товара',
+    productDescription: 'Описание товара',
+    productPrice: 'Цена',
+    productOriginalPrice: 'Первоначальная цена',
+    productStock: 'На складе',
+    productCategory: 'Категория',
+    productImages: 'Изображения',
+    productStatus: 'Статус',
+    productCreated: 'Товар добавлен!',
+    productUpdated: 'Товар обновлен!',
+    productDeleted: 'Товар удален!',
+    
+    // Product Status
+    statusDraft: 'Черновик',
+    statusActive: 'Активный',
+    statusInactive: 'Неактивный',
+    statusOutOfStock: 'Нет в наличии',
+    
+    // Product Source
+    sourceManual: 'Вручную',
+    sourceAI: 'Через AI',
+    sourceDropshipping: 'Дропшиппинг',
+    
+    // Add Product Methods
+    addManually: 'Добавить вручную',
+    addWithAI: 'Добавить через AI',
+    addDropshipping: 'Импорт дропшиппинг',
+    uploadImage: 'Загрузить изображение',
+    analyzeImage: 'Анализировать изображение',
+    aiSuggestion: 'Предложение AI',
+    
+    // Affiliate
+    enableAffiliate: 'Включить партнерский режим',
+    commissionPercent: 'Процент комиссии',
+    
+    // Stats
+    totalProducts: 'Всего товаров',
+    totalSales: 'Всего продаж',
+    totalViews: 'Просмотров',
+    
     // Errors
     emailRequired: 'Email обязателен',
     passwordRequired: 'Пароль обязателен',
     passwordMismatch: 'Пароли не совпадают',
     invalidEmail: 'Неверный формат email',
     passwordTooShort: 'Пароль должен содержать минимум 6 символов',
+    shopNameRequired: 'Название магазина обязательно',
+    productNameRequired: 'Название товара обязательно',
+    priceRequired: 'Цена обязательна',
     
     // Success
     registrationSuccess: 'Регистрация успешна! Подтвердите email.',
@@ -137,6 +283,18 @@ export const translations = {
     // Common
     appName: 'SuperEshop Hub',
     tagline: 'E-commerce platform for Uzbekistan and Central Asia',
+    save: 'Save',
+    cancel: 'Cancel',
+    delete: 'Delete',
+    edit: 'Edit',
+    add: 'Add',
+    search: 'Search',
+    filter: 'Filter',
+    loading: 'Loading...',
+    noData: 'No data found',
+    success: 'Success!',
+    error: 'An error occurred',
+    required: 'Required field',
     
     // Navigation
     home: 'Home',
@@ -146,6 +304,8 @@ export const translations = {
     logout: 'Logout',
     dashboard: 'Dashboard',
     profile: 'Profile',
+    myShop: 'My Shop',
+    myProducts: 'My Products',
     
     // Auth
     email: 'Email',
@@ -188,12 +348,71 @@ export const translations = {
     // Footer
     allRightsReserved: 'All rights reserved',
     
+    // Shop
+    createShop: 'Create Shop',
+    shopName: 'Shop Name',
+    shopDescription: 'Shop Description',
+    shopSlug: 'Shop URL',
+    shopLogo: 'Shop Logo',
+    shopCreated: 'Shop created successfully!',
+    manageShop: 'Manage Shop',
+    viewShop: 'View Shop',
+    shopSettings: 'Shop Settings',
+    noShop: 'You don\'t have a shop yet',
+    createShopDesc: 'Create a shop and start selling products',
+    
+    // Products
+    products: 'Products',
+    addProduct: 'Add Product',
+    productName: 'Product Name',
+    productDescription: 'Product Description',
+    productPrice: 'Price',
+    productOriginalPrice: 'Original Price',
+    productStock: 'In Stock',
+    productCategory: 'Category',
+    productImages: 'Images',
+    productStatus: 'Status',
+    productCreated: 'Product added!',
+    productUpdated: 'Product updated!',
+    productDeleted: 'Product deleted!',
+    
+    // Product Status
+    statusDraft: 'Draft',
+    statusActive: 'Active',
+    statusInactive: 'Inactive',
+    statusOutOfStock: 'Out of Stock',
+    
+    // Product Source
+    sourceManual: 'Manual',
+    sourceAI: 'Via AI',
+    sourceDropshipping: 'Dropshipping',
+    
+    // Add Product Methods
+    addManually: 'Add Manually',
+    addWithAI: 'Add with AI',
+    addDropshipping: 'Dropshipping Import',
+    uploadImage: 'Upload Image',
+    analyzeImage: 'Analyze Image',
+    aiSuggestion: 'AI Suggestion',
+    
+    // Affiliate
+    enableAffiliate: 'Enable Affiliate Mode',
+    commissionPercent: 'Commission Percent',
+    
+    // Stats
+    totalProducts: 'Total Products',
+    totalSales: 'Total Sales',
+    totalViews: 'Views',
+    
     // Errors
     emailRequired: 'Email is required',
     passwordRequired: 'Password is required',
     passwordMismatch: 'Passwords do not match',
     invalidEmail: 'Invalid email format',
     passwordTooShort: 'Password must be at least 6 characters',
+    shopNameRequired: 'Shop name is required',
+    productNameRequired: 'Product name is required',
+    priceRequired: 'Price is required',
     
     // Success
     registrationSuccess: 'Registration successful! Please verify your email.',

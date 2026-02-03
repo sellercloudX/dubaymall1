@@ -14,6 +14,125 @@ export type Database = {
   }
   public: {
     Tables: {
+      categories: {
+        Row: {
+          created_at: string
+          icon: string | null
+          id: string
+          name_en: string
+          name_ru: string
+          name_uz: string
+          parent_id: string | null
+          slug: string
+        }
+        Insert: {
+          created_at?: string
+          icon?: string | null
+          id?: string
+          name_en: string
+          name_ru: string
+          name_uz: string
+          parent_id?: string | null
+          slug: string
+        }
+        Update: {
+          created_at?: string
+          icon?: string | null
+          id?: string
+          name_en?: string
+          name_ru?: string
+          name_uz?: string
+          parent_id?: string | null
+          slug?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "categories_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      products: {
+        Row: {
+          affiliate_commission_percent: number | null
+          category_id: string | null
+          created_at: string
+          description: string | null
+          id: string
+          images: string[] | null
+          is_affiliate_enabled: boolean | null
+          name: string
+          original_price: number | null
+          price: number
+          shop_id: string
+          source: Database["public"]["Enums"]["product_source"]
+          source_url: string | null
+          specifications: Json | null
+          status: Database["public"]["Enums"]["product_status"]
+          stock_quantity: number
+          updated_at: string
+          view_count: number | null
+        }
+        Insert: {
+          affiliate_commission_percent?: number | null
+          category_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          images?: string[] | null
+          is_affiliate_enabled?: boolean | null
+          name: string
+          original_price?: number | null
+          price: number
+          shop_id: string
+          source?: Database["public"]["Enums"]["product_source"]
+          source_url?: string | null
+          specifications?: Json | null
+          status?: Database["public"]["Enums"]["product_status"]
+          stock_quantity?: number
+          updated_at?: string
+          view_count?: number | null
+        }
+        Update: {
+          affiliate_commission_percent?: number | null
+          category_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          images?: string[] | null
+          is_affiliate_enabled?: boolean | null
+          name?: string
+          original_price?: number | null
+          price?: number
+          shop_id?: string
+          source?: Database["public"]["Enums"]["product_source"]
+          source_url?: string | null
+          specifications?: Json | null
+          status?: Database["public"]["Enums"]["product_status"]
+          stock_quantity?: number
+          updated_at?: string
+          view_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -46,6 +165,51 @@ export type Database = {
           preferred_language?:
             | Database["public"]["Enums"]["app_language"]
             | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      shops: {
+        Row: {
+          banner_url: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          logo_url: string | null
+          name: string
+          rating: number | null
+          slug: string
+          total_sales: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          banner_url?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          logo_url?: string | null
+          name: string
+          rating?: number | null
+          slug: string
+          total_sales?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          banner_url?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          logo_url?: string | null
+          name?: string
+          rating?: number | null
+          slug?: string
+          total_sales?: number | null
           updated_at?: string
           user_id?: string
         }
@@ -87,6 +251,8 @@ export type Database = {
     }
     Enums: {
       app_language: "uz" | "ru" | "en"
+      product_source: "manual" | "ai" | "dropshipping"
+      product_status: "draft" | "active" | "inactive" | "out_of_stock"
       user_role: "seller" | "blogger" | "buyer" | "admin"
     }
     CompositeTypes: {
@@ -216,6 +382,8 @@ export const Constants = {
   public: {
     Enums: {
       app_language: ["uz", "ru", "en"],
+      product_source: ["manual", "ai", "dropshipping"],
+      product_status: ["draft", "active", "inactive", "out_of_stock"],
       user_role: ["seller", "blogger", "buyer", "admin"],
     },
   },
