@@ -1,12 +1,40 @@
 import { Link } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Layout } from '@/components/Layout';
+import { SEOHead, StructuredData } from '@/components/SEOHead';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Store, Sparkles, Package, Users, ArrowRight, CheckCircle } from 'lucide-react';
 
 export default function Index() {
   const { t } = useLanguage();
+
+  const organizationData = {
+    name: 'SuperEshop Hub',
+    url: 'https://supereshop.uz',
+    logo: 'https://supereshop.uz/logo.png',
+    description: "O'zbekistonning eng yirik onlayn savdo platformasi",
+    address: {
+      '@type': 'PostalAddress',
+      addressCountry: 'UZ',
+      addressLocality: 'Toshkent',
+    },
+    contactPoint: {
+      '@type': 'ContactPoint',
+      contactType: 'customer service',
+      availableLanguage: ['uz', 'ru', 'en'],
+    },
+  };
+
+  const websiteData = {
+    name: 'SuperEshop Hub',
+    url: 'https://supereshop.uz',
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: 'https://supereshop.uz/marketplace?search={search_term_string}',
+      'query-input': 'required name=search_term_string',
+    },
+  };
 
   const features = [
     {
@@ -40,6 +68,13 @@ export default function Index() {
 
   return (
     <Layout>
+      <SEOHead 
+        title="SuperEshop Hub - O'zbekiston onlayn bozori"
+        description="O'zbekistonning eng yirik onlayn savdo platformasi. Minglab mahsulotlar, ishonchli sotuvchilar va tez yetkazib berish."
+      />
+      <StructuredData type="Organization" data={organizationData} />
+      <StructuredData type="WebSite" data={websiteData} />
+
       {/* Hero Section */}
       <section className="relative overflow-hidden bg-gradient-to-b from-primary/5 via-background to-background">
         <div className="container mx-auto px-4 py-20 md:py-32">
