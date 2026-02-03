@@ -38,6 +38,16 @@ export function Navbar() {
             <Link to="/marketplace" className="text-muted-foreground hover:text-foreground transition-colors">
               {t.marketplace}
             </Link>
+            {user && (
+              <>
+                <Link to="/seller" className="text-muted-foreground hover:text-foreground transition-colors">
+                  {t.myShop}
+                </Link>
+                <Link to="/blogger" className="text-muted-foreground hover:text-foreground transition-colors">
+                  Blogger
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Right Side */}
@@ -113,6 +123,24 @@ export function Navbar() {
               >
                 {t.marketplace}
               </Link>
+              {user && (
+                <>
+                  <Link
+                    to="/seller"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    {t.myShop}
+                  </Link>
+                  <Link
+                    to="/blogger"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Blogger
+                  </Link>
+                </>
+              )}
               
               <div className="border-t pt-4 flex flex-col gap-2">
                 <LanguageSwitcher />

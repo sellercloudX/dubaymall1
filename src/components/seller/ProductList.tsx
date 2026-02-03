@@ -3,6 +3,8 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
+import { Input } from '@/components/ui/input';
 import {
   Table,
   TableBody,
@@ -27,7 +29,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { MoreHorizontal, Edit, Trash2, Eye, Package } from 'lucide-react';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { MoreHorizontal, Edit, Trash2, Eye, Package, Users, Percent } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Product = Tables<'products'>;
@@ -37,11 +46,57 @@ interface ProductListProps {
   loading: boolean;
   onEdit: (product: Product) => void;
   onDelete: (id: string) => void;
+  onRefresh?: () => void;
 }
 
-export function ProductList({ products, loading, onEdit, onDelete }: ProductListProps) {
+export function ProductList({ products, loading, onEdit, onDelete, onRefresh }: ProductListProps) {
   const { t } = useLanguage();
+  const { toast } = useToast();
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [affiliateProduct, setAffiliateProduct] = useState<Product | null>(null);
+  const [commissionPercent, setCommissionPercent] = useState('15');
+
+  const handleAffiliateToggle = async (product: Product, enabled: boolean) => {
+    if (enabled) {
+      setAffiliateProduct(product);
+      setCommissionPercent(String(product.affiliate_commission_percent || 15));
+    } else {
+      const { error } = await supabase
+        .from('products')
+        .update({ is_affiliate_enabled: false, affiliate_commission_percent: null })
+        .eq('id', product.id);
+
+      if (error) {
+        toast({ title: 'Xatolik', description: error.message, variant: 'destructive' });
+      } else {
+        toast({ title: 'Muvaffaqiyatli', description: 'Affiliate o\'chirildi' });
+        onRefresh?.();
+      }
+    }
+  };
+
+  const saveAffiliateSettings = async () => {
+    if (!affiliateProduct) return;
+
+    const percent = parseInt(commissionPercent);
+    if (isNaN(percent) || percent < 5 || percent > 50) {
+      toast({ title: 'Xatolik', description: 'Komissiya 5-50% orasida bo\'lishi kerak', variant: 'destructive' });
+      return;
+    }
+
+    const { error } = await supabase
+      .from('products')
+      .update({ is_affiliate_enabled: true, affiliate_commission_percent: percent })
+      .eq('id', affiliateProduct.id);
+
+    if (error) {
+      toast({ title: 'Xatolik', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ title: 'Muvaffaqiyatli', description: 'Affiliate yoqildi' });
+      setAffiliateProduct(null);
+      onRefresh?.();
+    }
+  };
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
@@ -95,6 +150,7 @@ export function ProductList({ products, loading, onEdit, onDelete }: ProductList
               <TableHead>{t.productPrice}</TableHead>
               <TableHead>{t.productStock}</TableHead>
               <TableHead>{t.productStatus}</TableHead>
+              <TableHead className="text-center">Affiliate</TableHead>
               <TableHead className="w-[70px]"></TableHead>
             </TableRow>
           </TableHeader>
@@ -136,6 +192,19 @@ export function ProductList({ products, loading, onEdit, onDelete }: ProductList
                 </TableCell>
                 <TableCell>{product.stock_quantity}</TableCell>
                 <TableCell>{getStatusBadge(product.status)}</TableCell>
+                <TableCell className="text-center">
+                  <div className="flex items-center justify-center gap-2">
+                    <Switch
+                      checked={product.is_affiliate_enabled || false}
+                      onCheckedChange={(checked) => handleAffiliateToggle(product, checked)}
+                    />
+                    {product.is_affiliate_enabled && (
+                      <Badge variant="secondary" className="text-xs">
+                        {product.affiliate_commission_percent}%
+                      </Badge>
+                    )}
+                  </div>
+                </TableCell>
                 <TableCell>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -164,6 +233,7 @@ export function ProductList({ products, loading, onEdit, onDelete }: ProductList
         </Table>
       </Card>
 
+      {/* Delete Dialog */}
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -184,6 +254,43 @@ export function ProductList({ products, loading, onEdit, onDelete }: ProductList
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {t.delete}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Affiliate Settings Dialog */}
+      <AlertDialog open={!!affiliateProduct} onOpenChange={() => setAffiliateProduct(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Affiliate sozlamalari
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {affiliateProduct?.name} uchun komissiya foizini belgilang
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4">
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                min="5"
+                max="50"
+                value={commissionPercent}
+                onChange={(e) => setCommissionPercent(e.target.value)}
+                className="w-24"
+              />
+              <span className="text-muted-foreground">% komissiya</span>
+            </div>
+            <p className="text-sm text-muted-foreground mt-2">
+              Bloggerlar har sotuvdan {commissionPercent}% komissiya oladi
+            </p>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t.cancel}</AlertDialogCancel>
+            <AlertDialogAction onClick={saveAffiliateSettings}>
+              {t.save}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -14,6 +14,86 @@ export type Database = {
   }
   public: {
     Tables: {
+      affiliate_links: {
+        Row: {
+          blogger_id: string
+          clicks: number | null
+          conversions: number | null
+          created_at: string
+          id: string
+          is_active: boolean | null
+          link_code: string
+          product_id: string
+          total_commission: number | null
+          updated_at: string
+        }
+        Insert: {
+          blogger_id: string
+          clicks?: number | null
+          conversions?: number | null
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          link_code: string
+          product_id: string
+          total_commission?: number | null
+          updated_at?: string
+        }
+        Update: {
+          blogger_id?: string
+          clicks?: number | null
+          conversions?: number | null
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          link_code?: string
+          product_id?: string
+          total_commission?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "affiliate_links_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      blogger_balances: {
+        Row: {
+          available_balance: number | null
+          created_at: string
+          id: string
+          pending_balance: number | null
+          total_earned: number | null
+          total_withdrawn: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          available_balance?: number | null
+          created_at?: string
+          id?: string
+          pending_balance?: number | null
+          total_earned?: number | null
+          total_withdrawn?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          available_balance?: number | null
+          created_at?: string
+          id?: string
+          pending_balance?: number | null
+          total_earned?: number | null
+          total_withdrawn?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       cart_items: {
         Row: {
           created_at: string
@@ -86,6 +166,70 @@ export type Database = {
             columns: ["parent_id"]
             isOneToOne: false
             referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commissions: {
+        Row: {
+          affiliate_link_id: string | null
+          blogger_id: string
+          commission_amount: number
+          commission_percent: number
+          created_at: string
+          id: string
+          order_amount: number
+          order_id: string | null
+          paid_at: string | null
+          product_id: string | null
+          status: string | null
+        }
+        Insert: {
+          affiliate_link_id?: string | null
+          blogger_id: string
+          commission_amount: number
+          commission_percent: number
+          created_at?: string
+          id?: string
+          order_amount: number
+          order_id?: string | null
+          paid_at?: string | null
+          product_id?: string | null
+          status?: string | null
+        }
+        Update: {
+          affiliate_link_id?: string | null
+          blogger_id?: string
+          commission_amount?: number
+          commission_percent?: number
+          created_at?: string
+          id?: string
+          order_amount?: number
+          order_id?: string | null
+          paid_at?: string | null
+          product_id?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commissions_affiliate_link_id_fkey"
+            columns: ["affiliate_link_id"]
+            isOneToOne: false
+            referencedRelation: "affiliate_links"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commissions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commissions_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
         ]
@@ -426,11 +570,48 @@ export type Database = {
         }
         Relationships: []
       }
+      withdrawal_requests: {
+        Row: {
+          amount: number
+          blogger_id: string
+          created_at: string
+          id: string
+          notes: string | null
+          payment_details: Json | null
+          payment_method: string
+          processed_at: string | null
+          status: string | null
+        }
+        Insert: {
+          amount: number
+          blogger_id: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          payment_details?: Json | null
+          payment_method: string
+          processed_at?: string | null
+          status?: string | null
+        }
+        Update: {
+          amount?: number
+          blogger_id?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          payment_details?: Json | null
+          payment_method?: string
+          processed_at?: string | null
+          status?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      generate_affiliate_code: { Args: never; Returns: string }
       generate_order_number: { Args: never; Returns: string }
       has_role: {
         Args: {
@@ -438,6 +619,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      track_affiliate_click: {
+        Args: { p_link_code: string }
+        Returns: undefined
       }
     }
     Enums: {
