@@ -4,6 +4,7 @@ import { Layout } from '@/components/Layout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AdminStats } from '@/components/admin/AdminStats';
 import { AdminAnalytics } from '@/components/admin/AdminAnalytics';
+import { AdminFinancials } from '@/components/admin/AdminFinancials';
 import { UsersManagement } from '@/components/admin/UsersManagement';
 import { ProductsModeration } from '@/components/admin/ProductsModeration';
 import { ShopsManagement } from '@/components/admin/ShopsManagement';
@@ -11,7 +12,7 @@ import { OrdersManagement } from '@/components/admin/OrdersManagement';
 import MonetizationSettings from '@/components/admin/MonetizationSettings';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Shield, Users, Package, Store, ShoppingCart, BarChart3, DollarSign } from 'lucide-react';
+import { Shield, Users, Package, Store, ShoppingCart, BarChart3, DollarSign, Wallet } from 'lucide-react';
 
 export default function AdminDashboard() {
   const { user, loading } = useAuth();
@@ -92,10 +93,14 @@ export default function AdminDashboard() {
 
         {/* Management Tabs */}
         <Tabs defaultValue="analytics" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:inline-grid">
+          <TabsList className="grid w-full grid-cols-7 lg:w-auto lg:inline-grid">
             <TabsTrigger value="analytics" className="gap-2">
               <BarChart3 className="h-4 w-4" />
               <span className="hidden sm:inline">Analitika</span>
+            </TabsTrigger>
+            <TabsTrigger value="financials" className="gap-2">
+              <Wallet className="h-4 w-4" />
+              <span className="hidden sm:inline">Moliya</span>
             </TabsTrigger>
             <TabsTrigger value="monetization" className="gap-2">
               <DollarSign className="h-4 w-4" />
@@ -121,6 +126,10 @@ export default function AdminDashboard() {
 
           <TabsContent value="analytics">
             <AdminAnalytics />
+          </TabsContent>
+
+          <TabsContent value="financials">
+            <AdminFinancials />
           </TabsContent>
 
           <TabsContent value="monetization">

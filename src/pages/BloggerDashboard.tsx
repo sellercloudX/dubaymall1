@@ -11,6 +11,7 @@ import MyAffiliateLinks from '@/components/blogger/MyAffiliateLinks';
 import CommissionsHistory from '@/components/blogger/CommissionsHistory';
 import WithdrawalSection from '@/components/blogger/WithdrawalSection';
 import { BloggerAnalytics } from '@/components/blogger/BloggerAnalytics';
+import { BloggerBalanceCard } from '@/components/blogger/BloggerBalanceCard';
 import useBloggerStats from '@/hooks/useBloggerStats';
 
 export default function BloggerDashboard() {
@@ -116,8 +117,12 @@ export default function BloggerDashboard() {
         </div>
 
         {/* Main Content Tabs */}
-        <Tabs defaultValue="analytics" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-flex">
+        <Tabs defaultValue="balance" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:inline-flex">
+            <TabsTrigger value="balance" className="gap-2">
+              <Wallet className="h-4 w-4" />
+              <span className="hidden sm:inline">Balans</span>
+            </TabsTrigger>
             <TabsTrigger value="analytics" className="gap-2">
               <BarChart3 className="h-4 w-4" />
               <span className="hidden sm:inline">Analitika</span>
@@ -127,6 +132,10 @@ export default function BloggerDashboard() {
             <TabsTrigger value="commissions">Komissiyalar</TabsTrigger>
             <TabsTrigger value="withdraw">Yechib olish</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="balance">
+            <BloggerBalanceCard />
+          </TabsContent>
 
           <TabsContent value="analytics">
             <BloggerAnalytics />
