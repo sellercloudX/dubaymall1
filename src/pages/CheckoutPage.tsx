@@ -9,9 +9,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { PaymentMethods } from '@/components/payment/PaymentMethods';
+import { PaymentModal } from '@/components/payment/PaymentModal';
 import { toast } from 'sonner';
 import { 
   ShoppingCart, 
@@ -31,6 +32,8 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [orderNumber, setOrderNumber] = useState('');
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [pendingOrder, setPendingOrder] = useState<{ id: string; orderNumber: string } | null>(null);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -70,6 +73,10 @@ export default function CheckoutPage() {
       const orderNum = 'ORD-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-' + 
         Math.random().toString(36).substring(2, 8).toUpperCase();
 
+      // Determine payment status based on method
+      const isOnlinePayment = ['payme', 'click', 'uzcard'].includes(formData.paymentMethod);
+      const paymentStatus = isOnlinePayment ? 'pending' : 'cash_on_delivery';
+
       // Create order
       const { data: order, error: orderError } = await supabase
         .from('orders')
@@ -85,6 +92,7 @@ export default function CheckoutPage() {
             address: formData.address,
           },
           payment_method: formData.paymentMethod,
+          payment_status: paymentStatus,
           notes: formData.notes || null,
         })
         .select()
@@ -108,9 +116,16 @@ export default function CheckoutPage() {
 
       if (itemsError) throw itemsError;
 
-      // Clear cart
-      await clearCart();
+      // If online payment, show payment modal
+      if (isOnlinePayment) {
+        setPendingOrder({ id: order.id, orderNumber: orderNum });
+        setShowPaymentModal(true);
+        setLoading(false);
+        return;
+      }
 
+      // For cash payment, complete order
+      await clearCart();
       setOrderNumber(orderNum);
       setOrderSuccess(true);
       toast.success(t.orderSuccess || 'Buyurtma muvaffaqiyatli qabul qilindi!');
@@ -120,6 +135,26 @@ export default function CheckoutPage() {
       toast.error(error.message || t.error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePaymentSuccess = async () => {
+    if (!pendingOrder) return;
+
+    try {
+      // Update payment status
+      await supabase
+        .from('orders')
+        .update({ payment_status: 'paid' })
+        .eq('id', pendingOrder.id);
+
+      await clearCart();
+      setOrderNumber(pendingOrder.orderNumber);
+      setOrderSuccess(true);
+      setPendingOrder(null);
+      toast.success('To\'lov muvaffaqiyatli amalga oshirildi!');
+    } catch (error) {
+      console.error('Payment update error:', error);
     }
   };
 
@@ -281,39 +316,10 @@ export default function CheckoutPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <RadioGroup
+                  <PaymentMethods
                     value={formData.paymentMethod}
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, paymentMethod: value }))}
-                    className="space-y-3"
-                  >
-                    <div className="flex items-center space-x-3 p-3 border rounded-lg cursor-pointer hover:bg-muted/50">
-                      <RadioGroupItem value="cash" id="cash" />
-                      <Label htmlFor="cash" className="flex-1 cursor-pointer">
-                        <div className="font-medium">{t.cashOnDelivery || 'Naqd pul (yetkazib berishda)'}</div>
-                        <p className="text-sm text-muted-foreground">
-                          {t.cashOnDeliveryDesc || 'Mahsulotni qabul qilganda to\'laysiz'}
-                        </p>
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-3 p-3 border rounded-lg cursor-pointer hover:bg-muted/50">
-                      <RadioGroupItem value="payme" id="payme" />
-                      <Label htmlFor="payme" className="flex-1 cursor-pointer">
-                        <div className="font-medium">Payme</div>
-                        <p className="text-sm text-muted-foreground">
-                          {t.paymeDesc || 'Payme ilovasi orqali to\'lang'}
-                        </p>
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-3 p-3 border rounded-lg cursor-pointer hover:bg-muted/50">
-                      <RadioGroupItem value="click" id="click" />
-                      <Label htmlFor="click" className="flex-1 cursor-pointer">
-                        <div className="font-medium">Click</div>
-                        <p className="text-sm text-muted-foreground">
-                          {t.clickDesc || 'Click ilovasi orqali to\'lang'}
-                        </p>
-                      </Label>
-                    </div>
-                  </RadioGroup>
+                    onChange={(value) => setFormData(prev => ({ ...prev, paymentMethod: value }))}
+                  />
                 </CardContent>
               </Card>
             </div>
@@ -383,6 +389,16 @@ export default function CheckoutPage() {
             </div>
           </div>
         </form>
+
+        {/* Payment Modal */}
+        <PaymentModal
+          open={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          onSuccess={handlePaymentSuccess}
+          paymentMethod={formData.paymentMethod}
+          amount={totalPrice}
+          orderNumber={pendingOrder?.orderNumber || ''}
+        />
       </div>
     </Layout>
   );
