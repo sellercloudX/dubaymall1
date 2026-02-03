@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -18,35 +18,37 @@ import CartPage from "./pages/CartPage";
 import CheckoutPage from "./pages/CheckoutPage";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+function App() {
+  const [queryClient] = useState(() => new QueryClient());
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <LanguageProvider>
-      <AuthProvider>
-        <CartProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/seller" element={<SellerDashboard />} />
-                <Route path="/shop/:slug" element={<ShopPage />} />
-                <Route path="/marketplace" element={<Marketplace />} />
-                <Route path="/product/:id" element={<ProductPage />} />
-                <Route path="/cart" element={<CartPage />} />
-                <Route path="/checkout" element={<CheckoutPage />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </BrowserRouter>
-          </TooltipProvider>
-        </CartProvider>
-      </AuthProvider>
-    </LanguageProvider>
-  </QueryClientProvider>
-);
+  return (
+    <QueryClientProvider client={queryClient}>
+      <LanguageProvider>
+        <AuthProvider>
+          <CartProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/seller" element={<SellerDashboard />} />
+                  <Route path="/shop/:slug" element={<ShopPage />} />
+                  <Route path="/marketplace" element={<Marketplace />} />
+                  <Route path="/product/:id" element={<ProductPage />} />
+                  <Route path="/cart" element={<CartPage />} />
+                  <Route path="/checkout" element={<CheckoutPage />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </BrowserRouter>
+            </TooltipProvider>
+          </CartProvider>
+        </AuthProvider>
+      </LanguageProvider>
+    </QueryClientProvider>
+  );
+}
 
 export default App;
