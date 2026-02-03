@@ -12,6 +12,8 @@ import { CreateShopDialog } from '@/components/seller/CreateShopDialog';
 import { AddProductDialog } from '@/components/seller/AddProductDialog';
 import { ProductList } from '@/components/seller/ProductList';
 import { ProductForm } from '@/components/seller/ProductForm';
+import { DropshippingImport } from '@/components/seller/DropshippingImport';
+import { DropshippingProducts } from '@/components/seller/DropshippingProducts';
 import {
   Sheet,
   SheetContent,
@@ -20,7 +22,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { toast } from 'sonner';
-import { Store, Package, TrendingUp, Eye, ExternalLink, Loader2 } from 'lucide-react';
+import { Store, Package, TrendingUp, Eye, ExternalLink, Loader2, Truck } from 'lucide-react';
 import type { Tables, TablesInsert } from '@/integrations/supabase/types';
 
 type Product = Tables<'products'>;
@@ -33,6 +35,7 @@ export default function SellerDashboard() {
   const { products, loading: productsLoading, createProduct, updateProduct, deleteProduct, refetch: refetchProducts } = useProducts(shop?.id || null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [dropshippingRefresh, setDropshippingRefresh] = useState(0);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -44,8 +47,9 @@ export default function SellerDashboard() {
     try {
       await createProduct(data);
       toast.success(t.productCreated);
-    } catch (error: any) {
-      toast.error(error.message || t.error);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : t.error;
+      toast.error(errorMessage);
       throw error;
     }
   };
@@ -57,8 +61,9 @@ export default function SellerDashboard() {
       await updateProduct(editingProduct.id, data);
       toast.success(t.productUpdated);
       setEditingProduct(null);
-    } catch (error: any) {
-      toast.error(error.message || t.error);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : t.error;
+      toast.error(errorMessage);
     } finally {
       setIsUpdating(false);
     }
@@ -68,9 +73,15 @@ export default function SellerDashboard() {
     try {
       await deleteProduct(id);
       toast.success(t.productDeleted);
-    } catch (error: any) {
-      toast.error(error.message || t.error);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : t.error;
+      toast.error(errorMessage);
     }
+  };
+
+  const handleDropshippingImported = () => {
+    setDropshippingRefresh(prev => prev + 1);
+    refetchProducts();
   };
 
   if (authLoading || shopLoading) {
@@ -83,7 +94,6 @@ export default function SellerDashboard() {
     );
   }
 
-  // No shop yet
   if (!shop) {
     return (
       <Layout>
@@ -100,6 +110,7 @@ export default function SellerDashboard() {
   }
 
   const activeProducts = products.filter(p => p.status === 'active').length;
+  const dropshippingProducts = products.filter(p => p.source === 'dropshipping').length;
 
   return (
     <Layout>
@@ -119,7 +130,7 @@ export default function SellerDashboard() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -141,8 +152,21 @@ export default function SellerDashboard() {
             </CardHeader>
             <CardContent>
               <div className="flex items-center gap-2">
-                <Eye className="h-4 w-4 text-success" />
+                <Eye className="h-4 w-4 text-emerald-500" />
                 <span className="text-2xl font-bold">{activeProducts}</span>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Dropshipping
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-2">
+                <Truck className="h-4 w-4 text-blue-500" />
+                <span className="text-2xl font-bold">{dropshippingProducts}</span>
               </div>
             </CardContent>
           </Card>
@@ -179,6 +203,7 @@ export default function SellerDashboard() {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <TabsList>
               <TabsTrigger value="products">{t.products}</TabsTrigger>
+              <TabsTrigger value="dropshipping">Dropshipping</TabsTrigger>
               <TabsTrigger value="settings">{t.shopSettings}</TabsTrigger>
             </TabsList>
             <AddProductDialog shopId={shop.id} onSubmit={handleCreateProduct} />
@@ -191,6 +216,17 @@ export default function SellerDashboard() {
               onEdit={setEditingProduct}
               onDelete={handleDeleteProduct}
               onRefresh={refetchProducts}
+            />
+          </TabsContent>
+
+          <TabsContent value="dropshipping" className="space-y-6">
+            <DropshippingImport 
+              shopId={shop.id} 
+              onProductImported={handleDropshippingImported} 
+            />
+            <DropshippingProducts 
+              shopId={shop.id} 
+              refreshTrigger={dropshippingRefresh} 
             />
           </TabsContent>
 
