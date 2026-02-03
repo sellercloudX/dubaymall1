@@ -1,14 +1,17 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCart } from '@/contexts/CartContext';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { Button } from '@/components/ui/button';
-import { ShoppingBag, User, LogOut, Menu, X } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { ShoppingBag, ShoppingCart, User, LogOut, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 
 export function Navbar() {
   const { t } = useLanguage();
   const { user, signOut } = useAuth();
+  const { totalItems } = useCart();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -40,6 +43,20 @@ export function Navbar() {
           {/* Right Side */}
           <div className="hidden md:flex items-center gap-4">
             <LanguageSwitcher />
+            
+            {/* Cart */}
+            <Link to="/cart" className="relative">
+              <Button variant="ghost" size="icon">
+                <ShoppingCart className="h-5 w-5" />
+                {totalItems > 0 && (
+                  <Badge 
+                    className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
+                  >
+                    {totalItems > 99 ? '99+' : totalItems}
+                  </Badge>
+                )}
+              </Button>
+            </Link>
             
             {user ? (
               <div className="flex items-center gap-2">
@@ -99,6 +116,19 @@ export function Navbar() {
               
               <div className="border-t pt-4 flex flex-col gap-2">
                 <LanguageSwitcher />
+                
+                {/* Mobile Cart */}
+                <Link 
+                  to="/cart" 
+                  className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <ShoppingCart className="h-4 w-4" />
+                  {t.cart}
+                  {totalItems > 0 && (
+                    <Badge className="ml-auto">{totalItems}</Badge>
+                  )}
+                </Link>
                 
                 {user ? (
                   <>
