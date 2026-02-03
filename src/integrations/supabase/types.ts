@@ -296,6 +296,94 @@ export type Database = {
         }
         Relationships: []
       }
+      order_financials: {
+        Row: {
+          affiliate_link_id: string | null
+          blogger_commission_amount: number | null
+          blogger_commission_percent: number | null
+          blogger_id: string | null
+          created_at: string
+          id: string
+          is_dropshipping: boolean | null
+          order_id: string
+          order_total: number
+          payout_available_at: string | null
+          payout_completed_at: string | null
+          payout_status: string | null
+          platform_commission_amount: number
+          platform_commission_percent: number
+          seller_net_amount: number
+          seller_profit: number | null
+          shipping_cost: number | null
+          shop_id: string
+          supplier_cost: number | null
+        }
+        Insert: {
+          affiliate_link_id?: string | null
+          blogger_commission_amount?: number | null
+          blogger_commission_percent?: number | null
+          blogger_id?: string | null
+          created_at?: string
+          id?: string
+          is_dropshipping?: boolean | null
+          order_id: string
+          order_total: number
+          payout_available_at?: string | null
+          payout_completed_at?: string | null
+          payout_status?: string | null
+          platform_commission_amount: number
+          platform_commission_percent: number
+          seller_net_amount: number
+          seller_profit?: number | null
+          shipping_cost?: number | null
+          shop_id: string
+          supplier_cost?: number | null
+        }
+        Update: {
+          affiliate_link_id?: string | null
+          blogger_commission_amount?: number | null
+          blogger_commission_percent?: number | null
+          blogger_id?: string | null
+          created_at?: string
+          id?: string
+          is_dropshipping?: boolean | null
+          order_id?: string
+          order_total?: number
+          payout_available_at?: string | null
+          payout_completed_at?: string | null
+          payout_status?: string | null
+          platform_commission_amount?: number
+          platform_commission_percent?: number
+          seller_net_amount?: number
+          seller_profit?: number | null
+          shipping_cost?: number | null
+          shop_id?: string
+          supplier_cost?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_financials_affiliate_link_id_fkey"
+            columns: ["affiliate_link_id"]
+            isOneToOne: false
+            referencedRelation: "affiliate_links"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_financials_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_financials_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_items: {
         Row: {
           created_at: string
@@ -608,6 +696,47 @@ export type Database = {
           },
         ]
       }
+      seller_balances: {
+        Row: {
+          available_balance: number | null
+          created_at: string
+          id: string
+          pending_balance: number | null
+          shop_id: string
+          total_earned: number | null
+          total_withdrawn: number | null
+          updated_at: string
+        }
+        Insert: {
+          available_balance?: number | null
+          created_at?: string
+          id?: string
+          pending_balance?: number | null
+          shop_id: string
+          total_earned?: number | null
+          total_withdrawn?: number | null
+          updated_at?: string
+        }
+        Update: {
+          available_balance?: number | null
+          created_at?: string
+          id?: string
+          pending_balance?: number | null
+          shop_id?: string
+          total_earned?: number | null
+          total_withdrawn?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seller_balances_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: true
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       seller_subscriptions: {
         Row: {
           created_at: string
@@ -645,6 +774,50 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "seller_subscriptions_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      seller_withdrawal_requests: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          notes: string | null
+          payment_details: Json | null
+          payment_method: string
+          processed_at: string | null
+          shop_id: string
+          status: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          payment_details?: Json | null
+          payment_method: string
+          processed_at?: string | null
+          shop_id: string
+          status?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          payment_details?: Json | null
+          payment_method?: string
+          processed_at?: string | null
+          shop_id?: string
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seller_withdrawal_requests_shop_id_fkey"
             columns: ["shop_id"]
             isOneToOne: false
             referencedRelation: "shops"
@@ -795,6 +968,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_order_financials: {
+        Args: { p_order_id: string; p_platform_commission_percent?: number }
+        Returns: Json
+      }
       generate_affiliate_code: { Args: never; Returns: string }
       generate_delivery_otp: { Args: { p_order_id: string }; Returns: string }
       generate_order_number: { Args: never; Returns: string }
@@ -812,6 +989,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      process_pending_payouts: { Args: never; Returns: number }
       track_affiliate_click: {
         Args: { p_link_code: string }
         Returns: undefined

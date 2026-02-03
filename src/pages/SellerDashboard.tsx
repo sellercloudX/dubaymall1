@@ -15,6 +15,7 @@ import { ProductForm } from '@/components/seller/ProductForm';
 import { DropshippingImport } from '@/components/seller/DropshippingImport';
 import { DropshippingProducts } from '@/components/seller/DropshippingProducts';
 import { SellerAnalytics } from '@/components/seller/SellerAnalytics';
+import { SellerBalanceCard } from '@/components/seller/SellerBalanceCard';
 import {
   Sheet,
   SheetContent,
@@ -23,7 +24,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { toast } from 'sonner';
-import { Store, Package, TrendingUp, Eye, ExternalLink, Loader2, Truck, BarChart3 } from 'lucide-react';
+import { Store, Package, TrendingUp, Eye, ExternalLink, Loader2, Truck, BarChart3, Wallet } from 'lucide-react';
 import type { Tables, TablesInsert } from '@/integrations/supabase/types';
 
 type Product = Tables<'products'>;
@@ -138,6 +139,10 @@ export default function SellerDashboard() {
                 <BarChart3 className="h-4 w-4" />
                 <span className="hidden sm:inline">Analitika</span>
               </TabsTrigger>
+              <TabsTrigger value="balance" className="gap-2">
+                <Wallet className="h-4 w-4" />
+                <span className="hidden sm:inline">Balans</span>
+              </TabsTrigger>
               <TabsTrigger value="products" className="gap-2">
                 <Package className="h-4 w-4" />
                 <span className="hidden sm:inline">{t.products}</span>
@@ -152,6 +157,10 @@ export default function SellerDashboard() {
 
           <TabsContent value="analytics">
             <SellerAnalytics shopId={shop.id} />
+          </TabsContent>
+
+          <TabsContent value="balance">
+            <SellerBalanceCard />
           </TabsContent>
 
           <TabsContent value="products">
