@@ -114,10 +114,11 @@ ${productDescription ? `Description: ${productDescription}` : ''}
 
 CRITICAL RULES:
 - This must look like a professional MARKETPLACE INFOGRAPHIC, not just a product photo
-- Include text overlays with features/benefits in Russian or Uzbek
+- Include text overlays with features/benefits - USE CORRECT SPELLING in Russian or Uzbek (no typos!)
 - Add visual badges and icons
 - Make it sales-optimized for e-commerce
-- The final image should make customers want to buy immediately`;
+- The final image should make customers want to buy immediately
+- IMPORTANT: Double-check all text for spelling accuracy before generating`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
