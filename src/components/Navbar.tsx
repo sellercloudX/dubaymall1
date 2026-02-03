@@ -2,43 +2,31 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
+import { useUserRoles } from '@/hooks/useUserRoles';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { NotificationsDropdown } from '@/components/notifications/NotificationsDropdown';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ShoppingBag, ShoppingCart, User, LogOut, Menu, X, Shield, Heart } from 'lucide-react';
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { ShoppingBag, ShoppingCart, User, LogOut, Menu, X, Shield, Heart, Handshake, Store, Users } from 'lucide-react';
+import { useState } from 'react';
 
 export function Navbar() {
   const { t } = useLanguage();
   const { user, signOut } = useAuth();
   const { totalItems } = useCart();
+  const { isAdmin, isSeller, isBlogger, loading: rolesLoading } = useUserRoles();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
-
-  useEffect(() => {
-    const checkAdmin = async () => {
-      if (!user) {
-        setIsAdmin(false);
-        return;
-      }
-      const { data } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .eq('role', 'admin')
-        .maybeSingle();
-      setIsAdmin(!!data);
-    };
-    checkAdmin();
-  }, [user]);
 
   const handleSignOut = async () => {
     await signOut();
     navigate('/');
   };
+
+  // Only show role-specific links if user has that role
+  const showSellerLink = user && isSeller;
+  const showBloggerLink = user && isBlogger;
+  const showAdminLink = user && isAdmin;
 
   return (
     <nav className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 safe-area-top">
@@ -58,15 +46,29 @@ export function Navbar() {
             <Link to="/marketplace" className="text-muted-foreground hover:text-foreground transition-colors">
               {t.marketplace}
             </Link>
-            {user && (
+            
+            {/* Partnership link - visible to everyone */}
+            <Link to="/partnership" className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5">
+              <Handshake className="h-4 w-4" />
+              Hamkorlik
+            </Link>
+
+            {/* Role-specific links - only visible to users with that role */}
+            {!rolesLoading && (
               <>
-                <Link to="/seller" className="text-muted-foreground hover:text-foreground transition-colors">
-                  {t.myShop}
-                </Link>
-                <Link to="/blogger" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Blogger
-                </Link>
-                {isAdmin && (
+                {showSellerLink && (
+                  <Link to="/seller" className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5">
+                    <Store className="h-4 w-4" />
+                    {t.myShop}
+                  </Link>
+                )}
+                {showBloggerLink && (
+                  <Link to="/blogger" className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5">
+                    <Users className="h-4 w-4" />
+                    Blogger
+                  </Link>
+                )}
+                {showAdminLink && (
                   <Link to="/admin" className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
                     <Shield className="h-4 w-4" />
                     Admin
@@ -148,23 +150,40 @@ export function Navbar() {
         {mobileMenuOpen && (
           <div className="md:hidden py-4 border-t animate-fade-in">
             <div className="flex flex-col gap-3">
-              {user && (
+              {/* Partnership - visible to all */}
+              <Link
+                to="/partnership"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2 py-2"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <Handshake className="h-4 w-4" />
+                Hamkorlik
+              </Link>
+
+              {/* Role-specific links */}
+              {user && !rolesLoading && (
                 <>
-                  <Link
-                    to="/seller"
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    {t.myShop}
-                  </Link>
-                  <Link
-                    to="/blogger"
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Blogger Panel
-                  </Link>
-                  {isAdmin && (
+                  {showSellerLink && (
+                    <Link
+                      to="/seller"
+                      className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2 py-2"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <Store className="h-4 w-4" />
+                      {t.myShop}
+                    </Link>
+                  )}
+                  {showBloggerLink && (
+                    <Link
+                      to="/blogger"
+                      className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2 py-2"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <Users className="h-4 w-4" />
+                      Blogger Panel
+                    </Link>
+                  )}
+                  {showAdminLink && (
                     <Link
                       to="/admin"
                       className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2 py-2"
