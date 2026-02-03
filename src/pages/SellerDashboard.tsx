@@ -190,6 +190,7 @@ export default function SellerDashboard() {
               loading={productsLoading}
               onEdit={setEditingProduct}
               onDelete={handleDeleteProduct}
+              onRefresh={refetchProducts}
             />
           </TabsContent>
 
