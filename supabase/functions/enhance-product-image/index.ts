@@ -25,97 +25,77 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    console.log("Generating visual infographic product image for:", productName, "category:", category);
+    console.log("Enhancing product image for:", productName, "category:", category);
 
-    // Category-specific visual infographic styles - NO TEXT to avoid spelling errors
-    const categoryPrompts: Record<string, string> = {
+    // Category-specific background and styling - KEEPING THE EXACT PRODUCT
+    const categoryStyles: Record<string, string> = {
       // Cosmetics & Beauty
-      "cosmetics": `Create a VISUAL MARKETPLACE INFOGRAPHIC for cosmetics product.
-COMPOSITION (NO TEXT - VISUAL ONLY):
-- Main: Product bottle/packaging on elegant white pedestal or platform
-- Background: Soft gradient (pink/peach/cream) with bokeh effects
-- Decorative elements: Fresh fruits (oranges, lemons), flower petals, water droplets, leaves
-- Show product ingredients visually: citrus slices, vitamin capsules, honey drops
-- Add lifestyle element: Beautiful model face/lips/skin in corner using the product
-- Include: Glass serum droplets, golden particles, sparkles for luxury feel
-- NO TEXT, NO WORDS, NO LETTERS - pure visual storytelling
-AESTHETIC: Luxurious, feminine, fresh, natural ingredients visible`,
+      "cosmetics": `EDIT this image: KEEP THE EXACT SAME PRODUCT visible in the photo unchanged.
+ONLY change the background and add decorative elements AROUND the product:
+- Replace background with: soft pink/peach gradient with subtle bokeh
+- Add around product: scattered flower petals, citrus slices, water droplets
+- Add lighting: soft glow, sparkles, golden particles
+- The PRODUCT ITSELF must remain EXACTLY as shown - same bottle, same packaging, same angle
+DO NOT replace or redraw the product - only enhance the surroundings`,
 
-      // Electronics
-      "electronics": `Create a VISUAL MARKETPLACE INFOGRAPHIC for electronics product.
-COMPOSITION (NO TEXT - VISUAL ONLY):
-- Main: Product displayed on sleek platform with dramatic lighting
-- Background: Dark gradient (deep blue, black, silver) with tech glow effects
-- Show multiple angles of the product in composition
-- Add: Light trails, circuit patterns, neon accents, reflection effects
-- Include visual size comparison if relevant (coin, hand silhouette)
-- Add: Charging lightning bolt icon, battery visual, signal waves
-- NO TEXT, NO WORDS, NO LETTERS - pure visual demonstration
-AESTHETIC: Premium tech, futuristic, professional, high-end`,
+      // Electronics  
+      "electronics": `EDIT this image: KEEP THE EXACT SAME PRODUCT visible in the photo unchanged.
+ONLY change the background and add visual effects AROUND the product:
+- Replace background with: dark gradient (blue/black) with tech glow
+- Add around product: light trails, subtle circuit patterns, neon accents
+- Add lighting: dramatic side lighting, reflection on surface below
+- The PRODUCT ITSELF must remain EXACTLY as shown - same device, same angle
+DO NOT replace or redraw the product - only enhance the surroundings`,
 
       // Clothing & Fashion
-      "clothing": `Create a VISUAL MARKETPLACE INFOGRAPHIC for fashion product.
-COMPOSITION (NO TEXT - VISUAL ONLY):
-- Main: Product displayed elegantly or worn by model
-- Background: Clean neutral tones or lifestyle setting
-- Show fabric texture close-up in corner
-- Add: Hangers, fashion accessories, styling elements
-- Include lifestyle context (outfit combination ideas)
-- Multiple views: front, detail, styling suggestion
-- NO TEXT, NO WORDS, NO LETTERS - pure visual presentation
-AESTHETIC: Stylish, aspirational, editorial fashion photography`,
+      "clothing": `EDIT this image: KEEP THE EXACT SAME PRODUCT visible in the photo unchanged.
+ONLY change the background and styling AROUND the product:
+- Replace background with: clean studio backdrop or lifestyle setting
+- Add: soft natural lighting, subtle shadows for depth
+- The PRODUCT ITSELF must remain EXACTLY as shown - same fabric, same color
+DO NOT replace or redraw the product - only enhance the surroundings`,
 
       // Food & Beverages
-      "food": `Create a VISUAL MARKETPLACE INFOGRAPHIC for food product.
-COMPOSITION (NO TEXT - VISUAL ONLY):
-- Main: Product packaging with appetizing presentation
-- Background: Warm, inviting colors with natural elements
-- Show ingredients: fresh fruits, vegetables, grains around product
-- Add: Steam effects, water droplets for freshness
-- Include: Serving suggestion, recipe idea visualization
-- Natural elements: wooden surface, leaves, raw ingredients
-- NO TEXT, NO WORDS, NO LETTERS - pure appetite appeal
-AESTHETIC: Fresh, organic, appetizing, trustworthy`,
+      "food": `EDIT this image: KEEP THE EXACT SAME PRODUCT visible in the photo unchanged.
+ONLY change the background and add elements AROUND the product:
+- Replace background with: warm, appetizing setting (wooden surface, natural light)
+- Add around product: fresh ingredients related to the product, leaves, natural elements
+- Add: steam effect if warm product, water droplets for freshness
+- The PRODUCT ITSELF must remain EXACTLY as shown
+DO NOT replace or redraw the product - only enhance the surroundings`,
 
       // Home & Kitchen
-      "home": `Create a VISUAL MARKETPLACE INFOGRAPHIC for home product.
-COMPOSITION (NO TEXT - VISUAL ONLY):
-- Main: Product in beautiful home/lifestyle setting
-- Background: Cozy interior, natural light
-- Show product in use scenario
-- Add: Complementary home decor elements
-- Include size reference (hand, common objects)
-- Multiple angles or before/after visual
-- NO TEXT, NO WORDS, NO LETTERS - pure lifestyle visualization
-AESTHETIC: Cozy, practical, aspirational home style`,
+      "home": `EDIT this image: KEEP THE EXACT SAME PRODUCT visible in the photo unchanged.
+ONLY change the background to lifestyle setting:
+- Replace background with: cozy home interior, natural light from window
+- Add: complementary decor elements around the product
+- The PRODUCT ITSELF must remain EXACTLY as shown
+DO NOT replace or redraw the product - only enhance the surroundings`,
 
-      // Default for any category
-      "default": `Create a VISUAL MARKETPLACE INFOGRAPHIC for product.
-COMPOSITION (NO TEXT - VISUAL ONLY):
-- Main: Product prominently displayed on elegant platform/pedestal
-- Background: Clean gradient with professional lighting
-- Add lifestyle context and usage scenario
-- Include decorative elements related to product category
-- Show product from best angle with detail shots
-- Add: Sparkles, light effects, reflections for premium feel
-- NO TEXT, NO WORDS, NO LETTERS - pure visual selling
-AESTHETIC: Professional, premium, sales-optimized visual`
+      // Default
+      "default": `EDIT this image: KEEP THE EXACT SAME PRODUCT visible in the photo unchanged.
+ONLY change the background and add professional lighting:
+- Replace background with: clean gradient, professional studio lighting
+- Add: soft shadows, subtle reflections, elegant platform/surface
+- The PRODUCT ITSELF must remain EXACTLY as shown - same shape, same color, same details
+DO NOT replace or redraw the product - only enhance the surroundings`
     };
 
-    // Determine which prompt to use based on category
+    // Determine style based on category
     const categoryKey = category?.toLowerCase() || "default";
-    const categoryPrompt = categoryPrompts[categoryKey] || categoryPrompts["default"];
+    const stylePrompt = categoryStyles[categoryKey] || categoryStyles["default"];
 
-    const prompt = `${categoryPrompt}
+    const prompt = `${stylePrompt}
 
-CRITICAL RULES:
-- ABSOLUTELY NO TEXT, NO WORDS, NO LETTERS, NO NUMBERS on the image
-- DO NOT add any text overlays, labels, badges with text, or typography
-- Focus ONLY on beautiful visual composition
-- Use icons/symbols ONLY if they have no text
-- Make it look like a premium marketplace product photo collage
-- The visual elements should tell the product story without any words
-- Final image must be 100% text-free`;
+CRITICAL INSTRUCTIONS:
+1. The EXACT product from this image must be preserved - DO NOT change the product itself
+2. DO NOT generate a different or similar product - use THIS EXACT product
+3. Only modify: background, lighting, decorative elements AROUND the product
+4. NO TEXT, NO WORDS, NO LETTERS anywhere on the image
+5. The product should look like it was professionally photographed for a marketplace
+6. Think of this as removing the background and placing the SAME product on a better set
+
+OUTPUT: A professional marketplace photo with the SAME EXACT product on enhanced background`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -157,23 +137,23 @@ CRITICAL RULES:
         );
       }
       
-      throw new Error("AI image generation failed");
+      throw new Error("AI image enhancement failed");
     }
 
     const data = await response.json();
     console.log("AI response received");
     
-    // Extract the generated image
-    const generatedImage = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    // Extract the enhanced image
+    const enhancedImage = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
     
-    if (!generatedImage) {
+    if (!enhancedImage) {
       console.error("No image in response:", JSON.stringify(data));
       throw new Error("No image generated");
     }
 
     return new Response(
       JSON.stringify({ 
-        enhancedImageBase64: generatedImage,
+        enhancedImageBase64: enhancedImage,
         message: "Image enhanced successfully"
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
