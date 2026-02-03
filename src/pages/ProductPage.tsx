@@ -4,12 +4,15 @@ import { Layout } from '@/components/Layout';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useFavorites } from '@/hooks/useFavorites';
+import { useRecentlyViewed } from '@/hooks/useRecommendations';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ProductReviews } from '@/components/reviews/ProductReviews';
+import { ProductRecommendations } from '@/components/marketplace/ProductRecommendations';
 import { StarRating } from '@/components/reviews/StarRating';
 import { useProductRating } from '@/hooks/useReviews';
 import { 
@@ -20,7 +23,8 @@ import {
   Store, 
   Package,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Tables } from '@/integrations/supabase/types';
@@ -35,15 +39,19 @@ export default function ProductPage() {
   const { t } = useLanguage();
   const { addToCart } = useCart();
   const { user } = useAuth();
+  const { isFavorite, toggleFavorite } = useFavorites();
+  const { addToRecentlyViewed } = useRecentlyViewed();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [currentImage, setCurrentImage] = useState(0);
+  const [favoriteLoading, setFavoriteLoading] = useState(false);
   const { data: ratingData } = useProductRating(id || '');
 
   useEffect(() => {
     if (id) {
       fetchProduct();
+      addToRecentlyViewed(id);
     }
   }, [id]);
 
@@ -77,6 +85,22 @@ export default function ProductPage() {
 
     await addToCart(product!.id, quantity);
     toast.success(t.addedToCart || 'Savatchaga qo\'shildi');
+  };
+
+  const handleToggleFavorite = async () => {
+    if (!user) {
+      toast.error('Sevimlilarga qo\'shish uchun tizimga kiring');
+      return;
+    }
+
+    setFavoriteLoading(true);
+    const isCurrentlyFavorite = isFavorite(product!.id);
+    const success = await toggleFavorite(product!.id);
+    
+    if (success) {
+      toast.success(isCurrentlyFavorite ? 'Sevimlilardan o\'chirildi' : 'Sevimlilarga qo\'shildi');
+    }
+    setFavoriteLoading(false);
   };
 
   const discount = product?.original_price && product.original_price > product.price
@@ -274,8 +298,18 @@ export default function ProductPage() {
                     <ShoppingCart className="h-5 w-5" />
                     {t.addToCart || 'Savatga qo\'shish'}
                   </Button>
-                  <Button variant="outline" size="lg">
-                    <Heart className="h-5 w-5" />
+                  <Button 
+                    variant="outline" 
+                    size="lg"
+                    onClick={handleToggleFavorite}
+                    disabled={favoriteLoading}
+                    className={isFavorite(product.id) ? 'text-destructive' : ''}
+                  >
+                    {favoriteLoading ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <Heart className={`h-5 w-5 ${isFavorite(product.id) ? 'fill-current' : ''}`} />
+                    )}
                   </Button>
                 </div>
               </CardContent>
@@ -283,9 +317,19 @@ export default function ProductPage() {
           </div>
         </div>
 
+        {/* Similar Products */}
+        <div className="mt-12">
+          <ProductRecommendations currentProductId={product.id} />
+        </div>
+
         {/* Reviews Section */}
         <div className="mt-12">
           <ProductReviews productId={product.id} />
+        </div>
+
+        {/* Recently Viewed */}
+        <div className="mt-12">
+          <ProductRecommendations type="recent" />
         </div>
       </div>
     </Layout>

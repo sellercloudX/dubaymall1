@@ -6,6 +6,7 @@ import { useCategories } from '@/hooks/useCategories';
 import { supabase } from '@/integrations/supabase/client';
 import { ProductCard } from '@/components/marketplace/ProductCard';
 import { SearchAutocomplete } from '@/components/marketplace/SearchAutocomplete';
+import { ProductRecommendations } from '@/components/marketplace/ProductRecommendations';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -284,6 +285,13 @@ export default function Marketplace() {
                 <ProductCard key={product.id} product={product} />
               ))}
             </div>
+
+            {/* Trending Products */}
+            {!searchQuery && selectedCategory === 'all' && (
+              <div className="mt-16">
+                <ProductRecommendations type="trending" title="Trendda" />
+              </div>
+            )}
           </>
         )}
       </div>
