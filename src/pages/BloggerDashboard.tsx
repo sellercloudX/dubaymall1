@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { DollarSign, MousePointer, ShoppingCart, Wallet, BarChart3 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import AffiliateProducts from '@/components/blogger/AffiliateProducts';
@@ -118,20 +119,23 @@ export default function BloggerDashboard() {
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="balance" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:inline-flex">
-            <TabsTrigger value="balance" className="gap-2">
-              <Wallet className="h-4 w-4" />
-              <span className="hidden sm:inline">Balans</span>
-            </TabsTrigger>
-            <TabsTrigger value="analytics" className="gap-2">
-              <BarChart3 className="h-4 w-4" />
-              <span className="hidden sm:inline">Analitika</span>
-            </TabsTrigger>
-            <TabsTrigger value="products">Mahsulotlar</TabsTrigger>
-            <TabsTrigger value="links">Havolalarim</TabsTrigger>
-            <TabsTrigger value="commissions">Komissiyalar</TabsTrigger>
-            <TabsTrigger value="withdraw">Yechib olish</TabsTrigger>
-          </TabsList>
+          <ScrollArea className="w-full whitespace-nowrap">
+            <TabsList className="inline-flex w-max">
+              <TabsTrigger value="balance" className="gap-2">
+                <Wallet className="h-4 w-4" />
+                <span className="hidden sm:inline">Balans</span>
+              </TabsTrigger>
+              <TabsTrigger value="analytics" className="gap-2">
+                <BarChart3 className="h-4 w-4" />
+                <span className="hidden sm:inline">Analitika</span>
+              </TabsTrigger>
+              <TabsTrigger value="products">Mahsulotlar</TabsTrigger>
+              <TabsTrigger value="links">Havolalarim</TabsTrigger>
+              <TabsTrigger value="commissions">Komissiyalar</TabsTrigger>
+              <TabsTrigger value="withdraw">Yechib olish</TabsTrigger>
+            </TabsList>
+            <ScrollBar orientation="horizontal" />
+          </ScrollArea>
 
           <TabsContent value="balance">
             <BloggerBalanceCard />

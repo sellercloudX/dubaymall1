@@ -7,6 +7,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { ProductCard } from '@/components/marketplace/ProductCard';
 import { SearchAutocomplete } from '@/components/marketplace/SearchAutocomplete';
 import { ProductRecommendations } from '@/components/marketplace/ProductRecommendations';
+import { HeroBanner } from '@/components/marketplace/HeroBanner';
+import { FlashSaleBanner } from '@/components/marketplace/FlashSaleBanner';
+import { CategoryCards } from '@/components/marketplace/CategoryCards';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -122,11 +125,20 @@ export default function Marketplace() {
 
   return (
     <Layout>
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-6">
+        {/* Hero Banner */}
+        <HeroBanner />
+
+        {/* Flash Sale */}
+        <FlashSaleBanner />
+
+        {/* Categories */}
+        <CategoryCards />
+
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">{t.marketplace}</h1>
-          <p className="text-muted-foreground mt-2">
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold">{t.marketplace}</h2>
+          <p className="text-muted-foreground mt-1">
             Barcha do'konlardan eng yaxshi mahsulotlar
           </p>
         </div>

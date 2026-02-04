@@ -61,6 +61,63 @@ export type Database = {
           },
         ]
       }
+      banners: {
+        Row: {
+          clicks_count: number | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          end_date: string | null
+          id: string
+          image_url: string
+          is_active: boolean | null
+          link_id: string | null
+          link_type: string | null
+          link_url: string | null
+          position: string | null
+          priority: number | null
+          start_date: string | null
+          title: string
+          views_count: number | null
+        }
+        Insert: {
+          clicks_count?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          image_url: string
+          is_active?: boolean | null
+          link_id?: string | null
+          link_type?: string | null
+          link_url?: string | null
+          position?: string | null
+          priority?: number | null
+          start_date?: string | null
+          title: string
+          views_count?: number | null
+        }
+        Update: {
+          clicks_count?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          image_url?: string
+          is_active?: boolean | null
+          link_id?: string | null
+          link_type?: string | null
+          link_url?: string | null
+          position?: string | null
+          priority?: number | null
+          start_date?: string | null
+          title?: string
+          views_count?: number | null
+        }
+        Relationships: []
+      }
       blogger_balances: {
         Row: {
           available_balance: number | null
@@ -262,6 +319,87 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      flash_sale_products: {
+        Row: {
+          created_at: string | null
+          flash_sale_id: string | null
+          id: string
+          product_id: string | null
+          sale_price: number
+          sold_count: number | null
+          stock_limit: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          flash_sale_id?: string | null
+          id?: string
+          product_id?: string | null
+          sale_price: number
+          sold_count?: number | null
+          stock_limit?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          flash_sale_id?: string | null
+          id?: string
+          product_id?: string | null
+          sale_price?: number
+          sold_count?: number | null
+          stock_limit?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flash_sale_products_flash_sale_id_fkey"
+            columns: ["flash_sale_id"]
+            isOneToOne: false
+            referencedRelation: "flash_sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flash_sale_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flash_sales: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          discount_percent: number | null
+          end_date: string
+          id: string
+          is_active: boolean | null
+          start_date: string
+          title: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          discount_percent?: number | null
+          end_date: string
+          id?: string
+          is_active?: boolean | null
+          start_date: string
+          title: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          discount_percent?: number | null
+          end_date?: string
+          id?: string
+          is_active?: boolean | null
+          start_date?: string
+          title?: string
+        }
+        Relationships: []
       }
       marketplace_connections: {
         Row: {
@@ -710,6 +848,78 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      promotions: {
+        Row: {
+          budget: number | null
+          clicks_count: number | null
+          conversions: number | null
+          created_at: string | null
+          daily_budget: number | null
+          end_date: string | null
+          id: string
+          product_id: string | null
+          shop_id: string | null
+          spent: number | null
+          start_date: string | null
+          status: string | null
+          type: string
+          updated_at: string | null
+          user_id: string
+          views_count: number | null
+        }
+        Insert: {
+          budget?: number | null
+          clicks_count?: number | null
+          conversions?: number | null
+          created_at?: string | null
+          daily_budget?: number | null
+          end_date?: string | null
+          id?: string
+          product_id?: string | null
+          shop_id?: string | null
+          spent?: number | null
+          start_date?: string | null
+          status?: string | null
+          type: string
+          updated_at?: string | null
+          user_id: string
+          views_count?: number | null
+        }
+        Update: {
+          budget?: number | null
+          clicks_count?: number | null
+          conversions?: number | null
+          created_at?: string | null
+          daily_budget?: number | null
+          end_date?: string | null
+          id?: string
+          product_id?: string | null
+          shop_id?: string | null
+          spent?: number | null
+          start_date?: string | null
+          status?: string | null
+          type?: string
+          updated_at?: string | null
+          user_id?: string
+          views_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "promotions_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "promotions_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       reviews: {
         Row: {
