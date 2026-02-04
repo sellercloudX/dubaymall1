@@ -16,6 +16,7 @@ const Auth = lazy(() => import("./pages/Auth"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Marketplace = lazy(() => import("./pages/Marketplace"));
 const SellerDashboard = lazy(() => import("./pages/SellerDashboard"));
+const SellerCloudX = lazy(() => import("./pages/SellerCloudX"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const ShopPage = lazy(() => import("./pages/ShopPage"));
 const ProductPage = lazy(() => import("./pages/ProductPage"));
@@ -54,6 +55,7 @@ function App() {
                     <Route path="/auth" element={<Auth />} />
                     <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/seller" element={<SellerDashboard />} />
+                    <Route path="/seller-cloud" element={<SellerCloudX />} />
                     <Route path="/admin" element={<AdminDashboard />} />
                     <Route path="/shop/:slug" element={<ShopPage />} />
                     <Route path="/marketplace" element={<Marketplace />} />
