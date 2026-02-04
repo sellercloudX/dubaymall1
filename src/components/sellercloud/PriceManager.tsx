@@ -1,17 +1,18 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
 import { 
-  DollarSign, TrendingUp, TrendingDown, BarChart3, 
+  DollarSign, TrendingUp, BarChart3, 
   Percent, Calculator, Eye, RefreshCw, AlertCircle
 } from 'lucide-react';
 
 interface PriceManagerProps {
   connectedMarketplaces: string[];
+  fetchMarketplaceData: (marketplace: string, dataType: string, options?: Record<string, any>) => Promise<any>;
 }
 
 const MARKETPLACE_NAMES: Record<string, string> = {
@@ -25,55 +26,74 @@ interface ProductPrice {
   id: string;
   name: string;
   sku: string;
-  costPrice: number;
   prices: Record<string, number>;
-  competitorPrices: Record<string, number>;
-  recommendedPrice: number;
-  profit: number;
-  profitPercent: number;
+  avgPrice: number;
 }
 
-// Mock data
-const MOCK_PRICES: ProductPrice[] = [
-  {
-    id: '1',
-    name: 'iPhone 15 Pro Max 256GB',
-    sku: 'IPH15PM-256',
-    costPrice: 1200,
-    prices: { yandex: 1499, uzum: 1450 },
-    competitorPrices: { yandex: 1480, uzum: 1420 },
-    recommendedPrice: 1460,
-    profit: 260,
-    profitPercent: 21.7,
-  },
-  {
-    id: '2',
-    name: 'Samsung Galaxy S24 Ultra',
-    sku: 'SGS24U-256',
-    costPrice: 1100,
-    prices: { yandex: 1350, uzum: 1320 },
-    competitorPrices: { yandex: 1299, uzum: 1280 },
-    recommendedPrice: 1290,
-    profit: 190,
-    profitPercent: 17.3,
-  },
-  {
-    id: '3',
-    name: 'AirPods Pro 2',
-    sku: 'APP2-WHT',
-    costPrice: 180,
-    prices: { yandex: 249, uzum: 239 },
-    competitorPrices: { yandex: 245, uzum: 235 },
-    recommendedPrice: 240,
-    profit: 60,
-    profitPercent: 33.3,
-  },
-];
-
-export function PriceManager({ connectedMarketplaces }: PriceManagerProps) {
-  const [products] = useState<ProductPrice[]>(MOCK_PRICES);
+export function PriceManager({ connectedMarketplaces, fetchMarketplaceData }: PriceManagerProps) {
+  const [products, setProducts] = useState<ProductPrice[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [autoPricing, setAutoPricing] = useState(false);
   const [minProfit, setMinProfit] = useState(15);
+
+  useEffect(() => {
+    if (connectedMarketplaces.length > 0) {
+      loadPricesFromMarketplaces();
+    } else {
+      setIsLoading(false);
+    }
+  }, [connectedMarketplaces]);
+
+  const loadPricesFromMarketplaces = async () => {
+    setIsLoading(true);
+    
+    try {
+      const productMap = new Map<string, ProductPrice>();
+
+      for (const marketplace of connectedMarketplaces) {
+        const result = await fetchMarketplaceData(marketplace, 'products', { limit: 100 });
+        
+        if (result.success && result.data) {
+          result.data.forEach((product: any) => {
+            const sku = product.shopSku || product.offerId;
+            const price = product.price || 0;
+            const existing = productMap.get(sku);
+            
+            if (existing) {
+              existing.prices[marketplace] = price;
+              // Recalculate average
+              const prices = Object.values(existing.prices).filter(p => p > 0);
+              existing.avgPrice = prices.length > 0 
+                ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length)
+                : 0;
+            } else {
+              productMap.set(sku, {
+                id: product.offerId,
+                name: product.name || 'Nomsiz',
+                sku: sku,
+                prices: { [marketplace]: price },
+                avgPrice: price,
+              });
+            }
+          });
+        }
+      }
+
+      setProducts(Array.from(productMap.values()));
+    } catch (err) {
+      console.error('Error loading prices:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const formatPrice = (price?: number) => {
+    if (!price && price !== 0) return '—';
+    return new Intl.NumberFormat('uz-UZ', { 
+      style: 'decimal',
+      minimumFractionDigits: 0 
+    }).format(price) + ' so\'m';
+  };
 
   if (connectedMarketplaces.length === 0) {
     return (
@@ -89,8 +109,10 @@ export function PriceManager({ connectedMarketplaces }: PriceManagerProps) {
     );
   }
 
-  const totalProfit = products.reduce((sum, p) => sum + p.profit, 0);
-  const avgProfitPercent = products.reduce((sum, p) => sum + p.profitPercent, 0) / products.length;
+  const totalProducts = products.length;
+  const avgOverallPrice = products.length > 0 
+    ? Math.round(products.reduce((sum, p) => sum + p.avgPrice, 0) / products.length)
+    : 0;
 
   return (
     <div className="space-y-6">
@@ -100,18 +122,18 @@ export function PriceManager({ connectedMarketplaces }: PriceManagerProps) {
           <CardContent className="pt-4">
             <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
               <Calculator className="h-4 w-4" />
-              O'rtacha foyda
+              O'rtacha narx
             </div>
-            <div className="text-2xl font-bold text-green-600">{avgProfitPercent.toFixed(1)}%</div>
+            <div className="text-2xl font-bold">{formatPrice(avgOverallPrice)}</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4">
             <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
               <TrendingUp className="h-4 w-4" />
-              Jami foyda
+              Minimal foyda %
             </div>
-            <div className="text-2xl font-bold">${totalProfit}</div>
+            <div className="text-2xl font-bold text-green-600">{minProfit}%</div>
           </CardContent>
         </Card>
         <Card>
@@ -120,7 +142,7 @@ export function PriceManager({ connectedMarketplaces }: PriceManagerProps) {
               <Eye className="h-4 w-4" />
               Monitoring
             </div>
-            <div className="text-2xl font-bold">{products.length}</div>
+            <div className="text-2xl font-bold">{totalProducts}</div>
             <div className="text-xs text-muted-foreground">mahsulot</div>
           </CardContent>
         </Card>
@@ -128,10 +150,10 @@ export function PriceManager({ connectedMarketplaces }: PriceManagerProps) {
           <CardContent className="pt-4">
             <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
               <AlertCircle className="h-4 w-4" />
-              Narx ogohlantirish
+              Marketplacelar
             </div>
-            <div className="text-2xl font-bold text-orange-500">2</div>
-            <div className="text-xs text-muted-foreground">raqobatchilar arzonroq</div>
+            <div className="text-2xl font-bold text-primary">{connectedMarketplaces.length}</div>
+            <div className="text-xs text-muted-foreground">ulangan</div>
           </CardContent>
         </Card>
       </div>
@@ -186,87 +208,79 @@ export function PriceManager({ connectedMarketplaces }: PriceManagerProps) {
             <div>
               <CardTitle className="flex items-center gap-2">
                 <BarChart3 className="h-5 w-5" />
-                Narxlar va raqobat tahlili
+                Mahsulotlar narxi
+                {products.length > 0 && (
+                  <Badge variant="secondary" className="ml-2">{products.length} ta</Badge>
+                )}
               </CardTitle>
               <CardDescription>
-                Marketplacedagi narxlar va raqobatchilar bilan taqqoslash
+                Marketplacedagi haqiqiy narxlar
               </CardDescription>
             </div>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={loadPricesFromMarketplaces}>
               <RefreshCw className="h-4 w-4 mr-2" />
               Yangilash
             </Button>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-3 px-2 text-sm font-medium">Mahsulot</th>
-                  <th className="text-right py-3 px-2 text-sm font-medium">Tannarx</th>
-                  {connectedMarketplaces.map(mp => (
-                    <th key={mp} className="text-center py-3 px-2 text-sm font-medium" colSpan={2}>
-                      {MARKETPLACE_NAMES[mp]}
-                    </th>
-                  ))}
-                  <th className="text-right py-3 px-2 text-sm font-medium">Tavsiya</th>
-                  <th className="text-right py-3 px-2 text-sm font-medium">Foyda</th>
-                </tr>
-                <tr className="border-b bg-muted/30">
-                  <th></th>
-                  <th></th>
-                  {connectedMarketplaces.map(mp => (
-                    <>
-                      <th key={`${mp}-price`} className="text-center py-1 px-2 text-xs font-normal text-muted-foreground">Sizning</th>
-                      <th key={`${mp}-comp`} className="text-center py-1 px-2 text-xs font-normal text-muted-foreground">Raqobat</th>
-                    </>
-                  ))}
-                  <th></th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {products.map(product => (
-                  <tr key={product.id} className="border-b hover:bg-muted/50">
-                    <td className="py-3 px-2">
-                      <div className="font-medium text-sm">{product.name}</div>
-                      <div className="text-xs text-muted-foreground">{product.sku}</div>
-                    </td>
-                    <td className="text-right py-3 px-2 font-medium">
-                      ${product.costPrice}
-                    </td>
-                    {connectedMarketplaces.map(mp => {
-                      const myPrice = product.prices[mp] || 0;
-                      const compPrice = product.competitorPrices[mp] || 0;
-                      const isHigher = myPrice > compPrice;
-                      return (
-                        <>
-                          <td key={`${mp}-price`} className="text-center py-3 px-2">
-                            <span className={isHigher ? 'text-red-500' : 'text-green-500'}>
-                              ${myPrice}
-                            </span>
-                          </td>
-                          <td key={`${mp}-comp`} className="text-center py-3 px-2 text-muted-foreground">
-                            ${compPrice}
-                          </td>
-                        </>
-                      );
-                    })}
-                    <td className="text-right py-3 px-2">
-                      <Badge variant="outline" className="bg-blue-50 dark:bg-blue-950">
-                        ${product.recommendedPrice}
-                      </Badge>
-                    </td>
-                    <td className="text-right py-3 px-2">
-                      <div className="font-medium text-green-600">${product.profit}</div>
-                      <div className="text-xs text-muted-foreground">{product.profitPercent}%</div>
-                    </td>
+          {isLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="flex items-center gap-4">
+                  <Skeleton className="h-10 flex-1" />
+                  <Skeleton className="h-10 w-24" />
+                  <Skeleton className="h-10 w-24" />
+                </div>
+              ))}
+            </div>
+          ) : products.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <DollarSign className="h-12 w-12 mx-auto mb-3 opacity-50" />
+              <p>Mahsulotlar topilmadi</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-3 px-2 text-sm font-medium">Mahsulot</th>
+                    <th className="text-left py-3 px-2 text-sm font-medium">SKU</th>
+                    {connectedMarketplaces.map(mp => (
+                      <th key={mp} className="text-right py-3 px-2 text-sm font-medium">
+                        {MARKETPLACE_NAMES[mp]}
+                      </th>
+                    ))}
+                    <th className="text-right py-3 px-2 text-sm font-medium">O'rtacha</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {products.map(product => (
+                    <tr key={product.id} className="border-b hover:bg-muted/50">
+                      <td className="py-3 px-2">
+                        <div className="font-medium text-sm line-clamp-1">{product.name}</div>
+                      </td>
+                      <td className="py-3 px-2">
+                        <code className="text-xs bg-muted px-1.5 py-0.5 rounded">{product.sku}</code>
+                      </td>
+                      {connectedMarketplaces.map(mp => (
+                        <td key={mp} className="text-right py-3 px-2">
+                          <span className="font-medium">
+                            {formatPrice(product.prices[mp])}
+                          </span>
+                        </td>
+                      ))}
+                      <td className="text-right py-3 px-2">
+                        <Badge variant="outline" className="bg-primary/10">
+                          {formatPrice(product.avgPrice)}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -280,10 +294,6 @@ export function PriceManager({ connectedMarketplaces }: PriceManagerProps) {
             <Button variant="outline">
               <Percent className="h-4 w-4 mr-2" />
               Barcha narxlarni +5%
-            </Button>
-            <Button variant="outline">
-              <TrendingDown className="h-4 w-4 mr-2" />
-              Raqobatchilar darajasiga
             </Button>
             <Button variant="outline">
               <Calculator className="h-4 w-4 mr-2" />

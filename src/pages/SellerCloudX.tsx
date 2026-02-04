@@ -292,11 +292,17 @@ export default function SellerCloudX() {
           </TabsContent>
 
           <TabsContent value="inventory">
-            <InventorySync connectedMarketplaces={connectedMarketplaces} />
+            <InventorySync 
+              connectedMarketplaces={connectedMarketplaces} 
+              fetchMarketplaceData={fetchMarketplaceData}
+            />
           </TabsContent>
 
           <TabsContent value="pricing">
-            <PriceManager connectedMarketplaces={connectedMarketplaces} />
+            <PriceManager 
+              connectedMarketplaces={connectedMarketplaces}
+              fetchMarketplaceData={fetchMarketplaceData}
+            />
           </TabsContent>
 
           <TabsContent value="publish">
@@ -304,7 +310,10 @@ export default function SellerCloudX() {
           </TabsContent>
 
           <TabsContent value="analytics">
-            <MarketplaceAnalytics connectedMarketplaces={connectedMarketplaces} />
+            <MarketplaceAnalytics 
+              connectedMarketplaces={connectedMarketplaces}
+              fetchMarketplaceData={fetchMarketplaceData}
+            />
           </TabsContent>
 
           <TabsContent value="reports">
