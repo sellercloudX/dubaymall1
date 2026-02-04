@@ -44,3 +44,9 @@ verify_jwt = false
 
 [functions.cj-get-token]
 verify_jwt = false
+
+[functions.click-payment]
+verify_jwt = false
+
+[functions.dropshipping-fulfill]
+verify_jwt = false
