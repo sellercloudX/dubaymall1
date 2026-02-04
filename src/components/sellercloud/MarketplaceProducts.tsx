@@ -12,7 +12,7 @@ import {
   TableHeader, 
   TableRow 
 } from '@/components/ui/table';
-import { Package, Filter, Plus, RefreshCw, Loader2, Image, AlertCircle } from 'lucide-react';
+import { Package, Plus, RefreshCw, Loader2, Image, AlertCircle } from 'lucide-react';
 
 interface MarketplaceProduct {
   offerId: string;
@@ -22,6 +22,8 @@ interface MarketplaceProduct {
   category?: string;
   pictures?: string[];
   availability?: string;
+  stockFBO?: number;
+  stockFBS?: number;
   stockCount?: number;
 }
 
@@ -30,6 +32,13 @@ interface MarketplaceProductsProps {
   fetchMarketplaceData: (marketplace: string, dataType: string, options?: Record<string, any>) => Promise<any>;
 }
 
+const MARKETPLACE_NAMES: Record<string, string> = {
+  yandex: 'Yandex',
+  uzum: 'Uzum',
+  wildberries: 'WB',
+  ozon: 'Ozon',
+};
+
 export function MarketplaceProducts({ connectedMarketplaces, fetchMarketplaceData }: MarketplaceProductsProps) {
   const [products, setProducts] = useState<MarketplaceProduct[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -37,7 +46,6 @@ export function MarketplaceProducts({ connectedMarketplaces, fetchMarketplaceDat
   const [selectedMarketplace, setSelectedMarketplace] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
 
   useEffect(() => {
     if (connectedMarketplaces.length > 0 && !selectedMarketplace) {
@@ -49,7 +57,7 @@ export function MarketplaceProducts({ connectedMarketplaces, fetchMarketplaceDat
     if (selectedMarketplace) {
       loadProducts();
     }
-  }, [selectedMarketplace, page]);
+  }, [selectedMarketplace]);
 
   const loadProducts = async () => {
     if (!selectedMarketplace) return;
@@ -58,14 +66,15 @@ export function MarketplaceProducts({ connectedMarketplaces, fetchMarketplaceDat
     setError(null);
     
     try {
+      // Fetch ALL products with fetchAll flag
       const result = await fetchMarketplaceData(selectedMarketplace, 'products', { 
-        limit: 50, 
-        page 
+        limit: 200, 
+        fetchAll: true 
       });
       
       if (result.success) {
         setProducts(result.data || []);
-        setTotal(result.total || 0);
+        setTotal(result.total || result.data?.length || 0);
       } else {
         setError(result.error || 'Mahsulotlarni yuklashda xatolik');
         setProducts([]);
@@ -86,10 +95,7 @@ export function MarketplaceProducts({ connectedMarketplaces, fetchMarketplaceDat
 
   const formatPrice = (price?: number) => {
     if (!price && price !== 0) return '—';
-    return new Intl.NumberFormat('uz-UZ', { 
-      style: 'decimal',
-      minimumFractionDigits: 0 
-    }).format(price) + ' so\'m';
+    return new Intl.NumberFormat('uz-UZ').format(price) + ' so\'m';
   };
 
   const getAvailabilityBadge = (availability?: string) => {
@@ -100,24 +106,24 @@ export function MarketplaceProducts({ connectedMarketplaces, fetchMarketplaceDat
       case 'READY':
       case 'HAS_CARD_CAN_UPDATE':
       case 'HAS_CARD_NO_UPDATE':
-        return <Badge variant="default" className="bg-green-500">Faol</Badge>;
+        return <Badge variant="default" className="bg-green-500 whitespace-nowrap">Faol</Badge>;
       case 'INACTIVE':
       case 'UNPUBLISHED':
       case 'DISABLED_BY_PARTNER':
-        return <Badge variant="secondary">Nofaol</Badge>;
+        return <Badge variant="secondary" className="whitespace-nowrap">Nofaol</Badge>;
       case 'DELISTED':
       case 'REJECTED':
       case 'DISABLED_AUTOMATICALLY':
-        return <Badge variant="destructive">O'chirilgan</Badge>;
+        return <Badge variant="destructive" className="whitespace-nowrap">O'chirilgan</Badge>;
       case 'MODERATION':
       case 'PROCESSING':
       case 'CREATING_CARD':
       case 'NO_CARD':
-        return <Badge variant="outline" className="bg-yellow-100 text-yellow-800">Moderatsiyada</Badge>;
+        return <Badge variant="outline" className="bg-yellow-100 text-yellow-800 whitespace-nowrap">Moderatsiya</Badge>;
       case 'ARCHIVED':
-        return <Badge variant="secondary">Arxivlangan</Badge>;
+        return <Badge variant="secondary" className="whitespace-nowrap">Arxiv</Badge>;
       default:
-        return <Badge variant="outline">{availability || 'Noma\'lum'}</Badge>;
+        return <Badge variant="outline" className="whitespace-nowrap">{availability || 'Noma\'lum'}</Badge>;
     }
   };
 
@@ -140,16 +146,12 @@ export function MarketplaceProducts({ connectedMarketplaces, fetchMarketplaceDat
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between">
         <div className="flex flex-wrap gap-2">
-          {/* Marketplace tabs */}
           {connectedMarketplaces.map((mp) => (
             <Button
               key={mp}
               variant={selectedMarketplace === mp ? 'default' : 'outline'}
               size="sm"
-              onClick={() => {
-                setSelectedMarketplace(mp);
-                setPage(1);
-              }}
+              onClick={() => setSelectedMarketplace(mp)}
             >
               {mp === 'yandex' ? '🟡 Yandex' : mp === 'uzum' ? '🟣 Uzum' : mp}
             </Button>
@@ -176,7 +178,7 @@ export function MarketplaceProducts({ connectedMarketplaces, fetchMarketplaceDat
           </Button>
           <Button size="sm">
             <Plus className="h-4 w-4 mr-2" />
-            Yangi mahsulot
+            Yangi
           </Button>
         </div>
       </div>
@@ -198,7 +200,7 @@ export function MarketplaceProducts({ connectedMarketplaces, fetchMarketplaceDat
 
       {/* Products table */}
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2">
             <Package className="h-5 w-5" />
             Mahsulotlar
@@ -207,7 +209,7 @@ export function MarketplaceProducts({ connectedMarketplaces, fetchMarketplaceDat
             )}
           </CardTitle>
           <CardDescription>
-            {selectedMarketplace === 'yandex' ? 'Yandex Market' : selectedMarketplace} dagi mahsulotlar
+            {MARKETPLACE_NAMES[selectedMarketplace] || selectedMarketplace} dagi mahsulotlar
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -215,7 +217,7 @@ export function MarketplaceProducts({ connectedMarketplaces, fetchMarketplaceDat
             <div className="space-y-3">
               {[1, 2, 3, 4, 5].map((i) => (
                 <div key={i} className="flex items-center gap-4">
-                  <Skeleton className="h-12 w-12 rounded" />
+                  <Skeleton className="h-16 w-16 rounded" />
                   <div className="flex-1 space-y-2">
                     <Skeleton className="h-4 w-3/4" />
                     <Skeleton className="h-3 w-1/4" />
@@ -233,57 +235,65 @@ export function MarketplaceProducts({ connectedMarketplaces, fetchMarketplaceDat
               )}
             </div>
           ) : (
-            <div className="rounded-md border">
+            <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-12"></TableHead>
-                    <TableHead>Mahsulot</TableHead>
-                    <TableHead>SKU</TableHead>
-                    <TableHead>Narxi</TableHead>
-                    <TableHead>Zaxira</TableHead>
-                    <TableHead>Holat</TableHead>
+                    <TableHead className="w-20">Rasm</TableHead>
+                    <TableHead className="min-w-[200px]">Mahsulot</TableHead>
+                    <TableHead className="w-32">SKU</TableHead>
+                    <TableHead className="w-36 text-right">Narxi</TableHead>
+                    <TableHead className="w-24 text-center">FBO</TableHead>
+                    <TableHead className="w-24 text-center">FBS</TableHead>
+                    <TableHead className="w-28 text-center">Holat</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredProducts.map((product) => (
                     <TableRow key={product.offerId}>
-                      <TableCell>
-                        {product.pictures && product.pictures.length > 0 ? (
-                          <img 
-                            src={product.pictures[0]} 
-                            alt={product.name}
-                            className="w-10 h-10 object-cover rounded"
-                            onError={(e) => {
-                              e.currentTarget.style.display = 'none';
-                              e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                            }}
-                          />
-                        ) : null}
-                        <div className={`w-10 h-10 bg-muted rounded flex items-center justify-center ${product.pictures?.length ? 'hidden' : ''}`}>
-                          <Image className="h-5 w-5 text-muted-foreground" />
+                      <TableCell className="p-2">
+                        <div className="w-16 h-16 rounded-lg overflow-hidden bg-muted flex items-center justify-center flex-shrink-0">
+                          {product.pictures && product.pictures.length > 0 ? (
+                            <img 
+                              src={product.pictures[0]} 
+                              alt={product.name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                                e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                              }}
+                            />
+                          ) : null}
+                          <div className={`flex items-center justify-center ${product.pictures?.length ? 'hidden' : ''}`}>
+                            <Image className="h-6 w-6 text-muted-foreground" />
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div>
-                          <div className="font-medium line-clamp-1">{product.name || 'Nomsiz'}</div>
-                          <div className="text-xs text-muted-foreground">{product.offerId}</div>
+                        <div className="min-w-0">
+                          <div className="font-medium line-clamp-2">{product.name || 'Nomsiz'}</div>
+                          <div className="text-xs text-muted-foreground mt-1">{product.offerId}</div>
                         </div>
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {product.shopSku || '—'}
+                      <TableCell>
+                        <code className="text-xs bg-muted px-1.5 py-0.5 rounded block truncate max-w-[100px]">
+                          {product.shopSku || '—'}
+                        </code>
                       </TableCell>
-                      <TableCell className="font-medium">
+                      <TableCell className="text-right font-medium whitespace-nowrap">
                         {formatPrice(product.price)}
                       </TableCell>
-                      <TableCell>
-                        {product.stockCount !== undefined ? (
-                          <Badge variant={product.stockCount > 0 ? 'outline' : 'destructive'}>
-                            {product.stockCount} dona
-                          </Badge>
-                        ) : '—'}
+                      <TableCell className="text-center">
+                        <Badge variant={(product.stockFBO || 0) > 0 ? 'outline' : 'secondary'} className="whitespace-nowrap">
+                          {product.stockFBO || 0}
+                        </Badge>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant={(product.stockFBS || 0) > 0 ? 'default' : 'destructive'} className="whitespace-nowrap">
+                          {product.stockFBS || 0}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
                         {getAvailabilityBadge(product.availability)}
                       </TableCell>
                     </TableRow>
@@ -293,30 +303,10 @@ export function MarketplaceProducts({ connectedMarketplaces, fetchMarketplaceDat
             </div>
           )}
 
-          {/* Pagination */}
-          {total > 50 && (
-            <div className="flex items-center justify-between mt-4">
-              <p className="text-sm text-muted-foreground">
-                {((page - 1) * 50) + 1} - {Math.min(page * 50, total)} / {total}
-              </p>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page === 1 || isLoading}
-                  onClick={() => setPage(p => p - 1)}
-                >
-                  Oldingi
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page * 50 >= total || isLoading}
-                  onClick={() => setPage(p => p + 1)}
-                >
-                  Keyingi
-                </Button>
-              </div>
+          {/* Results count */}
+          {!isLoading && filteredProducts.length > 0 && (
+            <div className="mt-4 text-sm text-muted-foreground text-center">
+              Ko'rsatilmoqda: {filteredProducts.length} / {total} mahsulot
             </div>
           )}
         </CardContent>

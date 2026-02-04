@@ -16,9 +16,9 @@ interface PriceManagerProps {
 }
 
 const MARKETPLACE_NAMES: Record<string, string> = {
-  yandex: 'Yandex Market',
-  uzum: 'Uzum Market',
-  wildberries: 'Wildberries',
+  yandex: 'Yandex',
+  uzum: 'Uzum',
+  wildberries: 'WB',
   ozon: 'Ozon',
 };
 
@@ -26,8 +26,8 @@ interface ProductPrice {
   id: string;
   name: string;
   sku: string;
-  prices: Record<string, number>;
-  avgPrice: number;
+  price: number;
+  marketplace: string;
 }
 
 export function PriceManager({ connectedMarketplaces, fetchMarketplaceData }: PriceManagerProps) {
@@ -48,38 +48,28 @@ export function PriceManager({ connectedMarketplaces, fetchMarketplaceData }: Pr
     setIsLoading(true);
     
     try {
-      const productMap = new Map<string, ProductPrice>();
+      const allProducts: ProductPrice[] = [];
 
       for (const marketplace of connectedMarketplaces) {
-        const result = await fetchMarketplaceData(marketplace, 'products', { limit: 100 });
+        const result = await fetchMarketplaceData(marketplace, 'products', { 
+          limit: 200, 
+          fetchAll: true 
+        });
         
         if (result.success && result.data) {
           result.data.forEach((product: any) => {
-            const sku = product.shopSku || product.offerId;
-            const price = product.price || 0;
-            const existing = productMap.get(sku);
-            
-            if (existing) {
-              existing.prices[marketplace] = price;
-              // Recalculate average
-              const prices = Object.values(existing.prices).filter(p => p > 0);
-              existing.avgPrice = prices.length > 0 
-                ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length)
-                : 0;
-            } else {
-              productMap.set(sku, {
-                id: product.offerId,
-                name: product.name || 'Nomsiz',
-                sku: sku,
-                prices: { [marketplace]: price },
-                avgPrice: price,
-              });
-            }
+            allProducts.push({
+              id: product.offerId,
+              name: product.name || 'Nomsiz',
+              sku: product.shopSku || product.offerId,
+              price: product.price || 0,
+              marketplace,
+            });
           });
         }
       }
 
-      setProducts(Array.from(productMap.values()));
+      setProducts(allProducts);
     } catch (err) {
       console.error('Error loading prices:', err);
     } finally {
@@ -89,10 +79,10 @@ export function PriceManager({ connectedMarketplaces, fetchMarketplaceData }: Pr
 
   const formatPrice = (price?: number) => {
     if (!price && price !== 0) return '—';
-    return new Intl.NumberFormat('uz-UZ', { 
-      style: 'decimal',
-      minimumFractionDigits: 0 
-    }).format(price) + ' so\'m';
+    if (price >= 1000000) {
+      return (price / 1000000).toFixed(1) + ' mln';
+    }
+    return new Intl.NumberFormat('uz-UZ').format(price) + ' so\'m';
   };
 
   if (connectedMarketplaces.length === 0) {
@@ -111,29 +101,31 @@ export function PriceManager({ connectedMarketplaces, fetchMarketplaceData }: Pr
 
   const totalProducts = products.length;
   const avgOverallPrice = products.length > 0 
-    ? Math.round(products.reduce((sum, p) => sum + p.avgPrice, 0) / products.length)
+    ? Math.round(products.reduce((sum, p) => sum + p.price, 0) / products.length)
     : 0;
+  const minPrice = products.length > 0 ? Math.min(...products.map(p => p.price).filter(p => p > 0)) : 0;
+  const maxPrice = products.length > 0 ? Math.max(...products.map(p => p.price)) : 0;
 
   return (
     <div className="space-y-6">
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
         <Card>
           <CardContent className="pt-4">
             <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
               <Calculator className="h-4 w-4" />
-              O'rtacha narx
+              O'rtacha
             </div>
-            <div className="text-2xl font-bold">{formatPrice(avgOverallPrice)}</div>
+            <div className="text-lg md:text-2xl font-bold">{formatPrice(avgOverallPrice)}</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4">
             <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
               <TrendingUp className="h-4 w-4" />
-              Minimal foyda %
+              Min foyda
             </div>
-            <div className="text-2xl font-bold text-green-600">{minProfit}%</div>
+            <div className="text-lg md:text-2xl font-bold text-green-600">{minProfit}%</div>
           </CardContent>
         </Card>
         <Card>
@@ -142,7 +134,7 @@ export function PriceManager({ connectedMarketplaces, fetchMarketplaceData }: Pr
               <Eye className="h-4 w-4" />
               Monitoring
             </div>
-            <div className="text-2xl font-bold">{totalProducts}</div>
+            <div className="text-lg md:text-2xl font-bold">{totalProducts}</div>
             <div className="text-xs text-muted-foreground">mahsulot</div>
           </CardContent>
         </Card>
@@ -150,9 +142,9 @@ export function PriceManager({ connectedMarketplaces, fetchMarketplaceData }: Pr
           <CardContent className="pt-4">
             <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
               <AlertCircle className="h-4 w-4" />
-              Marketplacelar
+              MP
             </div>
-            <div className="text-2xl font-bold text-primary">{connectedMarketplaces.length}</div>
+            <div className="text-lg md:text-2xl font-bold text-primary">{connectedMarketplaces.length}</div>
             <div className="text-xs text-muted-foreground">ulangan</div>
           </CardContent>
         </Card>
@@ -167,18 +159,18 @@ export function PriceManager({ connectedMarketplaces, fetchMarketplaceData }: Pr
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
             <div className="p-4 rounded-lg bg-muted/50 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Avtomatik narxlash</span>
+                <span className="text-sm font-medium">Avto-narx</span>
                 <Switch checked={autoPricing} onCheckedChange={setAutoPricing} />
               </div>
               <p className="text-xs text-muted-foreground">
-                Raqobatchilar asosida avtomatik
+                Raqobatchilar asosida
               </p>
             </div>
             <div className="p-4 rounded-lg bg-muted/50 space-y-2">
-              <label className="text-sm font-medium">Minimal foyda %</label>
+              <label className="text-sm font-medium">Min foyda %</label>
               <div className="flex items-center gap-2">
                 <Input 
                   type="number" 
@@ -190,12 +182,12 @@ export function PriceManager({ connectedMarketplaces, fetchMarketplaceData }: Pr
               </div>
             </div>
             <div className="p-4 rounded-lg bg-muted/50 space-y-2">
-              <div className="text-sm font-medium">Narx yuvarlash</div>
-              <Badge variant="outline">99 ga tugasin</Badge>
+              <div className="text-sm font-medium">Yuvarlash</div>
+              <Badge variant="outline">99 ga</Badge>
             </div>
             <div className="p-4 rounded-lg bg-muted/50 space-y-2">
-              <div className="text-sm font-medium">Yangilash chastotasi</div>
-              <Badge variant="outline">Har 1 soatda</Badge>
+              <div className="text-sm font-medium">Yangilash</div>
+              <Badge variant="outline">1 soat</Badge>
             </div>
           </div>
         </CardContent>
@@ -214,7 +206,7 @@ export function PriceManager({ connectedMarketplaces, fetchMarketplaceData }: Pr
                 )}
               </CardTitle>
               <CardDescription>
-                Marketplacedagi haqiqiy narxlar
+                Marketplacedagi haqiqiy narxlar (so'm)
               </CardDescription>
             </div>
             <Button variant="outline" size="sm" onClick={loadPricesFromMarketplaces}>
@@ -245,40 +237,39 @@ export function PriceManager({ connectedMarketplaces, fetchMarketplaceData }: Pr
                 <thead>
                   <tr className="border-b">
                     <th className="text-left py-3 px-2 text-sm font-medium">Mahsulot</th>
-                    <th className="text-left py-3 px-2 text-sm font-medium">SKU</th>
-                    {connectedMarketplaces.map(mp => (
-                      <th key={mp} className="text-right py-3 px-2 text-sm font-medium">
-                        {MARKETPLACE_NAMES[mp]}
-                      </th>
-                    ))}
-                    <th className="text-right py-3 px-2 text-sm font-medium">O'rtacha</th>
+                    <th className="text-left py-3 px-2 text-sm font-medium w-28">SKU</th>
+                    <th className="text-center py-3 px-2 text-sm font-medium w-20">MP</th>
+                    <th className="text-right py-3 px-2 text-sm font-medium w-36">Narxi</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {products.map(product => (
-                    <tr key={product.id} className="border-b hover:bg-muted/50">
+                  {products.slice(0, 100).map((product, idx) => (
+                    <tr key={`${product.id}-${product.marketplace}-${idx}`} className="border-b hover:bg-muted/50">
                       <td className="py-3 px-2">
                         <div className="font-medium text-sm line-clamp-1">{product.name}</div>
                       </td>
                       <td className="py-3 px-2">
-                        <code className="text-xs bg-muted px-1.5 py-0.5 rounded">{product.sku}</code>
+                        <code className="text-xs bg-muted px-1.5 py-0.5 rounded truncate block max-w-[100px]">{product.sku}</code>
                       </td>
-                      {connectedMarketplaces.map(mp => (
-                        <td key={mp} className="text-right py-3 px-2">
-                          <span className="font-medium">
-                            {formatPrice(product.prices[mp])}
-                          </span>
-                        </td>
-                      ))}
-                      <td className="text-right py-3 px-2">
-                        <Badge variant="outline" className="bg-primary/10">
-                          {formatPrice(product.avgPrice)}
+                      <td className="text-center py-3 px-2">
+                        <Badge variant="outline" className="text-xs">
+                          {MARKETPLACE_NAMES[product.marketplace]}
                         </Badge>
+                      </td>
+                      <td className="text-right py-3 px-2">
+                        <span className="font-bold whitespace-nowrap">
+                          {formatPrice(product.price)}
+                        </span>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              {products.length > 100 && (
+                <div className="mt-4 text-sm text-muted-foreground text-center">
+                  Ko'rsatilmoqda: 100 / {products.length} mahsulot
+                </div>
+              )}
             </div>
           )}
         </CardContent>

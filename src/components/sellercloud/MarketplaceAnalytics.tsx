@@ -47,15 +47,24 @@ export function MarketplaceAnalytics({ connectedMarketplaces, fetchMarketplaceDa
       let totalRevenue = 0;
 
       for (const marketplace of connectedMarketplaces) {
+        // Fetch all products and orders
         const [productsResult, ordersResult] = await Promise.all([
-          fetchMarketplaceData(marketplace, 'products', { limit: 1 }),
-          fetchMarketplaceData(marketplace, 'orders', {}),
+          fetchMarketplaceData(marketplace, 'products', { limit: 200, fetchAll: true }),
+          fetchMarketplaceData(marketplace, 'orders', { fetchAll: true }),
         ]);
 
-        const productsCount = productsResult.total || 0;
+        const productsCount = productsResult.total || productsResult.data?.length || 0;
         const orders = ordersResult.data || [];
         const ordersCount = orders.length;
-        const revenue = orders.reduce((sum: number, order: any) => sum + (order.total || 0), 0);
+        
+        // Calculate revenue from orders (use UZS converted value)
+        const revenue = orders.reduce((sum: number, order: any) => {
+          // Use totalUZS if available (converted from RUB), otherwise use total
+          const orderTotal = order.totalUZS || order.total || 0;
+          return sum + orderTotal;
+        }, 0);
+
+        console.log(`${marketplace}: ${productsCount} products, ${ordersCount} orders, ${revenue} so'm revenue`);
 
         marketplaceStats.push({
           marketplace,
@@ -79,10 +88,10 @@ export function MarketplaceAnalytics({ connectedMarketplaces, fetchMarketplaceDa
   };
 
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('uz-UZ', { 
-      style: 'decimal',
-      minimumFractionDigits: 0 
-    }).format(price) + ' so\'m';
+    if (price >= 1000000) {
+      return (price / 1000000).toFixed(1) + ' mln so\'m';
+    }
+    return new Intl.NumberFormat('uz-UZ').format(price) + ' so\'m';
   };
 
   if (connectedMarketplaces.length === 0) {
@@ -113,7 +122,7 @@ export function MarketplaceAnalytics({ connectedMarketplaces, fetchMarketplaceDa
               <Skeleton className="h-8 w-24" />
             ) : (
               <>
-                <div className="text-2xl font-bold">{formatPrice(totals.revenue)}</div>
+                <div className="text-xl md:text-2xl font-bold">{formatPrice(totals.revenue)}</div>
                 <div className="text-xs text-muted-foreground">So'nggi 30 kun</div>
               </>
             )}
@@ -129,7 +138,7 @@ export function MarketplaceAnalytics({ connectedMarketplaces, fetchMarketplaceDa
               <Skeleton className="h-8 w-16" />
             ) : (
               <>
-                <div className="text-2xl font-bold">{totals.orders}</div>
+                <div className="text-xl md:text-2xl font-bold">{totals.orders}</div>
                 <div className="text-xs text-muted-foreground">So'nggi 30 kun</div>
               </>
             )}
@@ -145,7 +154,7 @@ export function MarketplaceAnalytics({ connectedMarketplaces, fetchMarketplaceDa
               <Skeleton className="h-8 w-16" />
             ) : (
               <>
-                <div className="text-2xl font-bold">{totals.products}</div>
+                <div className="text-xl md:text-2xl font-bold">{totals.products}</div>
                 <div className="text-xs text-muted-foreground">Jami</div>
               </>
             )}
@@ -161,7 +170,7 @@ export function MarketplaceAnalytics({ connectedMarketplaces, fetchMarketplaceDa
               <Skeleton className="h-8 w-24" />
             ) : (
               <>
-                <div className="text-2xl font-bold">
+                <div className="text-xl md:text-2xl font-bold">
                   {totals.orders > 0 ? formatPrice(Math.round(totals.revenue / totals.orders)) : '—'}
                 </div>
                 <div className="text-xs text-muted-foreground">Buyurtma uchun</div>
@@ -179,8 +188,8 @@ export function MarketplaceAnalytics({ connectedMarketplaces, fetchMarketplaceDa
               <CardTitle>Marketplace bo'yicha statistika</CardTitle>
               <CardDescription>Har bir marketplace uchun alohida ko'rsatkichlar</CardDescription>
             </div>
-            <Button variant="outline" size="sm" onClick={loadAnalytics}>
-              <RefreshCw className="h-4 w-4 mr-2" />
+            <Button variant="outline" size="sm" onClick={loadAnalytics} disabled={isLoading}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
               Yangilash
             </Button>
           </div>

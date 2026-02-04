@@ -40,6 +40,7 @@ interface MarketplaceOrder {
   substatus?: string;
   createdAt: string;
   total: number;
+  totalUZS?: number;
   itemsTotal: number;
   deliveryTotal: number;
   buyer?: {
@@ -91,7 +92,7 @@ export function MarketplaceOrders({ connectedMarketplaces, fetchMarketplaceData 
     setError(null);
     
     try {
-      const options: Record<string, any> = {};
+      const options: Record<string, any> = { fetchAll: true };
       if (statusFilter && statusFilter !== 'all') {
         options.status = statusFilter;
       }
@@ -100,7 +101,7 @@ export function MarketplaceOrders({ connectedMarketplaces, fetchMarketplaceData 
       
       if (result.success) {
         setOrders(result.data || []);
-        setTotal(result.total || 0);
+        setTotal(result.total || result.data?.length || 0);
       } else {
         setError(result.error || 'Buyurtmalarni yuklashda xatolik');
         setOrders([]);
@@ -293,7 +294,7 @@ export function MarketplaceOrders({ connectedMarketplaces, fetchMarketplaceData 
                             {getStatusBadge(order.status, order.substatus)}
                             
                             <div className="text-right">
-                              <div className="font-bold">{formatPrice(order.total)}</div>
+                              <div className="font-bold">{formatPrice(order.totalUZS || order.total)}</div>
                               <div className="text-xs text-muted-foreground">
                                 {order.items?.length || 0} mahsulot
                               </div>
@@ -347,7 +348,7 @@ export function MarketplaceOrders({ connectedMarketplaces, fetchMarketplaceData 
                           </div>
                           <div>
                             <div className="text-muted-foreground">Jami:</div>
-                            <div className="font-bold text-primary">{formatPrice(order.total)}</div>
+                            <div className="font-bold text-primary">{formatPrice(order.totalUZS || order.total)}</div>
                           </div>
                         </div>
                       </div>

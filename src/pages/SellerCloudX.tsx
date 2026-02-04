@@ -317,7 +317,10 @@ export default function SellerCloudX() {
           </TabsContent>
 
           <TabsContent value="reports">
-            <ReportsExport connectedMarketplaces={connectedMarketplaces} />
+            <ReportsExport 
+              connectedMarketplaces={connectedMarketplaces}
+              fetchMarketplaceData={fetchMarketplaceData}
+            />
           </TabsContent>
 
           <TabsContent value="notifications">
