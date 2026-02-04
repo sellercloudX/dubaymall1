@@ -30,10 +30,22 @@ export default function SellerCloudX() {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [hasSubscription, setHasSubscription] = useState(false);
-  const { connections, isLoading: connectionsLoading } = useMarketplaceConnections();
+  const { 
+    connections, 
+    isLoading: connectionsLoading, 
+    connectMarketplace,
+    syncMarketplace,
+    refetch
+  } = useMarketplaceConnections();
   
   // Derive connected marketplace IDs from connections
   const connectedMarketplaces = connections.map(c => c.marketplace);
+
+  // Handle marketplace connection - refetch to update all components
+  const handleMarketplaceConnect = async (marketplace: string) => {
+    await refetch();
+    toast.success(`${marketplace} ma'lumotlari yangilandi`);
+  };
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -169,20 +181,26 @@ export default function SellerCloudX() {
           </Card>
           <Card>
             <CardContent className="pt-4">
-              <div className="text-2xl font-bold">0</div>
+              <div className="text-2xl font-bold">
+                {connections.reduce((sum, c) => sum + (c.products_count || 0), 0)}
+              </div>
               <div className="text-sm text-muted-foreground">Jami mahsulotlar</div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-4">
-              <div className="text-2xl font-bold">0</div>
-              <div className="text-sm text-muted-foreground">Bugungi buyurtmalar</div>
+              <div className="text-2xl font-bold">
+                {connections.reduce((sum, c) => sum + (c.orders_count || 0), 0)}
+              </div>
+              <div className="text-sm text-muted-foreground">Jami buyurtmalar</div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-4">
-              <div className="text-2xl font-bold">$0</div>
-              <div className="text-sm text-muted-foreground">Bugungi daromad</div>
+              <div className="text-2xl font-bold">
+                ${connections.reduce((sum, c) => sum + (c.total_revenue || 0), 0).toLocaleString()}
+              </div>
+              <div className="text-sm text-muted-foreground">Jami daromad</div>
             </CardContent>
           </Card>
         </div>
@@ -233,7 +251,13 @@ export default function SellerCloudX() {
           </TabsList>
 
           <TabsContent value="marketplaces">
-            <MarketplaceOAuth />
+            <MarketplaceOAuth 
+              connections={connections}
+              isLoading={connectionsLoading}
+              connectMarketplace={connectMarketplace}
+              syncMarketplace={syncMarketplace}
+              onConnect={handleMarketplaceConnect}
+            />
           </TabsContent>
 
           <TabsContent value="scanner">
