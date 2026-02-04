@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -32,6 +33,7 @@ export default function SellerCloudX() {
   const { user, loading: authLoading } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const { 
     connections, 
     isLoading: connectionsLoading, 
@@ -59,6 +61,13 @@ export default function SellerCloudX() {
     await refetch();
     toast.success(`${marketplace} ma'lumotlari yangilandi`);
   };
+
+  // Redirect mobile users to mobile version
+  useEffect(() => {
+    if (isMobile && subscription) {
+      navigate('/seller-cloud-mobile', { replace: true });
+    }
+  }, [isMobile, subscription, navigate]);
 
   useEffect(() => {
     if (!authLoading && !user) {

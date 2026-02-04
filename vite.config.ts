@@ -67,7 +67,7 @@ export default defineConfig(({ mode }) => ({
           {
             name: 'SellerCloudX',
             short_name: 'SellerCloud',
-            url: '/seller-cloud',
+            url: '/seller-cloud-mobile',
             icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }]
           }
         ]
