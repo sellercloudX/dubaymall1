@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,21 +12,81 @@ serve(async (req) => {
   }
 
   try {
-    const { imageBase64, productName, productDescription, category } = await req.json();
+    // Authentication check
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-    if (!imageBase64) {
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    
+    if (claimsError || !claimsData?.claims) {
+      return new Response(
+        JSON.stringify({ error: "Invalid authentication" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const body = await req.json();
+    const { imageBase64, productName, productDescription, category } = body;
+
+    // Input validation
+    if (!imageBase64 || typeof imageBase64 !== 'string') {
       return new Response(
         JSON.stringify({ error: "Image is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    // Validate base64 format
+    if (!imageBase64.startsWith('data:image/') && !imageBase64.match(/^[A-Za-z0-9+/=]+$/)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid image format" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    console.log("Enhancing product image for:", productName, "category:", category);
+    // Limit image size (roughly 10MB base64)
+    if (imageBase64.length > 14000000) {
+      return new Response(
+        JSON.stringify({ error: "Image too large" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (productName && (typeof productName !== 'string' || productName.length > 500)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid product name" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (category && (typeof category !== 'string' || category.length > 100)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid category" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) {
+      return new Response(
+        JSON.stringify({ error: "Service unavailable" }),
+        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`Enhancing product image for user ${claimsData.claims.sub}:`, productName?.slice(0, 50), "category:", category?.slice(0, 30));
 
     // Category-specific background and styling - KEEPING THE EXACT PRODUCT
     const categoryStyles: Record<string, string> = {
@@ -82,7 +143,7 @@ DO NOT replace or redraw the product - only enhance the surroundings`
     };
 
     // Determine style based on category
-    const categoryKey = category?.toLowerCase() || "default";
+    const categoryKey = category?.toLowerCase().slice(0, 50) || "default";
     const stylePrompt = categoryStyles[categoryKey] || categoryStyles["default"];
 
     const prompt = `${stylePrompt}
@@ -127,17 +188,19 @@ OUTPUT: A professional marketplace photo with the SAME EXACT product on enhanced
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("AI Gateway error:", response.status, errorText);
+      console.error("AI Gateway error:", response.status);
       
       if (response.status === 429) {
         return new Response(
-          JSON.stringify({ error: "Rate limit exceeded, please try again later" }),
+          JSON.stringify({ error: "Service busy, please try again" }),
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
       
-      throw new Error("AI image enhancement failed");
+      return new Response(
+        JSON.stringify({ error: "Image enhancement failed" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const data = await response.json();
@@ -147,8 +210,11 @@ OUTPUT: A professional marketplace photo with the SAME EXACT product on enhanced
     const enhancedImage = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
     
     if (!enhancedImage) {
-      console.error("No image in response:", JSON.stringify(data));
-      throw new Error("No image generated");
+      console.error("No image in response");
+      return new Response(
+        JSON.stringify({ error: "Image generation failed" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     return new Response(
@@ -161,7 +227,7 @@ OUTPUT: A professional marketplace photo with the SAME EXACT product on enhanced
   } catch (error) {
     console.error("Error:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      JSON.stringify({ error: "Image enhancement failed" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

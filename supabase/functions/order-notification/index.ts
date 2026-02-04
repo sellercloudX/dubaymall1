@@ -18,15 +18,75 @@ serve(async (req) => {
   }
 
   try {
+    // Authentication check
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+    // Verify user authentication
+    const authSupabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await authSupabase.auth.getClaims(token);
+    
+    if (claimsError || !claimsData?.claims) {
+      return new Response(
+        JSON.stringify({ error: "Invalid authentication" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const callerUserId = claimsData.claims.sub;
+
+    // Use service role for database operations
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { orderId, status, userId }: OrderNotification = await req.json();
+    const body = await req.json();
+    const { orderId, status, userId } = body as OrderNotification;
 
-    console.log("Processing order notification:", { orderId, status, userId });
+    // Input validation
+    if (!orderId || typeof orderId !== 'string' || orderId.length > 100) {
+      return new Response(
+        JSON.stringify({ error: "Invalid order ID" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-    // Get order details
+    if (!status || typeof status !== 'string' || status.length > 50) {
+      return new Response(
+        JSON.stringify({ error: "Invalid status" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!userId || typeof userId !== 'string' || userId.length > 100) {
+      return new Response(
+        JSON.stringify({ error: "Invalid user ID" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const validStatuses = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled', 'out_for_delivery'];
+    if (!validStatuses.includes(status)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid status value" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log("Processing order notification:", { orderId, status });
+
+    // Get order details and verify ownership
     const { data: order, error: orderError } = await supabase
       .from("orders")
       .select(`
@@ -34,15 +94,34 @@ serve(async (req) => {
         order_items (
           product_name,
           quantity,
-          subtotal
+          subtotal,
+          products:product_id (
+            shop_id,
+            shops:shop_id (user_id)
+          )
         )
       `)
       .eq("id", orderId)
       .single();
 
     if (orderError || !order) {
-      console.error("Order not found:", orderError);
-      throw new Error("Order not found");
+      return new Response(
+        JSON.stringify({ error: "Order not found" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Verify caller is order owner or shop owner
+    const isOrderOwner = order.user_id === callerUserId;
+    const isShopOwner = order.order_items?.some((item: any) => 
+      item.products?.shops?.user_id === callerUserId
+    );
+
+    if (!isOrderOwner && !isShopOwner) {
+      return new Response(
+        JSON.stringify({ error: "Access denied" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // Get user profile
@@ -74,11 +153,15 @@ serve(async (req) => {
         title: "Buyurtma bekor qilindi",
         message: `${order.order_number} raqamli buyurtmangiz bekor qilindi.`,
       },
+      out_for_delivery: {
+        title: "Yetkazib berish boshlandi",
+        message: `${order.order_number} raqamli buyurtmangiz yetkazib berilmoqda.`,
+      },
     };
 
     const notification = statusMessages[status] || {
       title: "Buyurtma holati yangilandi",
-      message: `${order.order_number} raqamli buyurtmangiz holati: ${status}`,
+      message: `${order.order_number} raqamli buyurtmangiz holati yangilandi.`,
     };
 
     // Store notification in database for in-app notifications
@@ -94,15 +177,13 @@ serve(async (req) => {
       });
 
     if (notificationError) {
-      console.log("Notification table may not exist, skipping in-app notification");
+      console.log("Notification insert skipped:", notificationError.code);
     }
 
     // Log the notification (in production, this would send SMS/email)
     console.log("Notification sent:", {
       userId,
-      phone: profile?.phone,
       title: notification.title,
-      message: notification.message,
     });
 
     return new Response(
@@ -118,7 +199,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      JSON.stringify({ error: "Notification failed" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

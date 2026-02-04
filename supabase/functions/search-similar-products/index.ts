@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,7 +22,7 @@ async function searchWebForProducts(productName: string, category: string): Prom
   // Create comprehensive multi-platform search prompt
   const searchPrompt = `You are an expert e-commerce product researcher. Your task is to find REAL, existing products across multiple online marketplaces.
 
-SEARCH QUERY: "${productName}" ${category ? `in category: ${category}` : ''}
+SEARCH QUERY: "${productName.slice(0, 200)}" ${category ? `in category: ${category.slice(0, 50)}` : ''}
 
 Search and find products from these platforms (prioritize platforms with good product images):
 1. **Uzum Market** (uzum.uz) - Uzbekistan's main marketplace
@@ -101,7 +102,7 @@ Make sure images are real product images from the actual marketplace product pag
 async function searchForProductImages(productName: string): Promise<string[]> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   
-  const imageSearchPrompt = `Find 5 high-quality product images for: "${productName}"
+  const imageSearchPrompt = `Find 5 high-quality product images for: "${productName.slice(0, 200)}"
 
 Look for:
 - Professional product photography
@@ -147,21 +148,58 @@ serve(async (req) => {
   }
 
   try {
-    const { productName, category, description, searchMode } = await req.json();
-
-    if (!productName) {
+    // Authentication check
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
       return new Response(
-        JSON.stringify({ error: "Product name is required" }),
+        JSON.stringify({ error: "Unauthorized", products: [] }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    
+    if (claimsError || !claimsData?.claims) {
+      return new Response(
+        JSON.stringify({ error: "Invalid authentication", products: [] }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const body = await req.json();
+    const { productName, category, description, searchMode } = body;
+
+    // Input validation
+    if (!productName || typeof productName !== 'string' || productName.length > 500) {
+      return new Response(
+        JSON.stringify({ error: "Invalid product name", products: [] }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (category && (typeof category !== 'string' || category.length > 200)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid category", products: [] }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+      return new Response(
+        JSON.stringify({ error: "Service unavailable", products: [] }),
+        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    console.log("🔍 Multi-platform search for:", productName);
+    console.log(`🔍 Multi-platform search for: ${productName} by user ${claimsData.claims.sub}`);
 
     // Perform comprehensive web search across platforms
     const products = await searchWebForProducts(productName, category || "");
@@ -183,7 +221,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Search error:", error);
     return new Response(
-      JSON.stringify({ products: [], error: error instanceof Error ? error.message : "Unknown error" }),
+      JSON.stringify({ products: [], error: "Search failed" }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

@@ -18,25 +18,69 @@ serve(async (req) => {
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    );
+    // Authentication check
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
-    const { orderId, action }: OrderRequest = await req.json();
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
 
-    if (!orderId) {
-      throw new Error('Order ID is required');
+    // Verify user authentication
+    const authSupabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await authSupabase.auth.getClaims(token);
+    
+    if (claimsError || !claimsData?.claims) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Invalid authentication' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const userId = claimsData.claims.sub;
+
+    // Use service role for database operations
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const body = await req.json();
+    const { orderId, action } = body as OrderRequest;
+
+    // Input validation
+    if (!orderId || typeof orderId !== 'string' || orderId.length > 100) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Invalid order ID' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!action || !['create', 'check_status', 'get_tracking'].includes(action)) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Invalid action' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const CJDROPSHIPPING_API_KEY = Deno.env.get('CJDROPSHIPPING_API_KEY');
     if (!CJDROPSHIPPING_API_KEY) {
-      throw new Error('CJDropshipping API key not configured');
+      console.error('CJDropshipping API key not configured');
+      return new Response(
+        JSON.stringify({ success: false, error: 'Service unavailable' }),
+        { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Extract token from API key
     const parts = CJDROPSHIPPING_API_KEY.split('@api@');
-    const token = parts.length === 2 ? parts[1] : CJDROPSHIPPING_API_KEY;
+    const apiToken = parts.length === 2 ? parts[1] : CJDROPSHIPPING_API_KEY;
 
     // Get dropshipping order details
     const { data: dropOrder, error: dropError } = await supabase
@@ -44,14 +88,29 @@ serve(async (req) => {
       .select(`
         *,
         orders:order_id (*),
-        products:product_id (*)
+        products:product_id (*),
+        shops:shop_id (user_id)
       `)
       .eq('order_id', orderId)
       .single();
 
     if (dropError || !dropOrder) {
-      throw new Error('Dropshipping order not found');
+      return new Response(
+        JSON.stringify({ success: false, error: 'Order not found' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
+
+    // Verify user owns this order's shop
+    const shopUserId = (dropOrder.shops as any)?.user_id;
+    if (shopUserId !== userId) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Access denied' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`Processing dropshipping action: ${action} for order ${orderId} by user ${userId}`);
 
     switch (action) {
       case 'create': {
@@ -82,14 +141,14 @@ serve(async (req) => {
         const createResponse = await fetch('https://developers.cjdropshipping.com/api2.0/v1/shopping/order/createOrder', {
           method: 'POST',
           headers: {
-            'CJ-Access-Token': token,
+            'CJ-Access-Token': apiToken,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(orderPayload),
         });
 
         const createData = await createResponse.json();
-        console.log('CJ Order creation response:', JSON.stringify(createData).slice(0, 500));
+        console.log('CJ Order creation completed');
 
         if (createData.result && createData.data) {
           // Update dropshipping order with supplier info
@@ -111,13 +170,26 @@ serve(async (req) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         } else {
-          throw new Error(createData.message || 'Failed to create order at supplier');
+          console.error('CJ order creation failed');
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Supplier order creation failed',
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
         }
       }
 
       case 'check_status': {
         if (!dropOrder.supplier_order_id) {
-          throw new Error('No supplier order ID found');
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'No supplier order found',
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
         }
 
         console.log('Checking order status...');
@@ -125,7 +197,7 @@ serve(async (req) => {
         const statusResponse = await fetch(`https://developers.cjdropshipping.com/api2.0/v1/shopping/order/getOrderDetail?orderId=${dropOrder.supplier_order_id}`, {
           method: 'GET',
           headers: {
-            'CJ-Access-Token': token,
+            'CJ-Access-Token': apiToken,
             'Content-Type': 'application/json',
           },
         });
@@ -166,18 +238,29 @@ serve(async (req) => {
             success: true,
             status: newStatus,
             trackingNumber: orderData.trackNumber || dropOrder.tracking_number,
-            rawData: orderData,
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
 
-        throw new Error('Failed to get order status');
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Status check failed',
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
 
       case 'get_tracking': {
         if (!dropOrder.tracking_number) {
-          throw new Error('No tracking number available');
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'No tracking available',
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
         }
 
         // Return tracking info
@@ -193,17 +276,22 @@ serve(async (req) => {
       }
 
       default:
-        throw new Error('Invalid action');
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Invalid action',
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
     }
 
   } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-    console.error('Error in dropshipping-fulfill:', errorMessage);
+    console.error('Error in dropshipping-fulfill:', err);
     return new Response(JSON.stringify({ 
       success: false,
-      error: errorMessage,
+      error: 'Operation failed',
     }), {
-      status: 400,
+      status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
