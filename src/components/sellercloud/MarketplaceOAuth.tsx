@@ -1,10 +1,10 @@
-import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Dialog,
   DialogContent,
@@ -15,8 +15,9 @@ import {
 import { toast } from 'sonner';
 import { 
   Link2, Check, ExternalLink, Loader2, 
-  Settings, RefreshCw, AlertCircle
+  Settings, RefreshCw, AlertCircle, Package, ShoppingCart, TrendingUp
 } from 'lucide-react';
+import { useMarketplaceConnections } from '@/hooks/useMarketplaceConnections';
 
 interface Marketplace {
   id: string;
@@ -81,13 +82,21 @@ const MARKETPLACES: Marketplace[] = [
 ];
 
 interface MarketplaceOAuthProps {
-  onConnect: (marketplace: string) => void;
-  connectedMarketplaces: string[];
+  onConnect?: (marketplace: string) => void;
 }
 
-export function MarketplaceOAuth({ onConnect, connectedMarketplaces }: MarketplaceOAuthProps) {
+export function MarketplaceOAuth({ onConnect }: MarketplaceOAuthProps) {
+  const { 
+    connections, 
+    isLoading, 
+    connectMarketplace, 
+    syncMarketplace, 
+    refetch 
+  } = useMarketplaceConnections();
+  
   const [connectingId, setConnectingId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [syncingId, setSyncingId] = useState<string | null>(null);
   const [credentials, setCredentials] = useState<Record<string, string>>({});
 
   const handleConnect = async (marketplace: Marketplace) => {
@@ -108,29 +117,71 @@ export function MarketplaceOAuth({ onConnect, connectedMarketplaces }: Marketpla
       return;
     }
 
-    setIsLoading(true);
+    setIsSubmitting(true);
     try {
-      const { data, error } = await supabase.functions.invoke('connect-marketplace', {
-        body: {
-          shopId: 'sellercloud',
-          marketplace: marketplace.id,
-          ...credentials,
-        },
-      });
+      const result = await connectMarketplace(marketplace.id, credentials);
 
-      if (error) throw error;
+      if (!result.success) {
+        toast.error('Ulanish xatosi: ' + (result.error || 'Noma\'lum xato'));
+        return;
+      }
 
-      onConnect(marketplace.id);
+      toast.success(`${marketplace.name} muvaffaqiyatli ulandi!`);
+      
+      if (result.data) {
+        const info = [];
+        if (result.data.productsCount > 0) {
+          info.push(`${result.data.productsCount} ta mahsulot`);
+        }
+        if (result.data.ordersCount > 0) {
+          info.push(`${result.data.ordersCount} ta buyurtma`);
+        }
+        if (info.length > 0) {
+          toast.info(`Topildi: ${info.join(', ')}`);
+        }
+      }
+
+      onConnect?.(marketplace.id);
       setConnectingId(null);
       setCredentials({});
     } catch (error: any) {
       toast.error('Ulanish xatosi: ' + (error.message || 'Noma\'lum xato'));
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
-  const isConnected = (id: string) => connectedMarketplaces.includes(id);
+  const handleSync = async (marketplaceId: string) => {
+    setSyncingId(marketplaceId);
+    try {
+      await syncMarketplace(marketplaceId);
+      toast.success('Ma\'lumotlar yangilandi');
+    } catch (error) {
+      toast.error('Sinxronizatsiya xatosi');
+    } finally {
+      setSyncingId(null);
+    }
+  };
+
+  const getConnection = (marketplaceId: string) => {
+    return connections.find(c => c.marketplace === marketplaceId);
+  };
+
+  const isConnected = (id: string) => !!getConnection(id);
+
+  const formatNumber = (num: number) => {
+    return new Intl.NumberFormat('uz-UZ').format(num);
+  };
+
+  const formatRevenue = (num: number) => {
+    if (num >= 1000000) {
+      return `${(num / 1000000).toFixed(1)}M`;
+    }
+    if (num >= 1000) {
+      return `${(num / 1000).toFixed(0)}K`;
+    }
+    return formatNumber(num);
+  };
 
   return (
     <div className="space-y-6">
@@ -146,83 +197,140 @@ export function MarketplaceOAuth({ onConnect, connectedMarketplaces }: Marketpla
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-2">
-            {MARKETPLACES.map((mp) => (
-              <Card 
-                key={mp.id} 
-                className={`relative overflow-hidden transition-all ${
-                  isConnected(mp.id) ? 'border-green-500/50 bg-green-50/50 dark:bg-green-950/20' : ''
-                } ${mp.status === 'coming_soon' ? 'opacity-60' : ''}`}
-              >
-                {/* Status indicator */}
-                <div className={`absolute top-0 right-0 w-2 h-full ${
-                  isConnected(mp.id) ? 'bg-green-500' : 
-                  mp.status === 'coming_soon' ? 'bg-gray-300' : 'bg-gray-400'
-                }`} />
-                
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${mp.color} flex items-center justify-center text-2xl`}>
-                        {mp.logo}
+          {isLoading ? (
+            <div className="grid gap-4 md:grid-cols-2">
+              {[1, 2, 3, 4].map((i) => (
+                <Card key={i}>
+                  <CardHeader className="pb-3">
+                    <Skeleton className="h-12 w-12 rounded-xl" />
+                    <Skeleton className="h-4 w-24 mt-2" />
+                  </CardHeader>
+                  <CardContent>
+                    <Skeleton className="h-10 w-full" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {MARKETPLACES.map((mp) => {
+                const connection = getConnection(mp.id);
+                const connected = !!connection;
+
+                return (
+                  <Card 
+                    key={mp.id} 
+                    className={`relative overflow-hidden transition-all ${
+                      connected ? 'border-green-500/50 bg-green-50/50 dark:bg-green-950/20' : ''
+                    } ${mp.status === 'coming_soon' ? 'opacity-60' : ''}`}
+                  >
+                    {/* Status indicator */}
+                    <div className={`absolute top-0 right-0 w-2 h-full ${
+                      connected ? 'bg-green-500' : 
+                      mp.status === 'coming_soon' ? 'bg-gray-300' : 'bg-gray-400'
+                    }`} />
+                    
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${mp.color} flex items-center justify-center text-2xl`}>
+                            {mp.logo}
+                          </div>
+                          <div>
+                            <CardTitle className="text-lg">{mp.name}</CardTitle>
+                            <Badge variant={connected ? 'default' : mp.status === 'coming_soon' ? 'outline' : 'secondary'}>
+                              {connected ? (
+                                <><Check className="h-3 w-3 mr-1" /> Ulangan</>
+                              ) : mp.status === 'coming_soon' ? (
+                                'Tez kunda'
+                              ) : (
+                                'Ulanmagan'
+                              )}
+                            </Badge>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <CardTitle className="text-lg">{mp.name}</CardTitle>
-                        <Badge variant={isConnected(mp.id) ? 'default' : mp.status === 'coming_soon' ? 'outline' : 'secondary'}>
-                          {isConnected(mp.id) ? (
-                            <><Check className="h-3 w-3 mr-1" /> Ulangan</>
-                          ) : mp.status === 'coming_soon' ? (
+                    </CardHeader>
+                    
+                    <CardContent>
+                      {connected && connection ? (
+                        <div className="space-y-3">
+                          {/* Store name */}
+                          {connection.account_info?.campaignName && (
+                            <p className="text-sm font-medium text-muted-foreground">
+                              {connection.account_info.campaignName}
+                            </p>
+                          )}
+                          
+                          {/* Stats */}
+                          <div className="grid grid-cols-3 gap-2 text-center">
+                            <div className="p-2 rounded-lg bg-muted/50">
+                              <Package className="h-4 w-4 mx-auto text-muted-foreground mb-1" />
+                              <div className="text-lg font-bold">{formatNumber(connection.products_count)}</div>
+                              <div className="text-xs text-muted-foreground">Mahsulotlar</div>
+                            </div>
+                            <div className="p-2 rounded-lg bg-muted/50">
+                              <ShoppingCart className="h-4 w-4 mx-auto text-muted-foreground mb-1" />
+                              <div className="text-lg font-bold">{formatNumber(connection.orders_count)}</div>
+                              <div className="text-xs text-muted-foreground">Buyurtmalar</div>
+                            </div>
+                            <div className="p-2 rounded-lg bg-muted/50">
+                              <TrendingUp className="h-4 w-4 mx-auto text-muted-foreground mb-1" />
+                              <div className="text-lg font-bold">{formatRevenue(connection.total_revenue)}</div>
+                              <div className="text-xs text-muted-foreground">Daromad</div>
+                            </div>
+                          </div>
+
+                          {/* Last sync */}
+                          {connection.last_sync_at && (
+                            <p className="text-xs text-muted-foreground text-center">
+                              Oxirgi sinxronizatsiya: {new Date(connection.last_sync_at).toLocaleString('uz-UZ')}
+                            </p>
+                          )}
+                          
+                          {/* Actions */}
+                          <div className="flex gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="flex-1"
+                              onClick={() => handleSync(mp.id)}
+                              disabled={syncingId === mp.id}
+                            >
+                              {syncingId === mp.id ? (
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              ) : (
+                                <RefreshCw className="h-4 w-4 mr-2" />
+                              )}
+                              Sinxronlash
+                            </Button>
+                            <Button variant="outline" size="sm">
+                              <Settings className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <Button 
+                          className={`w-full bg-gradient-to-r ${mp.color} hover:opacity-90`}
+                          onClick={() => handleConnect(mp)}
+                          disabled={mp.status === 'coming_soon'}
+                        >
+                          {mp.status === 'coming_soon' ? (
                             'Tez kunda'
                           ) : (
-                            'Ulanmagan'
+                            <>
+                              <Link2 className="h-4 w-4 mr-2" />
+                              Ulash
+                            </>
                           )}
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                </CardHeader>
-                
-                <CardContent>
-                  {isConnected(mp.id) ? (
-                    <div className="space-y-3">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Mahsulotlar:</span>
-                        <span className="font-medium">0</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Buyurtmalar:</span>
-                        <span className="font-medium">0</span>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm" className="flex-1">
-                          <RefreshCw className="h-4 w-4 mr-2" />
-                          Sinxronlash
                         </Button>
-                        <Button variant="outline" size="sm">
-                          <Settings className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <Button 
-                      className={`w-full bg-gradient-to-r ${mp.color} hover:opacity-90`}
-                      onClick={() => handleConnect(mp)}
-                      disabled={mp.status === 'coming_soon'}
-                    >
-                      {mp.status === 'coming_soon' ? (
-                        'Tez kunda'
-                      ) : (
-                        <>
-                          <Link2 className="h-4 w-4 mr-2" />
-                          Ulash
-                        </>
                       )}
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -283,9 +391,9 @@ export function MarketplaceOAuth({ onConnect, connectedMarketplaces }: Marketpla
                   <Button 
                     className={`w-full bg-gradient-to-r ${mp.color}`}
                     onClick={() => submitConnection(mp)}
-                    disabled={isLoading}
+                    disabled={isSubmitting}
                   >
-                    {isLoading ? (
+                    {isSubmitting ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                         Ulanmoqda...
