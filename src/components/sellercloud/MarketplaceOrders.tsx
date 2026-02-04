@@ -55,7 +55,7 @@ interface MarketplaceOrdersProps {
 }
 
 const ORDER_STATUSES = [
-  { value: '', label: 'Barcha holatlar' },
+  { value: 'all', label: 'Barcha holatlar' },
   { value: 'PROCESSING', label: 'Jarayonda' },
   { value: 'DELIVERY', label: 'Yetkazilmoqda' },
   { value: 'PICKUP', label: 'Olib ketish' },
@@ -68,7 +68,7 @@ export function MarketplaceOrders({ connectedMarketplaces, fetchMarketplaceData 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedMarketplace, setSelectedMarketplace] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [expandedOrder, setExpandedOrder] = useState<number | null>(null);
   const [total, setTotal] = useState(0);
 
@@ -92,7 +92,7 @@ export function MarketplaceOrders({ connectedMarketplaces, fetchMarketplaceData 
     
     try {
       const options: Record<string, any> = {};
-      if (statusFilter) {
+      if (statusFilter && statusFilter !== 'all') {
         options.status = statusFilter;
       }
       
@@ -258,7 +258,7 @@ export function MarketplaceOrders({ connectedMarketplaces, fetchMarketplaceData 
             <div className="text-center py-8 text-muted-foreground">
               <ShoppingCart className="h-12 w-12 mx-auto mb-3 opacity-50" />
               <p>Buyurtmalar topilmadi</p>
-              {statusFilter && (
+              {statusFilter && statusFilter !== 'all' && (
                 <p className="text-sm mt-1">Tanlangan holat bo'yicha natija yo'q</p>
               )}
             </div>
