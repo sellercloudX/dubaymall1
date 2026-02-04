@@ -35,6 +35,7 @@ export default function SellerCloudX() {
     isLoading: connectionsLoading, 
     connectMarketplace,
     syncMarketplace,
+    fetchMarketplaceData,
     refetch
   } = useMarketplaceConnections();
   
@@ -277,11 +278,17 @@ export default function SellerCloudX() {
           </TabsContent>
 
           <TabsContent value="products">
-            <MarketplaceProducts connectedMarketplaces={connectedMarketplaces} />
+            <MarketplaceProducts 
+              connectedMarketplaces={connectedMarketplaces} 
+              fetchMarketplaceData={fetchMarketplaceData}
+            />
           </TabsContent>
 
           <TabsContent value="orders">
-            <MarketplaceOrders connectedMarketplaces={connectedMarketplaces} />
+            <MarketplaceOrders 
+              connectedMarketplaces={connectedMarketplaces}
+              fetchMarketplaceData={fetchMarketplaceData}
+            />
           </TabsContent>
 
           <TabsContent value="inventory">
