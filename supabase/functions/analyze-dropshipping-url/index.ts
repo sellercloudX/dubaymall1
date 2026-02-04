@@ -575,9 +575,17 @@ serve(async (req) => {
     // METHOD 1: CJ API (if configured and is CJ URL)
     if (CJDROPSHIPPING_API_KEY && isCJUrl) {
       console.log('Trying CJ API...');
+      console.log('API Key length:', CJDROPSHIPPING_API_KEY.length);
+      console.log('API Key preview:', CJDROPSHIPPING_API_KEY.substring(0, 20) + '...');
       
-      const parts = CJDROPSHIPPING_API_KEY.split('@api@');
-      const token = parts.length === 2 ? parts[1] : CJDROPSHIPPING_API_KEY;
+      // Token can be:
+      // 1. Direct access token
+      // 2. Format: email@api@token
+      let token = CJDROPSHIPPING_API_KEY;
+      if (CJDROPSHIPPING_API_KEY.includes('@api@')) {
+        const parts = CJDROPSHIPPING_API_KEY.split('@api@');
+        token = parts[1];
+      }
       const productId = extractCJProductId(url);
 
       if (productId && token) {
