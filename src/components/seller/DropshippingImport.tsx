@@ -33,6 +33,7 @@ interface Variant {
   priceUSD: number;
   image?: string;
   inventory?: number;
+  properties?: string; // Color: Red, Size: XL
 }
 
 interface ImportedProductData {
@@ -447,27 +448,63 @@ export function DropshippingImport({ shopId, onProductImported }: DropshippingIm
 
               <Separator />
 
-              {/* Variants */}
+              {/* Variants with Visual Display */}
               {importedData.variants && importedData.variants.length > 0 && (
-                <div className="space-y-2">
-                  <Label>Variantlar ({importedData.variants.length})</Label>
-                  <Select value={selectedVariant} onValueChange={handleVariantChange}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Variant tanlang" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {importedData.variants.map((variant) => (
-                        <SelectItem key={variant.id} value={variant.id}>
-                          <div className="flex items-center justify-between gap-4">
-                            <span>{variant.name}</span>
-                            <span className="text-muted-foreground">
-                              ${variant.priceUSD}
-                            </span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label>Variantlar (Rang / Razmer)</Label>
+                    <Badge variant="secondary">{importedData.variants.length} ta</Badge>
+                  </div>
+                  
+                  {/* Variants Grid - with images */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-48 overflow-y-auto p-1">
+                    {importedData.variants.map((variant) => (
+                      <button
+                        key={variant.id}
+                        onClick={() => handleVariantChange(variant.id)}
+                        className={`relative flex flex-col items-center p-2 rounded-lg border-2 transition-all ${
+                          selectedVariant === variant.id 
+                            ? 'border-primary bg-primary/10' 
+                            : 'border-border hover:border-primary/50'
+                        }`}
+                      >
+                        {variant.image && (
+                          <img
+                            src={variant.image}
+                            alt={variant.name}
+                            className="w-12 h-12 rounded object-cover mb-1"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                        )}
+                        <span className="text-xs font-medium text-center line-clamp-2">
+                          {variant.name}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          ${variant.priceUSD.toFixed(2)}
+                        </span>
+                        {variant.inventory !== undefined && variant.inventory > 0 && (
+                          <Badge variant="outline" className="text-[10px] mt-1">
+                            {variant.inventory} dona
+                          </Badge>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                  
+                  {/* Selected variant info */}
+                  {selectedVariant && (
+                    <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+                      <strong>Tanlangan:</strong>{' '}
+                      {importedData.variants.find(v => v.id === selectedVariant)?.name}
+                      {importedData.variants.find(v => v.id === selectedVariant)?.properties && (
+                        <span className="ml-2">
+                          ({importedData.variants.find(v => v.id === selectedVariant)?.properties})
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
