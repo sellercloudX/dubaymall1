@@ -142,21 +142,46 @@ Return ONLY valid JSON:
 
     console.log("Yandex payload prepared:", yandexPayload.offerId);
 
-    // Step 3: Call Yandex Market API
-    // Note: This is the actual API call structure for Yandex Market Partner API
+    // Step 3: Call Yandex Market API (FBS Model - Fulfillment by Seller)
+    // Using the correct Yandex Market Partner API v2 format
+    // API Documentation: https://yandex.ru/dev/market/partner-api/doc/concepts/about.html
+    
+    // First, let's check if API credentials are valid by getting campaign info
+    console.log("Testing Yandex API connection...");
+    
+    const testResponse = await fetch(
+      `https://api.partner.market.yandex.ru/campaigns/${YANDEX_CAMPAIGN_ID}`,
+      {
+        method: "GET",
+        headers: {
+          "Api-Key": YANDEX_API_KEY,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    
+    if (!testResponse.ok) {
+      const testError = await testResponse.text();
+      console.error("Yandex API connection test failed:", testResponse.status, testError);
+    } else {
+      console.log("Yandex API connection successful!");
+    }
+
+    // Create offer using the correct API endpoint and format
+    // Yandex Market uses Api-Key header, not OAuth
     const yandexResponse = await fetch(
-      `https://api.partner.market.yandex.ru/campaigns/${YANDEX_CAMPAIGN_ID}/offer-mapping-entries`,
+      `https://api.partner.market.yandex.ru/businesses/${YANDEX_CAMPAIGN_ID}/offer-mappings/update`,
       {
         method: "POST",
         headers: {
-          "Authorization": `OAuth oauth_token="${YANDEX_API_KEY}"`,
+          "Api-Key": YANDEX_API_KEY,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          offerMappingEntries: [
+          offerMappings: [
             {
               offer: {
-                shopSku: yandexPayload.offerId,
+                offerId: yandexPayload.offerId,
                 name: yandexPayload.name,
                 category: yandexPayload.category,
                 vendor: yandexPayload.vendor,
@@ -165,18 +190,23 @@ Return ONLY valid JSON:
                 urls: yandexPayload.urls,
                 pictures: yandexPayload.pictures,
                 manufacturer: yandexPayload.vendor,
-                manufacturerCountries: ["Узбекистан"],
+                manufacturerCountries: ["UZ"],
                 weightDimensions: {
-                  weight: yandexPayload.weight,
+                  weight: yandexPayload.weight * 1000, // Convert to grams
                   length: yandexPayload.dimensions.length,
                   width: yandexPayload.dimensions.width,
                   height: yandexPayload.dimensions.height,
                 },
                 supplyScheduleDays: yandexPayload.supplyScheduleDays,
-                shelfLife: yandexPayload.shelfLife,
-              },
-              mapping: {
-                marketSku: null // Will be matched by Yandex
+                shelfLife: {
+                  timePeriod: 365,
+                  timeUnit: "DAY",
+                  comment: "Standard shelf life"
+                },
+                basicPrice: {
+                  value: pricing.recommendedPrice,
+                  currencyId: "RUR"
+                }
               }
             }
           ]
