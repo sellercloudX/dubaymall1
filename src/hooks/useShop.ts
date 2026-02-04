@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Tables, TablesInsert } from '@/integrations/supabase/types';
@@ -8,106 +8,93 @@ type ShopInsert = TablesInsert<'shops'>;
 
 export function useShop() {
   const { user } = useAuth();
-  const [shop, setShop] = useState<Shop | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    if (user) {
-      fetchShop();
-    } else {
-      setShop(null);
-      setLoading(false);
-    }
-  }, [user]);
+  const { data: shop = null, isLoading: loading, error } = useQuery({
+    queryKey: ['shop', 'user', user?.id],
+    queryFn: async () => {
+      if (!user) return null;
 
-  const fetchShop = async () => {
-    if (!user) return;
+      const { data, error } = await supabase
+        .from('shops')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
 
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('shops')
-      .select('*')
-      .eq('user_id', user.id)
-      .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+    staleTime: 1000 * 60 * 5,
+  });
 
-    if (error) {
-      setError(error.message);
-    } else {
-      setShop(data);
-    }
-    setLoading(false);
-  };
+  const createShopMutation = useMutation({
+    mutationFn: async (shopData: Omit<ShopInsert, 'user_id'>) => {
+      if (!user) throw new Error('User not authenticated');
 
-  const createShop = async (shopData: Omit<ShopInsert, 'user_id'>) => {
-    if (!user) throw new Error('User not authenticated');
+      const { data, error } = await supabase
+        .from('shops')
+        .insert({
+          ...shopData,
+          user_id: user.id,
+        })
+        .select()
+        .single();
 
-    const { data, error } = await supabase
-      .from('shops')
-      .insert({
-        ...shopData,
-        user_id: user.id,
-      })
-      .select()
-      .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shop', 'user', user?.id] });
+    },
+  });
 
-    if (error) throw error;
-    setShop(data);
-    return data;
-  };
+  const updateShopMutation = useMutation({
+    mutationFn: async (updates: Partial<Shop>) => {
+      if (!shop) throw new Error('No shop to update');
 
-  const updateShop = async (updates: Partial<Shop>) => {
-    if (!shop) throw new Error('No shop to update');
+      const { data, error } = await supabase
+        .from('shops')
+        .update(updates)
+        .eq('id', shop.id)
+        .select()
+        .single();
 
-    const { data, error } = await supabase
-      .from('shops')
-      .update(updates)
-      .eq('id', shop.id)
-      .select()
-      .single();
-
-    if (error) throw error;
-    setShop(data);
-    return data;
-  };
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shop', 'user', user?.id] });
+    },
+  });
 
   return {
     shop,
     loading,
-    error,
-    createShop,
-    updateShop,
-    refetch: fetchShop,
+    error: error?.message || null,
+    createShop: createShopMutation.mutateAsync,
+    updateShop: updateShopMutation.mutateAsync,
+    refetch: () => queryClient.invalidateQueries({ queryKey: ['shop', 'user', user?.id] }),
   };
 }
 
 export function useShopBySlug(slug: string) {
-  const [shop, setShop] = useState<Shop | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: shop = null, isLoading: loading, error } = useQuery({
+    queryKey: ['shop', 'slug', slug],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('shops')
+        .select('*')
+        .eq('slug', slug)
+        .eq('is_active', true)
+        .maybeSingle();
 
-  useEffect(() => {
-    if (slug) {
-      fetchShop();
-    }
-  }, [slug]);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!slug,
+    staleTime: 1000 * 60 * 5,
+  });
 
-  const fetchShop = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('shops')
-      .select('*')
-      .eq('slug', slug)
-      .eq('is_active', true)
-      .maybeSingle();
-
-    if (error) {
-      setError(error.message);
-    } else {
-      setShop(data);
-    }
-    setLoading(false);
-  };
-
-  return { shop, loading, error };
+  return { shop, loading, error: error?.message || null };
 }

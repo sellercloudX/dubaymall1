@@ -123,14 +123,14 @@ export default function Index() {
 
       {/* Hero Section - Premium Fintech */}
       <section className="relative overflow-hidden min-h-[90vh] flex items-center">
-        {/* Background layers */}
+        {/* Background layers - Optimized */}
         <div className="absolute inset-0 bg-mesh" />
-        <div className="absolute inset-0 bg-dot-pattern opacity-[0.03] dark:opacity-[0.05]" />
+        <div className="absolute inset-0 bg-dot-pattern opacity-[0.02]" />
         
-        {/* Animated gradient orbs */}
-        <div className="absolute top-20 left-[10%] w-72 h-72 bg-primary/20 rounded-full blur-[100px] animate-float" />
-        <div className="absolute bottom-20 right-[10%] w-96 h-96 bg-accent/15 rounded-full blur-[120px] animate-float" style={{ animationDelay: '-3s' }} />
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[700px] h-[700px] bg-gradient-to-r from-primary/10 to-accent/10 rounded-full blur-[150px]" />
+        {/* Simplified gradient orbs for performance */}
+        <div className="absolute top-20 left-[10%] w-64 h-64 bg-primary/15 rounded-full blur-3xl" style={{ willChange: 'auto' }} />
+        <div className="absolute bottom-20 right-[10%] w-80 h-80 bg-accent/10 rounded-full blur-3xl" />
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-gradient-to-r from-primary/8 to-accent/8 rounded-full blur-3xl" />
 
         <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-4xl mx-auto text-center">

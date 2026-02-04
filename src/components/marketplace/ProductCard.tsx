@@ -1,3 +1,4 @@
+import { memo, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useCart } from '@/contexts/CartContext';
@@ -8,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ShoppingCart, Heart, Package, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useState } from 'react';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Product = Tables<'products'>;
@@ -17,18 +17,19 @@ interface ProductCardProps {
   product: Product & { shop?: { name: string; slug: string } };
 }
 
-export function ProductCard({ product }: ProductCardProps) {
+// Memoized component for better list performance
+export const ProductCard = memo(function ProductCard({ product }: ProductCardProps) {
   const { t } = useLanguage();
   const { addToCart } = useCart();
   const { user } = useAuth();
   const { isFavorite, toggleFavorite } = useFavorites();
   const [favoriteLoading, setFavoriteLoading] = useState(false);
 
-  const formatPrice = (price: number) => {
+  const formatPrice = useCallback((price: number) => {
     return new Intl.NumberFormat('uz-UZ').format(price) + " so'm";
-  };
+  }, []);
 
-  const handleAddToCart = async (e: React.MouseEvent) => {
+  const handleAddToCart = useCallback(async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     
@@ -39,9 +40,9 @@ export function ProductCard({ product }: ProductCardProps) {
 
     await addToCart(product.id);
     toast.success(t.addedToCart || 'Savatchaga qo\'shildi');
-  };
+  }, [user, addToCart, product.id, t]);
 
-  const handleToggleFavorite = async (e: React.MouseEvent) => {
+  const handleToggleFavorite = useCallback(async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     
@@ -58,7 +59,7 @@ export function ProductCard({ product }: ProductCardProps) {
       toast.success(isCurrentlyFavorite ? 'Sevimlilardan o\'chirildi' : 'Sevimlilarga qo\'shildi');
     }
     setFavoriteLoading(false);
-  };
+  }, [user, isFavorite, toggleFavorite, product.id]);
 
   const discount = product.original_price && product.original_price > product.price
     ? Math.round((1 - product.price / product.original_price) * 100)
@@ -68,14 +69,16 @@ export function ProductCard({ product }: ProductCardProps) {
 
   return (
     <Link to={`/product/${product.id}`}>
-      <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 group h-full">
+      <Card className="overflow-hidden hover:shadow-lg transition-shadow duration-200 group h-full">
         <CardHeader className="p-0 relative">
           <div className="aspect-square bg-muted overflow-hidden">
             {product.images && product.images.length > 0 ? (
               <img
                 src={product.images[0]}
                 alt={product.name}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                loading="lazy"
+                decoding="async"
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
@@ -127,4 +130,4 @@ export function ProductCard({ product }: ProductCardProps) {
       </Card>
     </Link>
   );
-}
+});

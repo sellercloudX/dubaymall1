@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Tables } from '@/integrations/supabase/types';
@@ -12,83 +12,84 @@ interface FavoriteWithProduct extends Favorite {
 
 export function useFavorites() {
   const { user } = useAuth();
-  const [favorites, setFavorites] = useState<FavoriteWithProduct[]>([]);
-  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  const fetchFavorites = useCallback(async () => {
-    if (!user) {
-      setFavorites([]);
-      setFavoriteIds(new Set());
-      setLoading(false);
-      return;
-    }
+  const { data, isLoading: loading } = useQuery({
+    queryKey: ['favorites', user?.id],
+    queryFn: async () => {
+      if (!user) return { favorites: [], favoriteIds: new Set<string>() };
 
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('favorites')
-      .select(`
-        *,
-        products (
+      const { data, error } = await supabase
+        .from('favorites')
+        .select(`
           *,
-          shop:shops (name, slug)
-        )
-      `)
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
+          products (
+            *,
+            shop:shops (name, slug)
+          )
+        `)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error fetching favorites:', error);
-    } else {
+      if (error) throw error;
+
       const typedData = data as unknown as FavoriteWithProduct[];
-      setFavorites(typedData || []);
-      setFavoriteIds(new Set(typedData?.map(f => f.product_id) || []));
-    }
-    setLoading(false);
-  }, [user]);
+      return {
+        favorites: typedData || [],
+        favoriteIds: new Set(typedData?.map(f => f.product_id) || []),
+      };
+    },
+    enabled: !!user,
+    staleTime: 1000 * 60 * 2,
+  });
 
-  useEffect(() => {
-    fetchFavorites();
-  }, [fetchFavorites]);
+  const favorites = data?.favorites || [];
+  const favoriteIds = data?.favoriteIds || new Set<string>();
+
+  const addMutation = useMutation({
+    mutationFn: async (productId: string) => {
+      if (!user) throw new Error('Not authenticated');
+      const { error } = await supabase
+        .from('favorites')
+        .insert({ user_id: user.id, product_id: productId });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['favorites', user?.id] });
+    },
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: async (productId: string) => {
+      if (!user) throw new Error('Not authenticated');
+      const { error } = await supabase
+        .from('favorites')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('product_id', productId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['favorites', user?.id] });
+    },
+  });
 
   const addToFavorites = async (productId: string) => {
-    if (!user) return false;
-
-    const { error } = await supabase
-      .from('favorites')
-      .insert({ user_id: user.id, product_id: productId });
-
-    if (error) {
-      console.error('Error adding to favorites:', error);
+    try {
+      await addMutation.mutateAsync(productId);
+      return true;
+    } catch {
       return false;
     }
-
-    setFavoriteIds(prev => new Set([...prev, productId]));
-    await fetchFavorites();
-    return true;
   };
 
   const removeFromFavorites = async (productId: string) => {
-    if (!user) return false;
-
-    const { error } = await supabase
-      .from('favorites')
-      .delete()
-      .eq('user_id', user.id)
-      .eq('product_id', productId);
-
-    if (error) {
-      console.error('Error removing from favorites:', error);
+    try {
+      await removeMutation.mutateAsync(productId);
+      return true;
+    } catch {
       return false;
     }
-
-    setFavoriteIds(prev => {
-      const newSet = new Set(prev);
-      newSet.delete(productId);
-      return newSet;
-    });
-    await fetchFavorites();
-    return true;
   };
 
   const toggleFavorite = async (productId: string) => {
@@ -109,6 +110,6 @@ export function useFavorites() {
     removeFromFavorites,
     toggleFavorite,
     isFavorite,
-    refetch: fetchFavorites,
+    refetch: () => queryClient.invalidateQueries({ queryKey: ['favorites', user?.id] }),
   };
 }
