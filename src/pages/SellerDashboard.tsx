@@ -18,6 +18,8 @@ import { DropshippingProducts } from '@/components/seller/DropshippingProducts';
 import { SellerAnalytics } from '@/components/seller/SellerAnalytics';
 import { SellerBalanceCard } from '@/components/seller/SellerBalanceCard';
 import { SellerOrders } from '@/components/seller/SellerOrders';
+import { ProductBoost } from '@/components/seller/ProductBoost';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import {
   Sheet,
   SheetContent,
@@ -28,7 +30,7 @@ import {
 import { toast } from 'sonner';
 import { 
   Store, Package, TrendingUp, Eye, ExternalLink, Loader2, 
-  Truck, BarChart3, Wallet, ShoppingCart, Globe, Crown
+  Truck, BarChart3, Wallet, ShoppingCart, Globe, Crown, Rocket
 } from 'lucide-react';
 import type { Tables, TablesInsert } from '@/integrations/supabase/types';
 
@@ -212,28 +214,35 @@ export default function SellerDashboard() {
         {/* Main Tabs */}
         <Tabs defaultValue="products" className="space-y-4">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <TabsList>
-              <TabsTrigger value="products" className="gap-2">
-                <Package className="h-4 w-4" />
-                <span className="hidden sm:inline">{t.products}</span>
-              </TabsTrigger>
-              <TabsTrigger value="dropshipping" className="gap-2">
-                <Truck className="h-4 w-4" />
-                <span className="hidden sm:inline">Dropshipping</span>
-              </TabsTrigger>
-              <TabsTrigger value="orders" className="gap-2">
-                <ShoppingCart className="h-4 w-4" />
-                <span className="hidden sm:inline">Buyurtmalar</span>
-              </TabsTrigger>
-              <TabsTrigger value="analytics" className="gap-2">
-                <BarChart3 className="h-4 w-4" />
-                <span className="hidden sm:inline">Analitika</span>
-              </TabsTrigger>
-              <TabsTrigger value="balance" className="gap-2">
-                <Wallet className="h-4 w-4" />
-                <span className="hidden sm:inline">Balans</span>
-              </TabsTrigger>
-            </TabsList>
+            <ScrollArea className="w-full sm:w-auto whitespace-nowrap">
+              <TabsList className="inline-flex">
+                <TabsTrigger value="products" className="gap-2">
+                  <Package className="h-4 w-4" />
+                  <span className="hidden sm:inline">{t.products}</span>
+                </TabsTrigger>
+                <TabsTrigger value="dropshipping" className="gap-2">
+                  <Truck className="h-4 w-4" />
+                  <span className="hidden sm:inline">Dropshipping</span>
+                </TabsTrigger>
+                <TabsTrigger value="orders" className="gap-2">
+                  <ShoppingCart className="h-4 w-4" />
+                  <span className="hidden sm:inline">Buyurtmalar</span>
+                </TabsTrigger>
+                <TabsTrigger value="boost" className="gap-2">
+                  <Rocket className="h-4 w-4" />
+                  <span className="hidden sm:inline">Reklama</span>
+                </TabsTrigger>
+                <TabsTrigger value="analytics" className="gap-2">
+                  <BarChart3 className="h-4 w-4" />
+                  <span className="hidden sm:inline">Analitika</span>
+                </TabsTrigger>
+                <TabsTrigger value="balance" className="gap-2">
+                  <Wallet className="h-4 w-4" />
+                  <span className="hidden sm:inline">Balans</span>
+                </TabsTrigger>
+              </TabsList>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
             <AddProductDialog shopId={shop.id} onSubmit={handleCreateProduct} />
           </div>
 
@@ -260,6 +269,10 @@ export default function SellerDashboard() {
 
           <TabsContent value="orders">
             <SellerOrders />
+          </TabsContent>
+
+          <TabsContent value="boost">
+            <ProductBoost shopId={shop.id} />
           </TabsContent>
 
           <TabsContent value="analytics">

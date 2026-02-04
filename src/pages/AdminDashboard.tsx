@@ -11,9 +11,12 @@ import { ShopsManagement } from '@/components/admin/ShopsManagement';
 import { OrdersManagement } from '@/components/admin/OrdersManagement';
 import MonetizationSettings from '@/components/admin/MonetizationSettings';
 import { SellerCloudManagement } from '@/components/admin/SellerCloudManagement';
+import { BannersManagement } from '@/components/admin/BannersManagement';
+import { FlashSalesManagement } from '@/components/admin/FlashSalesManagement';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Shield, Users, Package, Store, ShoppingCart, BarChart3, DollarSign, Wallet, Crown } from 'lucide-react';
+import { Shield, Users, Package, Store, ShoppingCart, BarChart3, DollarSign, Wallet, Crown, Image, Zap } from 'lucide-react';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
 export default function AdminDashboard() {
   const { user, loading } = useAuth();
@@ -94,40 +97,51 @@ export default function AdminDashboard() {
 
         {/* Management Tabs */}
         <Tabs defaultValue="analytics" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-8 lg:w-auto lg:inline-grid">
-            <TabsTrigger value="analytics" className="gap-2">
-              <BarChart3 className="h-4 w-4" />
-              <span className="hidden sm:inline">Analitika</span>
-            </TabsTrigger>
-            <TabsTrigger value="financials" className="gap-2">
-              <Wallet className="h-4 w-4" />
-              <span className="hidden sm:inline">Moliya</span>
-            </TabsTrigger>
-            <TabsTrigger value="monetization" className="gap-2">
-              <DollarSign className="h-4 w-4" />
-              <span className="hidden sm:inline">Monetizatsiya</span>
-            </TabsTrigger>
-            <TabsTrigger value="sellercloud" className="gap-2">
-              <Crown className="h-4 w-4" />
-              <span className="hidden sm:inline">SellerCloudX</span>
-            </TabsTrigger>
-            <TabsTrigger value="users" className="gap-2">
-              <Users className="h-4 w-4" />
-              <span className="hidden sm:inline">Foydalanuvchilar</span>
-            </TabsTrigger>
-            <TabsTrigger value="products" className="gap-2">
-              <Package className="h-4 w-4" />
-              <span className="hidden sm:inline">Mahsulotlar</span>
-            </TabsTrigger>
-            <TabsTrigger value="shops" className="gap-2">
-              <Store className="h-4 w-4" />
-              <span className="hidden sm:inline">Do'konlar</span>
-            </TabsTrigger>
-            <TabsTrigger value="orders" className="gap-2">
-              <ShoppingCart className="h-4 w-4" />
-              <span className="hidden sm:inline">Buyurtmalar</span>
-            </TabsTrigger>
-          </TabsList>
+          <ScrollArea className="w-full whitespace-nowrap">
+            <TabsList className="inline-flex w-max">
+              <TabsTrigger value="analytics" className="gap-2">
+                <BarChart3 className="h-4 w-4" />
+                <span className="hidden sm:inline">Analitika</span>
+              </TabsTrigger>
+              <TabsTrigger value="financials" className="gap-2">
+                <Wallet className="h-4 w-4" />
+                <span className="hidden sm:inline">Moliya</span>
+              </TabsTrigger>
+              <TabsTrigger value="monetization" className="gap-2">
+                <DollarSign className="h-4 w-4" />
+                <span className="hidden sm:inline">Monetizatsiya</span>
+              </TabsTrigger>
+              <TabsTrigger value="banners" className="gap-2">
+                <Image className="h-4 w-4" />
+                <span className="hidden sm:inline">Bannerlar</span>
+              </TabsTrigger>
+              <TabsTrigger value="flashsales" className="gap-2">
+                <Zap className="h-4 w-4" />
+                <span className="hidden sm:inline">Aksiyalar</span>
+              </TabsTrigger>
+              <TabsTrigger value="sellercloud" className="gap-2">
+                <Crown className="h-4 w-4" />
+                <span className="hidden sm:inline">SellerCloudX</span>
+              </TabsTrigger>
+              <TabsTrigger value="users" className="gap-2">
+                <Users className="h-4 w-4" />
+                <span className="hidden sm:inline">Foydalanuvchilar</span>
+              </TabsTrigger>
+              <TabsTrigger value="products" className="gap-2">
+                <Package className="h-4 w-4" />
+                <span className="hidden sm:inline">Mahsulotlar</span>
+              </TabsTrigger>
+              <TabsTrigger value="shops" className="gap-2">
+                <Store className="h-4 w-4" />
+                <span className="hidden sm:inline">Do'konlar</span>
+              </TabsTrigger>
+              <TabsTrigger value="orders" className="gap-2">
+                <ShoppingCart className="h-4 w-4" />
+                <span className="hidden sm:inline">Buyurtmalar</span>
+              </TabsTrigger>
+            </TabsList>
+            <ScrollBar orientation="horizontal" />
+          </ScrollArea>
 
           <TabsContent value="analytics">
             <AdminAnalytics />
@@ -139,6 +153,14 @@ export default function AdminDashboard() {
 
           <TabsContent value="monetization">
             <MonetizationSettings />
+          </TabsContent>
+
+          <TabsContent value="banners">
+            <BannersManagement />
+          </TabsContent>
+
+          <TabsContent value="flashsales">
+            <FlashSalesManagement />
           </TabsContent>
 
           <TabsContent value="sellercloud">
