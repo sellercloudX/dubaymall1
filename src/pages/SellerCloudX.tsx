@@ -198,10 +198,16 @@ export default function SellerCloudX() {
           </Card>
           <Card>
             <CardContent className="pt-4">
-              <div className="text-2xl font-bold">
-                ${connections.reduce((sum, c) => sum + (c.total_revenue || 0), 0).toLocaleString()}
+              <div className="text-2xl font-bold text-primary">
+                {(() => {
+                  const revenue = connections.reduce((sum, c) => sum + (c.total_revenue || 0), 0);
+                  if (revenue >= 1000000) {
+                    return (revenue / 1000000).toFixed(1) + ' mln';
+                  }
+                  return new Intl.NumberFormat('uz-UZ').format(revenue);
+                })()}
               </div>
-              <div className="text-sm text-muted-foreground">Jami daromad</div>
+              <div className="text-sm text-muted-foreground">Jami daromad (so'm)</div>
             </CardContent>
           </Card>
         </div>

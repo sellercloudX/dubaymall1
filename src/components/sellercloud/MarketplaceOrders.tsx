@@ -32,6 +32,7 @@ interface OrderItem {
   offerName: string;
   count: number;
   price: number;
+  priceUZS?: number;
 }
 
 interface MarketplaceOrder {
@@ -42,7 +43,9 @@ interface MarketplaceOrder {
   total: number;
   totalUZS?: number;
   itemsTotal: number;
+  itemsTotalUZS?: number;
   deliveryTotal: number;
+  deliveryTotalUZS?: number;
   buyer?: {
     firstName?: string;
     lastName?: string;
@@ -325,7 +328,7 @@ export function MarketplaceOrders({ connectedMarketplaces, fetchMarketplaceData 
                                   </div>
                                 </div>
                                 <div className="text-right">
-                                  <div className="font-medium">{formatPrice(item.price)}</div>
+                                  <div className="font-medium">{formatPrice(item.priceUZS || item.price)}</div>
                                   <div className="text-xs text-muted-foreground">
                                     × {item.count}
                                   </div>
@@ -340,11 +343,11 @@ export function MarketplaceOrders({ connectedMarketplaces, fetchMarketplaceData 
                         <div className="mt-4 pt-3 border-t grid grid-cols-3 gap-4 text-sm">
                           <div>
                             <div className="text-muted-foreground">Mahsulotlar:</div>
-                            <div className="font-medium">{formatPrice(order.itemsTotal)}</div>
+                            <div className="font-medium">{formatPrice(order.itemsTotalUZS || order.itemsTotal)}</div>
                           </div>
                           <div>
                             <div className="text-muted-foreground">Yetkazish:</div>
-                            <div className="font-medium">{formatPrice(order.deliveryTotal)}</div>
+                            <div className="font-medium">{formatPrice(order.deliveryTotalUZS || order.deliveryTotal)}</div>
                           </div>
                           <div>
                             <div className="text-muted-foreground">Jami:</div>
