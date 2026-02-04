@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 import { 
   Camera, Search, Sparkles, Loader2, X, ImageIcon, 
   Check, Package, DollarSign, Globe, ArrowRight,
-  Calculator, Store, ExternalLink
+  Calculator, Store, ExternalLink, Wand2, FileText, Image as ImageLucide, Zap
 } from 'lucide-react';
 
 interface WebProduct {
@@ -31,6 +31,10 @@ interface AnalyzedProduct {
   category: string;
   suggestedPrice: number;
   features?: string[];
+  brand?: string;
+  specifications?: Record<string, string>;
+  aiModel?: string;
+  confidence?: number;
 }
 
 interface PricingCalculation {
@@ -41,6 +45,13 @@ interface PricingCalculation {
   targetProfit: number;
   recommendedPrice: number;
   netProfit: number;
+}
+
+interface AIStep {
+  name: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  model?: string;
+  icon: React.ReactNode;
 }
 
 type Step = 'capture' | 'analyzing' | 'search' | 'select' | 'pricing' | 'creating' | 'done';
@@ -61,6 +72,10 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
   const [pricing, setPricing] = useState<PricingCalculation | null>(null);
   const [isCreatingCard, setIsCreatingCard] = useState(false);
   const [createdCardUrl, setCreatedCardUrl] = useState<string | null>(null);
+  const [generateInfographics, setGenerateInfographics] = useState(true);
+  const [infographicCount, setInfographicCount] = useState(6);
+  const [creationProgress, setCreationProgress] = useState<AIStep[]>([]);
+  const [generatedImages, setGeneratedImages] = useState<string[]>([]);
 
   // Marketplace config (Yandex Market defaults)
   const [marketplaceConfig] = useState({
@@ -224,13 +239,30 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
 
     setIsCreatingCard(true);
     setCurrentStep('creating');
+    
+    // Initialize AI steps for progress tracking
+    const steps: AIStep[] = [
+      { name: 'Rasm tahlili', status: 'pending', model: 'GPT-4o Vision', icon: <Camera className="h-4 w-4" /> },
+      { name: 'SEO kontent', status: 'pending', model: 'Claude Haiku', icon: <Search className="h-4 w-4" /> },
+      { name: 'Tavsif yaratish', status: 'pending', model: 'Claude Sonnet', icon: <FileText className="h-4 w-4" /> },
+      { name: 'Infografikalar', status: 'pending', model: 'Flux Pro', icon: <ImageLucide className="h-4 w-4" /> },
+      { name: 'Kartochka yaratish', status: 'pending', model: 'Yandex API', icon: <Store className="h-4 w-4" /> },
+    ];
+    setCreationProgress(steps);
 
     try {
+      // Use the comprehensive card creation pipeline
+      const updateStep = (index: number, status: AIStep['status']) => {
+        setCreationProgress(prev => prev.map((s, i) => i === index ? { ...s, status } : s));
+      };
+
+      // Step 1: Start - rasm tahlili already done
+      updateStep(0, 'completed');
+
       // Rasmni Storage'ga yuklash
       let imageUrl: string | undefined;
       const imagesToUpload: string[] = [];
 
-      // Captured image va web product image'larni yig'ish
       if (capturedImage && capturedImage.startsWith('data:')) {
         toast.info('Rasm yuklanmoqda...');
         const uploadedUrl = await uploadImageToStorage(capturedImage);
@@ -243,7 +275,6 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
         imagesToUpload.push(capturedImage);
       }
 
-      // Web'dan topilgan rasm URL bo'lsa qo'shish
       if (selectedProduct.image && selectedProduct.image.startsWith('http')) {
         imagesToUpload.push(selectedProduct.image);
       }
@@ -255,18 +286,114 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
         return;
       }
 
+      // Step 2: SEO content generation
+      updateStep(1, 'running');
+      let seoContent = null;
+      try {
+        const { data: seoData, error: seoError } = await supabase.functions.invoke('generate-product-content', {
+          body: {
+            productName: selectedProduct.title,
+            productDescription: selectedProduct.description || analyzedProduct?.description,
+            category: analyzedProduct?.category,
+            brand: analyzedProduct?.brand,
+            specifications: analyzedProduct?.specifications,
+            targetMarketplace: 'yandex',
+            contentType: 'seo',
+            languages: ['uz', 'ru']
+          },
+        });
+        if (!seoError && seoData) {
+          seoContent = seoData;
+          updateStep(1, 'completed');
+        } else {
+          updateStep(1, 'failed');
+        }
+      } catch {
+        updateStep(1, 'failed');
+      }
+
+      // Step 3: Description generation
+      updateStep(2, 'running');
+      let descriptions = null;
+      try {
+        const { data: descData, error: descError } = await supabase.functions.invoke('generate-product-content', {
+          body: {
+            productName: selectedProduct.title,
+            productDescription: selectedProduct.description || analyzedProduct?.description,
+            category: analyzedProduct?.category,
+            brand: analyzedProduct?.brand,
+            specifications: analyzedProduct?.specifications,
+            targetMarketplace: 'yandex',
+            contentType: 'description',
+            languages: ['uz', 'ru']
+          },
+        });
+        if (!descError && descData) {
+          descriptions = descData;
+          updateStep(2, 'completed');
+        } else {
+          updateStep(2, 'failed');
+        }
+      } catch {
+        updateStep(2, 'failed');
+      }
+
+      // Step 4: Infographic generation (if enabled)
+      if (generateInfographics && capturedImage) {
+        updateStep(3, 'running');
+        const styles = ['professional', 'minimalist', 'vibrant', 'luxury', 'tech', 'professional'];
+        const generatedInfos: string[] = [];
+
+        for (let i = 0; i < Math.min(infographicCount, 6); i++) {
+          try {
+            const { data: infoData, error: infoError } = await supabase.functions.invoke('generate-infographic', {
+              body: {
+                productImage: capturedImage,
+                productName: selectedProduct.title,
+                category: analyzedProduct?.category,
+                style: styles[i % styles.length],
+                count: 1
+              },
+            });
+
+            if (!infoError && infoData?.images?.length > 0) {
+              generatedInfos.push(infoData.images[0].url);
+            }
+          } catch (e) {
+            console.error(`Infographic ${i + 1} failed:`, e);
+          }
+        }
+
+        if (generatedInfos.length > 0) {
+          setGeneratedImages(generatedInfos);
+          imagesToUpload.push(...generatedInfos);
+          updateStep(3, 'completed');
+        } else {
+          updateStep(3, 'failed');
+        }
+      } else {
+        updateStep(3, 'completed'); // Skip
+      }
+
+      // Step 5: Create Yandex card
+      updateStep(4, 'running');
+      
       const { data, error } = await supabase.functions.invoke('yandex-market-create-card', {
         body: {
           shopId,
           product: {
             name: selectedProduct.title,
-            description: selectedProduct.description || analyzedProduct?.description,
+            nameRu: seoContent?.seoTitle?.ru || selectedProduct.title,
+            description: descriptions?.fullDescription?.uz || selectedProduct.description || analyzedProduct?.description,
+            descriptionRu: descriptions?.fullDescription?.ru || selectedProduct.description,
             category: analyzedProduct?.category,
             price: pricing.recommendedPrice,
             costPrice: pricing.costPrice,
             image: imageUrl,
             images: imagesToUpload,
             sourceUrl: selectedProduct.url,
+            keywords: seoContent?.keywords,
+            bulletPoints: seoContent?.bulletPoints || descriptions?.sellingPoints,
           },
           pricing: pricing,
         },
@@ -274,6 +401,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
 
       if (error) throw error;
 
+      updateStep(4, 'completed');
       setCreatedCardUrl(data?.cardUrl || null);
       setCurrentStep('done');
       toast.success('Yandex Market kartochkasi yaratildi!');
@@ -296,6 +424,8 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
     setCostPrice(0);
     setPricing(null);
     setCreatedCardUrl(null);
+    setCreationProgress([]);
+    setGeneratedImages([]);
     setCurrentStep('capture');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -607,6 +737,45 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
               </div>
             )}
 
+            {/* Infographic Options */}
+            {pricing && (
+              <div className="space-y-3 p-4 border rounded-lg bg-muted/50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Wand2 className="h-4 w-4 text-primary" />
+                    <span className="font-medium">AI Infografikalar</span>
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={generateInfographics}
+                      onChange={(e) => setGenerateInfographics(e.target.checked)}
+                      className="rounded"
+                    />
+                    <span className="text-sm">Yaratish</span>
+                  </label>
+                </div>
+                {generateInfographics && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">Soni:</span>
+                    <select
+                      value={infographicCount}
+                      onChange={(e) => setInfographicCount(Number(e.target.value))}
+                      className="text-sm border rounded px-2 py-1"
+                    >
+                      <option value={1}>1 ta</option>
+                      <option value={3}>3 ta</option>
+                      <option value={6}>6 ta (tavsiya)</option>
+                    </select>
+                    <Badge variant="secondary" className="text-xs">Flux Pro</Badge>
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Professional marketplace infografikalari Flux Pro AI orqali yaratiladi
+                </p>
+              </div>
+            )}
+
             <div className="flex justify-between pt-4">
               <Button variant="outline" onClick={() => setCurrentStep('select')}>
                 Orqaga
@@ -622,8 +791,8 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
                   </>
                 ) : (
                   <>
-                    <Store className="mr-2 h-4 w-4" />
-                    Yandex Market'ga yuklash
+                    <Zap className="mr-2 h-4 w-4" />
+                    AI bilan yaratish
                   </>
                 )}
               </Button>
@@ -632,15 +801,77 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
         </Card>
       )}
 
-      {/* Step 6: Creating */}
+      {/* Step 6: Creating with AI Progress */}
       {currentStep === 'creating' && (
         <Card>
-          <CardContent className="py-12 text-center">
-            <Loader2 className="h-12 w-12 animate-spin mx-auto text-primary mb-4" />
-            <p className="text-lg font-medium">Kartochka yaratilmoqda...</p>
-            <p className="text-sm text-muted-foreground">
-              Yandex Market'ga mahsulot yuklanmoqda
-            </p>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary animate-pulse" />
+              AI kartochka yaratmoqda
+            </CardTitle>
+            <CardDescription>
+              5 ta AI model bir vaqtda ishlayapti
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {creationProgress.map((step, index) => (
+              <div 
+                key={index}
+                className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
+                  step.status === 'running' ? 'border-primary bg-primary/5' :
+                  step.status === 'completed' ? 'border-green-500 bg-green-50 dark:bg-green-950/20' :
+                  step.status === 'failed' ? 'border-destructive bg-destructive/5' :
+                  'border-muted'
+                }`}
+              >
+                <div className={`p-2 rounded-full ${
+                  step.status === 'running' ? 'bg-primary text-primary-foreground' :
+                  step.status === 'completed' ? 'bg-green-500 text-white' :
+                  step.status === 'failed' ? 'bg-destructive text-destructive-foreground' :
+                  'bg-muted text-muted-foreground'
+                }`}>
+                  {step.status === 'running' ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : step.status === 'completed' ? (
+                    <Check className="h-4 w-4" />
+                  ) : step.status === 'failed' ? (
+                    <X className="h-4 w-4" />
+                  ) : (
+                    step.icon
+                  )}
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium text-sm">{step.name}</p>
+                  <p className="text-xs text-muted-foreground">{step.model}</p>
+                </div>
+                <Badge variant={
+                  step.status === 'completed' ? 'default' :
+                  step.status === 'running' ? 'secondary' :
+                  step.status === 'failed' ? 'destructive' : 'outline'
+                }>
+                  {step.status === 'running' ? 'Ishlanmoqda...' :
+                   step.status === 'completed' ? 'Tayyor' :
+                   step.status === 'failed' ? 'Xato' : 'Kutmoqda'}
+                </Badge>
+              </div>
+            ))}
+            
+            {/* Generated infographics preview */}
+            {generatedImages.length > 0 && (
+              <div className="pt-4">
+                <p className="text-sm font-medium mb-2">Yaratilgan infografikalar:</p>
+                <div className="flex gap-2 overflow-x-auto pb-2">
+                  {generatedImages.map((img, i) => (
+                    <img 
+                      key={i}
+                      src={img} 
+                      alt={`Infographic ${i + 1}`}
+                      className="w-16 h-16 object-cover rounded border flex-shrink-0"
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -649,13 +880,37 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
       {currentStep === 'done' && (
         <Card>
           <CardContent className="py-12 text-center">
-            <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-              <Check className="h-8 w-8 text-green-600" />
+            <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-950 flex items-center justify-center mx-auto mb-4">
+              <Check className="h-8 w-8 text-green-600 dark:text-green-400" />
             </div>
-            <p className="text-lg font-medium text-green-600">Kartochka muvaffaqiyatli yaratildi!</p>
+            <p className="text-lg font-medium text-green-600 dark:text-green-400">Kartochka muvaffaqiyatli yaratildi!</p>
             <p className="text-sm text-muted-foreground mt-2">
               Mahsulot Yandex Market'ga yuklandi va ko'rib chiqilmoqda
             </p>
+            
+            {/* AI models used summary */}
+            <div className="flex flex-wrap justify-center gap-2 mt-4">
+              <Badge variant="outline">GPT-4o Vision</Badge>
+              <Badge variant="outline">Claude Sonnet</Badge>
+              <Badge variant="outline">Flux Pro</Badge>
+            </div>
+            
+            {/* Generated images preview */}
+            {generatedImages.length > 0 && (
+              <div className="mt-6">
+                <p className="text-sm font-medium mb-2">AI infografikalar ({generatedImages.length} ta):</p>
+                <div className="flex justify-center gap-2 overflow-x-auto pb-2">
+                  {generatedImages.map((img, i) => (
+                    <img 
+                      key={i}
+                      src={img} 
+                      alt={`Infographic ${i + 1}`}
+                      className="w-20 h-20 object-cover rounded border"
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
             
             {createdCardUrl && (
               <Button variant="outline" className="mt-4" asChild>
