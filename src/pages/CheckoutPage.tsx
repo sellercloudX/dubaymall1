@@ -409,6 +409,7 @@ export default function CheckoutPage() {
           paymentMethod={formData.paymentMethod}
           amount={totalPrice}
           orderNumber={pendingOrder?.orderNumber || ''}
+          orderId={pendingOrder?.id}
         />
       </div>
     </Layout>
