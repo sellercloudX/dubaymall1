@@ -30,7 +30,9 @@ interface YandexOrder {
   total: number;
   totalUZS: number;
   itemsTotal: number;
+  itemsTotalUZS: number;
   deliveryTotal: number;
+  deliveryTotalUZS: number;
   buyer?: {
     firstName?: string;
     lastName?: string;
@@ -40,6 +42,7 @@ interface YandexOrder {
     offerName: string;
     count: number;
     price: number;
+    priceUZS: number;
   }>;
 }
 
@@ -411,6 +414,9 @@ serve(async (req) => {
 
           const pageOrders: YandexOrder[] = orders.map((order: any) => {
             const totalRUB = order.total || 0;
+            const itemsTotalRUB = order.itemsTotal || 0;
+            const deliveryTotalRUB = order.deliveryTotal || 0;
+            
             return {
               id: order.id,
               status: order.status,
@@ -418,15 +424,21 @@ serve(async (req) => {
               createdAt: order.createdAt,
               total: totalRUB,
               totalUZS: Math.round(totalRUB * RUB_TO_UZS),
-              itemsTotal: order.itemsTotal,
-              deliveryTotal: order.deliveryTotal,
+              itemsTotal: itemsTotalRUB,
+              itemsTotalUZS: Math.round(itemsTotalRUB * RUB_TO_UZS),
+              deliveryTotal: deliveryTotalRUB,
+              deliveryTotalUZS: Math.round(deliveryTotalRUB * RUB_TO_UZS),
               buyer: order.buyer,
-              items: order.items?.map((item: any) => ({
-                offerId: item.offerId,
-                offerName: item.offerName,
-                count: item.count,
-                price: item.price,
-              })),
+              items: order.items?.map((item: any) => {
+                const itemPriceRUB = item.price || 0;
+                return {
+                  offerId: item.offerId,
+                  offerName: item.offerName,
+                  count: item.count,
+                  price: itemPriceRUB,
+                  priceUZS: Math.round(itemPriceRUB * RUB_TO_UZS),
+                };
+              }),
             };
           });
 
