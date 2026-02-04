@@ -11,3 +11,18 @@ verify_jwt = false
 
 [functions.enhance-product-image]
 verify_jwt = false
+
+[functions.search-similar-products]
+verify_jwt = false
+
+[functions.yandex-market-create-card]
+verify_jwt = false
+
+[functions.connect-marketplace]
+verify_jwt = false
+
+[functions.check-marketplace-connections]
+verify_jwt = false
+
+[functions.order-notification]
+verify_jwt = false
