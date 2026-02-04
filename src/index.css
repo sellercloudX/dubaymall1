@@ -209,26 +209,19 @@
 }
 
 @layer components {
-  /* Premium Card with Glassmorphism */
+  /* Premium Card with Glassmorphism - Optimized */
   .card-premium {
-    @apply relative overflow-hidden rounded-2xl bg-card/80 backdrop-blur-xl border shadow-lg;
-    background: linear-gradient(135deg, hsl(var(--card)) 0%, hsl(var(--card) / 0.8) 100%);
-  }
-
-  .card-premium::before {
-    content: '';
-    @apply absolute inset-0 opacity-0 transition-opacity duration-500;
-    background: var(--gradient-primary);
+    @apply relative overflow-hidden rounded-2xl bg-card/90 border shadow-lg;
+    will-change: transform;
+    contain: layout style;
+    transform: translateZ(0);
+    background: linear-gradient(135deg, hsl(var(--card)) 0%, hsl(var(--card) / 0.95) 100%);
   }
 
   .card-premium:hover {
     box-shadow: var(--shadow-xl), var(--shadow-glow);
-    transform: translateY(-4px);
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  .card-premium:hover::before {
-    @apply opacity-5;
+    transform: translateY(-4px) translateZ(0);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
   }
 
   /* Gradient Text */
@@ -242,13 +235,14 @@
     background-image: var(--gradient-success);
   }
 
-  /* Glass Effect */
+  /* Glass Effect - Reduced blur for performance */
   .glass {
-    @apply bg-background/60 backdrop-blur-2xl border border-border/50;
+    @apply bg-background/80 backdrop-blur-md border border-border/50;
   }
 
   .glass-card {
-    @apply bg-card/40 backdrop-blur-xl border border-border/30 shadow-lg;
+    @apply bg-card/70 backdrop-blur-sm border border-border/30 shadow-lg;
+    contain: layout style;
   }
 
   /* Hero Gradient Background */
@@ -317,26 +311,32 @@
     background-size: 20px 20px;
   }
 
-  /* Floating Animation */
+  /* Floating Animation - GPU optimized */
   .float {
     animation: float 6s ease-in-out infinite;
+    will-change: transform;
+    transform: translateZ(0);
   }
 
-  /* Pulse Glow */
+  /* Pulse Glow - Reduced for performance */
   .pulse-glow {
-    animation: pulse-glow 2s ease-in-out infinite;
+    animation: pulse-glow 3s ease-in-out infinite;
+    will-change: box-shadow;
   }
 
-  /* Shimmer Effect */
+  /* Shimmer Effect - GPU optimized */
   .shimmer {
     @apply relative overflow-hidden;
+    contain: layout;
   }
 
   .shimmer::after {
     content: '';
     @apply absolute inset-0;
-    background: linear-gradient(90deg, transparent, hsl(var(--background) / 0.5), transparent);
-    animation: shimmer 2s infinite;
+    background: linear-gradient(90deg, transparent, hsl(var(--background) / 0.3), transparent);
+    animation: shimmer 2.5s infinite;
+    will-change: transform;
+    transform: translateZ(0);
   }
 }
 
