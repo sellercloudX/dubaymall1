@@ -6,12 +6,12 @@ const corsHeaders = {
 };
 
 interface InfographicRequest {
-  productImage: string; // base64 or URL
+  productImage: string; // base64 or URL - ORIGINAL product image from AI Scanner
   productName: string;
   category?: string;
   style?: "professional" | "minimalist" | "vibrant" | "luxury" | "tech";
   backgroundColor?: string;
-  count?: number; // how many variants to generate
+  count?: number;
 }
 
 serve(async (req) => {
@@ -21,7 +21,7 @@ serve(async (req) => {
 
   try {
     const request: InfographicRequest = await req.json();
-    const { productImage, productName, category, style = "professional", backgroundColor, count = 1 } = request;
+    const { productImage, productName, category, style = "professional", count = 1 } = request;
 
     if (!productImage) {
       return new Response(
@@ -30,128 +30,145 @@ serve(async (req) => {
       );
     }
 
-    const REPLICATE_API_TOKEN = Deno.env.get("REPLICATE_API_TOKEN");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     
-    if (!REPLICATE_API_TOKEN) {
-      // Fallback to Lovable AI image generation
-      return await fallbackToLovableAI(request, corsHeaders);
+    if (!LOVABLE_API_KEY) {
+      throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    console.log(`🎨 Generating ${count} infographic(s) using Flux Pro via Replicate`);
+    console.log(`🎨 Generating ${count} infographic(s) for: ${productName}`);
+    console.log(`📐 Target size: 1080x1440 (Uzum/Yandex marketplace format)`);
+    console.log(`🎯 Style: ${style}, Category: ${category || "general"}`);
 
-    // Map style to visual prompt modifiers
-    const stylePrompts: Record<string, string> = {
-      professional: "clean white background, professional product photography, soft studio lighting, subtle shadows, high-end commercial style",
-      minimalist: "pure white background, minimal composition, elegant simplicity, premium feel, negative space",
-      vibrant: "colorful gradient background, dynamic composition, energetic mood, eye-catching, bold colors",
-      luxury: "dark elegant background, golden accents, premium lighting, sophisticated, high-end luxury brand aesthetic",
-      tech: "futuristic tech background, blue neon accents, digital grid elements, modern technology aesthetic"
-    };
-
-    // Category-specific background suggestions
+    // Category-specific background styling (NO TEXT - Zero-Text Policy)
     const categoryBackgrounds: Record<string, string> = {
-      "Elektronika": "tech gradient background with subtle circuit patterns",
-      "Kiyim-kechak": "soft fabric texture background, fashion editorial style",
-      "Go'zallik": "soft pink or gold bokeh background, beauty product photography",
-      "Sport": "dynamic action background with motion blur effects",
-      "Uy-ro'zg'or": "warm cozy home interior background",
-      "Bolalar uchun": "playful colorful background with soft edges",
+      "Elektronika": "sleek dark gradient background with subtle blue tech glow effects, premium studio lighting",
+      "Smartfonlar": "elegant dark gradient with soft blue/purple ambient lighting, floating reflections",
+      "Kiyim-kechak": "soft neutral fabric texture background, fashion editorial lighting, subtle shadows",
+      "Go'zallik": "luxurious soft pink/gold bokeh background, beauty product photography lighting",
+      "Sport": "dynamic gradient with energy vibes, athletic mood lighting",
+      "Uy-ro'zg'or": "warm cozy home interior blur background, natural lighting",
+      "Bolalar uchun": "playful soft pastel gradient background, cheerful mood",
+      "Kompyuterlar": "professional dark tech background with subtle grid patterns, RGB accents",
+      "Audio": "premium dark background with sound wave subtle effects, studio quality",
     };
 
-    const bgPrompt = backgroundColor || categoryBackgrounds[category || ""] || stylePrompts[style];
+    const styleBackgrounds: Record<string, string> = {
+      professional: "clean white/light gray gradient studio background, professional product photography lighting, soft shadows",
+      minimalist: "pure white background, minimal composition, elegant simplicity, premium feel",
+      vibrant: "colorful dynamic gradient background, eye-catching energy, bold modern feel",
+      luxury: "dark elegant background with golden/warm accents, premium sophisticated lighting",
+      tech: "futuristic dark gradient with blue/cyan tech accents, modern digital aesthetic"
+    };
 
-    // Create the prompt for Flux Pro
-    const prompt = `Professional e-commerce product infographic for marketplace listing.
-Product: ${productName}
-Style: ${bgPrompt}
-Requirements:
-- Product must be the main focus, perfectly centered
-- Clean, professional background that enhances the product
-- No text or watermarks on the image
-- High resolution, sharp details
-- Perfect for e-commerce marketplace thumbnail
-- Magazine-quality product photography`;
+    const bgStyle = categoryBackgrounds[category || ""] || styleBackgrounds[style];
 
-    // Start Flux Pro generation via Replicate
-    const predictions = [];
-    
-    for (let i = 0; i < count; i++) {
-      const response = await fetch("https://api.replicate.com/v1/predictions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${REPLICATE_API_TOKEN}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          version: "black-forest-labs/flux-1.1-pro",
-          input: {
-            prompt: prompt + (i > 0 ? ` Variation ${i + 1} with slightly different composition.` : ""),
-            image: productImage.startsWith("data:") ? productImage : undefined,
-            aspect_ratio: "1:1",
-            output_format: "webp",
-            output_quality: 90,
-            safety_tolerance: 2,
-            prompt_upsampling: true
-          }
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Replicate API error:", response.status, errorText);
-        continue;
-      }
-
-      const prediction = await response.json();
-      predictions.push(prediction);
-    }
-
-    if (predictions.length === 0) {
-      return await fallbackToLovableAI(request, corsHeaders);
-    }
-
-    // Poll for results
+    // Generate infographics using Lovable AI image editing
+    // This KEEPS the original product and only changes the background/lighting
     const results = [];
-    for (const prediction of predictions) {
-      let result = prediction;
-      let attempts = 0;
-      const maxAttempts = 60; // 60 seconds max wait
 
-      while (result.status !== "succeeded" && result.status !== "failed" && attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        const pollResponse = await fetch(`https://api.replicate.com/v1/predictions/${prediction.id}`, {
+    for (let i = 0; i < Math.min(count, 6); i++) {
+      try {
+        const variationPrompts = [
+          "centered composition, main focus on product",
+          "slightly angled view, dynamic composition",
+          "front-facing, symmetrical layout",
+          "premium angle, highlights product details",
+          "clean centered, maximum visibility",
+          "professional catalog style"
+        ];
+
+        const editPrompt = `Transform this product photo into a professional e-commerce marketplace infographic.
+
+CRITICAL RULES:
+- Keep the EXACT same product visible - do not change or replace the product
+- Keep all product details, model, and appearance EXACTLY as shown
+- Output size: 1080x1440 pixels (3:4 portrait aspect ratio)
+- NO TEXT, NO WATERMARKS, NO LOGOS on the image
+
+BACKGROUND & STYLING:
+- ${bgStyle}
+- ${variationPrompts[i % variationPrompts.length]}
+- Product should fill about 70-80% of the frame
+- Add professional studio lighting and subtle reflections
+- Create depth with soft shadows under the product
+
+This is for Uzum Market / Yandex Market marketplace listing.`;
+
+        console.log(`📸 Generating infographic ${i + 1}/${count}...`);
+
+        const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
           headers: {
-            "Authorization": `Bearer ${REPLICATE_API_TOKEN}`,
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
           },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash-image",
+            messages: [
+              {
+                role: "user",
+                content: [
+                  {
+                    type: "text",
+                    text: editPrompt
+                  },
+                  {
+                    type: "image_url",
+                    image_url: {
+                      url: productImage // Original product image from AI Scanner
+                    }
+                  }
+                ]
+              }
+            ],
+            modalities: ["image", "text"]
+          }),
         });
-        
-        if (pollResponse.ok) {
-          result = await pollResponse.json();
-        }
-        attempts++;
-      }
 
-      if (result.status === "succeeded" && result.output) {
-        results.push({
-          url: Array.isArray(result.output) ? result.output[0] : result.output,
-          id: result.id
-        });
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`Infographic ${i + 1} API error:`, response.status, errorText);
+          continue;
+        }
+
+        const data = await response.json();
+        const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+
+        if (imageUrl) {
+          results.push({
+            url: imageUrl,
+            id: `infographic-${i + 1}-${Date.now()}`,
+            style: style,
+            variation: variationPrompts[i % variationPrompts.length]
+          });
+          console.log(`✅ Infographic ${i + 1} generated successfully`);
+        }
+
+        // Small delay between requests to avoid rate limiting
+        if (i < count - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
+      } catch (err) {
+        console.error(`Error generating infographic ${i + 1}:`, err);
       }
     }
 
     if (results.length === 0) {
-      throw new Error("Image generation failed");
+      throw new Error("Failed to generate any infographics");
     }
 
-    console.log(`✅ Generated ${results.length} infographic(s) with Flux Pro`);
+    console.log(`🎉 Generated ${results.length}/${count} infographics successfully`);
 
     return new Response(
       JSON.stringify({ 
         images: results,
-        aiModel: "flux-1.1-pro",
+        aiModel: "gemini-2.5-flash-image",
         style,
-        count: results.length
+        count: results.length,
+        dimensions: "1080x1440",
+        format: "marketplace-optimized"
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
@@ -163,60 +180,3 @@ Requirements:
     );
   }
 });
-
-// Fallback to Lovable AI
-async function fallbackToLovableAI(request: InfographicRequest, corsHeaders: Record<string, string>) {
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) {
-    throw new Error("No AI API keys configured");
-  }
-
-  console.log("⚠️ Falling back to Lovable AI for infographic generation");
-
-  const stylePrompts: Record<string, string> = {
-    professional: "clean white background, professional product photography",
-    minimalist: "pure white background, minimal composition",
-    vibrant: "colorful gradient background, dynamic composition",
-    luxury: "dark elegant background, premium lighting",
-    tech: "futuristic tech background, blue accents"
-  };
-
-  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${LOVABLE_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "google/gemini-2.5-flash-image",
-      messages: [
-        {
-          role: "user",
-          content: `Create a professional e-commerce product infographic for: ${request.productName}. Style: ${stylePrompts[request.style || "professional"]}. High quality product photography suitable for marketplace listing.`
-        }
-      ],
-      modalities: ["image", "text"]
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error("Image generation failed");
-  }
-
-  const data = await response.json();
-  const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-
-  if (!imageUrl) {
-    throw new Error("No image generated");
-  }
-
-  return new Response(
-    JSON.stringify({ 
-      images: [{ url: imageUrl, id: "lovable-ai" }],
-      aiModel: "gemini-2.5-flash-image",
-      style: request.style,
-      count: 1
-    }),
-    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-  );
-}
