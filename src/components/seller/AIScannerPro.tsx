@@ -624,28 +624,64 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
               1-qadam: Mahsulot rasmini oling
             </CardTitle>
             <CardDescription>
-              Telefon kamerasi orqali mahsulotni rasmga oling yoki rasm yuklang
+              Telefon kamerasi orqali mahsulotni rasmga oling yoki galereyadan tanlang
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div
-              className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:border-primary transition-colors"
+          <CardContent className="space-y-4">
+            {/* Main Camera Button - Full width for mobile */}
+            <Button
+              size="lg"
+              className="w-full h-32 text-lg flex flex-col gap-2"
+              onClick={() => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'image/*';
+                input.capture = 'environment';
+                input.onchange = (e: any) => handleImageCapture(e);
+                input.click();
+              }}
+            >
+              <Camera className="h-12 w-12" />
+              <span>📸 Kamera orqali rasmga olish</span>
+            </Button>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">yoki</span>
+              </div>
+            </div>
+
+            {/* Gallery Upload Button */}
+            <Button
+              variant="outline"
+              size="lg"
+              className="w-full h-16"
               onClick={() => fileInputRef.current?.click()}
             >
-              <ImageIcon className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-              <p className="text-lg font-medium">Rasm yuklash uchun bosing</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                yoki kamera orqali rasmga oling
-              </p>
-            </div>
+              <ImageIcon className="h-5 w-5 mr-2" />
+              Galereyadan tanlash
+            </Button>
+
             <input
               ref={fileInputRef}
               type="file"
               accept="image/*"
-              capture="environment"
               onChange={handleImageCapture}
               className="hidden"
             />
+
+            {/* Tips for mobile users */}
+            <div className="bg-muted/50 rounded-lg p-3 text-sm text-muted-foreground">
+              <p className="font-medium text-foreground mb-1">💡 Maslahat:</p>
+              <ul className="space-y-1 text-xs">
+                <li>• Mahsulotni yaxshi yoritilgan joyda rasmga oling</li>
+                <li>• Rasm tiniq va aniq bo'lishi kerak</li>
+                <li>• Faqat bitta mahsulotni rasmga oling</li>
+              </ul>
+            </div>
           </CardContent>
         </Card>
       )}
