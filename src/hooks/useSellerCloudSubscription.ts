@@ -167,8 +167,8 @@ export function useSellerCloudSubscription(): UseSellerCloudSubscriptionReturn {
           plan_type: planType,
           monthly_fee: monthlyFee,
           commission_percent: commissionPercent,
-          is_trial: true,
-          is_active: false, // Will be activated after trial or payment
+          is_trial: false,
+          is_active: false, // Admin tasdiqlashidan keyin aktiv bo'ladi
         });
 
       if (error) throw error;

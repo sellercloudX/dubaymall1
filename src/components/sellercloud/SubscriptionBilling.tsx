@@ -89,14 +89,14 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
                 <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-500" /> Cheksiz mahsulotlar</li>
                 <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-500" /> AI Scanner Pro</li>
                 <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-500" /> Zaxira sinxronizatsiya</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-500" /> 7 kunlik bepul sinov</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-500" /> 24/7 qo'llab-quvvatlash</li>
               </ul>
               <Button 
                 className="w-full" 
                 onClick={() => handleStartSubscription('pro')}
                 disabled={isCreating}
               >
-                {isCreating ? 'Yuklanmoqda...' : 'Bepul sinovni boshlash'}
+                {isCreating ? 'Yuklanmoqda...' : 'Obunani boshlash'}
               </Button>
             </CardContent>
           </Card>
@@ -141,10 +141,8 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
     switch (accessStatus.reason) {
       case 'active':
         return <Badge className="bg-green-500"><CheckCircle2 className="h-3 w-3 mr-1" /> Faol</Badge>;
-      case 'trial':
-        return <Badge className="bg-blue-500"><Clock className="h-3 w-3 mr-1" /> Sinov davri</Badge>;
       case 'admin_override':
-        return <Badge className="bg-purple-500"><Crown className="h-3 w-3 mr-1" /> Admin aktivlashtirilgan</Badge>;
+        return <Badge className="bg-purple-500"><Crown className="h-3 w-3 mr-1" /> Premium</Badge>;
       case 'debt':
         return <Badge variant="destructive"><AlertTriangle className="h-3 w-3 mr-1" /> Qarzdorlik</Badge>;
       default:
@@ -229,24 +227,6 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
             </div>
           </div>
 
-          {/* Trial Progress */}
-          {subscription.is_trial && subscription.trial_ends_at && (
-            <div className="mt-6 p-4 rounded-lg border bg-blue-50 dark:bg-blue-950/20">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium">Sinov davri</span>
-                <span className="text-sm text-muted-foreground">
-                  {format(new Date(subscription.trial_ends_at), 'dd MMMM yyyy')} gacha
-                </span>
-              </div>
-              <Progress 
-                value={Math.max(0, Math.min(100, 
-                  ((new Date().getTime() - new Date(subscription.started_at).getTime()) / 
-                  (new Date(subscription.trial_ends_at).getTime() - new Date(subscription.started_at).getTime())) * 100
-                ))} 
-                className="h-2"
-              />
-            </div>
-          )}
         </CardContent>
       </Card>
 
