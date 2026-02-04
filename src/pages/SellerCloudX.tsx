@@ -11,11 +11,17 @@ import { MarketplaceOAuth } from '@/components/sellercloud/MarketplaceOAuth';
 import { MarketplaceProducts } from '@/components/sellercloud/MarketplaceProducts';
 import { MarketplaceOrders } from '@/components/sellercloud/MarketplaceOrders';
 import { MarketplaceAnalytics } from '@/components/sellercloud/MarketplaceAnalytics';
+import { InventorySync } from '@/components/sellercloud/InventorySync';
+import { PriceManager } from '@/components/sellercloud/PriceManager';
+import { MultiPublish } from '@/components/sellercloud/MultiPublish';
+import { NotificationCenter } from '@/components/sellercloud/NotificationCenter';
+import { ReportsExport } from '@/components/sellercloud/ReportsExport';
 import { AIScannerPro } from '@/components/seller/AIScannerPro';
 import { toast } from 'sonner';
 import { 
   Loader2, Globe, Package, ShoppingCart, BarChart3, 
-  Scan, Crown, Check, ArrowRight
+  Scan, Crown, Check, ArrowRight, ArrowDownUp, DollarSign,
+  Upload, Bell, FileSpreadsheet
 } from 'lucide-react';
 
 export default function SellerCloudX() {
@@ -179,7 +185,7 @@ export default function SellerCloudX() {
 
         {/* Main Tabs */}
         <Tabs defaultValue="marketplaces" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
+          <TabsList className="flex flex-wrap h-auto gap-1 p-1">
             <TabsTrigger value="marketplaces" className="gap-2">
               <Globe className="h-4 w-4" />
               <span className="hidden sm:inline">Marketplacelar</span>
@@ -196,9 +202,29 @@ export default function SellerCloudX() {
               <ShoppingCart className="h-4 w-4" />
               <span className="hidden sm:inline">Buyurtmalar</span>
             </TabsTrigger>
+            <TabsTrigger value="inventory" className="gap-2">
+              <ArrowDownUp className="h-4 w-4" />
+              <span className="hidden sm:inline">Zaxira</span>
+            </TabsTrigger>
+            <TabsTrigger value="pricing" className="gap-2">
+              <DollarSign className="h-4 w-4" />
+              <span className="hidden sm:inline">Narxlar</span>
+            </TabsTrigger>
+            <TabsTrigger value="publish" className="gap-2">
+              <Upload className="h-4 w-4" />
+              <span className="hidden sm:inline">Joylash</span>
+            </TabsTrigger>
             <TabsTrigger value="analytics" className="gap-2">
               <BarChart3 className="h-4 w-4" />
               <span className="hidden sm:inline">Analitika</span>
+            </TabsTrigger>
+            <TabsTrigger value="reports" className="gap-2">
+              <FileSpreadsheet className="h-4 w-4" />
+              <span className="hidden sm:inline">Hisobotlar</span>
+            </TabsTrigger>
+            <TabsTrigger value="notifications" className="gap-2">
+              <Bell className="h-4 w-4" />
+              <span className="hidden sm:inline">Bildirishnoma</span>
             </TabsTrigger>
           </TabsList>
 
@@ -223,9 +249,6 @@ export default function SellerCloudX() {
                   <p className="text-muted-foreground mb-4">
                     Avval kamida bitta marketplace ulang
                   </p>
-                  <Button variant="outline" onClick={() => document.querySelector('[value="marketplaces"]')?.dispatchEvent(new Event('click'))}>
-                    Marketplace ulash
-                  </Button>
                 </CardContent>
               </Card>
             )}
@@ -239,8 +262,28 @@ export default function SellerCloudX() {
             <MarketplaceOrders connectedMarketplaces={connectedMarketplaces} />
           </TabsContent>
 
+          <TabsContent value="inventory">
+            <InventorySync connectedMarketplaces={connectedMarketplaces} />
+          </TabsContent>
+
+          <TabsContent value="pricing">
+            <PriceManager connectedMarketplaces={connectedMarketplaces} />
+          </TabsContent>
+
+          <TabsContent value="publish">
+            <MultiPublish connectedMarketplaces={connectedMarketplaces} />
+          </TabsContent>
+
           <TabsContent value="analytics">
             <MarketplaceAnalytics connectedMarketplaces={connectedMarketplaces} />
+          </TabsContent>
+
+          <TabsContent value="reports">
+            <ReportsExport connectedMarketplaces={connectedMarketplaces} />
+          </TabsContent>
+
+          <TabsContent value="notifications">
+            <NotificationCenter />
           </TabsContent>
         </Tabs>
       </div>
