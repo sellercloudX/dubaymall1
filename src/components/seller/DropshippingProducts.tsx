@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,7 +16,10 @@ import {
   Trash2, 
   TrendingUp,
   TrendingDown,
-  Loader2
+  Loader2,
+  Truck,
+  DollarSign,
+  Info
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -272,21 +276,34 @@ export function DropshippingProducts({ shopId, refreshTrigger }: DropshippingPro
                   </TableCell>
                   <TableCell>
                     {profit !== null ? (
-                      <div className="flex items-center gap-1">
-                        {profit >= 0 ? (
-                          <TrendingUp className="h-4 w-4 text-emerald-500" />
-                        ) : (
-                          <TrendingDown className="h-4 w-4 text-destructive" />
-                        )}
-                        <span className={profit >= 0 ? 'text-emerald-600' : 'text-destructive'}>
-                          {profit.toLocaleString()} so'm
-                        </span>
-                        {margin !== null && (
-                          <span className="text-xs text-muted-foreground">
-                            ({margin.toFixed(0)}%)
-                          </span>
-                        )}
-                      </div>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex items-center gap-1 cursor-help">
+                              {profit >= 0 ? (
+                                <TrendingUp className="h-4 w-4 text-primary" />
+                              ) : (
+                                <TrendingDown className="h-4 w-4 text-destructive" />
+                              )}
+                              <span className={profit >= 0 ? 'text-primary font-medium' : 'text-destructive'}>
+                                {profit.toLocaleString()} so'm
+                              </span>
+                              {margin !== null && (
+                                <Badge variant="outline" className="text-xs ml-1">
+                                  {margin.toFixed(0)}%
+                                </Badge>
+                              )}
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <div className="text-xs space-y-1">
+                              <p>Tannarx: {product.original_price?.toLocaleString()} so'm</p>
+                              <p>Sotish narxi: {product.price.toLocaleString()} so'm</p>
+                              <p>Sof foyda: {profit.toLocaleString()} so'm</p>
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     ) : (
                       '-'
                     )}

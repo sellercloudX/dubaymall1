@@ -291,6 +291,122 @@ export type Database = {
           },
         ]
       }
+      dropshipping_orders: {
+        Row: {
+          created_at: string
+          delivered_at: string | null
+          estimated_delivery_days: string | null
+          id: string
+          notes: string | null
+          order_id: string
+          order_item_id: string
+          ordered_at: string | null
+          product_id: string
+          quantity: number
+          shipped_at: string | null
+          shipping_address: Json | null
+          shipping_cost: number
+          shipping_method: string | null
+          shop_id: string
+          supplier_cost: number
+          supplier_order_id: string | null
+          supplier_order_status: string | null
+          supplier_platform: string
+          supplier_response: Json | null
+          total_cost: number
+          tracking_number: string | null
+          tracking_url: string | null
+          updated_at: string
+          variant_id: string | null
+          variant_sku: string | null
+        }
+        Insert: {
+          created_at?: string
+          delivered_at?: string | null
+          estimated_delivery_days?: string | null
+          id?: string
+          notes?: string | null
+          order_id: string
+          order_item_id: string
+          ordered_at?: string | null
+          product_id: string
+          quantity?: number
+          shipped_at?: string | null
+          shipping_address?: Json | null
+          shipping_cost?: number
+          shipping_method?: string | null
+          shop_id: string
+          supplier_cost?: number
+          supplier_order_id?: string | null
+          supplier_order_status?: string | null
+          supplier_platform?: string
+          supplier_response?: Json | null
+          total_cost?: number
+          tracking_number?: string | null
+          tracking_url?: string | null
+          updated_at?: string
+          variant_id?: string | null
+          variant_sku?: string | null
+        }
+        Update: {
+          created_at?: string
+          delivered_at?: string | null
+          estimated_delivery_days?: string | null
+          id?: string
+          notes?: string | null
+          order_id?: string
+          order_item_id?: string
+          ordered_at?: string | null
+          product_id?: string
+          quantity?: number
+          shipped_at?: string | null
+          shipping_address?: Json | null
+          shipping_cost?: number
+          shipping_method?: string | null
+          shop_id?: string
+          supplier_cost?: number
+          supplier_order_id?: string | null
+          supplier_order_status?: string | null
+          supplier_platform?: string
+          supplier_response?: Json | null
+          total_cost?: number
+          tracking_number?: string | null
+          tracking_url?: string | null
+          updated_at?: string
+          variant_id?: string | null
+          variant_sku?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dropshipping_orders_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dropshipping_orders_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dropshipping_orders_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dropshipping_orders_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       favorites: {
         Row: {
           created_at: string
