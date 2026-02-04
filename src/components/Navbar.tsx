@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
 import { useUserRoles } from '@/hooks/useUserRoles';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { NotificationsDropdown } from '@/components/notifications/NotificationsDropdown';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -80,6 +81,7 @@ export function Navbar() {
 
           {/* Right Side - Desktop */}
           <div className="hidden md:flex items-center gap-4">
+            <ThemeToggle />
             <LanguageSwitcher />
             
             {user && (
@@ -132,6 +134,7 @@ export function Navbar() {
 
           {/* Mobile - Right side */}
           <div className="flex md:hidden items-center gap-2">
+            <ThemeToggle />
             <LanguageSwitcher />
             <button
               className="p-2"
