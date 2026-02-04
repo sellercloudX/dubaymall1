@@ -1,11 +1,90 @@
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { BarChart3, TrendingUp, DollarSign, Package, ShoppingCart } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { BarChart3, TrendingUp, DollarSign, Package, ShoppingCart, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface MarketplaceAnalyticsProps {
   connectedMarketplaces: string[];
+  fetchMarketplaceData: (marketplace: string, dataType: string, options?: Record<string, any>) => Promise<any>;
 }
 
-export function MarketplaceAnalytics({ connectedMarketplaces }: MarketplaceAnalyticsProps) {
+interface MarketplaceStats {
+  marketplace: string;
+  productsCount: number;
+  ordersCount: number;
+  totalRevenue: number;
+}
+
+const MARKETPLACE_NAMES: Record<string, string> = {
+  yandex: 'Yandex Market',
+  uzum: 'Uzum Market',
+  wildberries: 'Wildberries',
+  ozon: 'Ozon',
+};
+
+export function MarketplaceAnalytics({ connectedMarketplaces, fetchMarketplaceData }: MarketplaceAnalyticsProps) {
+  const [stats, setStats] = useState<MarketplaceStats[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [totals, setTotals] = useState({ products: 0, orders: 0, revenue: 0 });
+
+  useEffect(() => {
+    if (connectedMarketplaces.length > 0) {
+      loadAnalytics();
+    } else {
+      setIsLoading(false);
+    }
+  }, [connectedMarketplaces]);
+
+  const loadAnalytics = async () => {
+    setIsLoading(true);
+    
+    try {
+      const marketplaceStats: MarketplaceStats[] = [];
+      let totalProducts = 0;
+      let totalOrders = 0;
+      let totalRevenue = 0;
+
+      for (const marketplace of connectedMarketplaces) {
+        const [productsResult, ordersResult] = await Promise.all([
+          fetchMarketplaceData(marketplace, 'products', { limit: 1 }),
+          fetchMarketplaceData(marketplace, 'orders', {}),
+        ]);
+
+        const productsCount = productsResult.total || 0;
+        const orders = ordersResult.data || [];
+        const ordersCount = orders.length;
+        const revenue = orders.reduce((sum: number, order: any) => sum + (order.total || 0), 0);
+
+        marketplaceStats.push({
+          marketplace,
+          productsCount,
+          ordersCount,
+          totalRevenue: revenue,
+        });
+
+        totalProducts += productsCount;
+        totalOrders += ordersCount;
+        totalRevenue += revenue;
+      }
+
+      setStats(marketplaceStats);
+      setTotals({ products: totalProducts, orders: totalOrders, revenue: totalRevenue });
+    } catch (err) {
+      console.error('Error loading analytics:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('uz-UZ', { 
+      style: 'decimal',
+      minimumFractionDigits: 0 
+    }).format(price) + ' so\'m';
+  };
+
   if (connectedMarketplaces.length === 0) {
     return (
       <Card>
@@ -30,8 +109,14 @@ export function MarketplaceAnalytics({ connectedMarketplaces }: MarketplaceAnaly
               <DollarSign className="h-4 w-4" />
               <span className="text-sm">Jami daromad</span>
             </div>
-            <div className="text-2xl font-bold">$0</div>
-            <div className="text-xs text-green-500">+0% o'tgan oyga</div>
+            {isLoading ? (
+              <Skeleton className="h-8 w-24" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold">{formatPrice(totals.revenue)}</div>
+                <div className="text-xs text-muted-foreground">So'nggi 30 kun</div>
+              </>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -40,8 +125,14 @@ export function MarketplaceAnalytics({ connectedMarketplaces }: MarketplaceAnaly
               <ShoppingCart className="h-4 w-4" />
               <span className="text-sm">Buyurtmalar</span>
             </div>
-            <div className="text-2xl font-bold">0</div>
-            <div className="text-xs text-muted-foreground">Bu oy</div>
+            {isLoading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold">{totals.orders}</div>
+                <div className="text-xs text-muted-foreground">So'nggi 30 kun</div>
+              </>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -50,18 +141,32 @@ export function MarketplaceAnalytics({ connectedMarketplaces }: MarketplaceAnaly
               <Package className="h-4 w-4" />
               <span className="text-sm">Mahsulotlar</span>
             </div>
-            <div className="text-2xl font-bold">0</div>
-            <div className="text-xs text-muted-foreground">Faol</div>
+            {isLoading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold">{totals.products}</div>
+                <div className="text-xs text-muted-foreground">Jami</div>
+              </>
+            )}
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4">
             <div className="flex items-center gap-2 text-muted-foreground mb-2">
               <TrendingUp className="h-4 w-4" />
-              <span className="text-sm">Konversiya</span>
+              <span className="text-sm">O'rtacha chek</span>
             </div>
-            <div className="text-2xl font-bold">0%</div>
-            <div className="text-xs text-muted-foreground">O'rtacha</div>
+            {isLoading ? (
+              <Skeleton className="h-8 w-24" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold">
+                  {totals.orders > 0 ? formatPrice(Math.round(totals.revenue / totals.orders)) : '—'}
+                </div>
+                <div className="text-xs text-muted-foreground">Buyurtma uchun</div>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -69,29 +174,45 @@ export function MarketplaceAnalytics({ connectedMarketplaces }: MarketplaceAnaly
       {/* Marketplace breakdown */}
       <Card>
         <CardHeader>
-          <CardTitle>Marketplace bo'yicha statistika</CardTitle>
-          <CardDescription>Har bir marketplace uchun alohida ko'rsatkichlar</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Marketplace bo'yicha statistika</CardTitle>
+              <CardDescription>Har bir marketplace uchun alohida ko'rsatkichlar</CardDescription>
+            </div>
+            <Button variant="outline" size="sm" onClick={loadAnalytics}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Yangilash
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {connectedMarketplaces.map((mp) => (
-              <div key={mp} className="flex items-center justify-between p-4 rounded-lg border">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                    {mp === 'yandex' ? '🟡' : mp === 'uzum' ? '🟣' : '📦'}
+          {isLoading ? (
+            <div className="space-y-4">
+              {[1, 2].map((i) => (
+                <Skeleton key={i} className="h-20 w-full" />
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {stats.map((stat) => (
+                <div key={stat.marketplace} className="flex items-center justify-between p-4 rounded-lg border">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                      {stat.marketplace === 'yandex' ? '🟡' : stat.marketplace === 'uzum' ? '🟣' : '📦'}
+                    </div>
+                    <div>
+                      <div className="font-medium">{MARKETPLACE_NAMES[stat.marketplace] || stat.marketplace}</div>
+                      <div className="text-sm text-muted-foreground">{stat.productsCount} mahsulot</div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="font-medium capitalize">{mp}</div>
-                    <div className="text-sm text-muted-foreground">0 mahsulot</div>
+                  <div className="text-right">
+                    <div className="font-bold">{formatPrice(stat.totalRevenue)}</div>
+                    <div className="text-sm text-muted-foreground">{stat.ordersCount} buyurtma</div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="font-bold">$0</div>
-                  <div className="text-sm text-muted-foreground">0 buyurtma</div>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -85,22 +85,29 @@ export function MarketplaceProducts({ connectedMarketplaces, fetchMarketplaceDat
   );
 
   const formatPrice = (price?: number) => {
-    if (!price) return '—';
-    return new Intl.NumberFormat('ru-RU', { 
-      style: 'currency', 
-      currency: 'RUB',
+    if (!price && price !== 0) return '—';
+    return new Intl.NumberFormat('uz-UZ', { 
+      style: 'decimal',
       minimumFractionDigits: 0 
-    }).format(price);
+    }).format(price) + ' so\'m';
   };
 
   const getAvailabilityBadge = (availability?: string) => {
-    switch (availability) {
+    const status = availability?.toUpperCase();
+    switch (status) {
       case 'ACTIVE':
+      case 'PUBLISHED':
+      case 'READY':
         return <Badge variant="default" className="bg-green-500">Faol</Badge>;
       case 'INACTIVE':
+      case 'UNPUBLISHED':
         return <Badge variant="secondary">Nofaol</Badge>;
       case 'DELISTED':
+      case 'REJECTED':
         return <Badge variant="destructive">O'chirilgan</Badge>;
+      case 'MODERATION':
+      case 'PROCESSING':
+        return <Badge variant="outline" className="bg-yellow-100 text-yellow-800">Moderatsiyada</Badge>;
       default:
         return <Badge variant="outline">{availability || 'Noma\'lum'}</Badge>;
     }

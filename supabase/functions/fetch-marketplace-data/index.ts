@@ -94,7 +94,7 @@ serve(async (req) => {
     const credentials = connection.credentials as { apiKey: string; campaignId?: string; businessId?: string };
     const { apiKey, campaignId, businessId } = credentials;
 
-    console.log(`Fetching ${dataType} from ${marketplace} for user ${user.id}`);
+    console.log(`Fetching ${dataType} from ${marketplace} for user ${user.id}, campaignId: ${campaignId}, businessId: ${businessId}`);
 
     let result: any = { success: true, data: [] };
 
@@ -105,57 +105,79 @@ serve(async (req) => {
       };
 
       if (dataType === "products") {
-        // Fetch products from Yandex Market
-        let apiPath: string;
-        let requestMethod = 'POST';
-        let requestBody: any = null;
+        // Use offer-mappings endpoint which returns full product data
+        const apiPath = businessId 
+          ? `https://api.partner.market.yandex.ru/businesses/${businessId}/offer-mappings`
+          : `https://api.partner.market.yandex.ru/campaigns/${campaignId}/offer-mappings`;
         
-        if (businessId) {
-          // Use Business API (newer)
-          apiPath = `https://api.partner.market.yandex.ru/businesses/${businessId}/offer-mappings`;
-          requestBody = {
-            archived: false
-          };
-        } else if (campaignId) {
-          // Use Campaign API with offers endpoint - empty body to get all
-          apiPath = `https://api.partner.market.yandex.ru/campaigns/${campaignId}/offers`;
-          requestBody = {};
-        } else {
-          return new Response(
-            JSON.stringify({ success: false, error: "No campaignId or businessId found" }),
-            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-        
-        const paginationParam = `?limit=${limit}`;
+        console.log(`Calling API: ${apiPath}`);
         
         const response = await fetch(
-          `${apiPath}${paginationParam}`,
+          `${apiPath}?limit=${limit}`,
           { 
-            method: requestMethod,
+            method: 'POST',
             headers,
-            body: JSON.stringify(requestBody)
+            body: JSON.stringify({})
           }
         );
 
+        console.log(`Products API response status: ${response.status}`);
+
         if (response.ok) {
           const data = await response.json();
+          console.log("Products API response keys:", Object.keys(data.result || {}));
           
-          // Handle different API response formats
-          const offers = data.result?.offers || data.result?.offerMappings || [];
-          const products: YandexProduct[] = offers.map((entry: any) => {
-            const offer = entry.offer || entry;
+          const offerMappings = data.result?.offerMappings || [];
+          console.log(`Found ${offerMappings.length} offer mappings`);
+          
+          if (offerMappings.length > 0) {
+            console.log("Sample mapping structure:", JSON.stringify(offerMappings[0]).substring(0, 800));
+          }
+          
+          const products: YandexProduct[] = offerMappings.map((entry: any) => {
+            const offer = entry.offer || {};
+            const mapping = entry.mapping || {};
+            const awaitingMapping = entry.awaitingModerationMapping || {};
+            
+            // Get pictures from multiple possible locations
+            const pictures = offer.urls || offer.pictures || mapping.pictures || [];
+            
+            // Get price - check multiple fields
+            const price = offer.basicPrice?.value || 
+                         offer.price?.value || 
+                         offer.price ||
+                         mapping.price?.value || 0;
+            
+            // Get stock from warehouses or stocks array
+            let stockCount = 0;
+            if (offer.stocks && offer.stocks.length > 0) {
+              stockCount = offer.stocks.reduce((sum: number, s: any) => sum + (s.count || 0), 0);
+            } else if (offer.stockCount !== undefined) {
+              stockCount = offer.stockCount;
+            }
+            
+            // Get status
+            const statusValue = mapping.status || 
+                          awaitingMapping.status || 
+                          offer.availability || 
+                          'UNKNOWN';
+            
             return {
-              offerId: offer.offerId,
-              name: offer.name,
-              price: offer.basicPrice?.value || offer.price?.value || offer.price,
-              shopSku: offer.shopSku,
-              category: offer.category,
-              pictures: offer.pictures || [],
-              availability: offer.availability,
-              stockCount: offer.stocks?.[0]?.count || offer.stockCount,
+              offerId: offer.offerId || offer.shopSku || '',
+              name: offer.name || mapping.marketSkuName || 'Nomsiz',
+              price: price,
+              shopSku: offer.shopSku || offer.offerId || '',
+              category: mapping.categoryName || offer.category || '',
+              pictures: pictures,
+              availability: statusValue,
+              stockCount: stockCount,
             };
           });
+
+          console.log(`Mapped ${products.length} products`);
+          if (products.length > 0) {
+            console.log("Sample product:", JSON.stringify(products[0]));
+          }
 
           result = {
             success: true,
@@ -181,10 +203,16 @@ serve(async (req) => {
           url += `&status=${status}`;
         }
 
+        console.log(`Calling orders API: ${url}`);
+
         const response = await fetch(url, { headers });
+
+        console.log(`Orders API response status: ${response.status}`);
 
         if (response.ok) {
           const data = await response.json();
+          console.log(`Found ${data.orders?.length || 0} orders`);
+          
           const orders: YandexOrder[] = data.orders?.map((order: any) => ({
             id: order.id,
             status: order.status,

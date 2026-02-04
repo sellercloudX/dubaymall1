@@ -114,12 +114,11 @@ export function MarketplaceOrders({ connectedMarketplaces, fetchMarketplaceData 
   };
 
   const formatPrice = (price?: number) => {
-    if (!price) return '—';
-    return new Intl.NumberFormat('ru-RU', { 
-      style: 'currency', 
-      currency: 'RUB',
+    if (!price && price !== 0) return '—';
+    return new Intl.NumberFormat('uz-UZ', { 
+      style: 'decimal',
       minimumFractionDigits: 0 
-    }).format(price);
+    }).format(price) + ' so\'m';
   };
 
   const getStatusBadge = (status: string, substatus?: string) => {
