@@ -16,20 +16,22 @@ import { PriceManager } from '@/components/sellercloud/PriceManager';
 import { MultiPublish } from '@/components/sellercloud/MultiPublish';
 import { NotificationCenter } from '@/components/sellercloud/NotificationCenter';
 import { ReportsExport } from '@/components/sellercloud/ReportsExport';
+import { SubscriptionBilling } from '@/components/sellercloud/SubscriptionBilling';
+import { FinancialDashboard } from '@/components/sellercloud/FinancialDashboard';
 import { AIScannerPro } from '@/components/seller/AIScannerPro';
 import { useMarketplaceConnections } from '@/hooks/useMarketplaceConnections';
+import { useSellerCloudSubscription } from '@/hooks/useSellerCloudSubscription';
 import { toast } from 'sonner';
 import { 
   Loader2, Globe, Package, ShoppingCart, BarChart3, 
   Scan, Crown, Check, ArrowRight, ArrowDownUp, DollarSign,
-  Upload, Bell, FileSpreadsheet
+  Upload, Bell, FileSpreadsheet, CreditCard, Calculator, AlertTriangle
 } from 'lucide-react';
 
 export default function SellerCloudX() {
   const { user, loading: authLoading } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
-  const [hasSubscription, setHasSubscription] = useState(false);
   const { 
     connections, 
     isLoading: connectionsLoading, 
@@ -39,8 +41,18 @@ export default function SellerCloudX() {
     refetch
   } = useMarketplaceConnections();
   
+  const {
+    subscription,
+    accessStatus,
+    totalDebt,
+    isLoading: subscriptionLoading,
+  } = useSellerCloudSubscription();
+  
   // Derive connected marketplace IDs from connections
   const connectedMarketplaces = connections.map(c => c.marketplace);
+  
+  // Calculate total sales for billing
+  const totalRevenue = connections.reduce((sum, c) => sum + (c.total_revenue || 0), 0);
 
   // Handle marketplace connection - refetch to update all components
   const handleMarketplaceConnect = async (marketplace: string) => {
@@ -53,12 +65,9 @@ export default function SellerCloudX() {
       navigate('/auth?redirect=/seller-cloud');
     }
   }, [user, authLoading, navigate]);
-
-  // Mock subscription check - replace with real check
-  useEffect(() => {
-    // TODO: Check if user has SellerCloudX subscription
-    setHasSubscription(true); // For demo
-  }, [user]);
+  
+  // Check if user has active access (subscription, trial, or admin override)
+  const hasAccess = accessStatus?.is_active ?? true; // Default to true for demo
 
   if (authLoading) {
     return (
@@ -71,7 +80,7 @@ export default function SellerCloudX() {
   }
 
   // Show pricing if no subscription
-  if (!hasSubscription) {
+  if (!subscription) {
     return (
       <Layout>
         <div className="container mx-auto px-4 py-12">
@@ -213,6 +222,28 @@ export default function SellerCloudX() {
         </div>
 
         {/* Main Tabs */}
+        {/* Access Warning */}
+        {accessStatus && !accessStatus.is_active && (
+          <Card className="border-destructive bg-destructive/5 mb-6">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-4">
+                <AlertTriangle className="h-6 w-6 text-destructive flex-shrink-0" />
+                <div className="flex-1">
+                  <h4 className="font-semibold text-destructive">Akkount cheklangan</h4>
+                  <p className="text-sm text-muted-foreground mt-1">{accessStatus.message}</p>
+                  {totalDebt > 0 && (
+                    <p className="font-medium mt-2">
+                      Qarzdorlik: {new Intl.NumberFormat('uz-UZ').format(totalDebt)} so'm
+                    </p>
+                  )}
+                </div>
+                <Button variant="destructive" size="sm">To'lash</Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Main Tabs */}
         <Tabs defaultValue="marketplaces" className="space-y-6">
           <TabsList className="flex flex-wrap h-auto gap-1 p-1">
             <TabsTrigger value="marketplaces" className="gap-2">
@@ -246,6 +277,14 @@ export default function SellerCloudX() {
             <TabsTrigger value="analytics" className="gap-2">
               <BarChart3 className="h-4 w-4" />
               <span className="hidden sm:inline">Analitika</span>
+            </TabsTrigger>
+            <TabsTrigger value="financials" className="gap-2">
+              <Calculator className="h-4 w-4" />
+              <span className="hidden sm:inline">Moliya</span>
+            </TabsTrigger>
+            <TabsTrigger value="subscription" className="gap-2">
+              <CreditCard className="h-4 w-4" />
+              <span className="hidden sm:inline">Obuna</span>
             </TabsTrigger>
             <TabsTrigger value="reports" className="gap-2">
               <FileSpreadsheet className="h-4 w-4" />
@@ -320,6 +359,19 @@ export default function SellerCloudX() {
               connectedMarketplaces={connectedMarketplaces}
               fetchMarketplaceData={fetchMarketplaceData}
             />
+          </TabsContent>
+
+          <TabsContent value="financials">
+            <FinancialDashboard 
+              connectedMarketplaces={connectedMarketplaces}
+              fetchMarketplaceData={fetchMarketplaceData}
+              monthlyFee={subscription?.monthly_fee || 499}
+              commissionPercent={subscription?.commission_percent || 4}
+            />
+          </TabsContent>
+
+          <TabsContent value="subscription">
+            <SubscriptionBilling totalSalesVolume={totalRevenue} />
           </TabsContent>
 
           <TabsContent value="reports">
