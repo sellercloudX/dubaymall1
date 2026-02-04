@@ -121,62 +121,71 @@ export default function Index() {
       <StructuredData type="Organization" data={organizationData} />
       <StructuredData type="WebSite" data={websiteData} />
 
-      {/* Hero Section - Premium */}
+      {/* Hero Section - Premium Fintech */}
       <section className="relative overflow-hidden min-h-[90vh] flex items-center">
         {/* Background layers */}
-        <div className="absolute inset-0 hero-gradient" />
-        <div className="absolute inset-0 bg-grid-pattern opacity-[0.03]" />
+        <div className="absolute inset-0 bg-mesh" />
+        <div className="absolute inset-0 bg-dot-pattern opacity-[0.03] dark:opacity-[0.05]" />
         
-        {/* Animated shapes */}
-        <div className="absolute top-20 left-[10%] w-72 h-72 bg-primary/20 rounded-full blur-3xl float" />
-        <div className="absolute bottom-20 right-[10%] w-96 h-96 bg-accent/20 rounded-full blur-3xl float" style={{ animationDelay: '-3s' }} />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-to-r from-primary/10 to-accent/10 rounded-full blur-3xl" />
+        {/* Animated gradient orbs */}
+        <div className="absolute top-20 left-[10%] w-72 h-72 bg-primary/20 rounded-full blur-[100px] animate-float" />
+        <div className="absolute bottom-20 right-[10%] w-96 h-96 bg-accent/15 rounded-full blur-[120px] animate-float" style={{ animationDelay: '-3s' }} />
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[700px] h-[700px] bg-gradient-to-r from-primary/10 to-accent/10 rounded-full blur-[150px]" />
 
         <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-4xl mx-auto text-center">
             {/* Badge */}
-            <Badge className="mb-6 px-4 py-2 text-sm bg-primary/10 text-primary border-primary/20 hover:bg-primary/20">
-              <Sparkles className="h-4 w-4 mr-2" />
-              #1 E-commerce platforma O'zbekistonda
-            </Badge>
+            <div className="inline-flex animate-fade-up">
+              <Badge className="mb-8 px-5 py-2.5 text-sm font-medium bg-primary/10 text-primary border-primary/20 hover:bg-primary/15 transition-colors backdrop-blur-sm">
+                <Sparkles className="h-4 w-4 mr-2 animate-bounce-subtle" />
+                #1 E-commerce platforma O'zbekistonda
+              </Badge>
+            </div>
 
             {/* Headline */}
-            <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6 animate-fade-in">
+            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-8 animate-fade-up font-display" style={{ animationDelay: '0.1s' }}>
               <span className="text-foreground">Sotish oson,</span>
               <br />
               <span className="text-gradient">Sotib olish qulay</span>
             </h1>
             
-            <p className="text-xl md:text-2xl text-muted-foreground mb-10 max-w-2xl mx-auto animate-fade-in" style={{ animationDelay: '0.1s' }}>
+            <p className="text-xl md:text-2xl text-muted-foreground mb-12 max-w-2xl mx-auto animate-fade-up leading-relaxed" style={{ animationDelay: '0.2s' }}>
               Minglab mahsulotlar, ishonchli sotuvchilar va AI bilan quvvatlangan xarid tajribasi
             </p>
 
             {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in" style={{ animationDelay: '0.2s' }}>
-              <Button size="lg" className="text-lg px-8 py-6 shadow-lg hover:shadow-xl transition-all" asChild>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-up" style={{ animationDelay: '0.3s' }}>
+              <Button size="lg" className="text-lg px-8 py-6 shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all btn-glow group" asChild>
                 <Link to="/marketplace">
-                  <ShoppingBag className="mr-2 h-5 w-5" />
+                  <ShoppingBag className="mr-2 h-5 w-5 group-hover:scale-110 transition-transform" />
                   Xarid qilish
                 </Link>
               </Button>
-              <Button size="lg" variant="outline" className="text-lg px-8 py-6 bg-background/80 backdrop-blur" asChild>
+              <Button size="lg" variant="outline" className="text-lg px-8 py-6 glass hover:bg-primary/5 transition-all group" asChild>
                 <Link to="/partnership">
                   Hamkorlik
-                  <ArrowRight className="ml-2 h-5 w-5" />
+                  <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                 </Link>
               </Button>
             </div>
 
             {/* Quick stats */}
-            <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-6 animate-fade-in" style={{ animationDelay: '0.3s' }}>
+            <div className="mt-20 grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 animate-fade-up" style={{ animationDelay: '0.4s' }}>
               {stats.map((stat, i) => (
-                <div key={i} className="text-center p-4 rounded-2xl bg-background/60 backdrop-blur border border-border/50 shadow-sm">
-                  <stat.icon className="h-6 w-6 mx-auto mb-2 text-primary" />
-                  <div className="text-2xl md:text-3xl font-bold text-foreground">{stat.value}</div>
-                  <div className="text-sm text-muted-foreground">{stat.label}</div>
+                <div key={i} className="group text-center p-5 rounded-2xl glass-card hover:border-primary/30 transition-all hover:-translate-y-1">
+                  <stat.icon className="h-6 w-6 mx-auto mb-3 text-primary group-hover:scale-110 transition-transform" />
+                  <div className="text-2xl md:text-3xl font-bold text-foreground font-display">{stat.value}</div>
+                  <div className="text-sm text-muted-foreground mt-1">{stat.label}</div>
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+
+        {/* Scroll indicator */}
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce-subtle">
+          <div className="w-6 h-10 rounded-full border-2 border-muted-foreground/30 flex items-start justify-center p-1.5">
+            <div className="w-1.5 h-2.5 rounded-full bg-muted-foreground/50 animate-pulse" />
           </div>
         </div>
       </section>
@@ -253,14 +262,14 @@ export default function Index() {
                     <div className="text-muted-foreground">Faol do'konlar</div>
                   </div>
                   <div className="p-6 rounded-2xl bg-card shadow-xl border">
-                    <Package className="h-10 w-10 text-emerald-500 mb-3" />
+                    <Package className="h-10 w-10 text-success mb-3" />
                     <div className="text-3xl font-bold">50K+</div>
                     <div className="text-muted-foreground">Mahsulotlar</div>
                   </div>
                 </div>
                 <div className="space-y-4 mt-8">
                   <div className="p-6 rounded-2xl bg-card shadow-xl border">
-                    <Users className="h-10 w-10 text-purple-500 mb-3" />
+                    <Users className="h-10 w-10 text-accent mb-3" />
                     <div className="text-3xl font-bold">10K+</div>
                     <div className="text-muted-foreground">Xaridorlar</div>
                   </div>
@@ -312,8 +321,8 @@ export default function Index() {
 
       {/* CTA Section */}
       <section className="py-24 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary via-primary to-indigo-700" />
-        <div className="absolute inset-0 bg-grid-pattern opacity-10" />
+        <div className="absolute inset-0 bg-gradient-to-br from-primary to-accent" />
+        <div className="absolute inset-0 bg-dot-pattern opacity-10" />
         
         <div className="container mx-auto px-4 relative z-10 text-center">
           <h2 className="text-4xl md:text-5xl font-bold text-primary-foreground mb-6">
