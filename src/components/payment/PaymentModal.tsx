@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
-import { CheckCircle, Loader2, CreditCard, Smartphone, Shield } from 'lucide-react';
+import { CheckCircle, Loader2, CreditCard, Smartphone, Shield, ExternalLink } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface PaymentModalProps {
   open: boolean;
@@ -13,16 +15,18 @@ interface PaymentModalProps {
   paymentMethod: string;
   amount: number;
   orderNumber: string;
+  orderId?: string;
 }
 
-export function PaymentModal({ open, onClose, onSuccess, paymentMethod, amount, orderNumber }: PaymentModalProps) {
-  const [step, setStep] = useState<'form' | 'processing' | 'success'>('form');
+export function PaymentModal({ open, onClose, onSuccess, paymentMethod, amount, orderNumber, orderId }: PaymentModalProps) {
+  const [step, setStep] = useState<'form' | 'processing' | 'redirect' | 'success'>('form');
   const [progress, setProgress] = useState(0);
   const [cardNumber, setCardNumber] = useState('');
   const [expiry, setExpiry] = useState('');
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [showOtp, setShowOtp] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('uz-UZ').format(price) + " so'm";
@@ -47,8 +51,48 @@ export function PaymentModal({ open, onClose, onSuccess, paymentMethod, amount, 
     return v;
   };
 
-  const handleSubmit = () => {
-    if (paymentMethod === 'payme' || paymentMethod === 'click') {
+  // Handle Click payment with real API
+  const handleClickPayment = async () => {
+    if (!orderId) {
+      toast.error('Buyurtma topilmadi');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('click-payment', {
+        body: {
+          orderId,
+          amount,
+          returnUrl: window.location.origin + '/dashboard?tab=orders'
+        }
+      });
+
+      if (error) throw error;
+
+      if (data?.paymentUrl) {
+        setStep('redirect');
+        // Open Click payment page
+        window.open(data.paymentUrl, '_blank');
+        toast.success('Click to\'lov sahifasi ochildi');
+      }
+    } catch (error: any) {
+      console.error('Click payment error:', error);
+      toast.error('To\'lov xatosi: ' + (error.message || 'Noma\'lum xato'));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    // For Click - use real API integration
+    if (paymentMethod === 'click') {
+      await handleClickPayment();
+      return;
+    }
+
+    // For other methods (Payme, Uzcard) - use mock flow
+    if (paymentMethod === 'payme' || paymentMethod === 'uzcard') {
       if (!showOtp) {
         setShowOtp(true);
         return;
@@ -106,7 +150,7 @@ export function PaymentModal({ open, onClose, onSuccess, paymentMethod, amount, 
           name: 'Click', 
           color: 'bg-[#00AAFF]', 
           icon: '📱',
-          description: 'Click ilovasi orqali'
+          description: 'Click ilovasi orqali to\'lash'
         };
       case 'uzcard':
         return { 
@@ -176,31 +220,33 @@ export function PaymentModal({ open, onClose, onSuccess, paymentMethod, amount, 
               </div>
             )}
 
-            {/* Phone Form for Click */}
-            {paymentMethod === 'click' && !showOtp && (
-              <div className="space-y-2">
-                <Label>Telefon raqami</Label>
-                <div className="relative">
-                  <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+998 90 123 45 67"
-                    className="pl-10"
-                  />
+            {/* Click Payment - Direct redirect */}
+            {paymentMethod === 'click' && (
+              <div className="space-y-4">
+                <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg text-center">
+                  <div className="w-16 h-16 mx-auto mb-3 bg-[#00AAFF] rounded-full flex items-center justify-center">
+                    <span className="text-3xl">📱</span>
+                  </div>
+                  <p className="font-medium">Click orqali to'lash</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Tugmani bosganingizda Click to'lov sahifasi ochiladi
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground">Click ilovasiga ulangan telefon raqami</p>
+                <div className="bg-muted/50 p-3 rounded-lg text-xs text-muted-foreground">
+                  <p>✓ Click ilovasiga ro'yxatdan o'tgan bo'lishingiz kerak</p>
+                  <p>✓ To'lov xavfsiz SSL shifrlangan</p>
+                </div>
               </div>
             )}
 
             {/* OTP Form */}
-            {showOtp && (
+            {showOtp && paymentMethod !== 'click' && (
               <div className="space-y-4">
                 <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg text-center">
                   <Shield className="h-8 w-8 mx-auto mb-2 text-blue-500" />
                   <p className="text-sm">SMS kod yuborildi</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {paymentMethod === 'click' ? phone : `**** ${cardNumber.slice(-4)}`}
+                    **** {cardNumber.slice(-4)}
                   </p>
                 </div>
                 <div className="space-y-2">
@@ -223,12 +269,44 @@ export function PaymentModal({ open, onClose, onSuccess, paymentMethod, amount, 
               onClick={handleSubmit} 
               className="w-full" 
               disabled={
+                isLoading ||
                 (paymentMethod !== 'click' && !showOtp && cardNumber.length < 19) ||
-                (paymentMethod === 'click' && !showOtp && phone.length < 9) ||
                 (showOtp && otp.length < 6)
               }
             >
-              {showOtp ? 'Tasdiqlash' : 'Davom etish'}
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Yuklanmoqda...
+                </>
+              ) : paymentMethod === 'click' ? (
+                <>
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Click sahifasiga o'tish
+                </>
+              ) : showOtp ? (
+                'Tasdiqlash'
+              ) : (
+                'Davom etish'
+              )}
+            </Button>
+          </div>
+        )}
+
+        {step === 'redirect' && (
+          <div className="py-8 text-center space-y-4">
+            <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900 rounded-full mx-auto flex items-center justify-center">
+              <ExternalLink className="h-8 w-8 text-blue-600" />
+            </div>
+            <div>
+              <p className="font-bold text-lg">Click sahifasi ochildi</p>
+              <p className="text-sm text-muted-foreground mt-2">
+                To'lovni Click sahifasida yakunlang. <br/>
+                To'lov yakunlangach, buyurtma statusi yangilanadi.
+              </p>
+            </div>
+            <Button variant="outline" onClick={handleComplete} className="w-full">
+              Tushundim
             </Button>
           </div>
         )}
