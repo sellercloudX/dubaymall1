@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -99,7 +98,7 @@ export function AIChat({ context }: AIChatProps) {
           </CardHeader>
           <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">
             {/* Messages */}
-            <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+            <div className="flex-1 overflow-y-auto p-4" ref={scrollRef}>
               {messages.length === 0 ? (
                 <div className="text-center text-muted-foreground py-8">
                   <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -151,8 +150,8 @@ export function AIChat({ context }: AIChatProps) {
                     </div>
                   )}
                 </div>
-              )}
-            </ScrollArea>
+                )}
+              </div>
 
             {/* Input */}
             <div className="p-4 border-t">
