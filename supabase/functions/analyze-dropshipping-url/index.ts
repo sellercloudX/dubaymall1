@@ -177,6 +177,35 @@ async function fetchShippingOptions(token: string, weight: number = 0.5): Promis
   }
 }
 
+// Helper: Check if URL is a valid product image
+function isValidProductImage(src: string): boolean {
+  if (!src || typeof src !== 'string') return false;
+  
+  // Must be a valid URL
+  if (!src.startsWith('http') && !src.startsWith('//')) return false;
+  
+  // Exclude common non-product images
+  const excludePatterns = [
+    'icon', 'logo', 'avatar', 'emoji', 'flag', 'banner',
+    'sprite', 'placeholder', 'loading', 'blank', 'pixel',
+    'facebook', 'twitter', 'instagram', 'youtube', 'pinterest',
+    'payment', 'visa', 'mastercard', 'paypal', 'badge',
+    '.svg', '.gif', '1x1', '2x2', 'spacer',
+  ];
+  
+  const srcLower = src.toLowerCase();
+  for (const pattern of excludePatterns) {
+    if (srcLower.includes(pattern)) return false;
+  }
+  
+  // Must look like an image URL or have image-like patterns
+  const hasImageExtension = /\.(jpg|jpeg|png|webp)/i.test(src);
+  const hasImageCDN = /(alicdn|cjdropshipping|aliexpress|1688)/i.test(src);
+  const hasImageInPath = /\/img|\/image|\/pic|\/photo|\/product/i.test(src);
+  
+  return hasImageExtension || hasImageCDN || hasImageInPath;
+}
+
 // FIRECRAWL SCRAPING - Fallback method
 async function scrapeWithFirecrawl(url: string): Promise<ProductResponse | null> {
   const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
@@ -196,9 +225,9 @@ async function scrapeWithFirecrawl(url: string): Promise<ProductResponse | null>
       },
       body: JSON.stringify({
         url: url,
-        formats: ['markdown', 'html', 'links'],
-        onlyMainContent: true,
-        waitFor: 3000,
+        formats: ['markdown', 'html', 'links', 'screenshot'],
+        onlyMainContent: false, // Get full page for images
+        waitFor: 5000, // Wait for JS to load
       }),
     });
 
@@ -215,11 +244,13 @@ async function scrapeWithFirecrawl(url: string): Promise<ProductResponse | null>
     }
 
     const html = data.data.html || '';
+    const rawHtml = data.data.rawHtml || html;
     const markdown = data.data.markdown || '';
     const metadata = data.data.metadata || {};
+    const links = data.data.links || [];
 
     // Extract product data from scraped content
-    const productData = extractProductFromScrapedContent(html, markdown, metadata, url);
+    const productData = extractProductFromScrapedContent(rawHtml || html, markdown, metadata, url, links);
     return productData;
   } catch (error) {
     console.error('Firecrawl error:', error);
@@ -232,37 +263,73 @@ function extractProductFromScrapedContent(
   html: string, 
   markdown: string, 
   metadata: any, 
-  url: string
+  url: string,
+  links: string[] = []
 ): ProductResponse {
-  // Extract images from HTML
   const images: string[] = [];
-  const imgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
-  let imgMatch;
-  while ((imgMatch = imgRegex.exec(html)) !== null) {
-    const src = imgMatch[1];
-    if (src && !src.includes('icon') && !src.includes('logo') && !src.includes('avatar')) {
-      if (src.startsWith('http') && !images.includes(src)) {
+  
+  // Method 1: Extract from markdown image links ![](url)
+  const mdImgRegex = /!\[[^\]]*\]\(([^)]+)\)/g;
+  let match;
+  while ((match = mdImgRegex.exec(markdown)) !== null) {
+    const src = match[1];
+    if (isValidProductImage(src)) {
+      images.push(src);
+    }
+  }
+
+  // Method 2: Extract all image URLs from HTML
+  const allImgPatterns = [
+    /src=["']([^"']*(?:\.jpg|\.jpeg|\.png|\.webp)[^"']*)/gi,
+    /data-src=["']([^"']+)/gi,
+    /data-original=["']([^"']+)/gi,
+    /srcset=["']([^\s"']+)/gi,
+    /background-image:\s*url\(['"]?([^'")\s]+)/gi,
+  ];
+
+  for (const pattern of allImgPatterns) {
+    while ((match = pattern.exec(html)) !== null) {
+      let src = match[1];
+      // Handle relative URLs
+      if (src.startsWith('//')) {
+        src = 'https:' + src;
+      }
+      if (isValidProductImage(src) && !images.includes(src)) {
         images.push(src);
       }
     }
   }
 
-  // Also try data-src for lazy loaded images
-  const dataSrcRegex = /data-src=["']([^"']+)["']/gi;
-  while ((imgMatch = dataSrcRegex.exec(html)) !== null) {
-    const src = imgMatch[1];
-    if (src && src.startsWith('http') && !images.includes(src)) {
-      images.push(src);
+  // Method 3: Look for CJDropshipping specific image patterns
+  const cjImagePatterns = [
+    /cbu\d+\.alicdn\.com[^"'\s)]+/g,
+    /img\.cjdropshipping\.com[^"'\s)]+/g,
+    /ae\d+\.alicdn\.com[^"'\s)]+/g,
+    /gw\.alicdn\.com[^"'\s)]+/g,
+  ];
+
+  for (const pattern of cjImagePatterns) {
+    while ((match = pattern.exec(html)) !== null) {
+      let src = match[0];
+      if (!src.startsWith('http')) {
+        src = 'https://' + src;
+      }
+      if (!images.includes(src)) {
+        images.push(src);
+      }
     }
   }
 
-  // Extract product-gallery images specifically
-  const galleryRegex = /product-gallery[^>]*>[\s\S]*?<img[^>]+src=["']([^"']+)["']/gi;
-  while ((imgMatch = galleryRegex.exec(html)) !== null) {
-    if (imgMatch[1] && !images.includes(imgMatch[1])) {
-      images.unshift(imgMatch[1]); // Add to beginning as main images
+  // Method 4: Extract from links array (image file extensions)
+  links.forEach(link => {
+    if (link && /\.(jpg|jpeg|png|webp|gif)/i.test(link) && isValidProductImage(link)) {
+      if (!images.includes(link)) {
+        images.push(link);
+      }
     }
-  }
+  });
+
+  console.log('Found images:', images.length);
 
   // Extract price
   let priceUSD = 10;
