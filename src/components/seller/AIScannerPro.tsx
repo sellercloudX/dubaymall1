@@ -16,6 +16,30 @@ import {
   Clock, CheckCircle, AlertCircle
 } from 'lucide-react';
 
+// Safe image component with fallback - no innerHTML
+function ProductImageWithFallback({ src, alt }: { src?: string; alt: string }) {
+  const [hasError, setHasError] = useState(false);
+  
+  if (!src || hasError) {
+    return (
+      <div className="w-16 h-16 rounded bg-muted flex items-center justify-center overflow-hidden flex-shrink-0">
+        <ImageIcon className="h-8 w-8 text-muted-foreground" />
+      </div>
+    );
+  }
+  
+  return (
+    <div className="w-16 h-16 rounded bg-muted flex items-center justify-center overflow-hidden flex-shrink-0">
+      <img 
+        src={src} 
+        alt={alt}
+        className="w-full h-full object-cover"
+        onError={() => setHasError(true)}
+      />
+    </div>
+  );
+}
+
 interface WebProduct {
   title: string;
   price: string;
@@ -760,22 +784,10 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
                         className="flex gap-3 p-3 border rounded-lg hover:border-primary cursor-pointer transition-colors"
                         onClick={() => handleProductSelect(product)}
                       >
-                        <div className="w-16 h-16 rounded bg-muted flex items-center justify-center overflow-hidden flex-shrink-0">
-                          {product.image ? (
-                            <img 
-                              src={product.image} 
-                              alt={product.title}
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                target.style.display = 'none';
-                                target.parentElement!.innerHTML = '<svg class="h-8 w-8 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>';
-                              }}
-                            />
-                          ) : (
-                            <ImageIcon className="h-8 w-8 text-muted-foreground" />
-                          )}
-                        </div>
+                        <ProductImageWithFallback 
+                          src={product.image} 
+                          alt={product.title} 
+                        />
                         <div className="flex-1 min-w-0">
                           <h5 className="font-medium line-clamp-1">{product.title}</h5>
                           <p className="text-sm text-muted-foreground line-clamp-1">

@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,14 +12,58 @@ serve(async (req) => {
   }
 
   try {
+    // Authentication check
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    
+    if (claimsError || !claimsData?.claims) {
+      return new Response(
+        JSON.stringify({ error: "Invalid authentication" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const { imageBase64 } = await req.json();
 
-    if (!imageBase64) {
+    // Input validation
+    if (!imageBase64 || typeof imageBase64 !== 'string') {
       return new Response(
         JSON.stringify({ error: "Image is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    // Validate base64 format (should be data URL or valid base64)
+    if (!imageBase64.startsWith('data:image/') && !imageBase64.match(/^[A-Za-z0-9+/=]+$/)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid image format" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Limit image size (roughly 10MB base64)
+    if (imageBase64.length > 14000000) {
+      return new Response(
+        JSON.stringify({ error: "Image too large" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`🔍 Analyzing product image for user ${claimsData.claims.sub}`);
 
     // Use OpenAI GPT-4o Vision for best image analysis (10K RPM capacity)
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
@@ -138,12 +183,11 @@ Return JSON only.`
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("OpenAI API error:", response.status, errorText);
+      console.error("OpenAI API error:", response.status);
       
       if (response.status === 429) {
         return new Response(
-          JSON.stringify({ error: "Rate limit exceeded, please try again later" }),
+          JSON.stringify({ error: "Service busy, please try again" }),
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -156,7 +200,11 @@ Return JSON only.`
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
     
     if (!toolCall?.function?.arguments) {
-      throw new Error("Invalid AI response");
+      console.error("Invalid AI response");
+      return new Response(
+        JSON.stringify({ error: "Analysis failed" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const result = JSON.parse(toolCall.function.arguments);
@@ -169,7 +217,7 @@ Return JSON only.`
   } catch (error) {
     console.error("Error:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      JSON.stringify({ error: "Analysis failed" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
@@ -179,7 +227,10 @@ Return JSON only.`
 async function fallbackToLovableAI(imageBase64: string, corsHeaders: Record<string, string>) {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!LOVABLE_API_KEY) {
-    throw new Error("No AI API keys configured");
+    return new Response(
+      JSON.stringify({ error: "Service unavailable" }),
+      { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   }
 
   console.log("⚠️ Falling back to Lovable AI");
@@ -238,14 +289,20 @@ Suggest prices in Uzbek Som (UZS) based on typical market prices in Uzbekistan.`
   });
 
   if (!response.ok) {
-    throw new Error("AI analysis failed");
+    return new Response(
+      JSON.stringify({ error: "Analysis failed" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   }
 
   const data = await response.json();
   const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
   
   if (!toolCall?.function?.arguments) {
-    throw new Error("Invalid AI response");
+    return new Response(
+      JSON.stringify({ error: "Analysis failed" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   }
 
   const result = JSON.parse(toolCall.function.arguments);

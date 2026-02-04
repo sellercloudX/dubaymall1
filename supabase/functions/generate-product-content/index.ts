@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -22,12 +23,74 @@ serve(async (req) => {
   }
 
   try {
+    // Authentication check
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    
+    if (claimsError || !claimsData?.claims) {
+      return new Response(
+        JSON.stringify({ error: "Invalid authentication" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const request: ContentRequest = await req.json();
+    
+    // Input validation
     const { productName, productDescription, category, brand, specifications, targetMarketplace, contentType, languages = ["uz", "ru"] } = request;
 
-    if (!productName) {
+    if (!productName || typeof productName !== 'string' || productName.length > 500) {
       return new Response(
-        JSON.stringify({ error: "Product name is required" }),
+        JSON.stringify({ error: "Invalid product name" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (productDescription && (typeof productDescription !== 'string' || productDescription.length > 5000)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid product description" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (category && (typeof category !== 'string' || category.length > 200)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid category" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (brand && (typeof brand !== 'string' || brand.length > 200)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid brand" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (contentType && !["seo", "description", "full"].includes(contentType)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid content type" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (targetMarketplace && !["yandex", "uzum", "wildberries", "ozon"].includes(targetMarketplace)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid marketplace" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -35,19 +98,16 @@ serve(async (req) => {
     const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
     
     // Choose model based on content type
-    // SEO: Claude Haiku (fast, cheap, 4K RPM)
-    // Description: Claude Sonnet (best quality)
     const model = contentType === "seo" ? "claude-3-5-haiku-20241022" : "claude-3-5-sonnet-20241022";
     
-    console.log(`📝 Generating ${contentType} content using ${model}`);
+    console.log(`📝 Generating ${contentType} content using ${model} for user ${claimsData.claims.sub}`);
 
     if (!ANTHROPIC_API_KEY) {
-      // Fallback to Lovable AI
       return await fallbackToLovableAI(request, corsHeaders);
     }
 
     const specsText = specifications 
-      ? Object.entries(specifications).map(([k, v]) => `${k}: ${v}`).join(", ")
+      ? Object.entries(specifications).slice(0, 20).map(([k, v]) => `${String(k).slice(0, 50)}: ${String(v).slice(0, 100)}`).join(", ")
       : "";
 
     const systemPrompt = contentType === "seo" 
@@ -62,11 +122,11 @@ Create authentic, native-sounding content in both Uzbek and Russian.`;
 
     const userPrompt = contentType === "seo"
       ? `Create SEO-optimized content for this product:
-Product: ${productName}
-${brand ? `Brand: ${brand}` : ""}
-${category ? `Category: ${category}` : ""}
-${specsText ? `Specifications: ${specsText}` : ""}
-${productDescription ? `Base description: ${productDescription}` : ""}
+Product: ${productName.slice(0, 200)}
+${brand ? `Brand: ${brand.slice(0, 100)}` : ""}
+${category ? `Category: ${category.slice(0, 100)}` : ""}
+${specsText ? `Specifications: ${specsText.slice(0, 500)}` : ""}
+${productDescription ? `Base description: ${productDescription.slice(0, 500)}` : ""}
 
 Generate:
 1. SEO title (max 80 chars) in both UZ and RU
@@ -74,11 +134,11 @@ Generate:
 3. 10 relevant keywords in both languages
 4. Search-friendly bullet points (5 items) in both languages`
       : `Create compelling product descriptions for:
-Product: ${productName}
-${brand ? `Brand: ${brand}` : ""}
-${category ? `Category: ${category}` : ""}
-${specsText ? `Specifications: ${specsText}` : ""}
-${productDescription ? `Base info: ${productDescription}` : ""}
+Product: ${productName.slice(0, 200)}
+${brand ? `Brand: ${brand.slice(0, 100)}` : ""}
+${category ? `Category: ${category.slice(0, 100)}` : ""}
+${specsText ? `Specifications: ${specsText.slice(0, 500)}` : ""}
+${productDescription ? `Base info: ${productDescription.slice(0, 500)}` : ""}
 
 Generate detailed marketing descriptions in both Uzbek and Russian:
 1. Short description (2-3 sentences) - hook the buyer
@@ -185,12 +245,11 @@ Generate detailed marketing descriptions in both Uzbek and Russian:
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Anthropic API error:", response.status, errorText);
+      console.error("Anthropic API error:", response.status);
       
       if (response.status === 429) {
         return new Response(
-          JSON.stringify({ error: "Rate limit exceeded" }),
+          JSON.stringify({ error: "Service busy, please try again" }),
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -202,7 +261,11 @@ Generate detailed marketing descriptions in both Uzbek and Russian:
     const toolUse = data.content?.find((c: any) => c.type === "tool_use");
     
     if (!toolUse?.input) {
-      throw new Error("Invalid AI response");
+      console.error("Invalid AI response");
+      return new Response(
+        JSON.stringify({ error: "Content generation failed" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     console.log(`✅ Content generated with ${model}`);
@@ -218,7 +281,7 @@ Generate detailed marketing descriptions in both Uzbek and Russian:
   } catch (error) {
     console.error("Error:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      JSON.stringify({ error: "Content generation failed" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
@@ -228,7 +291,10 @@ Generate detailed marketing descriptions in both Uzbek and Russian:
 async function fallbackToLovableAI(request: ContentRequest, corsHeaders: Record<string, string>) {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!LOVABLE_API_KEY) {
-    throw new Error("No AI API keys configured");
+    return new Response(
+      JSON.stringify({ error: "Service unavailable" }),
+      { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   }
 
   console.log("⚠️ Falling back to Lovable AI for content generation");
@@ -244,7 +310,7 @@ async function fallbackToLovableAI(request: ContentRequest, corsHeaders: Record<
       messages: [
         {
           role: "user",
-          content: `Generate ${request.contentType} content for product: ${request.productName}. 
+          content: `Generate ${request.contentType} content for product: ${request.productName?.slice(0, 200)}. 
           Return JSON with uz and ru versions of title, description, and keywords.`
         }
       ],
@@ -252,7 +318,10 @@ async function fallbackToLovableAI(request: ContentRequest, corsHeaders: Record<
   });
 
   if (!response.ok) {
-    throw new Error("Content generation failed");
+    return new Response(
+      JSON.stringify({ error: "Content generation failed" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   }
 
   const data = await response.json();
