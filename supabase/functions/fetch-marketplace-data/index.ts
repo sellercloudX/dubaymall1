@@ -104,75 +104,161 @@ serve(async (req) => {
         "Content-Type": "application/json",
       };
 
+      // Helper to get businessId from campaign if not available
+      let effectiveBusinessId = businessId;
+      if (!effectiveBusinessId && campaignId) {
+        try {
+          const campaignInfoResponse = await fetch(
+            `https://api.partner.market.yandex.ru/campaigns/${campaignId}`,
+            { headers }
+          );
+          if (campaignInfoResponse.ok) {
+            const campaignData = await campaignInfoResponse.json();
+            effectiveBusinessId = campaignData.campaign?.business?.id;
+            console.log(`Got businessId ${effectiveBusinessId} from campaign ${campaignId}`);
+          }
+        } catch (e) {
+          console.error("Error fetching campaign info:", e);
+        }
+      }
+
       if (dataType === "products") {
-        // Use offer-mappings endpoint which returns full product data
-        const apiPath = businessId 
-          ? `https://api.partner.market.yandex.ru/businesses/${businessId}/offer-mappings`
-          : `https://api.partner.market.yandex.ru/campaigns/${campaignId}/offer-mappings`;
+        let response: Response;
+        let useOffersEndpoint = false;
         
-        console.log(`Calling API: ${apiPath}`);
-        
-        const response = await fetch(
-          `${apiPath}?limit=${limit}`,
-          { 
+        // Use offer-mappings with businessId for full product data
+        if (effectiveBusinessId) {
+          const apiPath = `https://api.partner.market.yandex.ru/businesses/${effectiveBusinessId}/offer-mappings`;
+          console.log(`Calling Business API: ${apiPath}`);
+          response = await fetch(apiPath, { 
             method: 'POST',
             headers,
-            body: JSON.stringify({})
-          }
-        );
+            body: JSON.stringify({
+              pageable: { limit, page: page - 1 }
+            })
+          });
+        } else {
+          // Fallback to /campaigns/{campaignId}/offers POST endpoint
+          const apiPath = `https://api.partner.market.yandex.ru/campaigns/${campaignId}/offers`;
+          console.log(`Calling Campaign Offers API: ${apiPath}`);
+          useOffersEndpoint = true;
+          response = await fetch(apiPath, { 
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              pageable: { limit, page: page - 1 }
+            })
+          });
+        }
 
         console.log(`Products API response status: ${response.status}`);
 
         if (response.ok) {
           const data = await response.json();
-          console.log("Products API response keys:", Object.keys(data.result || {}));
+          console.log("Products API response keys:", Object.keys(data.result || data || {}));
+          console.log("Full response sample:", JSON.stringify(data).substring(0, 1500));
           
-          const offerMappings = data.result?.offerMappings || [];
-          console.log(`Found ${offerMappings.length} offer mappings`);
+          let products: YandexProduct[] = [];
+          let total = 0;
           
-          if (offerMappings.length > 0) {
-            console.log("Sample mapping structure:", JSON.stringify(offerMappings[0]).substring(0, 800));
-          }
-          
-          const products: YandexProduct[] = offerMappings.map((entry: any) => {
-            const offer = entry.offer || {};
-            const mapping = entry.mapping || {};
-            const awaitingMapping = entry.awaitingModerationMapping || {};
+          if (useOffersEndpoint) {
+            // Parse /campaigns/{campaignId}/offers response
+            const offers = data.result?.offers || data.offers || [];
+            console.log(`Found ${offers.length} offers from campaign endpoint`);
             
-            // Get pictures from multiple possible locations
-            const pictures = offer.urls || offer.pictures || mapping.pictures || [];
-            
-            // Get price - check multiple fields
-            const price = offer.basicPrice?.value || 
-                         offer.price?.value || 
-                         offer.price ||
-                         mapping.price?.value || 0;
-            
-            // Get stock from warehouses or stocks array
-            let stockCount = 0;
-            if (offer.stocks && offer.stocks.length > 0) {
-              stockCount = offer.stocks.reduce((sum: number, s: any) => sum + (s.count || 0), 0);
-            } else if (offer.stockCount !== undefined) {
-              stockCount = offer.stockCount;
+            if (offers.length > 0) {
+              console.log("Sample offer structure:", JSON.stringify(offers[0]).substring(0, 1000));
             }
             
-            // Get status
-            const statusValue = mapping.status || 
-                          awaitingMapping.status || 
-                          offer.availability || 
-                          'UNKNOWN';
+            products = offers.map((offer: any) => {
+              // Get price from different possible locations
+              const price = offer.basicPrice?.value || 
+                           offer.price?.value || 
+                           offer.price || 0;
+              
+              // Get stock - sum from all warehouses
+              let stockCount = 0;
+              if (offer.warehouses && Array.isArray(offer.warehouses)) {
+                stockCount = offer.warehouses.reduce((sum: number, wh: any) => {
+                  const stocks = wh.stocks || [];
+                  return sum + stocks.reduce((s: number, st: any) => s + (st.count || 0), 0);
+                }, 0);
+              } else if (offer.stocks && Array.isArray(offer.stocks)) {
+                stockCount = offer.stocks.reduce((sum: number, s: any) => sum + (s.count || 0), 0);
+              }
+              
+              // Get pictures
+              const pictures = offer.pictures || offer.urls || [];
+              
+              return {
+                offerId: offer.offerId || '',
+                name: offer.name || 'Nomsiz',
+                price: price,
+                shopSku: offer.shopSku || offer.offerId || '',
+                category: offer.category || '',
+                pictures: pictures,
+                availability: offer.cardStatus || offer.status || 'UNKNOWN',
+                stockCount: stockCount,
+              };
+            });
             
-            return {
-              offerId: offer.offerId || offer.shopSku || '',
-              name: offer.name || mapping.marketSkuName || 'Nomsiz',
-              price: price,
-              shopSku: offer.shopSku || offer.offerId || '',
-              category: mapping.categoryName || offer.category || '',
-              pictures: pictures,
-              availability: statusValue,
-              stockCount: stockCount,
-            };
-          });
+            total = data.result?.paging?.total || data.paging?.total || products.length;
+          } else {
+            // Parse /businesses/{businessId}/offer-mappings response
+            const offerMappings = data.result?.offerMappings || [];
+            console.log(`Found ${offerMappings.length} offer mappings`);
+            
+            if (offerMappings.length > 0) {
+              console.log("Mapping structure:", JSON.stringify(offerMappings[0]).substring(0, 1500));
+            }
+            
+            products = offerMappings.map((entry: any) => {
+              const offer = entry.offer || {};
+              const mapping = entry.mapping || {};
+              const awaitingMapping = entry.awaitingModerationMapping || {};
+              
+              const pictures = offer.pictures || offer.urls || mapping.pictures || [];
+              const price = offer.basicPrice?.value || 
+                           offer.price?.value || 
+                           offer.price ||
+                           mapping.price?.value || 0;
+              
+              // Get stock - check multiple locations
+              let stockCount = 0;
+              if (offer.stocks && Array.isArray(offer.stocks)) {
+                stockCount = offer.stocks.reduce((sum: number, s: any) => sum + (s.count || s.available || 0), 0);
+              } else if (mapping.stocks && Array.isArray(mapping.stocks)) {
+                stockCount = mapping.stocks.reduce((sum: number, s: any) => sum + (s.count || s.available || 0), 0);
+              }
+              
+              // Get status - check multiple locations
+              const statusValue = mapping.status || 
+                                 awaitingMapping.status || 
+                                 offer.cardStatus || 
+                                 (offer.archived ? 'ARCHIVED' : null) ||
+                                 'ACTIVE';
+              
+              // Get category
+              const category = mapping.marketCategoryName || 
+                              mapping.categoryName || 
+                              offer.category?.name || 
+                              offer.category || 
+                              '';
+              
+              return {
+                offerId: offer.offerId || offer.shopSku || '',
+                name: offer.name || mapping.marketSkuName || 'Nomsiz',
+                price: price,
+                shopSku: offer.shopSku || offer.offerId || '',
+                category: category,
+                pictures: pictures,
+                availability: statusValue,
+                stockCount: stockCount,
+              };
+            });
+            
+            total = data.result?.paging?.total || products.length;
+          }
 
           console.log(`Mapped ${products.length} products`);
           if (products.length > 0) {
@@ -182,7 +268,7 @@ serve(async (req) => {
           result = {
             success: true,
             data: products,
-            total: data.result?.paging?.total || products.length,
+            total: total,
             page,
             limit,
           };

@@ -98,16 +98,24 @@ export function MarketplaceProducts({ connectedMarketplaces, fetchMarketplaceDat
       case 'ACTIVE':
       case 'PUBLISHED':
       case 'READY':
+      case 'HAS_CARD_CAN_UPDATE':
+      case 'HAS_CARD_NO_UPDATE':
         return <Badge variant="default" className="bg-green-500">Faol</Badge>;
       case 'INACTIVE':
       case 'UNPUBLISHED':
+      case 'DISABLED_BY_PARTNER':
         return <Badge variant="secondary">Nofaol</Badge>;
       case 'DELISTED':
       case 'REJECTED':
+      case 'DISABLED_AUTOMATICALLY':
         return <Badge variant="destructive">O'chirilgan</Badge>;
       case 'MODERATION':
       case 'PROCESSING':
+      case 'CREATING_CARD':
+      case 'NO_CARD':
         return <Badge variant="outline" className="bg-yellow-100 text-yellow-800">Moderatsiyada</Badge>;
+      case 'ARCHIVED':
+        return <Badge variant="secondary">Arxivlangan</Badge>;
       default:
         return <Badge variant="outline">{availability || 'Noma\'lum'}</Badge>;
     }
