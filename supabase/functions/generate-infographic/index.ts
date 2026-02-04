@@ -64,38 +64,74 @@ serve(async (req) => {
     const bgStyle = categoryBackgrounds[category || ""] || styleBackgrounds[style];
 
     // Generate infographics using Lovable AI image editing
-    // This KEEPS the original product and only changes the background/lighting
+    // This KEEPS the original product and only changes the background/lighting/composition
     const results = [];
+
+    // Enhanced variation prompts - different compositions, zooms, and angles
+    // Each variation focuses on different aspects while keeping the EXACT same product
+    const variationConfigs = [
+      {
+        composition: "centered hero composition, product fills 80% of frame, dramatic lighting from above",
+        focus: "overall product showcase, full visibility",
+        cameraAngle: "straight-on frontal view"
+      },
+      {
+        composition: "slight 15-degree angle, dynamic perspective, product fills 70% of frame",
+        focus: "emphasize product depth and dimension",
+        cameraAngle: "three-quarter view showing product form"
+      },
+      {
+        composition: "close-up crop focusing on key product details, product fills 90% of frame",
+        focus: "highlight textures, materials, and craftsmanship",
+        cameraAngle: "macro detail shot"
+      },
+      {
+        composition: "elegant offset composition, product positioned slightly right, negative space on left",
+        focus: "premium catalog style, editorial feel",
+        cameraAngle: "eye-level elegant angle"
+      },
+      {
+        composition: "dramatic low angle view, product appears powerful and prominent",
+        focus: "create impression of quality and importance",
+        cameraAngle: "slight upward perspective"
+      },
+      {
+        composition: "clean symmetrical layout, perfectly centered with balanced lighting",
+        focus: "professional product photography standard",
+        cameraAngle: "direct frontal catalog view"
+      }
+    ];
 
     for (let i = 0; i < Math.min(count, 6); i++) {
       try {
-        const variationPrompts = [
-          "centered composition, main focus on product",
-          "slightly angled view, dynamic composition",
-          "front-facing, symmetrical layout",
-          "premium angle, highlights product details",
-          "clean centered, maximum visibility",
-          "professional catalog style"
-        ];
+        const config = variationConfigs[i % variationConfigs.length];
 
         const editPrompt = `Transform this product photo into a professional e-commerce marketplace infographic.
 
-CRITICAL RULES:
-- Keep the EXACT same product visible - do not change or replace the product
-- Keep all product details, model, and appearance EXACTLY as shown
-- Output size: 1080x1440 pixels (3:4 portrait aspect ratio)
-- NO TEXT, NO WATERMARKS, NO LOGOS on the image
+ABSOLUTE REQUIREMENTS (MUST FOLLOW):
+- Keep the EXACT same product - do NOT change, replace, or alter the product in ANY way
+- The product model, shape, color, brand, and ALL details MUST remain 100% identical
+- Output size: 1080x1440 pixels (3:4 portrait aspect ratio for Uzum/Yandex marketplace)
+- ZERO TEXT on the image - no text, no watermarks, no logos, no labels, no prices
+
+COMPOSITION FOR THIS VARIATION:
+- ${config.composition}
+- Focus: ${config.focus}
+- Camera angle: ${config.cameraAngle}
 
 BACKGROUND & STYLING:
 - ${bgStyle}
-- ${variationPrompts[i % variationPrompts.length]}
-- Product should fill about 70-80% of the frame
-- Add professional studio lighting and subtle reflections
-- Create depth with soft shadows under the product
+- Professional e-commerce studio lighting setup
+- Soft shadows beneath product for depth and grounding
+- Subtle reflections to enhance premium feel
+- Clean separation between product and background
 
-This is for Uzum Market / Yandex Market marketplace listing.`;
+QUALITY REQUIREMENTS:
+- Ultra high resolution, sharp details
+- Professional product photography quality
+- Ready for Uzum Market / Yandex Market listing`;
 
-        console.log(`📸 Generating infographic ${i + 1}/${count}...`);
+        console.log(`📸 Generating infographic ${i + 1}/${count} - ${config.focus}...`);
 
         const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
           method: "POST",
@@ -140,9 +176,10 @@ This is for Uzum Market / Yandex Market marketplace listing.`;
             url: imageUrl,
             id: `infographic-${i + 1}-${Date.now()}`,
             style: style,
-            variation: variationPrompts[i % variationPrompts.length]
+            variation: config.focus,
+            composition: config.cameraAngle
           });
-          console.log(`✅ Infographic ${i + 1} generated successfully`);
+          console.log(`✅ Infographic ${i + 1} generated - ${config.cameraAngle}`);
         }
 
         // Small delay between requests to avoid rate limiting

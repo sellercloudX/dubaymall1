@@ -1,9 +1,8 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -13,7 +12,8 @@ import { toast } from 'sonner';
 import { 
   Camera, Search, Sparkles, Loader2, X, ImageIcon, 
   Check, Package, DollarSign, Globe, ArrowRight,
-  Calculator, Store, ExternalLink, Wand2, FileText, Image as ImageLucide, Zap
+  Calculator, Store, Wand2, FileText, Image as ImageLucide, Zap, 
+  Clock, CheckCircle, AlertCircle
 } from 'lucide-react';
 
 interface WebProduct {
@@ -54,7 +54,17 @@ interface AIStep {
   icon: React.ReactNode;
 }
 
-type Step = 'capture' | 'analyzing' | 'search' | 'select' | 'pricing' | 'creating' | 'done';
+interface BackgroundTask {
+  id: string;
+  productName: string;
+  status: 'processing' | 'completed' | 'failed';
+  progress: AIStep[];
+  generatedImages: string[];
+  startedAt: Date;
+  completedAt?: Date;
+}
+
+type Step = 'capture' | 'analyzing' | 'search' | 'select' | 'pricing';
 
 interface AIScannerProProps {
   shopId: string;
@@ -70,28 +80,28 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
   const [selectedProduct, setSelectedProduct] = useState<WebProduct | null>(null);
   const [costPrice, setCostPrice] = useState<number>(0);
   const [pricing, setPricing] = useState<PricingCalculation | null>(null);
-  const [isCreatingCard, setIsCreatingCard] = useState(false);
-  const [createdCardUrl, setCreatedCardUrl] = useState<string | null>(null);
   const [generateInfographics, setGenerateInfographics] = useState(true);
   const [infographicCount, setInfographicCount] = useState(6);
-  const [creationProgress, setCreationProgress] = useState<AIStep[]>([]);
-  const [generatedImages, setGeneratedImages] = useState<string[]>([]);
+  
+  // Background processing state
+  const [backgroundTasks, setBackgroundTasks] = useState<BackgroundTask[]>([]);
+  const [showBackgroundPanel, setShowBackgroundPanel] = useState(false);
 
   // Marketplace config (Yandex Market defaults)
   const [marketplaceConfig] = useState({
-    commission: 8, // 8% default commission
-    logistics: 15, // 15% logistics cost
-    tax: 12, // 12% tax rate
-    targetProfit: 20, // 20% target profit margin
+    commission: 8,
+    logistics: 15,
+    tax: 12,
+    targetProfit: 20,
   });
 
   const getStepNumber = () => {
-    const steps: Step[] = ['capture', 'analyzing', 'search', 'select', 'pricing', 'creating', 'done'];
+    const steps: Step[] = ['capture', 'analyzing', 'search', 'select', 'pricing'];
     return steps.indexOf(currentStep) + 1;
   };
 
   const getProgress = () => {
-    return (getStepNumber() / 7) * 100;
+    return (getStepNumber() / 5) * 100;
   };
 
   const handleImageCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -109,7 +119,6 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
   const analyzeImage = async (imageBase64: string) => {
     setCurrentStep('analyzing');
     try {
-      // Step 1: Analyze the product image
       const { data: analysisData, error: analysisError } = await supabase.functions.invoke('analyze-product-image', {
         body: { imageBase64 },
       });
@@ -118,7 +127,6 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
 
       setAnalyzedProduct(analysisData);
       
-      // Step 2: Search for similar products on the web
       setCurrentStep('search');
       const { data: searchData, error: searchError } = await supabase.functions.invoke('search-similar-products', {
         body: { 
@@ -130,14 +138,13 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
 
       if (searchError) {
         console.error('Search error:', searchError);
-        // Continue with just the analyzed data
         setWebProducts([]);
       } else {
         setWebProducts(searchData?.products || []);
       }
 
       setCurrentStep('select');
-      toast.success('Mahsulot tahlil qilindi va o\'xshash mahsulotlar topildi!');
+      toast.success('Mahsulot tahlil qilindi!');
     } catch (error: any) {
       console.error('Analysis error:', error);
       toast.error('Tahlil xatosi: ' + (error.message || 'Noma\'lum xato'));
@@ -185,15 +192,13 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
       logisticsCost: logistics,
       taxRate: tax,
       targetProfit: targetProfitAmount,
-      recommendedPrice: Math.ceil(recommendedPrice / 100) * 100, // Round up to nearest 100
+      recommendedPrice: Math.ceil(recommendedPrice / 100) * 100,
       netProfit,
     });
   };
 
-  // Base64 rasmni Supabase Storage'ga yuklash
   const uploadImageToStorage = async (base64Image: string): Promise<string | null> => {
     try {
-      // Base64 dan Blob yaratish
       const base64Data = base64Image.split(',')[1];
       const byteCharacters = atob(base64Data);
       const byteNumbers = new Array(byteCharacters.length);
@@ -203,11 +208,9 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
       const byteArray = new Uint8Array(byteNumbers);
       const blob = new Blob([byteArray], { type: 'image/jpeg' });
 
-      // Unique fayl nomi
       const fileName = `scanner/${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
 
-      // Supabase Storage'ga yuklash
-      const { data, error } = await supabase.storage
+      const { error } = await supabase.storage
         .from('product-images')
         .upload(fileName, blob, {
           contentType: 'image/jpeg',
@@ -219,7 +222,6 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
         return null;
       }
 
-      // Public URL olish
       const { data: { publicUrl } } = supabase.storage
         .from('product-images')
         .getPublicUrl(fileName);
@@ -231,72 +233,71 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
     }
   };
 
-  const createYandexCard = async () => {
-    if (!pricing || !selectedProduct) {
-      toast.error('Ma\'lumotlar to\'liq emas');
-      return;
-    }
+  // Background card creation process
+  const processCardInBackground = useCallback(async (
+    taskId: string,
+    product: WebProduct,
+    productImage: string | null,
+    analyzed: AnalyzedProduct | null,
+    pricingData: PricingCalculation,
+    shouldGenerateInfographics: boolean,
+    infoCount: number
+  ) => {
+    const updateTaskProgress = (stepIndex: number, status: AIStep['status']) => {
+      setBackgroundTasks(prev => prev.map(task => {
+        if (task.id !== taskId) return task;
+        const newProgress = [...task.progress];
+        newProgress[stepIndex] = { ...newProgress[stepIndex], status };
+        return { ...task, progress: newProgress };
+      }));
+    };
 
-    setIsCreatingCard(true);
-    setCurrentStep('creating');
-    
-    // Initialize AI steps for progress tracking
-    const steps: AIStep[] = [
-      { name: 'Rasm tahlili', status: 'pending', model: 'GPT-4o Vision', icon: <Camera className="h-4 w-4" /> },
-      { name: 'SEO kontent', status: 'pending', model: 'Claude Haiku', icon: <Search className="h-4 w-4" /> },
-      { name: 'Tavsif yaratish', status: 'pending', model: 'Claude Sonnet', icon: <FileText className="h-4 w-4" /> },
-      { name: 'Infografikalar', status: 'pending', model: 'Flux Pro', icon: <ImageLucide className="h-4 w-4" /> },
-      { name: 'Kartochka yaratish', status: 'pending', model: 'Yandex API', icon: <Store className="h-4 w-4" /> },
-    ];
-    setCreationProgress(steps);
+    const updateTaskStatus = (status: BackgroundTask['status'], images?: string[]) => {
+      setBackgroundTasks(prev => prev.map(task => {
+        if (task.id !== taskId) return task;
+        return { 
+          ...task, 
+          status,
+          generatedImages: images || task.generatedImages,
+          completedAt: status !== 'processing' ? new Date() : undefined
+        };
+      }));
+    };
 
     try {
-      // Use the comprehensive card creation pipeline
-      const updateStep = (index: number, status: AIStep['status']) => {
-        setCreationProgress(prev => prev.map((s, i) => i === index ? { ...s, status } : s));
-      };
+      // Step 1: Already done - mark complete
+      updateTaskProgress(0, 'completed');
 
-      // Step 1: Start - rasm tahlili already done
-      updateStep(0, 'completed');
-
-      // Rasmni Storage'ga yuklash
+      // Upload image
       let imageUrl: string | undefined;
       const imagesToUpload: string[] = [];
 
-      if (capturedImage && capturedImage.startsWith('data:')) {
-        toast.info('Rasm yuklanmoqda...');
-        const uploadedUrl = await uploadImageToStorage(capturedImage);
+      if (productImage && productImage.startsWith('data:')) {
+        const uploadedUrl = await uploadImageToStorage(productImage);
         if (uploadedUrl) {
           imageUrl = uploadedUrl;
           imagesToUpload.push(uploadedUrl);
         }
-      } else if (capturedImage && capturedImage.startsWith('http')) {
-        imageUrl = capturedImage;
-        imagesToUpload.push(capturedImage);
+      } else if (productImage && productImage.startsWith('http')) {
+        imageUrl = productImage;
+        imagesToUpload.push(productImage);
       }
 
-      if (selectedProduct.image && selectedProduct.image.startsWith('http')) {
-        imagesToUpload.push(selectedProduct.image);
+      if (product.image && product.image.startsWith('http')) {
+        imagesToUpload.push(product.image);
       }
 
-      if (imagesToUpload.length === 0) {
-        toast.error('Kamida bitta rasm kerak. Iltimos, rasmni qayta yuklang.');
-        setCurrentStep('pricing');
-        setIsCreatingCard(false);
-        return;
-      }
-
-      // Step 2: SEO content generation
-      updateStep(1, 'running');
+      // Step 2: SEO content
+      updateTaskProgress(1, 'running');
       let seoContent = null;
       try {
         const { data: seoData, error: seoError } = await supabase.functions.invoke('generate-product-content', {
           body: {
-            productName: selectedProduct.title,
-            productDescription: selectedProduct.description || analyzedProduct?.description,
-            category: analyzedProduct?.category,
-            brand: analyzedProduct?.brand,
-            specifications: analyzedProduct?.specifications,
+            productName: product.title,
+            productDescription: product.description || analyzed?.description,
+            category: analyzed?.category,
+            brand: analyzed?.brand,
+            specifications: analyzed?.specifications,
             targetMarketplace: 'yandex',
             contentType: 'seo',
             languages: ['uz', 'ru']
@@ -304,25 +305,25 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
         });
         if (!seoError && seoData) {
           seoContent = seoData;
-          updateStep(1, 'completed');
+          updateTaskProgress(1, 'completed');
         } else {
-          updateStep(1, 'failed');
+          updateTaskProgress(1, 'failed');
         }
       } catch {
-        updateStep(1, 'failed');
+        updateTaskProgress(1, 'failed');
       }
 
       // Step 3: Description generation
-      updateStep(2, 'running');
+      updateTaskProgress(2, 'running');
       let descriptions = null;
       try {
         const { data: descData, error: descError } = await supabase.functions.invoke('generate-product-content', {
           body: {
-            productName: selectedProduct.title,
-            productDescription: selectedProduct.description || analyzedProduct?.description,
-            category: analyzedProduct?.category,
-            brand: analyzedProduct?.brand,
-            specifications: analyzedProduct?.specifications,
+            productName: product.title,
+            productDescription: product.description || analyzed?.description,
+            category: analyzed?.category,
+            brand: analyzed?.brand,
+            specifications: analyzed?.specifications,
             targetMarketplace: 'yandex',
             contentType: 'description',
             languages: ['uz', 'ru']
@@ -330,27 +331,27 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
         });
         if (!descError && descData) {
           descriptions = descData;
-          updateStep(2, 'completed');
+          updateTaskProgress(2, 'completed');
         } else {
-          updateStep(2, 'failed');
+          updateTaskProgress(2, 'failed');
         }
       } catch {
-        updateStep(2, 'failed');
+        updateTaskProgress(2, 'failed');
       }
 
-      // Step 4: Infographic generation (if enabled)
-      if (generateInfographics && capturedImage) {
-        updateStep(3, 'running');
+      // Step 4: Infographic generation
+      const generatedInfos: string[] = [];
+      if (shouldGenerateInfographics && productImage) {
+        updateTaskProgress(3, 'running');
         const styles = ['professional', 'minimalist', 'vibrant', 'luxury', 'tech', 'professional'];
-        const generatedInfos: string[] = [];
 
-        for (let i = 0; i < Math.min(infographicCount, 6); i++) {
+        for (let i = 0; i < Math.min(infoCount, 6); i++) {
           try {
             const { data: infoData, error: infoError } = await supabase.functions.invoke('generate-infographic', {
               body: {
-                productImage: capturedImage,
-                productName: selectedProduct.title,
-                category: analyzedProduct?.category,
+                productImage: productImage,
+                productName: product.title,
+                category: analyzed?.category,
                 style: styles[i % styles.length],
                 count: 1
               },
@@ -358,6 +359,10 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
 
             if (!infoError && infoData?.images?.length > 0) {
               generatedInfos.push(infoData.images[0].url);
+              // Update task with new images as they come in
+              setBackgroundTasks(prev => prev.map(task => 
+                task.id === taskId ? { ...task, generatedImages: [...generatedInfos] } : task
+              ));
             }
           } catch (e) {
             console.error(`Infographic ${i + 1} failed:`, e);
@@ -365,55 +370,93 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
         }
 
         if (generatedInfos.length > 0) {
-          setGeneratedImages(generatedInfos);
           imagesToUpload.push(...generatedInfos);
-          updateStep(3, 'completed');
+          updateTaskProgress(3, 'completed');
         } else {
-          updateStep(3, 'failed');
+          updateTaskProgress(3, 'failed');
         }
       } else {
-        updateStep(3, 'completed'); // Skip
+        updateTaskProgress(3, 'completed');
       }
 
       // Step 5: Create Yandex card
-      updateStep(4, 'running');
+      updateTaskProgress(4, 'running');
       
-      const { data, error } = await supabase.functions.invoke('yandex-market-create-card', {
+      const { error } = await supabase.functions.invoke('yandex-market-create-card', {
         body: {
           shopId,
           product: {
-            name: selectedProduct.title,
-            nameRu: seoContent?.seoTitle?.ru || selectedProduct.title,
-            description: descriptions?.fullDescription?.uz || selectedProduct.description || analyzedProduct?.description,
-            descriptionRu: descriptions?.fullDescription?.ru || selectedProduct.description,
-            category: analyzedProduct?.category,
-            price: pricing.recommendedPrice,
-            costPrice: pricing.costPrice,
+            name: product.title,
+            nameRu: seoContent?.seoTitle?.ru || product.title,
+            description: descriptions?.fullDescription?.uz || product.description || analyzed?.description,
+            descriptionRu: descriptions?.fullDescription?.ru || product.description,
+            category: analyzed?.category,
+            price: pricingData.recommendedPrice,
+            costPrice: pricingData.costPrice,
             image: imageUrl,
             images: imagesToUpload,
-            sourceUrl: selectedProduct.url,
+            sourceUrl: product.url,
             keywords: seoContent?.keywords,
             bulletPoints: seoContent?.bulletPoints || descriptions?.sellingPoints,
           },
-          pricing: pricing,
+          pricing: pricingData,
         },
       });
 
       if (error) throw error;
 
-      updateStep(4, 'completed');
-      setCreatedCardUrl(data?.cardUrl || null);
-      setCurrentStep('done');
-      toast.success('Yandex Market kartochkasi yaratildi!');
+      updateTaskProgress(4, 'completed');
+      updateTaskStatus('completed', generatedInfos);
+      toast.success(`"${product.title}" kartochkasi tayyor!`);
       
       if (onSuccess) onSuccess();
     } catch (error: any) {
-      console.error('Card creation error:', error);
-      toast.error('Kartochka yaratishda xato: ' + (error.message || 'Noma\'lum xato'));
-      setCurrentStep('pricing');
-    } finally {
-      setIsCreatingCard(false);
+      console.error('Background card creation error:', error);
+      updateTaskStatus('failed');
+      toast.error(`"${product.title}" yaratishda xato`);
     }
+  }, [shopId, onSuccess]);
+
+  const startBackgroundCardCreation = () => {
+    if (!pricing || !selectedProduct || !capturedImage) {
+      toast.error('Ma\'lumotlar to\'liq emas');
+      return;
+    }
+
+    // Create new background task
+    const taskId = `task-${Date.now()}`;
+    const newTask: BackgroundTask = {
+      id: taskId,
+      productName: selectedProduct.title,
+      status: 'processing',
+      progress: [
+        { name: 'Rasm tahlili', status: 'pending', model: 'GPT-4o Vision', icon: <Camera className="h-4 w-4" /> },
+        { name: 'SEO kontent', status: 'pending', model: 'Claude Haiku', icon: <Search className="h-4 w-4" /> },
+        { name: 'Tavsif yaratish', status: 'pending', model: 'Claude Sonnet', icon: <FileText className="h-4 w-4" /> },
+        { name: 'Infografikalar', status: 'pending', model: 'Gemini Image', icon: <ImageLucide className="h-4 w-4" /> },
+        { name: 'Kartochka yaratish', status: 'pending', model: 'Yandex API', icon: <Store className="h-4 w-4" /> },
+      ],
+      generatedImages: [],
+      startedAt: new Date(),
+    };
+
+    setBackgroundTasks(prev => [newTask, ...prev]);
+    setShowBackgroundPanel(true);
+
+    // Start background processing
+    processCardInBackground(
+      taskId,
+      selectedProduct,
+      capturedImage,
+      analyzedProduct,
+      pricing,
+      generateInfographics,
+      infographicCount
+    );
+
+    // Reset scanner for next product
+    toast.success('Kartochka fonda yaratilmoqda. Keyingi mahsulotni skanerlashingiz mumkin!');
+    resetScanner();
   };
 
   const resetScanner = () => {
@@ -423,9 +466,6 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
     setSelectedProduct(null);
     setCostPrice(0);
     setPricing(null);
-    setCreatedCardUrl(null);
-    setCreationProgress([]);
-    setGeneratedImages([]);
     setCurrentStep('capture');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -435,6 +475,9 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('uz-UZ').format(price) + ' so\'m';
   };
+
+  const completedTasks = backgroundTasks.filter(t => t.status === 'completed').length;
+  const processingTasks = backgroundTasks.filter(t => t.status === 'processing').length;
 
   return (
     <div className="space-y-6">
@@ -451,24 +494,126 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
                 Rasmdan mahsulot kartochkasini Yandex Market'ga yuklash
               </CardDescription>
             </div>
-            <Badge variant="outline">
-              {getStepNumber()} / 7 qadam
-            </Badge>
+            <div className="flex items-center gap-2">
+              {backgroundTasks.length > 0 && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setShowBackgroundPanel(!showBackgroundPanel)}
+                  className="relative"
+                >
+                  <Clock className="h-4 w-4 mr-1" />
+                  Fon ishlari
+                  {processingTasks > 0 && (
+                    <Badge className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
+                      {processingTasks}
+                    </Badge>
+                  )}
+                </Button>
+              )}
+              <Badge variant="outline">
+                {getStepNumber()} / 5 qadam
+              </Badge>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
           <Progress value={getProgress()} className="h-2" />
           <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-            <span>Rasm olish</span>
+            <span>Rasm</span>
             <span>Tahlil</span>
             <span>Qidiruv</span>
             <span>Tanlash</span>
             <span>Narx</span>
-            <span>Yaratish</span>
-            <span>Tayyor</span>
           </div>
         </CardContent>
       </Card>
+
+      {/* Background Tasks Panel */}
+      {showBackgroundPanel && backgroundTasks.length > 0 && (
+        <Card className="border-primary/50">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Fonda ishlanayotgan kartochkalar
+              </CardTitle>
+              <div className="flex items-center gap-2 text-sm">
+                {processingTasks > 0 && (
+                  <Badge variant="secondary">{processingTasks} ta ishlanmoqda</Badge>
+                )}
+                {completedTasks > 0 && (
+                  <Badge variant="default">{completedTasks} ta tayyor</Badge>
+                )}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <ScrollArea className="max-h-[300px]">
+              <div className="space-y-3">
+                {backgroundTasks.map((task) => (
+                  <div 
+                    key={task.id} 
+                    className={`p-3 rounded-lg border ${
+                      task.status === 'completed' ? 'border-green-500 bg-green-50 dark:bg-green-950/20' :
+                      task.status === 'failed' ? 'border-destructive bg-destructive/5' :
+                      'border-primary/30 bg-primary/5'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        {task.status === 'processing' && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
+                        {task.status === 'completed' && <CheckCircle className="h-4 w-4 text-green-500" />}
+                        {task.status === 'failed' && <AlertCircle className="h-4 w-4 text-destructive" />}
+                        <span className="font-medium text-sm line-clamp-1">{task.productName}</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {task.status === 'processing' ? 'Ishlanmoqda...' : 
+                         task.status === 'completed' ? 'Tayyor' : 'Xato'}
+                      </span>
+                    </div>
+                    
+                    {/* Mini progress */}
+                    <div className="flex items-center gap-1">
+                      {task.progress.map((step, i) => (
+                        <div 
+                          key={i}
+                    className={`h-1.5 flex-1 rounded-full transition-colors ${
+                            step.status === 'completed' ? 'bg-emerald-500 dark:bg-emerald-400' :
+                            step.status === 'running' ? 'bg-primary animate-pulse' :
+                            step.status === 'failed' ? 'bg-destructive' :
+                            'bg-muted'
+                          }`}
+                          title={step.name}
+                        />
+                      ))}
+                    </div>
+
+                    {/* Generated images preview */}
+                    {task.generatedImages.length > 0 && (
+                      <div className="flex gap-1 mt-2 overflow-x-auto">
+                        {task.generatedImages.slice(0, 4).map((img, i) => (
+                          <img 
+                            key={i}
+                            src={img} 
+                            alt={`Img ${i + 1}`}
+                            className="w-10 h-10 object-cover rounded border flex-shrink-0"
+                          />
+                        ))}
+                        {task.generatedImages.length > 4 && (
+                          <div className="w-10 h-10 rounded border bg-muted flex items-center justify-center text-xs">
+                            +{task.generatedImages.length - 4}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Step 1: Image Capture */}
       {currentStep === 'capture' && (
@@ -540,7 +685,6 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Captured Image Preview */}
             {capturedImage && (
               <div className="flex gap-4 items-start">
                 <img 
@@ -566,7 +710,6 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
 
             <Separator />
 
-            {/* Web Search Results */}
             {webProducts.length > 0 ? (
               <div>
                 <h4 className="font-medium mb-3 flex items-center gap-2">
@@ -650,7 +793,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
               5-qadam: Narx hisoblash
             </CardTitle>
             <CardDescription>
-              Tannarxni kiriting - AI raqobatbardosh narxni hisoblab beradi
+              Tannarxni kiriting - kartochka fonda yaratiladi, siz keyingi mahsulotga o'tasiz
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -690,9 +833,6 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
                   Hisoblash
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Mahsulotni sotib olish narxini kiriting (supplier narxi)
-              </p>
             </div>
 
             {/* Pricing Breakdown */}
@@ -767,11 +907,11 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
                       <option value={3}>3 ta</option>
                       <option value={6}>6 ta (tavsiya)</option>
                     </select>
-                    <Badge variant="secondary" className="text-xs">Flux Pro</Badge>
+                    <Badge variant="secondary" className="text-xs">Gemini Image</Badge>
                   </div>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  Professional marketplace infografikalari Flux Pro AI orqali yaratiladi
+                  Turli burchak va kompozitsiyalarda professional infografikalar (1080×1440)
                 </p>
               </div>
             )}
@@ -781,150 +921,11 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
                 Orqaga
               </Button>
               <Button 
-                onClick={createYandexCard} 
-                disabled={!pricing || isCreatingCard}
+                onClick={startBackgroundCardCreation} 
+                disabled={!pricing}
               >
-                {isCreatingCard ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Yaratilmoqda...
-                  </>
-                ) : (
-                  <>
-                    <Zap className="mr-2 h-4 w-4" />
-                    AI bilan yaratish
-                  </>
-                )}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Step 6: Creating with AI Progress */}
-      {currentStep === 'creating' && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary animate-pulse" />
-              AI kartochka yaratmoqda
-            </CardTitle>
-            <CardDescription>
-              5 ta AI model bir vaqtda ishlayapti
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {creationProgress.map((step, index) => (
-              <div 
-                key={index}
-                className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
-                  step.status === 'running' ? 'border-primary bg-primary/5' :
-                  step.status === 'completed' ? 'border-green-500 bg-green-50 dark:bg-green-950/20' :
-                  step.status === 'failed' ? 'border-destructive bg-destructive/5' :
-                  'border-muted'
-                }`}
-              >
-                <div className={`p-2 rounded-full ${
-                  step.status === 'running' ? 'bg-primary text-primary-foreground' :
-                  step.status === 'completed' ? 'bg-green-500 text-white' :
-                  step.status === 'failed' ? 'bg-destructive text-destructive-foreground' :
-                  'bg-muted text-muted-foreground'
-                }`}>
-                  {step.status === 'running' ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : step.status === 'completed' ? (
-                    <Check className="h-4 w-4" />
-                  ) : step.status === 'failed' ? (
-                    <X className="h-4 w-4" />
-                  ) : (
-                    step.icon
-                  )}
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium text-sm">{step.name}</p>
-                  <p className="text-xs text-muted-foreground">{step.model}</p>
-                </div>
-                <Badge variant={
-                  step.status === 'completed' ? 'default' :
-                  step.status === 'running' ? 'secondary' :
-                  step.status === 'failed' ? 'destructive' : 'outline'
-                }>
-                  {step.status === 'running' ? 'Ishlanmoqda...' :
-                   step.status === 'completed' ? 'Tayyor' :
-                   step.status === 'failed' ? 'Xato' : 'Kutmoqda'}
-                </Badge>
-              </div>
-            ))}
-            
-            {/* Generated infographics preview */}
-            {generatedImages.length > 0 && (
-              <div className="pt-4">
-                <p className="text-sm font-medium mb-2">Yaratilgan infografikalar:</p>
-                <div className="flex gap-2 overflow-x-auto pb-2">
-                  {generatedImages.map((img, i) => (
-                    <img 
-                      key={i}
-                      src={img} 
-                      alt={`Infographic ${i + 1}`}
-                      className="w-16 h-16 object-cover rounded border flex-shrink-0"
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Step 7: Done */}
-      {currentStep === 'done' && (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-950 flex items-center justify-center mx-auto mb-4">
-              <Check className="h-8 w-8 text-green-600 dark:text-green-400" />
-            </div>
-            <p className="text-lg font-medium text-green-600 dark:text-green-400">Kartochka muvaffaqiyatli yaratildi!</p>
-            <p className="text-sm text-muted-foreground mt-2">
-              Mahsulot Yandex Market'ga yuklandi va ko'rib chiqilmoqda
-            </p>
-            
-            {/* AI models used summary */}
-            <div className="flex flex-wrap justify-center gap-2 mt-4">
-              <Badge variant="outline">GPT-4o Vision</Badge>
-              <Badge variant="outline">Claude Sonnet</Badge>
-              <Badge variant="outline">Flux Pro</Badge>
-            </div>
-            
-            {/* Generated images preview */}
-            {generatedImages.length > 0 && (
-              <div className="mt-6">
-                <p className="text-sm font-medium mb-2">AI infografikalar ({generatedImages.length} ta):</p>
-                <div className="flex justify-center gap-2 overflow-x-auto pb-2">
-                  {generatedImages.map((img, i) => (
-                    <img 
-                      key={i}
-                      src={img} 
-                      alt={`Infographic ${i + 1}`}
-                      className="w-20 h-20 object-cover rounded border"
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            {createdCardUrl && (
-              <Button variant="outline" className="mt-4" asChild>
-                <a href={createdCardUrl} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="mr-2 h-4 w-4" />
-                  Kartochkani ko'rish
-                </a>
-              </Button>
-            )}
-
-            <div className="flex gap-2 justify-center mt-6">
-              <Button onClick={resetScanner}>
-                <Camera className="mr-2 h-4 w-4" />
-                Yangi mahsulot qo'shish
+                <Zap className="mr-2 h-4 w-4" />
+                Fonda yaratish & Keyingisiga
               </Button>
             </div>
           </CardContent>
