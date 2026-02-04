@@ -558,6 +558,78 @@ function createFallbackResponse(url: string): ProductResponse {
   };
 }
 
+// In-memory token cache
+let cachedToken: string | null = null;
+let tokenExpiry: Date | null = null;
+
+// Get CJ Access Token with caching
+async function getCJAccessToken(): Promise<string | null> {
+  // Check cached token
+  if (cachedToken && tokenExpiry && tokenExpiry > new Date()) {
+    console.log('Using cached CJ token');
+    return cachedToken;
+  }
+
+  // Try to get from stored API key first (might be a valid JWT)
+  const storedKey = Deno.env.get('CJDROPSHIPPING_API_KEY');
+  if (storedKey) {
+    let token = storedKey;
+    if (storedKey.includes('@CJ:')) {
+      token = storedKey.split('@CJ:')[1];
+    }
+    if (token.startsWith('eyJ')) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        const exp = payload.exp || payload.iat + 15 * 24 * 60 * 60;
+        const expiryDate = new Date(exp * 1000);
+        if (expiryDate > new Date()) {
+          console.log('Using stored JWT token');
+          cachedToken = token;
+          tokenExpiry = expiryDate;
+          return token;
+        }
+      } catch (e) {
+        console.log('Could not parse stored token');
+      }
+    }
+  }
+
+  // Get fresh token using email/password
+  const email = Deno.env.get('CJDROPSHIPPING_EMAIL');
+  const password = Deno.env.get('CJDROPSHIPPING_PASSWORD');
+  
+  if (!email || !password) {
+    console.log('No CJ credentials configured');
+    return null;
+  }
+
+  try {
+    console.log('Getting fresh CJ access token...');
+    
+    const response = await fetch('https://developers.cjdropshipping.com/api2.0/v1/authentication/getAccessToken', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+
+    const data = await response.json();
+    console.log('CJ Auth result:', data.result, data.message);
+    
+    if (data.result === true && data.data?.accessToken) {
+      cachedToken = data.data.accessToken;
+      tokenExpiry = new Date(data.data.accessTokenExpiryDate);
+      console.log('Got fresh token, expires:', tokenExpiry.toISOString());
+      return cachedToken;
+    }
+    
+    console.error('CJ token error:', data.message);
+    return null;
+  } catch (error) {
+    console.error('CJ auth error:', error);
+    return null;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -569,47 +641,31 @@ serve(async (req) => {
 
     console.log('Processing URL:', url);
 
-    const CJDROPSHIPPING_API_KEY = Deno.env.get('CJDROPSHIPPING_API_KEY');
     const isCJUrl = url.toLowerCase().includes('cjdropshipping.com');
 
-    // METHOD 1: CJ API (if configured and is CJ URL)
-    if (CJDROPSHIPPING_API_KEY && isCJUrl) {
-      console.log('Trying CJ API...');
-      console.log('API Key length:', CJDROPSHIPPING_API_KEY.length);
-      console.log('API Key preview:', CJDROPSHIPPING_API_KEY.substring(0, 30) + '...');
+    // METHOD 1: CJ API (if CJ URL)
+    if (isCJUrl) {
+      const token = await getCJAccessToken();
       
-      // Token formats:
-      // 1. Direct JWT access token: eyJ...
-      // 2. Full format: API@CJ2904420@CJ:eyJ...
-      // 3. Old format: email@api@apikey (deprecated)
-      let token = CJDROPSHIPPING_API_KEY;
-      
-      // Extract JWT from full format: API@CJ2904420@CJ:eyJ...
-      if (CJDROPSHIPPING_API_KEY.includes('@CJ:')) {
-        const parts = CJDROPSHIPPING_API_KEY.split('@CJ:');
-        token = parts[1];
-        console.log('Extracted JWT token from @CJ: format');
-      } else if (CJDROPSHIPPING_API_KEY.startsWith('eyJ')) {
-        // Direct JWT token
-        console.log('Using direct JWT token');
-      }
-      
-      const productId = extractCJProductId(url);
+      if (token) {
+        console.log('Trying CJ API with token...');
+        const productId = extractCJProductId(url);
 
-      if (productId && token) {
-        const product = await fetchCJProduct(productId, token);
-        
-        if (product) {
-          console.log('CJ API success!');
-          const [variants, shippingOptions] = await Promise.all([
-            fetchCJVariants(product.pid || productId, token),
-            fetchShippingOptions(token, product.packingWeight || 0.5),
-          ]);
+        if (productId) {
+          const product = await fetchCJProduct(productId, token);
+          
+          if (product) {
+            console.log('CJ API success!');
+            const [variants, shippingOptions] = await Promise.all([
+              fetchCJVariants(product.pid || productId, token),
+              fetchShippingOptions(token, product.packingWeight || 0.5),
+            ]);
 
-          const response = buildCJResponse(product, variants, shippingOptions, url);
-          return new Response(JSON.stringify(response), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
+            const response = buildCJResponse(product, variants, shippingOptions, url);
+            return new Response(JSON.stringify(response), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
         }
       }
       console.log('CJ API failed, trying Firecrawl...');
