@@ -10,33 +10,35 @@ import {
   Dumbbell,
   BookOpen,
   Gift,
-  ChefHat,
+  Apple,
   Sparkles
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const iconMap: Record<string, React.ElementType> = {
-  'elektronika': Smartphone,
-  'kiyim': Shirt,
-  'uy-jihozlari': Home,
-  'avtomobil': Car,
-  'bolalar': Baby,
-  'sport': Dumbbell,
-  'kitoblar': BookOpen,
-  'sovgalar': Gift,
-  'oshxona': ChefHat,
+  'electronics': Smartphone,
+  'clothing': Shirt,
+  'home-garden': Home,
+  'auto': Car,
+  'kids': Baby,
+  'sports': Dumbbell,
+  'books': BookOpen,
+  'gifts': Gift,
+  'food': Apple,
+  'beauty': Sparkles,
 };
 
 const colorMap: Record<string, string> = {
-  'elektronika': 'from-blue-500 to-indigo-500',
-  'kiyim': 'from-pink-500 to-rose-500',
-  'uy-jihozlari': 'from-amber-500 to-orange-500',
-  'avtomobil': 'from-slate-600 to-slate-800',
-  'bolalar': 'from-cyan-400 to-blue-400',
-  'sport': 'from-green-500 to-emerald-500',
-  'kitoblar': 'from-purple-500 to-violet-500',
-  'sovgalar': 'from-red-500 to-pink-500',
-  'oshxona': 'from-yellow-500 to-orange-400',
+  'electronics': 'from-blue-500 to-indigo-500',
+  'clothing': 'from-pink-500 to-rose-500',
+  'home-garden': 'from-amber-500 to-orange-500',
+  'auto': 'from-slate-600 to-slate-800',
+  'kids': 'from-cyan-400 to-blue-400',
+  'sports': 'from-green-500 to-emerald-500',
+  'books': 'from-purple-500 to-violet-500',
+  'gifts': 'from-red-500 to-pink-500',
+  'food': 'from-yellow-500 to-orange-400',
+  'beauty': 'from-fuchsia-500 to-pink-500',
 };
 
 export function CategoryCards() {

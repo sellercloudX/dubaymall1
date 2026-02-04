@@ -67,7 +67,7 @@ export function FlashSaleBanner() {
   const fetchActiveFlashSale = async () => {
     const now = new Date().toISOString();
     
-    const { data: sale } = await supabase
+    const { data: sale, error } = await supabase
       .from('flash_sales')
       .select('*')
       .eq('is_active', true)
@@ -75,9 +75,9 @@ export function FlashSaleBanner() {
       .gte('end_date', now)
       .order('created_at', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
-    if (sale) {
+    if (!error && sale) {
       setFlashSale(sale);
       
       const { data: saleProducts } = await supabase

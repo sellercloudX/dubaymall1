@@ -61,14 +61,19 @@ export function useRecommendations(currentProductId?: string, limit: number = 8)
 
         if (favoriteCategories.length > 0) {
           // Get popular products from favorite categories
-          const { data: recommendedProducts } = await supabase
+          let recQuery = supabase
             .from('products')
             .select('*, shop:shops(name, slug)')
             .in('category_id', favoriteCategories)
             .eq('status', 'active')
-            .neq('id', currentProductId || '')
             .order('view_count', { ascending: false })
             .limit(limit);
+          
+          if (currentProductId) {
+            recQuery = recQuery.neq('id', currentProductId);
+          }
+            
+          const { data: recommendedProducts } = await recQuery;
 
           if (recommendedProducts && recommendedProducts.length > 0) {
             setRecommendations(recommendedProducts as unknown as ProductWithShop[]);
@@ -79,13 +84,18 @@ export function useRecommendations(currentProductId?: string, limit: number = 8)
       }
 
       // Strategy 3: Fallback - get trending/popular products
-      const { data: trendingProducts } = await supabase
+      let query = supabase
         .from('products')
         .select('*, shop:shops(name, slug)')
         .eq('status', 'active')
-        .neq('id', currentProductId || '')
         .order('view_count', { ascending: false })
         .limit(limit);
+      
+      if (currentProductId) {
+        query = query.neq('id', currentProductId);
+      }
+        
+      const { data: trendingProducts } = await query;
 
       setRecommendations((trendingProducts as unknown as ProductWithShop[]) || []);
     } catch (error) {
