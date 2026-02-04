@@ -6,120 +6,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
-  Store, 
-  Users, 
-  Package, 
-  ArrowRight, 
-  CheckCircle, 
-  TrendingUp,
-  Percent,
-  Globe,
-  Truck
+  Store, Users, ArrowRight, CheckCircle, TrendingUp,
+  Percent, Globe, Crown, Package, Truck
 } from 'lucide-react';
 
 export default function Partnership() {
   const { t } = useLanguage();
   const { user } = useAuth();
-
-  const partnershipOptions = [
-    {
-      id: 'seller',
-      title: "Sotuvchi bo'ling",
-      titleRu: "Станьте продавцом",
-      titleEn: "Become a Seller",
-      description: "O'z mahsulotlaringizni sotib, millionlab xaridorlarga yeting",
-      descriptionRu: "Продавайте свои товары миллионам покупателей",
-      descriptionEn: "Sell your products to millions of customers",
-      icon: Store,
-      color: "from-blue-500 to-blue-600",
-      features: [
-        "Bepul do'kon yaratish",
-        "AI yordamida mahsulot qo'shish",
-        "Buyurtmalarni boshqarish",
-        "Moliyaviy hisobotlar",
-      ],
-      featuresRu: [
-        "Бесплатное создание магазина",
-        "Добавление товаров с помощью ИИ",
-        "Управление заказами",
-        "Финансовые отчеты",
-      ],
-      featuresEn: [
-        "Free shop creation",
-        "AI-powered product listing",
-        "Order management",
-        "Financial reports",
-      ],
-      link: user ? '/seller' : '/auth?mode=register&role=seller',
-      badge: "Mashhur",
-      badgeRu: "Популярно",
-      badgeEn: "Popular",
-    },
-    {
-      id: 'blogger',
-      title: "Blogger sifatida ishlang",
-      titleRu: "Работайте как блогер",
-      titleEn: "Work as a Blogger",
-      description: "Mahsulotlarni reklama qilib, har bir sotuvdan komissiya oling",
-      descriptionRu: "Рекламируйте товары и получайте комиссию с каждой продажи",
-      descriptionEn: "Promote products and earn commission on every sale",
-      icon: Users,
-      color: "from-purple-500 to-purple-600",
-      features: [
-        "10-25% komissiya",
-        "Shaxsiy referral havolalar",
-        "Real-time statistika",
-        "Tez pul yechish",
-      ],
-      featuresRu: [
-        "Комиссия 10-25%",
-        "Персональные реферальные ссылки",
-        "Статистика в реальном времени",
-        "Быстрый вывод средств",
-      ],
-      featuresEn: [
-        "10-25% commission",
-        "Personal referral links",
-        "Real-time statistics",
-        "Fast withdrawals",
-      ],
-      link: user ? '/blogger' : '/auth?mode=register&role=blogger',
-      badge: "Yangi",
-      badgeRu: "Новое",
-      badgeEn: "New",
-    },
-    {
-      id: 'dropshipping',
-      title: "Dropshipping biznes",
-      titleRu: "Дропшиппинг бизнес",
-      titleEn: "Dropshipping Business",
-      description: "Xitoydan import qilib, O'zbekistonda sotib daromad oling",
-      descriptionRu: "Импортируйте из Китая и продавайте в Узбекистане",
-      descriptionEn: "Import from China and sell in Uzbekistan",
-      icon: Globe,
-      color: "from-emerald-500 to-emerald-600",
-      features: [
-        "Havola orqali import",
-        "Avtomatik narx belgilash",
-        "Omborsiz sotish",
-        "Yetkazib beruvchi integratsiyasi",
-      ],
-      featuresRu: [
-        "Импорт по ссылке",
-        "Автоматическое ценообразование",
-        "Продажа без склада",
-        "Интеграция с поставщиками",
-      ],
-      featuresEn: [
-        "Import via URL",
-        "Automatic pricing",
-        "No warehouse needed",
-        "Supplier integration",
-      ],
-      link: user ? '/seller' : '/auth?mode=register&role=seller',
-      badge: null,
-    },
-  ];
 
   const stats = [
     { value: "5,000+", label: "Faol sotuvchilar", icon: Store },
@@ -138,16 +31,15 @@ export default function Partnership() {
             <Badge className="mb-4 bg-primary/10 text-primary hover:bg-primary/20">
               Hamkorlik dasturi
             </Badge>
-            <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-6 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
+            <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-6">
               Biz bilan birga o'sing
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-              SuperEshop Hub platformasida o'z biznesingizni boshlang. Sotuvchi, blogger yoki dropshipper sifatida ishlang va daromad oling.
+              Sotuvchi, blogger yoki marketplace integratori sifatida ishlang va daromad oling.
             </p>
           </div>
         </div>
         
-        {/* Decorative elements */}
         <div className="absolute top-20 left-10 w-72 h-72 bg-primary/20 rounded-full blur-3xl -z-10 animate-pulse" />
         <div className="absolute bottom-10 right-10 w-96 h-96 bg-accent/20 rounded-full blur-3xl -z-10" />
       </section>
@@ -169,61 +61,150 @@ export default function Partnership() {
         </div>
       </section>
 
-      {/* Partnership Options */}
+      {/* Main Products */}
       <section className="py-16 md:py-24">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold mb-4">Hamkorlik turlarini tanlang</h2>
+            <h2 className="text-3xl font-bold mb-4">Biznes modelingizni tanlang</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Sizga mos yo'nalishni tanlang va bugun boshlang
+              Ikki yo'nalishdan birini tanlang - yoki ikkalasini ham!
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            {partnershipOptions.map((option) => (
-              <Card 
-                key={option.id} 
-                className="relative overflow-hidden border-0 shadow-xl hover:shadow-2xl transition-all duration-300 group"
-              >
-                {option.badge && (
-                  <Badge className="absolute top-4 right-4 bg-accent text-accent-foreground">
-                    {option.badge}
-                  </Badge>
-                )}
-                
-                <CardHeader className="pb-4">
-                  <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${option.color} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
-                    <option.icon className="h-7 w-7 text-white" />
-                  </div>
-                  <CardTitle className="text-xl">{option.title}</CardTitle>
-                  <CardDescription className="text-base">
-                    {option.description}
-                  </CardDescription>
-                </CardHeader>
-                
-                <CardContent className="space-y-4">
-                  <ul className="space-y-3">
-                    {option.features.map((feature, idx) => (
-                      <li key={idx} className="flex items-center gap-3 text-sm">
-                        <CheckCircle className="h-5 w-5 text-success flex-shrink-0" />
-                        <span>{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  
-                  <Button 
-                    className={`w-full mt-6 bg-gradient-to-r ${option.color} hover:opacity-90`}
-                    asChild
-                  >
-                    <Link to={option.link}>
-                      Boshlash
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Link>
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
+          <div className="grid lg:grid-cols-2 gap-8 max-w-5xl mx-auto mb-16">
+            {/* SellerCloudX */}
+            <Card className="relative overflow-hidden border-2 border-amber-500/30 shadow-xl">
+              <div className="absolute top-0 right-0">
+                <Badge className="rounded-none rounded-bl-lg bg-gradient-to-r from-amber-500 to-orange-500 text-white">
+                  <Crown className="h-3 w-3 mr-1" />
+                  Premium
+                </Badge>
+              </div>
+              
+              <CardHeader className="pb-4">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center mb-4">
+                  <Globe className="h-8 w-8 text-white" />
+                </div>
+                <CardTitle className="text-2xl">SellerCloudX</CardTitle>
+                <CardDescription className="text-base">
+                  Marketplace avtomatizatsiya platformasi
+                </CardDescription>
+              </CardHeader>
+              
+              <CardContent className="space-y-6">
+                <div>
+                  <div className="text-4xl font-bold text-primary">$499</div>
+                  <div className="text-muted-foreground">/oyiga</div>
+                </div>
+
+                <p className="text-sm text-muted-foreground">
+                  Uzum, Yandex, Wildberries, Ozon - barcha marketplacelarni bitta 
+                  dashboarddan boshqaring. API orqali ulang va savdoni avtomatlashtirig.
+                </p>
+
+                <ul className="space-y-2">
+                  {[
+                    "4 ta marketplace integratsiya",
+                    "AI bilan kartochka yaratish",
+                    "Markazlashtirilgan buyurtma boshqaruvi",
+                    "Zaxira sinxronizatsiyasi",
+                    "Narx optimizatsiyasi",
+                  ].map((feature, idx) => (
+                    <li key={idx} className="flex items-center gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <Button 
+                  className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:opacity-90" 
+                  size="lg"
+                  asChild
+                >
+                  <Link to={user ? '/seller-cloud' : '/auth?redirect=/seller-cloud'}>
+                    Boshlash
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* BazarHub */}
+            <Card className="relative overflow-hidden border-2 shadow-xl">
+              <div className="absolute top-0 right-0">
+                <Badge className="rounded-none rounded-bl-lg">
+                  Mashhur
+                </Badge>
+              </div>
+              
+              <CardHeader className="pb-4">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mb-4">
+                  <Store className="h-8 w-8 text-primary-foreground" />
+                </div>
+                <CardTitle className="text-2xl">BazarHub Do'koni</CardTitle>
+                <CardDescription className="text-base">
+                  O'z onlayn do'koningizni yarating
+                </CardDescription>
+              </CardHeader>
+              
+              <CardContent className="space-y-6">
+                <div>
+                  <div className="text-4xl font-bold text-primary">Bepul</div>
+                  <div className="text-muted-foreground">boshlash</div>
+                </div>
+
+                <p className="text-sm text-muted-foreground">
+                  BazarHub marketplace'da o'z do'koningizni oching. 
+                  Mahsulotlaringizni qo'shing yoki dropshipping bilan ishlang.
+                </p>
+
+                <ul className="space-y-2">
+                  {[
+                    "Bepul do'kon yaratish",
+                    "AI yordamida mahsulot qo'shish",
+                    "Dropshipping import",
+                    "Buyurtma va moliya boshqaruvi",
+                    "3-8% sotuvdan komissiya",
+                  ].map((feature, idx) => (
+                    <li key={idx} className="flex items-center gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-primary flex-shrink-0" />
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <Button className="w-full" size="lg" asChild>
+                  <Link to={user ? '/seller' : '/auth?mode=register&role=seller'}>
+                    Bepul boshlash
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
           </div>
+
+          {/* Blogger Section */}
+          <Card className="max-w-3xl mx-auto">
+            <CardContent className="flex flex-col md:flex-row items-center gap-6 py-6">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-violet-500 flex items-center justify-center flex-shrink-0">
+                <Users className="h-8 w-8 text-white" />
+              </div>
+              <div className="flex-1 text-center md:text-left">
+                <h3 className="text-xl font-bold mb-1">Blogger sifatida ishlang</h3>
+                <p className="text-muted-foreground">
+                  Mahsulotlarni reklama qiling va har bir sotuvdan 10-25% komissiya oling.
+                  Shaxsiy referral havolalar va real-time statistika.
+                </p>
+              </div>
+              <Button variant="outline" asChild>
+                <Link to={user ? '/blogger' : '/auth?mode=register&role=blogger'}>
+                  Batafsil
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </section>
 
@@ -237,8 +218,8 @@ export default function Partnership() {
           <div className="grid md:grid-cols-4 gap-8 max-w-4xl mx-auto">
             {[
               { step: 1, title: "Ro'yxatdan o'ting", desc: "1 daqiqada bepul hisob yarating" },
-              { step: 2, title: "Yo'nalish tanlang", desc: "Sotuvchi, blogger yoki dropshipper" },
-              { step: 3, title: "Ishni boshlang", desc: "Do'kon yarating yoki reklama qiling" },
+              { step: 2, title: "Yo'nalish tanlang", desc: "SellerCloudX yoki BazarHub" },
+              { step: 3, title: "Ishni boshlang", desc: "Marketplace ulang yoki do'kon yarating" },
               { step: 4, title: "Daromad oling", desc: "Har bir sotuvdan foyda oling" },
             ].map((item) => (
               <div key={item.step} className="text-center">
@@ -259,7 +240,7 @@ export default function Partnership() {
           <div className="max-w-2xl mx-auto text-center">
             <h2 className="text-3xl font-bold mb-4">Tayyor bo'lsangiz, boshlang!</h2>
             <p className="text-muted-foreground mb-8">
-              Minglab sotuvchilar va bloggerlar allaqachon biz bilan ishlashmoqda. Navbat sizda!
+              Minglab sotuvchilar allaqachon biz bilan ishlashmoqda. Navbat sizda!
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button size="lg" asChild>
