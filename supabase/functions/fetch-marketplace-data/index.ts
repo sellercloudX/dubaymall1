@@ -6,8 +6,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// RUB to UZS conversion rate (approximate)
-const RUB_TO_UZS = 140;
+// Note: Yandex Market for Uzbekistan already returns prices in UZS (som)
+// No currency conversion needed - prices are displayed as-is
 
 interface YandexProduct {
   offerId: string;
@@ -196,8 +196,8 @@ serve(async (req) => {
             console.log(`Found ${offers.length} offers on page ${currentPage}`);
             
             pageProducts = offers.map((offer: any) => {
-              const priceRUB = offer.basicPrice?.value || offer.price?.value || offer.price || 0;
-              const price = Math.round(priceRUB * RUB_TO_UZS);
+              // Yandex Market UZ returns prices in UZS directly
+              const price = offer.basicPrice?.value || offer.price?.value || offer.price || 0;
               
               // Get stock from all warehouses (FBO + FBS)
               let stockFBO = 0;
@@ -244,11 +244,11 @@ serve(async (req) => {
               const awaitingMapping = entry.awaitingModerationMapping || {};
               
               const pictures = offer.pictures || offer.urls || mapping.pictures || [];
-              const priceRUB = offer.basicPrice?.value || 
+              // Yandex Market UZ returns prices in UZS directly
+              const price = offer.basicPrice?.value || 
                            offer.price?.value || 
                            offer.price ||
                            mapping.price?.value || 0;
-              const price = Math.round(priceRUB * RUB_TO_UZS);
               
               // Get stock from all sources
               let stockFBO = 0;
@@ -412,31 +412,32 @@ serve(async (req) => {
           const orders = data.orders || [];
           console.log(`Found ${orders.length} orders on page ${orderPage}`);
 
+          // Yandex Market UZ returns prices in UZS directly - no conversion needed
           const pageOrders: YandexOrder[] = orders.map((order: any) => {
-            const totalRUB = order.total || 0;
-            const itemsTotalRUB = order.itemsTotal || 0;
-            const deliveryTotalRUB = order.deliveryTotal || 0;
+            const total = order.total || 0;
+            const itemsTotal = order.itemsTotal || 0;
+            const deliveryTotal = order.deliveryTotal || 0;
             
             return {
               id: order.id,
               status: order.status,
               substatus: order.substatus,
               createdAt: order.createdAt,
-              total: totalRUB,
-              totalUZS: Math.round(totalRUB * RUB_TO_UZS),
-              itemsTotal: itemsTotalRUB,
-              itemsTotalUZS: Math.round(itemsTotalRUB * RUB_TO_UZS),
-              deliveryTotal: deliveryTotalRUB,
-              deliveryTotalUZS: Math.round(deliveryTotalRUB * RUB_TO_UZS),
+              total: total,
+              totalUZS: total,
+              itemsTotal: itemsTotal,
+              itemsTotalUZS: itemsTotal,
+              deliveryTotal: deliveryTotal,
+              deliveryTotalUZS: deliveryTotal,
               buyer: order.buyer,
               items: order.items?.map((item: any) => {
-                const itemPriceRUB = item.price || 0;
+                const itemPrice = item.price || 0;
                 return {
                   offerId: item.offerId,
                   offerName: item.offerName,
                   count: item.count,
-                  price: itemPriceRUB,
-                  priceUZS: Math.round(itemPriceRUB * RUB_TO_UZS),
+                  price: itemPrice,
+                  priceUZS: itemPrice,
                 };
               }),
             };
