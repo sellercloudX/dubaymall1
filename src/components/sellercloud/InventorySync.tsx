@@ -6,7 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
   RefreshCw, Package, AlertTriangle, Check, 
-  ArrowDownUp, Clock, Settings, Loader2
+  ArrowDownUp, Clock, Settings
 } from 'lucide-react';
 
 interface InventorySyncProps {
@@ -15,9 +15,9 @@ interface InventorySyncProps {
 }
 
 const MARKETPLACE_NAMES: Record<string, string> = {
-  yandex: 'Yandex Market',
-  uzum: 'Uzum Market',
-  wildberries: 'Wildberries',
+  yandex: 'Yandex',
+  uzum: 'Uzum',
+  wildberries: 'WB',
   ozon: 'Ozon',
 };
 
@@ -25,10 +25,11 @@ interface ProductStock {
   id: string;
   name: string;
   sku: string;
-  stocks: Record<string, number>;
+  stockFBO: number;
+  stockFBS: number;
   totalStock: number;
   lowStockAlert: boolean;
-  lastSync: string;
+  marketplace: string;
 }
 
 export function InventorySync({ connectedMarketplaces, fetchMarketplaceData }: InventorySyncProps) {
@@ -53,37 +54,35 @@ export function InventorySync({ connectedMarketplaces, fetchMarketplaceData }: I
     
     try {
       const allProducts: ProductStock[] = [];
-      const productMap = new Map<string, ProductStock>();
 
       for (const marketplace of connectedMarketplaces) {
-        const result = await fetchMarketplaceData(marketplace, 'products', { limit: 100 });
+        // Fetch all products with stock data
+        const result = await fetchMarketplaceData(marketplace, 'products', { 
+          limit: 200, 
+          fetchAll: true 
+        });
         
         if (result.success && result.data) {
           result.data.forEach((product: any) => {
-            const sku = product.shopSku || product.offerId;
-            const existing = productMap.get(sku);
+            const stockFBO = product.stockFBO || 0;
+            const stockFBS = product.stockFBS || 0;
+            const totalStock = stockFBO + stockFBS;
             
-            if (existing) {
-              existing.stocks[marketplace] = product.stockCount || 0;
-              existing.totalStock += product.stockCount || 0;
-              existing.lowStockAlert = existing.totalStock < LOW_STOCK_THRESHOLD;
-            } else {
-              const newProduct: ProductStock = {
-                id: product.offerId,
-                name: product.name || 'Nomsiz',
-                sku: sku,
-                stocks: { [marketplace]: product.stockCount || 0 },
-                totalStock: product.stockCount || 0,
-                lowStockAlert: (product.stockCount || 0) < LOW_STOCK_THRESHOLD,
-                lastSync: new Date().toISOString(),
-              };
-              productMap.set(sku, newProduct);
-            }
+            allProducts.push({
+              id: product.offerId,
+              name: product.name || 'Nomsiz',
+              sku: product.shopSku || product.offerId,
+              stockFBO,
+              stockFBS,
+              totalStock,
+              lowStockAlert: totalStock < LOW_STOCK_THRESHOLD,
+              marketplace,
+            });
           });
         }
       }
 
-      setProducts(Array.from(productMap.values()));
+      setProducts(allProducts);
       setLastSyncTime(new Date().toISOString());
     } catch (err) {
       console.error('Error loading inventory:', err);
@@ -99,6 +98,8 @@ export function InventorySync({ connectedMarketplaces, fetchMarketplaceData }: I
   };
 
   const lowStockCount = products.filter(p => p.lowStockAlert).length;
+  const totalFBO = products.reduce((sum, p) => sum + p.stockFBO, 0);
+  const totalFBS = products.reduce((sum, p) => sum + p.stockFBS, 0);
 
   const formatLastSync = () => {
     if (!lastSyncTime) return 'Hali sinxronlanmagan';
@@ -144,19 +145,19 @@ export function InventorySync({ connectedMarketplaces, fetchMarketplaceData }: I
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-4">
             {/* Auto Sync Toggle */}
             <Card className="bg-muted/50">
               <CardContent className="pt-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">Avtomatik sinxronlash</span>
+                    <span className="text-sm font-medium">Avto-sinxron</span>
                   </div>
                   <Switch checked={autoSync} onCheckedChange={setAutoSync} />
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
-                  Har {syncInterval} daqiqada avtomatik yangilanadi
+                  Har {syncInterval} daqiqada
                 </p>
               </CardContent>
             </Card>
@@ -166,11 +167,22 @@ export function InventorySync({ connectedMarketplaces, fetchMarketplaceData }: I
               <CardContent className="pt-4">
                 <div className="flex items-center gap-2 mb-2">
                   <Check className="h-4 w-4 text-green-500" />
-                  <span className="text-sm font-medium">Oxirgi sinxronlash</span>
+                  <span className="text-sm font-medium">Sinxronlash</span>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {formatLastSync()} • {products.length} mahsulot
+                  {formatLastSync()} • {products.length} ta
                 </p>
+              </CardContent>
+            </Card>
+
+            {/* FBO Stock */}
+            <Card className="bg-muted/50">
+              <CardContent className="pt-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Package className="h-4 w-4 text-blue-500" />
+                  <span className="text-sm font-medium">FBO (Yandex)</span>
+                </div>
+                <p className="text-lg font-bold">{totalFBO} dona</p>
               </CardContent>
             </Card>
 
@@ -181,8 +193,8 @@ export function InventorySync({ connectedMarketplaces, fetchMarketplaceData }: I
                   <AlertTriangle className={`h-4 w-4 ${lowStockCount > 0 ? 'text-destructive' : 'text-muted-foreground'}`} />
                   <span className="text-sm font-medium">Kam qoldiq</span>
                 </div>
-                <p className={`text-xs ${lowStockCount > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
-                  {lowStockCount > 0 ? `${lowStockCount} ta mahsulot kam qolgan` : 'Barcha mahsulotlar yetarli'}
+                <p className={`text-lg font-bold ${lowStockCount > 0 ? 'text-destructive' : ''}`}>
+                  {lowStockCount} ta
                 </p>
               </CardContent>
             </Card>
@@ -201,7 +213,7 @@ export function InventorySync({ connectedMarketplaces, fetchMarketplaceData }: I
             )}
           </CardTitle>
           <CardDescription>
-            Barcha marketplacedagi zaxira holati
+            Barcha marketplacedagi FBO va FBS zaxira holati
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -226,43 +238,49 @@ export function InventorySync({ connectedMarketplaces, fetchMarketplaceData }: I
                 <thead>
                   <tr className="border-b">
                     <th className="text-left py-3 px-2 text-sm font-medium">Mahsulot</th>
-                    <th className="text-left py-3 px-2 text-sm font-medium">SKU</th>
-                    {connectedMarketplaces.map(mp => (
-                      <th key={mp} className="text-center py-3 px-2 text-sm font-medium">
-                        {MARKETPLACE_NAMES[mp]}
-                      </th>
-                    ))}
-                    <th className="text-center py-3 px-2 text-sm font-medium">Jami</th>
-                    <th className="text-center py-3 px-2 text-sm font-medium">Holat</th>
+                    <th className="text-left py-3 px-2 text-sm font-medium w-28">SKU</th>
+                    <th className="text-left py-3 px-2 text-sm font-medium w-20">MP</th>
+                    <th className="text-center py-3 px-2 text-sm font-medium w-20">FBO</th>
+                    <th className="text-center py-3 px-2 text-sm font-medium w-20">FBS</th>
+                    <th className="text-center py-3 px-2 text-sm font-medium w-20">Jami</th>
+                    <th className="text-center py-3 px-2 text-sm font-medium w-20">Holat</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {products.map(product => (
-                    <tr key={product.id} className="border-b hover:bg-muted/50">
+                  {products.slice(0, 100).map(product => (
+                    <tr key={`${product.id}-${product.marketplace}`} className="border-b hover:bg-muted/50">
                       <td className="py-3 px-2">
                         <div className="font-medium text-sm line-clamp-1">{product.name}</div>
                       </td>
                       <td className="py-3 px-2">
-                        <code className="text-xs bg-muted px-1.5 py-0.5 rounded">{product.sku}</code>
+                        <code className="text-xs bg-muted px-1.5 py-0.5 rounded truncate block max-w-[100px]">{product.sku}</code>
                       </td>
-                      {connectedMarketplaces.map(mp => (
-                        <td key={mp} className="text-center py-3 px-2">
-                          <span className={`font-medium ${(product.stocks[mp] || 0) < LOW_STOCK_THRESHOLD ? 'text-destructive' : ''}`}>
-                            {product.stocks[mp] || 0}
-                          </span>
-                        </td>
-                      ))}
+                      <td className="py-3 px-2">
+                        <Badge variant="outline" className="text-xs">
+                          {MARKETPLACE_NAMES[product.marketplace]}
+                        </Badge>
+                      </td>
+                      <td className="text-center py-3 px-2">
+                        <span className={`font-medium ${product.stockFBO < LOW_STOCK_THRESHOLD ? 'text-muted-foreground' : ''}`}>
+                          {product.stockFBO}
+                        </span>
+                      </td>
+                      <td className="text-center py-3 px-2">
+                        <span className={`font-medium ${product.stockFBS < LOW_STOCK_THRESHOLD ? 'text-destructive' : 'text-green-600'}`}>
+                          {product.stockFBS}
+                        </span>
+                      </td>
                       <td className="text-center py-3 px-2">
                         <span className="font-bold">{product.totalStock}</span>
                       </td>
                       <td className="text-center py-3 px-2">
                         {product.lowStockAlert ? (
-                          <Badge variant="destructive" className="text-xs">
+                          <Badge variant="destructive" className="text-xs whitespace-nowrap">
                             <AlertTriangle className="h-3 w-3 mr-1" />
                             Kam
                           </Badge>
                         ) : (
-                          <Badge variant="secondary" className="text-xs">
+                          <Badge variant="secondary" className="text-xs whitespace-nowrap">
                             <Check className="h-3 w-3 mr-1" />
                             OK
                           </Badge>
@@ -272,6 +290,11 @@ export function InventorySync({ connectedMarketplaces, fetchMarketplaceData }: I
                   ))}
                 </tbody>
               </table>
+              {products.length > 100 && (
+                <div className="mt-4 text-sm text-muted-foreground text-center">
+                  Ko'rsatilmoqda: 100 / {products.length} mahsulot
+                </div>
+              )}
             </div>
           )}
         </CardContent>

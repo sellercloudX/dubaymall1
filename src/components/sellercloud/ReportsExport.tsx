@@ -1,18 +1,20 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 import { 
   FileSpreadsheet, FileText, Download, Calendar as CalendarIcon, 
-  BarChart3, Package, ShoppingCart, DollarSign, TrendingUp
+  BarChart3, Package, ShoppingCart, DollarSign, TrendingUp, Loader2
 } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface ReportsExportProps {
   connectedMarketplaces: string[];
+  fetchMarketplaceData?: (marketplace: string, dataType: string, options?: Record<string, any>) => Promise<any>;
 }
 
 const REPORT_TYPES = [
@@ -61,12 +63,74 @@ const MARKETPLACE_NAMES: Record<string, string> = {
   all: 'Barcha marketplacelar',
 };
 
-export function ReportsExport({ connectedMarketplaces }: ReportsExportProps) {
+interface ReportStats {
+  totalSales: number;
+  totalOrders: number;
+  avgCheck: number;
+  totalProducts: number;
+}
+
+export function ReportsExport({ connectedMarketplaces, fetchMarketplaceData }: ReportsExportProps) {
   const [selectedReport, setSelectedReport] = useState<string | null>(null);
   const [selectedMarketplace, setSelectedMarketplace] = useState<string>('all');
   const [dateFrom, setDateFrom] = useState<Date>(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
   const [dateTo, setDateTo] = useState<Date>(new Date());
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [stats, setStats] = useState<ReportStats>({ totalSales: 0, totalOrders: 0, avgCheck: 0, totalProducts: 0 });
+
+  useEffect(() => {
+    if (connectedMarketplaces.length > 0 && fetchMarketplaceData) {
+      loadStats();
+    } else {
+      setIsLoading(false);
+    }
+  }, [connectedMarketplaces, selectedMarketplace]);
+
+  const loadStats = async () => {
+    if (!fetchMarketplaceData) {
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    
+    try {
+      let totalSales = 0;
+      let totalOrders = 0;
+      let totalProducts = 0;
+
+      const marketplacesToFetch = selectedMarketplace === 'all' 
+        ? connectedMarketplaces 
+        : [selectedMarketplace];
+
+      for (const mp of marketplacesToFetch) {
+        const [productsResult, ordersResult] = await Promise.all([
+          fetchMarketplaceData(mp, 'products', { limit: 200, fetchAll: true }),
+          fetchMarketplaceData(mp, 'orders', { fetchAll: true }),
+        ]);
+
+        totalProducts += productsResult.total || productsResult.data?.length || 0;
+        
+        const orders = ordersResult.data || [];
+        totalOrders += orders.length;
+        totalSales += orders.reduce((sum: number, order: any) => {
+          return sum + (order.totalUZS || order.total || 0);
+        }, 0);
+      }
+
+      setStats({
+        totalSales,
+        totalOrders,
+        avgCheck: totalOrders > 0 ? Math.round(totalSales / totalOrders) : 0,
+        totalProducts,
+      });
+    } catch (err) {
+      console.error('Error loading stats:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleGenerateReport = async (reportId: string, format: string) => {
     setIsGenerating(true);
@@ -76,6 +140,13 @@ export function ReportsExport({ connectedMarketplaces }: ReportsExportProps) {
     
     // In real implementation, this would trigger download
     console.log(`Generating ${reportId} report in ${format} format`);
+  };
+
+  const formatPrice = (price: number) => {
+    if (price >= 1000000) {
+      return (price / 1000000).toFixed(1) + ' mln so\'m';
+    }
+    return new Intl.NumberFormat('uz-UZ').format(price) + ' so\'m';
   };
 
   return (
@@ -192,7 +263,11 @@ export function ReportsExport({ connectedMarketplaces }: ReportsExportProps) {
                         handleGenerateReport(report.id, fmt);
                       }}
                     >
-                      <Download className="h-3 w-3 mr-1" />
+                      {isGenerating ? (
+                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                      ) : (
+                        <Download className="h-3 w-3 mr-1" />
+                      )}
                       {fmt.toUpperCase()}
                     </Button>
                   ))}
@@ -212,28 +287,32 @@ export function ReportsExport({ connectedMarketplaces }: ReportsExportProps) {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-4">
-            <div className="p-4 rounded-lg bg-muted/50">
-              <div className="text-sm text-muted-foreground mb-1">Jami sotuvlar</div>
-              <div className="text-2xl font-bold">$12,450</div>
-              <div className="text-xs text-green-600">+15% o'tgan oydan</div>
+          {isLoading ? (
+            <div className="grid gap-4 md:grid-cols-4">
+              {[1, 2, 3, 4].map(i => (
+                <Skeleton key={i} className="h-24" />
+              ))}
             </div>
-            <div className="p-4 rounded-lg bg-muted/50">
-              <div className="text-sm text-muted-foreground mb-1">Buyurtmalar</div>
-              <div className="text-2xl font-bold">248</div>
-              <div className="text-xs text-green-600">+8% o'tgan oydan</div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-4">
+              <div className="p-4 rounded-lg bg-muted/50">
+                <div className="text-sm text-muted-foreground mb-1">Jami sotuvlar</div>
+                <div className="text-xl md:text-2xl font-bold">{formatPrice(stats.totalSales)}</div>
+              </div>
+              <div className="p-4 rounded-lg bg-muted/50">
+                <div className="text-sm text-muted-foreground mb-1">Buyurtmalar</div>
+                <div className="text-xl md:text-2xl font-bold">{stats.totalOrders}</div>
+              </div>
+              <div className="p-4 rounded-lg bg-muted/50">
+                <div className="text-sm text-muted-foreground mb-1">O'rtacha chek</div>
+                <div className="text-xl md:text-2xl font-bold">{formatPrice(stats.avgCheck)}</div>
+              </div>
+              <div className="p-4 rounded-lg bg-muted/50">
+                <div className="text-sm text-muted-foreground mb-1">Mahsulotlar</div>
+                <div className="text-xl md:text-2xl font-bold">{stats.totalProducts}</div>
+              </div>
             </div>
-            <div className="p-4 rounded-lg bg-muted/50">
-              <div className="text-sm text-muted-foreground mb-1">O'rtacha chek</div>
-              <div className="text-2xl font-bold">$50.2</div>
-              <div className="text-xs text-green-600">+5% o'tgan oydan</div>
-            </div>
-            <div className="p-4 rounded-lg bg-muted/50">
-              <div className="text-sm text-muted-foreground mb-1">Sof foyda</div>
-              <div className="text-2xl font-bold">$3,890</div>
-              <div className="text-xs text-green-600">+12% o'tgan oydan</div>
-            </div>
-          </div>
+          )}
         </CardContent>
       </Card>
     </div>

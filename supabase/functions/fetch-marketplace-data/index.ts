@@ -6,6 +6,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// RUB to UZS conversion rate (approximate)
+const RUB_TO_UZS = 140;
+
 interface YandexProduct {
   offerId: string;
   name: string;
@@ -14,6 +17,8 @@ interface YandexProduct {
   category?: string;
   pictures?: string[];
   availability?: string;
+  stockFBO?: number;
+  stockFBS?: number;
   stockCount?: number;
 }
 
@@ -23,6 +28,7 @@ interface YandexOrder {
   substatus?: string;
   createdAt: string;
   total: number;
+  totalUZS: number;
   itemsTotal: number;
   deliveryTotal: number;
   buyer?: {
@@ -51,7 +57,7 @@ serve(async (req) => {
       );
     }
 
-    const { marketplace, dataType, limit = 50, page = 1, fromDate, toDate, status } = await req.json();
+    const { marketplace, dataType, limit = 200, page = 1, fromDate, toDate, status, fetchAll = false } = await req.json();
 
     if (!marketplace || !dataType) {
       return new Response(
@@ -123,122 +129,158 @@ serve(async (req) => {
       }
 
       if (dataType === "products") {
-        let response: Response;
-        let useOffersEndpoint = false;
-        
-        // Use offer-mappings with businessId for full product data
-        if (effectiveBusinessId) {
-          const apiPath = `https://api.partner.market.yandex.ru/businesses/${effectiveBusinessId}/offer-mappings`;
-          console.log(`Calling Business API: ${apiPath}`);
-          response = await fetch(apiPath, { 
-            method: 'POST',
-            headers,
-            body: JSON.stringify({
-              pageable: { limit, page: page - 1 }
-            })
-          });
-        } else {
-          // Fallback to /campaigns/{campaignId}/offers POST endpoint
-          const apiPath = `https://api.partner.market.yandex.ru/campaigns/${campaignId}/offers`;
-          console.log(`Calling Campaign Offers API: ${apiPath}`);
-          useOffersEndpoint = true;
-          response = await fetch(apiPath, { 
-            method: 'POST',
-            headers,
-            body: JSON.stringify({
-              pageable: { limit, page: page - 1 }
-            })
-          });
-        }
+        let allProducts: YandexProduct[] = [];
+        let total = 0;
+        let pageToken: string | undefined;
+        let currentPage = 0;
+        const pageLimit = fetchAll ? 200 : limit;
 
-        console.log(`Products API response status: ${response.status}`);
-
-        if (response.ok) {
-          const data = await response.json();
-          console.log("Products API response keys:", Object.keys(data.result || data || {}));
-          console.log("Full response sample:", JSON.stringify(data).substring(0, 1500));
+        // Fetch products with pagination
+        do {
+          let response: Response;
+          let useOffersEndpoint = false;
           
-          let products: YandexProduct[] = [];
-          let total = 0;
-          
-          if (useOffersEndpoint) {
-            // Parse /campaigns/{campaignId}/offers response
-            const offers = data.result?.offers || data.offers || [];
-            console.log(`Found ${offers.length} offers from campaign endpoint`);
+          if (effectiveBusinessId) {
+            const apiPath = `https://api.partner.market.yandex.ru/businesses/${effectiveBusinessId}/offer-mappings`;
+            console.log(`Calling Business API page ${currentPage}: ${apiPath}`);
             
-            if (offers.length > 0) {
-              console.log("Sample offer structure:", JSON.stringify(offers[0]).substring(0, 1000));
+            const body: any = { limit: pageLimit };
+            if (pageToken) {
+              body.page_token = pageToken;
             }
             
-            products = offers.map((offer: any) => {
-              // Get price from different possible locations
-              const price = offer.basicPrice?.value || 
-                           offer.price?.value || 
-                           offer.price || 0;
+            response = await fetch(apiPath, { 
+              method: 'POST',
+              headers,
+              body: JSON.stringify(body)
+            });
+          } else {
+            const apiPath = `https://api.partner.market.yandex.ru/campaigns/${campaignId}/offers`;
+            console.log(`Calling Campaign Offers API page ${currentPage}: ${apiPath}`);
+            useOffersEndpoint = true;
+            
+            const body: any = { limit: pageLimit };
+            if (pageToken) {
+              body.page_token = pageToken;
+            }
+            
+            response = await fetch(apiPath, { 
+              method: 'POST',
+              headers,
+              body: JSON.stringify(body)
+            });
+          }
+
+          console.log(`Products API response status: ${response.status}`);
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error("Yandex products error:", response.status, errorText);
+            break;
+          }
+
+          const data = await response.json();
+          console.log("Products API response sample:", JSON.stringify(data).substring(0, 1500));
+          
+          // Get next page token
+          pageToken = data.result?.paging?.nextPageToken;
+          total = data.result?.paging?.total || total;
+          
+          let pageProducts: YandexProduct[] = [];
+          
+          if (useOffersEndpoint) {
+            const offers = data.result?.offers || data.offers || [];
+            console.log(`Found ${offers.length} offers on page ${currentPage}`);
+            
+            pageProducts = offers.map((offer: any) => {
+              const priceRUB = offer.basicPrice?.value || offer.price?.value || offer.price || 0;
+              const price = Math.round(priceRUB * RUB_TO_UZS);
               
-              // Get stock - sum from all warehouses
-              let stockCount = 0;
+              // Get stock from all warehouses (FBO + FBS)
+              let stockFBO = 0;
+              let stockFBS = 0;
+              
               if (offer.warehouses && Array.isArray(offer.warehouses)) {
-                stockCount = offer.warehouses.reduce((sum: number, wh: any) => {
+                offer.warehouses.forEach((wh: any) => {
                   const stocks = wh.stocks || [];
-                  return sum + stocks.reduce((s: number, st: any) => s + (st.count || 0), 0);
-                }, 0);
+                  const warehouseStock = stocks.reduce((s: number, st: any) => s + (st.count || 0), 0);
+                  
+                  // Check warehouse type - FBO (Yandex) vs FBS (Seller)
+                  if (wh.warehouseId && wh.warehouseId < 100000) {
+                    stockFBO += warehouseStock;
+                  } else {
+                    stockFBS += warehouseStock;
+                  }
+                });
               } else if (offer.stocks && Array.isArray(offer.stocks)) {
-                stockCount = offer.stocks.reduce((sum: number, s: any) => sum + (s.count || 0), 0);
+                stockFBS = offer.stocks.reduce((sum: number, s: any) => sum + (s.count || 0), 0);
               }
               
-              // Get pictures
               const pictures = offer.pictures || offer.urls || [];
               
               return {
                 offerId: offer.offerId || '',
-                name: offer.name || 'Nomsiz',
+                name: offer.name || offer.marketModelName || '',
                 price: price,
                 shopSku: offer.shopSku || offer.offerId || '',
-                category: offer.category || '',
+                category: offer.category?.name || offer.marketCategoryName || '',
                 pictures: pictures,
                 availability: offer.cardStatus || offer.status || 'UNKNOWN',
-                stockCount: stockCount,
+                stockFBO,
+                stockFBS,
+                stockCount: stockFBO + stockFBS,
               };
             });
-            
-            total = data.result?.paging?.total || data.paging?.total || products.length;
           } else {
-            // Parse /businesses/{businessId}/offer-mappings response
             const offerMappings = data.result?.offerMappings || [];
-            console.log(`Found ${offerMappings.length} offer mappings`);
+            console.log(`Found ${offerMappings.length} offer mappings on page ${currentPage}`);
             
-            if (offerMappings.length > 0) {
-              console.log("Mapping structure:", JSON.stringify(offerMappings[0]).substring(0, 1500));
-            }
-            
-            products = offerMappings.map((entry: any) => {
+            pageProducts = offerMappings.map((entry: any) => {
               const offer = entry.offer || {};
               const mapping = entry.mapping || {};
               const awaitingMapping = entry.awaitingModerationMapping || {};
               
               const pictures = offer.pictures || offer.urls || mapping.pictures || [];
-              const price = offer.basicPrice?.value || 
+              const priceRUB = offer.basicPrice?.value || 
                            offer.price?.value || 
                            offer.price ||
                            mapping.price?.value || 0;
+              const price = Math.round(priceRUB * RUB_TO_UZS);
               
-              // Get stock - check multiple locations
-              let stockCount = 0;
+              // Get stock from all sources
+              let stockFBO = 0;
+              let stockFBS = 0;
+              
+              // Check offer stocks
               if (offer.stocks && Array.isArray(offer.stocks)) {
-                stockCount = offer.stocks.reduce((sum: number, s: any) => sum + (s.count || s.available || 0), 0);
-              } else if (mapping.stocks && Array.isArray(mapping.stocks)) {
-                stockCount = mapping.stocks.reduce((sum: number, s: any) => sum + (s.count || s.available || 0), 0);
+                offer.stocks.forEach((s: any) => {
+                  const count = s.count || s.available || 0;
+                  if (s.type === 'FBO' || s.warehouseType === 'FBO') {
+                    stockFBO += count;
+                  } else {
+                    stockFBS += count;
+                  }
+                });
               }
               
-              // Get status - check multiple locations
+              // Check mapping stocks
+              if (mapping.stocks && Array.isArray(mapping.stocks)) {
+                mapping.stocks.forEach((s: any) => {
+                  const count = s.count || s.available || 0;
+                  if (s.type === 'FBO' || s.warehouseType === 'FBO') {
+                    stockFBO += count;
+                  } else {
+                    stockFBS += count;
+                  }
+                });
+              }
+              
               const statusValue = mapping.status || 
-                                 awaitingMapping.status || 
+                                 awaitingMapping?.cardStatus || 
                                  offer.cardStatus || 
                                  (offer.archived ? 'ARCHIVED' : null) ||
                                  'ACTIVE';
               
-              // Get category
               const category = mapping.marketCategoryName || 
                               mapping.categoryName || 
                               offer.category?.name || 
@@ -247,84 +289,222 @@ serve(async (req) => {
               
               return {
                 offerId: offer.offerId || offer.shopSku || '',
-                name: offer.name || mapping.marketSkuName || 'Nomsiz',
+                name: offer.name || mapping.marketSkuName || mapping.marketModelName || '',
                 price: price,
                 shopSku: offer.shopSku || offer.offerId || '',
                 category: category,
                 pictures: pictures,
                 availability: statusValue,
-                stockCount: stockCount,
+                stockFBO,
+                stockFBS,
+                stockCount: stockFBO + stockFBS,
               };
             });
+          }
+
+          allProducts = [...allProducts, ...pageProducts];
+          currentPage++;
+          
+          // If not fetching all, break after first page
+          if (!fetchAll) break;
+          
+        } while (pageToken && currentPage < 50); // Max 50 pages safety limit
+
+        console.log(`Total mapped ${allProducts.length} products`);
+        
+        // Try to get stocks from dedicated endpoint
+        if (campaignId && allProducts.length > 0) {
+          try {
+            const stocksResponse = await fetch(
+              `https://api.partner.market.yandex.ru/campaigns/${campaignId}/offers/stocks`,
+              {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ limit: 200 })
+              }
+            );
             
-            total = data.result?.paging?.total || products.length;
+            if (stocksResponse.ok) {
+              const stocksData = await stocksResponse.json();
+              const warehouseOffers = stocksData.result?.warehouses || [];
+              console.log(`Got stocks data from ${warehouseOffers.length} warehouses`);
+              
+              // Create a map of offerId -> stocks
+              const stockMap = new Map<string, { fbo: number; fbs: number }>();
+              
+              warehouseOffers.forEach((wh: any) => {
+                const offers = wh.offers || [];
+                offers.forEach((offer: any) => {
+                  const offerId = offer.offerId;
+                  const items = offer.stocks || [];
+                  const count = items.reduce((sum: number, s: any) => sum + (s.count || 0), 0);
+                  
+                  const existing = stockMap.get(offerId) || { fbo: 0, fbs: 0 };
+                  // Yandex warehouses are FBO, seller warehouses are FBS
+                  if (wh.warehouseId < 100000) {
+                    existing.fbo += count;
+                  } else {
+                    existing.fbs += count;
+                  }
+                  stockMap.set(offerId, existing);
+                });
+              });
+              
+              // Update products with accurate stock data
+              allProducts = allProducts.map(p => {
+                const stocks = stockMap.get(p.offerId);
+                if (stocks) {
+                  return {
+                    ...p,
+                    stockFBO: stocks.fbo,
+                    stockFBS: stocks.fbs,
+                    stockCount: stocks.fbo + stocks.fbs,
+                  };
+                }
+                return p;
+              });
+              
+              console.log(`Updated stocks for ${stockMap.size} products`);
+            }
+          } catch (e) {
+            console.error("Error fetching stocks:", e);
           }
-
-          console.log(`Mapped ${products.length} products`);
-          if (products.length > 0) {
-            console.log("Sample product:", JSON.stringify(products[0]));
-          }
-
-          result = {
-            success: true,
-            data: products,
-            total: total,
-            page,
-            limit,
-          };
-        } else {
-          const errorText = await response.text();
-          console.error("Yandex products error:", response.status, errorText);
-          result = { success: false, error: "Failed to fetch products", details: errorText };
         }
+
+        result = {
+          success: true,
+          data: allProducts,
+          total: total || allProducts.length,
+          page,
+          limit,
+        };
       } else if (dataType === "orders") {
-        // Fetch orders from Yandex Market
+        // Fetch ALL orders from Yandex Market
         const today = new Date();
         const defaultFromDate = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
         const from = fromDate || defaultFromDate.toISOString().split('T')[0];
         const to = toDate || today.toISOString().split('T')[0];
 
-        let url = `https://api.partner.market.yandex.ru/campaigns/${campaignId}/orders?fromDate=${from}&toDate=${to}`;
-        if (status) {
-          url += `&status=${status}`;
+        let allOrders: YandexOrder[] = [];
+        let orderPage = 1;
+        let hasMoreOrders = true;
+
+        while (hasMoreOrders) {
+          let url = `https://api.partner.market.yandex.ru/campaigns/${campaignId}/orders?fromDate=${from}&toDate=${to}&page=${orderPage}&pageSize=50`;
+          if (status) {
+            url += `&status=${status}`;
+          }
+
+          console.log(`Calling orders API page ${orderPage}: ${url}`);
+
+          const response = await fetch(url, { headers });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error("Yandex orders error:", response.status, errorText);
+            break;
+          }
+
+          const data = await response.json();
+          const orders = data.orders || [];
+          console.log(`Found ${orders.length} orders on page ${orderPage}`);
+
+          const pageOrders: YandexOrder[] = orders.map((order: any) => {
+            const totalRUB = order.total || 0;
+            return {
+              id: order.id,
+              status: order.status,
+              substatus: order.substatus,
+              createdAt: order.createdAt,
+              total: totalRUB,
+              totalUZS: Math.round(totalRUB * RUB_TO_UZS),
+              itemsTotal: order.itemsTotal,
+              deliveryTotal: order.deliveryTotal,
+              buyer: order.buyer,
+              items: order.items?.map((item: any) => ({
+                offerId: item.offerId,
+                offerName: item.offerName,
+                count: item.count,
+                price: item.price,
+              })),
+            };
+          });
+
+          allOrders = [...allOrders, ...pageOrders];
+
+          // Check if there are more pages
+          const paging = data.pager || data.paging || {};
+          const totalPages = paging.pagesCount || Math.ceil((paging.total || 0) / 50);
+          
+          if (orderPage >= totalPages || orders.length < 50 || !fetchAll) {
+            hasMoreOrders = false;
+          } else {
+            orderPage++;
+          }
         }
 
-        console.log(`Calling orders API: ${url}`);
+        console.log(`Total orders fetched: ${allOrders.length}`);
 
-        const response = await fetch(url, { headers });
-
-        console.log(`Orders API response status: ${response.status}`);
-
-        if (response.ok) {
-          const data = await response.json();
-          console.log(`Found ${data.orders?.length || 0} orders`);
-          
-          const orders: YandexOrder[] = data.orders?.map((order: any) => ({
-            id: order.id,
-            status: order.status,
-            substatus: order.substatus,
-            createdAt: order.createdAt,
-            total: order.total,
-            itemsTotal: order.itemsTotal,
-            deliveryTotal: order.deliveryTotal,
-            buyer: order.buyer,
-            items: order.items?.map((item: any) => ({
-              offerId: item.offerId,
-              offerName: item.offerName,
-              count: item.count,
-              price: item.price,
-            })),
-          })) || [];
-
-          result = {
-            success: true,
-            data: orders,
-            total: data.paging?.total || orders.length,
-          };
+        result = {
+          success: true,
+          data: allOrders,
+          total: allOrders.length,
+        };
+      } else if (dataType === "stocks") {
+        // Dedicated stocks endpoint with FBO/FBS breakdown
+        if (!campaignId) {
+          result = { success: false, error: "Campaign ID required for stocks" };
         } else {
-          const errorText = await response.text();
-          console.error("Yandex orders error:", response.status, errorText);
-          result = { success: false, error: "Failed to fetch orders", details: errorText };
+          try {
+            const stocksResponse = await fetch(
+              `https://api.partner.market.yandex.ru/campaigns/${campaignId}/offers/stocks`,
+              {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ limit: 200 })
+              }
+            );
+            
+            if (stocksResponse.ok) {
+              const stocksData = await stocksResponse.json();
+              const warehouseOffers = stocksData.result?.warehouses || [];
+              
+              // Aggregate by offerId
+              const stockMap = new Map<string, { offerId: string; fbo: number; fbs: number; total: number }>();
+              
+              warehouseOffers.forEach((wh: any) => {
+                const warehouseName = wh.warehouseName || '';
+                const isFBO = warehouseName.toLowerCase().includes('yandex') || wh.warehouseId < 100000;
+                
+                const offers = wh.offers || [];
+                offers.forEach((offer: any) => {
+                  const offerId = offer.offerId;
+                  const items = offer.stocks || [];
+                  const count = items.reduce((sum: number, s: any) => sum + (s.count || 0), 0);
+                  
+                  const existing = stockMap.get(offerId) || { offerId, fbo: 0, fbs: 0, total: 0 };
+                  if (isFBO) {
+                    existing.fbo += count;
+                  } else {
+                    existing.fbs += count;
+                  }
+                  existing.total = existing.fbo + existing.fbs;
+                  stockMap.set(offerId, existing);
+                });
+              });
+              
+              result = {
+                success: true,
+                data: Array.from(stockMap.values()),
+                total: stockMap.size,
+              };
+            } else {
+              result = { success: false, error: "Failed to fetch stocks" };
+            }
+          } catch (e) {
+            console.error("Error fetching stocks:", e);
+            result = { success: false, error: "Error fetching stocks" };
+          }
         }
       } else if (dataType === "stats") {
         // Fetch statistics from Yandex Market
