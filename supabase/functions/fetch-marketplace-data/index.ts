@@ -91,44 +91,76 @@ serve(async (req) => {
       );
     }
 
-    const credentials = connection.credentials as { apiKey: string; campaignId?: string; sellerId?: string };
-    const { apiKey, campaignId } = credentials;
+    const credentials = connection.credentials as { apiKey: string; campaignId?: string; businessId?: string };
+    const { apiKey, campaignId, businessId } = credentials;
 
     console.log(`Fetching ${dataType} from ${marketplace} for user ${user.id}`);
 
     let result: any = { success: true, data: [] };
 
-    if (marketplace === "yandex" && campaignId) {
+    if (marketplace === "yandex" && (campaignId || businessId)) {
       const headers = {
-        "Authorization": `OAuth oauth_token="${apiKey}"`,
+        "Api-Key": apiKey,
         "Content-Type": "application/json",
       };
 
       if (dataType === "products") {
         // Fetch products from Yandex Market
-        const offset = (page - 1) * limit;
+        let apiPath: string;
+        let requestMethod = 'POST';
+        let requestBody: any = null;
+        
+        if (businessId) {
+          // Use Business API (newer)
+          apiPath = `https://api.partner.market.yandex.ru/businesses/${businessId}/offer-mappings`;
+          requestBody = {
+            archived: false
+          };
+        } else if (campaignId) {
+          // Use Campaign API with offers endpoint - empty body to get all
+          apiPath = `https://api.partner.market.yandex.ru/campaigns/${campaignId}/offers`;
+          requestBody = {};
+        } else {
+          return new Response(
+            JSON.stringify({ success: false, error: "No campaignId or businessId found" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        
+        const paginationParam = `?limit=${limit}`;
+        
         const response = await fetch(
-          `https://api.partner.market.yandex.ru/campaigns/${campaignId}/offer-mapping-entries?limit=${limit}&offset=${offset}`,
-          { headers }
+          `${apiPath}${paginationParam}`,
+          { 
+            method: requestMethod,
+            headers,
+            body: JSON.stringify(requestBody)
+          }
         );
 
         if (response.ok) {
           const data = await response.json();
-          const products: YandexProduct[] = data.offerMappingEntries?.map((entry: any) => ({
-            offerId: entry.offer?.offerId,
-            name: entry.offer?.name,
-            price: entry.offer?.price?.value,
-            shopSku: entry.offer?.shopSku,
-            category: entry.offer?.category,
-            pictures: entry.offer?.pictures || [],
-            availability: entry.awaitingModerationMapping?.availability,
-            stockCount: entry.offer?.stockCount,
-          })) || [];
+          
+          // Handle different API response formats
+          const offers = data.result?.offers || data.result?.offerMappings || [];
+          const products: YandexProduct[] = offers.map((entry: any) => {
+            const offer = entry.offer || entry;
+            return {
+              offerId: offer.offerId,
+              name: offer.name,
+              price: offer.basicPrice?.value || offer.price?.value || offer.price,
+              shopSku: offer.shopSku,
+              category: offer.category,
+              pictures: offer.pictures || [],
+              availability: offer.availability,
+              stockCount: offer.stocks?.[0]?.count || offer.stockCount,
+            };
+          });
 
           result = {
             success: true,
             data: products,
-            total: data.paging?.total || 0,
+            total: data.result?.paging?.total || products.length,
             page,
             limit,
           };
