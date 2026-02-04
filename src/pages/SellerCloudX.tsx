@@ -17,6 +17,7 @@ import { MultiPublish } from '@/components/sellercloud/MultiPublish';
 import { NotificationCenter } from '@/components/sellercloud/NotificationCenter';
 import { ReportsExport } from '@/components/sellercloud/ReportsExport';
 import { AIScannerPro } from '@/components/seller/AIScannerPro';
+import { useMarketplaceConnections } from '@/hooks/useMarketplaceConnections';
 import { toast } from 'sonner';
 import { 
   Loader2, Globe, Package, ShoppingCart, BarChart3, 
@@ -29,7 +30,10 @@ export default function SellerCloudX() {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [hasSubscription, setHasSubscription] = useState(false);
-  const [connectedMarketplaces, setConnectedMarketplaces] = useState<string[]>([]);
+  const { connections, isLoading: connectionsLoading } = useMarketplaceConnections();
+  
+  // Derive connected marketplace IDs from connections
+  const connectedMarketplaces = connections.map(c => c.marketplace);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -229,13 +233,7 @@ export default function SellerCloudX() {
           </TabsList>
 
           <TabsContent value="marketplaces">
-            <MarketplaceOAuth 
-              onConnect={(marketplace) => {
-                setConnectedMarketplaces(prev => [...prev, marketplace]);
-                toast.success(`${marketplace} muvaffaqiyatli ulandi!`);
-              }}
-              connectedMarketplaces={connectedMarketplaces}
-            />
+            <MarketplaceOAuth />
           </TabsContent>
 
           <TabsContent value="scanner">

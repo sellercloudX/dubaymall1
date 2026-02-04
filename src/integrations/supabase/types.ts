@@ -263,6 +263,62 @@ export type Database = {
           },
         ]
       }
+      marketplace_connections: {
+        Row: {
+          account_info: Json | null
+          created_at: string
+          credentials: Json
+          id: string
+          is_active: boolean | null
+          last_sync_at: string | null
+          marketplace: string
+          orders_count: number | null
+          products_count: number | null
+          shop_id: string | null
+          total_revenue: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_info?: Json | null
+          created_at?: string
+          credentials?: Json
+          id?: string
+          is_active?: boolean | null
+          last_sync_at?: string | null
+          marketplace: string
+          orders_count?: number | null
+          products_count?: number | null
+          shop_id?: string | null
+          total_revenue?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_info?: Json | null
+          created_at?: string
+          credentials?: Json
+          id?: string
+          is_active?: boolean | null
+          last_sync_at?: string | null
+          marketplace?: string
+          orders_count?: number | null
+          products_count?: number | null
+          shop_id?: string | null
+          total_revenue?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_connections_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string
