@@ -175,6 +175,47 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
     });
   };
 
+  // Base64 rasmni Supabase Storage'ga yuklash
+  const uploadImageToStorage = async (base64Image: string): Promise<string | null> => {
+    try {
+      // Base64 dan Blob yaratish
+      const base64Data = base64Image.split(',')[1];
+      const byteCharacters = atob(base64Data);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'image/jpeg' });
+
+      // Unique fayl nomi
+      const fileName = `scanner/${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
+
+      // Supabase Storage'ga yuklash
+      const { data, error } = await supabase.storage
+        .from('product-images')
+        .upload(fileName, blob, {
+          contentType: 'image/jpeg',
+          upsert: false,
+        });
+
+      if (error) {
+        console.error('Storage upload error:', error);
+        return null;
+      }
+
+      // Public URL olish
+      const { data: { publicUrl } } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(fileName);
+
+      return publicUrl;
+    } catch (error) {
+      console.error('Image upload error:', error);
+      return null;
+    }
+  };
+
   const createYandexCard = async () => {
     if (!pricing || !selectedProduct) {
       toast.error('Ma\'lumotlar to\'liq emas');
@@ -185,6 +226,35 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
     setCurrentStep('creating');
 
     try {
+      // Rasmni Storage'ga yuklash
+      let imageUrl: string | undefined;
+      const imagesToUpload: string[] = [];
+
+      // Captured image va web product image'larni yig'ish
+      if (capturedImage && capturedImage.startsWith('data:')) {
+        toast.info('Rasm yuklanmoqda...');
+        const uploadedUrl = await uploadImageToStorage(capturedImage);
+        if (uploadedUrl) {
+          imageUrl = uploadedUrl;
+          imagesToUpload.push(uploadedUrl);
+        }
+      } else if (capturedImage && capturedImage.startsWith('http')) {
+        imageUrl = capturedImage;
+        imagesToUpload.push(capturedImage);
+      }
+
+      // Web'dan topilgan rasm URL bo'lsa qo'shish
+      if (selectedProduct.image && selectedProduct.image.startsWith('http')) {
+        imagesToUpload.push(selectedProduct.image);
+      }
+
+      if (imagesToUpload.length === 0) {
+        toast.error('Kamida bitta rasm kerak. Iltimos, rasmni qayta yuklang.');
+        setCurrentStep('pricing');
+        setIsCreatingCard(false);
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke('yandex-market-create-card', {
         body: {
           shopId,
@@ -194,7 +264,8 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
             category: analyzedProduct?.category,
             price: pricing.recommendedPrice,
             costPrice: pricing.costPrice,
-            image: capturedImage,
+            image: imageUrl,
+            images: imagesToUpload,
             sourceUrl: selectedProduct.url,
           },
           pricing: pricing,
