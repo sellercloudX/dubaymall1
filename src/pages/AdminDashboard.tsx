@@ -10,9 +10,10 @@ import { ProductsModeration } from '@/components/admin/ProductsModeration';
 import { ShopsManagement } from '@/components/admin/ShopsManagement';
 import { OrdersManagement } from '@/components/admin/OrdersManagement';
 import MonetizationSettings from '@/components/admin/MonetizationSettings';
+import { SellerCloudManagement } from '@/components/admin/SellerCloudManagement';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Shield, Users, Package, Store, ShoppingCart, BarChart3, DollarSign, Wallet } from 'lucide-react';
+import { Shield, Users, Package, Store, ShoppingCart, BarChart3, DollarSign, Wallet, Crown } from 'lucide-react';
 
 export default function AdminDashboard() {
   const { user, loading } = useAuth();
@@ -93,7 +94,7 @@ export default function AdminDashboard() {
 
         {/* Management Tabs */}
         <Tabs defaultValue="analytics" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-7 lg:w-auto lg:inline-grid">
+          <TabsList className="grid w-full grid-cols-8 lg:w-auto lg:inline-grid">
             <TabsTrigger value="analytics" className="gap-2">
               <BarChart3 className="h-4 w-4" />
               <span className="hidden sm:inline">Analitika</span>
@@ -105,6 +106,10 @@ export default function AdminDashboard() {
             <TabsTrigger value="monetization" className="gap-2">
               <DollarSign className="h-4 w-4" />
               <span className="hidden sm:inline">Monetizatsiya</span>
+            </TabsTrigger>
+            <TabsTrigger value="sellercloud" className="gap-2">
+              <Crown className="h-4 w-4" />
+              <span className="hidden sm:inline">SellerCloudX</span>
             </TabsTrigger>
             <TabsTrigger value="users" className="gap-2">
               <Users className="h-4 w-4" />
@@ -134,6 +139,10 @@ export default function AdminDashboard() {
 
           <TabsContent value="monetization">
             <MonetizationSettings />
+          </TabsContent>
+
+          <TabsContent value="sellercloud">
+            <SellerCloudManagement />
           </TabsContent>
 
           <TabsContent value="users">

@@ -881,6 +881,175 @@ export type Database = {
           },
         ]
       }
+      sellercloud_billing: {
+        Row: {
+          balance_due: number
+          billing_period_end: string
+          billing_period_start: string
+          commission_percent: number
+          created_at: string
+          id: string
+          monthly_fee_amount: number
+          paid_at: string | null
+          sales_commission_amount: number
+          status: string
+          subscription_id: string | null
+          total_due: number
+          total_paid: number
+          total_sales_volume: number
+          updated_at: string
+          user_id: string
+          waived_by: string | null
+          waived_reason: string | null
+        }
+        Insert: {
+          balance_due?: number
+          billing_period_end: string
+          billing_period_start: string
+          commission_percent?: number
+          created_at?: string
+          id?: string
+          monthly_fee_amount?: number
+          paid_at?: string | null
+          sales_commission_amount?: number
+          status?: string
+          subscription_id?: string | null
+          total_due?: number
+          total_paid?: number
+          total_sales_volume?: number
+          updated_at?: string
+          user_id: string
+          waived_by?: string | null
+          waived_reason?: string | null
+        }
+        Update: {
+          balance_due?: number
+          billing_period_end?: string
+          billing_period_start?: string
+          commission_percent?: number
+          created_at?: string
+          id?: string
+          monthly_fee_amount?: number
+          paid_at?: string | null
+          sales_commission_amount?: number
+          status?: string
+          subscription_id?: string | null
+          total_due?: number
+          total_paid?: number
+          total_sales_volume?: number
+          updated_at?: string
+          user_id?: string
+          waived_by?: string | null
+          waived_reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sellercloud_billing_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "sellercloud_subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sellercloud_payments: {
+        Row: {
+          amount: number
+          billing_id: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          payment_method: string
+          payment_reference: string | null
+          processed_at: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          billing_id?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          payment_method: string
+          payment_reference?: string | null
+          processed_at?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          billing_id?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          payment_method?: string
+          payment_reference?: string | null
+          processed_at?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sellercloud_payments_billing_id_fkey"
+            columns: ["billing_id"]
+            isOneToOne: false
+            referencedRelation: "sellercloud_billing"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sellercloud_subscriptions: {
+        Row: {
+          admin_notes: string | null
+          admin_override: boolean
+          commission_percent: number
+          created_at: string
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          is_trial: boolean
+          monthly_fee: number
+          plan_type: string
+          started_at: string
+          trial_ends_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          admin_override?: boolean
+          commission_percent?: number
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          is_trial?: boolean
+          monthly_fee?: number
+          plan_type?: string
+          started_at?: string
+          trial_ends_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          admin_notes?: string | null
+          admin_override?: boolean
+          commission_percent?: number
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          is_trial?: boolean
+          monthly_fee?: number
+          plan_type?: string
+          started_at?: string
+          trial_ends_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       shops: {
         Row: {
           banner_url: string | null
@@ -1028,6 +1197,16 @@ export type Database = {
         Args: { p_order_id: string; p_platform_commission_percent?: number }
         Returns: Json
       }
+      calculate_sellercloud_billing: {
+        Args: {
+          p_period_end: string
+          p_period_start: string
+          p_total_sales: number
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      check_sellercloud_access: { Args: { p_user_id: string }; Returns: Json }
       generate_affiliate_code: { Args: never; Returns: string }
       generate_delivery_otp: { Args: { p_order_id: string }; Returns: string }
       generate_order_number: { Args: never; Returns: string }
