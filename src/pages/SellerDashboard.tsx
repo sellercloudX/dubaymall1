@@ -17,6 +17,7 @@ import { DropshippingProducts } from '@/components/seller/DropshippingProducts';
 import { SellerAnalytics } from '@/components/seller/SellerAnalytics';
 import { SellerBalanceCard } from '@/components/seller/SellerBalanceCard';
 import { SellerOrders } from '@/components/seller/SellerOrders';
+import { MarketplaceManager } from '@/components/seller/MarketplaceManager';
 import {
   Sheet,
   SheetContent,
@@ -25,7 +26,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { toast } from 'sonner';
-import { Store, Package, TrendingUp, Eye, ExternalLink, Loader2, Truck, BarChart3, Wallet, ShoppingCart } from 'lucide-react';
+import { Store, Package, TrendingUp, Eye, ExternalLink, Loader2, Truck, BarChart3, Wallet, ShoppingCart, Globe } from 'lucide-react';
 import type { Tables, TablesInsert } from '@/integrations/supabase/types';
 
 type Product = Tables<'products'>;
@@ -133,9 +134,13 @@ export default function SellerDashboard() {
         </div>
 
         {/* Main Content */}
-        <Tabs defaultValue="analytics" className="space-y-4">
+        <Tabs defaultValue="marketplaces" className="space-y-4">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <TabsList>
+            <TabsList className="flex-wrap">
+              <TabsTrigger value="marketplaces" className="gap-2">
+                <Globe className="h-4 w-4" />
+                <span className="hidden sm:inline">Marketplacelar</span>
+              </TabsTrigger>
               <TabsTrigger value="analytics" className="gap-2">
                 <BarChart3 className="h-4 w-4" />
                 <span className="hidden sm:inline">Analitika</span>
@@ -159,6 +164,10 @@ export default function SellerDashboard() {
             </TabsList>
             <AddProductDialog shopId={shop.id} onSubmit={handleCreateProduct} />
           </div>
+
+          <TabsContent value="marketplaces">
+            <MarketplaceManager shopId={shop.id} />
+          </TabsContent>
 
           <TabsContent value="analytics">
             <SellerAnalytics shopId={shop.id} />
