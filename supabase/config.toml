@@ -38,3 +38,9 @@ verify_jwt = false
 
 [functions.create-marketplace-card]
 verify_jwt = false
+
+[functions.cj-create-order]
+verify_jwt = false
+
+[functions.cj-get-token]
+verify_jwt = false
