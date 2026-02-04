@@ -17,7 +17,22 @@ import {
   Link2, Check, ExternalLink, Loader2, 
   Settings, RefreshCw, AlertCircle, Package, ShoppingCart, TrendingUp
 } from 'lucide-react';
-import { useMarketplaceConnections } from '@/hooks/useMarketplaceConnections';
+interface MarketplaceConnection {
+  id: string;
+  marketplace: string;
+  account_info: {
+    campaignName?: string;
+    storeName?: string;
+    state?: string;
+    campaignId?: string;
+    sellerId?: string;
+  };
+  products_count: number;
+  orders_count: number;
+  total_revenue: number;
+  last_sync_at: string | null;
+  is_active: boolean;
+}
 
 interface Marketplace {
   id: string;
@@ -82,17 +97,20 @@ const MARKETPLACES: Marketplace[] = [
 ];
 
 interface MarketplaceOAuthProps {
+  connections: MarketplaceConnection[];
+  isLoading: boolean;
+  connectMarketplace: (marketplace: string, credentials: Record<string, string>) => Promise<{ success: boolean; error?: string; data?: any }>;
+  syncMarketplace: (marketplace: string) => Promise<void>;
   onConnect?: (marketplace: string) => void;
 }
 
-export function MarketplaceOAuth({ onConnect }: MarketplaceOAuthProps) {
-  const { 
-    connections, 
-    isLoading, 
-    connectMarketplace, 
-    syncMarketplace, 
-    refetch 
-  } = useMarketplaceConnections();
+export function MarketplaceOAuth({ 
+  connections, 
+  isLoading, 
+  connectMarketplace, 
+  syncMarketplace,
+  onConnect 
+}: MarketplaceOAuthProps) {
   
   const [connectingId, setConnectingId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
