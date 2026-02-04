@@ -40,10 +40,6 @@ interface CJProductDetails {
   packingWidth?: number;
   packingHeight?: number;
   materialNameEn?: string;
-  entryCode?: string;
-  entryNameEn?: string;
-  sourceFrom?: number;
-  productType?: string;
 }
 
 interface ShippingOption {
@@ -85,50 +81,26 @@ interface ProductResponse {
   source: string;
   category?: string;
   material?: string;
-  productType?: string;
 }
 
-// Extract CJ product ID from URL - the numeric ID after -p-
+// Extract CJ product ID from URL
 function extractCJProductId(url: string): string | null {
-  // Format: /product/product-name-p-1234567890.html or /product/1234567890
-  // The PID is the long numeric string
-  
-  // Try to extract from -p- format (most common)
   const pMatch = url.match(/-p-(\d{10,})/i);
-  if (pMatch) {
-    console.log('Extracted PID from -p- format:', pMatch[1]);
-    return pMatch[1];
-  }
+  if (pMatch) return pMatch[1];
   
-  // Try direct numeric product ID
   const directMatch = url.match(/\/product\/(\d{10,})/i);
-  if (directMatch) {
-    console.log('Extracted PID from direct format:', directMatch[1]);
-    return directMatch[1];
-  }
+  if (directMatch) return directMatch[1];
   
-  // Try pid parameter
   const pidParam = url.match(/[?&]pid=([A-Za-z0-9-]+)/i);
-  if (pidParam) {
-    console.log('Extracted PID from query param:', pidParam[1]);
-    return pidParam[1];
-  }
+  if (pidParam) return pidParam[1];
   
-  // Try detail page format
-  const detailMatch = url.match(/\/detail\/([A-Za-z0-9-]+)/i);
-  if (detailMatch) {
-    console.log('Extracted PID from detail format:', detailMatch[1]);
-    return detailMatch[1];
-  }
-  
-  console.log('Could not extract PID from URL:', url);
   return null;
 }
 
-// Fetch product details from CJDropshipping API v2.0
+// Fetch product from CJDropshipping API
 async function fetchCJProduct(productId: string, token: string): Promise<CJProductDetails | null> {
   try {
-    console.log('Fetching CJ product with PID:', productId);
+    console.log('Fetching CJ product:', productId);
     
     const response = await fetch(`https://developers.cjdropshipping.com/api2.0/v1/product/query?pid=${productId}`, {
       method: 'GET',
@@ -138,35 +110,22 @@ async function fetchCJProduct(productId: string, token: string): Promise<CJProdu
       },
     });
 
-    const responseText = await response.text();
-    console.log('CJ API Response status:', response.status);
-    console.log('CJ API Response:', responseText.slice(0, 1000));
+    const data = await response.json();
+    console.log('CJ API result:', data.result, data.message);
 
-    if (!response.ok) {
-      console.error('CJ API request failed:', response.status, responseText);
-      return null;
-    }
-
-    const data = JSON.parse(responseText);
-    
     if (data.result === true && data.data) {
-      console.log('Product found:', data.data.productNameEn);
       return data.data;
     }
-    
-    console.log('Product not found or API returned false:', data.message);
     return null;
   } catch (error) {
-    console.error('Error fetching CJ product:', error);
+    console.error('CJ API error:', error);
     return null;
   }
 }
 
-// Fetch all variants for a product
+// Fetch variants from CJ
 async function fetchCJVariants(productId: string, token: string): Promise<CJVariant[]> {
   try {
-    console.log('Fetching variants for PID:', productId);
-    
     const response = await fetch(`https://developers.cjdropshipping.com/api2.0/v1/product/variant/query?pid=${productId}`, {
       method: 'GET',
       headers: {
@@ -175,33 +134,19 @@ async function fetchCJVariants(productId: string, token: string): Promise<CJVari
       },
     });
 
-    const responseText = await response.text();
-    console.log('Variants API Response:', responseText.slice(0, 500));
-
-    if (!response.ok) {
-      console.error('Variants request failed:', response.status);
-      return [];
-    }
-
-    const data = JSON.parse(responseText);
-    
+    const data = await response.json();
     if (data.result === true && data.data) {
-      console.log('Found variants:', data.data.length);
       return data.data;
     }
-    
     return [];
-  } catch (error) {
-    console.error('Error fetching variants:', error);
+  } catch {
     return [];
   }
 }
 
-// Fetch shipping options to Uzbekistan
-async function fetchShippingOptions(productId: string, token: string, weight: number = 0.5): Promise<ShippingOption[]> {
+// Fetch shipping options
+async function fetchShippingOptions(token: string, weight: number = 0.5): Promise<ShippingOption[]> {
   try {
-    console.log('Fetching shipping for weight:', weight, 'kg');
-    
     const response = await fetch('https://developers.cjdropshipping.com/api2.0/v1/logistic/freightCalculate', {
       method: 'POST',
       headers: {
@@ -216,15 +161,7 @@ async function fetchShippingOptions(productId: string, token: string, weight: nu
       }),
     });
 
-    const responseText = await response.text();
-    console.log('Shipping API Response:', responseText.slice(0, 500));
-
-    if (!response.ok) {
-      return [];
-    }
-
-    const data = JSON.parse(responseText);
-    
+    const data = await response.json();
     if (data.result === true && data.data) {
       return data.data.map((opt: any) => ({
         logisticName: opt.logisticName || 'Standard',
@@ -234,127 +171,224 @@ async function fetchShippingOptions(productId: string, token: string, weight: nu
         logisticId: opt.logisticId || '',
       }));
     }
-    
     return [];
-  } catch (error) {
-    console.error('Error fetching shipping:', error);
+  } catch {
     return [];
   }
 }
 
-// Search products by name (fallback)
-async function searchCJProducts(query: string, token: string): Promise<CJProductDetails | null> {
+// FIRECRAWL SCRAPING - Fallback method
+async function scrapeWithFirecrawl(url: string): Promise<ProductResponse | null> {
+  const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
+  if (!FIRECRAWL_API_KEY) {
+    console.log('Firecrawl not configured');
+    return null;
+  }
+
   try {
-    console.log('Searching CJ products:', query);
+    console.log('Scraping with Firecrawl:', url);
     
-    // Clean the search query
-    const cleanQuery = query
-      .replace(/[-_]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .split(' ')
-      .slice(0, 5) // Take first 5 words
-      .join(' ');
-    
-    console.log('Clean search query:', cleanQuery);
-    
-    const response = await fetch(`https://developers.cjdropshipping.com/api2.0/v1/product/list?pageNum=1&pageSize=5&productNameEn=${encodeURIComponent(cleanQuery)}`, {
-      method: 'GET',
+    const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
+      method: 'POST',
       headers: {
-        'CJ-Access-Token': token,
+        'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
         'Content-Type': 'application/json',
       },
+      body: JSON.stringify({
+        url: url,
+        formats: ['markdown', 'html', 'links'],
+        onlyMainContent: true,
+        waitFor: 3000,
+      }),
     });
 
-    const responseText = await response.text();
-    console.log('Search API Response:', responseText.slice(0, 500));
-
     if (!response.ok) {
+      console.error('Firecrawl request failed:', response.status);
       return null;
     }
 
-    const data = JSON.parse(responseText);
-    
-    if (data.result === true && data.data?.list?.length > 0) {
-      console.log('Search found product:', data.data.list[0].productNameEn);
-      return data.data.list[0];
+    const data = await response.json();
+    console.log('Firecrawl success:', data.success);
+
+    if (!data.success || !data.data) {
+      return null;
     }
-    
-    return null;
+
+    const html = data.data.html || '';
+    const markdown = data.data.markdown || '';
+    const metadata = data.data.metadata || {};
+
+    // Extract product data from scraped content
+    const productData = extractProductFromScrapedContent(html, markdown, metadata, url);
+    return productData;
   } catch (error) {
-    console.error('Error searching products:', error);
+    console.error('Firecrawl error:', error);
     return null;
   }
 }
 
-// Build comprehensive product response
-function buildProductResponse(
+// Extract product info from scraped HTML/markdown
+function extractProductFromScrapedContent(
+  html: string, 
+  markdown: string, 
+  metadata: any, 
+  url: string
+): ProductResponse {
+  // Extract images from HTML
+  const images: string[] = [];
+  const imgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
+  let imgMatch;
+  while ((imgMatch = imgRegex.exec(html)) !== null) {
+    const src = imgMatch[1];
+    if (src && !src.includes('icon') && !src.includes('logo') && !src.includes('avatar')) {
+      if (src.startsWith('http') && !images.includes(src)) {
+        images.push(src);
+      }
+    }
+  }
+
+  // Also try data-src for lazy loaded images
+  const dataSrcRegex = /data-src=["']([^"']+)["']/gi;
+  while ((imgMatch = dataSrcRegex.exec(html)) !== null) {
+    const src = imgMatch[1];
+    if (src && src.startsWith('http') && !images.includes(src)) {
+      images.push(src);
+    }
+  }
+
+  // Extract product-gallery images specifically
+  const galleryRegex = /product-gallery[^>]*>[\s\S]*?<img[^>]+src=["']([^"']+)["']/gi;
+  while ((imgMatch = galleryRegex.exec(html)) !== null) {
+    if (imgMatch[1] && !images.includes(imgMatch[1])) {
+      images.unshift(imgMatch[1]); // Add to beginning as main images
+    }
+  }
+
+  // Extract price
+  let priceUSD = 10;
+  const pricePatterns = [
+    /\$\s*(\d+\.?\d*)/,
+    /USD\s*(\d+\.?\d*)/i,
+    /price["\s:]+(\d+\.?\d*)/i,
+    /(\d+\.?\d*)\s*USD/i,
+  ];
+  
+  for (const pattern of pricePatterns) {
+    const match = html.match(pattern) || markdown.match(pattern);
+    if (match) {
+      const parsedPrice = parseFloat(match[1]);
+      if (parsedPrice > 0 && parsedPrice < 10000) {
+        priceUSD = parsedPrice;
+        break;
+      }
+    }
+  }
+
+  // Extract name
+  let name = metadata.title || 'Imported Product';
+  // Clean up the name
+  name = name
+    .replace(/\s*[-|]\s*CJDropshipping.*$/i, '')
+    .replace(/\s*[-|]\s*AliExpress.*$/i, '')
+    .replace(/Buy\s+/i, '')
+    .trim();
+
+  // Extract description
+  let description = metadata.description || '';
+  
+  // Try to extract from markdown
+  if (!description && markdown) {
+    const descMatch = markdown.match(/(?:Description|Product\s+Details?)[\s:]+([^\n]+)/i);
+    if (descMatch) {
+      description = descMatch[1].trim();
+    }
+  }
+
+  // Extract variants from HTML (basic extraction)
+  const variants: ProductResponse['variants'] = [];
+  
+  // Look for color/size options
+  const variantPatterns = [
+    /data-variant-id=["']([^"']+)["'][^>]*>([^<]+)/gi,
+    /class=["'][^"']*variant[^"']*["'][^>]*>([^<]+)/gi,
+    /option[^>]*value=["']([^"']+)["'][^>]*>([^<]*)/gi,
+  ];
+
+  for (const pattern of variantPatterns) {
+    let varMatch;
+    while ((varMatch = pattern.exec(html)) !== null) {
+      const id = varMatch[1] || `v${variants.length}`;
+      const varName = varMatch[2]?.trim() || varMatch[1];
+      if (varName && varName.length < 50) {
+        variants.push({
+          id: id,
+          name: varName,
+          sku: `SKU-${id}`,
+          price: Math.round(priceUSD * USD_TO_UZS),
+          priceUSD: priceUSD,
+        });
+      }
+    }
+    if (variants.length > 0) break;
+  }
+
+  // Extract video if present
+  let video: string | undefined;
+  const videoMatch = html.match(/<video[^>]+src=["']([^"']+)["']/i) ||
+                     html.match(/data-video=["']([^"']+)["']/i);
+  if (videoMatch) {
+    video = videoMatch[1];
+  }
+
+  console.log(`Extracted: ${images.length} images, ${variants.length} variants, price: $${priceUSD}`);
+
+  return {
+    name: name.slice(0, 200),
+    description: description.slice(0, 1000),
+    price: Math.round(priceUSD * USD_TO_UZS),
+    priceUSD: priceUSD,
+    images: images.length > 0 ? images.slice(0, 20) : ['/placeholder.svg'],
+    video: video,
+    source_url: url,
+    variants: variants.slice(0, 50),
+    estimatedShippingCost: Math.round(5 * USD_TO_UZS),
+    estimatedShippingCostUSD: 5,
+    source: url.includes('cjdropshipping') ? 'cjdropshipping' : 
+            url.includes('aliexpress') ? 'aliexpress' : 
+            url.includes('1688') ? '1688' : 'other',
+  };
+}
+
+// Build response from CJ data
+function buildCJResponse(
   product: CJProductDetails,
   variants: CJVariant[],
   shippingOptions: ShippingOption[],
   sourceUrl: string
 ): ProductResponse {
   const priceUSD = product.sellPrice || 10;
-  const priceUZS = Math.round(priceUSD * USD_TO_UZS);
-
-  // Build images array from all sources
   const images: string[] = [];
   
-  // Main product image
-  if (product.productImage && product.productImage.trim()) {
-    images.push(product.productImage);
-  }
-  
-  // Product image set
-  if (product.productImageSet && Array.isArray(product.productImageSet)) {
+  if (product.productImage) images.push(product.productImage);
+  if (product.productImageSet) {
     product.productImageSet.forEach(img => {
-      if (img && img.trim() && !images.includes(img)) {
-        images.push(img);
-      }
+      if (img && !images.includes(img)) images.push(img);
     });
   }
-  
-  // Variant images
   variants.forEach(v => {
-    if (v.variantImage && v.variantImage.trim() && !images.includes(v.variantImage)) {
+    if (v.variantImage && !images.includes(v.variantImage)) {
       images.push(v.variantImage);
     }
   });
 
-  console.log('Total images collected:', images.length);
-
-  // Build description
-  let description = product.description || product.productDescription || '';
-  if (!description && product.materialNameEn) {
-    description = `Material: ${product.materialNameEn}`;
-  }
-  if (product.productSku) {
-    description += description ? `\n\nSKU: ${product.productSku}` : `SKU: ${product.productSku}`;
-  }
-
-  // Get cheapest shipping
   const cheapestShipping = shippingOptions.length > 0
     ? shippingOptions.reduce((min, opt) => opt.logisticPrice < min.logisticPrice ? opt : min)
     : null;
 
-  // Map variants
-  const mappedVariants = variants.map(v => ({
-    id: v.vid,
-    name: v.variantNameEn || v.variantName || 'Variant',
-    sku: v.variantSku,
-    price: Math.round(v.variantSellPrice * USD_TO_UZS),
-    priceUSD: v.variantSellPrice,
-    image: v.variantImage || undefined,
-    inventory: v.variantInventory,
-    properties: v.variantProperty || v.variantKey,
-  }));
-
-  console.log('Mapped variants:', mappedVariants.length);
-
   return {
     name: product.productNameEn || 'CJ Product',
-    description: description || 'Product from CJDropshipping',
-    price: priceUZS,
+    description: product.description || product.productDescription || `SKU: ${product.productSku || 'N/A'}`,
+    price: Math.round(priceUSD * USD_TO_UZS),
     priceUSD: priceUSD,
     images: images.length > 0 ? images : ['/placeholder.svg'],
     video: product.productVideo || undefined,
@@ -366,14 +400,94 @@ function buildProductResponse(
       width: product.packingWidth || 0,
       height: product.packingHeight || 0,
     } : undefined,
-    variants: mappedVariants,
+    variants: variants.map(v => ({
+      id: v.vid,
+      name: v.variantNameEn || v.variantName || 'Variant',
+      sku: v.variantSku,
+      price: Math.round(v.variantSellPrice * USD_TO_UZS),
+      priceUSD: v.variantSellPrice,
+      image: v.variantImage || undefined,
+      inventory: v.variantInventory,
+      properties: v.variantProperty || v.variantKey,
+    })),
     shippingOptions: shippingOptions,
     estimatedShippingCost: cheapestShipping ? cheapestShipping.logisticPriceUZS : Math.round(5 * USD_TO_UZS),
     estimatedShippingCostUSD: cheapestShipping ? cheapestShipping.logisticPrice : 5,
     source: 'cjdropshipping',
     category: product.categoryNameEn || product.categoryName,
     material: product.materialNameEn,
-    productType: product.productType,
+  };
+}
+
+// AI fallback for parsing
+async function analyzeWithAI(url: string): Promise<ProductResponse> {
+  const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+  
+  if (!LOVABLE_API_KEY) {
+    return createFallbackResponse(url);
+  }
+
+  try {
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          { 
+            role: 'system', 
+            content: 'Extract product info from URL. Return JSON only: {"name":"...","description":"...","priceUSD":number}' 
+          },
+          { role: 'user', content: `URL: ${url}` }
+        ],
+        temperature: 0.2,
+      }),
+    });
+
+    if (!response.ok) {
+      return createFallbackResponse(url);
+    }
+
+    const result = await response.json();
+    const content = result.choices?.[0]?.message?.content || '';
+    
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      const priceUSD = parsed.priceUSD || 25;
+      return {
+        name: parsed.name || 'Imported Product',
+        description: parsed.description || '',
+        price: Math.round(priceUSD * USD_TO_UZS),
+        priceUSD: priceUSD,
+        images: ['/placeholder.svg'],
+        source_url: url,
+        estimatedShippingCost: Math.round(5 * USD_TO_UZS),
+        estimatedShippingCostUSD: 5,
+        source: 'other',
+      };
+    }
+  } catch (error) {
+    console.error('AI analysis error:', error);
+  }
+
+  return createFallbackResponse(url);
+}
+
+function createFallbackResponse(url: string): ProductResponse {
+  return {
+    name: 'Imported Product',
+    description: 'Please edit product details manually',
+    price: 128000,
+    priceUSD: 10,
+    images: ['/placeholder.svg'],
+    source_url: url,
+    estimatedShippingCost: 64000,
+    estimatedShippingCostUSD: 5,
+    source: 'manual',
   };
 }
 
@@ -384,173 +498,62 @@ serve(async (req) => {
 
   try {
     const { url } = await req.json();
-
-    if (!url) {
-      throw new Error('URL is required');
-    }
+    if (!url) throw new Error('URL is required');
 
     console.log('Processing URL:', url);
 
     const CJDROPSHIPPING_API_KEY = Deno.env.get('CJDROPSHIPPING_API_KEY');
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    const isCJUrl = url.toLowerCase().includes('cjdropshipping.com');
 
-    const isCJUrl = url.toLowerCase().includes('cjdropshipping.com') || url.toLowerCase().includes('cj.com');
-    
-    // Try CJDropshipping API
+    // METHOD 1: CJ API (if configured and is CJ URL)
     if (CJDROPSHIPPING_API_KEY && isCJUrl) {
-      console.log('Using CJDropshipping API...');
+      console.log('Trying CJ API...');
       
-      // Extract token from API key (format: email@api@token)
       const parts = CJDROPSHIPPING_API_KEY.split('@api@');
       const token = parts.length === 2 ? parts[1] : CJDROPSHIPPING_API_KEY;
-      
-      if (!token) {
-        throw new Error('Invalid CJ API key format');
-      }
-
-      // Extract product ID from URL
       const productId = extractCJProductId(url);
-      console.log('Extracted product ID:', productId);
 
-      let product: CJProductDetails | null = null;
+      if (productId && token) {
+        const product = await fetchCJProduct(productId, token);
+        
+        if (product) {
+          console.log('CJ API success!');
+          const [variants, shippingOptions] = await Promise.all([
+            fetchCJVariants(product.pid || productId, token),
+            fetchShippingOptions(token, product.packingWeight || 0.5),
+          ]);
 
-      // Try direct lookup first
-      if (productId) {
-        product = await fetchCJProduct(productId, token);
-      }
-
-      // If not found, try search by product name from URL
-      if (!product) {
-        // Extract name from URL for search
-        const urlPath = new URL(url).pathname;
-        const nameMatch = urlPath.match(/\/product\/([^/]+)/);
-        if (nameMatch) {
-          const searchName = nameMatch[1]
-            .replace(/-p-\d+/g, '')
-            .replace(/\.html$/i, '')
-            .replace(/-/g, ' ');
-          console.log('Searching by name:', searchName);
-          product = await searchCJProducts(searchName, token);
+          const response = buildCJResponse(product, variants, shippingOptions, url);
+          return new Response(JSON.stringify(response), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
         }
       }
-
-      if (product) {
-        // Fetch variants and shipping in parallel
-        const actualPid = product.pid || productId || '';
-        const [variants, shippingOptions] = await Promise.all([
-          fetchCJVariants(actualPid, token),
-          fetchShippingOptions(actualPid, token, product.packingWeight || 0.5),
-        ]);
-
-        const response = buildProductResponse(product, variants, shippingOptions, url);
-
-        console.log('Returning product with', response.images.length, 'images and', response.variants?.length || 0, 'variants');
-
-        return new Response(JSON.stringify(response), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-
-      console.log('Product not found via CJ API, falling back to AI analysis');
+      console.log('CJ API failed, trying Firecrawl...');
     }
 
-    // Fallback: Use AI to analyze URL
-    if (!LOVABLE_API_KEY) {
-      throw new Error('No API keys configured for analysis');
+    // METHOD 2: Firecrawl scraping (fallback)
+    const scrapedData = await scrapeWithFirecrawl(url);
+    if (scrapedData && scrapedData.images.length > 1) {
+      console.log('Firecrawl success!');
+      return new Response(JSON.stringify(scrapedData), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    const prompt = `Analyze this e-commerce product URL and extract product information.
-
-URL: ${url}
-
-Based on the URL structure and common e-commerce patterns, provide a JSON response with:
-- name: Product name (extract from URL if possible)
-- description: A brief product description based on URL keywords
-- priceUSD: Estimated price in USD (10-50 range for typical products)
-- images: Array with placeholder image URL
-
-Response MUST be valid JSON only:
-{
-  "name": "Product Name",
-  "description": "Product description",
-  "priceUSD": 25,
-  "images": ["/placeholder.svg"]
-}`;
-
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: 'You are a helpful assistant that extracts product information from e-commerce URLs. Always respond with valid JSON only.' },
-          { role: 'user', content: prompt }
-        ],
-        temperature: 0.3,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('AI API error:', errorText);
-      throw new Error('Failed to analyze URL');
-    }
-
-    const aiResult = await response.json();
-    const content = aiResult.choices?.[0]?.message?.content || '';
-
-    let productData;
-    try {
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        productData = JSON.parse(jsonMatch[0]);
-      } else {
-        throw new Error('No JSON found');
-      }
-    } catch {
-      productData = {
-        name: 'Imported Product',
-        description: 'Product imported from external source',
-        priceUSD: 25,
-        images: ['/placeholder.svg']
-      };
-    }
-
-    const priceUSD = productData.priceUSD || 25;
-    const fullResponse: ProductResponse = {
-      name: productData.name || 'Imported Product',
-      description: productData.description || '',
-      price: Math.round(priceUSD * USD_TO_UZS),
-      priceUSD: priceUSD,
-      images: productData.images || ['/placeholder.svg'],
-      source_url: url,
-      estimatedShippingCost: Math.round(5 * USD_TO_UZS),
-      estimatedShippingCostUSD: 5,
-      source: url.includes('aliexpress') ? 'aliexpress' : url.includes('1688') ? '1688' : 'other',
-    };
-
-    return new Response(JSON.stringify(fullResponse), {
+    // METHOD 3: AI analysis (last resort)
+    console.log('Trying AI analysis...');
+    const aiResult = await analyzeWithAI(url);
+    
+    return new Response(JSON.stringify(aiResult), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-    console.error('Error in analyze-dropshipping-url:', errorMessage);
+    console.error('Error:', errorMessage);
     
-    return new Response(JSON.stringify({ 
-      error: errorMessage,
-      name: 'Imported Product',
-      description: 'Please edit product details manually',
-      price: 100000,
-      priceUSD: 8,
-      images: ['/placeholder.svg'],
-      estimatedShippingCost: 64000,
-      estimatedShippingCostUSD: 5,
-      source: 'manual',
-    }), {
+    return new Response(JSON.stringify(createFallbackResponse('')), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
