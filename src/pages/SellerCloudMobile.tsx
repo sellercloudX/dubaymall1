@@ -94,7 +94,6 @@ export default function SellerCloudMobile() {
           <MobileAnalytics 
             connections={connections}
             connectedMarketplaces={connectedMarketplaces}
-            fetchMarketplaceData={fetchMarketplaceData}
           />
         );
       case 'scanner':
@@ -107,14 +106,12 @@ export default function SellerCloudMobile() {
         return (
           <MobileProducts
             connectedMarketplaces={connectedMarketplaces}
-            fetchMarketplaceData={fetchMarketplaceData}
           />
         );
       case 'orders':
         return (
           <MobileOrders
             connectedMarketplaces={connectedMarketplaces}
-            fetchMarketplaceData={fetchMarketplaceData}
           />
         );
       default:

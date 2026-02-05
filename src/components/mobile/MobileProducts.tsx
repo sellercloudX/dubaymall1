@@ -1,16 +1,16 @@
-import { useState, useEffect } from 'react';
+ import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Package, Search, RefreshCw, Image as ImageIcon } from 'lucide-react';
-import { toast } from 'sonner';
+ import { Package, Search, RefreshCw, Image as ImageIcon, WifiOff } from 'lucide-react';
+ import { toast } from 'sonner';
+ import { useMarketplaceProducts, useInvalidateMarketplaceData } from '@/hooks/useMarketplaceData';
 
-interface MobileProductsProps {
-  connectedMarketplaces: string[];
-  fetchMarketplaceData: (marketplace: string, dataType: string, options?: Record<string, any>) => Promise<any>;
-}
+ interface MobileProductsProps {
+   connectedMarketplaces: string[];
+ }
 
 const MARKETPLACE_EMOJI: Record<string, string> = {
   yandex: '🟡',
@@ -19,17 +19,21 @@ const MARKETPLACE_EMOJI: Record<string, string> = {
   ozon: '🟢',
 };
 
-export function MobileProducts({ connectedMarketplaces, fetchMarketplaceData }: MobileProductsProps) {
-  const [products, setProducts] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+ export function MobileProducts({ connectedMarketplaces }: MobileProductsProps) {
   const [selectedMp, setSelectedMp] = useState('');
   const [search, setSearch] = useState('');
-  const [total, setTotal] = useState(0);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  
-  // Cache products per marketplace
-  const [cachedProducts, setCachedProducts] = useState<Record<string, any[]>>({});
+ 
+   // TanStack Query hooks - proper caching & offline support
+   const { 
+     data: productsData, 
+     isLoading, 
+     isFetching,
+     dataUpdatedAt,
+     isStale,
+   } = useMarketplaceProducts(selectedMp || null);
+   
+   const { invalidateProducts } = useInvalidateMarketplaceData();
+   const isOnline = navigator.onLine;
 
   useEffect(() => {
     if (connectedMarketplaces.length > 0 && !selectedMp) {
@@ -37,54 +41,35 @@ export function MobileProducts({ connectedMarketplaces, fetchMarketplaceData }: 
     }
   }, [connectedMarketplaces]);
 
-  useEffect(() => {
-    if (selectedMp) {
-      // Use cache if available, then refresh in background
-      if (cachedProducts[selectedMp]) {
-        setProducts(cachedProducts[selectedMp]);
-        setTotal(cachedProducts[selectedMp].length);
-        // Background refresh
-        loadProducts(true);
-      } else {
-        loadProducts();
-      }
-    }
-  }, [selectedMp]);
-
-  const loadProducts = async (background = false) => {
-    if (background) {
-      setIsRefreshing(true);
-    } else {
-      setIsLoading(true);
-    }
-    
-    try {
-      const result = await fetchMarketplaceData(selectedMp, 'products', { limit: 200, fetchAll: true });
-      if (result.success) {
-        const data = result.data || [];
-        setProducts(data);
-        setTotal(result.total || data.length);
-        setLastUpdated(new Date());
-        
-        // Update cache
-        setCachedProducts(prev => ({ ...prev, [selectedMp]: data }));
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  };
+   const products = productsData?.data || [];
+   const total = productsData?.total || 0;
+   const lastUpdated = dataUpdatedAt ? new Date(dataUpdatedAt) : null;
 
   const handleRefresh = () => {
+     if (!isOnline) {
+       toast.error('Internet aloqasi yo\'q');
+       return;
+     }
     toast.info('Yangilanmoqda...');
-    loadProducts();
+     invalidateProducts(selectedMp);
   };
+
+   // Filter products with memoization
+   const filteredProducts = useMemo(() => {
+     const searchLower = search.toLowerCase();
+     return products.filter(p =>
+       p.name?.toLowerCase().includes(searchLower) ||
+       p.offerId?.toLowerCase().includes(searchLower)
+     );
+   }, [products, search]);
  
-  const filteredProducts = products.filter(p =>
-    p.name?.toLowerCase().includes(search.toLowerCase()) ||
-    p.offerId?.toLowerCase().includes(search.toLowerCase())
+   // Create unique keys for products (handle duplicates)
+   const productsWithKeys = useMemo(() => 
+     filteredProducts.map((p, index) => ({
+       ...p,
+       uniqueKey: `${p.offerId}-${index}`,
+     })),
+     [filteredProducts]
   );
 
   const formatPrice = (price?: number) => {
@@ -121,15 +106,20 @@ export function MobileProducts({ connectedMarketplaces, fetchMarketplaceData }: 
                 • {lastUpdated.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })}
               </span>
             )}
+             {!isOnline && (
+               <span className="text-xs text-yellow-600 ml-2 flex items-center gap-1">
+                 <WifiOff className="h-3 w-3" /> Offline
+               </span>
+             )}
           </div>
           <Button 
             variant="ghost" 
             size="sm" 
             onClick={handleRefresh}
-            disabled={isLoading || isRefreshing}
+             disabled={isLoading || isFetching}
             className="h-8 px-2"
           >
-            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+             <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
           </Button>
         </div>
  
@@ -177,14 +167,14 @@ export function MobileProducts({ connectedMarketplaces, fetchMarketplaceData }: 
               </CardContent>
             </Card>
           ))
-        ) : filteredProducts.length === 0 ? (
+         ) : productsWithKeys.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
             <Package className="h-12 w-12 mx-auto mb-3 opacity-50" />
             <p>Mahsulotlar topilmadi</p>
           </div>
         ) : (
-          filteredProducts.map((product) => (
-            <Card key={product.offerId} className="overflow-hidden">
+           productsWithKeys.map((product) => (
+             <Card key={product.uniqueKey} className="overflow-hidden">
               <CardContent className="p-0">
                 <div className="flex">
                   {/* Product Image */}
