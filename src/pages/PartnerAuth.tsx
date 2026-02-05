@@ -219,24 +219,24 @@
                    className="space-y-2"
                  >
                    {roleOptions.map((option) => (
-                     <div 
+                     <label 
                        key={option.value}
+                       htmlFor={option.value}
                        className={`flex items-center space-x-3 p-3 rounded-lg border cursor-pointer transition-all ${
                          selectedRole === option.value 
                            ? 'border-primary bg-primary/5' 
                            : 'border-border hover:border-primary/50'
                        }`}
-                       onClick={() => setSelectedRole(option.value)}
                      >
                        <RadioGroupItem value={option.value} id={option.value} />
                        <option.icon className={`h-5 w-5 ${option.color}`} />
                        <div className="flex-1">
-                         <Label htmlFor={option.value} className="cursor-pointer font-medium">
+                         <span className="cursor-pointer font-medium block">
                            {option.label}
-                         </Label>
+                         </span>
                          <p className="text-xs text-muted-foreground">{option.description}</p>
                        </div>
-                     </div>
+                     </label>
                    ))}
                  </RadioGroup>
                </div>
