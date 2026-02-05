@@ -148,14 +148,17 @@ export default function AffiliateProducts() {
               Affiliate mahsulotlar topilmadi
             </p>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
               {filteredProducts.map((product) => {
                 const existingLink = getExistingLink(product.id);
                 const shops = product.shops as { name: string; slug: string } | null;
+                const commissionPercent = product.affiliate_commission_percent || 0;
+                const bonusAmount = Math.round((product.price * commissionPercent) / 100);
 
                 return (
-                  <Card key={product.id} className="overflow-hidden">
-                    <div className="aspect-video relative bg-muted">
+                  <Card key={product.id} className="overflow-hidden border-0 shadow-sm hover:shadow-md transition-shadow">
+                    {/* 3:4 aspect ratio like Marketplace */}
+                    <div className="aspect-[3/4] relative bg-muted">
                       {product.images?.[0] ? (
                         <img
                           src={product.images[0]}
@@ -163,53 +166,66 @@ export default function AffiliateProducts() {
                           className="w-full h-full object-cover"
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                          No image
+                        <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
+                          Rasm yo'q
                         </div>
                       )}
-                      <Badge className="absolute top-2 right-2 bg-emerald-600">
-                        {product.affiliate_commission_percent}% komissiya
+                      {/* Bonus badge */}
+                      <Badge className="absolute top-2 left-2 bg-emerald-600 text-white text-[10px] sm:text-xs px-1.5 py-0.5">
+                        +{bonusAmount.toLocaleString()} so'm
                       </Badge>
                     </div>
-                    <CardContent className="p-4">
-                      <h3 className="font-semibold text-foreground line-clamp-1">
-                        {product.name}
-                      </h3>
-                      <p className="text-sm text-muted-foreground mb-2">
-                        {shops?.name || 'Unknown shop'}
-                      </p>
-                      <p className="text-lg font-bold text-primary mb-3">
+                    <CardContent className="p-2 sm:p-3">
+                      {/* Price */}
+                      <p className="text-sm sm:text-base font-bold text-primary whitespace-nowrap">
                         {product.price.toLocaleString()} so'm
                       </p>
+                      {/* Bonus info */}
+                      <p className="text-[10px] sm:text-xs text-emerald-600 font-medium whitespace-nowrap">
+                        Bonus: {bonusAmount.toLocaleString()} so'm ({commissionPercent}%)
+                      </p>
+                      {/* Product name */}
+                      <h3 className="text-xs sm:text-sm font-medium text-foreground line-clamp-2 mt-1 min-h-[2.5rem]">
+                        {product.name}
+                      </h3>
+                      {/* Shop name */}
+                      <p className="text-[10px] sm:text-xs text-muted-foreground truncate">
+                        {shops?.name || 'Do\'kon'}
+                      </p>
 
-                      {existingLink ? (
-                        <Button
-                          variant="outline"
-                          className="w-full"
-                          onClick={() => copyLink(existingLink.link_code, product.id)}
-                        >
-                          {copiedId === product.id ? (
-                            <>
-                              <Check className="h-4 w-4 mr-2" />
-                              Nusxalandi!
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="h-4 w-4 mr-2" />
-                              Havolani nusxalash
-                            </>
-                          )}
-                        </Button>
-                      ) : (
-                        <Button
-                          className="w-full"
-                          onClick={() => createLinkMutation.mutate(product.id)}
-                          disabled={createLinkMutation.isPending}
-                        >
-                          <Link2 className="h-4 w-4 mr-2" />
-                          Havola yaratish
-                        </Button>
-                      )}
+                      {/* Action button */}
+                      <div className="mt-2">
+                        {existingLink ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full h-8 text-xs"
+                            onClick={() => copyLink(existingLink.link_code, product.id)}
+                          >
+                            {copiedId === product.id ? (
+                              <>
+                                <Check className="h-3 w-3 mr-1" />
+                                Nusxalandi
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="h-3 w-3 mr-1" />
+                                Nusxalash
+                              </>
+                            )}
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            className="w-full h-8 text-xs"
+                            onClick={() => createLinkMutation.mutate(product.id)}
+                            disabled={createLinkMutation.isPending}
+                          >
+                            <Link2 className="h-3 w-3 mr-1" />
+                            Havola olish
+                          </Button>
+                        )}
+                      </div>
                     </CardContent>
                   </Card>
                 );
