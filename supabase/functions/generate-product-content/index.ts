@@ -416,10 +416,8 @@ Create compelling marketing copy in Uzbek and Russian languages.`;
         );
       }
       if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "AI credits exhausted" }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        console.log("⚠️ AI credits exhausted, using fallback content");
+        return generateFallbackContent(request, corsHeaders);
       }
       
       // Return fallback content
@@ -460,16 +458,30 @@ Create compelling marketing copy in Uzbek and Russian languages.`;
 // Generate basic fallback content when AI fails
 function generateFallbackContent(request: ContentRequest, corsHeaders: Record<string, string>) {
   const { productName, productDescription, contentType } = request;
-  const name = productName || "Mahsulot";
-  const desc = productDescription || name;
+    const name = (productName || "Mahsulot").slice(0, 200);
+    const desc = (productDescription || name).slice(0, 500);
+    
+    console.log("📝 Generating fallback content for:", name);
   
   if (contentType === "seo") {
     return new Response(
       JSON.stringify({
-        seoTitle: { uz: name, ru: name },
-        metaDescription: { uz: desc.slice(0, 160), ru: desc.slice(0, 160) },
-        keywords: { uz: [name], ru: [name] },
-        bulletPoints: { uz: [desc], ru: [desc] },
+          seoTitle: { 
+            uz: `${name} - sifatli mahsulot`, 
+            ru: `${name} - качественный товар` 
+          },
+          metaDescription: { 
+            uz: `${name}. ${desc.slice(0, 120)}. Tez yetkazib berish.`, 
+            ru: `${name}. ${desc.slice(0, 120)}. Быстрая доставка.` 
+          },
+          keywords: { 
+            uz: [name, "sotib olish", "arzon", "sifatli", "yetkazib berish"], 
+            ru: [name, "купить", "недорого", "качественный", "доставка"] 
+          },
+          bulletPoints: { 
+            uz: ["Sifatli mahsulot", "Tez yetkazib berish", "Kafolat mavjud", "Qulay narx", "Original mahsulot"], 
+            ru: ["Качественный товар", "Быстрая доставка", "Гарантия качества", "Выгодная цена", "Оригинальный товар"] 
+          },
         aiModel: "fallback",
         contentType
       }),
@@ -479,9 +491,18 @@ function generateFallbackContent(request: ContentRequest, corsHeaders: Record<st
   
   return new Response(
     JSON.stringify({
-      shortDescription: { uz: desc.slice(0, 150), ru: desc.slice(0, 150) },
-      fullDescription: { uz: desc, ru: desc },
-      sellingPoints: { uz: [name], ru: [name] },
+        shortDescription: { 
+          uz: `${name} - yuqori sifatli mahsulot. ${desc.slice(0, 100)}`, 
+          ru: `${name} - товар высокого качества. ${desc.slice(0, 100)}` 
+        },
+        fullDescription: { 
+          uz: `${name}\n\n${desc}\n\nBizning do'konimizda siz eng sifatli mahsulotlarni topishingiz mumkin. Barcha mahsulotlar sertifikatlangan va kafolatga ega. Tez yetkazib berish xizmati mavjud.`, 
+          ru: `${name}\n\n${desc}\n\nВ нашем магазине вы найдете только качественные товары. Все товары сертифицированы и имеют гарантию. Быстрая доставка по всей стране.` 
+        },
+        sellingPoints: { 
+          uz: ["Yuqori sifat kafolati", "Tez yetkazib berish", "Qulay to'lov usullari", "Professional xizmat", "Eng yaxshi narxlar"], 
+          ru: ["Гарантия качества", "Быстрая доставка", "Удобные способы оплаты", "Профессиональный сервис", "Лучшие цены"] 
+        },
       aiModel: "fallback",
       contentType
     }),
