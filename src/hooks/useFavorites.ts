@@ -17,7 +17,7 @@ export function useFavorites() {
   const { data, isLoading: loading } = useQuery({
     queryKey: ['favorites', user?.id],
     queryFn: async () => {
-      if (!user) return { favorites: [], favoriteIds: new Set<string>() };
+      if (!user) return { favorites: [], favoriteIds: [] as string[] };
 
       const { data, error } = await supabase
         .from('favorites')
@@ -36,7 +36,7 @@ export function useFavorites() {
       const typedData = data as unknown as FavoriteWithProduct[];
       return {
         favorites: typedData || [],
-        favoriteIds: new Set(typedData?.map(f => f.product_id) || []),
+        favoriteIds: typedData?.map(f => f.product_id) || [],
       };
     },
     enabled: !!user,
@@ -44,7 +44,8 @@ export function useFavorites() {
   });
 
   const favorites = data?.favorites || [];
-  const favoriteIds = data?.favoriteIds || new Set<string>();
+  // Always create a fresh Set to handle React Query persistence deserialization
+  const favoriteIds = new Set<string>(data?.favoriteIds || []);
 
   const addMutation = useMutation({
     mutationFn: async (productId: string) => {
