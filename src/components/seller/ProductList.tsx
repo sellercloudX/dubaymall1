@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -41,7 +42,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { MoreHorizontal, Edit, Trash2, Eye, Package, Users, Percent, Palette } from 'lucide-react';
+import { MoreHorizontal, Edit, Trash2, Eye, Package, Users, Percent, Palette, ExternalLink } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { VariantManager } from './VariantManager';
@@ -167,7 +168,7 @@ export function ProductList({ products, loading, onEdit, onDelete, onRefresh }: 
             {products.map((product) => (
               <TableRow key={product.id}>
                 <TableCell>
-                  <div className="flex items-center gap-3">
+                  <Link to={`/product/${product.id}`} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
                     {product.images && product.images.length > 0 ? (
                       <img
                         src={product.images[0]}
@@ -180,14 +181,14 @@ export function ProductList({ products, loading, onEdit, onDelete, onRefresh }: 
                       </div>
                     )}
                     <div>
-                      <p className="font-medium">{product.name}</p>
+                      <p className="font-medium hover:text-primary transition-colors">{product.name}</p>
                       {product.source !== 'manual' && (
                         <Badge variant="outline" className="text-xs">
                           {product.source === 'ai' ? t.sourceAI : t.sourceDropshipping}
                         </Badge>
                       )}
                     </div>
-                  </div>
+                  </Link>
                 </TableCell>
                 <TableCell>
                   <div>
@@ -222,6 +223,12 @@ export function ProductList({ products, loading, onEdit, onDelete, onRefresh }: 
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      <DropdownMenuItem asChild>
+                        <Link to={`/product/${product.id}`} className="flex items-center">
+                          <ExternalLink className="mr-2 h-4 w-4" />
+                          Ko'rish
+                        </Link>
+                      </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => onEdit(product)}>
                         <Edit className="mr-2 h-4 w-4" />
                         {t.edit}
