@@ -1,11 +1,11 @@
-import { memo, useState, useCallback } from 'react';
+import { memo, useState, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFavorites } from '@/hooks/useFavorites';
 import { Button } from '@/components/ui/button';
-import { Heart, Package, Loader2, Star, Truck } from 'lucide-react';
+import { Heart, Package, Loader2, Star, Truck, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Tables } from '@/integrations/supabase/types';
 
@@ -46,7 +46,7 @@ const calculateInstallment = (price: number): number => {
   return Math.round((price * 1.6) / 24);
 };
 
-// Uzum.uz style product card
+// Uzum.uz style product card with image carousel
 export const ProductCard = memo(function ProductCard({ product }: ProductCardProps) {
   const { t } = useLanguage();
   const { addToCart } = useCart();
@@ -54,6 +54,8 @@ export const ProductCard = memo(function ProductCard({ product }: ProductCardPro
   const { isFavorite, toggleFavorite } = useFavorites();
   const [favoriteLoading, setFavoriteLoading] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const touchStartX = useRef<number | null>(null);
 
   const formatPrice = useCallback((price: number) => {
     return new Intl.NumberFormat('uz-UZ').format(price);
@@ -91,6 +93,48 @@ export const ProductCard = memo(function ProductCard({ product }: ProductCardPro
     setFavoriteLoading(false);
   }, [user, isFavorite, toggleFavorite, product.id]);
 
+  // Image navigation
+  const imageCount = product.images?.length || 0;
+  
+  const nextImage = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (imageCount > 1) {
+      setCurrentImageIndex((prev) => (prev + 1) % imageCount);
+    }
+  }, [imageCount]);
+
+  const prevImage = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (imageCount > 1) {
+      setCurrentImageIndex((prev) => (prev - 1 + imageCount) % imageCount);
+    }
+  }, [imageCount]);
+
+  // Touch handlers for swipe
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  }, []);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (touchStartX.current === null || imageCount <= 1) return;
+    
+    const touchEndX = e.changedTouches[0].clientX;
+    const diff = touchStartX.current - touchEndX;
+    
+    if (Math.abs(diff) > 50) {
+      if (diff > 0) {
+        // Swipe left - next image
+        setCurrentImageIndex((prev) => (prev + 1) % imageCount);
+      } else {
+        // Swipe right - prev image
+        setCurrentImageIndex((prev) => (prev - 1 + imageCount) % imageCount);
+      }
+    }
+    touchStartX.current = null;
+  }, [imageCount]);
+
   const discount = product.original_price && product.original_price > product.price
     ? Math.round((1 - product.price / product.original_price) * 100)
     : null;
@@ -111,23 +155,60 @@ export const ProductCard = memo(function ProductCard({ product }: ProductCardPro
   return (
     <Link to={`/product/${product.id}`} className="block">
       <div className="bg-card rounded-lg overflow-hidden border border-border/40 hover:shadow-lg transition-shadow duration-200 h-full flex flex-col">
-        {/* Image Container - 3:4 aspect ratio */}
-        <div className="relative aspect-[3/4] bg-muted overflow-hidden">
+        {/* Image Container - 3:4 aspect ratio with carousel */}
+        <div 
+          className="relative aspect-[3/4] bg-muted overflow-hidden"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
           {product.images && product.images.length > 0 ? (
             <>
               {!imageLoaded && (
                 <div className="absolute inset-0 bg-muted animate-pulse" />
               )}
               <img
-                src={product.images[0]}
+                src={product.images[currentImageIndex]}
                 alt={product.name}
                 loading="lazy"
                 decoding="async"
                 onLoad={() => setImageLoaded(true)}
-                className={`w-full h-full object-cover ${
+                className={`w-full h-full object-cover transition-opacity ${
                   imageLoaded ? 'opacity-100' : 'opacity-0'
                 }`}
+                style={{ aspectRatio: '1080/1440' }}
               />
+              
+              {/* Navigation arrows - show on hover when multiple images */}
+              {imageCount > 1 && (
+                <>
+                  <button
+                    onClick={prevImage}
+                    className="absolute left-1 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white/80 flex items-center justify-center opacity-0 hover:opacity-100 group-hover:opacity-100 transition-opacity shadow-sm"
+                    aria-label="Oldingi rasm"
+                  >
+                    <ChevronLeft className="h-4 w-4 text-foreground" />
+                  </button>
+                  <button
+                    onClick={nextImage}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white/80 flex items-center justify-center opacity-0 hover:opacity-100 group-hover:opacity-100 transition-opacity shadow-sm"
+                    aria-label="Keyingi rasm"
+                  >
+                    <ChevronRight className="h-4 w-4 text-foreground" />
+                  </button>
+                  
+                  {/* Image indicators */}
+                  <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-1">
+                    {product.images.map((_, index) => (
+                      <span
+                        key={index}
+                        className={`w-1.5 h-1.5 rounded-full transition-colors ${
+                          index === currentImageIndex ? 'bg-white' : 'bg-white/50'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
             </>
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-muted">
