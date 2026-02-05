@@ -65,10 +65,20 @@ export function useAdminUsers() {
         .select('*')
         .in('user_id', userIds);
 
+      // Get SellerCloudX subscriptions
+      const { data: subscriptions } = await supabase
+        .from('sellercloud_subscriptions')
+        .select('user_id, is_active, admin_override')
+        .in('user_id', userIds);
+
       // Combine profiles with roles
       const usersWithRoles = profiles?.map(profile => ({
         ...profile,
-        roles: roles?.filter(r => r.user_id === profile.user_id).map(r => r.role) || [],
+        roles: [
+          ...(roles?.filter(r => r.user_id === profile.user_id).map(r => r.role) || []),
+          // Add 'sellercloud' as a virtual role if user has active subscription
+          ...(subscriptions?.some(s => s.user_id === profile.user_id && s.is_active) ? ['sellercloud'] : [])
+        ],
       }));
 
       return usersWithRoles || [];
