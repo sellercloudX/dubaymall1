@@ -5,8 +5,7 @@ import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFavorites } from '@/hooks/useFavorites';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ShoppingCart, Heart, Package, Loader2, Star, Truck } from 'lucide-react';
+import { Heart, Package, Loader2, Star, Truck } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Tables } from '@/integrations/supabase/types';
 
@@ -20,7 +19,7 @@ interface ProductCardProps {
   };
 }
 
-// Uzum.uz style product card - clean, minimal design
+// Uzum.uz style product card
 export const ProductCard = memo(function ProductCard({ product }: ProductCardProps) {
   const { t } = useLanguage();
   const { addToCart } = useCart();
@@ -71,14 +70,17 @@ export const ProductCard = memo(function ProductCard({ product }: ProductCardPro
 
   const isProductFavorite = isFavorite(product.id);
 
-  // Mock rating for demo - in production, this would come from reviews
+  // Mock rating - in production from reviews
   const rating = product.rating || 4.5;
-  const reviewsCount = product.reviews_count || Math.floor(Math.random() * 100) + 10;
+  const reviewsCount = product.reviews_count || Math.floor(Math.random() * 500) + 50;
+
+  // Calculate monthly payment (12 months)
+  const monthlyPayment = Math.round(product.price / 12);
 
   return (
-    <Link to={`/product/${product.id}`} className="block group">
-      <div className="bg-card rounded-xl overflow-hidden border border-border/50 hover:border-border hover:shadow-md transition-all duration-200">
-        {/* Image Container - 3:4 aspect ratio like Uzum */}
+    <Link to={`/product/${product.id}`} className="block">
+      <div className="bg-card rounded-lg overflow-hidden border border-border/40 hover:shadow-lg transition-shadow duration-200 h-full flex flex-col">
+        {/* Image Container - 3:4 aspect ratio */}
         <div className="relative aspect-[3/4] bg-muted overflow-hidden">
           {product.images && product.images.length > 0 ? (
             <>
@@ -91,40 +93,32 @@ export const ProductCard = memo(function ProductCard({ product }: ProductCardPro
                 loading="lazy"
                 decoding="async"
                 onLoad={() => setImageLoaded(true)}
-                className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ${
+                className={`w-full h-full object-cover ${
                   imageLoaded ? 'opacity-100' : 'opacity-0'
                 }`}
               />
             </>
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-muted">
-              <Package className="h-12 w-12 text-muted-foreground/40" />
+              <Package className="h-10 w-10 text-muted-foreground/30" />
             </div>
           )}
 
-          {/* Discount Badge - Top Left */}
-          {discount && (
-            <Badge className="absolute top-2 left-2 bg-destructive text-destructive-foreground font-semibold text-xs px-2 py-0.5 rounded-md">
-              -{discount}%
-            </Badge>
-          )}
-
-          {/* Free Shipping Badge */}
-          {product.free_shipping && (
-            <Badge className="absolute top-2 left-2 mt-7 bg-green-600 dark:bg-green-500 text-white font-medium text-[10px] px-1.5 py-0.5 rounded flex items-center gap-0.5">
-              <Truck className="h-2.5 w-2.5" />
-              Bepul
-            </Badge>
+          {/* Discount Badge - Bottom Left on Image */}
+          {discount && discount >= 5 && (
+            <div className="absolute bottom-0 left-0 right-0 bg-primary/90 text-primary-foreground text-[11px] font-medium py-1 px-2 text-center">
+              -{discount}% chegirma
+            </div>
           )}
 
           {/* Favorite Button - Top Right */}
           <button
             type="button"
             aria-label={isProductFavorite ? "Sevimlilardan o'chirish" : "Sevimlilarga qo'shish"}
-            className={`absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
+            className={`absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center shadow-sm transition-all ${
               isProductFavorite 
-                ? 'bg-destructive/10 text-destructive' 
-                : 'bg-background/80 text-muted-foreground hover:text-destructive hover:bg-background'
+                ? 'bg-white text-destructive' 
+                : 'bg-white/90 text-muted-foreground hover:text-destructive'
             }`}
             onClick={handleToggleFavorite}
             disabled={favoriteLoading}
@@ -135,50 +129,55 @@ export const ProductCard = memo(function ProductCard({ product }: ProductCardPro
               <Heart className={`h-4 w-4 ${isProductFavorite ? 'fill-current' : ''}`} />
             )}
           </button>
-
-          {/* Quick Add to Cart - Bottom Right (appears on hover) */}
-          <button
-            type="button"
-            aria-label="Savatchaga qo'shish"
-            className="absolute bottom-2 right-2 w-9 h-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-primary/90 shadow-lg"
-            onClick={handleAddToCart}
-          >
-            <ShoppingCart className="h-4 w-4" />
-          </button>
         </div>
 
         {/* Content */}
-        <div className="p-3">
-          {/* Shop Name */}
-          {product.shop && (
-            <p className="text-[11px] text-muted-foreground mb-1 truncate">
-              {product.shop.name}
-            </p>
-          )}
-
-          {/* Product Name - 2 lines max */}
-          <h3 className="text-sm font-medium line-clamp-2 min-h-[2.5rem] leading-tight text-foreground mb-2">
-            {product.name}
-          </h3>
-
-          {/* Rating */}
-          <div className="flex items-center gap-1 mb-2">
-            <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
-            <span className="text-xs font-medium text-foreground">{rating.toFixed(1)}</span>
-            <span className="text-[11px] text-muted-foreground">({reviewsCount})</span>
-          </div>
-
-          {/* Price Section */}
-          <div className="flex flex-col">
-            <span className="text-base font-bold text-primary whitespace-nowrap">
-              {formatPrice(product.price)} <span className="text-xs font-medium">so'm</span>
-            </span>
+        <div className="p-2.5 flex flex-col flex-1">
+          {/* Price Section - Uzum style */}
+          <div className="mb-1.5">
+            {/* Current Price */}
+            <div className="flex items-baseline gap-1">
+              <span className="text-lg font-bold text-primary whitespace-nowrap">
+                {formatPrice(product.price)}
+              </span>
+              <span className="text-xs text-primary font-medium">so'm</span>
+            </div>
+            
+            {/* Original Price (struck through) */}
             {product.original_price && product.original_price > product.price && (
-              <span className="text-xs text-muted-foreground line-through">
+              <span className="text-xs text-muted-foreground line-through whitespace-nowrap">
                 {formatPrice(product.original_price)} so'm
               </span>
             )}
           </div>
+
+          {/* Monthly Payment Badge - Yellow like Uzum */}
+          <div className="mb-2">
+            <span className="inline-block bg-yellow-300 dark:bg-yellow-400 text-yellow-900 text-[10px] font-medium px-1.5 py-0.5 rounded whitespace-nowrap">
+              {formatPrice(monthlyPayment)} so'm/oyiga
+            </span>
+          </div>
+
+          {/* Product Name */}
+          <h3 className="text-sm font-normal line-clamp-2 min-h-[2.5rem] leading-tight text-foreground mb-2 flex-1">
+            {product.name}
+          </h3>
+
+          {/* Rating - Bottom */}
+          <div className="flex items-center gap-1 mb-2">
+            <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
+            <span className="text-xs font-medium text-foreground">{rating.toFixed(1)}</span>
+            <span className="text-[11px] text-muted-foreground">({reviewsCount} sharhlar)</span>
+          </div>
+
+          {/* Delivery Button - Full width, Purple like Uzum */}
+          <Button 
+            onClick={handleAddToCart}
+            className="w-full h-9 bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium rounded-lg flex items-center justify-center gap-1.5"
+          >
+            <Truck className="h-4 w-4" />
+            Ertaga
+          </Button>
         </div>
       </div>
     </Link>

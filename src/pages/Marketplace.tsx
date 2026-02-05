@@ -157,14 +157,6 @@ export default function Marketplace() {
         {/* Categories */}
         <CategoryCards />
 
-        {/* Header */}
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold">{t.marketplace}</h2>
-          <p className="text-muted-foreground mt-1">
-            Barcha do'konlardan eng yaxshi mahsulotlar
-          </p>
-        </div>
-
         {/* Search and Filters */}
         <div className="flex flex-col lg:flex-row gap-4 mb-8">
           <SearchAutocomplete 
