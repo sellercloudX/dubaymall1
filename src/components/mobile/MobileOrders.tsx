@@ -1,8 +1,9 @@
- import { useState, useEffect, useMemo } from 'react';
+ import { useState, useEffect, useMemo, useRef, memo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+ import { useVirtualizer } from '@tanstack/react-virtual';
 import {
   Select,
   SelectContent,
@@ -24,6 +25,21 @@ import { toast } from 'sonner';
  interface MobileOrdersProps {
    connectedMarketplaces: string[];
  }
+ 
+ interface Order {
+   id: number;
+   status: string;
+   substatus?: string;
+   createdAt: string;
+   total: number;
+   totalUZS: number;
+   itemsTotal: number;
+   itemsTotalUZS: number;
+   deliveryTotal: number;
+   deliveryTotalUZS: number;
+   buyer?: { firstName?: string; lastName?: string };
+   items?: any[];
+ }
 
 const MARKETPLACE_EMOJI: Record<string, string> = {
   yandex: '🟡',
@@ -40,19 +56,86 @@ const ORDER_STATUSES = [
   { value: 'CANCELLED', label: 'Bekor' },
 ];
 
+ const formatPrice = (price?: number) => {
+   if (!price) return '—';
+   return new Intl.NumberFormat('uz-UZ').format(price) + ' so\'m';
+ };
+ 
+ const formatDate = (dateStr: string) => {
+   try {
+     return format(new Date(dateStr), 'dd.MM.yyyy HH:mm');
+   } catch {
+     return dateStr;
+   }
+ };
+ 
+ const getStatusBadge = (status: string) => {
+   const config: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
+     PROCESSING: { variant: 'secondary', label: 'Jarayonda' },
+     DELIVERY: { variant: 'default', label: 'Yetkazilmoqda' },
+     DELIVERED: { variant: 'default', label: 'Yetkazildi' },
+     CANCELLED: { variant: 'destructive', label: 'Bekor' },
+   };
+   const c = config[status] || { variant: 'outline' as const, label: status };
+   return <Badge variant={c.variant} className="text-[10px]">{c.label}</Badge>;
+ };
+ 
+ // Memoized order row for performance
+ const OrderRow = memo(({ order, onClick }: { order: Order; onClick: (o: Order) => void }) => (
+   <Card 
+     className="overflow-hidden cursor-pointer active:bg-muted/50 mx-3"
+     onClick={() => onClick(order)}
+   >
+     <CardContent className="p-3">
+       <div className="flex items-start justify-between mb-1.5 gap-2">
+         <div className="min-w-0 flex-1">
+           <div className="font-semibold text-sm truncate">#{order.id}</div>
+           <div className="text-[10px] text-muted-foreground">
+             {formatDate(order.createdAt)}
+           </div>
+         </div>
+         <div className="shrink-0">
+           {getStatusBadge(order.status)}
+         </div>
+       </div>
+ 
+       {order.buyer && (
+         <div className="flex items-center gap-1 text-[10px] text-muted-foreground mb-1.5 truncate">
+           <User className="h-3 w-3" />
+           {order.buyer.firstName} {order.buyer.lastName}
+         </div>
+       )}
+ 
+       <div className="flex items-center justify-between gap-2">
+         <div className="min-w-0 flex-1">
+           <span className="font-bold text-primary text-sm">
+             {formatPrice(order.totalUZS || order.total)}
+           </span>
+           <span className="text-[10px] text-muted-foreground ml-1.5">
+             ({order.items?.length || 0} mahsulot)
+           </span>
+         </div>
+         <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+       </div>
+     </CardContent>
+   </Card>
+ ));
+ 
+ OrderRow.displayName = 'OrderRow';
+ 
  export function MobileOrders({ connectedMarketplaces }: MobileOrdersProps) {
   const [selectedMp, setSelectedMp] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
+   const parentRef = useRef<HTMLDivElement>(null);
  
    // TanStack Query hooks - proper caching & offline support
-   const statusOption = statusFilter !== 'all' ? { status: statusFilter } : undefined;
    const { 
      data: ordersData, 
      isLoading, 
      isFetching,
      dataUpdatedAt,
-   } = useMarketplaceOrders(selectedMp || null, statusOption);
+   } = useMarketplaceOrders(selectedMp || null);
    
    const { invalidateOrders } = useInvalidateMarketplaceData();
    const isOnline = navigator.onLine;
@@ -71,6 +154,14 @@ const ORDER_STATUSES = [
    }, [ordersData?.data, statusFilter]);
  
    const lastUpdated = dataUpdatedAt ? new Date(dataUpdatedAt) : null;
+ 
+   // Virtual scrolling for large order lists
+   const virtualizer = useVirtualizer({
+     count: orders.length,
+     getScrollElement: () => parentRef.current,
+     estimateSize: () => 100, // Estimated row height
+     overscan: 5,
+   });
 
   const handleRefresh = () => {
      if (!isOnline) {
@@ -79,30 +170,6 @@ const ORDER_STATUSES = [
      }
     toast.info('Buyurtmalar yangilanmoqda...');
      invalidateOrders(selectedMp);
-  };
- 
-  const formatPrice = (price?: number) => {
-    if (!price) return '—';
-    return new Intl.NumberFormat('uz-UZ').format(price) + ' so\'m';
-  };
-
-  const formatDate = (dateStr: string) => {
-    try {
-      return format(new Date(dateStr), 'dd.MM.yyyy HH:mm');
-    } catch {
-      return dateStr;
-    }
-  };
-
-  const getStatusBadge = (status: string) => {
-    const config: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
-      PROCESSING: { variant: 'secondary', label: 'Jarayonda' },
-      DELIVERY: { variant: 'default', label: 'Yetkazilmoqda' },
-      DELIVERED: { variant: 'default', label: 'Yetkazildi' },
-      CANCELLED: { variant: 'destructive', label: 'Bekor' },
-    };
-    const c = config[status] || { variant: 'outline' as const, label: status };
-    return <Badge variant={c.variant} className="text-[10px]">{c.label}</Badge>;
   };
 
   if (connectedMarketplaces.length === 0) {
@@ -115,7 +182,7 @@ const ORDER_STATUSES = [
   }
 
   return (
-    <div className="flex flex-col h-full">
+     <div className="flex flex-col h-[calc(100vh-120px)]">
       {/* Sticky Header */}
       <div className="sticky top-14 bg-background z-30 px-3 py-3 border-b space-y-2.5">
         {/* Marketplace Pills */}
@@ -154,7 +221,7 @@ const ORDER_STATUSES = [
           <span>{orders.length} ta buyurtma</span>
            <div className="flex items-center gap-2">
              {!isOnline && (
-               <span className="text-yellow-600 flex items-center gap-1">
+               <span className="text-amber-600 inline-flex items-center gap-1">
                  <WifiOff className="h-3 w-3" /> Offline
                </span>
              )}
@@ -162,13 +229,13 @@ const ORDER_STATUSES = [
                <span>{lastUpdated.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })}</span>
              )}
            </div>
-          </div>
+         </div>
       </div>
 
       {/* Orders List */}
-      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2.5">
-        {isLoading ? (
-          Array.from({ length: 5 }).map((_, i) => (
+       {isLoading ? (
+         <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2.5">
+           {Array.from({ length: 5 }).map((_, i) => (
             <Card key={i}>
               <CardContent className="p-3 space-y-2">
                 <div className="flex justify-between">
@@ -179,55 +246,48 @@ const ORDER_STATUSES = [
                 <Skeleton className="h-5 w-24" />
               </CardContent>
             </Card>
-          ))
-        ) : orders.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground">
-            <ShoppingCart className="h-12 w-12 mx-auto mb-3 opacity-50" />
-            <p>Buyurtmalar topilmadi</p>
-          </div>
-        ) : (
-          orders.map((order) => (
-            <Card 
-              key={order.id} 
-              className="overflow-hidden cursor-pointer active:bg-muted/50"
-              onClick={() => setSelectedOrder(order)}
-            >
-              <CardContent className="p-3">
-                <div className="flex items-start justify-between mb-1.5 gap-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="font-semibold text-sm truncate">#{order.id}</div>
-                    <div className="text-[10px] text-muted-foreground">
-                      {formatDate(order.createdAt)}
-                    </div>
-                  </div>
-                  <div className="shrink-0">
-                    {getStatusBadge(order.status)}
-                  </div>
-                </div>
-
-                {order.buyer && (
-                  <div className="flex items-center gap-1 text-[10px] text-muted-foreground mb-1.5 truncate">
-                    <User className="h-3 w-3" />
-                    {order.buyer.firstName} {order.buyer.lastName}
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <span className="font-bold text-primary text-sm">
-                      {formatPrice(order.totalUZS || order.total)}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground ml-1.5">
-                      ({order.items?.length || 0} mahsulot)
-                    </span>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
+           ))}
+         </div>
+       ) : orders.length === 0 ? (
+         <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
+           <ShoppingCart className="h-12 w-12 mb-3 opacity-50" />
+           <p>Buyurtmalar topilmadi</p>
+         </div>
+       ) : (
+         <div 
+           ref={parentRef} 
+           className="flex-1 overflow-y-auto py-3"
+           style={{ contain: 'strict' }}
+         >
+           <div
+             style={{
+               height: `${virtualizer.getTotalSize()}px`,
+               width: '100%',
+               position: 'relative',
+             }}
+           >
+             {virtualizer.getVirtualItems().map((virtualItem) => {
+               const order = orders[virtualItem.index];
+               return (
+                 <div
+                   key={order.id}
+                   style={{
+                     position: 'absolute',
+                     top: 0,
+                     left: 0,
+                     width: '100%',
+                     height: `${virtualItem.size}px`,
+                     transform: `translateY(${virtualItem.start}px)`,
+                     paddingBottom: '8px',
+                   }}
+                 >
+                   <OrderRow order={order} onClick={setSelectedOrder} />
+                 </div>
+               );
+             })}
+           </div>
+         </div>
+       )}
 
       {/* Order Detail Dialog */}
       <Dialog open={!!selectedOrder} onOpenChange={() => setSelectedOrder(null)}>
