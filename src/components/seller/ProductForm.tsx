@@ -14,9 +14,13 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Loader2 } from 'lucide-react';
+import { MxikLookup } from './MxikLookup';
 import type { TablesInsert } from '@/integrations/supabase/types';
 
-type ProductInsert = TablesInsert<'products'>;
+type ProductInsert = TablesInsert<'products'> & {
+  mxik_code?: string;
+  mxik_name?: string;
+};
 
 interface ProductFormProps {
   shopId: string;
@@ -39,6 +43,8 @@ export function ProductForm({ shopId, initialData, onSubmit, onCancel, isLoading
     status: 'draft',
     is_affiliate_enabled: false,
     affiliate_commission_percent: 0,
+    mxik_code: '',
+    mxik_name: '',
     ...initialData,
   });
 
@@ -57,7 +63,13 @@ export function ProductForm({ shopId, initialData, onSubmit, onCancel, isLoading
       affiliate_commission_percent: formData.affiliate_commission_percent,
       source: initialData?.source || 'manual',
       images: formData.images || [],
-    });
+      mxik_code: formData.mxik_code,
+      mxik_name: formData.mxik_name,
+    } as ProductInsert);
+  };
+
+  const handleMxikChange = (mxikCode: string, mxikName: string) => {
+    setFormData(prev => ({ ...prev, mxik_code: mxikCode, mxik_name: mxikName }));
   };
 
   return (
@@ -152,6 +164,17 @@ export function ProductForm({ shopId, initialData, onSubmit, onCancel, isLoading
               <SelectItem value="out_of_stock">{t.statusOutOfStock}</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+
+        <div className="sm:col-span-2 pt-4 border-t">
+          <MxikLookup
+            productName={formData.name || ''}
+            category={categories.find(c => c.id === formData.category_id)?.name}
+            description={formData.description || ''}
+            value={formData.mxik_code}
+            onChange={handleMxikChange}
+            disabled={isLoading}
+          />
         </div>
 
         <div className="sm:col-span-2 space-y-4 pt-4 border-t">

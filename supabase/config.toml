@@ -50,3 +50,6 @@ verify_jwt = false
 
 [functions.dropshipping-fulfill]
 verify_jwt = false
+
+[functions.lookup-mxik-code]
+verify_jwt = false
