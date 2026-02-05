@@ -46,7 +46,7 @@ export function CategoryCards() {
 
   if (loading) {
     return (
-      <div className="mb-8">
+      <div className="mb-8 min-h-[136px] md:min-h-[152px]">
         <div className="flex items-center justify-between mb-4">
           <Skeleton className="h-6 w-32" />
         </div>
@@ -59,10 +59,12 @@ export function CategoryCards() {
     );
   }
 
-  if (categories.length === 0) return null;
+  if (categories.length === 0) {
+    return <div className="mb-8 min-h-[136px] md:min-h-[152px]" />;
+  }
 
   return (
-    <div className="mb-8">
+    <div className="mb-8 min-h-[136px] md:min-h-[152px]">
       <h3 className="text-lg font-semibold mb-4">Kategoriyalar</h3>
       <div className="grid grid-cols-4 md:grid-cols-8 gap-2 md:gap-4">
         {categories.slice(0, 8).map((category) => {
