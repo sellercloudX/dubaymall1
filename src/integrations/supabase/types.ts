@@ -398,6 +398,41 @@ export type Database = {
           },
         ]
       }
+      category_commissions: {
+        Row: {
+          category_id: string | null
+          commission_percent: number
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          category_id?: string | null
+          commission_percent?: number
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          category_id?: string | null
+          commission_percent?: number
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "category_commissions_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       commissions: {
         Row: {
           affiliate_link_id: string | null
@@ -1218,6 +1253,7 @@ export type Database = {
           category_id: string | null
           created_at: string
           description: string | null
+          free_shipping: boolean | null
           id: string
           images: string[] | null
           is_affiliate_enabled: boolean | null
@@ -1226,6 +1262,7 @@ export type Database = {
           name: string
           original_price: number | null
           price: number
+          shipping_price: number | null
           shop_id: string
           source: Database["public"]["Enums"]["product_source"]
           source_url: string | null
@@ -1234,12 +1271,14 @@ export type Database = {
           stock_quantity: number
           updated_at: string
           view_count: number | null
+          weight_kg: number | null
         }
         Insert: {
           affiliate_commission_percent?: number | null
           category_id?: string | null
           created_at?: string
           description?: string | null
+          free_shipping?: boolean | null
           id?: string
           images?: string[] | null
           is_affiliate_enabled?: boolean | null
@@ -1248,6 +1287,7 @@ export type Database = {
           name: string
           original_price?: number | null
           price: number
+          shipping_price?: number | null
           shop_id: string
           source?: Database["public"]["Enums"]["product_source"]
           source_url?: string | null
@@ -1256,12 +1296,14 @@ export type Database = {
           stock_quantity?: number
           updated_at?: string
           view_count?: number | null
+          weight_kg?: number | null
         }
         Update: {
           affiliate_commission_percent?: number | null
           category_id?: string | null
           created_at?: string
           description?: string | null
+          free_shipping?: boolean | null
           id?: string
           images?: string[] | null
           is_affiliate_enabled?: boolean | null
@@ -1270,6 +1312,7 @@ export type Database = {
           name?: string
           original_price?: number | null
           price?: number
+          shipping_price?: number | null
           shop_id?: string
           source?: Database["public"]["Enums"]["product_source"]
           source_url?: string | null
@@ -1278,6 +1321,7 @@ export type Database = {
           stock_quantity?: number
           updated_at?: string
           view_count?: number | null
+          weight_kg?: number | null
         }
         Relationships: [
           {
@@ -1418,6 +1462,71 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      regional_shipping_rates: {
+        Row: {
+          base_rate: number
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          per_kg_rate: number | null
+          region_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          base_rate?: number
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          per_kg_rate?: number | null
+          region_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          base_rate?: number
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          per_kg_rate?: number | null
+          region_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "regional_shipping_rates_region_id_fkey"
+            columns: ["region_id"]
+            isOneToOne: false
+            referencedRelation: "regions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      regions: {
+        Row: {
+          code: string
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          name_ru: string | null
+          name_uz: string
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name_ru?: string | null
+          name_uz: string
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name_ru?: string | null
+          name_uz?: string
+        }
+        Relationships: []
       }
       reviews: {
         Row: {

@@ -17,9 +17,12 @@ import { SiteAnalytics } from '@/components/admin/SiteAnalytics';
 import { BlogManagement } from '@/components/admin/BlogManagement';
  import { ActivationsManagement } from '@/components/admin/ActivationsManagement';
  import { AdminsManagement } from '@/components/admin/AdminsManagement';
+ import { PartnersDetails } from '@/components/admin/PartnersDetails';
+ import { CategoryCommissions } from '@/components/admin/CategoryCommissions';
+ import { ShippingRatesManagement } from '@/components/admin/ShippingRatesManagement';
 import { useAuth } from '@/contexts/AuthContext';
  import { useAdminPermissions } from '@/hooks/useAdminPermissions';
- import { Shield, Users, Package, Store, ShoppingCart, BarChart3, DollarSign, Wallet, Crown, Image, Zap, Globe, FileText, UserCheck, Settings } from 'lucide-react';
+  import { Shield, Users, Package, Store, ShoppingCart, BarChart3, DollarSign, Wallet, Crown, Image, Zap, Globe, FileText, UserCheck, Settings, Percent, Truck, UsersRound } from 'lucide-react';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
 export default function AdminDashboard() {
@@ -79,10 +82,16 @@ export default function AdminDashboard() {
           <ScrollArea className="w-full whitespace-nowrap">
             <TabsList className="inline-flex w-max">
                {hasPermission('can_manage_finances') && (
+                  <>
+                    <TabsTrigger value="partners" className="gap-2">
+                      <UsersRound className="h-4 w-4" />
+                      <span className="hidden sm:inline">Hamkorlar</span>
+                    </TabsTrigger>
                  <TabsTrigger value="analytics" className="gap-2">
                    <BarChart3 className="h-4 w-4" />
                    <span className="hidden sm:inline">Analitika</span>
                  </TabsTrigger>
+                  </>
                )}
                {hasPermission('can_manage_content') && (
                  <>
@@ -114,6 +123,14 @@ export default function AdminDashboard() {
                      <DollarSign className="h-4 w-4" />
                      <span className="hidden sm:inline">Monetizatsiya</span>
                    </TabsTrigger>
+                    <TabsTrigger value="category-commissions" className="gap-2">
+                      <Percent className="h-4 w-4" />
+                      <span className="hidden sm:inline">Komissiyalar</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="shipping" className="gap-2">
+                      <Truck className="h-4 w-4" />
+                      <span className="hidden sm:inline">Yetkazish</span>
+                    </TabsTrigger>
                    <TabsTrigger value="sellercloud" className="gap-2">
                      <Crown className="h-4 w-4" />
                      <span className="hidden sm:inline">SellerCloudX</span>
@@ -160,6 +177,10 @@ export default function AdminDashboard() {
             <ScrollBar orientation="horizontal" />
           </ScrollArea>
 
+          <TabsContent value="partners">
+            <PartnersDetails />
+          </TabsContent>
+ 
           <TabsContent value="analytics">
             <AdminAnalytics />
           </TabsContent>
@@ -178,6 +199,14 @@ export default function AdminDashboard() {
 
           <TabsContent value="monetization">
             <MonetizationSettings />
+          </TabsContent>
+ 
+          <TabsContent value="category-commissions">
+            <CategoryCommissions />
+          </TabsContent>
+ 
+          <TabsContent value="shipping">
+            <ShippingRatesManagement />
           </TabsContent>
 
           <TabsContent value="banners">

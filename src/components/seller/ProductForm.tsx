@@ -20,6 +20,9 @@ import type { TablesInsert } from '@/integrations/supabase/types';
 type ProductInsert = TablesInsert<'products'> & {
   mxik_code?: string;
   mxik_name?: string;
+  shipping_price?: number;
+  free_shipping?: boolean;
+  weight_kg?: number;
 };
 
 interface ProductFormProps {
@@ -45,6 +48,9 @@ export function ProductForm({ shopId, initialData, onSubmit, onCancel, isLoading
     affiliate_commission_percent: 0,
     mxik_code: '',
     mxik_name: '',
+    shipping_price: 0,
+    free_shipping: false,
+    weight_kg: 0,
     ...initialData,
   });
 
@@ -65,6 +71,9 @@ export function ProductForm({ shopId, initialData, onSubmit, onCancel, isLoading
       images: formData.images || [],
       mxik_code: formData.mxik_code,
       mxik_name: formData.mxik_name,
+      shipping_price: formData.shipping_price || 0,
+      free_shipping: formData.free_shipping || false,
+      weight_kg: formData.weight_kg || 0,
     } as ProductInsert);
   };
 
@@ -177,6 +186,60 @@ export function ProductForm({ shopId, initialData, onSubmit, onCancel, isLoading
           />
         </div>
 
+        <div className="sm:col-span-2 space-y-4 pt-4 border-t">
+          <h3 className="font-semibold">Yetkazib berish sozlamalari</h3>
+          
+          <div className="flex items-center justify-between">
+            <div>
+              <Label htmlFor="free_shipping">Bepul yetkazib berish</Label>
+              <p className="text-sm text-muted-foreground">
+                Mahsulot bepul yetkazib beriladi
+              </p>
+            </div>
+            <Switch
+              id="free_shipping"
+              checked={formData.free_shipping || false}
+              onCheckedChange={(checked) => setFormData(prev => ({ 
+                ...prev, 
+                free_shipping: checked,
+                shipping_price: checked ? 0 : prev.shipping_price 
+              }))}
+            />
+          </div>
+ 
+          {!formData.free_shipping && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <Label htmlFor="shipping_price">Yetkazib berish narxi (so'm)</Label>
+                <Input
+                  id="shipping_price"
+                  type="number"
+                  min="0"
+                  step="1000"
+                  value={formData.shipping_price || 0}
+                  onChange={(e) => setFormData(prev => ({ ...prev, shipping_price: parseFloat(e.target.value) || 0 }))}
+                  placeholder="Sotuvchi qo'shimcha narxi"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Viloyat narxiga qo'shimcha sifatida qo'shiladi
+                </p>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="weight_kg">Mahsulot og'irligi (kg)</Label>
+                <Input
+                  id="weight_kg"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={formData.weight_kg || 0}
+                  onChange={(e) => setFormData(prev => ({ ...prev, weight_kg: parseFloat(e.target.value) || 0 }))}
+                  placeholder="0.5"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+ 
         <div className="sm:col-span-2 space-y-4 pt-4 border-t">
           <div className="flex items-center justify-between">
             <div>
