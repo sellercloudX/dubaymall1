@@ -4,6 +4,7 @@
  import { Button } from '@/components/ui/button';
  import { Input } from '@/components/ui/input';
  import { Switch } from '@/components/ui/switch';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
  import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
  import { supabase } from '@/integrations/supabase/client';
  import { toast } from 'sonner';
@@ -80,23 +81,23 @@
    return (
      <Card>
        <CardHeader>
-         <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-lg">
            <Truck className="h-5 w-5" />
            Viloyatlar bo'yicha yetkazib berish
          </CardTitle>
          <CardDescription>
-           Har bir viloyat uchun bazaviy yetkazib berish narxi va kg uchun qo'shimcha narx belgilang.
-           Sotuvchi o'z mahsulotiga qo'shimcha narx qo'shishi mumkin.
+            Har bir viloyat uchun bazaviy narx va kg uchun qo'shimcha narx.
          </CardDescription>
        </CardHeader>
        <CardContent>
+          <ScrollArea className="w-full">
          <Table>
            <TableHeader>
              <TableRow>
                <TableHead>Viloyat</TableHead>
                <TableHead>Bazaviy narx (so'm)</TableHead>
                <TableHead>Har kg uchun (so'm)</TableHead>
-               <TableHead>Amallar</TableHead>
+                <TableHead className="text-right">Amallar</TableHead>
              </TableRow>
            </TableHeader>
            <TableBody>
@@ -104,13 +105,13 @@
                const rate = getRateForRegion(region.id);
                return (
                  <TableRow key={region.id}>
-                   <TableCell className="font-medium">{region.name_uz}</TableCell>
+                    <TableCell className="font-medium whitespace-nowrap">{region.name_uz}</TableCell>
                    <TableCell>
                      <Input
                        type="number"
                        min="0"
                        step="1000"
-                       className="w-32"
+                        className="w-24"
                        defaultValue={rate?.base_rate || 0}
                        id={`base-${region.id}`}
                      />
@@ -120,14 +121,15 @@
                        type="number"
                        min="0"
                        step="500"
-                       className="w-32"
+                        className="w-24"
                        defaultValue={rate?.per_kg_rate || 0}
                        id={`perkg-${region.id}`}
                      />
                    </TableCell>
-                   <TableCell>
+                    <TableCell className="text-right">
                      <Button
-                       size="sm"
+                        size="icon"
+                        variant="outline"
                        onClick={() => {
                          const baseInput = document.getElementById(`base-${region.id}`) as HTMLInputElement;
                          const perKgInput = document.getElementById(`perkg-${region.id}`) as HTMLInputElement;
@@ -138,8 +140,7 @@
                          });
                        }}
                      >
-                       <Save className="h-4 w-4 mr-1" />
-                       Saqlash
+                        <Save className="h-4 w-4" />
                      </Button>
                    </TableCell>
                  </TableRow>
@@ -147,14 +148,15 @@
              })}
            </TableBody>
          </Table>
+          <ScrollBar orientation="horizontal" />
+          </ScrollArea>
  
-         <div className="mt-6 p-4 bg-muted rounded-lg">
-           <h4 className="font-semibold mb-2">Qanday ishlaydi?</h4>
-           <ul className="text-sm text-muted-foreground space-y-1">
+          <div className="mt-4 p-3 bg-muted rounded-lg">
+            <h4 className="font-semibold text-sm mb-1">Qanday ishlaydi?</h4>
+            <ul className="text-xs text-muted-foreground space-y-0.5">
              <li>• <strong>Bazaviy narx</strong> - viloyatga yetkazib berish uchun minimal narx</li>
              <li>• <strong>Har kg uchun</strong> - mahsulot og'irligi bo'yicha qo'shimcha narx</li>
              <li>• Yakuniy narx = Bazaviy + (Og'irlik × Kg narxi) + Sotuvchi qo'shimchasi</li>
-             <li>• Sotuvchi bepul yetkazib berish tanlasa, bu narxlar qo'llanilmaydi</li>
            </ul>
          </div>
        </CardContent>

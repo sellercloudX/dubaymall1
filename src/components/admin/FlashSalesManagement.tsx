@@ -21,6 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, Zap, Package } from 'lucide-react';
 import { format } from 'date-fns';
@@ -183,7 +184,7 @@ export function FlashSalesManagement() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2 text-lg">
           <Zap className="h-5 w-5" />
           Flash Sale boshqaruvi
         </CardTitle>
@@ -195,7 +196,7 @@ export function FlashSalesManagement() {
           }
         }}>
           <DialogTrigger asChild>
-            <Button>
+            <Button size="sm">
               <Plus className="h-4 w-4 mr-2" />
               Yangi aksiya
             </Button>
@@ -259,10 +260,10 @@ export function FlashSalesManagement() {
                 <Label>Faol</Label>
               </div>
               <div className="flex justify-end gap-2 pt-4">
-                <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                <Button size="sm" variant="outline" onClick={() => setDialogOpen(false)}>
                   Bekor qilish
                 </Button>
-                <Button onClick={handleSubmit}>
+                <Button size="sm" onClick={handleSubmit}>
                   {editingSale ? 'Saqlash' : 'Yaratish'}
                 </Button>
               </div>
@@ -271,6 +272,7 @@ export function FlashSalesManagement() {
         </Dialog>
       </CardHeader>
       <CardContent>
+        <ScrollArea className="w-full">
         <Table>
           <TableHeader>
             <TableRow>
@@ -288,30 +290,30 @@ export function FlashSalesManagement() {
                 <TableRow key={sale.id}>
                   <TableCell>
                     <div>
-                      <div className="font-medium">{sale.title}</div>
+                      <div className="font-medium whitespace-nowrap">{sale.title}</div>
                       <div className="text-xs text-muted-foreground">{sale.description}</div>
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="destructive">-{sale.discount_percent}%</Badge>
+                    <Badge variant="destructive" className="text-xs">-{sale.discount_percent}%</Badge>
                   </TableCell>
                   <TableCell>
                     <div className="text-sm">
-                      <div>{format(new Date(sale.start_date), 'dd.MM.yyyy HH:mm')}</div>
+                      <div className="whitespace-nowrap">{format(new Date(sale.start_date), 'dd.MM.yyyy HH:mm')}</div>
                       <div className="text-muted-foreground">
                         {format(new Date(sale.end_date), 'dd.MM.yyyy HH:mm')}
                       </div>
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={status.variant}>{status.label}</Badge>
+                    <Badge variant={status.variant} className="text-xs">{status.label}</Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button size="icon" variant="ghost" onClick={() => handleEdit(sale)}>
+                    <div className="flex justify-end gap-1">
+                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleEdit(sale)}>
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button size="icon" variant="ghost" onClick={() => handleDelete(sale.id)}>
+                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleDelete(sale.id)}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
@@ -328,6 +330,8 @@ export function FlashSalesManagement() {
             )}
           </TableBody>
         </Table>
+        <ScrollBar orientation="horizontal" />
+        </ScrollArea>
       </CardContent>
     </Card>
   );
