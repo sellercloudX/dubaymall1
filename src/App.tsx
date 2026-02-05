@@ -1,8 +1,10 @@
-import React, { useState, Suspense, lazy } from "react";
+ import React, { useState, Suspense, lazy, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+ import { QueryClient } from "@tanstack/react-query";
+ import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+ import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -28,22 +30,46 @@ const FavoritesPage = lazy(() => import("./pages/FavoritesPage"));
 const Partnership = lazy(() => import("./pages/Partnership"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
+ // Create persister for offline cache
+ const persister = createSyncStoragePersister({
+   storage: window.localStorage,
+   key: 'sellercloud-cache',
+   throttleTime: 1000,
+ });
+ 
 function App() {
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {
-        staleTime: 1000 * 60 * 5, // 5 minutes
-        gcTime: 1000 * 60 * 30, // 30 minutes
+        staleTime: 1000 * 60 * 2, // 2 minutes - fresher data
+        gcTime: 1000 * 60 * 60 * 24, // 24 hours for offline
         refetchOnWindowFocus: false,
-        refetchOnReconnect: false,
+        refetchOnReconnect: true, // Refetch when back online
         retry: 1,
         networkMode: 'offlineFirst',
       },
     },
   }));
 
+   // Listen for online/offline status
+   useEffect(() => {
+     const handleOnline = () => {
+       queryClient.invalidateQueries();
+     };
+     
+     window.addEventListener('online', handleOnline);
+     return () => window.removeEventListener('online', handleOnline);
+   }, [queryClient]);
+ 
   return (
-    <QueryClientProvider client={queryClient}>
+    <PersistQueryClientProvider 
+      client={queryClient} 
+      persistOptions={{ 
+        persister,
+        maxAge: 1000 * 60 * 60 * 24, // 24 hours
+        buster: 'v1',
+      }}
+    >
       <LanguageProvider>
         <AuthProvider>
           <CartProvider>
@@ -77,7 +103,7 @@ function App() {
           </CartProvider>
         </AuthProvider>
       </LanguageProvider>
-    </QueryClientProvider>
+    </PersistQueryClientProvider>
   );
 }
 

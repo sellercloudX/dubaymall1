@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { TrendingUp, DollarSign, Package, ShoppingCart, Globe } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { TrendingUp, DollarSign, Package, ShoppingCart, Globe, RefreshCw } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface MobileAnalyticsProps {
   connections: any[];
@@ -19,31 +21,44 @@ const MARKETPLACE_EMOJI: Record<string, string> = {
 export function MobileAnalytics({ connections, connectedMarketplaces, fetchMarketplaceData }: MobileAnalyticsProps) {
   const [stats, setStats] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [totals, setTotals] = useState({ products: 0, orders: 0, revenue: 0 });
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   useEffect(() => {
     loadAnalytics();
   }, [connectedMarketplaces]);
 
-  const loadAnalytics = async () => {
+  const loadAnalytics = async (showRefreshToast = false) => {
     if (connectedMarketplaces.length === 0) {
       setIsLoading(false);
       return;
     }
     
-    setIsLoading(true);
+    if (showRefreshToast) {
+      setIsRefreshing(true);
+    } else {
+      setIsLoading(true);
+    }
+    
     try {
       let totalProducts = 0;
       let totalOrders = 0;
       let totalRevenue = 0;
       const marketplaceStats: any[] = [];
 
-      for (const mp of connectedMarketplaces) {
-        const [productsResult, ordersResult] = await Promise.all([
-          fetchMarketplaceData(mp, 'products', { limit: 200, fetchAll: true }),
-          fetchMarketplaceData(mp, 'orders', { fetchAll: true }),
-        ]);
+      // Parallel fetch for all marketplaces
+      const results = await Promise.all(
+        connectedMarketplaces.map(async (mp) => {
+          const [productsResult, ordersResult] = await Promise.all([
+            fetchMarketplaceData(mp, 'products', { limit: 200, fetchAll: true }),
+            fetchMarketplaceData(mp, 'orders', { fetchAll: true }),
+          ]);
+          return { mp, productsResult, ordersResult };
+        })
+      );
 
+      for (const { mp, productsResult, ordersResult } of results) {
         const productsCount = productsResult.total || productsResult.data?.length || 0;
         const orders = ordersResult.data || [];
         const ordersCount = orders.length;
@@ -57,13 +72,26 @@ export function MobileAnalytics({ connections, connectedMarketplaces, fetchMarke
 
       setStats(marketplaceStats);
       setTotals({ products: totalProducts, orders: totalOrders, revenue: totalRevenue });
+      setLastUpdated(new Date());
+      
+      if (showRefreshToast) {
+        toast.success('Ma\'lumotlar yangilandi!');
+      }
     } catch (err) {
       console.error('Analytics error:', err);
+      if (showRefreshToast) {
+        toast.error('Yangilashda xato');
+      }
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   };
 
+  const handleRefresh = () => {
+    loadAnalytics(true);
+  };
+ 
   const formatPrice = (price: number) => {
     if (price >= 1000000) return (price / 1000000).toFixed(1) + ' mln';
     if (price >= 1000) return (price / 1000).toFixed(0) + ' ming';
@@ -84,6 +112,27 @@ export function MobileAnalytics({ connections, connectedMarketplaces, fetchMarke
 
   return (
     <div className="p-4 space-y-4 overflow-x-hidden">
+      {/* Header with refresh */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="font-semibold">Analitika</h2>
+          {lastUpdated && (
+            <p className="text-xs text-muted-foreground">
+              {lastUpdated.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })} da yangilangan
+            </p>
+          )}
+        </div>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+        >
+          <RefreshCw className={`h-4 w-4 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />
+          Yangilash
+        </Button>
+      </div>
+ 
       {/* Summary Stats */}
       <div className="grid grid-cols-2 gap-3">
         <Card className="bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/20 overflow-hidden">
