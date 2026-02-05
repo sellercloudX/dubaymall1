@@ -100,26 +100,26 @@ export function SellerBalanceCard() {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2 text-xs">
-              <Clock className="h-3.5 w-3.5" />
-              Kutilmoqda
+            <CardDescription className="flex items-center gap-2 text-xs whitespace-nowrap">
+              <Clock className="h-3.5 w-3.5 flex-shrink-0" />
+              <span className="truncate">Kutilmoqda</span>
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-xl md:text-2xl font-bold text-amber-600">{formatPrice(pendingBalance)}</p>
-            <p className="text-xs text-muted-foreground mt-1">7 kun kutish</p>
+            <p className="text-xl md:text-2xl font-bold text-amber-600 whitespace-nowrap">{formatPrice(pendingBalance)}</p>
+            <p className="text-xs text-muted-foreground mt-1">10 kun kutish</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2 text-xs">
-              <TrendingUp className="h-3.5 w-3.5" />
-              Jami daromad
+            <CardDescription className="flex items-center gap-2 text-xs whitespace-nowrap">
+              <TrendingUp className="h-3.5 w-3.5 flex-shrink-0" />
+              <span className="truncate">Jami daromad</span>
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-xl md:text-2xl font-bold text-emerald-600">{formatPrice(totalEarned)}</p>
+            <p className="text-xl md:text-2xl font-bold text-emerald-600 whitespace-nowrap">{formatPrice(totalEarned)}</p>
             <p className="text-xs text-muted-foreground mt-1">Barcha vaqt</p>
           </CardContent>
         </Card>
@@ -146,29 +146,29 @@ export function SellerBalanceCard() {
             
             <div className="p-3 md:p-4 bg-red-500/5 rounded-lg border border-red-500/20">
               <div className="flex items-center gap-2 text-red-600 mb-1">
-                <Building2 className="h-4 w-4" />
-                <span className="text-xs">Platform komissiya</span>
+                <Building2 className="h-4 w-4 flex-shrink-0" />
+                <span className="text-xs truncate">Platform komissiya</span>
               </div>
-              <p className="text-lg md:text-xl font-bold text-red-600">-{formatPrice(totalCommissions)}</p>
-              <p className="text-xs text-muted-foreground">5% har bir sotuvdan</p>
+              <p className="text-lg md:text-xl font-bold text-red-600 whitespace-nowrap">-{formatPrice(totalCommissions)}</p>
+              <p className="text-xs text-muted-foreground truncate">Baza + kategoriya %</p>
             </div>
 
             <div className="p-3 md:p-4 bg-orange-500/5 rounded-lg border border-orange-500/20">
               <div className="flex items-center gap-2 text-orange-600 mb-1">
-                <Percent className="h-4 w-4" />
-                <span className="text-xs">Blogger ulushi</span>
+                <Percent className="h-4 w-4 flex-shrink-0" />
+                <span className="text-xs truncate">Blogger ulushi</span>
               </div>
-              <p className="text-lg md:text-xl font-bold text-orange-600">-{formatPrice(totalBloggerCommissions)}</p>
-              <p className="text-xs text-muted-foreground">Affiliate sotuvlar</p>
+              <p className="text-lg md:text-xl font-bold text-orange-600 whitespace-nowrap">-{formatPrice(totalBloggerCommissions)}</p>
+              <p className="text-xs text-muted-foreground truncate">Affiliate sotuvlar</p>
             </div>
 
             <div className="p-3 md:p-4 bg-emerald-500/5 rounded-lg border border-emerald-500/20">
               <div className="flex items-center gap-2 text-emerald-600 mb-1">
-                <PiggyBank className="h-4 w-4" />
-                <span className="text-xs">Sof foyda</span>
+                <PiggyBank className="h-4 w-4 flex-shrink-0" />
+                <span className="text-xs truncate">Sof foyda</span>
               </div>
-              <p className="text-lg md:text-xl font-bold text-emerald-600">{formatPrice(totalProfit)}</p>
-              <p className="text-xs text-muted-foreground">Barcha xarajatlardan keyin</p>
+              <p className="text-lg md:text-xl font-bold text-emerald-600 whitespace-nowrap">{formatPrice(totalProfit)}</p>
+              <p className="text-xs text-muted-foreground truncate">Xarajatlardan keyin</p>
             </div>
           </div>
 
@@ -442,7 +442,7 @@ export function SellerBalanceCard() {
                   Kutilayotgan to'lovlar
                 </CardTitle>
                 <CardDescription>
-                  Buyurtma yetkazib berilgandan 7 kun o'tgach balansga qo'shiladi
+                  Buyurtma yetkazib berilgandan 10 kun o'tgach balansga qo'shiladi
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -450,7 +450,7 @@ export function SellerBalanceCard() {
                   {pendingPayouts.map((fin: any) => {
                     const availableDate = fin.payout_available_at 
                       ? new Date(fin.payout_available_at) 
-                      : new Date(new Date(fin.created_at).getTime() + 7 * 24 * 60 * 60 * 1000);
+                      : new Date(new Date(fin.created_at).getTime() + 10 * 24 * 60 * 60 * 1000);
                     const daysLeft = Math.ceil((availableDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
                     
                     return (
@@ -539,10 +539,22 @@ export function SellerBalanceCard() {
             <div className="space-y-1 text-sm">
               <p className="font-medium text-foreground">Pul oqimi haqida</p>
               <ul className="text-muted-foreground space-y-1">
-                <li>• Buyurtma yetkazib berilgandan so'ng 7 kun kutish muddati</li>
-                <li>• Platform komissiyasi: 5% (har bir sotuvdan)</li>
-                <li>• Blogger ulushi: agar affiliate orqali sotilgan bo'lsa</li>
-                <li>• Minimal yechish summasi: 50,000 so'm</li>
+                <li className="flex items-start gap-1">
+                  <span className="flex-shrink-0">•</span>
+                  <span>Buyurtma yetkazib berilgandan so'ng 10 kun kutish muddati</span>
+                </li>
+                <li className="flex items-start gap-1">
+                  <span className="flex-shrink-0">•</span>
+                  <span>Platform komissiyasi: baza % + kategoriya ustama %</span>
+                </li>
+                <li className="flex items-start gap-1">
+                  <span className="flex-shrink-0">•</span>
+                  <span>Blogger ulushi: agar affiliate orqali sotilgan bo'lsa</span>
+                </li>
+                <li className="flex items-start gap-1">
+                  <span className="flex-shrink-0">•</span>
+                  <span>Minimal yechish summasi: 50,000 so'm</span>
+                </li>
               </ul>
             </div>
           </div>
