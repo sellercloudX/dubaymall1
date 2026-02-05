@@ -53,3 +53,9 @@ verify_jwt = false
 
 [functions.lookup-mxik-code]
 verify_jwt = false
+
+[functions.generate-product-image]
+verify_jwt = false
+
+[functions.batch-marketplace-sync]
+verify_jwt = false

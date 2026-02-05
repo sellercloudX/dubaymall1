@@ -1,12 +1,14 @@
-import { useState, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Select,
   SelectContent,
@@ -16,7 +18,10 @@ import {
 } from '@/components/ui/select';
 import { useCategories } from '@/hooks/useCategories';
 import { toast } from 'sonner';
-import { Upload, Sparkles, Loader2, X, ImageIcon, Wand2, Check } from 'lucide-react';
+import { 
+  Search, Sparkles, Loader2, ImageIcon, Wand2, Check,
+  Globe, Package, ArrowRight, RefreshCw, Zap
+} from 'lucide-react';
 import type { TablesInsert } from '@/integrations/supabase/types';
 
 type ProductInsert = TablesInsert<'products'>;
@@ -28,37 +33,69 @@ interface AIProductFormProps {
   isLoading?: boolean;
 }
 
-interface AIResponse {
-  name: string;
-  description: string;
-  category: string;
-  suggestedPrice: number;
+interface WebProduct {
+  title: string;
+  price: string;
+  image: string;
+  source: string;
+  url: string;
+  description?: string;
 }
 
-type ProcessingStep = 'idle' | 'analyzing' | 'enhancing' | 'uploading' | 'done';
+type ProcessingStep = 'idle' | 'searching' | 'generating' | 'uploading' | 'done';
+
+// Safe image component with fallback
+function ProductImage({ src, alt, className }: { src?: string; alt: string; className?: string }) {
+  const [hasError, setHasError] = useState(false);
+  
+  if (!src || hasError) {
+    return (
+      <div className={`bg-muted flex items-center justify-center ${className}`}>
+        <ImageIcon className="h-8 w-8 text-muted-foreground" />
+      </div>
+    );
+  }
+  
+  return (
+    <img 
+      src={src} 
+      alt={alt}
+      className={className}
+      onError={() => setHasError(true)}
+    />
+  );
+}
 
 export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProductFormProps) {
   const { t } = useLanguage();
   const { categories } = useCategories();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [originalImage, setOriginalImage] = useState<string | null>(null);
-  const [enhancedImage, setEnhancedImage] = useState<string | null>(null);
-  const [imageFile, setImageFile] = useState<File | null>(null);
+  
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
   const [processingStep, setProcessingStep] = useState<ProcessingStep>('idle');
-  const [aiResult, setAiResult] = useState<AIResponse | null>(null);
+  
+  // Found products from web
+  const [webProducts, setWebProducts] = useState<WebProduct[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<WebProduct | null>(null);
+  
+  // Generated/selected images
+  const [productImages, setProductImages] = useState<string[]>([]);
+  const [isGeneratingImages, setIsGeneratingImages] = useState(false);
+  
+  // Form data
   const [formData, setFormData] = useState<Partial<ProductInsert>>({
     name: '',
     description: '',
     price: 0,
     stock_quantity: 10,
     category_id: null,
-    status: 'active', // Default to active so it shows in marketplace
+    status: 'active',
   });
 
   const getProgress = () => {
     switch (processingStep) {
-      case 'analyzing': return 33;
-      case 'enhancing': return 66;
+      case 'searching': return 33;
+      case 'generating': return 66;
       case 'uploading': return 90;
       case 'done': return 100;
       default: return 0;
@@ -67,167 +104,203 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
 
   const getStepText = () => {
     switch (processingStep) {
-      case 'analyzing': return 'Mahsulot tahlil qilinmoqda...';
-      case 'enhancing': return 'Infografik rasm yaratilmoqda...';
-      case 'uploading': return 'Rasm yuklanmoqda...';
-      case 'done': return 'Tayyor!';
+      case 'searching': return '🔍 Web\'dan o\'xshash mahsulotlar qidirilmoqda...';
+      case 'generating': return '🎨 Flux Pro bilan professional rasm yaratilmoqda...';
+      case 'uploading': return '📤 Rasmlar yuklanmoqda...';
+      case 'done': return '✅ Tayyor!';
       default: return '';
     }
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setImageFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setOriginalImage(reader.result as string);
-        setEnhancedImage(null);
-      };
-      reader.readAsDataURL(file);
-      setAiResult(null);
-      setProcessingStep('idle');
-    }
-  };
-
-  const clearImage = () => {
-    setOriginalImage(null);
-    setEnhancedImage(null);
-    setImageFile(null);
-    setAiResult(null);
-    setProcessingStep('idle');
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-
-  const processWithAI = async () => {
-    if (!originalImage) {
-      toast.error('Iltimos, avval rasm yuklang');
+  // Google Lens-like search - find products from web
+  const searchProducts = async () => {
+    if (!searchQuery.trim()) {
+      toast.error('Iltimos, mahsulot nomini kiriting');
       return;
     }
 
+    setProcessingStep('searching');
+    setWebProducts([]);
+    setSelectedProduct(null);
+    setProductImages([]);
+
     try {
-      // Step 1: Analyze the image
-      setProcessingStep('analyzing');
-      const { data: analysisData, error: analysisError } = await supabase.functions.invoke('analyze-product-image', {
-        body: { imageBase64: originalImage },
-      });
-
-      if (analysisError) throw analysisError;
-
-      setAiResult(analysisData);
-      setFormData(prev => ({
-        ...prev,
-        name: analysisData.name,
-        description: analysisData.description,
-        price: analysisData.suggestedPrice,
-      }));
-
-      // Match category
-      const matchedCategory = categories.find(
-        cat => cat.name.toLowerCase().includes(analysisData.category.toLowerCase()) ||
-               analysisData.category.toLowerCase().includes(cat.name.toLowerCase())
-      );
-      if (matchedCategory) {
-        setFormData(prev => ({ ...prev, category_id: matchedCategory.id }));
-      }
-
-      // Step 2: Generate infographic-style marketplace image
-      setProcessingStep('enhancing');
-      
-      // Map category name to infographic style
-      const categoryMapping: Record<string, string> = {
-        'elektronika': 'electronics',
-        'electronics': 'electronics',
-        'texnika': 'electronics',
-        'telefonlar': 'electronics',
-        'kosmetika': 'cosmetics',
-        'cosmetics': 'cosmetics',
-        'go\'zallik': 'cosmetics',
-        'beauty': 'cosmetics',
-        'parfyumeriya': 'cosmetics',
-        'kiyim': 'clothing',
-        'clothing': 'clothing',
-        'fashion': 'clothing',
-        'poyabzal': 'clothing',
-        'oziq-ovqat': 'food',
-        'food': 'food',
-        'ichimliklar': 'food',
-        'uy': 'home',
-        'home': 'home',
-        'mebel': 'home',
-        'oshxona': 'home',
-      };
-      
-      const categoryStyle = matchedCategory 
-        ? categoryMapping[matchedCategory.name.toLowerCase()] || analysisData.category.toLowerCase()
-        : analysisData.category.toLowerCase();
-      
-      const { data: enhanceData, error: enhanceError } = await supabase.functions.invoke('enhance-product-image', {
+      // Search for similar products across marketplaces
+      const { data, error } = await supabase.functions.invoke('search-similar-products', {
         body: { 
-          imageBase64: originalImage,
-          productName: analysisData.name,
-          productDescription: analysisData.description,
-          category: categoryStyle
+          productName: searchQuery.trim(),
+          category: '',
+          description: ''
         },
       });
 
-      if (enhanceError) {
-        console.error('Image enhancement failed:', enhanceError);
-        toast.warning('Rasm yaxshilash ishlamadi, asl rasm ishlatiladi');
-      } else if (enhanceData?.enhancedImageBase64) {
-        setEnhancedImage(enhanceData.enhancedImageBase64);
-      }
+      if (error) throw error;
 
-      setProcessingStep('done');
-      toast.success('AI tahlil va infografik rasm tayyor!');
+      const products = data?.products || [];
+      setWebProducts(products);
+
+      if (products.length === 0) {
+        toast.info('Mahsulot topilmadi. Rasm generatsiya qilinadi...');
+        // Auto-generate image if no products found
+        await generateProductImage(searchQuery);
+      } else {
+        toast.success(`${products.length} ta o'xshash mahsulot topildi!`);
+        setProcessingStep('idle');
+      }
     } catch (error: any) {
-      console.error('AI processing error:', error);
-      toast.error('AI ishlov berishda xatolik yuz berdi');
+      console.error('Search error:', error);
+      toast.error('Qidiruv xatosi: ' + (error.message || 'Noma\'lum xato'));
       setProcessingStep('idle');
+    }
+  };
+
+  // Select a product from search results
+  const selectProduct = (product: WebProduct) => {
+    setSelectedProduct(product);
+    
+    // Parse price from string
+    const priceMatch = product.price.match(/[\d\s,]+/);
+    const priceValue = priceMatch 
+      ? parseInt(priceMatch[0].replace(/\s/g, '').replace(',', '')) 
+      : 0;
+    
+    setFormData(prev => ({
+      ...prev,
+      name: product.title,
+      description: product.description || '',
+      price: priceValue,
+    }));
+
+    // If product has good image, use it
+    if (product.image && product.image.startsWith('http')) {
+      setProductImages([product.image]);
+    }
+    
+    // Match category
+    const matchedCategory = categories.find(
+      cat => product.title.toLowerCase().includes(cat.name.toLowerCase()) ||
+             cat.name.toLowerCase().includes(product.title.toLowerCase().split(' ')[0])
+    );
+    if (matchedCategory) {
+      setFormData(prev => ({ ...prev, category_id: matchedCategory.id }));
+    }
+  };
+
+  // Generate professional product image with Flux Pro
+  const generateProductImage = useCallback(async (productName: string) => {
+    setIsGeneratingImages(true);
+    setProcessingStep('generating');
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-product-image', {
+        body: { 
+          productName: productName || formData.name || searchQuery,
+          category: categories.find(c => c.id === formData.category_id)?.name || '',
+          style: 'marketplace'
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.imageUrl) {
+        setProductImages(prev => [...prev, data.imageUrl]);
+        toast.success('Professional rasm yaratildi!');
+      } else if (data?.images && data.images.length > 0) {
+        setProductImages(prev => [...prev, ...data.images]);
+        toast.success(`${data.images.length} ta rasm yaratildi!`);
+      }
+      
+      setProcessingStep('done');
+    } catch (error: any) {
+      console.error('Image generation error:', error);
+      toast.error('Rasm yaratishda xatolik: ' + (error.message || 'Noma\'lum xato'));
+      setProcessingStep('idle');
+    } finally {
+      setIsGeneratingImages(false);
+    }
+  }, [formData.name, formData.category_id, categories, searchQuery]);
+
+  // Use AI-analyzed product data
+  const useAsProduct = () => {
+    if (!selectedProduct && !searchQuery) return;
+    
+    const name = selectedProduct?.title || searchQuery;
+    setFormData(prev => ({
+      ...prev,
+      name: name,
+      description: selectedProduct?.description || `${name} - sifatli va ishonchli mahsulot`,
+    }));
+    
+    setProcessingStep('done');
+  };
+
+  // Upload image to storage
+  const uploadImageToStorage = async (imageUrl: string): Promise<string | null> => {
+    try {
+      // If already a public URL from our storage, return as is
+      if (imageUrl.includes('supabase') && imageUrl.includes('product-images')) {
+        return imageUrl;
+      }
+      
+      // For external URLs, we'll use them directly (most marketplaces allow this)
+      if (imageUrl.startsWith('http')) {
+        return imageUrl;
+      }
+      
+      // For base64 images, upload to storage
+      if (imageUrl.startsWith('data:')) {
+        const base64Data = imageUrl.split(',')[1];
+        const byteCharacters = atob(base64Data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'image/jpeg' });
+
+        const fileName = `${shopId}/${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
+
+        const { error } = await supabase.storage
+          .from('product-images')
+          .upload(fileName, blob, {
+            contentType: 'image/jpeg',
+            upsert: false,
+          });
+
+        if (error) {
+          console.error('Storage upload error:', error);
+          return null;
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('product-images')
+          .getPublicUrl(fileName);
+
+        return publicUrl;
+      }
+      
+      return imageUrl;
+    } catch (error) {
+      console.error('Image upload error:', error);
+      return null;
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!formData.name) {
+      toast.error('Mahsulot nomini kiriting');
+      return;
+    }
+    
     setProcessingStep('uploading');
-    let imageUrl: string | null = null;
     
-    // Upload enhanced image or original
-    const imageToUpload = enhancedImage || originalImage;
-    
-    if (imageToUpload) {
-      try {
-        // Convert base64 to blob
-        const response = await fetch(imageToUpload);
-        const blob = await response.blob();
-        
-        const fileName = `${shopId}/${Date.now()}-ai-product.${blob.type.includes('png') ? 'png' : 'jpg'}`;
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('product-images')
-          .upload(fileName, blob, {
-            contentType: blob.type
-          });
-
-        if (uploadError) {
-          toast.error('Rasm yuklashda xatolik');
-          setProcessingStep('done');
-          return;
-        }
-
-        const { data: urlData } = supabase.storage
-          .from('product-images')
-          .getPublicUrl(fileName);
-        
-        imageUrl = urlData.publicUrl;
-      } catch (err) {
-        console.error('Image upload error:', err);
-        toast.error('Rasm yuklashda xatolik');
-        setProcessingStep('done');
-        return;
-      }
+    // Upload all images
+    const uploadedImages: string[] = [];
+    for (const img of productImages) {
+      const url = await uploadImageToStorage(img);
+      if (url) uploadedImages.push(url);
     }
 
     await onSubmit({
@@ -237,9 +310,9 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
       price: formData.price || 0,
       stock_quantity: formData.stock_quantity || 0,
       category_id: formData.category_id,
-      status: 'active', // Always active so it shows in marketplace
+      status: 'active',
       source: 'ai',
-      images: imageUrl ? [imageUrl] : [],
+      images: uploadedImages,
     });
     
     setProcessingStep('idle');
@@ -249,77 +322,40 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {/* Image Upload */}
-      <div className="space-y-2">
-        <Label>{t.uploadImage}</Label>
-        <div className="relative">
-          {originalImage ? (
-            <div className="space-y-4">
-              {/* Original vs Enhanced comparison */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="relative">
-                  <p className="text-xs text-muted-foreground mb-2 text-center">Asl rasm</p>
-                  <div className="rounded-lg overflow-hidden border">
-                    <img
-                      src={originalImage}
-                      alt="Original"
-                      className="w-full h-32 object-cover"
-                    />
-                  </div>
-                </div>
-                <div className="relative">
-                  <p className="text-xs text-muted-foreground mb-2 text-center">
-                    {enhancedImage ? 'AI infografik' : 'AI infografik yaratadi'}
-                  </p>
-                  <div className="rounded-lg overflow-hidden border">
-                    {enhancedImage ? (
-                      <img
-                        src={enhancedImage}
-                        alt="Enhanced"
-                        className="w-full h-32 object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-32 bg-muted flex items-center justify-center">
-                        <Wand2 className="h-8 w-8 text-muted-foreground" />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-              
-              <Button
-                type="button"
-                variant="destructive"
-                size="sm"
-                className="w-full"
-                onClick={clearImage}
-                disabled={isProcessing}
-              >
-                <X className="h-4 w-4 mr-2" />
-                Rasmni o'chirish
-              </Button>
-            </div>
-          ) : (
-            <Card
-              className="border-dashed cursor-pointer hover:border-primary transition-colors"
-              onClick={() => fileInputRef.current?.click()}
+      {/* Search Input - Google Lens Style */}
+      <Card className="border-primary/20">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Search className="h-4 w-4 text-primary" />
+            Mahsulotni qidiring
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex gap-2">
+            <Input
+              placeholder="Mahsulot nomini kiriting... (masalan: iPhone 15 Pro)"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), searchProducts())}
+              className="flex-1"
+            />
+            <Button 
+              type="button" 
+              onClick={searchProducts}
+              disabled={isProcessing || !searchQuery.trim()}
             >
-              <CardContent className="flex flex-col items-center justify-center py-8">
-                <ImageIcon className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-sm text-muted-foreground">{t.uploadImage}</p>
-                <p className="text-xs text-muted-foreground mt-1">AI rasm sifatini yaxshilaydi</p>
-              </CardContent>
-            </Card>
-          )}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleImageChange}
-            className="hidden"
-          />
-        </div>
-      </div>
+              {processingStep === 'searching' ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Search className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            🔍 Google Lens kabi - mahsulot nomini yozing, AI web'dan o'xshash mahsulotlarni topadi
+          </p>
+        </CardContent>
+      </Card>
 
       {/* Progress indicator */}
       {isProcessing && (
@@ -332,37 +368,140 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
         </div>
       )}
 
-      {/* AI Process Button */}
-      {originalImage && !aiResult && processingStep === 'idle' && (
-        <Button
-          type="button"
-          variant="secondary"
-          className="w-full"
-          onClick={processWithAI}
-          disabled={isProcessing}
-        >
-          <Sparkles className="mr-2 h-4 w-4" />
-          AI bilan tahlil qilish va infografik yaratish
-        </Button>
+      {/* Search Results */}
+      {webProducts.length > 0 && !selectedProduct && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Globe className="h-4 w-4" />
+              Web'dan topilgan mahsulotlar
+              <Badge variant="secondary" className="ml-auto">{webProducts.length} ta</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ScrollArea className="h-64">
+              <div className="space-y-2">
+                {webProducts.map((product, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center gap-3 p-2 rounded-lg border hover:bg-accent/50 cursor-pointer transition-colors"
+                    onClick={() => selectProduct(product)}
+                  >
+                    <ProductImage
+                      src={product.image}
+                      alt={product.title}
+                      className="w-14 h-14 rounded object-cover flex-shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">{product.title}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Badge variant="outline" className="text-xs">{product.source}</Badge>
+                        <span className="text-sm font-semibold text-primary">{product.price}</span>
+                      </div>
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+            
+            {/* Option to generate custom image */}
+            <div className="mt-4 pt-4 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => generateProductImage(searchQuery)}
+                disabled={isGeneratingImages}
+              >
+                {isGeneratingImages ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Wand2 className="h-4 w-4 mr-2" />
+                )}
+                Flux Pro bilan yangi rasm yaratish
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
-      {/* AI Result / Form */}
-      {aiResult && (
+      {/* Selected Product / Form */}
+      {(selectedProduct || processingStep === 'done') && (
         <Card className="bg-primary/5 border-primary/20">
           <CardContent className="pt-4">
             <div className="flex items-center gap-2 mb-3">
               <Sparkles className="h-4 w-4 text-primary" />
-              <span className="font-medium text-primary">{t.aiSuggestion}</span>
+              <span className="font-medium text-primary">Mahsulot ma'lumotlari</span>
               {processingStep === 'done' && (
                 <Check className="h-4 w-4 text-green-500 ml-auto" />
               )}
             </div>
+            
+            {/* Product Images */}
+            {productImages.length > 0 && (
+              <div className="mb-4">
+                <Label className="mb-2 block">Rasmlar</Label>
+                <div className="flex gap-2 flex-wrap">
+                  {productImages.map((img, idx) => (
+                    <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border">
+                      <ProductImage
+                        src={img}
+                        alt={`Product ${idx + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="w-20 h-20"
+                    onClick={() => generateProductImage(formData.name || searchQuery)}
+                    disabled={isGeneratingImages}
+                  >
+                    {isGeneratingImages ? (
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    ) : (
+                      <Wand2 className="h-6 w-6" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+            
+            {/* No images yet - generate button */}
+            {productImages.length === 0 && (
+              <div className="mb-4">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="w-full"
+                  onClick={() => generateProductImage(formData.name || searchQuery)}
+                  disabled={isGeneratingImages}
+                >
+                  {isGeneratingImages ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Flux Pro ishlamoqda...
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="h-4 w-4 mr-2" />
+                      Flux Pro bilan professional rasm yaratish
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
+            
             <div className="space-y-4">
               <div>
                 <Label>{t.productName}</Label>
                 <Input
                   value={formData.name}
                   onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="Mahsulot nomi"
                 />
               </div>
               <div>
@@ -371,6 +510,7 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
                   value={formData.description || ''}
                   onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                   rows={3}
+                  placeholder="Mahsulot tavsifi"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -410,6 +550,19 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Quick create without search */}
+      {!selectedProduct && webProducts.length === 0 && processingStep === 'idle' && searchQuery && (
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          onClick={useAsProduct}
+        >
+          <Package className="h-4 w-4 mr-2" />
+          "{searchQuery}" nomli mahsulot yaratish
+        </Button>
       )}
 
       <div className="flex justify-end gap-2 pt-4">
