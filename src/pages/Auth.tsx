@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,6 +14,7 @@ import { z } from 'zod';
 
 const emailSchema = z.string().email();
 const passwordSchema = z.string().min(6);
+const phoneSchema = z.string().regex(/^\+998\s?\d{2}\s?\d{3}\s?\d{2}\s?\d{2}$/, 'Telefon raqami noto\'g\'ri formatda');
 
 export default function Auth() {
   const { t } = useLanguage();
@@ -32,6 +34,7 @@ export default function Auth() {
     password: '',
     confirmPassword: '',
     fullName: '',
+    phone: '',
   });
   
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -67,6 +70,19 @@ export default function Auth() {
     if (mode === 'register') {
       if (formData.password !== formData.confirmPassword) {
         newErrors.confirmPassword = t.passwordMismatch;
+      }
+      
+      if (!formData.fullName.trim()) {
+        newErrors.fullName = 'Ism familiya kiritish shart';
+      }
+      
+      if (!formData.phone) {
+        newErrors.phone = 'Telefon raqami kiritish shart';
+      } else {
+        const cleanPhone = formData.phone.replace(/\s/g, '');
+        if (!phoneSchema.safeParse(cleanPhone).success) {
+          newErrors.phone = 'Telefon raqami noto\'g\'ri formatda. Masalan: +998 90 123 45 67';
+        }
       }
     }
     
@@ -109,6 +125,15 @@ export default function Auth() {
             variant: 'destructive',
           });
         } else {
+          // Update profile with phone number after signup
+          const { data: { user: newUser } } = await supabase.auth.getUser();
+          if (newUser) {
+            await supabase
+              .from('profiles')
+              .update({ phone: formData.phone.replace(/\s/g, '') })
+              .eq('user_id', newUser.id);
+          }
+          
           toast({
             title: 'Muvaffaqiyat',
             description: t.registrationSuccess,
@@ -135,6 +160,34 @@ export default function Auth() {
     // Clear error when user starts typing
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
+    }
+  };
+
+  // Format phone number as user types
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/[^\d+]/g, '');
+    
+    // Add +998 prefix if not present
+    if (value && !value.startsWith('+')) {
+      value = '+' + value;
+    }
+    if (value.length > 0 && !value.startsWith('+998')) {
+      value = '+998' + value.replace('+', '');
+    }
+    
+    // Format: +998 XX XXX XX XX
+    if (value.length > 4) {
+      const parts = [value.slice(0, 4)];
+      if (value.length > 4) parts.push(value.slice(4, 6));
+      if (value.length > 6) parts.push(value.slice(6, 9));
+      if (value.length > 9) parts.push(value.slice(9, 11));
+      if (value.length > 11) parts.push(value.slice(11, 13));
+      value = parts.join(' ');
+    }
+    
+    setFormData(prev => ({ ...prev, phone: value }));
+    if (errors.phone) {
+      setErrors(prev => ({ ...prev, phone: '' }));
     }
   };
 
@@ -165,17 +218,39 @@ export default function Auth() {
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
             {mode === 'register' && (
-              <div className="space-y-2">
-                <Label htmlFor="fullName">{t.fullName}</Label>
-                <Input
-                  id="fullName"
-                  name="fullName"
-                  type="text"
-                  value={formData.fullName}
-                  onChange={handleChange}
-                  placeholder="Ism Familiya"
-                />
-              </div>
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="fullName">{t.fullName} *</Label>
+                  <Input
+                    id="fullName"
+                    name="fullName"
+                    type="text"
+                    value={formData.fullName}
+                    onChange={handleChange}
+                    placeholder="Ism Familiya"
+                    className={errors.fullName ? 'border-destructive' : ''}
+                  />
+                  {errors.fullName && (
+                    <p className="text-sm text-destructive">{errors.fullName}</p>
+                  )}
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="phone">{t.phone} *</Label>
+                  <Input
+                    id="phone"
+                    name="phone"
+                    type="tel"
+                    value={formData.phone}
+                    onChange={handlePhoneChange}
+                    placeholder="+998 90 123 45 67"
+                    className={errors.phone ? 'border-destructive' : ''}
+                  />
+                  {errors.phone && (
+                    <p className="text-sm text-destructive">{errors.phone}</p>
+                  )}
+                </div>
+              </>
             )}
             
             <div className="space-y-2">

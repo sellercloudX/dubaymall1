@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -20,8 +20,13 @@ import {
   Truck,
   MapPin,
   Loader2,
-  CheckCircle
+  CheckCircle,
+  Pencil
 } from 'lucide-react';
+
+// Installment calculation formulas
+const calculateInstallment24 = (price: number): number => Math.round((price * 1.6) / 24);
+const calculateInstallment12 = (price: number): number => Math.round((price * 1.45) / 12);
 
 export default function CheckoutPage() {
   const { t } = useLanguage();
@@ -30,10 +35,12 @@ export default function CheckoutPage() {
   const navigate = useNavigate();
   
   const [loading, setLoading] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [orderNumber, setOrderNumber] = useState('');
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [pendingOrder, setPendingOrder] = useState<{ id: string; orderNumber: string } | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -45,12 +52,76 @@ export default function CheckoutPage() {
     paymentMethod: 'cash',
   });
 
+  // Load profile data on mount
+  useEffect(() => {
+    const loadProfile = async () => {
+      if (!user) {
+        setProfileLoading(false);
+        return;
+      }
+
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name, phone, region, city, address')
+          .eq('user_id', user.id)
+          .single();
+
+        if (profile) {
+          setFormData(prev => ({
+            ...prev,
+            name: profile.full_name || '',
+            phone: profile.phone || '',
+            region: profile.region || '',
+            city: profile.city || '',
+            address: profile.address || '',
+          }));
+          // If all required fields are filled, don't show edit mode
+          if (profile.full_name && profile.phone && profile.region && profile.city && profile.address) {
+            setIsEditing(false);
+          } else {
+            setIsEditing(true);
+          }
+        } else {
+          setIsEditing(true);
+        }
+      } catch (error) {
+        console.error('Error loading profile:', error);
+        setIsEditing(true);
+      } finally {
+        setProfileLoading(false);
+      }
+    };
+
+    loadProfile();
+  }, [user]);
+
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('uz-UZ').format(price) + " so'm";
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  // Save address to profile when submitting
+  const saveAddressToProfile = async () => {
+    if (!user) return;
+    
+    try {
+      await supabase
+        .from('profiles')
+        .update({
+          full_name: formData.name,
+          phone: formData.phone,
+          region: formData.region,
+          city: formData.city,
+          address: formData.address,
+        })
+        .eq('user_id', user.id);
+    } catch (error) {
+      console.error('Error saving address:', error);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -66,9 +137,19 @@ export default function CheckoutPage() {
       return;
     }
 
+    // Validate phone number format
+    const phoneRegex = /^\+998\s?\d{2}\s?\d{3}\s?\d{2}\s?\d{2}$/;
+    if (!phoneRegex.test(formData.phone.replace(/\s/g, '').replace('+998', '+998 '))) {
+      toast.error('Telefon raqami noto\'g\'ri formatda. Masalan: +998 90 123 45 67');
+      return;
+    }
+
     setLoading(true);
 
     try {
+      // Save address to profile for future use
+      await saveAddressToProfile();
+
       // Generate order number
       const orderNum = 'ORD-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-' + 
         Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -240,82 +321,129 @@ export default function CheckoutPage() {
               {/* Shipping Address */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <MapPin className="h-5 w-5" />
-                    {t.shippingAddress || 'Yetkazib berish manzili'}
+                  <CardTitle className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-5 w-5" />
+                      {t.shippingAddress || 'Yetkazib berish manzili'}
+                    </div>
+                    {!isEditing && formData.name && (
+                      <Button 
+                        type="button"
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => setIsEditing(true)}
+                        className="gap-1"
+                      >
+                        <Pencil className="h-4 w-4" />
+                        Tahrirlash
+                      </Button>
+                    )}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">{t.fullName} *</Label>
-                      <Input
-                        id="name"
-                        name="name"
-                        value={formData.name}
-                        onChange={handleInputChange}
-                        placeholder="Ismingiz"
-                        required
-                      />
+                  {profileLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="phone">{t.phone} *</Label>
-                      <Input
-                        id="phone"
-                        name="phone"
-                        value={formData.phone}
-                        onChange={handleInputChange}
-                        placeholder="+998 90 123 45 67"
-                        required
-                      />
+                  ) : !isEditing && formData.name && formData.phone && formData.region && formData.city && formData.address ? (
+                    // Show saved address in read mode
+                    <div className="space-y-3 py-2">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-1">
+                          <p className="font-medium text-foreground">{formData.name}</p>
+                          <p className="text-sm text-muted-foreground">{formData.phone}</p>
+                        </div>
+                      </div>
+                      <div className="text-sm text-foreground">
+                        <p>{formData.region}, {formData.city}</p>
+                        <p>{formData.address}</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="region">{t.region || 'Viloyat'} *</Label>
-                      <Input
-                        id="region"
-                        name="region"
-                        value={formData.region}
-                        onChange={handleInputChange}
-                        placeholder="Toshkent viloyati"
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="city">{t.city || 'Shahar/Tuman'} *</Label>
-                      <Input
-                        id="city"
-                        name="city"
-                        value={formData.city}
-                        onChange={handleInputChange}
-                        placeholder="Toshkent"
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="address">{t.address || 'To\'liq manzil'} *</Label>
-                    <Input
-                      id="address"
-                      name="address"
-                      value={formData.address}
-                      onChange={handleInputChange}
-                      placeholder="Ko'cha, uy raqami"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="notes">{t.notes || 'Izoh'}</Label>
-                    <Textarea
-                      id="notes"
-                      name="notes"
-                      value={formData.notes}
-                      onChange={handleInputChange}
-                      placeholder="Qo'shimcha ma'lumotlar..."
-                      rows={3}
-                    />
-                  </div>
+                  ) : (
+                    // Edit mode - show form
+                    <>
+                      <div className="grid sm:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="name">{t.fullName} *</Label>
+                          <Input
+                            id="name"
+                            name="name"
+                            value={formData.name}
+                            onChange={handleInputChange}
+                            placeholder="Ismingiz"
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="phone">{t.phone} *</Label>
+                          <Input
+                            id="phone"
+                            name="phone"
+                            value={formData.phone}
+                            onChange={handleInputChange}
+                            placeholder="+998 90 123 45 67"
+                            required
+                          />
+                        </div>
+                      </div>
+                      <div className="grid sm:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="region">{t.region || 'Viloyat'} *</Label>
+                          <Input
+                            id="region"
+                            name="region"
+                            value={formData.region}
+                            onChange={handleInputChange}
+                            placeholder="Toshkent viloyati"
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="city">{t.city || 'Shahar/Tuman'} *</Label>
+                          <Input
+                            id="city"
+                            name="city"
+                            value={formData.city}
+                            onChange={handleInputChange}
+                            placeholder="Toshkent"
+                            required
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="address">{t.address || 'To\'liq manzil'} *</Label>
+                        <Input
+                          id="address"
+                          name="address"
+                          value={formData.address}
+                          onChange={handleInputChange}
+                          placeholder="Ko'cha, uy raqami"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="notes">{t.notes || 'Izoh'}</Label>
+                        <Textarea
+                          id="notes"
+                          name="notes"
+                          value={formData.notes}
+                          onChange={handleInputChange}
+                          placeholder="Qo'shimcha ma'lumotlar..."
+                          rows={3}
+                        />
+                      </div>
+                      {!profileLoading && isEditing && formData.name && (
+                        <Button 
+                          type="button"
+                          variant="outline"
+                          onClick={() => setIsEditing(false)}
+                          className="w-full"
+                        >
+                          Bekor qilish
+                        </Button>
+                      )}
+                    </>
+                  )}
                 </CardContent>
               </Card>
 
