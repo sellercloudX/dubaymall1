@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+ import { Suspense, lazy } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,7 +7,9 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { MessageCircle, X, Send, Loader2, Bot, User } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
+ 
+ // Lazy load react-markdown to reduce initial bundle size
+ const ReactMarkdown = lazy(() => import('react-markdown'));
 
 interface Message {
   role: 'user' | 'assistant';
@@ -126,7 +129,9 @@ export function AIChat({ context }: AIChatProps) {
                       >
                         {message.role === 'assistant' ? (
                           <div className="prose prose-sm dark:prose-invert max-w-none">
-                            <ReactMarkdown>{message.content}</ReactMarkdown>
+                             <Suspense fallback={<span className="text-sm">{message.content}</span>}>
+                               <ReactMarkdown>{message.content}</ReactMarkdown>
+                             </Suspense>
                           </div>
                         ) : (
                           <p className="text-sm">{message.content}</p>
