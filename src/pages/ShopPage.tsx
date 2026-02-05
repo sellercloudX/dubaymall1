@@ -1,32 +1,18 @@
-import { useParams, Link } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useShopBySlug } from '@/hooks/useShop';
 import { usePublicProducts } from '@/hooks/useProducts';
-import { useCart } from '@/contexts/CartContext';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Store, Package, Star, ShoppingCart, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { ProductCard } from '@/components/marketplace/ProductCard';
+import { Store, Package, Star, Loader2 } from 'lucide-react';
 
 export default function ShopPage() {
   const { slug } = useParams<{ slug: string }>();
   const { t } = useLanguage();
-  const { shop, loading: shopLoading, error } = useShopBySlug(slug || '');
+  const { shop, loading: shopLoading } = useShopBySlug(slug || '');
   const { products, loading: productsLoading } = usePublicProducts({ shopId: shop?.id });
-  const { addToCart } = useCart();
-
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('uz-UZ').format(price) + " so'm";
-  };
-
-  const handleAddToCart = async (e: React.MouseEvent, productId: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    await addToCart(productId);
-    toast.success("Savatga qo'shildi");
-  };
 
   if (shopLoading) {
     return (
@@ -106,52 +92,9 @@ export default function ShopPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
             {products.map((product) => (
-              <Link key={product.id} to={`/product/${product.id}`}>
-                <Card className="overflow-hidden group h-full hover:shadow-lg transition-shadow">
-                  <div className="aspect-square relative overflow-hidden bg-muted">
-                    {product.images && product.images.length > 0 ? (
-                      <img
-                        src={product.images[0]}
-                        alt={product.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Package className="h-12 w-12 text-muted-foreground" />
-                      </div>
-                    )}
-                    {product.original_price && product.original_price > product.price && (
-                      <Badge className="absolute top-2 left-2 bg-destructive">
-                        -{Math.round((1 - product.price / product.original_price) * 100)}%
-                      </Badge>
-                    )}
-                  </div>
-                  <CardContent className="p-3">
-                    <div className="mb-2">
-                      <p className="font-bold text-primary">{formatPrice(product.price)}</p>
-                      {product.original_price && product.original_price > product.price && (
-                        <p className="text-xs text-muted-foreground line-through">
-                          {formatPrice(product.original_price)}
-                        </p>
-                      )}
-                    </div>
-                    <h3 className="font-medium line-clamp-2 text-sm">{product.name}</h3>
-                    <div className="mt-2">
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        className="w-full"
-                        onClick={(e) => handleAddToCart(e, product.id)}
-                      >
-                        <ShoppingCart className="h-4 w-4 mr-2" />
-                        Savatga
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
+              <ProductCard key={product.id} product={product} />
             ))}
           </div>
         )}
