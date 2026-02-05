@@ -18,7 +18,7 @@
     --popover-foreground: 222 47% 11%;
 
     /* Primary - Deep Blue (Trust & Finance) */
-    --primary: 217 91% 60%;
+    --primary: 217 91% 50%;
     --primary-foreground: 0 0% 100%;
 
     /* Secondary - Slate */
@@ -48,16 +48,16 @@
     /* Border & Input */
     --border: 214 32% 91%;
     --input: 214 32% 91%;
-    --ring: 217 91% 60%;
+    --ring: 217 91% 50%;
 
     --radius: 0.75rem;
 
     /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%) 0%, hsl(250 95% 64%) 100%);
+    --gradient-primary: linear-gradient(135deg, hsl(217 91% 50%) 0%, hsl(250 95% 54%) 100%);
     --gradient-success: linear-gradient(135deg, hsl(160 84% 39%) 0%, hsl(172 66% 50%) 100%);
     --gradient-premium: linear-gradient(135deg, hsl(38 92% 50%) 0%, hsl(25 95% 53%) 100%);
-    --gradient-mesh: radial-gradient(at 40% 20%, hsl(217 91% 60% / 0.15) 0px, transparent 50%),
-                     radial-gradient(at 80% 0%, hsl(250 95% 64% / 0.1) 0px, transparent 50%),
+    --gradient-mesh: radial-gradient(at 40% 20%, hsl(217 91% 50% / 0.15) 0px, transparent 50%),
+                     radial-gradient(at 80% 0%, hsl(250 95% 54% / 0.1) 0px, transparent 50%),
                      radial-gradient(at 0% 50%, hsl(160 84% 39% / 0.1) 0px, transparent 50%);
 
     /* Shadows - Soft & Modern */
@@ -68,23 +68,23 @@
     --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.08), 0 4px 6px -4px hsl(0 0% 0% / 0.05);
     --shadow-xl: 0 20px 25px -5px hsl(0 0% 0% / 0.1), 0 8px 10px -6px hsl(0 0% 0% / 0.05);
     --shadow-2xl: 0 25px 50px -12px hsl(0 0% 0% / 0.15);
-    --shadow-glow: 0 0 40px -10px hsl(217 91% 60% / 0.3);
+    --shadow-glow: 0 0 40px -10px hsl(217 91% 50% / 0.3);
     --shadow-glow-success: 0 0 40px -10px hsl(160 84% 39% / 0.3);
 
     /* Sidebar */
     --sidebar-background: 0 0% 99%;
     --sidebar-foreground: 222 47% 11%;
-    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary: 217 91% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 250 95% 64%;
+    --sidebar-accent: 250 95% 54%;
     --sidebar-accent-foreground: 0 0% 100%;
     --sidebar-border: 214 32% 91%;
-    --sidebar-ring: 217 91% 60%;
+    --sidebar-ring: 217 91% 50%;
     --sidebar: 0 0% 99%;
 
     /* Charts */
-    --chart-1: 217 91% 60%;
-    --chart-2: 250 95% 64%;
+    --chart-1: 217 91% 50%;
+    --chart-2: 250 95% 54%;
     --chart-3: 160 84% 39%;
     --chart-4: 38 92% 50%;
     --chart-5: 0 84% 60%;
