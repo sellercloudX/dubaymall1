@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+ import { useUserRoles } from '@/hooks/useUserRoles';
 import { useShop } from '@/hooks/useShop';
 import { useProducts } from '@/hooks/useProducts';
 import { Layout } from '@/components/Layout';
@@ -40,6 +41,7 @@ export default function SellerDashboard() {
   const { user, loading: authLoading } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
+   const { isSeller, loading: rolesLoading } = useUserRoles();
   const { shop, loading: shopLoading, refetch: refetchShop } = useShop();
   const { products, loading: productsLoading, createProduct, updateProduct, deleteProduct, refetch: refetchProducts } = useProducts(shop?.id || null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -52,6 +54,13 @@ export default function SellerDashboard() {
     }
   }, [user, authLoading, navigate]);
 
+   // Redirect if not a seller
+   useEffect(() => {
+     if (!authLoading && !rolesLoading && user && !isSeller) {
+       navigate('/partnership');
+     }
+   }, [user, authLoading, rolesLoading, isSeller, navigate]);
+ 
   const handleCreateProduct = async (data: TablesInsert<'products'>) => {
     try {
       await createProduct(data);
@@ -93,7 +102,7 @@ export default function SellerDashboard() {
     refetchProducts();
   };
 
-  if (authLoading || shopLoading) {
+   if (authLoading || shopLoading || rolesLoading) {
     return (
       <Layout>
         <div className="flex items-center justify-center min-h-[60vh]">
@@ -103,6 +112,10 @@ export default function SellerDashboard() {
     );
   }
 
+   if (!isSeller) {
+     return null; // Will redirect
+   }
+ 
   if (!shop) {
     return (
       <Layout>
