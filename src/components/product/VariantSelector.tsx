@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { Check } from 'lucide-react';
 import type { ProductVariant } from '@/hooks/useProductVariants';
@@ -15,23 +15,38 @@ export function VariantSelector({
   onImageChange 
 }: VariantSelectorProps) {
   const [selected, setSelected] = useState<Record<string, ProductVariant | null>>({});
+  const initializedRef = useRef(false);
+  const variantIdsRef = useRef<string>('');
 
-  // Initialize with first variant of each type
+  // Only initialize once when variants first load, not on every re-render
   useEffect(() => {
-    const initial: Record<string, ProductVariant | null> = {};
-    Object.entries(variantsByType).forEach(([type, variants]) => {
-      if (variants.length > 0) {
-        initial[type] = variants[0];
-      }
-    });
-    setSelected(initial);
-    onVariantChange(initial);
+    // Create a stable identifier for the variants
+    const variantIds = Object.values(variantsByType)
+      .flat()
+      .map(v => v.id)
+      .sort()
+      .join(',');
     
-    // Set initial image from color variant if exists
-    if (initial.color?.image_url) {
-      onImageChange?.(initial.color.image_url);
+    // Only initialize if variants changed or not initialized yet
+    if (variantIds && variantIds !== variantIdsRef.current) {
+      variantIdsRef.current = variantIds;
+      
+      const initial: Record<string, ProductVariant | null> = {};
+      Object.entries(variantsByType).forEach(([type, variants]) => {
+        if (variants.length > 0) {
+          initial[type] = variants[0];
+        }
+      });
+      setSelected(initial);
+      onVariantChange(initial);
+      
+      // Set initial image from color variant if exists
+      if (initial.color?.image_url) {
+        onImageChange?.(initial.color.image_url);
+      }
+      initializedRef.current = true;
     }
-  }, [variantsByType]);
+  }, [variantsByType, onVariantChange, onImageChange]);
 
   const handleSelect = (type: string, variant: ProductVariant) => {
     const newSelected = { ...selected, [type]: variant };
