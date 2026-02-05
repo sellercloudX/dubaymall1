@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
- import { useVirtualizer } from '@tanstack/react-virtual';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import {
   Select,
   SelectContent,
@@ -11,8 +11,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
- import { ShoppingCart, RefreshCw, User, ChevronRight, WifiOff } from 'lucide-react';
-import { format } from 'date-fns';
+import { ShoppingCart, RefreshCw, User, ChevronRight, WifiOff, Clock, Package } from 'lucide-react';
+import { format, parse, isValid } from 'date-fns';
 import {
   Dialog,
   DialogContent,
@@ -20,7 +20,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
- import { useMarketplaceOrders, useInvalidateMarketplaceData } from '@/hooks/useMarketplaceData';
+import { useMarketplaceOrders, useInvalidateMarketplaceData } from '@/hooks/useMarketplaceData';
 
  interface MobileOrdersProps {
    connectedMarketplaces: string[];
@@ -56,72 +56,140 @@ const ORDER_STATUSES = [
   { value: 'CANCELLED', label: 'Bekor' },
 ];
 
- const formatPrice = (price?: number) => {
-   if (!price) return '—';
-   return new Intl.NumberFormat('uz-UZ').format(price) + ' so\'m';
- };
- 
- const formatDate = (dateStr: string) => {
-   try {
-     return format(new Date(dateStr), 'dd.MM.yyyy HH:mm');
-   } catch {
-     return dateStr;
-   }
- };
- 
- const getStatusBadge = (status: string) => {
-   const config: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
-     PROCESSING: { variant: 'secondary', label: 'Jarayonda' },
-     DELIVERY: { variant: 'default', label: 'Yetkazilmoqda' },
-     DELIVERED: { variant: 'default', label: 'Yetkazildi' },
-     CANCELLED: { variant: 'destructive', label: 'Bekor' },
-   };
-   const c = config[status] || { variant: 'outline' as const, label: status };
-   return <Badge variant={c.variant} className="text-[10px]">{c.label}</Badge>;
- };
- 
- // Memoized order row for performance
- const OrderRow = memo(({ order, onClick }: { order: Order; onClick: (o: Order) => void }) => (
-   <Card 
-     className="overflow-hidden cursor-pointer active:bg-muted/50 mx-3"
-     onClick={() => onClick(order)}
-   >
-     <CardContent className="p-3">
-       <div className="flex items-start justify-between mb-1.5 gap-2">
-         <div className="min-w-0 flex-1">
-           <div className="font-semibold text-sm truncate">#{order.id}</div>
-           <div className="text-[10px] text-muted-foreground">
-             {formatDate(order.createdAt)}
-           </div>
-         </div>
-         <div className="shrink-0">
-           {getStatusBadge(order.status)}
+const formatPrice = (price?: number) => {
+  if (!price) return '—';
+  if (price >= 1000000) {
+    return (price / 1000000).toFixed(1) + ' mln';
+  }
+  return new Intl.NumberFormat('uz-UZ').format(price) + ' so\'m';
+};
+
+const formatDate = (dateStr: string) => {
+  try {
+    if (!dateStr) return '—';
+    // Yandex returns DD-MM-YYYY HH:mm:ss format
+    if (dateStr.includes('-') && dateStr.split('-')[0].length === 2) {
+      const parsed = parse(dateStr, 'dd-MM-yyyy HH:mm:ss', new Date());
+      if (isValid(parsed)) {
+        return format(parsed, 'dd.MM.yyyy');
+      }
+    }
+    // Try standard ISO format
+    const date = new Date(dateStr);
+    if (isValid(date)) {
+      return format(date, 'dd.MM.yyyy');
+    }
+    return dateStr;
+  } catch {
+    return dateStr;
+  }
+};
+
+const formatTime = (dateStr: string) => {
+  try {
+    if (!dateStr) return '';
+    // Yandex returns DD-MM-YYYY HH:mm:ss format
+    if (dateStr.includes('-') && dateStr.split('-')[0].length === 2) {
+      const parsed = parse(dateStr, 'dd-MM-yyyy HH:mm:ss', new Date());
+      if (isValid(parsed)) {
+        return format(parsed, 'HH:mm');
+      }
+    }
+    // Try standard ISO format
+    const date = new Date(dateStr);
+    if (isValid(date)) {
+      return format(date, 'HH:mm');
+    }
+    return '';
+  } catch {
+    return '';
+  }
+};
+
+const getStatusBadge = (status: string) => {
+  const config: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string; className?: string }> = {
+    PROCESSING: { variant: 'secondary', label: 'Jarayonda' },
+    DELIVERY: { variant: 'default', label: 'Yetkazilmoqda' },
+    PICKUP: { variant: 'default', label: 'Olib ketish' },
+    DELIVERED: { variant: 'outline', label: 'Yetkazildi', className: 'border-green-500 text-green-600' },
+    CANCELLED: { variant: 'destructive', label: 'Bekor' },
+    RETURNED: { variant: 'destructive', label: 'Qaytarildi' },
+  };
+  const c = config[status] || { variant: 'outline' as const, label: status };
+  return <Badge variant={c.variant} className={`text-[10px] ${c.className || ''}`}>{c.label}</Badge>;
+};
+
+// Get first product name from order items
+const getFirstProductName = (order: Order): string => {
+  if (!order.items || order.items.length === 0) return 'Mahsulot nomi yuklanmadi';
+  const firstName = order.items[0].offerName || order.items[0].offerId || '';
+  // Truncate long names
+  if (firstName.length > 40) {
+    return firstName.substring(0, 40) + '...';
+  }
+  return firstName;
+};
+
+// Memoized order row for performance
+const OrderRow = memo(({ order, onClick }: { order: Order; onClick: (o: Order) => void }) => {
+  const productName = getFirstProductName(order);
+  const itemCount = order.items?.length || 0;
+  const totalPrice = order.itemsTotalUZS || order.itemsTotal || order.totalUZS || order.total || 0;
+  
+  return (
+    <Card 
+      className="overflow-hidden cursor-pointer active:bg-muted/50 mx-3 border-l-4 border-l-primary/30"
+      onClick={() => onClick(order)}
+    >
+      <CardContent className="p-3 space-y-2">
+        {/* Header: Order ID + Status */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="font-mono text-xs font-semibold text-primary">#{order.id}</span>
+            <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+              <Clock className="h-3 w-3" />
+              {formatDate(order.createdAt)} {formatTime(order.createdAt)}
+            </div>
+          </div>
+          <div className="shrink-0">
+            {getStatusBadge(order.status)}
+          </div>
+       </div>
+
+        {/* Product Name */}
+        <div className="flex items-start gap-2">
+          <Package className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-medium line-clamp-2">{productName}</div>
+            {itemCount > 1 && (
+              <span className="text-[10px] text-muted-foreground">+{itemCount - 1} ta boshqa mahsulot</span>
+            )}
          </div>
        </div>
- 
-       {order.buyer && (
-         <div className="flex items-center gap-1 text-[10px] text-muted-foreground mb-1.5 truncate">
-           <User className="h-3 w-3" />
-           {order.buyer.firstName} {order.buyer.lastName}
-         </div>
-       )}
- 
-       <div className="flex items-center justify-between gap-2">
-         <div className="min-w-0 flex-1">
-           <span className="font-bold text-primary text-sm">
-             {formatPrice(order.totalUZS || order.total)}
-           </span>
-           <span className="text-[10px] text-muted-foreground ml-1.5">
-             ({order.items?.length || 0} mahsulot)
-           </span>
-         </div>
-         <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-       </div>
-     </CardContent>
-   </Card>
- ));
- 
- OrderRow.displayName = 'OrderRow';
+
+        {/* Footer: Buyer + Price */}
+        <div className="flex items-center justify-between gap-2 pt-1 border-t border-dashed">
+          {order.buyer ? (
+            <div className="flex items-center gap-1 text-[10px] text-muted-foreground min-w-0 flex-1 truncate">
+              <User className="h-3 w-3 shrink-0" />
+              <span className="truncate">{order.buyer.firstName} {order.buyer.lastName}</span>
+            </div>
+          ) : (
+            <div className="flex-1" />
+          )}
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="font-bold text-primary text-sm">
+              {formatPrice(totalPrice)}
+            </span>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+});
+
+OrderRow.displayName = 'OrderRow';
  
  export function MobileOrders({ connectedMarketplaces }: MobileOrdersProps) {
   const [selectedMp, setSelectedMp] = useState('');
@@ -159,7 +227,7 @@ const ORDER_STATUSES = [
    const virtualizer = useVirtualizer({
      count: orders.length,
      getScrollElement: () => parentRef.current,
-     estimateSize: () => 100, // Estimated row height
+      estimateSize: () => 130, // Increased for more content
      overscan: 5,
    });
 
