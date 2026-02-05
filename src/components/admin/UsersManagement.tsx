@@ -11,7 +11,7 @@ import { useAdminUsers } from '@/hooks/useAdminStats';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
- import { Search, UserPlus, Shield, UserCog, Trash2 } from 'lucide-react';
+import { Search, UserPlus, Shield, UserCog, Trash2, Crown } from 'lucide-react';
 import { format } from 'date-fns';
 
 const roleColors: Record<string, string> = {
@@ -19,12 +19,14 @@ const roleColors: Record<string, string> = {
   seller: 'bg-blue-500',
   blogger: 'bg-purple-500',
   buyer: 'bg-green-500',
+  sellercloud: 'bg-amber-500',
 };
 
  const roleLabels: Record<string, string> = {
    seller: 'Sotuvchi',
    blogger: 'Blogger',
    admin: 'Admin',
+   sellercloud: 'SellerCloudX',
  };
  
 export function UsersManagement() {
@@ -33,6 +35,7 @@ export function UsersManagement() {
    const [showRoleDialog, setShowRoleDialog] = useState(false);
    const [selectedUser, setSelectedUser] = useState<any>(null);
    const [selectedRole, setSelectedRole] = useState<string>('');
+   const [grantingSellerCloud, setGrantingSellerCloud] = useState(false);
   const queryClient = useQueryClient();
 
   const filteredUsers = users?.filter(user => 
@@ -42,6 +45,12 @@ export function UsersManagement() {
 
    const addRole = async () => {
      if (!selectedUser || !selectedRole) return;
+     
+     // Handle SellerCloudX separately - create subscription
+     if (selectedRole === 'sellercloud') {
+       await grantSellerCloudAccess();
+       return;
+     }
      
     try {
       const { error } = await supabase
@@ -59,9 +68,81 @@ export function UsersManagement() {
     }
   };
 
+   const grantSellerCloudAccess = async () => {
+     if (!selectedUser) return;
+     setGrantingSellerCloud(true);
+     
+     try {
+       // Check if subscription already exists
+       const { data: existing } = await supabase
+         .from('sellercloud_subscriptions')
+         .select('id')
+         .eq('user_id', selectedUser.user_id)
+         .maybeSingle();
+       
+       if (existing) {
+         // Update existing to active with admin override
+         const { error } = await supabase
+           .from('sellercloud_subscriptions')
+           .update({ 
+             is_active: true, 
+             admin_override: true,
+             admin_notes: 'Admin tomonidan aktivlashtirildi'
+           })
+           .eq('id', existing.id);
+         
+         if (error) throw error;
+       } else {
+         // Create new subscription with admin override
+         const { error } = await supabase
+           .from('sellercloud_subscriptions')
+           .insert({
+             user_id: selectedUser.user_id,
+             plan_type: 'pro',
+             monthly_fee: 499,
+             commission_percent: 4,
+             is_active: true,
+             is_trial: false,
+             admin_override: true,
+             admin_notes: 'Admin tomonidan yaratildi',
+             started_at: new Date().toISOString(),
+           });
+         
+         if (error) throw error;
+       }
+       
+       toast.success('SellerCloudX ruxsati berildi');
+       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+       setShowRoleDialog(false);
+       setSelectedUser(null);
+       setSelectedRole('');
+     } catch (err: any) {
+       toast.error("Xatolik: " + err.message);
+     } finally {
+       setGrantingSellerCloud(false);
+     }
+   };
+
    const removeRole = async (userId: string, role: string) => {
      if (role === 'buyer') {
        toast.error("Xaridor rolini olib bo'lmaydi");
+       return;
+     }
+     
+     // Handle SellerCloudX separately
+     if (role === 'sellercloud') {
+       try {
+         const { error } = await supabase
+           .from('sellercloud_subscriptions')
+           .update({ is_active: false, admin_override: false })
+           .eq('user_id', userId);
+         
+         if (error) throw error;
+         toast.success('SellerCloudX ruxsati olib tashlandi');
+         queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+       } catch (err) {
+         toast.error("Xatolik yuz berdi");
+       }
        return;
      }
      
@@ -87,7 +168,7 @@ export function UsersManagement() {
    };
  
    const getAvailableRoles = (currentRoles: string[]) => {
-     const allRoles = ['seller', 'blogger'];
+     const allRoles = ['seller', 'blogger', 'sellercloud'];
      return allRoles.filter(r => !currentRoles?.includes(r));
    };
  
@@ -192,9 +273,9 @@ export function UsersManagement() {
              </div>
              <DialogFooter>
                <Button variant="outline" onClick={() => setShowRoleDialog(false)}>Bekor</Button>
-               <Button onClick={addRole} disabled={!selectedRole}>
+                <Button onClick={addRole} disabled={!selectedRole || grantingSellerCloud}>
                  <UserPlus className="h-4 w-4 mr-2" />
-                 Qo'shish
+                  {grantingSellerCloud ? 'Yuklanmoqda...' : 'Qo\'shish'}
                </Button>
              </DialogFooter>
            </DialogContent>
