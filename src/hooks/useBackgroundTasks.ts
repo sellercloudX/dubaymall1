@@ -14,9 +14,15 @@
      runningTasks: tasks.filter(t => t.status === 'running'),
      completedTasks: tasks.filter(t => t.status === 'completed'),
      failedTasks: tasks.filter(t => t.status === 'failed'),
+    cancelledTasks: tasks.filter(t => t.status === 'cancelled'),
      createTask: backgroundTaskManager.createTask.bind(backgroundTaskManager),
      runTask: backgroundTaskManager.runTask.bind(backgroundTaskManager),
      removeTask: backgroundTaskManager.removeTask.bind(backgroundTaskManager),
      clearCompleted: backgroundTaskManager.clearCompleted.bind(backgroundTaskManager),
+    cancelTask: backgroundTaskManager.cancelTask.bind(backgroundTaskManager),
+    updateTask: backgroundTaskManager.updateTask.bind(backgroundTaskManager),
+    incrementCompleted: backgroundTaskManager.incrementCompleted.bind(backgroundTaskManager),
+    incrementFailed: backgroundTaskManager.incrementFailed.bind(backgroundTaskManager),
+    getStats: backgroundTaskManager.getStats.bind(backgroundTaskManager),
    };
  }
