@@ -41,11 +41,8 @@ export function Navbar() {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-6">
-             <Link to="/home" className="text-muted-foreground hover:text-foreground transition-colors">
-              {t.home}
-            </Link>
-            <Link to="/marketplace" className="text-muted-foreground hover:text-foreground transition-colors">
-               Bozor
+            <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors">
+              Bozor
             </Link>
             
             {/* Partnership link - visible to everyone */}

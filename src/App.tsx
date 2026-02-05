@@ -28,8 +28,7 @@ import { PageLoader } from "@/components/PageLoader";
 import { InstallPWA } from "@/components/InstallPWA";
 
 // Lazy load pages for code splitting
-const Index = lazy(() => import("./pages/Index"));
- const Auth = lazy(() => import("./pages/Auth"));
+const Auth = lazy(() => import("./pages/Auth"));
  const PartnerAuth = lazy(() => import("./pages/PartnerAuth"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Marketplace = lazy(() => import("./pages/Marketplace"));
@@ -101,7 +100,6 @@ function App() {
                 <Suspense fallback={<PageLoader />}>
                   <Routes>
                     <Route path="/" element={<Marketplace />} />
-                    <Route path="/home" element={<Index />} />
                     <Route path="/auth" element={<Auth />} />
                     <Route path="/partner-auth" element={<PartnerAuth />} />
                     <Route path="/dashboard" element={<Dashboard />} />
