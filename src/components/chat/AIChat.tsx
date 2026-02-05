@@ -86,6 +86,7 @@ export function AIChat({ context }: AIChatProps) {
         onClick={() => setIsOpen(!isOpen)}
         className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg z-50"
         size="icon"
+        aria-label={isOpen ? "Chatni yopish" : "AI Chat ochish"}
       >
         {isOpen ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}
       </Button>
@@ -169,7 +170,7 @@ export function AIChat({ context }: AIChatProps) {
                   disabled={loading}
                   className="flex-1"
                 />
-                <Button onClick={handleSend} disabled={loading || !input.trim()} size="icon">
+                <Button onClick={handleSend} disabled={loading || !input.trim()} size="icon" aria-label="Yuborish">
                   <Send className="h-4 w-4" />
                 </Button>
               </div>

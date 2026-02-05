@@ -94,7 +94,7 @@ export function Navbar() {
               <>
                 <NotificationsDropdown />
                 <Link to="/favorites">
-                  <Button variant="ghost" size="icon">
+                  <Button variant="ghost" size="icon" aria-label="Sevimlilar">
                     <Heart className="h-5 w-5" />
                   </Button>
                 </Link>
@@ -102,7 +102,7 @@ export function Navbar() {
             )}
             
             <Link to="/cart" className="relative">
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" aria-label="Savatcha">
                 <ShoppingCart className="h-5 w-5" />
                 {totalItems > 0 && (
                   <Badge 
@@ -122,7 +122,7 @@ export function Navbar() {
                     {t.dashboard}
                   </Link>
                 </Button>
-                <Button variant="ghost" size="sm" onClick={handleSignOut}>
+                <Button variant="ghost" size="sm" onClick={handleSignOut} aria-label="Chiqish">
                   <LogOut className="h-4 w-4" />
                 </Button>
               </div>
@@ -145,6 +145,7 @@ export function Navbar() {
             <button
               className="p-2"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label={mobileMenuOpen ? "Menyuni yopish" : "Menyuni ochish"}
             >
               {mobileMenuOpen ? (
                 <X className="h-5 w-5" />

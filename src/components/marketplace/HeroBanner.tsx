@@ -118,6 +118,7 @@ export function HeroBanner() {
             <img
               src={currentBanner.image_url}
               alt={currentBanner.title}
+              fetchPriority="high"
               className="w-full h-full object-cover transition-transform duration-500"
             />
             {/* Overlay */}
@@ -148,12 +149,14 @@ export function HeroBanner() {
           <>
             <button
               onClick={goToPrevious}
+              aria-label="Oldingi banner"
               className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/20 backdrop-blur flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/30"
             >
               <ChevronLeft className="h-6 w-6" />
             </button>
             <button
               onClick={goToNext}
+              aria-label="Keyingi banner"
               className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/20 backdrop-blur flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/30"
             >
               <ChevronRight className="h-6 w-6" />
@@ -164,16 +167,17 @@ export function HeroBanner() {
 
       {/* Dots Indicator */}
       {banners.length > 1 && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-3">
           {banners.map((_, index) => (
             <button
               key={index}
               onClick={() => goToSlide(index)}
+              aria-label={`${index + 1}-banner`}
               className={cn(
-                "w-2 h-2 rounded-full transition-all",
+                "min-w-6 h-6 rounded-full transition-all flex items-center justify-center",
                 index === currentIndex
-                  ? "bg-white w-6"
-                  : "bg-white/50 hover:bg-white/70"
+                  ? "bg-white w-8"
+                  : "bg-white/50 hover:bg-white/70 w-6"
               )}
             />
           ))}

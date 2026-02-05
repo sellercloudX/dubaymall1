@@ -174,7 +174,7 @@ export default function Marketplace() {
           
           <div className="flex gap-2">
             <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-[180px]" aria-label="Saralash turi">
                 <SelectValue placeholder="Saralash" />
               </SelectTrigger>
               <SelectContent>

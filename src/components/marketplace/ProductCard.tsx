@@ -94,6 +94,7 @@ export const ProductCard = memo(function ProductCard({ product }: ProductCardPro
           <Button
             variant="ghost"
             size="icon"
+            aria-label={isProductFavorite ? "Sevimlilardan o'chirish" : "Sevimlilarga qo'shish"}
             className={`absolute top-2 right-2 bg-background/80 hover:bg-background ${
               isProductFavorite ? 'text-destructive' : ''
             }`}

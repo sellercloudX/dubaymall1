@@ -51,24 +51,25 @@ export function BottomNavigation() {
             <button
               key={item.path}
               onClick={() => handleNavigation(item)}
+              aria-label={item.label}
               className={cn(
-                "flex flex-col items-center justify-center w-full h-full gap-0.5 transition-colors",
+                "flex flex-col items-center justify-center w-full h-full gap-1 transition-colors min-h-[44px]",
                 active ? "text-primary" : "text-muted-foreground"
               )}
             >
               <div className="relative">
-                <Icon className={cn("h-4 w-4", active && "stroke-[2.5]")} />
+                <Icon className={cn("h-5 w-5", active && "stroke-[2.5]")} />
                 {item.badge && item.badge > 0 && (
                   <Badge 
                     variant="destructive" 
-                    className="absolute -top-1.5 -right-1.5 h-3.5 w-3.5 p-0 flex items-center justify-center text-[8px]"
+                    className="absolute -top-2 -right-2 h-4 w-4 p-0 flex items-center justify-center text-[9px]"
                   >
                     {item.badge > 9 ? '9+' : item.badge}
                   </Badge>
                 )}
               </div>
               <span className={cn(
-                "text-[9px] font-medium leading-tight",
+                "text-[10px] leading-tight",
                 active && "font-semibold"
               )}>
                 {item.label}
