@@ -739,17 +739,17 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Camera className="h-5 w-5" />
-              1-qadam: Mahsulot rasmini oling
+              Mahsulot rasmini oling
             </CardTitle>
             <CardDescription>
-              Telefon kamerasi orqali mahsulotni rasmga oling yoki galereyadan tanlang
+              Kamera orqali rasmga oling yoki galereyadan tanlang
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Main Camera Button - Full width for mobile */}
             <Button
               size="lg"
-              className="w-full h-32 text-lg flex flex-col gap-2"
+              className="w-full h-20 text-base flex items-center justify-center gap-3"
               onClick={() => {
                 const input = document.createElement('input');
                 input.type = 'file';
@@ -759,8 +759,8 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
                 input.click();
               }}
             >
-              <Camera className="h-12 w-12" />
-              <span>📸 Kamera orqali rasmga olish</span>
+              <Camera className="h-6 w-6" />
+              <span>Kamera orqali rasmga olish</span>
             </Button>
 
             <div className="relative">
@@ -768,15 +768,14 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
                 <span className="w-full border-t" />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">yoki</span>
+                <span className="bg-card px-2 text-muted-foreground">yoki</span>
               </div>
             </div>
 
             {/* Gallery Upload Button */}
             <Button
               variant="outline"
-              size="lg"
-              className="w-full h-16"
+              className="w-full h-12"
               onClick={() => fileInputRef.current?.click()}
             >
               <ImageIcon className="h-5 w-5 mr-2" />
@@ -792,12 +791,11 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
             />
 
             {/* Tips for mobile users */}
-            <div className="bg-muted/50 rounded-lg p-3 text-sm text-muted-foreground">
-              <p className="font-medium text-foreground mb-1">💡 Maslahat:</p>
-              <ul className="space-y-1 text-xs">
-                <li>• Mahsulotni yaxshi yoritilgan joyda rasmga oling</li>
-                <li>• Rasm tiniq va aniq bo'lishi kerak</li>
-                <li>• Faqat bitta mahsulotni rasmga oling</li>
+            <div className="bg-muted/50 rounded-lg p-3">
+              <p className="font-medium text-sm text-foreground mb-1">💡 Maslahat:</p>
+              <ul className="space-y-0.5 text-xs text-muted-foreground">
+                <li>• Yaxshi yoritilgan joyda rasmga oling</li>
+                <li>• Rasm tiniq bo'lishi kerak</li>
               </ul>
             </div>
           </CardContent>
@@ -832,10 +830,10 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Package className="h-5 w-5" />
-              4-qadam: Mahsulotni tanlang
+              Mahsulotni tanlang
             </CardTitle>
             <CardDescription>
-              O'xshash mahsulotlardan birini tanlang yoki AI tahlilidan foydalaning
+              Birini tanlang yoki AI tahlilidan foydalaning
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -882,7 +880,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
               <div>
                 <h4 className="font-medium mb-3 flex items-center gap-2">
                   <Globe className="h-4 w-4" />
-                  O'xshash mahsulotlar ({webProducts.length} ta topildi):
+                  O'xshash mahsulotlar ({webProducts.length} ta):
                 </h4>
                 <ScrollArea className="h-[280px]">
                   <div className="space-y-2">
@@ -923,8 +921,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
             ) : (
               <div className="text-center py-6 text-muted-foreground">
                 <Globe className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">O'xshash mahsulotlar qidirilmoqda...</p>
-                <p className="text-xs mt-1">Yoki yuqoridagi AI tahlilidan foydalaning</p>
+                <p className="text-sm">Qidirilmoqda...</p>
               </div>
             )}
 
@@ -944,10 +941,10 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Calculator className="h-5 w-5" />
-              5-qadam: Narx hisoblash
+              Narx hisoblash
             </CardTitle>
             <CardDescription>
-              Tannarxni kiriting - kartochka fonda yaratiladi, siz keyingi mahsulotga o'tasiz
+              Tannarxni kiriting va kartochka yarating
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -977,7 +974,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
             <div className="space-y-3">
               <Label htmlFor="costPrice" className="text-sm font-medium flex items-center gap-2">
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
-                Tannarx kiriting (so'm)
+                Tannarx (so'm)
               </Label>
               <div className="flex gap-2">
                 <Input
@@ -1077,7 +1074,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
                       onChange={(e) => setGenerateInfographics(e.target.checked)}
                       className="rounded"
                     />
-                    <span className="text-sm">Yaratish</span>
+                    <span className="text-sm">Generatsiya</span>
                   </label>
                 </div>
                 {generateInfographics && (
@@ -1090,26 +1087,23 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
                     >
                       <option value={1}>1 ta</option>
                       <option value={3}>3 ta</option>
-                      <option value={6}>6 ta (tavsiya)</option>
+                      <option value={6}>6 ta</option>
                     </select>
                   </div>
                 )}
-                <p className="text-xs text-muted-foreground">
-                  Turli burchak va kompozitsiyalarda professional infografikalar (1080×1440)
-                </p>
               </div>
             )}
 
-            <div className="flex justify-between pt-4">
+            <div className="flex gap-3 pt-4">
               <Button variant="outline" onClick={() => setCurrentStep('select')}>
                 Orqaga
               </Button>
               <Button 
                 onClick={startBackgroundCardCreation} 
                 disabled={!pricing}
-                className="flex-1 ml-3"
+                size="default"
               >
-                <Zap className="mr-2 h-4 w-4" />
+                <Zap className="h-4 w-4 mr-2" />
                 Yaratish
               </Button>
             </div>
