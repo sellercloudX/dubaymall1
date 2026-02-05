@@ -13,9 +13,11 @@ import MonetizationSettings from '@/components/admin/MonetizationSettings';
 import { SellerCloudManagement } from '@/components/admin/SellerCloudManagement';
 import { BannersManagement } from '@/components/admin/BannersManagement';
 import { FlashSalesManagement } from '@/components/admin/FlashSalesManagement';
+import { SiteAnalytics } from '@/components/admin/SiteAnalytics';
+import { BlogManagement } from '@/components/admin/BlogManagement';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Shield, Users, Package, Store, ShoppingCart, BarChart3, DollarSign, Wallet, Crown, Image, Zap } from 'lucide-react';
+import { Shield, Users, Package, Store, ShoppingCart, BarChart3, DollarSign, Wallet, Crown, Image, Zap, Globe, FileText } from 'lucide-react';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
 export default function AdminDashboard() {
@@ -103,6 +105,14 @@ export default function AdminDashboard() {
                 <BarChart3 className="h-4 w-4" />
                 <span className="hidden sm:inline">Analitika</span>
               </TabsTrigger>
+              <TabsTrigger value="site-stats" className="gap-2">
+                <Globe className="h-4 w-4" />
+                <span className="hidden sm:inline">Sayt statistikasi</span>
+              </TabsTrigger>
+              <TabsTrigger value="blog" className="gap-2">
+                <FileText className="h-4 w-4" />
+                <span className="hidden sm:inline">Blog</span>
+              </TabsTrigger>
               <TabsTrigger value="financials" className="gap-2">
                 <Wallet className="h-4 w-4" />
                 <span className="hidden sm:inline">Moliya</span>
@@ -145,6 +155,14 @@ export default function AdminDashboard() {
 
           <TabsContent value="analytics">
             <AdminAnalytics />
+          </TabsContent>
+
+          <TabsContent value="site-stats">
+            <SiteAnalytics />
+          </TabsContent>
+
+          <TabsContent value="blog">
+            <BlogManagement />
           </TabsContent>
 
           <TabsContent value="financials">

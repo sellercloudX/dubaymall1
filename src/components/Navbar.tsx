@@ -8,7 +8,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { NotificationsDropdown } from '@/components/notifications/NotificationsDropdown';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ShoppingBag, ShoppingCart, User, LogOut, Menu, X, Shield, Heart, Handshake, Store, Users } from 'lucide-react';
+import { ShoppingBag, ShoppingCart, User, LogOut, Menu, X, Shield, Heart, Handshake, Store, Users, BookOpen } from 'lucide-react';
 import { useState } from 'react';
 
 export function Navbar() {
@@ -52,6 +52,12 @@ export function Navbar() {
             <Link to="/partnership" className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5">
               <Handshake className="h-4 w-4" />
               Hamkorlik
+            </Link>
+            
+            {/* Blog link - visible to everyone */}
+            <Link to="/blog" className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5">
+              <BookOpen className="h-4 w-4" />
+              Blog
             </Link>
 
             {/* Role-specific links - only visible to users with that role */}
@@ -161,6 +167,16 @@ export function Navbar() {
               >
                 <Handshake className="h-4 w-4" />
                 Hamkorlik
+              </Link>
+              
+              {/* Blog - visible to all */}
+              <Link
+                to="/blog"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2 py-2"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <BookOpen className="h-4 w-4" />
+                Blog
               </Link>
 
               {/* Role-specific links */}
