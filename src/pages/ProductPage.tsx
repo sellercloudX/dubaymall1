@@ -7,6 +7,7 @@ import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useRecentlyViewed } from '@/hooks/useRecommendations';
+import { useProductVariants, type ProductVariant } from '@/hooks/useProductVariants';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +20,7 @@ import { StarRating } from '@/components/reviews/StarRating';
 import { useProductRating, useProductReviews } from '@/hooks/useReviews';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { SellerChat } from '@/components/chat/SellerChat';
+import { VariantSelector } from '@/components/product/VariantSelector';
 import { 
   ShoppingCart, 
   Heart, 
@@ -96,8 +98,11 @@ export default function ProductPage() {
   const [orderCount, setOrderCount] = useState(0);
   const [weeklyBuyers, setWeeklyBuyers] = useState(0);
   const [chatOpen, setChatOpen] = useState(false);
+  const [variantImageOverride, setVariantImageOverride] = useState<string | null>(null);
+  const [selectedVariants, setSelectedVariants] = useState<Record<string, ProductVariant | null>>({});
   const { data: ratingData } = useProductRating(id || '');
   const { data: reviews } = useProductReviews(id || '');
+  const { variantsByType, hasColors, hasSizes, hasModels } = useProductVariants(id);
 
   useEffect(() => {
     if (id) {
@@ -305,7 +310,7 @@ export default function ProductPage() {
               {images.length > 0 ? (
                 <>
                   <img
-                    src={images[currentImage]}
+                    src={variantImageOverride || images[currentImage]}
                     alt={formatProductName(product.name)}
                     className="w-full h-full object-cover"
                   />
@@ -366,40 +371,46 @@ export default function ProductPage() {
 
           {/* Details */}
           <div className="space-y-4">
-            {/* Price Section - Sticky on mobile */}
-            <Card className="border-0 shadow-none md:border md:shadow-sm">
-              <CardContent className="p-0 md:p-4 space-y-3">
-                {/* Price */}
-                <div className="flex items-baseline gap-3 flex-wrap">
-                  <span className="text-3xl md:text-4xl font-bold text-primary whitespace-nowrap">
-                    {formatPrice(product.price)}
-                  </span>
-                  {discount && (
-                    <Badge className="bg-destructive">-{discount}%</Badge>
-                  )}
-                </div>
-                {product.original_price && product.original_price > product.price && (
-                  <span className="text-lg text-muted-foreground line-through whitespace-nowrap">
-                    {formatPrice(product.original_price)}
-                  </span>
+            {/* Price Section - Uzum style */}
+            <div className="space-y-2">
+              {/* Price with discount */}
+              <div className="flex items-baseline gap-3 flex-wrap">
+                <span className="text-3xl md:text-4xl font-bold text-primary whitespace-nowrap">
+                  {formatPrice(product.price)}
+                </span>
+                {discount && (
+                  <Badge className="bg-destructive">-{discount}%</Badge>
                 )}
-                
-                {/* Monthly Payment Badge - Yellow like Uzum */}
-                {product.price > 0 && (
-                  <div>
-                    <span className="inline-block bg-yellow-300 dark:bg-yellow-400 text-yellow-900 text-sm font-medium px-3 py-1.5 rounded whitespace-nowrap">
-                      {new Intl.NumberFormat('uz-UZ').format(Math.round((product.price * 1.6) / 24))} so'm/oyiga
-                    </span>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Product Name & Stats */}
-            <div className="space-y-3">
-              <h1 className="text-xl md:text-2xl font-semibold hidden md:block">{formatProductName(product.name)}</h1>
+              </div>
               
-              {/* Rating & Stats Row */}
+              {/* Original price struck through */}
+              {product.original_price && product.original_price > product.price && (
+                <span className="text-lg text-muted-foreground line-through whitespace-nowrap block">
+                  {formatPrice(product.original_price)}
+                </span>
+              )}
+            </div>
+
+            {/* Product Name - Below price like Uzum.uz */}
+            <h1 className="text-lg md:text-xl font-medium text-foreground leading-tight">
+              {formatProductName(product.name)}
+            </h1>
+
+            {/* Variant Selector - Size, Color, Model */}
+            {(hasColors || hasSizes || hasModels) && (
+              <Card>
+                <CardContent className="p-4">
+                  <VariantSelector 
+                    variantsByType={variantsByType}
+                    onVariantChange={setSelectedVariants}
+                    onImageChange={setVariantImageOverride}
+                  />
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Rating & Stats Row */}
+            {(hasReviews || orderCount > 0 || weeklyBuyers > 0) && (
               <Card className="bg-muted/30">
                 <CardContent className="p-3 md:p-4">
                   <div className="flex items-center gap-4 flex-wrap">
@@ -437,7 +448,7 @@ export default function ProductPage() {
                   )}
                 </CardContent>
               </Card>
-            </div>
+            )}
 
             {/* Installment Calculator */}
             <Card className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30 border-purple-200 dark:border-purple-800">

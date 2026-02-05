@@ -18,6 +18,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import {
   AlertDialog,
@@ -30,13 +31,20 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { MoreHorizontal, Edit, Trash2, Eye, Package, Users, Percent } from 'lucide-react';
+import { MoreHorizontal, Edit, Trash2, Eye, Package, Users, Percent, Palette } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { VariantManager } from './VariantManager';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Product = Tables<'products'>;
@@ -55,6 +63,7 @@ export function ProductList({ products, loading, onEdit, onDelete, onRefresh }: 
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [affiliateProduct, setAffiliateProduct] = useState<Product | null>(null);
   const [commissionPercent, setCommissionPercent] = useState('15');
+  const [variantProduct, setVariantProduct] = useState<Product | null>(null);
 
   const handleAffiliateToggle = async (product: Product, enabled: boolean) => {
     if (enabled) {
@@ -217,6 +226,11 @@ export function ProductList({ products, loading, onEdit, onDelete, onRefresh }: 
                         <Edit className="mr-2 h-4 w-4" />
                         {t.edit}
                       </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setVariantProduct(product)}>
+                        <Palette className="mr-2 h-4 w-4" />
+                        Variantlar
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
                       <DropdownMenuItem
                         onClick={() => setDeleteId(product.id)}
                         className="text-destructive"
@@ -295,6 +309,21 @@ export function ProductList({ products, loading, onEdit, onDelete, onRefresh }: 
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Variant Manager Dialog */}
+      <Dialog open={!!variantProduct} onOpenChange={() => setVariantProduct(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Palette className="h-5 w-5" />
+              {variantProduct?.name} - Variantlar
+            </DialogTitle>
+          </DialogHeader>
+          {variantProduct && (
+            <VariantManager productId={variantProduct.id} />
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
