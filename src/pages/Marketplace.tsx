@@ -281,14 +281,15 @@ export default function Marketplace() {
           </div>
         )}
 
-        {/* Products Grid */}
+        {/* Products Grid - Uzum.uz style: 2 cols mobile, 3 tablet, 4-5 desktop */}
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {[...Array(8)].map((_, i) => (
-              <div key={i} className="space-y-3">
-                <Skeleton className="aspect-square w-full" />
-                <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-4 w-1/2" />
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
+            {[...Array(10)].map((_, i) => (
+              <div key={i} className="space-y-2">
+                <Skeleton className="aspect-[3/4] w-full rounded-xl" />
+                <Skeleton className="h-3 w-3/4" />
+                <Skeleton className="h-3 w-1/2" />
+                <Skeleton className="h-4 w-2/3" />
               </div>
             ))}
           </div>
@@ -311,10 +312,10 @@ export default function Marketplace() {
           </div>
         ) : (
           <>
-            <p className="text-muted-foreground mb-4">
+            <p className="text-sm text-muted-foreground mb-3">
               {filteredProducts.length} ta mahsulot topildi
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
               {filteredProducts.map((product) => (
                 <ProductCard key={product.id} product={product} />
               ))}
