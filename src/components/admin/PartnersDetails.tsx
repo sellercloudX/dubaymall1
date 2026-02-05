@@ -6,6 +6,7 @@
  import { Input } from '@/components/ui/input';
  import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
  import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
  import { useQuery } from '@tanstack/react-query';
  import { supabase } from '@/integrations/supabase/client';
  import { Search, Store, Users, Eye, TrendingUp, DollarSign, Package, ShoppingCart, Crown } from 'lucide-react';
@@ -34,9 +35,8 @@
          (sellerProfiles || []).map(async (seller) => {
            if (!seller.shop_id) return { ...seller, stats: null };
            
-           const [productsRes, ordersRes, balanceRes] = await Promise.all([
+            const [productsRes, balanceRes] = await Promise.all([
              supabase.from('products').select('id', { count: 'exact', head: true }).eq('shop_id', seller.shop_id),
-             supabase.from('order_items').select('subtotal, orders!inner(status)').eq('order_id', seller.shop_id),
              supabase.from('seller_balances').select('*').eq('shop_id', seller.shop_id).maybeSingle(),
            ]);
  
@@ -196,65 +196,70 @@
        </CardHeader>
        <CardContent>
          <Tabs defaultValue="sellers">
-           <TabsList>
-             <TabsTrigger value="sellers" className="gap-2">
+            <ScrollArea className="w-full whitespace-nowrap">
+              <TabsList className="inline-flex w-max">
+              <TabsTrigger value="sellers" className="gap-1 text-xs sm:text-sm">
                <Store className="h-4 w-4" />
-               Sotuvchilar ({sellers?.length || 0})
+                <span className="hidden sm:inline">Sotuvchilar</span> ({sellers?.length || 0})
              </TabsTrigger>
-             <TabsTrigger value="bloggers" className="gap-2">
+              <TabsTrigger value="bloggers" className="gap-1 text-xs sm:text-sm">
                <Users className="h-4 w-4" />
-               Bloggerlar ({bloggers?.length || 0})
+                <span className="hidden sm:inline">Bloggerlar</span> ({bloggers?.length || 0})
              </TabsTrigger>
-             <TabsTrigger value="sellercloud" className="gap-2">
+              <TabsTrigger value="sellercloud" className="gap-1 text-xs sm:text-sm">
                <Crown className="h-4 w-4" />
-               SellerCloudX ({sellerCloudUsers?.length || 0})
+                <span className="hidden sm:inline">SellerCloudX</span> ({sellerCloudUsers?.length || 0})
              </TabsTrigger>
-           </TabsList>
+              </TabsList>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
  
            {/* Sellers Tab */}
            <TabsContent value="sellers">
              {sellersLoading ? (
                <p className="text-center py-8">Yuklanmoqda...</p>
              ) : (
+                <ScrollArea className="w-full">
                <Table>
                  <TableHeader>
                    <TableRow>
-                     <TableHead>Biznes nomi</TableHead>
+                      <TableHead className="min-w-[120px]">Biznes nomi</TableHead>
                      <TableHead>Egasi</TableHead>
                      <TableHead>INN</TableHead>
                      <TableHead>Status</TableHead>
                      <TableHead>Mahsulotlar</TableHead>
                      <TableHead>Umumiy savdo</TableHead>
                      <TableHead>Platforma daromadi</TableHead>
-                     <TableHead>Amallar</TableHead>
+                      <TableHead className="text-right">Amallar</TableHead>
                    </TableRow>
                  </TableHeader>
                  <TableBody>
                    {filteredSellers?.map((seller) => (
                      <TableRow key={seller.id}>
-                       <TableCell className="font-medium">{seller.business_name || '-'}</TableCell>
-                       <TableCell>{(seller.profiles as any)?.full_name || '-'}</TableCell>
-                       <TableCell>{seller.inn || '-'}</TableCell>
+                        <TableCell className="font-medium whitespace-nowrap">{seller.business_name || '-'}</TableCell>
+                        <TableCell className="whitespace-nowrap">{(seller.profiles as any)?.full_name || '-'}</TableCell>
+                        <TableCell className="whitespace-nowrap">{seller.inn || '-'}</TableCell>
                        <TableCell>
-                         <Badge variant={seller.status === 'approved' ? 'default' : 'secondary'}>
+                          <Badge variant={seller.status === 'approved' ? 'default' : 'secondary'} className="text-xs">
                            {seller.status}
                          </Badge>
                        </TableCell>
                        <TableCell>{seller.stats?.productsCount || 0}</TableCell>
-                       <TableCell>{formatMoney(seller.stats?.totalRevenue || 0)}</TableCell>
-                       <TableCell className="text-green-600 font-medium">
+                        <TableCell className="whitespace-nowrap">{formatMoney(seller.stats?.totalRevenue || 0)}</TableCell>
+                        <TableCell className="text-green-600 font-medium whitespace-nowrap">
                          {formatMoney(seller.stats?.platformEarnings || 0)}
                        </TableCell>
-                       <TableCell>
-                         <Button size="sm" variant="outline" onClick={() => openDetails(seller, 'seller')}>
-                           <Eye className="h-4 w-4 mr-1" />
-                           Batafsil
+                        <TableCell className="text-right">
+                          <Button size="sm" variant="ghost" onClick={() => openDetails(seller, 'seller')}>
+                            <Eye className="h-4 w-4" />
                          </Button>
                        </TableCell>
                      </TableRow>
                    ))}
                  </TableBody>
                </Table>
+                <ScrollBar orientation="horizontal" />
+                </ScrollArea>
              )}
            </TabsContent>
  
@@ -263,6 +268,7 @@
              {bloggersLoading ? (
                <p className="text-center py-8">Yuklanmoqda...</p>
              ) : (
+                <ScrollArea className="w-full">
                <Table>
                  <TableHeader>
                    <TableRow>
@@ -274,38 +280,39 @@
                      <TableHead>Kliklar</TableHead>
                      <TableHead>Konversiyalar</TableHead>
                      <TableHead>Umumiy daromad</TableHead>
-                     <TableHead>Amallar</TableHead>
+                      <TableHead className="text-right">Amallar</TableHead>
                    </TableRow>
                  </TableHeader>
                  <TableBody>
                    {filteredBloggers?.map((blogger) => (
                      <TableRow key={blogger.id}>
-                       <TableCell className="font-medium">{(blogger.profiles as any)?.full_name || '-'}</TableCell>
+                        <TableCell className="font-medium whitespace-nowrap">{(blogger.profiles as any)?.full_name || '-'}</TableCell>
                        <TableCell>
-                         <Badge variant="outline">{blogger.social_platform}</Badge>
+                          <Badge variant="outline" className="text-xs">{blogger.social_platform}</Badge>
                        </TableCell>
                        <TableCell>{blogger.social_username || '-'}</TableCell>
                        <TableCell>{blogger.followers_count?.toLocaleString() || 0}</TableCell>
                        <TableCell>
-                         <Badge variant={blogger.status === 'approved' ? 'default' : 'secondary'}>
+                          <Badge variant={blogger.status === 'approved' ? 'default' : 'secondary'} className="text-xs">
                            {blogger.status}
                          </Badge>
                        </TableCell>
                        <TableCell>{blogger.stats?.totalClicks || 0}</TableCell>
                        <TableCell>{blogger.stats?.totalConversions || 0}</TableCell>
-                       <TableCell className="font-medium">
+                        <TableCell className="font-medium whitespace-nowrap">
                          {formatMoney(blogger.stats?.totalEarned || 0)}
                        </TableCell>
-                       <TableCell>
-                         <Button size="sm" variant="outline" onClick={() => openDetails(blogger, 'blogger')}>
-                           <Eye className="h-4 w-4 mr-1" />
-                           Batafsil
+                        <TableCell className="text-right">
+                          <Button size="sm" variant="ghost" onClick={() => openDetails(blogger, 'blogger')}>
+                            <Eye className="h-4 w-4" />
                          </Button>
                        </TableCell>
                      </TableRow>
                    ))}
                  </TableBody>
                </Table>
+                <ScrollBar orientation="horizontal" />
+                </ScrollArea>
              )}
            </TabsContent>
  
@@ -314,6 +321,7 @@
              {scLoading ? (
                <p className="text-center py-8">Yuklanmoqda...</p>
              ) : (
+                <ScrollArea className="w-full">
                <Table>
                  <TableHeader>
                    <TableRow>
@@ -323,39 +331,40 @@
                      <TableHead>Ulanishlar</TableHead>
                      <TableHead>To'langan</TableHead>
                      <TableHead>Qarzdorlik</TableHead>
-                     <TableHead>Amallar</TableHead>
+                      <TableHead className="text-right">Amallar</TableHead>
                    </TableRow>
                  </TableHeader>
                  <TableBody>
                    {filteredSC?.map((sub) => (
                      <TableRow key={sub.id}>
-                       <TableCell className="font-medium">{(sub.profiles as any)?.full_name || '-'}</TableCell>
+                        <TableCell className="font-medium whitespace-nowrap">{(sub.profiles as any)?.full_name || '-'}</TableCell>
                        <TableCell>
-                         <Badge variant="outline">{sub.plan_type}</Badge>
+                          <Badge variant="outline" className="text-xs">{sub.plan_type}</Badge>
                        </TableCell>
                        <TableCell>
-                         <Badge variant={sub.is_active ? 'default' : 'destructive'}>
+                          <Badge variant={sub.is_active ? 'default' : 'destructive'} className="text-xs">
                            {sub.is_active ? 'Faol' : 'Nofaol'}
                          </Badge>
-                         {sub.admin_override && <Badge className="ml-1 bg-amber-500">Override</Badge>}
+                          {sub.admin_override && <Badge className="ml-1 bg-amber-500 text-xs">Override</Badge>}
                        </TableCell>
                        <TableCell>{sub.stats?.connections?.length || 0}</TableCell>
-                       <TableCell className="text-green-600">
+                        <TableCell className="text-green-600 whitespace-nowrap">
                          {formatMoney(sub.stats?.totalPaid || 0)}
                        </TableCell>
-                       <TableCell className="text-red-600">
+                        <TableCell className="text-red-600 whitespace-nowrap">
                          {formatMoney(sub.stats?.totalDebt || 0)}
                        </TableCell>
-                       <TableCell>
-                         <Button size="sm" variant="outline" onClick={() => openDetails(sub, 'sellercloud')}>
-                           <Eye className="h-4 w-4 mr-1" />
-                           Batafsil
+                        <TableCell className="text-right">
+                          <Button size="sm" variant="ghost" onClick={() => openDetails(sub, 'sellercloud')}>
+                            <Eye className="h-4 w-4" />
                          </Button>
                        </TableCell>
                      </TableRow>
                    ))}
                  </TableBody>
                </Table>
+                <ScrollBar orientation="horizontal" />
+                </ScrollArea>
              )}
            </TabsContent>
          </Tabs>

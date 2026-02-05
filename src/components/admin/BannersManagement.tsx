@@ -29,6 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, Image, Eye, MousePointer } from 'lucide-react';
 
@@ -200,7 +201,7 @@ export function BannersManagement() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2 text-lg">
           <Image className="h-5 w-5" />
           Bannerlar boshqaruvi
         </CardTitle>
@@ -212,7 +213,7 @@ export function BannersManagement() {
           }
         }}>
           <DialogTrigger asChild>
-            <Button>
+            <Button size="sm">
               <Plus className="h-4 w-4 mr-2" />
               Yangi banner
             </Button>
@@ -290,10 +291,10 @@ export function BannersManagement() {
                 <Label>Faol</Label>
               </div>
               <div className="flex justify-end gap-2 pt-4">
-                <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                <Button size="sm" variant="outline" onClick={() => setDialogOpen(false)}>
                   Bekor qilish
                 </Button>
-                <Button onClick={handleSubmit}>
+                <Button size="sm" onClick={handleSubmit}>
                   {editingBanner ? 'Saqlash' : 'Qo\'shish'}
                 </Button>
               </div>
@@ -302,6 +303,7 @@ export function BannersManagement() {
         </Dialog>
       </CardHeader>
       <CardContent>
+        <ScrollArea className="w-full">
         <Table>
           <TableHeader>
             <TableRow>
@@ -323,7 +325,7 @@ export function BannersManagement() {
                       className="w-16 h-10 object-cover rounded"
                     />
                     <div>
-                      <div className="font-medium">{banner.title}</div>
+                      <div className="font-medium whitespace-nowrap">{banner.title}</div>
                       <div className="text-xs text-muted-foreground line-clamp-1">
                         {banner.description}
                       </div>
@@ -331,7 +333,7 @@ export function BannersManagement() {
                   </div>
                 </TableCell>
                 <TableCell>
-                  <Badge variant="outline">{positionLabels[banner.position]}</Badge>
+                  <Badge variant="outline" className="text-xs whitespace-nowrap">{positionLabels[banner.position]}</Badge>
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-3 text-sm text-muted-foreground">
@@ -352,11 +354,11 @@ export function BannersManagement() {
                   />
                 </TableCell>
                 <TableCell className="text-right">
-                  <div className="flex justify-end gap-2">
-                    <Button size="icon" variant="ghost" onClick={() => handleEdit(banner)}>
+                  <div className="flex justify-end gap-1">
+                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleEdit(banner)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button size="icon" variant="ghost" onClick={() => handleDelete(banner.id)}>
+                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleDelete(banner.id)}>
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
                   </div>
@@ -372,6 +374,8 @@ export function BannersManagement() {
             )}
           </TableBody>
         </Table>
+        <ScrollBar orientation="horizontal" />
+        </ScrollArea>
       </CardContent>
     </Card>
   );

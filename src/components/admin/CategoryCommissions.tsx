@@ -5,6 +5,7 @@
  import { Input } from '@/components/ui/input';
  import { Label } from '@/components/ui/label';
  import { Switch } from '@/components/ui/switch';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
  import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
  import { supabase } from '@/integrations/supabase/client';
  import { toast } from 'sonner';
@@ -107,7 +108,7 @@
    return (
      <Card>
        <CardHeader>
-         <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-lg">
            <Percent className="h-5 w-5" />
            Kategoriya bo'yicha komissiya
          </CardTitle>
@@ -117,12 +118,13 @@
        </CardHeader>
        <CardContent>
          <div className="mb-4">
-           <Button onClick={() => setShowAddDialog(true)} disabled={availableCategories.length === 0}>
+            <Button size="sm" onClick={() => setShowAddDialog(true)} disabled={availableCategories.length === 0}>
              <Plus className="h-4 w-4 mr-2" />
              Kategoriya qo'shish
            </Button>
          </div>
  
+          <ScrollArea className="w-full">
          <Table>
            <TableHeader>
              <TableRow>
@@ -130,13 +132,13 @@
                <TableHead>Qo'shimcha foiz</TableHead>
                <TableHead>Jami foiz</TableHead>
                <TableHead>Faol</TableHead>
-               <TableHead>Amallar</TableHead>
+                <TableHead className="text-right">Amallar</TableHead>
              </TableRow>
            </TableHeader>
            <TableBody>
              {commissions?.map((comm) => (
                <TableRow key={comm.id}>
-                 <TableCell className="font-medium">
+                  <TableCell className="font-medium whitespace-nowrap">
                    {(comm.categories as any)?.name_uz || 'Noma\'lum'}
                  </TableCell>
                  <TableCell>
@@ -146,7 +148,7 @@
                        min="0"
                        max="50"
                        step="0.5"
-                       className="w-20"
+                        className="w-16"
                        defaultValue={comm.commission_percent}
                        onBlur={(e) => {
                          const value = parseFloat(e.target.value);
@@ -169,10 +171,11 @@
                      onCheckedChange={(checked) => saveMutation.mutate({ id: comm.id, isActive: checked })}
                    />
                  </TableCell>
-                 <TableCell>
+                  <TableCell className="text-right">
                    <Button
-                     size="sm"
-                     variant="destructive"
+                      size="icon"
+                      variant="ghost"
+                      className="text-destructive"
                      onClick={() => deleteMutation.mutate(comm.id)}
                    >
                      <Trash2 className="h-4 w-4" />
@@ -182,6 +185,8 @@
              ))}
            </TableBody>
          </Table>
+          <ScrollBar orientation="horizontal" />
+          </ScrollArea>
  
          {commissions?.length === 0 && (
            <p className="text-center text-muted-foreground py-8">
@@ -227,8 +232,8 @@
                </div>
              </div>
              <DialogFooter>
-               <Button variant="outline" onClick={() => setShowAddDialog(false)}>Bekor</Button>
-               <Button onClick={() => addMutation.mutate()} disabled={!newCategoryId}>
+                <Button size="sm" variant="outline" onClick={() => setShowAddDialog(false)}>Bekor</Button>
+                <Button size="sm" onClick={() => addMutation.mutate()} disabled={!newCategoryId}>
                  <Save className="h-4 w-4 mr-2" />
                  Saqlash
                </Button>

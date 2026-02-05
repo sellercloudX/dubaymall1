@@ -9,6 +9,7 @@
  import { Switch } from '@/components/ui/switch';
  import { Label } from '@/components/ui/label';
  import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
  import { Plus, Edit, Trash2, Eye, Calendar, FileText, Image as ImageIcon, ExternalLink } from 'lucide-react';
  import { useBlogPosts, useBlogManagement, BlogPost } from '@/hooks/useBlogPosts';
  import { toast } from 'sonner';
@@ -122,7 +123,7 @@
        {/* Header */}
        <div className="flex items-center justify-between">
          <div>
-           <h2 className="text-2xl font-bold flex items-center gap-2">
+            <h2 className="text-xl font-bold flex items-center gap-2">
              <FileText className="h-6 w-6" />
              Blog boshqaruvi
            </h2>
@@ -130,7 +131,7 @@
          </div>
          <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) resetForm(); }}>
            <DialogTrigger asChild>
-             <Button>
+              <Button size="sm">
                <Plus className="h-4 w-4 mr-2" />
                Yangi maqola
              </Button>
@@ -235,10 +236,10 @@
                    <Label>Nashr qilish</Label>
                  </div>
                  <div className="flex gap-2">
-                   <Button variant="outline" onClick={() => { setIsDialogOpen(false); resetForm(); }}>
+                    <Button size="sm" variant="outline" onClick={() => { setIsDialogOpen(false); resetForm(); }}>
                      Bekor qilish
                    </Button>
-                   <Button onClick={handleSubmit} disabled={isSubmitting}>
+                    <Button size="sm" onClick={handleSubmit} disabled={isSubmitting}>
                      {isSubmitting ? 'Saqlanmoqda...' : 'Saqlash'}
                    </Button>
                  </div>
@@ -249,22 +250,22 @@
        </div>
  
        {/* Stats */}
-       <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 gap-2">
          <Card>
-           <CardContent className="p-4 text-center">
-             <p className="text-3xl font-bold">{posts.length}</p>
+            <CardContent className="p-3 text-center">
+              <p className="text-2xl font-bold">{posts.length}</p>
              <p className="text-sm text-muted-foreground">Jami maqolalar</p>
            </CardContent>
          </Card>
          <Card>
-           <CardContent className="p-4 text-center">
-            <p className="text-3xl font-bold text-primary">{posts.filter(p => p.is_published).length}</p>
+            <CardContent className="p-3 text-center">
+             <p className="text-2xl font-bold text-primary">{posts.filter(p => p.is_published).length}</p>
              <p className="text-sm text-muted-foreground">Nashr qilingan</p>
            </CardContent>
          </Card>
          <Card>
-           <CardContent className="p-4 text-center">
-            <p className="text-3xl font-bold text-foreground">{posts.reduce((sum, p) => sum + p.views_count, 0)}</p>
+            <CardContent className="p-3 text-center">
+             <p className="text-2xl font-bold text-foreground">{posts.reduce((sum, p) => sum + p.views_count, 0)}</p>
              <p className="text-sm text-muted-foreground">Jami ko'rishlar</p>
            </CardContent>
          </Card>
@@ -273,6 +274,7 @@
        {/* Posts Table */}
        <Card>
          <CardContent className="p-0">
+            <ScrollArea className="w-full">
            <Table>
              <TableHeader>
                <TableRow>
@@ -314,15 +316,15 @@
                        </div>
                      </TableCell>
                      <TableCell>
-                       <Badge variant="secondary">
+                        <Badge variant="secondary" className="text-xs">
                          {CATEGORIES.find(c => c.value === post.category)?.label || post.category}
                        </Badge>
                      </TableCell>
                      <TableCell>
                        {post.is_published ? (
-                        <Badge className="bg-primary/10 text-primary">Nashr</Badge>
+                         <Badge className="bg-primary/10 text-primary text-xs">Nashr</Badge>
                        ) : (
-                         <Badge variant="outline">Qoralama</Badge>
+                          <Badge variant="outline" className="text-xs">Qoralama</Badge>
                        )}
                      </TableCell>
                      <TableCell>
@@ -332,7 +334,7 @@
                        </div>
                      </TableCell>
                      <TableCell>
-                       <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground whitespace-nowrap">
                          <Calendar className="h-4 w-4" />
                          {format(new Date(post.created_at), 'dd.MM.yyyy')}
                        </div>
@@ -340,16 +342,16 @@
                      <TableCell className="text-right">
                        <div className="flex items-center justify-end gap-1">
                          {post.is_published && (
-                           <Button variant="ghost" size="icon" asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
                              <a href={`/blog/${post.slug}`} target="_blank" rel="noopener noreferrer">
                                <ExternalLink className="h-4 w-4" />
                              </a>
                            </Button>
                          )}
-                         <Button variant="ghost" size="icon" onClick={() => openEditDialog(post)}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditDialog(post)}>
                            <Edit className="h-4 w-4" />
                          </Button>
-                         <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDelete(post.id)}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(post.id)}>
                            <Trash2 className="h-4 w-4" />
                          </Button>
                        </div>
@@ -359,6 +361,8 @@
                )}
              </TableBody>
            </Table>
+            <ScrollBar orientation="horizontal" />
+            </ScrollArea>
          </CardContent>
        </Card>
      </div>

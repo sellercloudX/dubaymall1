@@ -4,9 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { usePlatformSettings, SalesCommissionSettings, BloggerFeeSettings, SubscriptionPlans, PromoPeriod } from '@/hooks/usePlatformSettings';
 import { Percent, CreditCard, Gift, Calendar, Save, Loader2 } from 'lucide-react';
 
@@ -64,35 +64,16 @@ export default function MonetizationSettings() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold">Monetizatsiya sozlamalari</h2>
+        <h2 className="text-xl font-bold">Monetizatsiya sozlamalari</h2>
         <p className="text-muted-foreground">Platform daromad manbalarini boshqaring</p>
       </div>
 
-      <Tabs defaultValue="commission" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="commission" className="flex items-center gap-2">
-            <Percent className="h-4 w-4" />
-            Komissiya
-          </TabsTrigger>
-          <TabsTrigger value="blogger" className="flex items-center gap-2">
-            <Percent className="h-4 w-4" />
-            Blogger fee
-          </TabsTrigger>
-          <TabsTrigger value="subscription" className="flex items-center gap-2">
-            <CreditCard className="h-4 w-4" />
-            Obuna
-          </TabsTrigger>
-          <TabsTrigger value="promo" className="flex items-center gap-2">
-            <Gift className="h-4 w-4" />
-            Imtiyoz
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Sales Commission Tab */}
-        <TabsContent value="commission">
+      {/* Grid Layout for Settings */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Sales Commission Card */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-lg">
                 <Percent className="h-5 w-5 text-emerald-500" />
                 Sotuv komissiyasi
               </CardTitle>
@@ -101,7 +82,6 @@ export default function MonetizationSettings() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="commission-percent">Asosiy komissiya (%)</Label>
                   <Input
@@ -126,7 +106,7 @@ export default function MonetizationSettings() {
                   </div>
                   
                   {salesCommission?.is_promo && (
-                    <div className="space-y-3 p-4 bg-muted/50 rounded-lg">
+                    <div className="space-y-3 p-3 bg-muted/50 rounded-lg">
                       <div className="space-y-2">
                         <Label>Aksiya komissiyasi (%)</Label>
                         <Input
@@ -148,23 +128,20 @@ export default function MonetizationSettings() {
                     </div>
                   )}
                 </div>
-              </div>
 
               <div className="flex justify-end">
-                <Button onClick={handleSaveSalesCommission} disabled={updateSetting.isPending}>
+                <Button size="sm" onClick={handleSaveSalesCommission} disabled={updateSetting.isPending}>
                   {updateSetting.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
                   Saqlash
                 </Button>
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
 
-        {/* Blogger Fee Tab */}
-        <TabsContent value="blogger">
+        {/* Blogger Fee Card */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-lg">
                 <Percent className="h-5 w-5 text-purple-500" />
                 Blogger platform to'lovi
               </CardTitle>
@@ -173,7 +150,6 @@ export default function MonetizationSettings() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Asosiy to'lov (%)</Label>
                   <Input
@@ -196,7 +172,7 @@ export default function MonetizationSettings() {
                   </div>
                   
                   {bloggerFee?.is_promo && (
-                    <div className="space-y-3 p-4 bg-muted/50 rounded-lg">
+                    <div className="space-y-3 p-3 bg-muted/50 rounded-lg">
                       <div className="space-y-2">
                         <Label>Aksiya to'lovi (%)</Label>
                         <Input
@@ -218,23 +194,21 @@ export default function MonetizationSettings() {
                     </div>
                   )}
                 </div>
-              </div>
 
               <div className="flex justify-end">
-                <Button onClick={handleSaveBloggerFee} disabled={updateSetting.isPending}>
+                <Button size="sm" onClick={handleSaveBloggerFee} disabled={updateSetting.isPending}>
                   {updateSetting.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
                   Saqlash
                 </Button>
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
+      </div>
 
-        {/* Subscription Plans Tab */}
-        <TabsContent value="subscription">
+      {/* Subscription Plans Card */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-lg">
                 <CreditCard className="h-5 w-5 text-blue-500" />
                 Obuna tariflari
               </CardTitle>
@@ -245,9 +219,9 @@ export default function MonetizationSettings() {
             <CardContent className="space-y-6">
               <div className="grid gap-6 md:grid-cols-3">
                 {/* Basic Plan */}
-                <div className="space-y-4 p-4 border rounded-lg">
+                <div className="space-y-3 p-3 border rounded-lg">
                   <div className="flex items-center justify-between">
-                    <Badge variant="secondary">Basic</Badge>
+                    <Badge variant="secondary" className="text-xs">Basic</Badge>
                     <span className="text-sm text-muted-foreground">Boshlang'ich</span>
                   </div>
                   <div className="space-y-2">
@@ -277,9 +251,9 @@ export default function MonetizationSettings() {
                 </div>
 
                 {/* Pro Plan */}
-                <div className="space-y-4 p-4 border rounded-lg border-primary/50 bg-primary/5">
+                <div className="space-y-3 p-3 border rounded-lg border-primary/50 bg-primary/5">
                   <div className="flex items-center justify-between">
-                    <Badge className="bg-primary">Pro</Badge>
+                    <Badge className="bg-primary text-xs">Pro</Badge>
                     <span className="text-sm text-muted-foreground">Tavsiya etilgan</span>
                   </div>
                   <div className="space-y-2">
@@ -309,9 +283,9 @@ export default function MonetizationSettings() {
                 </div>
 
                 {/* Enterprise Plan */}
-                <div className="space-y-4 p-4 border rounded-lg">
+                <div className="space-y-3 p-3 border rounded-lg">
                   <div className="flex items-center justify-between">
-                    <Badge variant="outline" className="border-amber-500 text-amber-600">Enterprise</Badge>
+                    <Badge variant="outline" className="border-amber-500 text-amber-600 text-xs">Enterprise</Badge>
                     <span className="text-sm text-muted-foreground">Premium</span>
                   </div>
                   <div className="space-y-2">
@@ -342,20 +316,18 @@ export default function MonetizationSettings() {
               </div>
 
               <div className="flex justify-end">
-                <Button onClick={handleSaveSubscriptionPlans} disabled={updateSetting.isPending}>
+                <Button size="sm" onClick={handleSaveSubscriptionPlans} disabled={updateSetting.isPending}>
                   {updateSetting.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
                   Saqlash
                 </Button>
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
 
-        {/* Promo Period Tab */}
-        <TabsContent value="promo">
+      {/* Promo Period Card */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-lg">
                 <Gift className="h-5 w-5 text-pink-500" />
                 Imtiyozli davr
               </CardTitle>
@@ -364,7 +336,7 @@ export default function MonetizationSettings() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="flex items-center justify-between p-4 border rounded-lg bg-gradient-to-r from-pink-500/10 to-purple-500/10">
+              <div className="flex items-center justify-between p-3 border rounded-lg bg-gradient-to-r from-pink-500/10 to-purple-500/10">
                 <div>
                   <h4 className="font-semibold">Imtiyozli davr faol</h4>
                   <p className="text-sm text-muted-foreground">
@@ -378,7 +350,7 @@ export default function MonetizationSettings() {
               </div>
 
               {promoPeriod?.is_active && (
-                <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
+                <div className="space-y-4 p-3 bg-muted/50 rounded-lg">
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
                       <Label>Aksiya nomi</Label>
@@ -403,10 +375,10 @@ export default function MonetizationSettings() {
                   <div className="space-y-4">
                     <h5 className="font-medium">Qanday to'lovlar 0 bo'lsin?</h5>
                     
-                    <div className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center justify-between p-2 border rounded-lg">
                       <div>
                         <p className="font-medium">Bepul obuna</p>
-                        <p className="text-sm text-muted-foreground">Barcha obunalar bepul</p>
+                        <p className="text-xs text-muted-foreground">Barcha obunalar bepul</p>
                       </div>
                       <Switch
                         checked={promoPeriod?.free_subscription || false}
@@ -429,15 +401,13 @@ export default function MonetizationSettings() {
               )}
 
               <div className="flex justify-end">
-                <Button onClick={handleSavePromoPeriod} disabled={updateSetting.isPending}>
+                <Button size="sm" onClick={handleSavePromoPeriod} disabled={updateSetting.isPending}>
                   {updateSetting.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
                   Saqlash
                 </Button>
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
     </div>
   );
 }
