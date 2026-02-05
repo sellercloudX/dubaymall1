@@ -3,11 +3,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 // ==================== GPT-4o VISION - PRIMARY ANALYZER ====================
-// Best vision model for accurate product recognition
 async function analyzeWithGPT4o(imageBase64: string): Promise<any | null> {
   const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
   
@@ -32,18 +31,19 @@ async function analyzeWithGPT4o(imageBase64: string): Promise<any | null> {
             role: "system",
             content: `You are a PROFESSIONAL E-COMMERCE PRODUCT ANALYST specializing in Uzbekistan and CIS markets.
 
+TASK: Identify the product from its IMAGE APPEARANCE (like Google Lens).
+
 YOUR EXPERTISE:
-- Accurate product identification from images
+- Accurate product identification from visual appearance
+- Brand and model recognition from packaging, labels, design
 - Market-appropriate pricing in Uzbek Som (UZS)
-- SEO-optimized product naming and descriptions
-- Category classification for marketplaces (Uzum, Yandex Market)
+- SEO-optimized product naming
 
 RESPONSE REQUIREMENTS:
 - Product names must be in Uzbek language, professional and descriptive
+- Include brand name if recognizable from the image
 - Descriptions must be detailed (3-5 sentences) highlighting key selling points
 - Prices must reflect realistic Uzbekistan market values in UZS
-- Always identify brand if visible on product
-- Provide accurate specifications (color, material, size, weight)
 
 CATEGORY OPTIONS:
 Elektronika, Kiyim-kechak, Uy-ro'zg'or, Sport, Go'zallik, Bolalar uchun, Avtomobil, Oziq-ovqat, Aksessuarlar, Qurilish, Smartfonlar, Kompyuterlar, Audio`
@@ -53,19 +53,15 @@ Elektronika, Kiyim-kechak, Uy-ro'zg'or, Sport, Go'zallik, Bolalar uchun, Avtomob
             content: [
               {
                 type: "text",
-                text: `ANALYZE THIS PRODUCT IMAGE IN DETAIL:
+                text: `IDENTIFY THIS PRODUCT FROM ITS APPEARANCE (Google Lens style):
 
-1. PRODUCT NAME (Uzbek): Create a professional, SEO-optimized product name
-2. DESCRIPTION (Uzbek): Write 3-5 sentences highlighting key features and benefits
-3. CATEGORY: Select the most accurate category
-4. PRICE (UZS): Suggest realistic market price in Uzbek Som
-5. BRAND: Identify if visible
-6. SPECIFICATIONS: Extract color, material, size, weight if detectable
-7. TARGET AUDIENCE: Who would buy this product?
-8. CONDITION: new/used/refurbished
-9. CONFIDENCE: Your confidence level 0-100%
+Look at the image and identify:
+1. What product is this? (Brand, model if visible)
+2. What category does it belong to?
+3. What would be a fair market price in Uzbekistan?
+4. Describe its key features
 
-Return structured JSON only.`
+Return structured JSON with your analysis.`
               },
               {
                 type: "image_url",
@@ -81,14 +77,14 @@ Return structured JSON only.`
           {
             type: "function",
             function: {
-              name: "analyze_product",
-              description: "Return structured product information from image analysis",
+              name: "identify_product",
+              description: "Return structured product information from visual analysis",
               parameters: {
                 type: "object",
                 properties: {
-                  name: {
+                  productName: {
                     type: "string",
-                    description: "Professional product name in Uzbek language"
+                    description: "Professional product name in Uzbek language (include brand if visible)"
                   },
                   description: {
                     type: "string",
@@ -97,7 +93,7 @@ Return structured JSON only.`
                   category: {
                     type: "string",
                     enum: ["Elektronika", "Kiyim-kechak", "Uy-ro'zg'or", "Sport", "Go'zallik", "Bolalar uchun", "Avtomobil", "Oziq-ovqat", "Aksessuarlar", "Qurilish", "Smartfonlar", "Kompyuterlar", "Audio"],
-                    description: "Product category for marketplace"
+                    description: "Product category"
                   },
                   suggestedPrice: {
                     type: "number",
@@ -107,36 +103,35 @@ Return structured JSON only.`
                     type: "string",
                     description: "Brand name if visible on product"
                   },
+                  model: {
+                    type: "string",
+                    description: "Model name/number if visible"
+                  },
                   specifications: {
                     type: "object",
                     description: "Key product specifications",
                     properties: {
-                      color: { type: "string", description: "Product color" },
-                      material: { type: "string", description: "Main material" },
-                      size: { type: "string", description: "Size or dimensions" },
-                      weight: { type: "string", description: "Weight if estimable" }
+                      color: { type: "string" },
+                      material: { type: "string" },
+                      size: { type: "string" }
                     }
-                  },
-                  targetAudience: {
-                    type: "string",
-                    description: "Target customer description"
-                  },
-                  condition: {
-                    type: "string",
-                    enum: ["new", "used", "refurbished"],
-                    description: "Product condition"
                   },
                   confidence: {
                     type: "number",
                     description: "Analysis confidence score 0-100"
+                  },
+                  searchKeywords: {
+                    type: "array",
+                    items: { type: "string" },
+                    description: "Keywords for searching similar products online"
                   }
                 },
-                required: ["name", "description", "category", "suggestedPrice"]
+                required: ["productName", "description", "category", "suggestedPrice"]
               }
             }
           }
         ],
-        tool_choice: { type: "function", function: { name: "analyze_product" } },
+        tool_choice: { type: "function", function: { name: "identify_product" } },
         max_tokens: 2000
       }),
     });
@@ -144,10 +139,7 @@ Return structured JSON only.`
     if (!response.ok) {
       const errorText = await response.text();
       console.error("GPT-4o API error:", response.status, errorText);
-      
-      if (response.status === 429) {
-        return { error: "rate_limited" };
-      }
+      if (response.status === 429) return { error: "rate_limited" };
       return null;
     }
 
@@ -160,7 +152,7 @@ Return structured JSON only.`
     }
 
     const result = JSON.parse(toolCall.function.arguments);
-    console.log("✅ GPT-4o Vision analysis complete:", result.name);
+    console.log("✅ GPT-4o Vision identified:", result.productName);
     return { ...result, aiModel: "gpt-4o-vision" };
   } catch (err) {
     console.error("GPT-4o Vision error:", err);
@@ -180,7 +172,6 @@ async function analyzeWithClaude(imageBase64: string): Promise<any | null> {
   try {
     console.log("🔍 FALLBACK: Using Claude 3.5 Sonnet for product analysis...");
 
-    // Extract base64 data and media type
     let mediaType = "image/jpeg";
     let base64Data = imageBase64;
     
@@ -216,20 +207,19 @@ async function analyzeWithClaude(imageBase64: string): Promise<any | null> {
               },
               {
                 type: "text",
-                text: `Analyze this product image for e-commerce in Uzbekistan.
+                text: `IDENTIFY this product from its visual appearance (like Google Lens).
 
-Return JSON with these fields:
-- name: Product name in Uzbek (professional, SEO-optimized)
-- description: 3-5 sentences in Uzbek about features and benefits
+Return JSON with:
+- productName: Professional product name in Uzbek (include brand if visible)
+- description: 3-5 sentences in Uzbek about features
 - category: One of [Elektronika, Kiyim-kechak, Uy-ro'zg'or, Sport, Go'zallik, Bolalar uchun, Avtomobil, Oziq-ovqat, Aksessuarlar, Qurilish]
 - suggestedPrice: Price in UZS (realistic Uzbekistan market value)
 - brand: Brand name if visible
-- specifications: {color, material, size, weight}
-- targetAudience: Who would buy this
-- condition: new/used/refurbished
+- model: Model name if visible
+- searchKeywords: Array of keywords for searching similar products
 - confidence: 0-100
 
-Return ONLY valid JSON, no other text.`
+Return ONLY valid JSON.`
               }
             ]
           }
@@ -245,20 +235,13 @@ Return ONLY valid JSON, no other text.`
     const data = await response.json();
     const content = data.content?.[0]?.text;
     
-    if (!content) {
-      console.error("Invalid Claude response");
-      return null;
-    }
+    if (!content) return null;
 
-    // Parse JSON from response
     const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      console.error("No JSON found in Claude response");
-      return null;
-    }
+    if (!jsonMatch) return null;
 
     const result = JSON.parse(jsonMatch[0]);
-    console.log("✅ Claude 3.5 Sonnet analysis complete:", result.name);
+    console.log("✅ Claude identified:", result.productName);
     return { ...result, aiModel: "claude-3.5-sonnet" };
   } catch (err) {
     console.error("Claude fallback error:", err);
@@ -276,7 +259,7 @@ async function analyzeWithGemini(imageBase64: string): Promise<any | null> {
   }
 
   try {
-    console.log("🔍 LAST FALLBACK: Using Gemini for product analysis...");
+    console.log("🔍 LAST FALLBACK: Using Gemini for product identification...");
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -289,8 +272,7 @@ async function analyzeWithGemini(imageBase64: string): Promise<any | null> {
         messages: [
           {
             role: "system",
-            content: `You are a product analysis assistant for e-commerce in Uzbekistan. 
-Analyze product images and provide structured information.
+            content: `You are Google Lens - identify products from their visual appearance.
 Always respond in Uzbek language for name and description.
 Suggest prices in Uzbek Som (UZS).`
           },
@@ -299,7 +281,7 @@ Suggest prices in Uzbek Som (UZS).`
             content: [
               {
                 type: "text",
-                text: "Analyze this product and return JSON with: name, description, category, suggestedPrice, brand, specifications, condition"
+                text: "IDENTIFY this product from its appearance. Return JSON with: productName, description, category, suggestedPrice, brand, searchKeywords"
               },
               {
                 type: "image_url",
@@ -312,22 +294,24 @@ Suggest prices in Uzbek Som (UZS).`
           {
             type: "function",
             function: {
-              name: "analyze_product",
-              description: "Return structured product information",
+              name: "identify_product",
+              description: "Return product identification results",
               parameters: {
                 type: "object",
                 properties: {
-                  name: { type: "string" },
-                  description: { type: "string" },
+                  productName: { type: "string", description: "Product name in Uzbek" },
+                  description: { type: "string", description: "Description in Uzbek" },
                   category: { type: "string", enum: ["Elektronika", "Kiyim-kechak", "Uy-ro'zg'or", "Sport", "Go'zallik", "Bolalar uchun", "Avtomobil", "Oziq-ovqat", "Aksessuarlar", "Qurilish"] },
-                  suggestedPrice: { type: "number" }
+                  suggestedPrice: { type: "number", description: "Price in UZS" },
+                  brand: { type: "string" },
+                  searchKeywords: { type: "array", items: { type: "string" } }
                 },
-                required: ["name", "description", "category", "suggestedPrice"]
+                required: ["productName", "description", "category", "suggestedPrice"]
               }
             }
           }
         ],
-        tool_choice: { type: "function", function: { name: "analyze_product" } }
+        tool_choice: { type: "function", function: { name: "identify_product" } }
       }),
     });
 
@@ -339,12 +323,10 @@ Suggest prices in Uzbek Som (UZS).`
     const data = await response.json();
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
     
-    if (!toolCall?.function?.arguments) {
-      return null;
-    }
+    if (!toolCall?.function?.arguments) return null;
 
     const result = JSON.parse(toolCall.function.arguments);
-    console.log("✅ Gemini analysis complete:", result.name);
+    console.log("✅ Gemini identified:", result.productName);
     return { ...result, aiModel: "gemini-2.5-flash" };
   } catch (err) {
     console.error("Gemini fallback error:", err);
@@ -358,7 +340,7 @@ serve(async (req) => {
   }
 
   try {
-    // Authentication check
+    // Simple auth check
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(
@@ -373,17 +355,17 @@ serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     
-    if (claimsError || !claimsData?.claims) {
+    if (authError || !user) {
       return new Response(
         JSON.stringify({ error: "Invalid authentication" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const { imageBase64 } = await req.json();
+    const body = await req.json();
+    const { imageBase64, mode } = body;
 
     // Input validation
     if (!imageBase64 || typeof imageBase64 !== 'string') {
@@ -409,15 +391,14 @@ serve(async (req) => {
       );
     }
 
-    console.log(`🔍 Analyzing product image for user ${claimsData.claims.sub}`);
+    console.log(`🔍 Google Lens mode: Identifying product for user ${user.id}`);
     console.log(`🤖 AI Priority: GPT-4o Vision → Claude 3.5 Sonnet → Gemini`);
 
     let result = null;
 
-    // PRIMARY: Try GPT-4o Vision first (best for product recognition)
+    // PRIMARY: GPT-4o Vision (best for visual recognition)
     result = await analyzeWithGPT4o(imageBase64);
     
-    // Check for rate limiting
     if (result?.error === "rate_limited") {
       return new Response(
         JSON.stringify({ error: "Service busy, please try again" }),
@@ -425,25 +406,25 @@ serve(async (req) => {
       );
     }
 
-    // FALLBACK 1: Try Claude 3.5 Sonnet
+    // FALLBACK 1: Claude 3.5 Sonnet
     if (!result) {
       result = await analyzeWithClaude(imageBase64);
     }
 
-    // FALLBACK 2: Try Gemini (last resort)
+    // FALLBACK 2: Gemini
     if (!result) {
       result = await analyzeWithGemini(imageBase64);
     }
 
     if (!result) {
-      console.error("All AI models failed for product analysis");
+      console.error("All AI models failed");
       return new Response(
-        JSON.stringify({ error: "Analysis failed. Please try again." }),
+        JSON.stringify({ error: "Could not identify product. Please try a clearer image." }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log(`✅ Product analysis complete with ${result.aiModel}`);
+    console.log(`✅ Product identified with ${result.aiModel}: ${result.productName}`);
 
     return new Response(
       JSON.stringify(result),

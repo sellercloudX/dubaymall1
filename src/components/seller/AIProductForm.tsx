@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -19,8 +19,8 @@ import {
 import { useCategories } from '@/hooks/useCategories';
 import { toast } from 'sonner';
 import { 
-  Search, Sparkles, Loader2, ImageIcon, Wand2, Check,
-  Globe, Package, ArrowRight, RefreshCw, Zap
+  Camera, Sparkles, Loader2, ImageIcon, Wand2, Check,
+  Globe, Package, ArrowRight, RefreshCw, Zap, Upload, X
 } from 'lucide-react';
 import type { TablesInsert } from '@/integrations/supabase/types';
 
@@ -42,7 +42,7 @@ interface WebProduct {
   description?: string;
 }
 
-type ProcessingStep = 'idle' | 'searching' | 'generating' | 'uploading' | 'done';
+type ProcessingStep = 'idle' | 'analyzing' | 'searching' | 'generating' | 'uploading' | 'done';
 
 // Safe image component with fallback
 function ProductImage({ src, alt, className }: { src?: string; alt: string; className?: string }) {
@@ -70,9 +70,18 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
   const { t } = useLanguage();
   const { categories } = useCategories();
   
-  // Search state
-  const [searchQuery, setSearchQuery] = useState('');
+  // Camera/Gallery input
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  
+  // Processing state
   const [processingStep, setProcessingStep] = useState<ProcessingStep>('idle');
+  const [analysisResult, setAnalysisResult] = useState<{
+    productName: string;
+    category: string;
+    description: string;
+    suggestedPrice: number;
+  } | null>(null);
   
   // Found products from web
   const [webProducts, setWebProducts] = useState<WebProduct[]>([]);
@@ -94,8 +103,9 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
 
   const getProgress = () => {
     switch (processingStep) {
-      case 'searching': return 33;
-      case 'generating': return 66;
+      case 'analyzing': return 20;
+      case 'searching': return 50;
+      case 'generating': return 75;
       case 'uploading': return 90;
       case 'done': return 100;
       default: return 0;
@@ -104,7 +114,8 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
 
   const getStepText = () => {
     switch (processingStep) {
-      case 'searching': return '🔍 Web\'dan o\'xshash mahsulotlar qidirilmoqda...';
+      case 'analyzing': return '🔍 AI Vision mahsulotni taniyapti...';
+      case 'searching': return '🌐 Web\'dan o\'xshash mahsulotlar qidirilmoqda...';
       case 'generating': return '🎨 Flux Pro bilan professional rasm yaratilmoqda...';
       case 'uploading': return '📤 Rasmlar yuklanmoqda...';
       case 'done': return '✅ Tayyor!';
@@ -112,25 +123,96 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
     }
   };
 
-  // Google Lens-like search - find products from web
-  const searchProducts = async () => {
-    if (!searchQuery.trim()) {
-      toast.error('Iltimos, mahsulot nomini kiriting');
-      return;
-    }
+  // Handle image capture from camera or gallery
+  const handleImageCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-    setProcessingStep('searching');
+    // Convert to base64
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64 = reader.result as string;
+      setCapturedImage(base64);
+      
+      // Immediately start analysis
+      await analyzeProductImage(base64);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // AI Vision - Analyze image to identify product (Google Lens style)
+  const analyzeProductImage = async (imageBase64: string) => {
+    setProcessingStep('analyzing');
     setWebProducts([]);
     setSelectedProduct(null);
     setProductImages([]);
+    setAnalysisResult(null);
 
     try {
-      // Search for similar products across marketplaces
+      // Call Vision AI to analyze the image
+      const { data, error } = await supabase.functions.invoke('analyze-product-image', {
+        body: { 
+          imageBase64,
+          mode: 'identify' // Google Lens mode - identify product from image
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.productName) {
+        setAnalysisResult({
+          productName: data.productName,
+          category: data.category || '',
+          description: data.description || '',
+          suggestedPrice: data.suggestedPrice || 0
+        });
+
+        // Update form with AI-detected data
+        setFormData(prev => ({
+          ...prev,
+          name: data.productName,
+          description: data.description || '',
+          price: data.suggestedPrice || 0,
+        }));
+
+        // Match category
+        if (data.category) {
+          const matchedCategory = categories.find(
+            cat => cat.name_uz?.toLowerCase().includes(data.category.toLowerCase()) ||
+                   cat.name_ru?.toLowerCase().includes(data.category.toLowerCase()) ||
+                   cat.name_en?.toLowerCase().includes(data.category.toLowerCase())
+          );
+          if (matchedCategory) {
+            setFormData(prev => ({ ...prev, category_id: matchedCategory.id }));
+          }
+        }
+
+        toast.success(`Mahsulot aniqlandi: ${data.productName}`);
+        
+        // Now search for similar products on web
+        await searchSimilarProducts(data.productName, data.category, imageBase64);
+      } else {
+        toast.error('Mahsulotni aniqlab bo\'lmadi. Iltimos, aniqroq rasm oling.');
+        setProcessingStep('idle');
+      }
+    } catch (error: any) {
+      console.error('Vision analysis error:', error);
+      toast.error('Tahlil xatosi: ' + (error.message || 'Noma\'lum xato'));
+      setProcessingStep('idle');
+    }
+  };
+
+  // Search for similar products across web (after AI identification)
+  const searchSimilarProducts = async (productName: string, category: string, imageBase64?: string) => {
+    setProcessingStep('searching');
+
+    try {
       const { data, error } = await supabase.functions.invoke('search-similar-products', {
         body: { 
-          productName: searchQuery.trim(),
-          category: '',
-          description: ''
+          productName,
+          category,
+          description: analysisResult?.description || '',
+          imageBase64 // Optional: for visual similarity matching
         },
       });
 
@@ -139,18 +221,34 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
       const products = data?.products || [];
       setWebProducts(products);
 
-      if (products.length === 0) {
-        toast.info('Mahsulot topilmadi. Rasm generatsiya qilinadi...');
-        // Auto-generate image if no products found
-        await generateProductImage(searchQuery);
-      } else {
+      if (products.length > 0) {
         toast.success(`${products.length} ta o'xshash mahsulot topildi!`);
-        setProcessingStep('idle');
+        
+        // Auto-select best match if image quality is good
+        const bestMatch = products.find((p: WebProduct) => 
+          p.image && p.image.startsWith('http') && !p.image.includes('unsplash')
+        );
+        
+        if (bestMatch) {
+          // Show high-quality marketplace images
+          const goodImages = products
+            .filter((p: WebProduct) => p.image && p.image.startsWith('http'))
+            .map((p: WebProduct) => p.image)
+            .slice(0, 4);
+          
+          if (goodImages.length > 0) {
+            setProductImages(goodImages);
+          }
+        }
+      } else {
+        toast.info('Web\'da o\'xshash mahsulot topilmadi. Rasm generatsiya qilinadi...');
+        await generateProductImage(productName);
       }
+      
+      setProcessingStep('done');
     } catch (error: any) {
       console.error('Search error:', error);
-      toast.error('Qidiruv xatosi: ' + (error.message || 'Noma\'lum xato'));
-      setProcessingStep('idle');
+      setProcessingStep('done');
     }
   };
 
@@ -162,40 +260,36 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
     const priceMatch = product.price.match(/[\d\s,]+/);
     const priceValue = priceMatch 
       ? parseInt(priceMatch[0].replace(/\s/g, '').replace(',', '')) 
-      : 0;
+      : formData.price || 0;
     
     setFormData(prev => ({
       ...prev,
-      name: product.title,
-      description: product.description || '',
+      name: product.title || prev.name,
+      description: product.description || prev.description,
       price: priceValue,
     }));
 
-    // If product has good image, use it
+    // Use product's image if it's high quality
     if (product.image && product.image.startsWith('http')) {
-      setProductImages([product.image]);
-    }
-    
-    // Match category
-    const matchedCategory = categories.find(
-      cat => product.title.toLowerCase().includes(cat.name.toLowerCase()) ||
-             cat.name.toLowerCase().includes(product.title.toLowerCase().split(' ')[0])
-    );
-    if (matchedCategory) {
-      setFormData(prev => ({ ...prev, category_id: matchedCategory.id }));
+      setProductImages(prev => {
+        if (!prev.includes(product.image)) {
+          return [product.image, ...prev].slice(0, 5);
+        }
+        return prev;
+      });
     }
   };
 
   // Generate professional product image with Flux Pro
-  const generateProductImage = useCallback(async (productName: string) => {
+  const generateProductImage = useCallback(async (productName?: string) => {
     setIsGeneratingImages(true);
     setProcessingStep('generating');
     
     try {
       const { data, error } = await supabase.functions.invoke('generate-product-image', {
         body: { 
-          productName: productName || formData.name || searchQuery,
-          category: categories.find(c => c.id === formData.category_id)?.name || '',
+          productName: productName || formData.name || analysisResult?.productName,
+          category: analysisResult?.category || categories.find(c => c.id === formData.category_id)?.name_uz || '',
           style: 'marketplace'
         },
       });
@@ -203,51 +297,52 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
       if (error) throw error;
 
       if (data?.imageUrl) {
-        setProductImages(prev => [...prev, data.imageUrl]);
+        setProductImages(prev => [data.imageUrl, ...prev].slice(0, 5));
         toast.success('Professional rasm yaratildi!');
-      } else if (data?.images && data.images.length > 0) {
-        setProductImages(prev => [...prev, ...data.images]);
-        toast.success(`${data.images.length} ta rasm yaratildi!`);
       }
       
       setProcessingStep('done');
     } catch (error: any) {
       console.error('Image generation error:', error);
-      toast.error('Rasm yaratishda xatolik: ' + (error.message || 'Noma\'lum xato'));
-      setProcessingStep('idle');
+      toast.error('Rasm yaratishda xatolik');
+      setProcessingStep('done');
     } finally {
       setIsGeneratingImages(false);
     }
-  }, [formData.name, formData.category_id, categories, searchQuery]);
+  }, [formData.name, formData.category_id, categories, analysisResult]);
 
-  // Use AI-analyzed product data
-  const useAsProduct = () => {
-    if (!selectedProduct && !searchQuery) return;
-    
-    const name = selectedProduct?.title || searchQuery;
-    setFormData(prev => ({
-      ...prev,
-      name: name,
-      description: selectedProduct?.description || `${name} - sifatli va ishonchli mahsulot`,
-    }));
-    
-    setProcessingStep('done');
+  // Clear captured image and reset
+  const clearCapture = () => {
+    setCapturedImage(null);
+    setAnalysisResult(null);
+    setWebProducts([]);
+    setSelectedProduct(null);
+    setProductImages([]);
+    setProcessingStep('idle');
+    setFormData({
+      name: '',
+      description: '',
+      price: 0,
+      stock_quantity: 10,
+      category_id: null,
+      status: 'active',
+    });
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   // Upload image to storage
   const uploadImageToStorage = async (imageUrl: string): Promise<string | null> => {
     try {
-      // If already a public URL from our storage, return as is
       if (imageUrl.includes('supabase') && imageUrl.includes('product-images')) {
         return imageUrl;
       }
       
-      // For external URLs, we'll use them directly (most marketplaces allow this)
-      if (imageUrl.startsWith('http')) {
+      if (imageUrl.startsWith('http') && !imageUrl.startsWith('data:')) {
         return imageUrl;
       }
       
-      // For base64 images, upload to storage
       if (imageUrl.startsWith('data:')) {
         const base64Data = imageUrl.split(',')[1];
         const byteCharacters = atob(base64Data);
@@ -296,7 +391,6 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
     
     setProcessingStep('uploading');
     
-    // Upload all images
     const uploadedImages: string[] = [];
     for (const img of productImages) {
       const url = await uploadImageToStorage(img);
@@ -322,38 +416,97 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {/* Search Input - Google Lens Style */}
-      <Card className="border-primary/20">
+      {/* Camera Input - Google Lens Style */}
+      <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
-            <Search className="h-4 w-4 text-primary" />
-            Mahsulotni qidiring
+            <Camera className="h-5 w-5 text-primary" />
+            Google Lens - Rasmdan tanish
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex gap-2">
-            <Input
-              placeholder="Mahsulot nomini kiriting... (masalan: iPhone 15 Pro)"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), searchProducts())}
-              className="flex-1"
-            />
-            <Button 
-              type="button" 
-              onClick={searchProducts}
-              disabled={isProcessing || !searchQuery.trim()}
-            >
-              {processingStep === 'searching' ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Search className="h-4 w-4" />
+        <CardContent className="space-y-4">
+          {!capturedImage ? (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                {/* Camera button */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-32 flex-col gap-2 border-dashed border-2 hover:border-primary hover:bg-primary/5"
+                  onClick={() => {
+                    if (fileInputRef.current) {
+                      fileInputRef.current.setAttribute('capture', 'environment');
+                      fileInputRef.current.click();
+                    }
+                  }}
+                >
+                  <Camera className="h-8 w-8 text-primary" />
+                  <span className="font-medium">Kamera</span>
+                  <span className="text-xs text-muted-foreground">Rasmga oling</span>
+                </Button>
+                
+                {/* Gallery button */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-32 flex-col gap-2 border-dashed border-2 hover:border-primary hover:bg-primary/5"
+                  onClick={() => {
+                    if (fileInputRef.current) {
+                      fileInputRef.current.removeAttribute('capture');
+                      fileInputRef.current.click();
+                    }
+                  }}
+                >
+                  <Upload className="h-8 w-8 text-primary" />
+                  <span className="font-medium">Galereya</span>
+                  <span className="text-xs text-muted-foreground">Rasmni tanlang</span>
+                </Button>
+              </div>
+              
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleImageCapture}
+              />
+              
+              <div className="text-center p-4 bg-muted/50 rounded-lg">
+                <p className="text-sm text-muted-foreground">
+                  📸 Mahsulotni rasmga oling yoki galereyadan tanlang
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  AI mahsulotni <strong>ko'rinishidan</strong> tanib oladi va web'dan topadi
+                </p>
+              </div>
+            </>
+          ) : (
+            <div className="relative">
+              <img 
+                src={capturedImage} 
+                alt="Captured" 
+                className="w-full h-48 object-cover rounded-lg"
+              />
+              <Button
+                type="button"
+                variant="destructive"
+                size="icon"
+                className="absolute top-2 right-2"
+                onClick={clearCapture}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+              
+              {analysisResult && (
+                <div className="absolute bottom-2 left-2 right-2 bg-background/90 backdrop-blur p-2 rounded-lg">
+                  <p className="font-medium text-sm truncate">{analysisResult.productName}</p>
+                  <Badge variant="secondary" className="text-xs mt-1">
+                    {analysisResult.category || 'Kategoriya aniqlanmoqda...'}
+                  </Badge>
+                </div>
               )}
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            🔍 Google Lens kabi - mahsulot nomini yozing, AI web'dan o'xshash mahsulotlarni topadi
-          </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -368,13 +521,13 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
         </div>
       )}
 
-      {/* Search Results */}
-      {webProducts.length > 0 && !selectedProduct && (
+      {/* Search Results from Web */}
+      {webProducts.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
               <Globe className="h-4 w-4" />
-              Web'dan topilgan mahsulotlar
+              Web'dan topilgan o'xshash mahsulotlar
               <Badge variant="secondary" className="ml-auto">{webProducts.length} ta</Badge>
             </CardTitle>
           </CardHeader>
@@ -384,7 +537,11 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
                 {webProducts.map((product, index) => (
                   <div
                     key={index}
-                    className="flex items-center gap-3 p-2 rounded-lg border hover:bg-accent/50 cursor-pointer transition-colors"
+                    className={`flex items-center gap-3 p-2 rounded-lg border cursor-pointer transition-colors ${
+                      selectedProduct === product 
+                        ? 'bg-primary/10 border-primary' 
+                        : 'hover:bg-accent/50'
+                    }`}
                     onClick={() => selectProduct(product)}
                   >
                     <ProductImage
@@ -399,19 +556,21 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
                         <span className="text-sm font-semibold text-primary">{product.price}</span>
                       </div>
                     </div>
-                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                    {selectedProduct === product && (
+                      <Check className="h-5 w-5 text-primary flex-shrink-0" />
+                    )}
                   </div>
                 ))}
               </div>
             </ScrollArea>
             
-            {/* Option to generate custom image */}
+            {/* Generate new image option */}
             <div className="mt-4 pt-4 border-t">
               <Button
                 type="button"
                 variant="outline"
                 className="w-full"
-                onClick={() => generateProductImage(searchQuery)}
+                onClick={() => generateProductImage()}
                 disabled={isGeneratingImages}
               >
                 {isGeneratingImages ? (
@@ -419,18 +578,18 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
                 ) : (
                   <Wand2 className="h-4 w-4 mr-2" />
                 )}
-                Flux Pro bilan yangi rasm yaratish
+                Flux Pro bilan yangi professional rasm yaratish
               </Button>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Selected Product / Form */}
-      {(selectedProduct || processingStep === 'done') && (
+      {/* Product Form - After Analysis */}
+      {(analysisResult || processingStep === 'done') && (
         <Card className="bg-primary/5 border-primary/20">
           <CardContent className="pt-4">
-            <div className="flex items-center gap-2 mb-3">
+            <div className="flex items-center gap-2 mb-4">
               <Sparkles className="h-4 w-4 text-primary" />
               <span className="font-medium text-primary">Mahsulot ma'lumotlari</span>
               {processingStep === 'done' && (
@@ -441,15 +600,20 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
             {/* Product Images */}
             {productImages.length > 0 && (
               <div className="mb-4">
-                <Label className="mb-2 block">Rasmlar</Label>
+                <Label className="mb-2 block">Rasmlar ({productImages.length})</Label>
                 <div className="flex gap-2 flex-wrap">
                   {productImages.map((img, idx) => (
-                    <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border">
+                    <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border-2 border-primary/20">
                       <ProductImage
                         src={img}
                         alt={`Product ${idx + 1}`}
                         className="w-full h-full object-cover"
                       />
+                      {idx === 0 && (
+                        <Badge className="absolute bottom-0 left-0 right-0 rounded-none text-xs justify-center">
+                          Asosiy
+                        </Badge>
+                      )}
                     </div>
                   ))}
                   <Button
@@ -457,7 +621,7 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
                     variant="outline"
                     size="icon"
                     className="w-20 h-20"
-                    onClick={() => generateProductImage(formData.name || searchQuery)}
+                    onClick={() => generateProductImage()}
                     disabled={isGeneratingImages}
                   >
                     {isGeneratingImages ? (
@@ -470,14 +634,14 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
               </div>
             )}
             
-            {/* No images yet - generate button */}
+            {/* No images yet */}
             {productImages.length === 0 && (
               <div className="mb-4">
                 <Button
                   type="button"
                   variant="secondary"
                   className="w-full"
-                  onClick={() => generateProductImage(formData.name || searchQuery)}
+                  onClick={() => generateProductImage()}
                   disabled={isGeneratingImages}
                 >
                   {isGeneratingImages ? (
@@ -499,50 +663,57 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
               <div>
                 <Label>{t.productName}</Label>
                 <Input
-                  value={formData.name}
+                  value={formData.name || ''}
                   onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                   placeholder="Mahsulot nomi"
                 />
               </div>
+              
               <div>
-                <Label>{t.productDescription}</Label>
+                <Label>Tavsif</Label>
                 <Textarea
                   value={formData.description || ''}
                   onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  rows={3}
                   placeholder="Mahsulot tavsifi"
+                  rows={3}
                 />
               </div>
+              
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>{t.productPrice} (so'm)</Label>
+                  <Label>Narx (so'm)</Label>
                   <Input
                     type="number"
-                    value={formData.price}
-                    onChange={(e) => setFormData(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
+                    value={formData.price || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, price: Number(e.target.value) }))}
+                    placeholder="0"
                   />
                 </div>
                 <div>
-                  <Label>{t.productStock}</Label>
+                  <Label>Miqdor</Label>
                   <Input
                     type="number"
-                    value={formData.stock_quantity}
-                    onChange={(e) => setFormData(prev => ({ ...prev, stock_quantity: parseInt(e.target.value) || 0 }))}
+                    value={formData.stock_quantity || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, stock_quantity: Number(e.target.value) }))}
+                    placeholder="10"
                   />
                 </div>
               </div>
+              
               <div>
-                <Label>{t.productCategory}</Label>
+                <Label>Kategoriya</Label>
                 <Select
                   value={formData.category_id || ''}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, category_id: value || null }))}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, category_id: value }))}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder={t.productCategory} />
+                    <SelectValue placeholder="Kategoriyani tanlang" />
                   </SelectTrigger>
                   <SelectContent>
                     {categories.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.name_uz || cat.name_ru || cat.name_en}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -552,26 +723,27 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
         </Card>
       )}
 
-      {/* Quick create without search */}
-      {!selectedProduct && webProducts.length === 0 && processingStep === 'idle' && searchQuery && (
+      {/* Action Buttons */}
+      <div className="flex gap-2 pt-4">
         <Button
           type="button"
           variant="outline"
-          className="w-full"
-          onClick={useAsProduct}
+          className="flex-1"
+          onClick={onCancel}
         >
-          <Package className="h-4 w-4 mr-2" />
-          "{searchQuery}" nomli mahsulot yaratish
+          Bekor qilish
         </Button>
-      )}
-
-      <div className="flex justify-end gap-2 pt-4">
-        <Button type="button" variant="outline" onClick={onCancel} disabled={isProcessing}>
-          {t.cancel}
-        </Button>
-        <Button type="submit" disabled={isLoading || !formData.name || isProcessing}>
-          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {t.save}
+        <Button
+          type="submit"
+          className="flex-1"
+          disabled={isLoading || isProcessing || !formData.name}
+        >
+          {isLoading ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <Package className="h-4 w-4 mr-2" />
+          )}
+          Mahsulotni qo'shish
         </Button>
       </div>
     </form>
