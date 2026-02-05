@@ -383,6 +383,15 @@ export default function ProductPage() {
                     {formatPrice(product.original_price)}
                   </span>
                 )}
+                
+                {/* Monthly Payment Badge - Yellow like Uzum */}
+                {product.price > 0 && (
+                  <div>
+                    <span className="inline-block bg-yellow-300 dark:bg-yellow-400 text-yellow-900 text-sm font-medium px-3 py-1.5 rounded whitespace-nowrap">
+                      {new Intl.NumberFormat('uz-UZ').format(Math.round((product.price * 1.6) / 24))} so'm/oyiga
+                    </span>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
