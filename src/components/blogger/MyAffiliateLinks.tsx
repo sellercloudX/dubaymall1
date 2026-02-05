@@ -43,7 +43,8 @@ export default function MyAffiliateLinks() {
   });
 
   const copyLink = async (linkCode: string, productId: string) => {
-    const fullUrl = `${window.location.origin}/product/${productId}?ref=${linkCode}`;
+    const productionDomain = 'https://dubaymall.com';
+    const fullUrl = `${productionDomain}/product/${productId}?ref=${linkCode}`;
     await navigator.clipboard.writeText(fullUrl);
     setCopiedId(linkCode);
     setTimeout(() => setCopiedId(null), 2000);
