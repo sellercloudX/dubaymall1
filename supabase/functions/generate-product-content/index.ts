@@ -98,7 +98,7 @@ serve(async (req) => {
     const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
     
     // Choose model based on content type
-    const model = contentType === "seo" ? "claude-3-5-haiku-20241022" : "claude-3-5-sonnet-20241022";
+    const model = contentType === "seo" ? "claude-3-haiku-20240307" : "claude-3-5-sonnet-latest";
     
     console.log(`📝 Generating ${contentType} content using ${model} for user ${claimsData.claims.sub}`);
 
