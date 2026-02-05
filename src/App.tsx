@@ -14,7 +14,8 @@ import { InstallPWA } from "@/components/InstallPWA";
 
 // Lazy load pages for code splitting
 const Index = lazy(() => import("./pages/Index"));
-const Auth = lazy(() => import("./pages/Auth"));
+ const Auth = lazy(() => import("./pages/Auth"));
+ const PartnerAuth = lazy(() => import("./pages/PartnerAuth"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Marketplace = lazy(() => import("./pages/Marketplace"));
 const SellerDashboard = lazy(() => import("./pages/SellerDashboard"));
@@ -28,7 +29,9 @@ const CheckoutPage = lazy(() => import("./pages/CheckoutPage"));
 const BloggerDashboard = lazy(() => import("./pages/BloggerDashboard"));
 const FavoritesPage = lazy(() => import("./pages/FavoritesPage"));
 const Partnership = lazy(() => import("./pages/Partnership"));
-const NotFound = lazy(() => import("./pages/NotFound"));
+ const NotFound = lazy(() => import("./pages/NotFound"));
+ const SellerActivation = lazy(() => import("./pages/SellerActivation"));
+ const BloggerActivation = lazy(() => import("./pages/BloggerActivation"));
 const Blog = lazy(() => import("./pages/Blog"));
 const BlogPost = lazy(() => import("./pages/BlogPost"));
 
@@ -82,8 +85,10 @@ function App() {
               <BrowserRouter>
                 <Suspense fallback={<PageLoader />}>
                   <Routes>
-                    <Route path="/" element={<Index />} />
+                    <Route path="/" element={<Marketplace />} />
+                    <Route path="/home" element={<Index />} />
                     <Route path="/auth" element={<Auth />} />
+                    <Route path="/partner-auth" element={<PartnerAuth />} />
                     <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/seller" element={<SellerDashboard />} />
                     <Route path="/seller-cloud" element={<SellerCloudX />} />
@@ -97,6 +102,8 @@ function App() {
                     <Route path="/blogger" element={<BloggerDashboard />} />
                     <Route path="/favorites" element={<FavoritesPage />} />
                     <Route path="/partnership" element={<Partnership />} />
+                    <Route path="/seller-activation" element={<SellerActivation />} />
+                    <Route path="/blogger-activation" element={<BloggerActivation />} />
                     <Route path="/blog" element={<Blog />} />
                     <Route path="/blog/:slug" element={<BlogPost />} />
                     <Route path="*" element={<NotFound />} />

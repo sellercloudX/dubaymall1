@@ -208,6 +208,69 @@ export type Database = {
         }
         Relationships: []
       }
+      blogger_profiles: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string | null
+          description: string | null
+          followers_count: number | null
+          id: string
+          niche: string | null
+          payment_details: Json | null
+          payment_method: string | null
+          rejection_reason: string | null
+          screenshots: string[] | null
+          social_platform: string
+          social_url: string | null
+          social_username: string | null
+          status: string
+          submitted_at: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string | null
+          description?: string | null
+          followers_count?: number | null
+          id?: string
+          niche?: string | null
+          payment_details?: Json | null
+          payment_method?: string | null
+          rejection_reason?: string | null
+          screenshots?: string[] | null
+          social_platform: string
+          social_url?: string | null
+          social_username?: string | null
+          status?: string
+          submitted_at?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string | null
+          description?: string | null
+          followers_count?: number | null
+          id?: string
+          niche?: string | null
+          payment_details?: Json | null
+          payment_method?: string | null
+          rejection_reason?: string | null
+          screenshots?: string[] | null
+          social_platform?: string
+          social_url?: string | null
+          social_username?: string | null
+          status?: string
+          submitted_at?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       cart_items: {
         Row: {
           created_at: string
@@ -1394,6 +1457,87 @@ export type Database = {
           },
         ]
       }
+      seller_profiles: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          bank_account: string | null
+          bank_mfo: string | null
+          bank_name: string | null
+          business_name: string | null
+          business_type: string
+          contact_phone: string | null
+          created_at: string | null
+          id: string
+          inn: string | null
+          legal_address: string | null
+          oked: string | null
+          rejection_reason: string | null
+          shop_id: string | null
+          status: string
+          submitted_at: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          bank_account?: string | null
+          bank_mfo?: string | null
+          bank_name?: string | null
+          business_name?: string | null
+          business_type?: string
+          contact_phone?: string | null
+          created_at?: string | null
+          id?: string
+          inn?: string | null
+          legal_address?: string | null
+          oked?: string | null
+          rejection_reason?: string | null
+          shop_id?: string | null
+          status?: string
+          submitted_at?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          bank_account?: string | null
+          bank_mfo?: string | null
+          bank_name?: string | null
+          business_name?: string | null
+          business_type?: string
+          contact_phone?: string | null
+          created_at?: string | null
+          id?: string
+          inn?: string | null
+          legal_address?: string | null
+          oked?: string | null
+          rejection_reason?: string | null
+          shop_id?: string | null
+          status?: string
+          submitted_at?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seller_profiles_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "seller_profiles_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       seller_subscriptions: {
         Row: {
           created_at: string
@@ -1622,11 +1766,17 @@ export type Database = {
           created_at: string
           expires_at: string | null
           id: string
+          initial_payment_at: string | null
+          initial_payment_completed: boolean | null
           is_active: boolean
           is_trial: boolean
+          marketplace_connected: boolean | null
           monthly_fee: number
           plan_type: string
+          profile_completed: boolean | null
           started_at: string
+          terms_accepted: boolean | null
+          terms_accepted_at: string | null
           trial_ends_at: string | null
           updated_at: string
           user_id: string
@@ -1638,11 +1788,17 @@ export type Database = {
           created_at?: string
           expires_at?: string | null
           id?: string
+          initial_payment_at?: string | null
+          initial_payment_completed?: boolean | null
           is_active?: boolean
           is_trial?: boolean
+          marketplace_connected?: boolean | null
           monthly_fee?: number
           plan_type?: string
+          profile_completed?: boolean | null
           started_at?: string
+          terms_accepted?: boolean | null
+          terms_accepted_at?: string | null
           trial_ends_at?: string | null
           updated_at?: string
           user_id: string
@@ -1654,11 +1810,17 @@ export type Database = {
           created_at?: string
           expires_at?: string | null
           id?: string
+          initial_payment_at?: string | null
+          initial_payment_completed?: boolean | null
           is_active?: boolean
           is_trial?: boolean
+          marketplace_connected?: boolean | null
           monthly_fee?: number
           plan_type?: string
+          profile_completed?: boolean | null
           started_at?: string
+          terms_accepted?: boolean | null
+          terms_accepted_at?: string | null
           trial_ends_at?: string | null
           updated_at?: string
           user_id?: string
@@ -1914,6 +2076,13 @@ export type Database = {
           p_user_id: string
         }
         Returns: Json
+      }
+      can_add_role: {
+        Args: {
+          p_new_role: Database["public"]["Enums"]["user_role"]
+          p_user_id: string
+        }
+        Returns: boolean
       }
       check_sellercloud_access: { Args: { p_user_id: string }; Returns: Json }
       generate_affiliate_code: { Args: never; Returns: string }

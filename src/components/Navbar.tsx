@@ -41,11 +41,11 @@ export function Navbar() {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-6">
-            <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors">
+             <Link to="/home" className="text-muted-foreground hover:text-foreground transition-colors">
               {t.home}
             </Link>
             <Link to="/marketplace" className="text-muted-foreground hover:text-foreground transition-colors">
-              {t.marketplace}
+               Bozor
             </Link>
             
             {/* Partnership link - visible to everyone */}

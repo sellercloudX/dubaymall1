@@ -4,10 +4,16 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
+ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+ import { Checkbox } from '@/components/ui/checkbox';
+ import { Label } from '@/components/ui/label';
 import { useSellerCloudSubscription } from '@/hooks/useSellerCloudSubscription';
+ import { PaymentModal } from '@/components/payment/PaymentModal';
+ import { supabase } from '@/integrations/supabase/client';
+ import { toast } from 'sonner';
 import { 
   CreditCard, AlertTriangle, CheckCircle2, Clock, Crown, 
-  Calendar, Receipt, DollarSign, TrendingUp, XCircle
+   Calendar, Receipt, DollarSign, TrendingUp, XCircle, FileText, ArrowRight
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -24,9 +30,14 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
     totalDebt, 
     accessStatus, 
     isLoading,
-    createSubscription 
+     createSubscription,
+     refetch
   } = useSellerCloudSubscription();
   const [isCreating, setIsCreating] = useState(false);
+   const [showTermsDialog, setShowTermsDialog] = useState(false);
+   const [showPaymentModal, setShowPaymentModal] = useState(false);
+   const [selectedPlan, setSelectedPlan] = useState<'pro' | 'enterprise'>('pro');
+   const [termsAccepted, setTermsAccepted] = useState(false);
 
   const formatPrice = (price: number, currency: 'uzs' | 'usd' = 'uzs') => {
     if (currency === 'usd') {
@@ -39,9 +50,45 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
   };
 
   const handleStartSubscription = async (planType: 'pro' | 'enterprise') => {
-    setIsCreating(true);
-    await createSubscription(planType);
-    setIsCreating(false);
+     setSelectedPlan(planType);
+     setShowTermsDialog(true);
+   };
+ 
+   const handleAcceptTerms = async () => {
+     if (!termsAccepted) {
+       toast.error('Shartlarni qabul qilishingiz kerak');
+       return;
+     }
+     
+     setIsCreating(true);
+     const result = await createSubscription(selectedPlan);
+     
+     if (result.success) {
+       setShowTermsDialog(false);
+       // Show payment modal
+       setShowPaymentModal(true);
+     } else {
+       toast.error(result.error || 'Xatolik yuz berdi');
+     }
+     setIsCreating(false);
+   };
+ 
+   const handlePaymentSuccess = async () => {
+     // Update subscription as payment completed
+     if (subscription) {
+       await supabase
+         .from('sellercloud_subscriptions')
+         .update({
+           initial_payment_completed: true,
+           initial_payment_at: new Date().toISOString(),
+           terms_accepted: true,
+           terms_accepted_at: new Date().toISOString(),
+         })
+         .eq('id', subscription.id);
+     }
+     
+     toast.success('To\'lov muvaffaqiyatli! Akkountingiz aktivlashtirildi.');
+     refetch();
   };
 
   if (isLoading) {
@@ -56,7 +103,8 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
   // No subscription - show plans
   if (!subscription) {
     return (
-      <div className="space-y-6">
+       <>
+         <div className="space-y-6">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -126,6 +174,73 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
           </Card>
         </div>
       </div>
+ 
+         {/* Terms Dialog */}
+         <Dialog open={showTermsDialog} onOpenChange={setShowTermsDialog}>
+           <DialogContent className="max-w-lg">
+             <DialogHeader>
+               <DialogTitle className="flex items-center gap-2">
+                 <FileText className="h-5 w-5" />
+                 Shartnoma shartlari
+               </DialogTitle>
+             </DialogHeader>
+             <div className="space-y-4">
+               <div className="bg-muted p-4 rounded-lg max-h-60 overflow-y-auto text-sm space-y-2">
+                 <p className="font-medium">SellerCloudX xizmat shartlari:</p>
+                 <ul className="list-disc pl-4 space-y-1">
+                   <li>Oylik to'lov: <strong>${selectedPlan === 'pro' ? '499' : 'Individual'}</strong></li>
+                   <li>Savdodan komissiya: <strong>{selectedPlan === 'pro' ? '4%' : '2%'}</strong></li>
+                   <li>To'lovlar har oy boshida hisoblanadi</li>
+                   <li>Marketplace savdo pullari to'g'ridan-to'g'ri sizning hisobingizga tushadi</li>
+                   <li>Platforma xizmat haqini alohida hisob-kitob qiladi</li>
+                   <li>To'lanmagan hisob-kitoblar akkountni bloklashga olib keladi</li>
+                 </ul>
+                 <p className="mt-3 font-medium">Mas'uliyat:</p>
+                 <ul className="list-disc pl-4 space-y-1">
+                   <li>Marketplace API kalitlarini xavfsiz saqlash</li>
+                   <li>Marketplacelar qoidalariga rioya qilish</li>
+                   <li>To'g'ri va halol savdo yuritish</li>
+                 </ul>
+               </div>
+ 
+               <div className="flex items-start gap-3 p-3 border rounded-lg">
+                 <Checkbox 
+                   id="terms" 
+                   checked={termsAccepted}
+                   onCheckedChange={(checked) => setTermsAccepted(checked === true)}
+                 />
+                 <Label htmlFor="terms" className="text-sm cursor-pointer">
+                   Men yuqoridagi shartlarni o'qidim va qabul qilaman
+                 </Label>
+               </div>
+ 
+               <Button 
+                 onClick={handleAcceptTerms}
+                 className="w-full"
+                 disabled={!termsAccepted || isCreating}
+               >
+                 {isCreating ? 'Yuklanmoqda...' : (
+                   <>
+                     To'lovga o'tish
+                     <ArrowRight className="ml-2 h-4 w-4" />
+                   </>
+                 )}
+               </Button>
+             </div>
+           </DialogContent>
+         </Dialog>
+ 
+         {/* Payment Modal */}
+         <PaymentModal
+           open={showPaymentModal}
+           onClose={() => setShowPaymentModal(false)}
+           onSuccess={handlePaymentSuccess}
+           paymentMethod="click"
+           amount={selectedPlan === 'pro' ? 499 * USD_TO_UZS : 999 * USD_TO_UZS}
+           orderNumber={`SCX-${Date.now()}`}
+           orderId={subscription?.id}
+         />
+       </>
     );
   }
 
