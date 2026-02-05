@@ -22,6 +22,7 @@ import { FinancialDashboard } from '@/components/sellercloud/FinancialDashboard'
 import { AIScannerPro } from '@/components/seller/AIScannerPro';
 import { useMarketplaceConnections } from '@/hooks/useMarketplaceConnections';
 import { useSellerCloudSubscription } from '@/hooks/useSellerCloudSubscription';
+import { useMarketplaceProducts, useMarketplaceOrders } from '@/hooks/useMarketplaceData';
 import { toast } from 'sonner';
 import { 
   Loader2, Globe, Package, ShoppingCart, BarChart3, 
@@ -52,6 +53,14 @@ export default function SellerCloudX() {
   
   // Derive connected marketplace IDs from connections
   const connectedMarketplaces = connections.map(c => c.marketplace);
+  
+  // Get actual product and order counts from fetched data
+  const primaryMp = connectedMarketplaces[0] || null;
+  const { data: productsData } = useMarketplaceProducts(primaryMp);
+  const { data: ordersData } = useMarketplaceOrders(primaryMp);
+  
+  const actualProductCount = productsData?.data?.length || 0;
+  const actualOrderCount = ordersData?.data?.length || 0;
   
   // Calculate total sales for billing
   const totalRevenue = connections.reduce((sum, c) => sum + (c.total_revenue || 0), 0);
@@ -201,7 +210,7 @@ export default function SellerCloudX() {
           <Card>
             <CardContent className="pt-4">
               <div className="text-2xl font-bold">
-                {connections.reduce((sum, c) => sum + (c.products_count || 0), 0)}
+                {actualProductCount}
               </div>
               <div className="text-sm text-muted-foreground">Jami mahsulotlar</div>
             </CardContent>
@@ -209,7 +218,7 @@ export default function SellerCloudX() {
           <Card>
             <CardContent className="pt-4">
               <div className="text-2xl font-bold">
-                {connections.reduce((sum, c) => sum + (c.orders_count || 0), 0)}
+                {actualOrderCount}
               </div>
               <div className="text-sm text-muted-foreground">Jami buyurtmalar</div>
             </CardContent>

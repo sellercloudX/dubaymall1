@@ -591,7 +591,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
   };
 
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('uz-UZ').format(price) + ' so\'m';
+    return new Intl.NumberFormat('uz-UZ').format(price) + " so'm";
   };
 
   const completedTasks = backgroundTasks.filter(t => t.status === 'completed').length;
@@ -1010,11 +1010,11 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
                 <div className="px-4 py-3 space-y-2">
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">Tannarx:</span>
-                    <span className="font-medium">{formatPrice(pricing.costPrice)}</span>
+                    <span className="font-medium whitespace-nowrap">{formatPrice(pricing.costPrice)}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">+ Logistika <span className="text-xs">({pricing.logisticsType})</span>:</span>
-                    <span className="font-medium">{formatPrice(pricing.logisticsCost)}</span>
+                    <span className="font-medium whitespace-nowrap">{formatPrice(pricing.logisticsCost)}</span>
                   </div>
                 </div>
 
@@ -1027,7 +1027,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
                     <span className="text-sm text-red-600/80 dark:text-red-400/80">
                       − Komissiya ({pricing.marketplaceCommissionPercent}%):
                     </span>
-                    <span className="font-medium text-red-600 dark:text-red-400">
+                    <span className="font-medium text-red-600 dark:text-red-400 whitespace-nowrap">
                       {formatPrice(pricing.marketplaceCommission)}
                     </span>
                   </div>
@@ -1035,7 +1035,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
                     <span className="text-sm text-red-600/80 dark:text-red-400/80">
                       − Soliq ({pricing.taxPercent}%):
                     </span>
-                    <span className="font-medium text-red-600 dark:text-red-400">
+                    <span className="font-medium text-red-600 dark:text-red-400 whitespace-nowrap">
                       {formatPrice(pricing.taxAmount)}
                     </span>
                   </div>
@@ -1048,13 +1048,13 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
                 <div className="px-4 py-4 bg-primary/5 space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="font-semibold">Tavsiya etilgan narx:</span>
-                    <span className="text-xl font-bold text-primary">{formatPrice(pricing.sellingPrice)}</span>
+                    <span className="text-xl font-bold text-primary whitespace-nowrap">{formatPrice(pricing.sellingPrice)}</span>
                   </div>
                   <div className="flex justify-between items-center bg-green-100 dark:bg-green-900/30 px-3 py-2 rounded-lg">
                     <span className="text-sm font-medium text-green-700 dark:text-green-400">
                       Sof foyda ({pricing.netProfitPercent}%):
                     </span>
-                    <span className="text-lg font-bold text-green-600 dark:text-green-400">
+                    <span className="text-lg font-bold text-green-600 dark:text-green-400 whitespace-nowrap">
                       {formatPrice(pricing.netProfit)}
                     </span>
                   </div>
@@ -1092,7 +1092,6 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
                       <option value={3}>3 ta</option>
                       <option value={6}>6 ta (tavsiya)</option>
                     </select>
-                    <Badge variant="secondary" className="text-xs">Gemini Image</Badge>
                   </div>
                 )}
                 <p className="text-xs text-muted-foreground">
@@ -1108,9 +1107,10 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
               <Button 
                 onClick={startBackgroundCardCreation} 
                 disabled={!pricing}
+                className="flex-1 ml-3"
               >
                 <Zap className="mr-2 h-4 w-4" />
-                Fonda yaratish & Keyingisiga
+                Yaratish
               </Button>
             </div>
           </CardContent>
