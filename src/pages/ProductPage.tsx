@@ -25,7 +25,10 @@ import {
   Package,
   ChevronLeft,
   ChevronRight,
-  Loader2
+  Loader2,
+  Truck,
+  CreditCard,
+  Calendar
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Tables } from '@/integrations/supabase/types';
@@ -34,6 +37,35 @@ type Product = Tables<'products'> & {
   shop?: Tables<'shops'>;
   category?: Tables<'categories'>;
 };
+
+// Format product name - first letter uppercase, rest lowercase
+const formatProductName = (name: string): string => {
+  if (!name) return '';
+  return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+};
+
+// Calculate delivery date
+const calculateDeliveryDate = (preparationDays: number = 1): { date: string; fullDate: string } => {
+  const today = new Date();
+  const deliveryDays = 2;
+  const totalDays = preparationDays + deliveryDays;
+  const deliveryDate = new Date(today.getTime() + totalDays * 24 * 60 * 60 * 1000);
+  
+  const day = deliveryDate.getDate();
+  const months = ['yanvar', 'fevral', 'mart', 'aprel', 'may', 'iyun', 'iyul', 'avgust', 'sentabr', 'oktabr', 'noyabr', 'dekabr'];
+  const month = months[deliveryDate.getMonth()];
+  
+  return {
+    date: `${day}-${month.slice(0, 3)}`,
+    fullDate: `${day}-${month}`
+  };
+};
+
+// Installment calculations
+const calculateInstallment24 = (price: number): number => Math.round((price * 1.6) / 24);
+const calculateInstallment12 = (price: number): number => Math.round((price * 1.45) / 12);
+const calculateTotal24 = (price: number): number => Math.round(price * 1.6);
+const calculateTotal12 = (price: number): number => Math.round(price * 1.45);
 
 export default function ProductPage() {
   const { id } = useParams<{ id: string }>();
@@ -47,6 +79,7 @@ export default function ProductPage() {
   const [quantity, setQuantity] = useState(1);
   const [currentImage, setCurrentImage] = useState(0);
   const [favoriteLoading, setFavoriteLoading] = useState(false);
+  const [paymentType, setPaymentType] = useState<'cash' | '12month' | '24month'>('cash');
   const { data: ratingData } = useProductRating(id || '');
 
   useEffect(() => {
@@ -141,10 +174,35 @@ export default function ProductPage() {
   }
 
   const images = product.images || [];
+  const hasReviews = ratingData?.total_reviews && Number(ratingData.total_reviews) > 0;
+  const deliveryInfo = calculateDeliveryDate(product.preparation_days || 1);
+
+  // Calculate prices based on payment type
+  const getFinalPrice = () => {
+    switch (paymentType) {
+      case '12month':
+        return calculateTotal12(product.price);
+      case '24month':
+        return calculateTotal24(product.price);
+      default:
+        return product.price;
+    }
+  };
+
+  const getMonthlyPayment = () => {
+    switch (paymentType) {
+      case '12month':
+        return calculateInstallment12(product.price);
+      case '24month':
+        return calculateInstallment24(product.price);
+      default:
+        return null;
+    }
+  };
 
   // Product structured data for SEO
   const productStructuredData = {
-    name: product.name,
+    name: formatProductName(product.name),
     description: product.description || '',
     image: images[0] || '/placeholder.svg',
     sku: product.id,
@@ -165,18 +223,18 @@ export default function ProductPage() {
         name: product.shop?.name || 'Dubay Mall',
       },
     },
-    aggregateRating: ratingData?.total_reviews ? {
+    aggregateRating: hasReviews ? {
       '@type': 'AggregateRating',
-      ratingValue: ratingData.average_rating || 0,
-      reviewCount: Number(ratingData.total_reviews),
+      ratingValue: ratingData?.average_rating || 0,
+      reviewCount: Number(ratingData?.total_reviews),
     } : undefined,
   };
 
   return (
     <Layout>
       <SEOHead
-        title={`${product.name} - Dubay Mall`}
-        description={product.description?.slice(0, 155) || `${product.name} - eng yaxshi narxlarda Dubay Mall'da xarid qiling`}
+        title={`${formatProductName(product.name)} - Dubay Mall`}
+        description={product.description?.slice(0, 155) || `${formatProductName(product.name)} - eng yaxshi narxlarda Dubay Mall'da xarid qiling`}
         image={images[0]}
         url={`https://dubaymall.uz/product/${product.id}`}
         type="product"
@@ -194,7 +252,7 @@ export default function ProductPage() {
         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
           <Link to="/marketplace" className="hover:text-primary">{t.marketplace}</Link>
           <span>/</span>
-          <span className="text-foreground">{product.name}</span>
+          <span className="text-foreground line-clamp-1">{formatProductName(product.name)}</span>
         </div>
 
         <div className="grid md:grid-cols-2 gap-8">
@@ -205,7 +263,7 @@ export default function ProductPage() {
                 <>
                   <img
                     src={images[currentImage]}
-                    alt={product.name}
+                    alt={formatProductName(product.name)}
                     className="w-full h-full object-cover"
                   />
                   {images.length > 1 && (
@@ -258,16 +316,19 @@ export default function ProductPage() {
               {discount && (
                 <Badge className="bg-destructive mb-2">-{discount}%</Badge>
               )}
-              <h1 className="text-3xl font-bold">{product.name}</h1>
+              {/* Full product name displayed here */}
+              <h1 className="text-2xl md:text-3xl font-bold">{formatProductName(product.name)}</h1>
               
-              {/* Rating */}
-              <div className="flex items-center gap-2 mt-2">
-                <StarRating 
-                  rating={ratingData?.average_rating || 0} 
-                  showValue 
-                  totalReviews={Number(ratingData?.total_reviews) || 0}
-                />
-              </div>
+              {/* Rating - Only show if has real reviews */}
+              {hasReviews && (
+                <div className="flex items-center gap-2 mt-2">
+                  <StarRating 
+                    rating={ratingData?.average_rating || 0} 
+                    showValue 
+                    totalReviews={Number(ratingData?.total_reviews) || 0}
+                  />
+                </div>
+              )}
 
               {product.shop && (
                 <Link 
@@ -280,26 +341,119 @@ export default function ProductPage() {
               )}
             </div>
 
-            <div className="flex items-baseline gap-4">
-              <span className="text-4xl font-bold text-primary">
-                {formatPrice(product.price)}
-              </span>
-              {product.original_price && product.original_price > product.price && (
-                <span className="text-xl text-muted-foreground line-through">
-                  {formatPrice(product.original_price)}
+            {/* Price Section */}
+            <div className="space-y-3">
+              <div className="flex items-baseline gap-4">
+                <span className="text-4xl font-bold text-primary whitespace-nowrap">
+                  {formatPrice(product.price)}
                 </span>
-              )}
+                {product.original_price && product.original_price > product.price && (
+                  <span className="text-xl text-muted-foreground line-through whitespace-nowrap">
+                    {formatPrice(product.original_price)}
+                  </span>
+                )}
+              </div>
+
+              {/* Installment Badge */}
+              <div className="inline-block bg-yellow-300 dark:bg-yellow-400 text-yellow-900 text-sm font-medium px-3 py-1.5 rounded whitespace-nowrap">
+                {new Intl.NumberFormat('uz-UZ').format(calculateInstallment24(product.price))} so'm/oyiga × 24 oy
+              </div>
             </div>
 
-            {product.description && (
-              <div>
-                <h3 className="font-semibold mb-2">{t.productDescription}</h3>
-                <p className="text-muted-foreground whitespace-pre-line">
-                  {product.description}
-                </p>
-              </div>
-            )}
+            {/* Delivery Info */}
+            <Card className="bg-muted/50">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Truck className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-medium">Yetkazib berish</p>
+                    <p className="text-sm text-muted-foreground">
+                      <span className="text-primary font-semibold">{deliveryInfo.fullDate}</span> gacha yetkaziladi
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
+            {/* Payment Options */}
+            <Card>
+              <CardContent className="p-4 space-y-4">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <CreditCard className="h-5 w-5" />
+                  To'lov usulini tanlang
+                </h3>
+                
+                <div className="space-y-2">
+                  {/* Cash Payment */}
+                  <button
+                    onClick={() => setPaymentType('cash')}
+                    className={`w-full p-3 rounded-lg border-2 transition-all text-left ${
+                      paymentType === 'cash' 
+                        ? 'border-primary bg-primary/5' 
+                        : 'border-border hover:border-primary/50'
+                    }`}
+                  >
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="font-medium">Naqd yoki karta</p>
+                        <p className="text-sm text-muted-foreground">To'liq to'lov</p>
+                      </div>
+                      <span className="font-bold text-lg whitespace-nowrap">{formatPrice(product.price)}</span>
+                    </div>
+                  </button>
+
+                  {/* 12 Month Installment */}
+                  <button
+                    onClick={() => setPaymentType('12month')}
+                    className={`w-full p-3 rounded-lg border-2 transition-all text-left ${
+                      paymentType === '12month' 
+                        ? 'border-primary bg-primary/5' 
+                        : 'border-border hover:border-primary/50'
+                    }`}
+                  >
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="font-medium">12 oylik muddatli</p>
+                        <p className="text-sm text-muted-foreground">Jami: {formatPrice(calculateTotal12(product.price))}</p>
+                      </div>
+                      <div className="text-right">
+                        <span className="font-bold text-lg text-primary whitespace-nowrap">
+                          {new Intl.NumberFormat('uz-UZ').format(calculateInstallment12(product.price))}
+                        </span>
+                        <span className="text-sm text-muted-foreground"> so'm/oy</span>
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* 24 Month Installment */}
+                  <button
+                    onClick={() => setPaymentType('24month')}
+                    className={`w-full p-3 rounded-lg border-2 transition-all text-left ${
+                      paymentType === '24month' 
+                        ? 'border-primary bg-primary/5' 
+                        : 'border-border hover:border-primary/50'
+                    }`}
+                  >
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="font-medium">24 oylik muddatli</p>
+                        <p className="text-sm text-muted-foreground">Jami: {formatPrice(calculateTotal24(product.price))}</p>
+                      </div>
+                      <div className="text-right">
+                        <span className="font-bold text-lg text-primary whitespace-nowrap">
+                          {new Intl.NumberFormat('uz-UZ').format(calculateInstallment24(product.price))}
+                        </span>
+                        <span className="text-sm text-muted-foreground"> so'm/oy</span>
+                      </div>
+                    </div>
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Stock & Quantity */}
             <Card>
               <CardContent className="p-4 space-y-4">
                 <div className="flex items-center justify-between">
@@ -360,6 +514,18 @@ export default function ProductPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Description */}
+            {product.description && (
+              <Card>
+                <CardContent className="p-4">
+                  <h3 className="font-semibold mb-2">{t.productDescription}</h3>
+                  <p className="text-muted-foreground whitespace-pre-line">
+                    {product.description}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
 

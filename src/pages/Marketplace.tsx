@@ -35,7 +35,11 @@ import {
 import { Slider } from '@/components/ui/slider';
 import type { Tables } from '@/integrations/supabase/types';
 
-type Product = Tables<'products'> & { shop?: { name: string; slug: string } };
+type Product = Tables<'products'> & { 
+  shop?: { name: string; slug: string };
+  rating?: number;
+  reviews_count?: number;
+};
 
 export default function Marketplace() {
   const { t } = useLanguage();
@@ -122,7 +126,33 @@ export default function Marketplace() {
     const { data, error } = await query;
 
     if (!error && data) {
-      setProducts(data as Product[]);
+      // Fetch ratings for all products
+      const productIds = data.map(p => p.id);
+      const { data: reviewsData } = await supabase
+        .from('reviews')
+        .select('product_id, rating')
+        .in('product_id', productIds);
+      
+      // Calculate ratings per product
+      const ratingsMap = new Map<string, { total: number; count: number }>();
+      reviewsData?.forEach(review => {
+        const existing = ratingsMap.get(review.product_id) || { total: 0, count: 0 };
+        existing.total += review.rating;
+        existing.count += 1;
+        ratingsMap.set(review.product_id, existing);
+      });
+      
+      // Attach ratings to products
+      const productsWithRatings = data.map(product => {
+        const ratingInfo = ratingsMap.get(product.id);
+        return {
+          ...product,
+          rating: ratingInfo ? ratingInfo.total / ratingInfo.count : undefined,
+          reviews_count: ratingInfo?.count || 0,
+        };
+      });
+      
+      setProducts(productsWithRatings as Product[]);
     }
     setLoading(false);
   };

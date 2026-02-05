@@ -16,8 +16,35 @@ interface ProductCardProps {
     shop?: { name: string; slug: string };
     rating?: number;
     reviews_count?: number;
+    preparation_days?: number;
   };
 }
+
+// Format product name - first letter uppercase, rest lowercase, truncate if needed
+const formatProductName = (name: string): string => {
+  if (!name) return '';
+  const formatted = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+  return formatted;
+};
+
+// Calculate delivery date based on preparation days + standard delivery time
+const calculateDeliveryDate = (preparationDays: number = 1): string => {
+  const today = new Date();
+  const deliveryDays = 2; // Standard delivery time
+  const totalDays = preparationDays + deliveryDays;
+  const deliveryDate = new Date(today.getTime() + totalDays * 24 * 60 * 60 * 1000);
+  
+  const day = deliveryDate.getDate();
+  const months = ['yan', 'fev', 'mar', 'apr', 'may', 'iyn', 'iyl', 'avg', 'sen', 'okt', 'noy', 'dek'];
+  const month = months[deliveryDate.getMonth()];
+  
+  return `${day}-${month}`;
+};
+
+// Calculate 24-month installment price: price * 1.6 / 24
+const calculateInstallment = (price: number): number => {
+  return Math.round((price * 1.6) / 24);
+};
 
 // Uzum.uz style product card
 export const ProductCard = memo(function ProductCard({ product }: ProductCardProps) {
@@ -70,12 +97,16 @@ export const ProductCard = memo(function ProductCard({ product }: ProductCardPro
 
   const isProductFavorite = isFavorite(product.id);
 
-  // Mock rating - in production from reviews
-  const rating = product.rating || 4.5;
-  const reviewsCount = product.reviews_count || Math.floor(Math.random() * 500) + 50;
+  // Real rating and reviews - only show if exists
+  const rating = product.rating;
+  const reviewsCount = product.reviews_count;
+  const hasReviews = rating !== undefined && rating > 0 && reviewsCount !== undefined && reviewsCount > 0;
 
-  // Calculate monthly payment (12 months)
-  const monthlyPayment = Math.round(product.price / 12);
+  // Calculate 24-month installment
+  const monthlyPayment = calculateInstallment(product.price);
+
+  // Calculate delivery date
+  const deliveryDate = calculateDeliveryDate(product.preparation_days);
 
   return (
     <Link to={`/product/${product.id}`} className="block">
@@ -151,32 +182,34 @@ export const ProductCard = memo(function ProductCard({ product }: ProductCardPro
             )}
           </div>
 
-          {/* Monthly Payment Badge - Yellow like Uzum */}
+          {/* Monthly Payment Badge - Yellow like Uzum - 24 month formula */}
           <div className="mb-2">
             <span className="inline-block bg-yellow-300 dark:bg-yellow-400 text-yellow-900 text-[10px] font-medium px-1.5 py-0.5 rounded whitespace-nowrap">
               {formatPrice(monthlyPayment)} so'm/oyiga
             </span>
           </div>
 
-          {/* Product Name */}
-          <h3 className="text-sm font-normal line-clamp-2 min-h-[2.5rem] leading-tight text-foreground mb-2 flex-1">
-            {product.name}
+          {/* Product Name - First letter uppercase, truncate with ellipsis */}
+          <h3 className="text-sm font-normal line-clamp-1 leading-tight text-foreground mb-2 flex-1">
+            {formatProductName(product.name)}
           </h3>
 
-          {/* Rating - Bottom */}
-          <div className="flex items-center gap-1 mb-2">
-            <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
-            <span className="text-xs font-medium text-foreground">{rating.toFixed(1)}</span>
-            <span className="text-[11px] text-muted-foreground">({reviewsCount} sharhlar)</span>
-          </div>
+          {/* Rating - Only show if has real reviews */}
+          {hasReviews && (
+            <div className="flex items-center gap-1 mb-2">
+              <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
+              <span className="text-xs font-medium text-foreground">{rating.toFixed(1)}</span>
+              <span className="text-[11px] text-muted-foreground">({reviewsCount} sharhlar)</span>
+            </div>
+          )}
 
-          {/* Delivery Button - Full width, Purple like Uzum */}
+          {/* Delivery Button - Full width with calculated date */}
           <Button 
             onClick={handleAddToCart}
             className="w-full h-9 bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium rounded-lg flex items-center justify-center gap-1.5"
           >
             <Truck className="h-4 w-4" />
-            Ertaga
+            {deliveryDate}
           </Button>
         </div>
       </div>
