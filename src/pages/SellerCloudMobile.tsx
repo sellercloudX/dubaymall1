@@ -8,13 +8,14 @@ import { MobileSellerCloudHeader } from '@/components/mobile/MobileSellerCloudHe
 import { MobileAnalytics } from '@/components/mobile/MobileAnalytics';
 import { MobileProducts } from '@/components/mobile/MobileProducts';
 import { MobileOrders } from '@/components/mobile/MobileOrders';
+ import { MobileTrendHunter } from '@/components/mobile/MobileTrendHunter';
 import { AIScannerPro } from '@/components/seller/AIScannerPro';
  import { BackgroundTasksPanel } from '@/components/mobile/BackgroundTasksPanel';
 import { Loader2, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 
-type TabType = 'analytics' | 'scanner' | 'products' | 'orders';
+ type TabType = 'analytics' | 'scanner' | 'products' | 'orders' | 'trends';
 
 export default function SellerCloudMobile() {
   const { user, loading: authLoading } = useAuth();
@@ -115,6 +116,8 @@ export default function SellerCloudMobile() {
             connectedMarketplaces={connectedMarketplaces}
           />
         );
+       case 'trends':
+         return <MobileTrendHunter />;
       default:
         return null;
     }

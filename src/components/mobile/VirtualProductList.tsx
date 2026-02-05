@@ -2,7 +2,7 @@
  import { useVirtualizer } from '@tanstack/react-virtual';
  import { Card, CardContent } from '@/components/ui/card';
  import { Badge } from '@/components/ui/badge';
- import { Image as ImageIcon } from 'lucide-react';
+ import { Image as ImageIcon, Package, Warehouse } from 'lucide-react';
  
  interface Product {
    offerId: string;
@@ -38,12 +38,12 @@
  // Memoized product row to prevent unnecessary re-renders
  const ProductRow = memo(({ product, onClick }: { product: Product; onClick?: (p: Product) => void }) => (
    <Card 
-     className="overflow-hidden mx-3 cursor-pointer hover:bg-accent/50 transition-colors"
+    className="overflow-hidden cursor-pointer hover:bg-accent/50 transition-colors"
      onClick={() => onClick?.(product)}
    >
-     <CardContent className="p-0">
+    <CardContent className="p-2">
        <div className="flex">
-         <div className="w-14 h-14 bg-muted flex items-center justify-center shrink-0">
+        <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
            {product.pictures?.[0] ? (
              <img 
                src={product.pictures[0]} 
@@ -52,24 +52,33 @@
                loading="lazy"
                onError={(e) => {
                  e.currentTarget.style.display = 'none';
+                e.currentTarget.parentElement?.classList.add('flex', 'items-center', 'justify-center');
                }}
              />
            ) : (
              <ImageIcon className="h-5 w-5 text-muted-foreground/50" />
            )}
          </div>
-         <div className="flex-1 p-2 min-w-0">
-           <div className="font-medium text-xs line-clamp-2 mb-0.5 leading-snug">
+        <div className="flex-1 pl-3 min-w-0">
+          <div className="font-medium text-sm line-clamp-2 mb-1 leading-tight">
              {product.name || 'Nomsiz'}
            </div>
-           <div className="text-[10px] text-muted-foreground mb-1 truncate">
+          <div className="text-xs text-muted-foreground mb-1.5 truncate">
              SKU: {product.shopSku || product.offerId}
            </div>
            <div className="flex items-center justify-between gap-2">
-             <span className="font-bold text-primary text-xs truncate">
+            <span className="font-bold text-primary text-sm">
                {formatPrice(product.price)}
              </span>
-             {getStockBadge(product.stockFBO, product.stockFBS)}
+            <div className="flex items-center gap-1.5">
+              {product.stockFBO !== undefined && product.stockFBO > 0 && (
+                <Badge variant="outline" className="text-[10px] py-0">
+                  <Warehouse className="h-2.5 w-2.5 mr-0.5" />
+                  {product.stockFBO}
+                </Badge>
+              )}
+              {getStockBadge(product.stockFBO, product.stockFBS)}
+            </div>
            </div>
          </div>
        </div>
@@ -85,14 +94,14 @@
    const virtualizer = useVirtualizer({
      count: products.length,
      getScrollElement: () => parentRef.current,
-     estimateSize: () => 68, // Estimated row height
+    estimateSize: () => 96, // Increased row height for better spacing
      overscan: 5, // Render 5 extra items above/below viewport
    });
  
    return (
      <div 
        ref={parentRef} 
-       className="flex-1 overflow-y-auto"
+      className="flex-1 overflow-y-auto px-3 py-2"
        style={{ contain: 'strict' }}
      >
        <div
@@ -114,7 +123,7 @@
                  width: '100%',
                  height: `${virtualItem.size}px`,
                  transform: `translateY(${virtualItem.start}px)`,
-                 paddingBottom: '8px',
+              paddingBottom: '12px',
                }}
              >
                <ProductRow product={product} onClick={onProductClick} />
