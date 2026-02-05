@@ -61,15 +61,19 @@ interface AnalyzedProduct {
   confidence?: number;
 }
 
-interface PricingCalculation {
-  costPrice: number;
-  marketplaceCommission: number;
-  logisticsCost: number;
-  taxRate: number;
-  targetProfit: number;
-  recommendedPrice: number;
-  netProfit: number;
-}
+ interface PricingCalculation {
+   costPrice: number;
+   sellingPrice: number;
+   marketplaceCommission: number;
+   marketplaceCommissionPercent: number;
+   logisticsCost: number;
+   logisticsType: string;
+   taxAmount: number;
+   taxPercent: number;
+   netProfit: number;
+   netProfitPercent: number;
+   categoryType: string;
+ }
 
 interface AIStep {
   name: string;
@@ -111,13 +115,56 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
   const [backgroundTasks, setBackgroundTasks] = useState<BackgroundTask[]>([]);
   const [showBackgroundPanel, setShowBackgroundPanel] = useState(false);
 
-  // Marketplace config (Yandex Market defaults)
-  const [marketplaceConfig] = useState({
-    commission: 8,
-    logistics: 15,
-    tax: 12,
-    targetProfit: 20,
-  });
+ // Yandex Market real tariffs (Uzbekistan)
+ // Based on official Yandex Market documentation
+ const YANDEX_TARIFFS = {
+   // Commission by category (% of selling price)
+   commissions: {
+     largeAppliances: 8,  // Katta maishiy texnika
+     default: 20,         // Boshqa kategoriyalar
+   },
+   // Tax rate (% of selling price)  
+   taxRate: 4,
+   // Logistics by gabarit (fixed so'm)
+   logistics: {
+     small: { maxVolume: 5, price: 2000, label: 'Kichik (5L gacha)' },
+     medium: { maxVolume: 25, price: 4000, label: 'O\'rta (25L gacha)' },
+     large: { maxVolume: 100, price: 8000, label: 'Katta (100L gacha)' },
+     xlarge: { maxVolume: Infinity, price: 20000, label: 'Juda katta (100L+)' },
+   },
+   // Target net profit (% of selling price)
+   targetNetProfit: 30,
+ };
+ 
+ // Determine logistics tier based on estimated product volume
+ const getLogisticsTier = (category?: string): { price: number; label: string } => {
+   // Default to medium size for most products
+   const categoryLower = (category || '').toLowerCase();
+   
+   if (categoryLower.includes('telefon') || categoryLower.includes('aksessuar') || categoryLower.includes('phone')) {
+     return { price: 2000, label: 'Kichik (5L gacha)' };
+   }
+   if (categoryLower.includes('kiyim') || categoryLower.includes('poyabzal') || categoryLower.includes('clothes')) {
+     return { price: 4000, label: 'O\'rta (25L gacha)' };
+   }
+   if (categoryLower.includes('maishiy') || categoryLower.includes('texnika') || categoryLower.includes('appliance')) {
+     return { price: 8000, label: 'Katta (100L gacha)' };
+   }
+   if (categoryLower.includes('mebel') || categoryLower.includes('furniture') || categoryLower.includes('shkaf')) {
+     return { price: 20000, label: 'Juda katta (100L+)' };
+   }
+   return { price: 4000, label: 'O\'rta (25L gacha)' };
+ };
+ 
+ // Determine commission rate based on category
+ const getCommissionRate = (category?: string): { rate: number; type: string } => {
+   const categoryLower = (category || '').toLowerCase();
+   if (categoryLower.includes('maishiy') || categoryLower.includes('katta texnika') || 
+       categoryLower.includes('muzlatgich') || categoryLower.includes('kir yuvish')) {
+     return { rate: 8, type: 'Katta maishiy texnika' };
+   }
+   return { rate: 20, type: 'Standart kategoriya' };
+ };
 
   const getStepNumber = () => {
     const steps: Step[] = ['capture', 'analyzing', 'search', 'select', 'pricing'];
@@ -201,24 +248,44 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
       return;
     }
 
-    const commission = costPrice * (marketplaceConfig.commission / 100);
-    const logistics = costPrice * (marketplaceConfig.logistics / 100);
-    const tax = costPrice * (marketplaceConfig.tax / 100);
-    const targetProfitAmount = costPrice * (marketplaceConfig.targetProfit / 100);
-    
-    const totalCosts = costPrice + commission + logistics + tax;
-    const recommendedPrice = totalCosts + targetProfitAmount;
-    const netProfit = recommendedPrice - totalCosts;
-
-    setPricing({
-      costPrice,
-      marketplaceCommission: commission,
-      logisticsCost: logistics,
-      taxRate: tax,
-      targetProfit: targetProfitAmount,
-      recommendedPrice: Math.ceil(recommendedPrice / 100) * 100,
-      netProfit,
-    });
+     // Get category-based rates
+     const category = analyzedProduct?.category;
+     const { rate: commissionRate, type: categoryType } = getCommissionRate(category);
+     const { price: logisticsCost, label: logisticsType } = getLogisticsTier(category);
+     const taxRate = YANDEX_TARIFFS.taxRate;
+     const targetProfitRate = YANDEX_TARIFFS.targetNetProfit;
+ 
+     // Reverse calculation formula:
+     // SellingPrice = CostPrice + Commission + Logistics + Tax + Profit
+     // Where Commission, Tax, Profit are % of SellingPrice
+     // SellingPrice = CostPrice + Logistics + SellingPrice × (commissionRate + taxRate + profitRate)
+     // SellingPrice × (1 - totalDeductions) = CostPrice + Logistics
+     // SellingPrice = (CostPrice + Logistics) / (1 - totalDeductions)
+     
+     const totalDeductionRate = (commissionRate + taxRate + targetProfitRate) / 100;
+     const sellingPrice = (costPrice + logisticsCost) / (1 - totalDeductionRate);
+     
+     // Calculate actual amounts based on selling price
+     const commissionAmount = sellingPrice * (commissionRate / 100);
+     const taxAmount = sellingPrice * (taxRate / 100);
+     const netProfit = sellingPrice * (targetProfitRate / 100);
+     
+     // Round to nearest 100 so'm
+     const roundedSellingPrice = Math.ceil(sellingPrice / 100) * 100;
+ 
+     setPricing({
+       costPrice,
+       sellingPrice: roundedSellingPrice,
+       marketplaceCommission: Math.round(commissionAmount),
+       marketplaceCommissionPercent: commissionRate,
+       logisticsCost,
+       logisticsType,
+       taxAmount: Math.round(taxAmount),
+       taxPercent: taxRate,
+       netProfit: Math.round(netProfit),
+       netProfitPercent: targetProfitRate,
+       categoryType,
+     });
   };
 
   const uploadImageToStorage = async (base64Image: string): Promise<string | null> => {
@@ -436,7 +503,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
             description: descriptions?.fullDescription?.uz || product.description || analyzed?.description,
             descriptionRu: descriptions?.fullDescription?.ru || product.description,
             category: analyzed?.category,
-            price: pricingData.recommendedPrice,
+             price: pricingData.sellingPrice,
             costPrice: pricingData.costPrice,
             image: imageUrl,
             images: imagesToUpload,
@@ -446,7 +513,10 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
             mxikCode: mxikData?.mxik_code,
             mxikName: mxikData?.mxik_name,
           },
-          pricing: pricingData,
+           pricing: {
+             ...pricingData,
+             recommendedPrice: pricingData.sellingPrice,
+           },
         },
       });
 
@@ -920,30 +990,30 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
                     <span>Tannarx:</span>
                     <span>{formatPrice(pricing.costPrice)}</span>
                   </div>
+                   <div className="flex justify-between">
+                     <span>+ Logistika ({pricing.logisticsType}):</span>
+                     <span>{formatPrice(pricing.logisticsCost)}</span>
+                   </div>
+                   <Separator className="my-2" />
+                   <div className="text-xs text-muted-foreground mb-1">
+                     Sotuv narxidan ushlanadi:
+                   </div>
                   <div className="flex justify-between text-muted-foreground">
-                    <span>+ Marketplace komissiyasi ({marketplaceConfig.commission}%):</span>
+                     <span>− Marketplace komissiyasi ({pricing.marketplaceCommissionPercent}% - {pricing.categoryType}):</span>
                     <span>{formatPrice(pricing.marketplaceCommission)}</span>
                   </div>
                   <div className="flex justify-between text-muted-foreground">
-                    <span>+ Logistika ({marketplaceConfig.logistics}%):</span>
-                    <span>{formatPrice(pricing.logisticsCost)}</span>
-                  </div>
-                  <div className="flex justify-between text-muted-foreground">
-                    <span>+ Soliq ({marketplaceConfig.tax}%):</span>
-                    <span>{formatPrice(pricing.taxRate)}</span>
-                  </div>
-                  <div className="flex justify-between text-muted-foreground">
-                    <span>+ Maqsadli foyda ({marketplaceConfig.targetProfit}%):</span>
-                    <span>{formatPrice(pricing.targetProfit)}</span>
+                     <span>− Soliq ({pricing.taxPercent}% sotuv narxidan):</span>
+                     <span>{formatPrice(pricing.taxAmount)}</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between font-bold text-lg">
                     <span>Tavsiya etilgan narx:</span>
-                    <span className="text-primary">{formatPrice(pricing.recommendedPrice)}</span>
+                     <span className="text-primary">{formatPrice(pricing.sellingPrice)}</span>
                   </div>
                   <div className="flex justify-between text-green-600">
-                    <span>Sof foyda:</span>
-                    <span>{formatPrice(pricing.netProfit)}</span>
+                     <span>Sof foyda ({pricing.netProfitPercent}% sotuv narxidan):</span>
+                     <span className="font-medium">{formatPrice(pricing.netProfit)}</span>
                   </div>
                 </div>
               </div>

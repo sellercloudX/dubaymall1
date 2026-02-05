@@ -96,6 +96,10 @@
      retry: 3,
      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
      networkMode: 'offlineFirst', // Show cached data immediately
+       select: (data) => ({
+         data: data.data || [],
+         total: data.data?.length || 0, // Always use actual fetched count
+       }),
    });
  }
  

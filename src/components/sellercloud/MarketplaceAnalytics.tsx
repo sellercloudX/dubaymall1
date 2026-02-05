@@ -53,7 +53,8 @@ export function MarketplaceAnalytics({ connectedMarketplaces, fetchMarketplaceDa
           fetchMarketplaceData(marketplace, 'orders', { fetchAll: true }),
         ]);
 
-        const productsCount = productsResult.total || productsResult.data?.length || 0;
+         // Always use actual loaded products count, not API total
+         const productsCount = productsResult.data?.length || 0;
         const orders = ordersResult.data || [];
         const ordersCount = orders.length;
         

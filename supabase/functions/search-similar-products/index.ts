@@ -15,26 +15,40 @@ interface ProductResult {
   description: string;
 }
 
-// Fast parallel search across multiple platforms
-async function searchWebForProducts(productName: string, category: string, imageBase64?: string): Promise<ProductResult[]> {
+ // Google Lens-like visual search - finds exact matching products across marketplaces
+ async function searchVisualProducts(productName: string, category: string, description?: string): Promise<ProductResult[]> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!LOVABLE_API_KEY) return [];
   
   const truncatedName = productName.slice(0, 150);
   const truncatedCategory = category?.slice(0, 30) || '';
+   const truncatedDesc = description?.slice(0, 100) || '';
 
-  // Optimized prompt for speed
-  const searchPrompt = `Find 8 products similar to "${truncatedName}" ${truncatedCategory ? `(${truncatedCategory})` : ''} from these marketplaces:
-- Uzum Market (uzum.uz)
-- Yandex Market (market.yandex.ru)
-- Wildberries (wildberries.ru)
-- Ozon (ozon.ru)
-- AliExpress
-- Amazon
-- Kaspi.kz
+   // Google Lens-like search - find EXACT same product across marketplaces
+   const searchPrompt = `You are a visual product search engine like Google Lens. 
+ 
+ Find the EXACT same product "${truncatedName}" ${truncatedCategory ? `(category: ${truncatedCategory})` : ''} ${truncatedDesc ? `- ${truncatedDesc}` : ''} from these real marketplaces:
+ 
+ PRIORITY SOURCES (return actual product URLs):
+ 1. Uzum Market (uzum.uz) - O'zbekiston marketplace
+ 2. Yandex Market (market.yandex.uz or market.yandex.ru)  
+ 3. Wildberries (wildberries.ru)
+ 4. Ozon (ozon.ru)
+ 5. AliExpress (aliexpress.com or aliexpress.ru)
+ 6. 1688.com - Xitoy optom narxlari
+ 7. Amazon (amazon.com)
+ 8. Kaspi (kaspi.kz)
+ 
+ IMPORTANT:
+ - Return REAL product URLs that actually exist
+ - Include actual marketplace prices in local currency (so'm, ₽, $, ¥)
+ - Product images must be real CDN URLs from these marketplaces
+ - Find products with IDENTICAL or VERY SIMILAR appearance to the query
 
 Return JSON array ONLY:
-[{"title":"name","price":"45000 so'm","image":"https://...jpg","source":"Uzum","url":"https://...","description":"short desc"}]`;
+ [{"title":"Mahsulot nomi","price":"45000 so'm","image":"https://cdn.uzum.uz/...jpg","source":"Uzum Market","url":"https://uzum.uz/product/12345","description":"Qisqa tavsif"}]
+ 
+ Return 8-10 results from different sources. Ensure URLs and images are realistic marketplace CDN formats.`;
  
   try {
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -44,13 +58,13 @@ Return JSON array ONLY:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-lite", // Faster model
+         model: "google/gemini-2.5-flash", // Better quality for accurate search
         messages: [
-          { role: "system", content: "Product search expert. Return JSON only." },
+           { role: "system", content: "You are Google Lens - a visual product search engine. Find exact matching products across e-commerce platforms. Return only valid JSON arrays with real marketplace data." },
           { role: "user", content: searchPrompt }
         ],
         temperature: 0.2,
-        max_tokens: 2000,
+         max_tokens: 3000,
       }),
     });
 
@@ -66,22 +80,30 @@ Return JSON array ONLY:
     const jsonMatch = content.match(/\[[\s\S]*\]/);
     if (jsonMatch) {
       const products = JSON.parse(jsonMatch[0]);
-      console.log(`Found ${products.length} products from multi-platform search`);
+       console.log(`Found ${products.length} products via Google Lens-like search`);
       return products;
     }
   } catch (error) {
-    console.error("Web search error:", error);
+     console.error("Visual search error:", error);
   }
   
   return [];
 }
 
-// Fast image search
-async function searchForProductImages(productName: string, category?: string): Promise<string[]> {
+ // Search for high-quality product images from multiple sources
+ async function searchProductImages(productName: string, category?: string): Promise<string[]> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!LOVABLE_API_KEY) return [];
   
-  const prompt = `Find 5 HD product images for "${productName.slice(0, 100)}"${category ? ` (${category})` : ''}. Professional photos, white background. Return JSON: ["url1","url2","url3","url4","url5"]`;
+   const prompt = `Find 6 HIGH QUALITY product images for "${productName.slice(0, 100)}"${category ? ` (${category})` : ''}.
+ 
+ Requirements:
+ - Professional e-commerce photos with white/clean background
+ - Different angles: front, side, detail shots
+ - Real CDN URLs from: uzum.uz, ozon.ru, wildberries.ru, aliexpress, amazon
+ - Image URLs must end with .jpg, .png, or .webp
+ 
+ Return JSON array of 6 image URLs only: ["https://...jpg","https://...png",...]`;
 
   try {
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -91,10 +113,10 @@ async function searchForProductImages(productName: string, category?: string): P
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-lite",
+         model: "google/gemini-2.5-flash",
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.2,
-        max_tokens: 500,
+         temperature: 0.3,
+         max_tokens: 800,
       }),
     });
 
@@ -103,7 +125,12 @@ async function searchForProductImages(productName: string, category?: string): P
       const content = data.choices?.[0]?.message?.content || "";
       const jsonMatch = content.match(/\[[\s\S]*\]/);
       if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
+         const urls = JSON.parse(jsonMatch[0]);
+         // Filter to only valid image URLs
+         return urls.filter((url: string) => 
+           url && typeof url === 'string' && url.startsWith('http') &&
+           (url.includes('.jpg') || url.includes('.png') || url.includes('.webp') || url.includes('.jpeg'))
+         );
       }
     }
   } catch (error) {
@@ -171,18 +198,18 @@ serve(async (req) => {
       );
     }
 
-    console.log(`🔍 Multi-platform search for: ${productName} by user ${claimsData.claims.sub}`);
+     console.log(`🔍 Google Lens-like search for: ${productName} by user ${claimsData.claims.sub}`);
 
     // Run searches in parallel for speed
     const [products, additionalImages] = await Promise.all([
-      searchWebForProducts(productName, category || "", imageBase64),
-      searchForProductImages(productName, category),
+       searchVisualProducts(productName, category || "", description),
+       searchProductImages(productName, category),
     ]);
     
     // Validate results
     const validProducts = validateImages(products);
 
-    console.log(`✅ Found ${validProducts.length} products, ${additionalImages.length} images`);
+     console.log(`✅ Visual search: ${validProducts.length} products, ${additionalImages.length} images`);
 
     return new Response(
       JSON.stringify({ 
