@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useProductVariants, type ProductVariant } from '@/hooks/useProductVariants';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, Palette, Ruler, Package } from 'lucide-react';
+import { Plus, Trash2, Palette, Ruler, Package, Upload, X, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface VariantManagerProps {
@@ -35,7 +36,7 @@ const PRESET_COLORS = [
 const PRESET_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'];
 
 export function VariantManager({ productId }: VariantManagerProps) {
-  const { variants, variantsByType, createVariant, deleteVariant, isLoading } = useProductVariants(productId);
+  const { variants, variantsByType, createVariant, deleteVariant, updateVariant, isLoading } = useProductVariants(productId);
   const [newVariant, setNewVariant] = useState({
     variant_type: 'color' as 'color' | 'size' | 'model',
     variant_value: '',
@@ -46,10 +47,100 @@ export function VariantManager({ productId }: VariantManagerProps) {
     price_adjustment: 0,
   });
   const [isAdding, setIsAdding] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [editingVariantId, setEditingVariantId] = useState<string | null>(null);
+  const [editingImageUpload, setEditingImageUpload] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Upload image to Supabase Storage
+  const uploadImage = async (file: File, variantId?: string): Promise<string | null> => {
+    try {
+      setUploading(true);
+      
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${productId}/${variantId || 'new'}_${Date.now()}.${fileExt}`;
+      
+      const { data, error } = await supabase.storage
+        .from('product-images')
+        .upload(fileName, file, { upsert: true });
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(data.path);
+
+      return publicUrl;
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      toast.error('Rasm yuklashda xatolik: ' + error.message);
+      return null;
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Faqat rasm fayllari qabul qilinadi');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Rasm hajmi 5MB dan oshmasligi kerak');
+      return;
+    }
+
+    const imageUrl = await uploadImage(file);
+    if (imageUrl) {
+      setNewVariant({ ...newVariant, image_url: imageUrl });
+      toast.success('Rasm yuklandi');
+    }
+  };
+
+  const handleEditFileSelect = async (e: React.ChangeEvent<HTMLInputElement>, variantId: string) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Faqat rasm fayllari qabul qilinadi');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Rasm hajmi 5MB dan oshmasligi kerak');
+      return;
+    }
+
+    setEditingImageUpload(true);
+    const imageUrl = await uploadImage(file, variantId);
+    if (imageUrl) {
+      try {
+        await updateVariant({ id: variantId, updates: { image_url: imageUrl } });
+        toast.success('Variant rasmi yangilandi');
+      } catch (error) {
+        toast.error('Xatolik yuz berdi');
+      }
+    }
+    setEditingImageUpload(false);
+    setEditingVariantId(null);
+  };
 
   const handleAddVariant = async () => {
     if (!newVariant.variant_value) {
       toast.error('Variant qiymatini kiriting');
+      return;
+    }
+
+    // For color variants, require an image
+    if (newVariant.variant_type === 'color' && !newVariant.image_url) {
+      toast.error('Rang varianti uchun rasm yuklang');
       return;
     }
 
@@ -109,6 +200,10 @@ export function VariantManager({ productId }: VariantManagerProps) {
     });
   };
 
+  const removeImage = () => {
+    setNewVariant({ ...newVariant, image_url: '' });
+  };
+
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -129,31 +224,82 @@ export function VariantManager({ productId }: VariantManagerProps) {
                 {type === 'color' ? 'Ranglar' : type === 'size' ? 'O\'lchamlar' : 'Modellar'}
               </span>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {typeVariants.map((variant) => (
                 <div 
                   key={variant.id}
-                  className="flex items-center gap-2 bg-muted rounded-lg px-3 py-1.5 text-sm"
+                  className="flex items-center gap-2 bg-muted rounded-lg p-2"
                 >
-                  {variant.hex_color && (
+                  {/* Variant Image or Color */}
+                  {type === 'color' && (
+                    <div className="relative group">
+                      {variant.image_url ? (
+                        <img 
+                          src={variant.image_url} 
+                          alt={variant.variant_label || variant.variant_value}
+                          className="w-12 h-12 rounded-lg object-cover border"
+                        />
+                      ) : (
+                        <div 
+                          className="w-12 h-12 rounded-lg border flex items-center justify-center"
+                          style={{ backgroundColor: variant.hex_color || '#ccc' }}
+                        >
+                          <ImageIcon className="h-4 w-4 text-white/70" />
+                        </div>
+                      )}
+                      {/* Upload overlay */}
+                      <button
+                        onClick={() => {
+                          setEditingVariantId(variant.id);
+                          editFileInputRef.current?.click();
+                        }}
+                        className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        {editingImageUpload && editingVariantId === variant.id ? (
+                          <Loader2 className="h-4 w-4 text-white animate-spin" />
+                        ) : (
+                          <Upload className="h-4 w-4 text-white" />
+                        )}
+                      </button>
+                    </div>
+                  )}
+                  
+                  {type !== 'color' && variant.hex_color && (
                     <span 
-                      className="w-4 h-4 rounded-full border"
+                      className="w-6 h-6 rounded-full border shrink-0"
                       style={{ backgroundColor: variant.hex_color }}
                     />
                   )}
-                  <span>{variant.variant_label || variant.variant_value}</span>
-                  <span className="text-muted-foreground">({variant.stock_quantity})</span>
+                  
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm font-medium truncate block">
+                      {variant.variant_label || variant.variant_value}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      Ombor: {variant.stock_quantity}
+                    </span>
+                  </div>
+                  
                   <button
                     onClick={() => handleDeleteVariant(variant.id)}
-                    className="text-destructive hover:text-destructive/80 ml-1"
+                    className="text-destructive hover:text-destructive/80 p-1 shrink-0"
                   >
-                    <Trash2 className="h-3 w-3" />
+                    <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
               ))}
             </div>
           </div>
         ))}
+
+        {/* Hidden file input for editing existing variants */}
+        <input
+          ref={editFileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => editingVariantId && handleEditFileSelect(e, editingVariantId)}
+        />
 
         {/* Add New Variant */}
         {!isAdding ? (
@@ -173,7 +319,14 @@ export function VariantManager({ productId }: VariantManagerProps) {
                 <Label>Variant turi</Label>
                 <Select 
                   value={newVariant.variant_type}
-                  onValueChange={(v) => setNewVariant({ ...newVariant, variant_type: v as any, variant_value: '', variant_label: '', hex_color: '' })}
+                  onValueChange={(v) => setNewVariant({ 
+                    ...newVariant, 
+                    variant_type: v as any, 
+                    variant_value: '', 
+                    variant_label: '', 
+                    hex_color: '',
+                    image_url: '' 
+                  })}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -200,7 +353,9 @@ export function VariantManager({ productId }: VariantManagerProps) {
                       <button
                         key={color.hex}
                         onClick={() => handlePresetColor(color)}
-                        className="w-8 h-8 rounded-full border-2 transition-all hover:scale-110"
+                        className={`w-8 h-8 rounded-full border-2 transition-all hover:scale-110 ${
+                          newVariant.hex_color === color.hex ? 'ring-2 ring-primary ring-offset-2' : ''
+                        }`}
                         style={{ backgroundColor: color.hex }}
                         title={color.name}
                       />
@@ -218,11 +373,64 @@ export function VariantManager({ productId }: VariantManagerProps) {
                       <button
                         key={size}
                         onClick={() => handlePresetSize(size)}
-                        className="px-3 py-1.5 rounded-lg border hover:bg-muted text-sm"
+                        className={`px-3 py-1.5 rounded-lg border hover:bg-muted text-sm ${
+                          newVariant.variant_value === size ? 'bg-primary text-primary-foreground' : ''
+                        }`}
                       >
                         {size}
                       </button>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Image Upload for Color Variants */}
+              {newVariant.variant_type === 'color' && (
+                <div className="space-y-2">
+                  <Label>Rang rasmi (majburiy)</Label>
+                  <div className="flex items-start gap-3">
+                    {newVariant.image_url ? (
+                      <div className="relative">
+                        <img 
+                          src={newVariant.image_url} 
+                          alt="Variant rasmi"
+                          className="w-20 h-20 rounded-lg object-cover border"
+                        />
+                        <button
+                          onClick={removeImage}
+                          className="absolute -top-2 -right-2 w-6 h-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploading}
+                        className="w-20 h-20 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-1 hover:bg-muted transition-colors"
+                      >
+                        {uploading ? (
+                          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                        ) : (
+                          <>
+                            <Upload className="h-6 w-6 text-muted-foreground" />
+                            <span className="text-[10px] text-muted-foreground">Yuklash</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleFileSelect}
+                    />
+                    <div className="flex-1 text-sm text-muted-foreground">
+                      <p>Ushbu rang uchun mahsulot rasmini yuklang.</p>
+                      <p className="text-xs mt-1">Maksimal hajm: 5MB</p>
+                      <p className="text-xs">Format: JPG, PNG, WebP</p>
+                    </div>
                   </div>
                 </div>
               )}
@@ -249,30 +457,20 @@ export function VariantManager({ productId }: VariantManagerProps) {
 
               {/* Color-specific fields */}
               {newVariant.variant_type === 'color' && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Rang kodi (HEX)</Label>
-                    <div className="flex gap-2">
-                      <Input 
-                        value={newVariant.hex_color}
-                        onChange={(e) => setNewVariant({ ...newVariant, hex_color: e.target.value })}
-                        placeholder="#FF0000"
-                      />
-                      {newVariant.hex_color && (
-                        <div 
-                          className="w-10 h-10 rounded-lg border"
-                          style={{ backgroundColor: newVariant.hex_color }}
-                        />
-                      )}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Rasm URL (ixtiyoriy)</Label>
+                <div className="space-y-2">
+                  <Label>Rang kodi (HEX)</Label>
+                  <div className="flex gap-2">
                     <Input 
-                      value={newVariant.image_url}
-                      onChange={(e) => setNewVariant({ ...newVariant, image_url: e.target.value })}
-                      placeholder="https://..."
+                      value={newVariant.hex_color}
+                      onChange={(e) => setNewVariant({ ...newVariant, hex_color: e.target.value })}
+                      placeholder="#FF0000"
                     />
+                    {newVariant.hex_color && (
+                      <div 
+                        className="w-10 h-10 rounded-lg border shrink-0"
+                        style={{ backgroundColor: newVariant.hex_color }}
+                      />
+                    )}
                   </div>
                 </div>
               )}
@@ -301,7 +499,7 @@ export function VariantManager({ productId }: VariantManagerProps) {
 
             {/* Actions */}
             <div className="flex gap-2">
-              <Button onClick={handleAddVariant} className="flex-1">
+              <Button onClick={handleAddVariant} className="flex-1" disabled={uploading}>
                 <Plus className="h-4 w-4 mr-2" />
                 Qo'shish
               </Button>

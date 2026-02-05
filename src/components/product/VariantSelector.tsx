@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
+import { Check } from 'lucide-react';
 import type { ProductVariant } from '@/hooks/useProductVariants';
 
 interface VariantSelectorProps {
@@ -37,9 +38,9 @@ export function VariantSelector({
     setSelected(newSelected);
     onVariantChange(newSelected);
     
-    // Only change image for color variants
-    if (type === 'color' && variant.image_url) {
-      onImageChange?.(variant.image_url);
+    // Only change image for color variants with images
+    if (type === 'color') {
+      onImageChange?.(variant.image_url || null);
     }
   };
 
@@ -55,7 +56,7 @@ export function VariantSelector({
 
   return (
     <div className="space-y-4">
-      {/* Color variants - show as color swatches */}
+      {/* Color variants - show as image thumbnails if available, otherwise color swatches */}
       {variantsByType.color && variantsByType.color.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
@@ -67,29 +68,57 @@ export function VariantSelector({
             )}
           </div>
           <div className="flex flex-wrap gap-2">
-            {variantsByType.color.map((variant) => (
-              <button
-                key={variant.id}
-                onClick={() => handleSelect('color', variant)}
-                className={cn(
-                  "w-10 h-10 rounded-full border-2 transition-all relative",
-                  selected.color?.id === variant.id
-                    ? "border-primary ring-2 ring-primary/30"
-                    : "border-border hover:border-primary/50"
-                )}
-                style={{ backgroundColor: variant.hex_color || '#ccc' }}
-                title={variant.variant_label || variant.variant_value}
-              >
-                {selected.color?.id === variant.id && (
-                  <span className="absolute inset-0 flex items-center justify-center">
-                    <span className={cn(
-                      "w-3 h-3 rounded-full",
-                      isLightColor(variant.hex_color) ? "bg-foreground" : "bg-white"
-                    )} />
-                  </span>
-                )}
-              </button>
-            ))}
+            {variantsByType.color.map((variant) => {
+              const isSelected = selected.color?.id === variant.id;
+              const hasImage = !!variant.image_url;
+              
+              return (
+                <button
+                  key={variant.id}
+                  onClick={() => handleSelect('color', variant)}
+                  className={cn(
+                    "relative transition-all",
+                    hasImage 
+                      ? "w-14 h-14 rounded-lg overflow-hidden border-2" 
+                      : "w-10 h-10 rounded-full border-2",
+                    isSelected
+                      ? "border-primary ring-2 ring-primary/30"
+                      : "border-border hover:border-primary/50"
+                  )}
+                  title={variant.variant_label || variant.variant_value}
+                >
+                  {hasImage ? (
+                    <>
+                      <img 
+                        src={variant.image_url!} 
+                        alt={variant.variant_label || variant.variant_value}
+                        className="w-full h-full object-cover"
+                      />
+                      {isSelected && (
+                        <span className="absolute inset-0 bg-primary/30 flex items-center justify-center">
+                          <Check className="w-5 h-5 text-white drop-shadow-md" />
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <span 
+                        className="absolute inset-0 rounded-full"
+                        style={{ backgroundColor: variant.hex_color || '#ccc' }}
+                      />
+                      {isSelected && (
+                        <span className="absolute inset-0 flex items-center justify-center">
+                          <span className={cn(
+                            "w-3 h-3 rounded-full",
+                            isLightColor(variant.hex_color) ? "bg-foreground" : "bg-white"
+                          )} />
+                        </span>
+                      )}
+                    </>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
