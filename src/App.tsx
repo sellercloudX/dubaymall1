@@ -29,6 +29,8 @@ const BloggerDashboard = lazy(() => import("./pages/BloggerDashboard"));
 const FavoritesPage = lazy(() => import("./pages/FavoritesPage"));
 const Partnership = lazy(() => import("./pages/Partnership"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const Blog = lazy(() => import("./pages/Blog"));
+const BlogPost = lazy(() => import("./pages/BlogPost"));
 
  // Create persister for offline cache
  const persister = createSyncStoragePersister({
@@ -95,6 +97,8 @@ function App() {
                     <Route path="/blogger" element={<BloggerDashboard />} />
                     <Route path="/favorites" element={<FavoritesPage />} />
                     <Route path="/partnership" element={<Partnership />} />
+                    <Route path="/blog" element={<Blog />} />
+                    <Route path="/blog/:slug" element={<BlogPost />} />
                     <Route path="*" element={<NotFound />} />
                   </Routes>
                 </Suspense>
