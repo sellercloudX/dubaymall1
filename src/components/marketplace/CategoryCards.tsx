@@ -46,13 +46,16 @@ export function CategoryCards() {
 
   if (loading) {
     return (
-      <div className="mb-8 min-h-[212px] md:min-h-[152px]">
+      <div className="mb-8 h-[212px] md:h-[152px]">
         <div className="flex items-center justify-between mb-4">
           <Skeleton className="h-6 w-32" />
         </div>
         <div className="grid grid-cols-4 md:grid-cols-8 gap-2 md:gap-4">
           {[...Array(8)].map((_, i) => (
-            <Skeleton key={i} className="aspect-square rounded-xl" />
+            <div key={i} className="flex flex-col items-center">
+              <Skeleton className="w-14 h-14 md:w-16 md:h-16 rounded-2xl" />
+              <Skeleton className="mt-2 h-4 w-12" />
+            </div>
           ))}
         </div>
       </div>
