@@ -75,7 +75,8 @@ export default function CheckoutPage() {
 
       // Determine payment status based on method
       const isOnlinePayment = ['payme', 'click', 'uzcard'].includes(formData.paymentMethod);
-      const paymentStatus = isOnlinePayment ? 'pending' : 'cash_on_delivery';
+      const isInstallment = formData.paymentMethod.startsWith('installment_');
+      const paymentStatus = isInstallment ? 'installment_pending' : (isOnlinePayment ? 'pending' : 'cash_on_delivery');
 
       // Create order
       const { data: order, error: orderError } = await supabase
@@ -330,6 +331,8 @@ export default function CheckoutPage() {
                   <PaymentMethods
                     value={formData.paymentMethod}
                     onChange={(value) => setFormData(prev => ({ ...prev, paymentMethod: value }))}
+                    totalAmount={totalPrice}
+                    showInstallments={true}
                   />
                 </CardContent>
               </Card>
@@ -378,8 +381,26 @@ export default function CheckoutPage() {
                   
                   <div className="flex justify-between text-lg font-bold">
                     <span>{t.total || 'Jami'}</span>
-                    <span className="text-primary">{formatPrice(totalPrice)}</span>
+                    <span className="text-primary whitespace-nowrap">{formatPrice(totalPrice)}</span>
                   </div>
+                  
+                  {/* Installment info */}
+                  {formData.paymentMethod.startsWith('installment_') && (
+                    <div className="mt-3 p-3 bg-yellow-50 dark:bg-yellow-950 rounded-lg">
+                      <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                        {formData.paymentMethod === 'installment_12' ? '12 oylik' : '24 oylik'} muddatli to'lov
+                      </p>
+                      <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
+                        Oylik to'lov: <span className="font-bold">
+                          {formatPrice(
+                            formData.paymentMethod === 'installment_12' 
+                              ? Math.round((totalPrice * 1.45) / 12)
+                              : Math.round((totalPrice * 1.6) / 24)
+                          )}
+                        </span> so'm
+                      </p>
+                    </div>
+                  )}
                 </CardContent>
                 <CardFooter>
                   <Button type="submit" className="w-full gap-2" size="lg" disabled={loading}>

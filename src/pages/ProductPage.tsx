@@ -12,10 +12,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ProductReviews } from '@/components/reviews/ProductReviews';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { ProductRecommendations } from '@/components/marketplace/ProductRecommendations';
 import { StarRating } from '@/components/reviews/StarRating';
-import { useProductRating } from '@/hooks/useReviews';
+import { useProductRating, useProductReviews } from '@/hooks/useReviews';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
   ShoppingCart, 
   Heart, 
@@ -27,10 +29,16 @@ import {
   ChevronRight,
   Loader2,
   Truck,
-  CreditCard,
-  Calendar
+  Share2,
+  Star,
+  MessageSquare,
+  ShoppingBag,
+  User,
+  TrendingUp,
+  ChevronRight as ArrowRight
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Product = Tables<'products'> & { 
@@ -62,10 +70,14 @@ const calculateDeliveryDate = (preparationDays: number = 1): { date: string; ful
 };
 
 // Installment calculations
-const calculateInstallment24 = (price: number): number => Math.round((price * 1.6) / 24);
-const calculateInstallment12 = (price: number): number => Math.round((price * 1.45) / 12);
-const calculateTotal24 = (price: number): number => Math.round(price * 1.6);
-const calculateTotal12 = (price: number): number => Math.round(price * 1.45);
+const calculateInstallment = (price: number, months: number): number => {
+  const multipliers: Record<number, number> = { 3: 1.15, 6: 1.25, 12: 1.45, 24: 1.6 };
+  return Math.round((price * (multipliers[months] || 1.6)) / months);
+};
+const calculateTotal = (price: number, months: number): number => {
+  const multipliers: Record<number, number> = { 3: 1.15, 6: 1.25, 12: 1.45, 24: 1.6 };
+  return Math.round(price * (multipliers[months] || 1.6));
+};
 
 export default function ProductPage() {
   const { id } = useParams<{ id: string }>();
@@ -79,12 +91,16 @@ export default function ProductPage() {
   const [quantity, setQuantity] = useState(1);
   const [currentImage, setCurrentImage] = useState(0);
   const [favoriteLoading, setFavoriteLoading] = useState(false);
-  const [paymentType, setPaymentType] = useState<'cash' | '12month' | '24month'>('cash');
+  const [selectedInstallment, setSelectedInstallment] = useState(24);
+  const [orderCount, setOrderCount] = useState(0);
+  const [weeklyBuyers, setWeeklyBuyers] = useState(0);
   const { data: ratingData } = useProductRating(id || '');
+  const { data: reviews } = useProductReviews(id || '');
 
   useEffect(() => {
     if (id) {
       fetchProduct();
+      fetchOrderStats();
       addToRecentlyViewed(id);
     }
   }, [id]);
@@ -105,6 +121,27 @@ export default function ProductPage() {
       setProduct(data as Product);
     }
     setLoading(false);
+  };
+
+  const fetchOrderStats = async () => {
+    // Get total orders containing this product
+    const { count: totalOrders } = await supabase
+      .from('order_items')
+      .select('*', { count: 'exact', head: true })
+      .eq('product_id', id);
+    
+    // Get weekly buyers (last 7 days)
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    
+    const { count: weeklyCount } = await supabase
+      .from('order_items')
+      .select('*', { count: 'exact', head: true })
+      .eq('product_id', id)
+      .gte('created_at', weekAgo.toISOString());
+    
+    setOrderCount(totalOrders || 0);
+    setWeeklyBuyers(weeklyCount || 0);
   };
 
   const formatPrice = (price: number) => {
@@ -135,6 +172,18 @@ export default function ProductPage() {
       toast.success(isCurrentlyFavorite ? 'Sevimlilardan o\'chirildi' : 'Sevimlilarga qo\'shildi');
     }
     setFavoriteLoading(false);
+  };
+
+  const handleShare = async () => {
+    try {
+      await navigator.share({
+        title: product?.name,
+        url: window.location.href,
+      });
+    } catch {
+      navigator.clipboard.writeText(window.location.href);
+      toast.success('Havola nusxalandi');
+    }
   };
 
   const discount = product?.original_price && product.original_price > product.price
@@ -177,29 +226,6 @@ export default function ProductPage() {
   const hasReviews = ratingData?.total_reviews && Number(ratingData.total_reviews) > 0;
   const deliveryInfo = calculateDeliveryDate(product.preparation_days || 1);
 
-  // Calculate prices based on payment type
-  const getFinalPrice = () => {
-    switch (paymentType) {
-      case '12month':
-        return calculateTotal12(product.price);
-      case '24month':
-        return calculateTotal24(product.price);
-      default:
-        return product.price;
-    }
-  };
-
-  const getMonthlyPayment = () => {
-    switch (paymentType) {
-      case '12month':
-        return calculateInstallment12(product.price);
-      case '24month':
-        return calculateInstallment24(product.price);
-      default:
-        return null;
-    }
-  };
-
   // Product structured data for SEO
   const productStructuredData = {
     name: formatProductName(product.name),
@@ -208,35 +234,26 @@ export default function ProductPage() {
     sku: product.id,
     brand: {
       '@type': 'Brand',
-      name: product.shop?.name || 'Dubay Mall',
+      name: product.shop?.name || 'BazarHub',
     },
     offers: {
       '@type': 'Offer',
-      url: `https://dubaymall.uz/product/${product.id}`,
+      url: window.location.href,
       priceCurrency: 'UZS',
       price: product.price,
       availability: product.stock_quantity > 0 
         ? 'https://schema.org/InStock' 
         : 'https://schema.org/OutOfStock',
-      seller: {
-        '@type': 'Organization',
-        name: product.shop?.name || 'Dubay Mall',
-      },
     },
-    aggregateRating: hasReviews ? {
-      '@type': 'AggregateRating',
-      ratingValue: ratingData?.average_rating || 0,
-      reviewCount: Number(ratingData?.total_reviews),
-    } : undefined,
   };
 
   return (
     <Layout>
       <SEOHead
-        title={`${formatProductName(product.name)} - Dubay Mall`}
-        description={product.description?.slice(0, 155) || `${formatProductName(product.name)} - eng yaxshi narxlarda Dubay Mall'da xarid qiling`}
+        title={`${formatProductName(product.name)} - BazarHub`}
+        description={product.description?.slice(0, 155) || `${formatProductName(product.name)} - eng yaxshi narxlarda`}
         image={images[0]}
-        url={`https://dubaymall.uz/product/${product.id}`}
+        url={window.location.href}
         type="product"
         product={{
           price: product.price,
@@ -246,18 +263,42 @@ export default function ProductPage() {
         }}
       />
       <StructuredData type="Product" data={productStructuredData} />
-      
-      <div className="container mx-auto px-4 py-8">
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
+
+      {/* Mobile Header */}
+      <div className="sticky top-0 z-40 bg-background border-b md:hidden">
+        <div className="flex items-center justify-between px-4 py-3">
+          <Button variant="ghost" size="icon" onClick={() => window.history.back()}>
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+          <h1 className="text-sm font-medium line-clamp-1 flex-1 mx-2">{formatProductName(product.name)}</h1>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" onClick={handleToggleFavorite}>
+              <Heart className={`h-5 w-5 ${isFavorite(product.id) ? 'fill-destructive text-destructive' : ''}`} />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={handleShare}>
+              <Share2 className="h-5 w-5" />
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="container mx-auto px-4 py-4 md:py-8 pb-24">
+        {/* Desktop Breadcrumb */}
+        <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground mb-6">
           <Link to="/marketplace" className="hover:text-primary">{t.marketplace}</Link>
           <span>/</span>
+          {product.category && (
+            <>
+              <span>{product.category.name_uz}</span>
+              <span>/</span>
+            </>
+          )}
           <span className="text-foreground line-clamp-1">{formatProductName(product.name)}</span>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-8">
+        <div className="grid md:grid-cols-2 gap-6 md:gap-8">
           {/* Images */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="aspect-square bg-muted rounded-lg overflow-hidden relative">
               {images.length > 0 ? (
                 <>
@@ -286,6 +327,12 @@ export default function ProductPage() {
                       </Button>
                     </>
                   )}
+                  {/* Image counter */}
+                  {images.length > 1 && (
+                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/60 text-white text-xs px-2 py-1 rounded-full">
+                      {currentImage + 1} / {images.length}
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
@@ -293,256 +340,359 @@ export default function ProductPage() {
                 </div>
               )}
             </div>
+            
+            {/* Thumbnail strip */}
             {images.length > 1 && (
-              <div className="flex gap-2 overflow-x-auto">
-                {images.map((img, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setCurrentImage(idx)}
-                    className={`w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 border-2 ${
-                      idx === currentImage ? 'border-primary' : 'border-transparent'
-                    }`}
-                  >
-                    <img src={img} alt="" className="w-full h-full object-cover" />
-                  </button>
-                ))}
-              </div>
+              <ScrollArea className="w-full">
+                <div className="flex gap-2 pb-2">
+                  {images.map((img, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setCurrentImage(idx)}
+                      className={`w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-colors ${
+                        idx === currentImage ? 'border-primary' : 'border-transparent hover:border-muted-foreground/50'
+                      }`}
+                    >
+                      <img src={img} alt="" className="w-full h-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
             )}
           </div>
 
           {/* Details */}
-          <div className="space-y-6">
-            <div>
-              {discount && (
-                <Badge className="bg-destructive mb-2">-{discount}%</Badge>
-              )}
-              {/* Full product name displayed here */}
-              <h1 className="text-2xl md:text-3xl font-bold">{formatProductName(product.name)}</h1>
-              
-              {/* Rating - Only show if has real reviews */}
-              {hasReviews && (
-                <div className="flex items-center gap-2 mt-2">
-                  <StarRating 
-                    rating={ratingData?.average_rating || 0} 
-                    showValue 
-                    totalReviews={Number(ratingData?.total_reviews) || 0}
-                  />
+          <div className="space-y-4">
+            {/* Price Section - Sticky on mobile */}
+            <Card className="border-0 shadow-none md:border md:shadow-sm">
+              <CardContent className="p-0 md:p-4 space-y-3">
+                {/* Price */}
+                <div className="flex items-baseline gap-3 flex-wrap">
+                  <span className="text-3xl md:text-4xl font-bold text-primary whitespace-nowrap">
+                    {formatPrice(product.price)}
+                  </span>
+                  {discount && (
+                    <Badge className="bg-destructive">-{discount}%</Badge>
+                  )}
                 </div>
-              )}
-
-              {product.shop && (
-                <Link 
-                  to={`/shop/${product.shop.slug}`}
-                  className="flex items-center gap-2 text-muted-foreground hover:text-primary mt-2"
-                >
-                  <Store className="h-4 w-4" />
-                  {product.shop.name}
-                </Link>
-              )}
-            </div>
-
-            {/* Price Section */}
-            <div className="space-y-3">
-              <div className="flex items-baseline gap-4">
-                <span className="text-4xl font-bold text-primary whitespace-nowrap">
-                  {formatPrice(product.price)}
-                </span>
                 {product.original_price && product.original_price > product.price && (
-                  <span className="text-xl text-muted-foreground line-through whitespace-nowrap">
+                  <span className="text-lg text-muted-foreground line-through whitespace-nowrap">
                     {formatPrice(product.original_price)}
                   </span>
                 )}
-              </div>
+              </CardContent>
+            </Card>
 
-              {/* Installment Badge */}
-              <div className="inline-block bg-yellow-300 dark:bg-yellow-400 text-yellow-900 text-sm font-medium px-3 py-1.5 rounded whitespace-nowrap">
-                {new Intl.NumberFormat('uz-UZ').format(calculateInstallment24(product.price))} so'm/oyiga × 24 oy
-              </div>
+            {/* Product Name & Stats */}
+            <div className="space-y-3">
+              <h1 className="text-xl md:text-2xl font-semibold hidden md:block">{formatProductName(product.name)}</h1>
+              
+              {/* Rating & Stats Row */}
+              <Card className="bg-muted/30">
+                <CardContent className="p-3 md:p-4">
+                  <div className="flex items-center gap-4 flex-wrap">
+                    {hasReviews && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl font-bold">{ratingData?.average_rating}</span>
+                        <div className="flex">
+                          {[1,2,3,4,5].map(i => (
+                            <Star 
+                              key={i} 
+                              className={`h-4 w-4 ${i <= Math.round(ratingData?.average_rating || 0) ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} 
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {hasReviews && (
+                      <span className="text-sm text-muted-foreground">
+                        {ratingData?.total_reviews} ta sharh
+                      </span>
+                    )}
+                    {orderCount > 0 && (
+                      <span className="text-sm text-muted-foreground">
+                        {orderCount > 1000 ? `${Math.floor(orderCount / 1000)}K+` : orderCount}+ ta buyurtma
+                      </span>
+                    )}
+                  </div>
+                  
+                  {/* Weekly buyers indicator */}
+                  {weeklyBuyers > 0 && (
+                    <div className="flex items-center gap-2 mt-3 text-sm text-green-600 dark:text-green-400">
+                      <TrendingUp className="h-4 w-4" />
+                      <span>Bu haftada {weeklyBuyers} kishi sotib oldi</span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </div>
 
+            {/* Installment Calculator */}
+            <Card className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30 border-purple-200 dark:border-purple-800">
+              <CardContent className="p-4 space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                    <span className="text-white text-lg">💳</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-sm">Muddatli to'lovga xaridlarga</p>
+                    <p className="text-xs text-muted-foreground">Hoziroq olish mumkin</p>
+                  </div>
+                </div>
+                
+                {/* Month selector tabs */}
+                <div className="flex gap-2 p-1 bg-background/50 rounded-lg">
+                  {[24, 12, 6, 3].map(months => (
+                    <button
+                      key={months}
+                      onClick={() => setSelectedInstallment(months)}
+                      className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-all ${
+                        selectedInstallment === months 
+                          ? 'bg-background shadow-sm' 
+                          : 'hover:bg-background/50'
+                      }`}
+                    >
+                      {months} oy
+                    </button>
+                  ))}
+                </div>
+                
+                {/* Monthly payment display */}
+                <div className="flex items-center justify-between">
+                  <div className="bg-yellow-300 text-yellow-900 px-3 py-1.5 rounded font-bold whitespace-nowrap">
+                    {new Intl.NumberFormat('uz-UZ').format(calculateInstallment(product.price, selectedInstallment))} so'm
+                  </div>
+                  <span className="text-sm text-muted-foreground">× {selectedInstallment} oy</span>
+                  <Button variant="outline" size="sm" className="hidden md:flex">
+                    Limit olish
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Delivery Info */}
-            <Card className="bg-muted/50">
+            <Card>
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                     <Truck className="h-5 w-5 text-primary" />
                   </div>
-                  <div>
-                    <p className="font-medium">Yetkazib berish</p>
+                  <div className="flex-1">
+                    <p className="font-semibold">{deliveryInfo.fullDate} yetkazib beramiz</p>
                     <p className="text-sm text-muted-foreground">
-                      <span className="text-primary font-semibold">{deliveryInfo.fullDate}</span> gacha yetkaziladi
+                      {product.free_shipping ? 'Bepul yetkazib berish' : `Yetkazish: ${formatPrice(product.shipping_price || 15000)}`}
                     </p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Payment Options */}
-            <Card>
-              <CardContent className="p-4 space-y-4">
-                <h3 className="font-semibold flex items-center gap-2">
-                  <CreditCard className="h-5 w-5" />
-                  To'lov usulini tanlang
-                </h3>
-                
-                <div className="space-y-2">
-                  {/* Cash Payment */}
-                  <button
-                    onClick={() => setPaymentType('cash')}
-                    className={`w-full p-3 rounded-lg border-2 transition-all text-left ${
-                      paymentType === 'cash' 
-                        ? 'border-primary bg-primary/5' 
-                        : 'border-border hover:border-primary/50'
-                    }`}
-                  >
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="font-medium">Naqd yoki karta</p>
-                        <p className="text-sm text-muted-foreground">To'liq to'lov</p>
-                      </div>
-                      <span className="font-bold text-lg whitespace-nowrap">{formatPrice(product.price)}</span>
-                    </div>
-                  </button>
-
-                  {/* 12 Month Installment */}
-                  <button
-                    onClick={() => setPaymentType('12month')}
-                    className={`w-full p-3 rounded-lg border-2 transition-all text-left ${
-                      paymentType === '12month' 
-                        ? 'border-primary bg-primary/5' 
-                        : 'border-border hover:border-primary/50'
-                    }`}
-                  >
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="font-medium">12 oylik muddatli</p>
-                        <p className="text-sm text-muted-foreground">Jami: {formatPrice(calculateTotal12(product.price))}</p>
-                      </div>
-                      <div className="text-right">
-                        <span className="font-bold text-lg text-primary whitespace-nowrap">
-                          {new Intl.NumberFormat('uz-UZ').format(calculateInstallment12(product.price))}
-                        </span>
-                        <span className="text-sm text-muted-foreground"> so'm/oy</span>
-                      </div>
-                    </div>
-                  </button>
-
-                  {/* 24 Month Installment */}
-                  <button
-                    onClick={() => setPaymentType('24month')}
-                    className={`w-full p-3 rounded-lg border-2 transition-all text-left ${
-                      paymentType === '24month' 
-                        ? 'border-primary bg-primary/5' 
-                        : 'border-border hover:border-primary/50'
-                    }`}
-                  >
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="font-medium">24 oylik muddatli</p>
-                        <p className="text-sm text-muted-foreground">Jami: {formatPrice(calculateTotal24(product.price))}</p>
-                      </div>
-                      <div className="text-right">
-                        <span className="font-bold text-lg text-primary whitespace-nowrap">
-                          {new Intl.NumberFormat('uz-UZ').format(calculateInstallment24(product.price))}
-                        </span>
-                        <span className="text-sm text-muted-foreground"> so'm/oy</span>
-                      </div>
-                    </div>
-                  </button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Stock & Quantity */}
-            <Card>
-              <CardContent className="p-4 space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">{t.productStock}:</span>
-                  <Badge variant={product.stock_quantity > 0 ? 'default' : 'destructive'}>
-                    {product.stock_quantity > 0 
-                      ? `${product.stock_quantity} dona` 
-                      : t.statusOutOfStock}
-                  </Badge>
-                </div>
-
-                <div className="flex items-center gap-4">
-                  <span className="text-muted-foreground">{t.quantity || 'Miqdori'}:</span>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => setQuantity(q => Math.max(1, q - 1))}
-                      disabled={quantity <= 1}
-                    >
-                      <Minus className="h-4 w-4" />
-                    </Button>
-                    <span className="w-12 text-center font-medium">{quantity}</span>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => setQuantity(q => Math.min(product.stock_quantity, q + 1))}
-                      disabled={quantity >= product.stock_quantity}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="flex gap-3">
-                  <Button 
-                    className="flex-1 gap-2" 
-                    size="lg"
-                    onClick={handleAddToCart}
-                    disabled={product.stock_quantity === 0}
-                  >
-                    <ShoppingCart className="h-5 w-5" />
-                    {t.addToCart || 'Savatga qo\'shish'}
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="lg"
-                    onClick={handleToggleFavorite}
-                    disabled={favoriteLoading}
-                    className={isFavorite(product.id) ? 'text-destructive' : ''}
-                  >
-                    {favoriteLoading ? (
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                    ) : (
-                      <Heart className={`h-5 w-5 ${isFavorite(product.id) ? 'fill-current' : ''}`} />
-                    )}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Description */}
-            {product.description && (
-              <Card>
-                <CardContent className="p-4">
-                  <h3 className="font-semibold mb-2">{t.productDescription}</h3>
-                  <p className="text-muted-foreground whitespace-pre-line">
-                    {product.description}
-                  </p>
-                </CardContent>
-              </Card>
-            )}
+            {/* Quantity & Add to Cart */}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center border rounded-lg">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                  disabled={quantity <= 1}
+                >
+                  <Minus className="h-4 w-4" />
+                </Button>
+                <span className="w-12 text-center font-medium">{quantity}</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setQuantity(q => Math.min(product.stock_quantity, q + 1))}
+                  disabled={quantity >= product.stock_quantity}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              
+              <Button 
+                className="flex-1 gap-2 h-12" 
+                onClick={handleAddToCart}
+                disabled={product.stock_quantity === 0}
+              >
+                <ShoppingCart className="h-5 w-5" />
+                Savatga
+              </Button>
+              
+              <Button 
+                variant="outline" 
+                size="icon"
+                className="h-12 w-12 hidden md:flex"
+                onClick={handleToggleFavorite}
+                disabled={favoriteLoading}
+              >
+                {favoriteLoading ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <Heart className={`h-5 w-5 ${isFavorite(product.id) ? 'fill-destructive text-destructive' : ''}`} />
+                )}
+              </Button>
+            </div>
           </div>
+        </div>
+
+        {/* Reviews Carousel */}
+        {hasReviews && reviews && reviews.length > 0 && (
+          <div className="mt-8">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold">{ratingData?.total_reviews} ta sharh</h2>
+              <Link to="#reviews" className="text-sm text-primary flex items-center gap-1">
+                Barcha <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+            
+            <ScrollArea className="w-full">
+              <div className="flex gap-4 pb-4">
+                {reviews.slice(0, 6).map((review) => (
+                  <Card key={review.id} className="w-[280px] flex-shrink-0">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="font-medium text-sm">{review.profiles?.full_name || 'Anonim'}</span>
+                        <div className="flex">
+                          {[1,2,3,4,5].map(i => (
+                            <Star 
+                              key={i} 
+                              className={`h-3 w-3 ${i <= review.rating ? 'fill-yellow-400 text-yellow-400' : 'text-muted'}`} 
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        {format(new Date(review.created_at), 'd MMMM yyyy')}
+                      </p>
+                      {review.comment && (
+                        <p className="text-sm line-clamp-3">{review.comment}</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
+          </div>
+        )}
+
+        {/* Seller Card */}
+        {product.shop && (
+          <div className="mt-8">
+            <h2 className="text-xl font-bold mb-4">Sotuvchi</h2>
+            <Card>
+              <CardContent className="p-4">
+                <Link to={`/shop/${product.shop.slug}`} className="flex items-center gap-4">
+                  <Avatar className="h-14 w-14">
+                    <AvatarImage src={product.shop.logo_url || undefined} />
+                    <AvatarFallback className="text-lg">
+                      {product.shop.name.charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <p className="font-semibold">{product.shop.name}</p>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                      <span>4.8</span>
+                      <span>·</span>
+                      <span>1000+ ta baho</span>
+                    </div>
+                  </div>
+                  <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                </Link>
+                
+                <Button variant="outline" className="w-full mt-4">
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  Sotuvchidan so'rash
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Category Link */}
+        {product.category && (
+          <div className="mt-8">
+            <h2 className="text-xl font-bold mb-4">Shuningdek qarang</h2>
+            <Card>
+              <CardContent className="p-4">
+                <Link to={`/marketplace?category=${product.category.id}`} className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">{product.category.name_uz}</p>
+                    <p className="text-sm text-muted-foreground">Turkum</p>
+                  </div>
+                  <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                </Link>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Description & Specifications Tabs */}
+        <div className="mt-8" id="details">
+          <Tabs defaultValue="description" className="w-full">
+            <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent">
+              <TabsTrigger 
+                value="description" 
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 py-3"
+              >
+                Ta'rif
+              </TabsTrigger>
+              <TabsTrigger 
+                value="specifications"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 py-3"
+              >
+                Tavsiflar
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="description" className="pt-4">
+              {product.description ? (
+                <div className="prose dark:prose-invert max-w-none">
+                  <p className="whitespace-pre-line text-muted-foreground">{product.description}</p>
+                </div>
+              ) : (
+                <p className="text-muted-foreground">Ta'rif mavjud emas</p>
+              )}
+            </TabsContent>
+            
+            <TabsContent value="specifications" className="pt-4">
+              {product.specifications ? (
+                <div className="space-y-2">
+                  {Object.entries(product.specifications as Record<string, string>).map(([key, value]) => (
+                    <div key={key} className="flex justify-between py-2 border-b">
+                      <span className="text-muted-foreground">{key}</span>
+                      <span className="font-medium">{value}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground">Tavsiflar mavjud emas</p>
+              )}
+            </TabsContent>
+          </Tabs>
         </div>
 
         {/* Similar Products */}
         <div className="mt-12">
+          <h2 className="text-xl font-bold mb-4">O'xshash mahsulotlar</h2>
           <ProductRecommendations currentProductId={product.id} />
         </div>
+      </div>
 
-        {/* Reviews Section */}
-        <div className="mt-12">
-          <ProductReviews productId={product.id} />
-        </div>
-
-        {/* Recently Viewed */}
-        <div className="mt-12">
-          <ProductRecommendations type="recent" />
-        </div>
+      {/* Mobile Sticky Footer */}
+      <div className="fixed bottom-0 left-0 right-0 bg-background border-t p-3 md:hidden z-50">
+        <Button 
+          className="w-full gap-2 h-12" 
+          size="lg"
+          onClick={handleAddToCart}
+          disabled={product.stock_quantity === 0}
+        >
+          <ShoppingCart className="h-5 w-5" />
+          Savatga
+          <span className="text-xs opacity-80 ml-1">{deliveryInfo.date}</span>
+        </Button>
       </div>
     </Layout>
   );
