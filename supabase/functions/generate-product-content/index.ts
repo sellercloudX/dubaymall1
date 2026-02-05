@@ -299,48 +299,191 @@ async function fallbackToLovableAI(request: ContentRequest, corsHeaders: Record<
 
   console.log("⚠️ Falling back to Lovable AI for content generation");
 
-  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${LOVABLE_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
-      messages: [
-        {
-          role: "user",
-          content: `Generate ${request.contentType} content for product: ${request.productName?.slice(0, 200)}. 
-          Return JSON with uz and ru versions of title, description, and keywords.`
-        }
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    return new Response(
-      JSON.stringify({ error: "Content generation failed" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
-
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content;
+  const { productName, productDescription, category, brand, contentType } = request;
   
+  const prompt = contentType === "seo"
+    ? `Generate SEO content for: ${productName?.slice(0, 200)}${brand ? ` by ${brand}` : ''}${category ? ` in ${category}` : ''}.
+${productDescription ? `Description: ${productDescription.slice(0, 300)}` : ''}
+Create optimized titles, keywords, and descriptions for e-commerce in Uzbek and Russian languages.`
+    : `Generate product descriptions for: ${productName?.slice(0, 200)}${brand ? ` by ${brand}` : ''}${category ? ` in ${category}` : ''}.
+${productDescription ? `Info: ${productDescription.slice(0, 300)}` : ''}
+Create compelling marketing copy in Uzbek and Russian languages.`;
+
+  const tools = contentType === "seo" ? [
+    {
+      type: "function",
+      function: {
+        name: "generate_seo_content",
+        description: "Generate SEO optimized content in Uzbek and Russian",
+        parameters: {
+          type: "object",
+          properties: {
+            seoTitle: {
+              type: "object",
+              properties: { uz: { type: "string" }, ru: { type: "string" } },
+              required: ["uz", "ru"]
+            },
+            metaDescription: {
+              type: "object", 
+              properties: { uz: { type: "string" }, ru: { type: "string" } },
+              required: ["uz", "ru"]
+            },
+            keywords: {
+              type: "object",
+              properties: { 
+                uz: { type: "array", items: { type: "string" } },
+                ru: { type: "array", items: { type: "string" } }
+              },
+              required: ["uz", "ru"]
+            },
+            bulletPoints: {
+              type: "object",
+              properties: {
+                uz: { type: "array", items: { type: "string" } },
+                ru: { type: "array", items: { type: "string" } }
+              },
+              required: ["uz", "ru"]
+            }
+          },
+          required: ["seoTitle", "metaDescription", "keywords", "bulletPoints"]
+        }
+      }
+    }
+  ] : [
+    {
+      type: "function",
+      function: {
+        name: "generate_description_content",
+        description: "Generate product descriptions in Uzbek and Russian",
+        parameters: {
+          type: "object",
+          properties: {
+            shortDescription: {
+              type: "object",
+              properties: { uz: { type: "string" }, ru: { type: "string" } },
+              required: ["uz", "ru"]
+            },
+            fullDescription: {
+              type: "object",
+              properties: { uz: { type: "string" }, ru: { type: "string" } },
+              required: ["uz", "ru"]
+            },
+            sellingPoints: {
+              type: "object",
+              properties: {
+                uz: { type: "array", items: { type: "string" } },
+                ru: { type: "array", items: { type: "string" } }
+              },
+              required: ["uz", "ru"]
+            }
+          },
+          required: ["shortDescription", "fullDescription", "sellingPoints"]
+        }
+      }
+    }
+  ];
+
+  const toolChoice = contentType === "seo" 
+    ? { type: "function", function: { name: "generate_seo_content" } }
+    : { type: "function", function: { name: "generate_description_content" } };
+
   try {
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-3-flash-preview",
+        messages: [
+          { role: "system", content: "You are a professional e-commerce copywriter fluent in Uzbek and Russian." },
+          { role: "user", content: prompt }
+        ],
+        tools,
+        tool_choice: toolChoice,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Lovable AI error:", response.status, errorText);
+      
+      if (response.status === 429) {
+        return new Response(
+          JSON.stringify({ error: "Rate limit exceeded, please try again later" }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      if (response.status === 402) {
+        return new Response(
+          JSON.stringify({ error: "AI credits exhausted" }),
+          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
+      // Return fallback content
+      return generateFallbackContent(request, corsHeaders);
+    }
+
+    const data = await response.json();
+    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+    
+    if (toolCall?.function?.arguments) {
+      const parsedArgs = JSON.parse(toolCall.function.arguments);
+      console.log("✅ Content generated with Lovable AI");
       return new Response(
-        JSON.stringify({ ...JSON.parse(jsonMatch[0]), aiModel: "gemini-2.5-flash" }),
+        JSON.stringify({ ...parsedArgs, aiModel: "gemini-3-flash", contentType }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-  } catch {}
+    
+    // If no tool call, try to parse content
+    const content = data.choices?.[0]?.message?.content;
+    if (content) {
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        return new Response(
+          JSON.stringify({ ...JSON.parse(jsonMatch[0]), aiModel: "gemini-3-flash" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+    
+    return generateFallbackContent(request, corsHeaders);
+  } catch (error) {
+    console.error("Lovable AI fallback error:", error);
+    return generateFallbackContent(request, corsHeaders);
+  }
+}
+
+// Generate basic fallback content when AI fails
+function generateFallbackContent(request: ContentRequest, corsHeaders: Record<string, string>) {
+  const { productName, productDescription, contentType } = request;
+  const name = productName || "Mahsulot";
+  const desc = productDescription || name;
+  
+  if (contentType === "seo") {
+    return new Response(
+      JSON.stringify({
+        seoTitle: { uz: name, ru: name },
+        metaDescription: { uz: desc.slice(0, 160), ru: desc.slice(0, 160) },
+        keywords: { uz: [name], ru: [name] },
+        bulletPoints: { uz: [desc], ru: [desc] },
+        aiModel: "fallback",
+        contentType
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
   
   return new Response(
-    JSON.stringify({ 
-      shortDescription: { uz: request.productName, ru: request.productName },
-      aiModel: "gemini-2.5-flash"
+    JSON.stringify({
+      shortDescription: { uz: desc.slice(0, 150), ru: desc.slice(0, 150) },
+      fullDescription: { uz: desc, ru: desc },
+      sellingPoints: { uz: [name], ru: [name] },
+      aiModel: "fallback",
+      contentType
     }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
