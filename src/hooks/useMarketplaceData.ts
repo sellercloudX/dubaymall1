@@ -1,5 +1,6 @@
  import { useQuery, useQueryClient } from '@tanstack/react-query';
  import { supabase } from '@/integrations/supabase/client';
+ import { marketplaceQueue } from '@/lib/requestQueue';
  
  interface MarketplaceProduct {
    offerId: string;
@@ -59,12 +60,18 @@
    dataType: string,
    options: Record<string, any> = {}
  ) {
-   const { data, error } = await supabase.functions.invoke('fetch-marketplace-data', {
-     body: { marketplace, dataType, ...options },
-   });
+   // Use request queue to prevent overwhelming the API
+   return marketplaceQueue.add(
+     async () => {
+       const { data, error } = await supabase.functions.invoke('fetch-marketplace-data', {
+         body: { marketplace, dataType, ...options },
+       });
  
-   if (error) throw error;
-   return data;
+       if (error) throw error;
+       return data;
+     },
+     { id: `${marketplace}-${dataType}`, priority: dataType === 'orders' ? 2 : 1 }
+   );
  }
  
  // Products hook with TanStack Query caching
@@ -74,7 +81,7 @@
      queryFn: async () => {
        if (!marketplace) return { data: [], total: 0 };
        const result = await fetchMarketplaceData(marketplace, 'products', { 
-         limit: 200, 
+         limit: 500, // Increased limit for better data completeness
          fetchAll: true 
        });
        return {
@@ -86,8 +93,9 @@
      staleTime: 1000 * 60 * 5, // 5 minutes - data is fresh
      gcTime: 1000 * 60 * 60 * 24, // 24 hours in cache for offline
      refetchOnWindowFocus: false,
-     retry: 2,
+     retry: 3,
      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+     networkMode: 'offlineFirst', // Show cached data immediately
    });
  }
  
@@ -115,6 +123,7 @@
      gcTime: 1000 * 60 * 60 * 24, // 24 hours in cache
      refetchOnWindowFocus: false,
      retry: 2,
+     networkMode: 'offlineFirst',
    });
  }
  

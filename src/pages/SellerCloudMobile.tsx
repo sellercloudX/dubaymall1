@@ -9,6 +9,7 @@ import { MobileAnalytics } from '@/components/mobile/MobileAnalytics';
 import { MobileProducts } from '@/components/mobile/MobileProducts';
 import { MobileOrders } from '@/components/mobile/MobileOrders';
 import { AIScannerPro } from '@/components/seller/AIScannerPro';
+ import { BackgroundTasksPanel } from '@/components/mobile/BackgroundTasksPanel';
 import { Loader2, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -135,6 +136,9 @@ export default function SellerCloudMobile() {
         activeTab={activeTab} 
         onTabChange={setActiveTab} 
       />
+       
+       {/* Background Tasks Panel */}
+       <BackgroundTasksPanel />
     </div>
   );
 }
