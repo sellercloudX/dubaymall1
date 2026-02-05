@@ -18,7 +18,7 @@ const navItems = [
 export function MobileSellerCloudNav({ activeTab, onTabChange }: MobileSellerCloudNavProps) {
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t safe-area-bottom">
-      <div className="flex items-center justify-around h-16">
+      <div className="flex items-center justify-around h-14">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
@@ -33,13 +33,13 @@ export function MobileSellerCloudNav({ activeTab, onTabChange }: MobileSellerClo
               )}
             >
               <div className={cn(
-                "flex items-center justify-center w-10 h-10 rounded-xl transition-colors",
+                "flex items-center justify-center w-8 h-8 rounded-lg transition-colors",
                 isActive && "bg-primary/10"
               )}>
-                <Icon className={cn("h-5 w-5", isActive && "stroke-[2.5]")} />
+                <Icon className={cn("h-4 w-4", isActive && "stroke-[2.5]")} />
               </div>
               <span className={cn(
-                "text-[10px] font-medium",
+                "text-[9px] font-medium leading-tight",
                 isActive && "font-semibold"
               )}>
                 {item.label}

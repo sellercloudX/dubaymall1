@@ -79,16 +79,16 @@ export function MobileProducts({ connectedMarketplaces, fetchMarketplaceData }: 
   return (
     <div className="flex flex-col h-full">
       {/* Sticky Header */}
-      <div className="sticky top-14 bg-background z-30 p-4 border-b space-y-3">
+      <div className="sticky top-14 bg-background z-30 px-3 py-3 border-b space-y-2.5">
         {/* Marketplace Pills */}
-        <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-hide">
+        <div className="flex gap-2 overflow-x-auto pb-1 -mx-3 px-3 scrollbar-hide">
           {connectedMarketplaces.map(mp => (
             <Button
               key={mp}
               variant={selectedMp === mp ? 'default' : 'outline'}
               size="sm"
               onClick={() => setSelectedMp(mp)}
-              className="shrink-0"
+              className="shrink-0 text-xs h-8 px-3"
             >
               {MARKETPLACE_EMOJI[mp]} {mp}
             </Button>
@@ -97,16 +97,16 @@ export function MobileProducts({ connectedMarketplaces, fetchMarketplaceData }: 
 
         {/* Search */}
         <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <div className="relative flex-1 min-w-0">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Qidirish..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
+              className="pl-8 h-9 text-sm"
             />
           </div>
-          <Button variant="outline" size="icon" onClick={loadProducts} disabled={isLoading}>
+          <Button variant="outline" size="icon" onClick={loadProducts} disabled={isLoading} className="shrink-0 h-9 w-9">
             <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
           </Button>
         </div>
@@ -119,12 +119,12 @@ export function MobileProducts({ connectedMarketplaces, fetchMarketplaceData }: 
       </div>
 
       {/* Products List */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2.5">
         {isLoading ? (
           Array.from({ length: 5 }).map((_, i) => (
             <Card key={i}>
               <CardContent className="p-3 flex gap-3">
-                <Skeleton className="w-16 h-16 rounded-lg shrink-0" />
+                <Skeleton className="w-14 h-14 rounded-lg shrink-0" />
                 <div className="flex-1 space-y-2">
                   <Skeleton className="h-4 w-3/4" />
                   <Skeleton className="h-3 w-1/2" />
@@ -144,7 +144,7 @@ export function MobileProducts({ connectedMarketplaces, fetchMarketplaceData }: 
               <CardContent className="p-0">
                 <div className="flex">
                   {/* Product Image */}
-                  <div className="w-20 h-20 bg-muted flex items-center justify-center shrink-0">
+                  <div className="w-16 h-16 bg-muted flex items-center justify-center shrink-0">
                     {product.pictures?.[0] ? (
                       <img 
                         src={product.pictures[0]} 
@@ -155,20 +155,20 @@ export function MobileProducts({ connectedMarketplaces, fetchMarketplaceData }: 
                         }}
                       />
                     ) : (
-                      <ImageIcon className="h-6 w-6 text-muted-foreground/50" />
+                      <ImageIcon className="h-5 w-5 text-muted-foreground/50" />
                     )}
                   </div>
 
                   {/* Product Info */}
-                  <div className="flex-1 p-3 min-w-0">
-                    <div className="font-medium text-sm line-clamp-2 mb-1">
+                  <div className="flex-1 p-2.5 min-w-0">
+                    <div className="font-medium text-xs line-clamp-2 mb-1 leading-snug">
                       {product.name || 'Nomsiz'}
                     </div>
-                    <div className="text-xs text-muted-foreground mb-2 truncate">
+                    <div className="text-[10px] text-muted-foreground mb-1.5 truncate">
                       SKU: {product.shopSku || product.offerId}
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-primary">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-bold text-primary text-xs truncate">
                         {formatPrice(product.price)}
                       </span>
                       {getStockBadge(product.stockFBO, product.stockFBS)}

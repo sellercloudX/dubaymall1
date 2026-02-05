@@ -111,16 +111,16 @@ export function MobileOrders({ connectedMarketplaces, fetchMarketplaceData }: Mo
   return (
     <div className="flex flex-col h-full">
       {/* Sticky Header */}
-      <div className="sticky top-14 bg-background z-30 p-4 border-b space-y-3">
+      <div className="sticky top-14 bg-background z-30 px-3 py-3 border-b space-y-2.5">
         {/* Marketplace Pills */}
-        <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-hide">
+        <div className="flex gap-2 overflow-x-auto pb-1 -mx-3 px-3 scrollbar-hide">
           {connectedMarketplaces.map(mp => (
             <Button
               key={mp}
               variant={selectedMp === mp ? 'default' : 'outline'}
               size="sm"
               onClick={() => setSelectedMp(mp)}
-              className="shrink-0"
+              className="shrink-0 text-xs h-8 px-3"
             >
               {MARKETPLACE_EMOJI[mp]} {mp}
             </Button>
@@ -130,7 +130,7 @@ export function MobileOrders({ connectedMarketplaces, fetchMarketplaceData }: Mo
         {/* Filters */}
         <div className="flex gap-2">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="flex-1">
+            <SelectTrigger className="flex-1 h-9 text-sm">
               <SelectValue placeholder="Holat" />
             </SelectTrigger>
             <SelectContent>
@@ -139,7 +139,7 @@ export function MobileOrders({ connectedMarketplaces, fetchMarketplaceData }: Mo
               ))}
             </SelectContent>
           </Select>
-          <Button variant="outline" size="icon" onClick={loadOrders} disabled={isLoading}>
+          <Button variant="outline" size="icon" onClick={loadOrders} disabled={isLoading} className="shrink-0 h-9 w-9">
             <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
           </Button>
         </div>
@@ -152,11 +152,11 @@ export function MobileOrders({ connectedMarketplaces, fetchMarketplaceData }: Mo
       </div>
 
       {/* Orders List */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2.5">
         {isLoading ? (
           Array.from({ length: 5 }).map((_, i) => (
             <Card key={i}>
-              <CardContent className="p-4 space-y-2">
+              <CardContent className="p-3 space-y-2">
                 <div className="flex justify-between">
                   <Skeleton className="h-4 w-20" />
                   <Skeleton className="h-4 w-16" />
@@ -178,34 +178,36 @@ export function MobileOrders({ connectedMarketplaces, fetchMarketplaceData }: Mo
               className="overflow-hidden cursor-pointer active:bg-muted/50"
               onClick={() => setSelectedOrder(order)}
             >
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <div className="font-semibold">#{order.id}</div>
-                    <div className="text-xs text-muted-foreground">
+              <CardContent className="p-3">
+                <div className="flex items-start justify-between mb-1.5 gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold text-sm truncate">#{order.id}</div>
+                    <div className="text-[10px] text-muted-foreground">
                       {formatDate(order.createdAt)}
                     </div>
                   </div>
-                  {getStatusBadge(order.status)}
+                  <div className="shrink-0">
+                    {getStatusBadge(order.status)}
+                  </div>
                 </div>
 
                 {order.buyer && (
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground mb-2">
+                  <div className="flex items-center gap-1 text-[10px] text-muted-foreground mb-1.5 truncate">
                     <User className="h-3 w-3" />
                     {order.buyer.firstName} {order.buyer.lastName}
                   </div>
                 )}
 
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="font-bold text-primary">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <span className="font-bold text-primary text-sm">
                       {formatPrice(order.totalUZS || order.total)}
                     </span>
-                    <span className="text-xs text-muted-foreground ml-2">
+                    <span className="text-[10px] text-muted-foreground ml-1.5">
                       ({order.items?.length || 0} mahsulot)
                     </span>
                   </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                 </div>
               </CardContent>
             </Card>
@@ -215,9 +217,9 @@ export function MobileOrders({ connectedMarketplaces, fetchMarketplaceData }: Mo
 
       {/* Order Detail Dialog */}
       <Dialog open={!!selectedOrder} onOpenChange={() => setSelectedOrder(null)}>
-        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md max-h-[80vh] overflow-y-auto mx-4">
           <DialogHeader>
-            <DialogTitle>Buyurtma #{selectedOrder?.id}</DialogTitle>
+            <DialogTitle className="text-base truncate pr-8">Buyurtma #{selectedOrder?.id}</DialogTitle>
           </DialogHeader>
           
           {selectedOrder && (
