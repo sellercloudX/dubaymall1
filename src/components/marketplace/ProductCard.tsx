@@ -43,6 +43,7 @@ const calculateDeliveryDate = (preparationDays: number = 1): string => {
 
 // Calculate 24-month installment price: price * 1.6 / 24
 const calculateInstallment = (price: number): number => {
+  if (!price || price <= 0) return 0;
   return Math.round((price * 1.6) / 24);
 };
 
@@ -245,8 +246,24 @@ export const ProductCard = memo(function ProductCard({ product }: ProductCardPro
 
         {/* Content */}
         <div className="p-2.5 flex flex-col flex-1">
+          {/* Product Name - First letter uppercase, 2 lines max */}
+          <h3 className="text-sm font-normal line-clamp-2 leading-tight text-foreground mb-1.5 min-h-[2.5rem]">
+            {formatProductName(product.name)}
+          </h3>
+
+          {/* Shop Name - Clickable link to shop */}
+          {product.shop && (
+            <Link 
+              to={`/shop/${product.shop.slug}`}
+              onClick={(e) => e.stopPropagation()}
+              className="text-[11px] text-muted-foreground hover:text-primary transition-colors mb-1.5 truncate"
+            >
+              {product.shop.name}
+            </Link>
+          )}
+
           {/* Price Section - Uzum style */}
-          <div className="mb-1.5">
+          <div className="mb-1">
             {/* Current Price */}
             <div className="flex items-baseline gap-1">
               <span className="text-lg font-bold text-primary whitespace-nowrap">
@@ -264,30 +281,27 @@ export const ProductCard = memo(function ProductCard({ product }: ProductCardPro
           </div>
 
           {/* Monthly Payment Badge - Yellow like Uzum - 24 month formula */}
-          <div className="mb-2">
-            <span className="inline-block bg-yellow-300 dark:bg-yellow-400 text-yellow-900 text-[10px] font-medium px-1.5 py-0.5 rounded whitespace-nowrap">
-              {formatPrice(monthlyPayment)} so'm/oyiga
-            </span>
-          </div>
-
-          {/* Product Name - First letter uppercase, truncate with ellipsis */}
-          <h3 className="text-sm font-normal line-clamp-1 leading-tight text-foreground mb-2 flex-1">
-            {formatProductName(product.name)}
-          </h3>
+          {monthlyPayment > 0 && (
+            <div className="mb-2">
+              <span className="inline-block bg-yellow-300 dark:bg-yellow-400 text-yellow-900 text-[10px] font-medium px-1.5 py-0.5 rounded whitespace-nowrap">
+                {formatPrice(monthlyPayment)} so'm/oyiga
+              </span>
+            </div>
+          )}
 
           {/* Rating - Only show if has real reviews */}
           {hasReviews && (
             <div className="flex items-center gap-1 mb-2">
               <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
               <span className="text-xs font-medium text-foreground">{rating.toFixed(1)}</span>
-              <span className="text-[11px] text-muted-foreground">({reviewsCount} sharhlar)</span>
+              <span className="text-[11px] text-muted-foreground">({reviewsCount})</span>
             </div>
           )}
 
           {/* Delivery Button - Full width with calculated date */}
           <Button 
             onClick={handleAddToCart}
-            className="w-full h-9 bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium rounded-lg flex items-center justify-center gap-1.5"
+            className="w-full h-9 bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium rounded-lg flex items-center justify-center gap-1.5 mt-auto"
           >
             <Truck className="h-4 w-4" />
             {deliveryDate}

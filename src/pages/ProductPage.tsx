@@ -18,6 +18,7 @@ import { ProductRecommendations } from '@/components/marketplace/ProductRecommen
 import { StarRating } from '@/components/reviews/StarRating';
 import { useProductRating, useProductReviews } from '@/hooks/useReviews';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { SellerChat } from '@/components/chat/SellerChat';
 import { 
   ShoppingCart, 
   Heart, 
@@ -94,6 +95,7 @@ export default function ProductPage() {
   const [selectedInstallment, setSelectedInstallment] = useState(24);
   const [orderCount, setOrderCount] = useState(0);
   const [weeklyBuyers, setWeeklyBuyers] = useState(0);
+  const [chatOpen, setChatOpen] = useState(false);
   const { data: ratingData } = useProductRating(id || '');
   const { data: reviews } = useProductReviews(id || '');
 
@@ -602,7 +604,7 @@ export default function ProductPage() {
                   <ArrowRight className="h-5 w-5 text-muted-foreground" />
                 </Link>
                 
-                <Button variant="outline" className="w-full mt-4">
+                <Button variant="outline" className="w-full mt-4" onClick={() => setChatOpen(true)}>
                   <MessageSquare className="h-4 w-4 mr-2" />
                   Sotuvchidan so'rash
                 </Button>
@@ -694,6 +696,22 @@ export default function ProductPage() {
           <span className="text-xs opacity-80 ml-1">{deliveryInfo.date}</span>
         </Button>
       </div>
+
+      {/* Seller Chat */}
+      {product?.shop && (
+        <SellerChat
+          isOpen={chatOpen}
+          onClose={() => setChatOpen(false)}
+          shop={{
+            id: product.shop.id,
+            name: product.shop.name,
+            logo_url: product.shop.logo_url,
+            user_id: product.shop.user_id,
+          }}
+          productId={product.id}
+          productName={product.name}
+        />
+      )}
     </Layout>
   );
 }
