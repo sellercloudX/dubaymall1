@@ -9,6 +9,7 @@
  import { Label } from '@/components/ui/label';
  import { useAdminPermissions } from '@/hooks/useAdminPermissions';
  import { useAdminUsers } from '@/hooks/useAdminStats';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
  import { Shield, UserPlus, Settings, Trash2, Crown } from 'lucide-react';
  import { format } from 'date-fns';
  
@@ -86,12 +87,12 @@
    return (
      <Card>
        <CardHeader className="flex flex-row items-center justify-between">
-         <CardTitle className="flex items-center gap-2">
-           <Crown className="h-5 w-5 text-amber-500" />
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Crown className="h-5 w-5 text-amber-500" />
            Adminlar boshqaruvi
          </CardTitle>
-         <Button onClick={() => setShowAddDialog(true)}>
-           <UserPlus className="h-4 w-4 mr-2" />
+          <Button size="sm" onClick={() => setShowAddDialog(true)}>
+            <UserPlus className="h-4 w-4" />
            Admin qo'shish
          </Button>
        </CardHeader>
@@ -99,45 +100,46 @@
          {loadingAdmins ? (
            <p className="text-center py-8 text-muted-foreground">Yuklanmoqda...</p>
          ) : (
+            <ScrollArea className="w-full">
            <Table>
              <TableHeader>
                <TableRow>
                  <TableHead>Admin</TableHead>
                  <TableHead>Tur</TableHead>
                  <TableHead>Ruxsatlar</TableHead>
-                 <TableHead>Qo'shilgan</TableHead>
-                 <TableHead>Amallar</TableHead>
+                  <TableHead className="whitespace-nowrap">Qo'shilgan</TableHead>
+                  <TableHead className="text-right">Amallar</TableHead>
                </TableRow>
              </TableHeader>
              <TableBody>
                {allAdmins?.map((admin: any) => (
                  <TableRow key={admin.id}>
-                   <TableCell className="font-medium">
+                    <TableCell className="font-medium whitespace-nowrap">
                      {admin.profiles?.full_name || 'Noma\'lum'}
                    </TableCell>
                    <TableCell>
                      {admin.is_super_admin ? (
-                     <Badge className="bg-amber-500 text-white">Super Admin</Badge>
+                        <Badge className="bg-amber-500 text-white text-xs">Super</Badge>
                      ) : (
-                       <Badge variant="secondary">Admin</Badge>
+                        <Badge variant="secondary" className="text-xs">Admin</Badge>
                      )}
                    </TableCell>
                    <TableCell>
                      <div className="flex flex-wrap gap-1">
                        {Object.entries(permissionLabels).map(([key, label]) => (
-                       admin[key] && <Badge key={key} variant="outline" className="text-xs bg-muted">{label}</Badge>
+                          admin[key] && <Badge key={key} variant="outline" className="text-xs">{label}</Badge>
                        ))}
                      </div>
                    </TableCell>
-                   <TableCell>{format(new Date(admin.created_at), 'dd.MM.yyyy')}</TableCell>
-                   <TableCell>
+                    <TableCell className="whitespace-nowrap">{format(new Date(admin.created_at), 'dd.MM.yyyy')}</TableCell>
+                    <TableCell className="text-right">
                      {!admin.is_super_admin && (
                        <div className="flex gap-1">
-                         <Button size="sm" variant="outline" onClick={() => openEditDialog(admin)}>
-                           <Settings className="h-3 w-3" />
+                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditDialog(admin)}>
+                            <Settings className="h-4 w-4" />
                          </Button>
-                         <Button size="sm" variant="destructive" onClick={() => handleRemoveAdmin(admin.user_id)}>
-                           <Trash2 className="h-3 w-3" />
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleRemoveAdmin(admin.user_id)}>
+                            <Trash2 className="h-4 w-4" />
                          </Button>
                        </div>
                      )}
@@ -146,6 +148,8 @@
                ))}
              </TableBody>
            </Table>
+            <ScrollBar orientation="horizontal" />
+            </ScrollArea>
          )}
  
          {/* Add Admin Dialog */}
