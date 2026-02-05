@@ -1,14 +1,15 @@
-import { useState, useEffect } from 'react';
+ import { useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { TrendingUp, DollarSign, Package, ShoppingCart, Globe, RefreshCw } from 'lucide-react';
+ import { TrendingUp, DollarSign, Package, ShoppingCart, Globe, RefreshCw, WifiOff, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
+ import { useMarketplaceStats, useMarketplaceProducts, useMarketplaceOrders, useInvalidateMarketplaceData } from '@/hooks/useMarketplaceData';
+ import { Badge } from '@/components/ui/badge';
 
 interface MobileAnalyticsProps {
   connections: any[];
   connectedMarketplaces: string[];
-  fetchMarketplaceData: (marketplace: string, dataType: string, options?: Record<string, any>) => Promise<any>;
 }
 
 const MARKETPLACE_EMOJI: Record<string, string> = {
@@ -18,79 +19,41 @@ const MARKETPLACE_EMOJI: Record<string, string> = {
   ozon: '🟢',
 };
 
-export function MobileAnalytics({ connections, connectedMarketplaces, fetchMarketplaceData }: MobileAnalyticsProps) {
-  const [stats, setStats] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [totals, setTotals] = useState({ products: 0, orders: 0, revenue: 0 });
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-
-  useEffect(() => {
-    loadAnalytics();
-  }, [connectedMarketplaces]);
-
-  const loadAnalytics = async (showRefreshToast = false) => {
-    if (connectedMarketplaces.length === 0) {
-      setIsLoading(false);
-      return;
-    }
-    
-    if (showRefreshToast) {
-      setIsRefreshing(true);
-    } else {
-      setIsLoading(true);
-    }
-    
-    try {
-      let totalProducts = 0;
-      let totalOrders = 0;
-      let totalRevenue = 0;
-      const marketplaceStats: any[] = [];
-
-      // Parallel fetch for all marketplaces
-      const results = await Promise.all(
-        connectedMarketplaces.map(async (mp) => {
-          const [productsResult, ordersResult] = await Promise.all([
-            fetchMarketplaceData(mp, 'products', { limit: 200, fetchAll: true }),
-            fetchMarketplaceData(mp, 'orders', { fetchAll: true }),
-          ]);
-          return { mp, productsResult, ordersResult };
-        })
-      );
-
-      for (const { mp, productsResult, ordersResult } of results) {
-        const productsCount = productsResult.total || productsResult.data?.length || 0;
-        const orders = ordersResult.data || [];
-        const ordersCount = orders.length;
-        const revenue = orders.reduce((sum: number, o: any) => sum + (o.totalUZS || o.total || 0), 0);
-
-        marketplaceStats.push({ marketplace: mp, productsCount, ordersCount, revenue });
-        totalProducts += productsCount;
-        totalOrders += ordersCount;
-        totalRevenue += revenue;
-      }
-
-      setStats(marketplaceStats);
-      setTotals({ products: totalProducts, orders: totalOrders, revenue: totalRevenue });
-      setLastUpdated(new Date());
-      
-      if (showRefreshToast) {
-        toast.success('Ma\'lumotlar yangilandi!');
-      }
-    } catch (err) {
-      console.error('Analytics error:', err);
-      if (showRefreshToast) {
-        toast.error('Yangilashda xato');
-      }
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  };
-
-  const handleRefresh = () => {
-    loadAnalytics(true);
-  };
+ export function MobileAnalytics({ connections, connectedMarketplaces }: MobileAnalyticsProps) {
+   const isOnline = navigator.onLine;
+   
+   // Use the first connected marketplace for stats
+   const primaryMp = connectedMarketplaces[0] || null;
+   
+   // TanStack Query hooks - proper caching & offline support
+   const { 
+     data: stats, 
+     isLoading, 
+     isFetching,
+     dataUpdatedAt,
+   } = useMarketplaceStats(primaryMp);
+   
+   const { data: productsData } = useMarketplaceProducts(primaryMp);
+   const { data: ordersData } = useMarketplaceOrders(primaryMp);
+   const { invalidateAll } = useInvalidateMarketplaceData();
+ 
+   const lastUpdated = dataUpdatedAt ? new Date(dataUpdatedAt) : null;
+   
+   // Calculate totals from stats
+   const totals = {
+     products: stats?.totalProducts || 0,
+     orders: stats?.totalOrders || 0,
+     revenue: stats?.totalRevenue || 0,
+   };
+ 
+   const handleRefresh = () => {
+     if (!isOnline) {
+       toast.error('Internet aloqasi yo\'q');
+       return;
+     }
+     toast.info('Yangilanmoqda...');
+     if (primaryMp) invalidateAll(primaryMp);
+   };
  
   const formatPrice = (price: number) => {
     if (price >= 1000000) return (price / 1000000).toFixed(1) + ' mln';
@@ -116,19 +79,26 @@ export function MobileAnalytics({ connections, connectedMarketplaces, fetchMarke
       <div className="flex items-center justify-between">
         <div>
           <h2 className="font-semibold">Analitika</h2>
-          {lastUpdated && (
-            <p className="text-xs text-muted-foreground">
-              {lastUpdated.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })} da yangilangan
-            </p>
-          )}
+           <div className="flex items-center gap-2">
+             {lastUpdated && (
+               <p className="text-xs text-muted-foreground">
+                 {lastUpdated.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })} da yangilangan
+               </p>
+             )}
+             {!isOnline && (
+               <span className="text-xs text-yellow-600 flex items-center gap-1">
+                 <WifiOff className="h-3 w-3" /> Offline
+               </span>
+             )}
+           </div>
         </div>
         <Button 
           variant="outline" 
           size="sm" 
           onClick={handleRefresh}
-          disabled={isRefreshing}
+           disabled={isFetching}
         >
-          <RefreshCw className={`h-4 w-4 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />
+           <RefreshCw className={`h-4 w-4 mr-1 ${isFetching ? 'animate-spin' : ''}`} />
           Yangilash
         </Button>
       </div>
@@ -200,37 +170,94 @@ export function MobileAnalytics({ connections, connectedMarketplaces, fetchMarke
         </Card>
       </div>
 
-      {/* Per Marketplace */}
-      <div className="space-y-2">
-        <h3 className="font-semibold text-sm px-1">Marketplace bo'yicha</h3>
-        {isLoading ? (
-          <div className="space-y-2">
-            {[1, 2].map(i => <Skeleton key={i} className="h-20 w-full rounded-lg" />)}
+       {/* Stock Alerts */}
+       {stats && (stats.lowStockProducts > 0 || stats.outOfStockProducts > 0) && (
+         <Card className="border-yellow-500/30 bg-yellow-500/5">
+           <CardContent className="p-3 flex items-center gap-3">
+             <AlertTriangle className="h-5 w-5 text-yellow-600 shrink-0" />
+             <div className="flex-1 min-w-0">
+               <div className="text-sm font-medium">Zaxira ogohlantirishi</div>
+               <div className="text-xs text-muted-foreground">
+                 {stats.outOfStockProducts > 0 && (
+                   <span className="text-destructive">{stats.outOfStockProducts} ta tugagan</span>
+                 )}
+                 {stats.outOfStockProducts > 0 && stats.lowStockProducts > 0 && ' • '}
+                 {stats.lowStockProducts > 0 && (
+                   <span>{stats.lowStockProducts} ta kam qolgan</span>
+                 )}
+               </div>
+             </div>
+           </CardContent>
+         </Card>
+       )}
+ 
+       {/* Order Status Breakdown */}
+       {stats && stats.totalOrders > 0 && (
+         <div className="space-y-2">
+           <h3 className="font-semibold text-sm px-1">Buyurtma holatlari</h3>
+           <div className="flex flex-wrap gap-2">
+             {stats.pendingOrders > 0 && (
+               <Badge variant="secondary" className="text-xs">
+                 Kutilmoqda: {stats.pendingOrders}
+               </Badge>
+             )}
+             {stats.processingOrders > 0 && (
+               <Badge variant="default" className="text-xs">
+                 Jarayonda: {stats.processingOrders}
+               </Badge>
+             )}
+             {stats.deliveredOrders > 0 && (
+               <Badge variant="outline" className="text-xs border-green-500 text-green-600">
+                 Yetkazilgan: {stats.deliveredOrders}
+               </Badge>
+             )}
+             {stats.cancelledOrders > 0 && (
+               <Badge variant="destructive" className="text-xs">
+                 Bekor: {stats.cancelledOrders}
+               </Badge>
+             )}
           </div>
-        ) : (
-          stats.map((stat) => (
-            <Card key={stat.marketplace} className="overflow-hidden">
-              <CardContent className="p-0">
-                <div className="flex items-center p-3 gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center text-xl shrink-0">
-                    {MARKETPLACE_EMOJI[stat.marketplace] || '📦'}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold capitalize text-sm truncate">{stat.marketplace}</div>
-                    <div className="text-xs text-muted-foreground truncate">
-                      {stat.productsCount} mahsulot • {stat.ordersCount} buyurtma
+         </div>
+       )}
+ 
+       {/* Top Products */}
+       {stats && stats.topProducts.length > 0 && (
+         <div className="space-y-2">
+           <h3 className="font-semibold text-sm px-1">Top mahsulotlar</h3>
+           {stats.topProducts.slice(0, 3).map((product, idx) => (
+             <Card key={product.offerId} className="overflow-hidden">
+               <CardContent className="p-3 flex items-center gap-3">
+                 <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-sm font-bold text-primary shrink-0">
+                   #{idx + 1}
+                 </div>
+                 <div className="flex-1 min-w-0">
+                   <div className="text-sm font-medium line-clamp-1">{product.name}</div>
+                   <div className="text-xs text-muted-foreground">
+                     {product.quantity} dona sotilgan
                     </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <div className="font-bold text-primary text-sm">{formatPrice(stat.revenue)}</div>
-                    <div className="text-[10px] text-muted-foreground">so'm</div>
-                  </div>
                 </div>
+                 <div className="text-right shrink-0">
+                   <div className="font-bold text-primary text-sm">{formatPrice(product.revenue)}</div>
+                 </div>
               </CardContent>
             </Card>
-          ))
-        )}
-      </div>
+           ))}
+         </div>
+       )}
+ 
+       {/* Connected Marketplaces */}
+       {connectedMarketplaces.length > 0 && (
+         <div className="space-y-2">
+           <h3 className="font-semibold text-sm px-1">Ulangan marketplacelar</h3>
+           <div className="flex flex-wrap gap-2">
+             {connectedMarketplaces.map(mp => (
+               <Badge key={mp} variant="secondary" className="text-xs capitalize">
+                 {MARKETPLACE_EMOJI[mp]} {mp}
+               </Badge>
+             ))}
+           </div>
+         </div>
+       )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+ import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ShoppingCart, RefreshCw, User, ChevronRight } from 'lucide-react';
+ import { ShoppingCart, RefreshCw, User, ChevronRight, WifiOff } from 'lucide-react';
 import { format } from 'date-fns';
 import {
   Dialog,
@@ -19,11 +19,11 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+ import { useMarketplaceOrders, useInvalidateMarketplaceData } from '@/hooks/useMarketplaceData';
 
-interface MobileOrdersProps {
-  connectedMarketplaces: string[];
-  fetchMarketplaceData: (marketplace: string, dataType: string, options?: Record<string, any>) => Promise<any>;
-}
+ interface MobileOrdersProps {
+   connectedMarketplaces: string[];
+ }
 
 const MARKETPLACE_EMOJI: Record<string, string> = {
   yandex: '🟡',
@@ -40,18 +40,22 @@ const ORDER_STATUSES = [
   { value: 'CANCELLED', label: 'Bekor' },
 ];
 
-export function MobileOrders({ connectedMarketplaces, fetchMarketplaceData }: MobileOrdersProps) {
-  const [orders, setOrders] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+ export function MobileOrders({ connectedMarketplaces }: MobileOrdersProps) {
   const [selectedMp, setSelectedMp] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
-  const [total, setTotal] = useState(0);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  
-  // Cache orders per marketplace
-  const [cachedOrders, setCachedOrders] = useState<Record<string, any[]>>({});
+ 
+   // TanStack Query hooks - proper caching & offline support
+   const statusOption = statusFilter !== 'all' ? { status: statusFilter } : undefined;
+   const { 
+     data: ordersData, 
+     isLoading, 
+     isFetching,
+     dataUpdatedAt,
+   } = useMarketplaceOrders(selectedMp || null, statusOption);
+   
+   const { invalidateOrders } = useInvalidateMarketplaceData();
+   const isOnline = navigator.onLine;
 
   useEffect(() => {
     if (connectedMarketplaces.length > 0 && !selectedMp) {
@@ -59,52 +63,22 @@ export function MobileOrders({ connectedMarketplaces, fetchMarketplaceData }: Mo
     }
   }, [connectedMarketplaces]);
 
-  useEffect(() => {
-    if (selectedMp) {
-      const cacheKey = `${selectedMp}-${statusFilter}`;
-      if (cachedOrders[cacheKey]) {
-        setOrders(cachedOrders[cacheKey]);
-        setTotal(cachedOrders[cacheKey].length);
-        loadOrders(true);
-      } else {
-        loadOrders();
-      }
-    }
-  }, [selectedMp, statusFilter]);
-
-  const loadOrders = async (background = false) => {
-    if (background) {
-      setIsRefreshing(true);
-    } else {
-      setIsLoading(true);
-    }
-    
-    try {
-      const options: Record<string, any> = { fetchAll: true };
-      if (statusFilter !== 'all') options.status = statusFilter;
-      
-      const result = await fetchMarketplaceData(selectedMp, 'orders', options);
-      if (result.success) {
-        const data = result.data || [];
-        setOrders(data);
-        setTotal(result.total || data.length);
-        setLastUpdated(new Date());
-        
-        // Update cache
-        const cacheKey = `${selectedMp}-${statusFilter}`;
-        setCachedOrders(prev => ({ ...prev, [cacheKey]: data }));
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  };
+   // Filter orders by status locally for faster filtering
+   const orders = useMemo(() => {
+     const allOrders = ordersData?.data || [];
+     if (statusFilter === 'all') return allOrders;
+     return allOrders.filter(o => o.status === statusFilter);
+   }, [ordersData?.data, statusFilter]);
+ 
+   const lastUpdated = dataUpdatedAt ? new Date(dataUpdatedAt) : null;
 
   const handleRefresh = () => {
+     if (!isOnline) {
+       toast.error('Internet aloqasi yo\'q');
+       return;
+     }
     toast.info('Buyurtmalar yangilanmoqda...');
-    loadOrders();
+     invalidateOrders(selectedMp);
   };
  
   const formatPrice = (price?: number) => {
@@ -171,16 +145,23 @@ export function MobileOrders({ connectedMarketplaces, fetchMarketplaceData }: Mo
               ))}
             </SelectContent>
           </Select>
-          <Button variant="outline" size="icon" onClick={handleRefresh} disabled={isLoading || isRefreshing} className="shrink-0 h-9 w-9">
-            <RefreshCw className={`h-4 w-4 ${isLoading || isRefreshing ? 'animate-spin' : ''}`} />
+           <Button variant="outline" size="icon" onClick={handleRefresh} disabled={isLoading || isFetching} className="shrink-0 h-9 w-9">
+             <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
           </Button>
         </div>
 
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>{orders.length} ta buyurtma</span>
-          {lastUpdated && (
-            <span>{lastUpdated.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })}</span>
-          )}
+           <div className="flex items-center gap-2">
+             {!isOnline && (
+               <span className="text-yellow-600 flex items-center gap-1">
+                 <WifiOff className="h-3 w-3" /> Offline
+               </span>
+             )}
+             {lastUpdated && (
+               <span>{lastUpdated.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })}</span>
+             )}
+           </div>
           </div>
       </div>
 
