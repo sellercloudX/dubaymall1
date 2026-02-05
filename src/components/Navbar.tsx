@@ -8,7 +8,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { NotificationsDropdown } from '@/components/notifications/NotificationsDropdown';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ShoppingBag, ShoppingCart, User, LogOut, Menu, X, Shield, Heart, Handshake, Store, Users, BookOpen } from 'lucide-react';
+ import { ShoppingBag, ShoppingCart, User, LogOut, Menu, X, Shield, Heart, Handshake, Store, Users, BookOpen, Crown } from 'lucide-react';
 import { useState } from 'react';
 
 export function Navbar() {
@@ -36,19 +36,19 @@ export function Navbar() {
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2">
             <ShoppingBag className="h-7 w-7 md:h-8 md:w-8 text-primary" />
-            <span className="text-lg md:text-xl font-bold text-foreground">{t.appName}</span>
+             <span className="text-lg md:text-xl font-bold text-foreground hidden sm:inline">{t.appName}</span>
           </Link>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-6">
             <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors">
-              Bozor
+               {t.marketplace}
             </Link>
             
             {/* Partnership link - visible to everyone */}
             <Link to="/partnership" className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5">
               <Handshake className="h-4 w-4" />
-              Hamkorlik
+               Hamkorlik
             </Link>
             
             {/* Blog link - visible to everyone */}
@@ -116,7 +116,7 @@ export function Navbar() {
                 <Button variant="ghost" size="sm" asChild>
                   <Link to="/dashboard" className="gap-2">
                     <User className="h-4 w-4" />
-                    {t.dashboard}
+                     <span className="hidden lg:inline">{t.dashboard}</span>
                   </Link>
                 </Button>
                 <Button variant="ghost" size="sm" onClick={handleSignOut} aria-label="Chiqish">
@@ -137,8 +137,16 @@ export function Navbar() {
 
           {/* Mobile - Right side */}
           <div className="flex md:hidden items-center gap-2">
-            <ThemeToggle />
-            <LanguageSwitcher />
+             <Link to="/cart" className="relative p-2">
+               <ShoppingCart className="h-5 w-5" />
+               {totalItems > 0 && (
+                 <Badge 
+                   className="absolute -top-0 -right-0 h-4 w-4 flex items-center justify-center p-0 text-[10px]"
+                 >
+                   {totalItems > 9 ? '9+' : totalItems}
+                 </Badge>
+               )}
+             </Link>
             <button
               className="p-2"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -157,6 +165,24 @@ export function Navbar() {
         {mobileMenuOpen && (
           <div className="md:hidden py-4 border-t animate-fade-in">
             <div className="flex flex-col gap-3">
+               {/* Quick actions */}
+               <div className="flex items-center justify-between pb-3 border-b">
+                 <div className="flex items-center gap-2">
+                   <ThemeToggle />
+                   <LanguageSwitcher />
+                 </div>
+                 {user && (
+                   <div className="flex items-center gap-2">
+                     <Link to="/favorites" onClick={() => setMobileMenuOpen(false)}>
+                       <Button variant="ghost" size="icon">
+                         <Heart className="h-5 w-5" />
+                       </Button>
+                     </Link>
+                     <NotificationsDropdown />
+                   </div>
+                 )}
+               </div>
+ 
               {/* Partnership - visible to all */}
               <Link
                 to="/partnership"
@@ -164,7 +190,7 @@ export function Navbar() {
                 onClick={() => setMobileMenuOpen(false)}
               >
                 <Handshake className="h-4 w-4" />
-                Hamkorlik
+                 Hamkorlik
               </Link>
               
               {/* Blog - visible to all */}
@@ -197,7 +223,7 @@ export function Navbar() {
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       <Users className="h-4 w-4" />
-                      Blogger Panel
+                       Blogger kabineti
                     </Link>
                   )}
                   {showAdminLink && (
@@ -207,7 +233,7 @@ export function Navbar() {
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       <Shield className="h-4 w-4" />
-                      Admin Panel
+                       Admin kabineti
                     </Link>
                   )}
                 </>
@@ -215,15 +241,23 @@ export function Navbar() {
               
               <div className="border-t pt-3 mt-2">
                 {user ? (
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => { handleSignOut(); setMobileMenuOpen(false); }}
-                    className="w-full justify-start gap-2 text-destructive"
-                  >
-                    <LogOut className="h-4 w-4" />
-                    {t.logout}
-                  </Button>
+                   <div className="flex flex-col gap-2">
+                     <Button variant="outline" size="sm" asChild>
+                       <Link to="/dashboard" onClick={() => setMobileMenuOpen(false)}>
+                         <User className="h-4 w-4 mr-2" />
+                         {t.dashboard}
+                       </Link>
+                     </Button>
+                     <Button 
+                       variant="ghost" 
+                       size="sm" 
+                       onClick={() => { handleSignOut(); setMobileMenuOpen(false); }}
+                       className="justify-start gap-2 text-destructive"
+                     >
+                       <LogOut className="h-4 w-4" />
+                       {t.logout}
+                     </Button>
+                   </div>
                 ) : (
                   <div className="flex flex-col gap-2">
                     <Button variant="outline" size="sm" asChild>

@@ -10,7 +10,7 @@
  import { supabase } from '@/integrations/supabase/client';
  import { useQuery, useQueryClient } from '@tanstack/react-query';
  import { toast } from 'sonner';
- import { Store, Users, CheckCircle, XCircle, Clock, Search, Eye } from 'lucide-react';
+ import { Store, Users, CheckCircle, XCircle, Clock, Search, Eye, ExternalLink } from 'lucide-react';
  import { format } from 'date-fns';
  
  export function ActivationsManagement() {
@@ -52,8 +52,10 @@
    const handleApprove = async (type: 'seller' | 'blogger', id: string, userId: string) => {
      try {
        const table = type === 'seller' ? 'seller_profiles' : 'blogger_profiles';
+       const role = type === 'seller' ? 'seller' : 'blogger';
        
-       const { error } = await supabase
+       // Update profile status
+       const { error: profileError } = await supabase
          .from(table)
          .update({
            status: 'approved',
@@ -61,10 +63,32 @@
          })
          .eq('id', id);
  
-       if (error) throw error;
+       if (profileError) throw profileError;
  
-       toast.success('Muvaffaqiyatli aktivlashtirildi');
+       // Add role to user_roles table
+       const { error: roleError } = await supabase
+         .from('user_roles')
+         .insert({ user_id: userId, role: role as 'seller' | 'blogger' })
+         .select()
+         .single();
+ 
+       // Ignore if role already exists
+       if (roleError && !roleError.message.includes('duplicate')) {
+         console.warn('Role might already exist:', roleError.message);
+       }
+ 
+       // Create balance record for blogger
+       if (type === 'blogger') {
+         await supabase
+           .from('blogger_balances')
+           .insert({ user_id: userId })
+           .select()
+           .single();
+       }
+ 
+       toast.success('Muvaffaqiyatli aktivlashtirildi va rol qo\'shildi');
        queryClient.invalidateQueries({ queryKey: [`admin-${type}-profiles`] });
+       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
        setShowDetailDialog(false);
      } catch (err: any) {
        toast.error('Xatolik: ' + err.message);
@@ -99,25 +123,28 @@
      }
    };
  
+ 
    const getStatusBadge = (status: string) => {
      switch (status) {
        case 'approved':
-         return <Badge className="bg-green-500"><CheckCircle className="h-3 w-3 mr-1" /> Tasdiqlangan</Badge>;
+         return <Badge className="bg-emerald-500 text-white"><CheckCircle className="h-3 w-3 mr-1" /> Faol</Badge>;
        case 'rejected':
-         return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" /> Rad etilgan</Badge>;
+         return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" /> Rad</Badge>;
        default:
-         return <Badge variant="outline" className="bg-amber-500/10 text-amber-600"><Clock className="h-3 w-3 mr-1" /> Kutilmoqda</Badge>;
+         return <Badge variant="outline" className="border-amber-500 text-amber-600"><Clock className="h-3 w-3 mr-1" /> Kutilmoqda</Badge>;
      }
    };
  
    const filteredSellers = sellerProfiles?.filter(s => 
      s.business_name?.toLowerCase().includes(search.toLowerCase()) ||
-     s.inn?.includes(search)
+     s.inn?.includes(search) ||
+     (s.profiles as any)?.full_name?.toLowerCase().includes(search.toLowerCase())
    );
  
    const filteredBloggers = bloggerProfiles?.filter(b => 
      b.social_username?.toLowerCase().includes(search.toLowerCase()) ||
-     b.social_platform?.toLowerCase().includes(search.toLowerCase())
+     b.social_platform?.toLowerCase().includes(search.toLowerCase()) ||
+     (b.profiles as any)?.full_name?.toLowerCase().includes(search.toLowerCase())
    );
  
    const pendingCount = {

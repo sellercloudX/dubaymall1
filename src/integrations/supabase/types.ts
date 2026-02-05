@@ -14,6 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_permissions: {
+        Row: {
+          can_add_admins: boolean | null
+          can_manage_activations: boolean | null
+          can_manage_content: boolean | null
+          can_manage_finances: boolean | null
+          can_manage_orders: boolean | null
+          can_manage_products: boolean | null
+          can_manage_shops: boolean | null
+          can_manage_users: boolean | null
+          created_at: string | null
+          granted_by: string | null
+          id: string
+          is_super_admin: boolean | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          can_add_admins?: boolean | null
+          can_manage_activations?: boolean | null
+          can_manage_content?: boolean | null
+          can_manage_finances?: boolean | null
+          can_manage_orders?: boolean | null
+          can_manage_products?: boolean | null
+          can_manage_shops?: boolean | null
+          can_manage_users?: boolean | null
+          created_at?: string | null
+          granted_by?: string | null
+          id?: string
+          is_super_admin?: boolean | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          can_add_admins?: boolean | null
+          can_manage_activations?: boolean | null
+          can_manage_content?: boolean | null
+          can_manage_finances?: boolean | null
+          can_manage_orders?: boolean | null
+          can_manage_products?: boolean | null
+          can_manage_shops?: boolean | null
+          can_manage_users?: boolean | null
+          created_at?: string | null
+          granted_by?: string | null
+          id?: string
+          is_super_admin?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       affiliate_links: {
         Row: {
           blogger_id: string
