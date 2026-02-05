@@ -94,7 +94,7 @@ export function useProducts(shopId: string | null) {
   };
 }
 
-// Public products with caching
+// Public products with caching and ratings
 export function usePublicProducts(filters?: {
   categoryId?: string;
   shopId?: string;
@@ -110,7 +110,7 @@ export function usePublicProducts(filters?: {
     queryFn: async () => {
       let query = supabase
         .from('products')
-        .select('*')
+        .select('*, shop:shops(name, slug)')
         .eq('status', 'active')
         .order('created_at', { ascending: false });
 
@@ -136,6 +136,35 @@ export function usePublicProducts(filters?: {
       const { data, error } = await query;
 
       if (error) throw error;
+      
+      // Fetch ratings for all products
+      if (data && data.length > 0) {
+        const productIds = data.map(p => p.id);
+        const { data: reviewsData } = await supabase
+          .from('reviews')
+          .select('product_id, rating')
+          .in('product_id', productIds);
+        
+        // Calculate ratings per product
+        const ratingsMap = new Map<string, { total: number; count: number }>();
+        reviewsData?.forEach(review => {
+          const existing = ratingsMap.get(review.product_id) || { total: 0, count: 0 };
+          existing.total += review.rating;
+          existing.count += 1;
+          ratingsMap.set(review.product_id, existing);
+        });
+        
+        // Attach ratings to products
+        return data.map(product => {
+          const ratingInfo = ratingsMap.get(product.id);
+          return {
+            ...product,
+            rating: ratingInfo ? ratingInfo.total / ratingInfo.count : undefined,
+            reviews_count: ratingInfo?.count || 0,
+          };
+        });
+      }
+      
       return data || [];
     },
     staleTime: 1000 * 60 * 2, // 2 minutes for public data

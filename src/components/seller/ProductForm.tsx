@@ -23,6 +23,7 @@ type ProductInsert = TablesInsert<'products'> & {
   shipping_price?: number;
   free_shipping?: boolean;
   weight_kg?: number;
+  preparation_days?: number;
 };
 
 interface ProductFormProps {
@@ -51,6 +52,7 @@ export function ProductForm({ shopId, initialData, onSubmit, onCancel, isLoading
     shipping_price: 0,
     free_shipping: false,
     weight_kg: 0,
+    preparation_days: 1,
     ...initialData,
   });
 
@@ -74,6 +76,7 @@ export function ProductForm({ shopId, initialData, onSubmit, onCancel, isLoading
       shipping_price: formData.shipping_price || 0,
       free_shipping: formData.free_shipping || false,
       weight_kg: formData.weight_kg || 0,
+      preparation_days: formData.preparation_days || 1,
     } as ProductInsert);
   };
 
@@ -188,6 +191,29 @@ export function ProductForm({ shopId, initialData, onSubmit, onCancel, isLoading
 
         <div className="sm:col-span-2 space-y-4 pt-4 border-t">
           <h3 className="font-semibold">Yetkazib berish sozlamalari</h3>
+          
+          <div className="grid gap-2">
+            <Label htmlFor="preparation_days">Tayyorlash vaqti (kun)</Label>
+            <Select
+              value={String(formData.preparation_days || 1)}
+              onValueChange={(value) => setFormData(prev => ({ ...prev, preparation_days: parseInt(value) }))}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="0">Shu kuni (zakaz tushgan kuni)</SelectItem>
+                <SelectItem value="1">1 kun</SelectItem>
+                <SelectItem value="2">2 kun</SelectItem>
+                <SelectItem value="3">3 kun</SelectItem>
+                <SelectItem value="5">5 kun</SelectItem>
+                <SelectItem value="7">7 kun</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Zakaz tushgandan keyin qancha kunda pochtaga topshirasiz
+            </p>
+          </div>
           
           <div className="flex items-center justify-between">
             <div>

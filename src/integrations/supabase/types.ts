@@ -1261,6 +1261,7 @@ export type Database = {
           mxik_name: string | null
           name: string
           original_price: number | null
+          preparation_days: number | null
           price: number
           shipping_price: number | null
           shop_id: string
@@ -1286,6 +1287,7 @@ export type Database = {
           mxik_name?: string | null
           name: string
           original_price?: number | null
+          preparation_days?: number | null
           price: number
           shipping_price?: number | null
           shop_id: string
@@ -1311,6 +1313,7 @@ export type Database = {
           mxik_name?: string | null
           name?: string
           original_price?: number | null
+          preparation_days?: number | null
           price?: number
           shipping_price?: number | null
           shop_id?: string
