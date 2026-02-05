@@ -1,18 +1,19 @@
-import { Link } from 'react-router-dom';
+ import { Link, useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Store, Users, ArrowRight, CheckCircle, TrendingUp,
-  Percent, Globe, Crown, Package, Truck
+ import {
+   Store, Users, ArrowRight, CheckCircle, TrendingUp,
+   Percent, Globe, Crown, Package, Star, Shield, Zap, Sparkles
 } from 'lucide-react';
 
 export default function Partnership() {
   const { t } = useLanguage();
   const { user } = useAuth();
+   const navigate = useNavigate();
 
   const stats = [
     { value: "5,000+", label: "Faol sotuvchilar", icon: Store },
@@ -21,27 +22,66 @@ export default function Partnership() {
     { value: "25%", label: "O'rtacha komissiya", icon: Percent },
   ];
 
+   const benefits = [
+     { icon: Shield, text: "Xavfsiz to'lov - Payme, Click, Uzcard" },
+     { icon: Globe, text: "3 tilda interfeys - O'zbek, Rus, Ingliz" },
+     { icon: Zap, text: "AI yordamchi - mahsulot qo'shish va tahlil" },
+     { icon: Star, text: "Professional qo'llab-quvvatlash 24/7" },
+   ];
+ 
+   const testimonials = [
+     {
+       name: "Aziza Karimova",
+       role: "Sotuvchi",
+       text: "AI yordamida mahsulot qo'shish juda oson. Bir haftada 50 ta buyurtma oldim!",
+       rating: 5,
+     },
+     {
+       name: "Jasur Toshmatov",
+       role: "Blogger",
+       text: "Affiliate dasturi orqali oyiga 5 mln so'm ishlab olaman. Ajoyib platforma!",
+       rating: 5,
+     },
+   ];
+ 
   return (
     <Layout>
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-primary/10 via-background to-accent/5 py-16 md:py-24">
+       <section className="relative overflow-hidden min-h-[70vh] flex items-center">
+         <div className="absolute inset-0 bg-mesh" />
         <div className="absolute inset-0 bg-grid-pattern opacity-5" />
-        <div className="container mx-auto px-4 relative">
+         <div className="absolute top-20 left-[10%] w-64 h-64 bg-primary/15 rounded-full blur-3xl" />
+         <div className="absolute bottom-20 right-[10%] w-80 h-80 bg-accent/10 rounded-full blur-3xl" />
+ 
+         <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-3xl mx-auto text-center">
-            <Badge className="mb-4 bg-primary/10 text-primary hover:bg-primary/20">
+             <Badge className="mb-6 px-5 py-2.5 text-sm font-medium bg-primary/10 text-primary border-primary/20">
+               <Sparkles className="h-4 w-4 mr-2" />
               Hamkorlik dasturi
             </Badge>
-            <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-6">
-              Biz bilan birga o'sing
+             <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-8">
+               <span className="text-foreground">Biz bilan birga</span>
+               <br />
+               <span className="text-gradient">o'sing va daromad oling</span>
             </h1>
-            <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
+             <p className="text-xl md:text-2xl text-muted-foreground mb-12 max-w-2xl mx-auto">
               Sotuvchi, blogger yoki marketplace integratori sifatida ishlang va daromad oling.
             </p>
+             <div className="flex flex-col sm:flex-row gap-4 justify-center">
+               <Button size="lg" className="text-lg px-8 py-6" asChild>
+                 <Link to="/partner-auth">
+                   Hamkor bo'lish
+                   <ArrowRight className="ml-2 h-5 w-5" />
+                 </Link>
+               </Button>
+               <Button size="lg" variant="outline" className="text-lg px-8 py-6" asChild>
+                 <Link to="/">
+                   Marketplace'ni ko'rish
+                 </Link>
+               </Button>
+             </div>
           </div>
         </div>
-        
-        <div className="absolute top-20 left-10 w-72 h-72 bg-primary/20 rounded-full blur-3xl -z-10 animate-pulse" />
-        <div className="absolute bottom-10 right-10 w-96 h-96 bg-accent/20 rounded-full blur-3xl -z-10" />
       </section>
 
       {/* Stats Section */}
@@ -122,7 +162,7 @@ export default function Partnership() {
                   size="lg"
                   asChild
                 >
-                  <Link to={user ? '/seller-cloud' : '/auth?redirect=/seller-cloud'}>
+                   <Link to={user ? '/seller-cloud' : '/partner-auth?role=sellercloud'}>
                     Boshlash
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
@@ -175,7 +215,7 @@ export default function Partnership() {
                 </ul>
 
                 <Button className="w-full" size="lg" asChild>
-                  <Link to={user ? '/seller' : '/auth?mode=register&role=seller'}>
+                   <Link to={user ? '/seller-activation' : '/partner-auth?role=seller'}>
                     Bepul boshlash
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
@@ -198,7 +238,7 @@ export default function Partnership() {
                 </p>
               </div>
               <Button variant="outline" asChild>
-                <Link to={user ? '/blogger' : '/auth?mode=register&role=blogger'}>
+                 <Link to={user ? '/blogger-activation' : '/partner-auth?role=blogger'}>
                   Batafsil
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
@@ -208,13 +248,67 @@ export default function Partnership() {
         </div>
       </section>
 
-      {/* How it works */}
-      <section className="py-16 bg-muted/30">
+       {/* Benefits */}
+       <section className="py-24">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold mb-4">Qanday ishlaydi?</h2>
+           <div className="grid lg:grid-cols-2 gap-16 items-center">
+             <div>
+               <Badge variant="outline" className="mb-4">Afzalliklar</Badge>
+               <h2 className="text-4xl font-bold mb-6">
+                 Nima uchun aynan <span className="text-gradient">biz</span>?
+               </h2>
+               <p className="text-lg text-muted-foreground mb-8">
+                 O'zbekiston bozori uchun maxsus ishlab chiqilgan platforma. 
+                 Mahalliy to'lov tizimlari va AI texnologiyalari.
+               </p>
+               
+               <div className="space-y-4">
+                 {benefits.map((benefit, index) => (
+                   <div 
+                     key={index} 
+                     className="flex items-center gap-4 p-4 rounded-xl bg-muted/50 border border-border/50 hover:border-primary/30 transition-all"
+                   >
+                     <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                       <benefit.icon className="h-6 w-6 text-primary" />
+                     </div>
+                     <span className="text-foreground font-medium">{benefit.text}</span>
+                   </div>
+                 ))}
+               </div>
+             </div>
+             <div className="grid grid-cols-2 gap-4">
+               {testimonials.map((testimonial, index) => (
+                 <Card key={index} className="border-0 shadow-lg">
+                   <CardContent className="pt-6">
+                     <div className="flex gap-1 mb-3">
+                       {Array.from({ length: testimonial.rating }).map((_, i) => (
+                         <Star key={i} className="h-4 w-4 fill-accent text-accent" />
+                       ))}
+                     </div>
+                     <p className="text-sm mb-4 italic">"{testimonial.text}"</p>
+                     <div className="flex items-center gap-2">
+                       <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                         <span className="text-primary font-semibold text-xs">{testimonial.name[0]}</span>
+                       </div>
+                       <div>
+                         <div className="font-medium text-sm">{testimonial.name}</div>
+                         <div className="text-xs text-muted-foreground">{testimonial.role}</div>
+                       </div>
+                     </div>
+                   </CardContent>
+                 </Card>
+               ))}
+             </div>
           </div>
-          
+         </div>
+       </section>
+ 
+       {/* How it works */}
+       <section className="py-16 bg-muted/30">
+         <div className="container mx-auto px-4">
+           <div className="text-center mb-12">
+             <h2 className="text-3xl font-bold mb-4">Qanday ishlaydi?</h2>
+           </div>
           <div className="grid md:grid-cols-4 gap-8 max-w-4xl mx-auto">
             {[
               { step: 1, title: "Ro'yxatdan o'ting", desc: "1 daqiqada bepul hisob yarating" },
@@ -235,27 +329,35 @@ export default function Partnership() {
       </section>
 
       {/* CTA */}
-      <section className="py-16">
-        <div className="container mx-auto px-4">
-          <div className="max-w-2xl mx-auto text-center">
-            <h2 className="text-3xl font-bold mb-4">Tayyor bo'lsangiz, boshlang!</h2>
-            <p className="text-muted-foreground mb-8">
+       <section className="py-24 relative overflow-hidden">
+         <div className="absolute inset-0 bg-gradient-to-br from-primary to-accent" />
+         <div className="absolute inset-0 bg-dot-pattern opacity-10" />
+ 
+         <div className="container mx-auto px-4 relative z-10 text-center">
+           <h2 className="text-4xl md:text-5xl font-bold text-primary-foreground mb-6">
+             Hoziroq boshlang!
+           </h2>
+           <p className="text-primary-foreground/80 mb-10 max-w-2xl mx-auto text-lg">
               Minglab sotuvchilar allaqachon biz bilan ishlashmoqda. Navbat sizda!
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button size="lg" asChild>
-                <Link to="/auth?mode=register">
-                  Bepul ro'yxatdan o'tish
+               <Button size="lg" variant="secondary" className="text-lg px-8 py-6" asChild>
+                 <Link to="/partner-auth">
+                   Hamkor bo'lish
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
-              <Button size="lg" variant="outline" asChild>
-                <Link to="/marketplace">
+               <Button 
+                 size="lg" 
+                 variant="outline" 
+                 className="text-lg px-8 py-6 bg-transparent border-2 border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10"
+                 asChild
+               >
+                 <Link to="/">
                   Marketplace'ni ko'rish
                 </Link>
               </Button>
             </div>
-          </div>
         </div>
       </section>
     </Layout>

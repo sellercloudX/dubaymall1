@@ -39,9 +39,15 @@ export default function Auth() {
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      navigate('/dashboard');
+       // Buyers go to marketplace
+       const redirect = searchParams.get('redirect');
+       if (redirect) {
+         navigate(redirect);
+       } else {
+         navigate('/');
+       }
     }
-  }, [user, navigate]);
+   }, [user, navigate, searchParams]);
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
@@ -90,7 +96,8 @@ export default function Auth() {
             title: 'Muvaffaqiyat',
             description: t.loginSuccess,
           });
-          navigate('/dashboard');
+               const redirect = searchParams.get('redirect');
+               navigate(redirect || '/');
         }
       } else {
         const { error } = await signUp(formData.email, formData.password, formData.fullName);

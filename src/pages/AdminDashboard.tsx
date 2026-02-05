@@ -15,9 +15,10 @@ import { BannersManagement } from '@/components/admin/BannersManagement';
 import { FlashSalesManagement } from '@/components/admin/FlashSalesManagement';
 import { SiteAnalytics } from '@/components/admin/SiteAnalytics';
 import { BlogManagement } from '@/components/admin/BlogManagement';
+ import { ActivationsManagement } from '@/components/admin/ActivationsManagement';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Shield, Users, Package, Store, ShoppingCart, BarChart3, DollarSign, Wallet, Crown, Image, Zap, Globe, FileText } from 'lucide-react';
+import { Shield, Users, Package, Store, ShoppingCart, BarChart3, DollarSign, Wallet, Crown, Image, Zap, Globe, FileText, UserCheck } from 'lucide-react';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
 export default function AdminDashboard() {
@@ -137,6 +138,10 @@ export default function AdminDashboard() {
                 <Users className="h-4 w-4" />
                 <span className="hidden sm:inline">Foydalanuvchilar</span>
               </TabsTrigger>
+               <TabsTrigger value="activations" className="gap-2">
+                 <UserCheck className="h-4 w-4" />
+                 <span className="hidden sm:inline">Aktivatsiya</span>
+               </TabsTrigger>
               <TabsTrigger value="products" className="gap-2">
                 <Package className="h-4 w-4" />
                 <span className="hidden sm:inline">Mahsulotlar</span>
@@ -189,6 +194,10 @@ export default function AdminDashboard() {
             <UsersManagement />
           </TabsContent>
 
+           <TabsContent value="activations">
+             <ActivationsManagement />
+           </TabsContent>
+ 
           <TabsContent value="products">
             <ProductsModeration />
           </TabsContent>
