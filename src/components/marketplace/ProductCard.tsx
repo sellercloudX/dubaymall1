@@ -4,29 +4,33 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFavorites } from '@/hooks/useFavorites';
-import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ShoppingCart, Heart, Package, Loader2 } from 'lucide-react';
+import { ShoppingCart, Heart, Package, Loader2, Star, Truck } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Product = Tables<'products'>;
 
 interface ProductCardProps {
-  product: Product & { shop?: { name: string; slug: string } };
+  product: Product & { 
+    shop?: { name: string; slug: string };
+    rating?: number;
+    reviews_count?: number;
+  };
 }
 
-// Memoized component for better list performance
+// Uzum.uz style product card - clean, minimal design
 export const ProductCard = memo(function ProductCard({ product }: ProductCardProps) {
   const { t } = useLanguage();
   const { addToCart } = useCart();
   const { user } = useAuth();
   const { isFavorite, toggleFavorite } = useFavorites();
   const [favoriteLoading, setFavoriteLoading] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
 
   const formatPrice = useCallback((price: number) => {
-    return new Intl.NumberFormat('uz-UZ').format(price) + " so'm";
+    return new Intl.NumberFormat('uz-UZ').format(price);
   }, []);
 
   const handleAddToCart = useCallback(async (e: React.MouseEvent) => {
@@ -67,36 +71,60 @@ export const ProductCard = memo(function ProductCard({ product }: ProductCardPro
 
   const isProductFavorite = isFavorite(product.id);
 
+  // Mock rating for demo - in production, this would come from reviews
+  const rating = product.rating || 4.5;
+  const reviewsCount = product.reviews_count || Math.floor(Math.random() * 100) + 10;
+
   return (
-    <Link to={`/product/${product.id}`}>
-      <Card className="overflow-hidden hover:shadow-lg transition-shadow duration-200 group h-full">
-        <CardHeader className="p-0 relative">
-          <div className="aspect-square bg-muted overflow-hidden">
-            {product.images && product.images.length > 0 ? (
+    <Link to={`/product/${product.id}`} className="block group">
+      <div className="bg-card rounded-xl overflow-hidden border border-border/50 hover:border-border hover:shadow-md transition-all duration-200">
+        {/* Image Container - 3:4 aspect ratio like Uzum */}
+        <div className="relative aspect-[3/4] bg-muted overflow-hidden">
+          {product.images && product.images.length > 0 ? (
+            <>
+              {!imageLoaded && (
+                <div className="absolute inset-0 bg-muted animate-pulse" />
+              )}
               <img
                 src={product.images[0]}
                 alt={product.name}
                 loading="lazy"
                 decoding="async"
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                onLoad={() => setImageLoaded(true)}
+                className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ${
+                  imageLoaded ? 'opacity-100' : 'opacity-0'
+                }`}
               />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <Package className="h-16 w-16 text-muted-foreground" />
-              </div>
-            )}
-          </div>
+            </>
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-muted">
+              <Package className="h-12 w-12 text-muted-foreground/40" />
+            </div>
+          )}
+
+          {/* Discount Badge - Top Left */}
           {discount && (
-            <Badge className="absolute top-2 left-2 bg-destructive">
+            <Badge className="absolute top-2 left-2 bg-destructive text-destructive-foreground font-semibold text-xs px-2 py-0.5 rounded-md">
               -{discount}%
             </Badge>
           )}
-          <Button
-            variant="ghost"
-            size="icon"
+
+          {/* Free Shipping Badge */}
+          {product.free_shipping && (
+            <Badge className="absolute top-2 left-2 mt-7 bg-green-600 dark:bg-green-500 text-white font-medium text-[10px] px-1.5 py-0.5 rounded flex items-center gap-0.5">
+              <Truck className="h-2.5 w-2.5" />
+              Bepul
+            </Badge>
+          )}
+
+          {/* Favorite Button - Top Right */}
+          <button
+            type="button"
             aria-label={isProductFavorite ? "Sevimlilardan o'chirish" : "Sevimlilarga qo'shish"}
-            className={`absolute top-2 right-2 bg-background/80 hover:bg-background ${
-              isProductFavorite ? 'text-destructive' : ''
+            className={`absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
+              isProductFavorite 
+                ? 'bg-destructive/10 text-destructive' 
+                : 'bg-background/80 text-muted-foreground hover:text-destructive hover:bg-background'
             }`}
             onClick={handleToggleFavorite}
             disabled={favoriteLoading}
@@ -106,29 +134,53 @@ export const ProductCard = memo(function ProductCard({ product }: ProductCardPro
             ) : (
               <Heart className={`h-4 w-4 ${isProductFavorite ? 'fill-current' : ''}`} />
             )}
-          </Button>
-        </CardHeader>
-        <CardContent className="p-4">
+          </button>
+
+          {/* Quick Add to Cart - Bottom Right (appears on hover) */}
+          <button
+            type="button"
+            aria-label="Savatchaga qo'shish"
+            className="absolute bottom-2 right-2 w-9 h-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-primary/90 shadow-lg"
+            onClick={handleAddToCart}
+          >
+            <ShoppingCart className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-3">
+          {/* Shop Name */}
           {product.shop && (
-            <p className="text-xs text-muted-foreground mb-1">{product.shop.name}</p>
+            <p className="text-[11px] text-muted-foreground mb-1 truncate">
+              {product.shop.name}
+            </p>
           )}
-          <h3 className="font-semibold line-clamp-2 min-h-[2.5rem]">{product.name}</h3>
-          <div className="mt-2 flex items-baseline gap-2">
-            <p className="text-primary font-bold text-lg">{formatPrice(product.price)}</p>
+
+          {/* Product Name - 2 lines max */}
+          <h3 className="text-sm font-medium line-clamp-2 min-h-[2.5rem] leading-tight text-foreground mb-2">
+            {product.name}
+          </h3>
+
+          {/* Rating */}
+          <div className="flex items-center gap-1 mb-2">
+            <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
+            <span className="text-xs font-medium text-foreground">{rating.toFixed(1)}</span>
+            <span className="text-[11px] text-muted-foreground">({reviewsCount})</span>
+          </div>
+
+          {/* Price Section */}
+          <div className="flex flex-col">
+            <span className="text-base font-bold text-primary whitespace-nowrap">
+              {formatPrice(product.price)} <span className="text-xs font-medium">so'm</span>
+            </span>
             {product.original_price && product.original_price > product.price && (
-              <p className="text-muted-foreground text-sm line-through">
-                {formatPrice(product.original_price)}
-              </p>
+              <span className="text-xs text-muted-foreground line-through">
+                {formatPrice(product.original_price)} so'm
+              </span>
             )}
           </div>
-        </CardContent>
-        <CardFooter className="p-4 pt-0">
-          <Button className="w-full gap-2" onClick={handleAddToCart}>
-            <ShoppingCart className="h-4 w-4" />
-            {t.addToCart || 'Savatga'}
-          </Button>
-        </CardFooter>
-      </Card>
+        </div>
+      </div>
     </Link>
   );
 });
