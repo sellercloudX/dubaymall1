@@ -14,6 +14,70 @@ interface InfographicRequest {
   count?: number;
 }
 
+// Fallback to OpenAI DALL-E when Lovable AI credits are exhausted
+async function generateWithOpenAI(
+  prompt: string,
+  productName: string,
+  style: string
+): Promise<{ url: string; id: string; style: string; variation: string; composition: string } | null> {
+  const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+  
+  if (!OPENAI_API_KEY) {
+    console.log("⚠️ OPENAI_API_KEY not configured for fallback");
+    return null;
+  }
+
+  try {
+    console.log("🎨 Fallback: Using OpenAI DALL-E for infographic...");
+    
+    // Simplified prompt for DALL-E
+    const dallePrompt = `Professional e-commerce product photo for "${productName}". 
+${style} style, clean studio background, premium lighting, high resolution product photography, 
+marketplace listing quality, no text or watermarks, 3:4 portrait aspect ratio.`;
+
+    const response = await fetch("https://api.openai.com/v1/images/generations", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "dall-e-3",
+        prompt: dallePrompt,
+        n: 1,
+        size: "1024x1792", // Closest to 3:4 ratio
+        quality: "standard",
+        style: style === "vibrant" ? "vivid" : "natural"
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("DALL-E API error:", response.status, errorText);
+      return null;
+    }
+
+    const data = await response.json();
+    const imageUrl = data.data?.[0]?.url;
+
+    if (imageUrl) {
+      console.log("✅ DALL-E infographic generated successfully");
+      return {
+        url: imageUrl,
+        id: `dalle-infographic-${Date.now()}`,
+        style: style,
+        variation: "DALL-E generated",
+        composition: "AI-enhanced product visualization"
+      };
+    }
+
+    return null;
+  } catch (err) {
+    console.error("DALL-E fallback error:", err);
+    return null;
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -165,6 +229,16 @@ QUALITY REQUIREMENTS:
         if (!response.ok) {
           const errorText = await response.text();
           console.error(`Infographic ${i + 1} API error:`, response.status, errorText);
+          
+          // If credits exhausted (402), try OpenAI DALL-E fallback
+          if (response.status === 402) {
+            console.log("⚠️ Lovable AI credits exhausted, trying OpenAI DALL-E fallback...");
+            const fallbackResult = await generateWithOpenAI(editPrompt, productName, style);
+            if (fallbackResult) {
+              results.push(fallbackResult);
+              console.log(`✅ Fallback infographic ${i + 1} generated with DALL-E`);
+            }
+          }
           continue;
         }
 
@@ -193,7 +267,19 @@ QUALITY REQUIREMENTS:
     }
 
     if (results.length === 0) {
-      throw new Error("Failed to generate any infographics");
+      console.log("⚠️ No infographics generated - returning graceful response");
+      return new Response(
+        JSON.stringify({ 
+          images: [],
+          aiModel: "fallback",
+          style,
+          count: 0,
+          dimensions: "1080x1440",
+          format: "marketplace-optimized",
+          message: "Infografika generatsiyasi vaqtinchalik mavjud emas. Iltimos, keyinroq urinib ko'ring yoki mahsulot rasmini qo'lda yuklang."
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     console.log(`🎉 Generated ${results.length}/${count} infographics successfully`);
