@@ -135,7 +135,7 @@ serve(async (req) => {
             }
           ],
           logisticName: dropOrder.shipping_method || 'CJPacket',
-          remark: `BazarHub Order: ${dropOrder.orders?.order_number}`,
+          remark: `Dubay Mall Order: ${dropOrder.orders?.order_number}`,
         };
 
         const createResponse = await fetch('https://developers.cjdropshipping.com/api2.0/v1/shopping/order/createOrder', {

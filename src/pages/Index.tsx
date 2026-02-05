@@ -24,9 +24,9 @@ export default function Index() {
   const { t } = useLanguage();
 
   const organizationData = {
-    name: 'SuperEshop Hub',
-    url: 'https://supereshop.uz',
-    logo: 'https://supereshop.uz/logo.png',
+    name: 'Dubay Mall',
+    url: 'https://dubaymall.uz',
+    logo: 'https://dubaymall.uz/logo.png',
     description: "O'zbekistonning eng yirik onlayn savdo platformasi",
     address: {
       '@type': 'PostalAddress',
@@ -41,11 +41,11 @@ export default function Index() {
   };
 
   const websiteData = {
-    name: 'SuperEshop Hub',
-    url: 'https://supereshop.uz',
+    name: 'Dubay Mall',
+    url: 'https://dubaymall.uz',
     potentialAction: {
       '@type': 'SearchAction',
-      target: 'https://supereshop.uz/marketplace?search={search_term_string}',
+      target: 'https://dubaymall.uz/marketplace?search={search_term_string}',
       'query-input': 'required name=search_term_string',
     },
   };
@@ -115,7 +115,7 @@ export default function Index() {
   return (
     <Layout>
       <SEOHead 
-        title="SuperEshop Hub - O'zbekiston onlayn bozori"
+        title="Dubay Mall - O'zbekiston onlayn bozori"
         description="O'zbekistonning eng yirik onlayn savdo platformasi. Minglab mahsulotlar, ishonchli sotuvchilar va tez yetkazib berish."
       />
       <StructuredData type="Organization" data={organizationData} />
@@ -229,9 +229,9 @@ export default function Index() {
         <div className="container mx-auto px-4">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div>
-              <Badge variant="outline" className="mb-4">Afzalliklar</Badge>
+            <Badge variant="outline" className="mb-4">Afzalliklar</Badge>
               <h2 className="text-4xl font-bold mb-6">
-                Nima uchun aynan <span className="text-gradient">SuperEshop</span>?
+                Nima uchun aynan <span className="text-gradient">Dubay Mall</span>?
               </h2>
               <p className="text-lg text-muted-foreground mb-8">
                 O'zbekiston bozori uchun maxsus ishlab chiqilgan platforma. Mahalliy to'lov tizimlari, tez yetkazib berish va AI texnologiyalari.

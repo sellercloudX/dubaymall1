@@ -105,10 +105,10 @@ serve(async (req) => {
     }
 
     // Build system prompt based on context
-    let systemPrompt = `Siz SuperEshop Hub platformasining yordamchi AI botisiz. 
+    let systemPrompt = `Siz Dubay Mall platformasining yordamchi AI botisiz. 
 Siz O'zbek, Rus va Ingliz tillarida javob bera olasiz. Foydalanuvchi qaysi tilda yozsa, shu tilda javob bering.
 
-SuperEshop Hub - bu O'zbekiston va Markaziy Osiyo uchun e-commerce platforma. 
+Dubay Mall - bu O'zbekiston va Markaziy Osiyo uchun e-commerce platforma. 
 
 Platformada quyidagi imkoniyatlar mavjud:
 - Sotuvchilar uchun: Do'kon yaratish, mahsulot qo'shish (AI orqali, qo'lda, dropshipping import)

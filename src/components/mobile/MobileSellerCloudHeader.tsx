@@ -42,7 +42,7 @@ export function MobileSellerCloudHeader({ connectedCount, onRefresh, isLoading }
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => navigate('/seller')}>
                 <Store className="h-4 w-4 mr-2" />
-                BazarHub Do'koni
+                Dubay Mall Do'koni
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => navigate('/blogger')}>
                 <FileText className="h-4 w-4 mr-2" />

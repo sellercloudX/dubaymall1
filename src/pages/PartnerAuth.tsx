@@ -151,14 +151,14 @@
      }
    };
  
-   const roleOptions = [
-     {
-       value: 'seller' as PartnerRole,
-       label: 'Sotuvchi',
-       description: "BazarHub'da do'kon ochish",
-       icon: Store,
-       color: 'text-primary',
-     },
+  const roleOptions = [
+      {
+        value: 'seller' as PartnerRole,
+        label: 'Sotuvchi',
+        description: "Dubay Mall'da do'kon ochish",
+        icon: Store,
+        color: 'text-primary',
+      },
      {
        value: 'blogger' as PartnerRole,
        label: 'Blogger',

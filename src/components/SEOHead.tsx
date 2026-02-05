@@ -15,7 +15,7 @@ interface SEOHeadProps {
 }
 
 export function SEOHead({
-  title = "SuperEshop Hub - O'zbekiston onlayn bozori",
+  title = "Dubay Mall - O'zbekiston onlayn bozori",
   description = "O'zbekistonning eng yirik onlayn savdo platformasi. Minglab mahsulotlar, ishonchli sotuvchilar va tez yetkazib berish.",
   image = "/og-image.png",
   url,
@@ -49,7 +49,7 @@ export function SEOHead({
     setMetaTag('og:image', image);
     setMetaTag('og:type', type);
     if (url) setMetaTag('og:url', url);
-    setMetaTag('og:site_name', 'SuperEshop Hub');
+    setMetaTag('og:site_name', 'Dubay Mall');
     setMetaTag('og:locale', 'uz_UZ');
 
     // Twitter Card tags
@@ -75,7 +75,7 @@ export function SEOHead({
     // Cleanup function
     return () => {
       // Reset to default title when component unmounts
-      document.title = "SuperEshop Hub - O'zbekiston onlayn bozori";
+      document.title = "Dubay Mall - O'zbekiston onlayn bozori";
     };
   }, [title, description, image, url, type, product]);
 

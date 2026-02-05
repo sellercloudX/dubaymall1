@@ -145,7 +145,7 @@ export default function SellerDashboard() {
             </div>
             <div>
               <h1 className="text-2xl font-bold">{shop.name}</h1>
-              <p className="text-sm text-muted-foreground">BazarHub do'koni</p>
+              <p className="text-sm text-muted-foreground">Dubay Mall do'koni</p>
             </div>
           </div>
           <div className="flex gap-2">

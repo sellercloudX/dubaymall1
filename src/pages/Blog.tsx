@@ -21,11 +21,11 @@
    const { posts, isLoading } = useBlogPosts(true);
  
    return (
-     <Layout>
-       <SEOHead
-         title="Blog - SuperEshop Hub"
-         description="O'zbekiston e-tijorat haqida eng so'nggi yangiliklar, qo'llanmalar va maslahatlar. Onlayn savdo bo'yicha foydali maqolalar."
-       />
+    <Layout>
+      <SEOHead
+        title="Blog - Dubay Mall"
+        description="O'zbekiston e-tijorat haqida eng so'nggi yangiliklar, qo'llanmalar va maslahatlar. Onlayn savdo bo'yicha foydali maqolalar."
+      />
  
        <div className="container mx-auto px-4 py-8">
          {/* Header */}
