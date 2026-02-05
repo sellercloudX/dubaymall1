@@ -673,7 +673,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
                   <div 
                     key={task.id} 
                     className={`p-3 rounded-lg border ${
-                      task.status === 'completed' ? 'border-green-500 bg-green-50 dark:bg-green-950/20' :
+                      task.status === 'completed' ? 'border-emerald-500/50 bg-emerald-50 dark:bg-emerald-950/20' :
                       task.status === 'failed' ? 'border-destructive bg-destructive/5' :
                       'border-primary/30 bg-primary/5'
                     }`}
@@ -681,7 +681,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         {task.status === 'processing' && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
-                        {task.status === 'completed' && <CheckCircle className="h-4 w-4 text-green-500" />}
+                        {task.status === 'completed' && <CheckCircle className="h-4 w-4 text-emerald-500" />}
                         {task.status === 'failed' && <AlertCircle className="h-4 w-4 text-destructive" />}
                         <span className="font-medium text-sm line-clamp-1">{task.productName}</span>
                       </div>
@@ -839,23 +839,36 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Analyzed Product Card - Clean layout */}
             {capturedImage && (
-              <div className="flex gap-4 items-start">
-                <img 
-                  src={capturedImage} 
-                  alt="Captured" 
-                  className="w-24 h-24 object-cover rounded-lg border"
-                />
-                <div className="flex-1">
-                  <h4 className="font-medium">{analyzedProduct?.name}</h4>
-                  <p className="text-sm text-muted-foreground line-clamp-2">
-                    {analyzedProduct?.description}
-                  </p>
-                  <Badge variant="secondary" className="mt-1">
-                    {analyzedProduct?.category}
-                  </Badge>
+              <div className="p-4 bg-gradient-to-r from-primary/5 to-primary/10 rounded-xl border border-primary/20">
+                <div className="flex gap-4 items-start">
+                  <div className="relative">
+                    <img 
+                      src={capturedImage} 
+                      alt="Captured" 
+                      className="w-20 h-20 object-cover rounded-lg border-2 border-background shadow-md"
+                    />
+                    <div className="absolute -top-1 -right-1 w-5 h-5 bg-primary rounded-full flex items-center justify-center">
+                      <Check className="h-3 w-3 text-primary-foreground" />
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-semibold text-base line-clamp-2">{analyzedProduct?.name}</h4>
+                    <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
+                      {analyzedProduct?.description}
+                    </p>
+                    <Badge variant="secondary" className="mt-2">
+                      {analyzedProduct?.category}
+                    </Badge>
+                  </div>
                 </div>
-                <Button variant="outline" onClick={useAnalyzedProduct}>
+                <Button 
+                  className="w-full mt-4" 
+                  variant="default"
+                  onClick={useAnalyzedProduct}
+                >
+                  <Sparkles className="mr-2 h-4 w-4" />
                   AI tahlilidan foydalanish
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
@@ -864,18 +877,19 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
 
             <Separator />
 
+            {/* Similar Products Section */}
             {webProducts.length > 0 ? (
               <div>
                 <h4 className="font-medium mb-3 flex items-center gap-2">
                   <Globe className="h-4 w-4" />
-                  Internetdan topilgan o'xshash mahsulotlar:
+                  O'xshash mahsulotlar ({webProducts.length} ta topildi):
                 </h4>
-                <ScrollArea className="h-[300px]">
-                  <div className="space-y-3">
+                <ScrollArea className="h-[280px]">
+                  <div className="space-y-2">
                     {webProducts.map((product, index) => (
                       <div
                         key={index}
-                        className="flex gap-3 p-3 border rounded-lg hover:border-primary cursor-pointer transition-colors"
+                        className="flex gap-3 p-3 border rounded-lg hover:border-primary hover:bg-primary/5 cursor-pointer transition-all"
                         onClick={() => handleProductSelect(product)}
                       >
                         <ProductImageWithFallback 
@@ -883,22 +897,22 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
                           alt={product.title} 
                         />
                         <div className="flex-1 min-w-0">
-                          <h5 className="font-medium line-clamp-1">{product.title}</h5>
-                          <p className="text-sm text-muted-foreground line-clamp-1">
+                          <h5 className="font-medium text-sm line-clamp-2">{product.title}</h5>
+                          <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
                             {product.description}
                           </p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Badge variant="outline" className="text-xs">
+                          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                            <Badge variant="outline" className="text-xs py-0">
                               {product.source}
                             </Badge>
                             {product.price && (
-                              <span className="text-sm font-medium text-primary">
+                              <span className="text-sm font-bold text-primary">
                                 {product.price}
                               </span>
                             )}
                           </div>
                         </div>
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" className="flex-shrink-0">
                           <ArrowRight className="h-4 w-4" />
                         </Button>
                       </div>
@@ -909,10 +923,8 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
             ) : (
               <div className="text-center py-6 text-muted-foreground">
                 <Globe className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p>O'xshash mahsulotlar topilmadi</p>
-                <Button className="mt-4" onClick={useAnalyzedProduct}>
-                  AI tahlilidan foydalanish
-                </Button>
+                <p className="text-sm">O'xshash mahsulotlar qidirilmoqda...</p>
+                <p className="text-xs mt-1">Yoki yuqoridagi AI tahlilidan foydalaning</p>
               </div>
             )}
 
@@ -940,35 +952,41 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Selected Product Preview */}
-            <div className="flex gap-4 p-4 bg-muted rounded-lg">
-              {capturedImage && (
-                <img 
-                  src={capturedImage} 
-                  alt="Product" 
-                  className="w-20 h-20 object-cover rounded"
-                />
-              )}
-              <div>
-                <h4 className="font-medium">{selectedProduct.title}</h4>
-                <p className="text-sm text-muted-foreground line-clamp-2">
-                  {selectedProduct.description}
-                </p>
+            <div className="flex gap-3 p-3 bg-muted/50 rounded-lg border">
+              <div className="w-16 h-16 flex-shrink-0">
+                {capturedImage ? (
+                  <img 
+                    src={capturedImage} 
+                    alt="Product" 
+                    className="w-full h-full object-cover rounded-md"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-muted rounded-md flex items-center justify-center">
+                    <ImageIcon className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="font-medium text-sm line-clamp-2">{selectedProduct.title}</h4>
+                <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{selectedProduct.description}</p>
+                <Badge variant="secondary" className="mt-1 text-xs">{analyzedProduct?.category}</Badge>
               </div>
             </div>
 
             {/* Cost Price Input */}
-            <div className="space-y-2">
-              <Label htmlFor="costPrice" className="text-base font-medium">
-                Tannarx (so'm)
+            <div className="space-y-3">
+              <Label htmlFor="costPrice" className="text-sm font-medium flex items-center gap-2">
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                Tannarx kiriting (so'm)
               </Label>
               <div className="flex gap-2">
                 <Input
                   id="costPrice"
                   type="number"
-                  placeholder="Masalan: 50000"
+                  placeholder="Masalan: 8500"
                   value={costPrice || ''}
                   onChange={(e) => setCostPrice(parseFloat(e.target.value) || 0)}
-                  className="text-lg"
+                  className="text-base font-medium"
                 />
                 <Button onClick={calculatePricing} disabled={!costPrice}>
                   <Calculator className="mr-2 h-4 w-4" />
@@ -979,41 +997,66 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
 
             {/* Pricing Breakdown */}
             {pricing && (
-              <div className="space-y-4 p-4 border rounded-lg">
-                <h4 className="font-medium flex items-center gap-2">
+              <div className="border rounded-xl overflow-hidden">
+                {/* Header */}
+                <div className="bg-muted/50 px-4 py-3 border-b">
+                  <h4 className="font-semibold flex items-center gap-2">
                   <DollarSign className="h-4 w-4" />
-                  Narx tuzilmasi (Yandex Market):
+                    Narx tuzilmasi (Yandex Market)
                 </h4>
-                
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span>Tannarx:</span>
-                    <span>{formatPrice(pricing.costPrice)}</span>
+                </div>
+
+                {/* Cost Section */}
+                <div className="px-4 py-3 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Tannarx:</span>
+                    <span className="font-medium">{formatPrice(pricing.costPrice)}</span>
                   </div>
-                   <div className="flex justify-between">
-                     <span>+ Logistika ({pricing.logisticsType}):</span>
-                     <span>{formatPrice(pricing.logisticsCost)}</span>
-                   </div>
-                   <Separator className="my-2" />
-                   <div className="text-xs text-muted-foreground mb-1">
-                     Sotuv narxidan ushlanadi:
-                   </div>
-                  <div className="flex justify-between text-muted-foreground">
-                     <span>− Marketplace komissiyasi ({pricing.marketplaceCommissionPercent}% - {pricing.categoryType}):</span>
-                    <span>{formatPrice(pricing.marketplaceCommission)}</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">+ Logistika <span className="text-xs">({pricing.logisticsType})</span>:</span>
+                    <span className="font-medium">{formatPrice(pricing.logisticsCost)}</span>
                   </div>
-                  <div className="flex justify-between text-muted-foreground">
-                     <span>− Soliq ({pricing.taxPercent}% sotuv narxidan):</span>
-                     <span>{formatPrice(pricing.taxAmount)}</span>
+                </div>
+
+                {/* Deductions Section */}
+                <div className="px-4 py-3 bg-red-50/50 dark:bg-red-950/20 border-y space-y-2">
+                  <p className="text-xs font-medium text-red-600 dark:text-red-400 mb-2">
+                    Sotuv narxidan ushlanadi:
+                  </p>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-red-600/80 dark:text-red-400/80">
+                      − Komissiya ({pricing.marketplaceCommissionPercent}%):
+                    </span>
+                    <span className="font-medium text-red-600 dark:text-red-400">
+                      {formatPrice(pricing.marketplaceCommission)}
+                    </span>
                   </div>
-                  <Separator />
-                  <div className="flex justify-between font-bold text-lg">
-                    <span>Tavsiya etilgan narx:</span>
-                     <span className="text-primary">{formatPrice(pricing.sellingPrice)}</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-red-600/80 dark:text-red-400/80">
+                      − Soliq ({pricing.taxPercent}%):
+                    </span>
+                    <span className="font-medium text-red-600 dark:text-red-400">
+                      {formatPrice(pricing.taxAmount)}
+                    </span>
                   </div>
-                  <div className="flex justify-between text-green-600">
-                     <span>Sof foyda ({pricing.netProfitPercent}% sotuv narxidan):</span>
-                     <span className="font-medium">{formatPrice(pricing.netProfit)}</span>
+                  <div className="text-xs text-muted-foreground pt-1">
+                    Kategoriya: {pricing.categoryType}
+                  </div>
+                </div>
+
+                {/* Result Section */}
+                <div className="px-4 py-4 bg-primary/5 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="font-semibold">Tavsiya etilgan narx:</span>
+                    <span className="text-xl font-bold text-primary">{formatPrice(pricing.sellingPrice)}</span>
+                  </div>
+                  <div className="flex justify-between items-center bg-green-100 dark:bg-green-900/30 px-3 py-2 rounded-lg">
+                    <span className="text-sm font-medium text-green-700 dark:text-green-400">
+                      Sof foyda ({pricing.netProfitPercent}%):
+                    </span>
+                    <span className="text-lg font-bold text-green-600 dark:text-green-400">
+                      {formatPrice(pricing.netProfit)}
+                    </span>
                   </div>
                 </div>
               </div>
