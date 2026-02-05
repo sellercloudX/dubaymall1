@@ -73,7 +73,7 @@ export function HeroBanner() {
   if (loading) {
     return (
       <div className="mb-8">
-        <Skeleton className="w-full h-[200px] md:h-[320px] rounded-2xl" />
+        <div className="w-full h-[200px] md:h-[320px] rounded-2xl bg-muted animate-pulse" />
       </div>
     );
   }
