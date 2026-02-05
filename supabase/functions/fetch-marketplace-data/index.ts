@@ -411,6 +411,16 @@ serve(async (req) => {
           const data = await response.json();
           const orders = data.orders || [];
           console.log(`Found ${orders.length} orders on page ${orderPage}`);
+          
+          // Log first order to see available fields
+          if (orders.length > 0 && orderPage === 1) {
+            console.log('Sample order fields:', JSON.stringify(Object.keys(orders[0])));
+            console.log('Sample order dates:', JSON.stringify({
+              createdAt: orders[0].createdAt,
+              creationDate: orders[0].creationDate,
+              updateDate: orders[0].updateDate,
+            }));
+          }
 
           // Yandex Market UZ returns prices in UZS directly - no conversion needed
           const pageOrders: YandexOrder[] = orders.map((order: any) => {
@@ -422,14 +432,20 @@ serve(async (req) => {
               id: order.id,
               status: order.status,
               substatus: order.substatus,
-              createdAt: order.createdAt,
+              createdAt: order.creationDate || order.createdAt || new Date().toISOString(),
               total: total,
               totalUZS: total,
               itemsTotal: itemsTotal,
               itemsTotalUZS: itemsTotal,
               deliveryTotal: deliveryTotal,
               deliveryTotalUZS: deliveryTotal,
-              buyer: order.buyer,
+              buyer: {
+                firstName: order.buyer?.firstName || '',
+                lastName: order.buyer?.lastName || '',
+                type: order.buyer?.type,
+              },
+              deliveryAddress: order.delivery?.address,
+              deliveryRegion: order.delivery?.region?.name,
               items: order.items?.map((item: any) => {
                 const itemPrice = item.price || 0;
                 return {
