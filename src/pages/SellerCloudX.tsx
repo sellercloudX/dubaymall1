@@ -3,7 +3,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Layout } from '@/components/Layout';
+import { Navbar } from '@/components/Navbar';
+import { Footer } from '@/components/Footer';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -89,18 +90,21 @@ export default function SellerCloudX() {
 
   if (authLoading) {
     return (
-      <Layout>
+      <>
+        <Navbar />
         <div className="flex items-center justify-center min-h-[60vh]">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
-      </Layout>
+        <Footer />
+      </>
     );
   }
 
   // Show pricing if no subscription
   if (!subscription) {
     return (
-      <Layout>
+      <>
+        <Navbar />
         <div className="container mx-auto px-4 py-12">
           <div className="max-w-4xl mx-auto">
             {/* Hero */}
@@ -169,12 +173,14 @@ export default function SellerCloudX() {
             </div>
           </div>
         </div>
-      </Layout>
+        <Footer />
+      </>
     );
   }
 
   return (
-    <Layout>
+    <>
+      <Navbar />
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
@@ -404,6 +410,7 @@ export default function SellerCloudX() {
           </TabsContent>
         </Tabs>
       </div>
-    </Layout>
+      <Footer />
+    </>
   );
 }
