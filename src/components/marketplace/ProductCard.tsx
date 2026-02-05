@@ -264,16 +264,14 @@ export const ProductCard = memo(function ProductCard({ product }: ProductCardPro
             )}
           </div>
 
-          {/* Monthly Payment Badge - Yellow like Uzum - 24 month formula */}
-          {product.price > 0 && (
-            <div className="mb-2">
-              <span className="inline-block bg-yellow-300 dark:bg-yellow-400 text-yellow-900 text-[10px] font-medium px-1.5 py-0.5 rounded whitespace-nowrap">
-                {formatPrice(Math.round((product.price * 1.6) / 24))} so'm/oyiga
-              </span>
-            </div>
-          )}
+          {/* Monthly Payment Badge - Yellow like Uzum - 24 month formula: (price * 1.6) / 24 */}
+          <div className="mb-2">
+            <span className="inline-block bg-yellow-300 dark:bg-yellow-400 text-yellow-900 text-[10px] font-medium px-1.5 py-0.5 rounded whitespace-nowrap">
+              {product.price > 0 ? formatPrice(Math.round((product.price * 1.6) / 24)) : '0'} so'm/oyiga
+            </span>
+          </div>
 
-          {/* Product Name - First letter uppercase, 2 lines max, BELOW price */}
+          {/* Product Name - First letter uppercase, 2 lines max, BELOW price and installment */}
           <h3 className="text-sm font-normal line-clamp-2 leading-tight text-foreground mb-2 flex-1">
             {formatProductName(product.name)}
           </h3>
