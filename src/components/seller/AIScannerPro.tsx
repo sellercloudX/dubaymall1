@@ -224,20 +224,61 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
   };
 
   const handleProductSelect = (product: WebProduct | null) => {
+    // MUHIM: Tanlangan mahsulotning sifatli rasmini saqlash
+    // Kameradan olingan rasm o'rniga web'dan topilgan sifatli rasmni ishlatamiz
+    if (product && product.image && product.image.startsWith('http')) {
+      // Web rasmni asosiy rasm sifatida belgilash
+      setCapturedImage(product.image);
+    }
     setSelectedProduct(product);
     setCurrentStep('pricing');
   };
 
+  // Mahsulot nomini o'zbek lotin harflariga o'tkazish
+  const normalizeProductName = (name: string): string => {
+    // Kirill harflarini lotin harflariga o'tkazish (transliteration)
+    const cyrillicToLatin: Record<string, string> = {
+      'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'yo',
+      'ж': 'j', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
+      'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u',
+      'ф': 'f', 'х': 'x', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'sh', 'ъ': '',
+      'ы': 'i', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya', 'ў': 'o\'', 'қ': 'q',
+      'ғ': 'g\'', 'ҳ': 'h',
+      'А': 'A', 'Б': 'B', 'В': 'V', 'Г': 'G', 'Д': 'D', 'Е': 'E', 'Ё': 'Yo',
+      'Ж': 'J', 'З': 'Z', 'И': 'I', 'Й': 'Y', 'К': 'K', 'Л': 'L', 'М': 'M',
+      'Н': 'N', 'О': 'O', 'П': 'P', 'Р': 'R', 'С': 'S', 'Т': 'T', 'У': 'U',
+      'Ф': 'F', 'Х': 'X', 'Ц': 'Ts', 'Ч': 'Ch', 'Ш': 'Sh', 'Щ': 'Sh', 'Ъ': '',
+      'Ы': 'I', 'Ь': '', 'Э': 'E', 'Ю': 'Yu', 'Я': 'Ya', 'Ў': 'O\'', 'Қ': 'Q',
+      'Ғ': 'G\'', 'Ҳ': 'H',
+    };
+    
+    return name.split('').map(char => cyrillicToLatin[char] || char).join('');
+  };
+
   const useAnalyzedProduct = () => {
     if (analyzedProduct) {
+      // Web'dan topilgan birinchi sifatli rasmni qo'llash
+      const bestImage = webProducts.length > 0 && webProducts[0].image?.startsWith('http') 
+        ? webProducts[0].image 
+        : capturedImage || '';
+      
+      // Mahsulot nomini normallashtirish (lotin harflarga)
+      const normalizedName = normalizeProductName(analyzedProduct.name);
+      
       setSelectedProduct({
-        title: analyzedProduct.name,
+        title: normalizedName,
         description: analyzedProduct.description,
         price: analyzedProduct.suggestedPrice.toString(),
-        image: capturedImage || '',
+        image: bestImage,
         source: 'AI Analysis',
         url: '',
       });
+      
+      // Agar web'dan rasm topilgan bo'lsa, uni asosiy rasm sifatida belgilash
+      if (bestImage.startsWith('http')) {
+        setCapturedImage(bestImage);
+      }
+      
       setCurrentStep('pricing');
     }
   };
@@ -359,24 +400,34 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
       // Step 1: Already done - mark complete
       updateTaskProgress(0, 'completed');
 
-      // Upload image
+      // MUHIM: Web rasmlarni afzal ko'ramiz (sifatliroq)
+      // Kameradan olingan rasmlar sifatsiz bo'lishi mumkin
       let imageUrl: string | undefined;
       const imagesToUpload: string[] = [];
 
-      if (productImage && productImage.startsWith('data:')) {
+      // 1. Avval web'dan topilgan rasmni tekshiramiz (eng sifatli)
+      if (product.image && product.image.startsWith('http')) {
+        imageUrl = product.image;
+        imagesToUpload.push(product.image);
+      }
+      
+      // 2. Agar productImage ham URL bo'lsa va farqli bo'lsa, qo'shamiz
+      if (productImage && productImage.startsWith('http') && productImage !== product.image) {
+        if (!imageUrl) imageUrl = productImage;
+        imagesToUpload.push(productImage);
+      }
+      
+      // 3. Agar faqat base64 rasm bo'lsa (kamera), uni oxirgi variant sifatida yuklaymiz
+      if (!imageUrl && productImage && productImage.startsWith('data:')) {
         const uploadedUrl = await uploadImageToStorage(productImage);
         if (uploadedUrl) {
           imageUrl = uploadedUrl;
           imagesToUpload.push(uploadedUrl);
         }
-      } else if (productImage && productImage.startsWith('http')) {
-        imageUrl = productImage;
-        imagesToUpload.push(productImage);
       }
 
-      if (product.image && product.image.startsWith('http')) {
-        imagesToUpload.push(product.image);
-      }
+      // Mahsulot nomini normallashtirish (lotin harflarga)
+      const normalizedProductName = normalizeProductName(product.title);
 
       // Step 2: SEO content
       updateTaskProgress(1, 'running');
@@ -384,7 +435,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
       try {
         const { data: seoData, error: seoError } = await supabase.functions.invoke('generate-product-content', {
           body: {
-            productName: product.title,
+            productName: normalizedProductName,
             productDescription: product.description || analyzed?.description,
             category: analyzed?.category,
             brand: analyzed?.brand,
@@ -410,7 +461,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
       try {
         const { data: descData, error: descError } = await supabase.functions.invoke('generate-product-content', {
           body: {
-            productName: product.title,
+            productName: normalizedProductName,
             productDescription: product.description || analyzed?.description,
             category: analyzed?.category,
             brand: analyzed?.brand,
@@ -436,7 +487,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
       try {
         const { data: mxikResult, error: mxikError } = await supabase.functions.invoke('lookup-mxik-code', {
           body: {
-            productName: product.title,
+            productName: normalizedProductName,
             category: analyzed?.category,
             description: product.description || analyzed?.description,
           },
@@ -451,9 +502,12 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
         updateTaskProgress(3, 'failed');
       }
 
-      // Step 5: Infographic generation
+      // Step 5: Infographic generation - web rasmdan foydalanish
       const generatedInfos: string[] = [];
-      if (shouldGenerateInfographics && productImage) {
+      // Infografika uchun eng yaxshi sifatli rasmni tanlaymiz
+      const bestImageForInfographic = imageUrl || productImage;
+      
+      if (shouldGenerateInfographics && bestImageForInfographic) {
         updateTaskProgress(4, 'running');
         const styles = ['professional', 'minimalist', 'vibrant', 'luxury', 'tech', 'professional'];
 
@@ -461,8 +515,8 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
           try {
             const { data: infoData, error: infoError } = await supabase.functions.invoke('generate-infographic', {
               body: {
-                productImage: productImage,
-                productName: product.title,
+                productImage: bestImageForInfographic,
+                productName: normalizedProductName,
                 category: analyzed?.category,
                 style: styles[i % styles.length],
                 count: 1
@@ -498,12 +552,12 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
         body: {
           shopId,
           product: {
-            name: product.title,
-            nameRu: seoContent?.seoTitle?.ru || product.title,
+            name: normalizedProductName,
+            nameRu: seoContent?.seoTitle?.ru || normalizedProductName,
             description: descriptions?.fullDescription?.uz || product.description || analyzed?.description,
             descriptionRu: descriptions?.fullDescription?.ru || product.description,
             category: analyzed?.category,
-             price: pricingData.sellingPrice,
+            price: pricingData.sellingPrice,
             costPrice: pricingData.costPrice,
             image: imageUrl,
             images: imagesToUpload,
@@ -513,10 +567,10 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
             mxikCode: mxikData?.mxik_code,
             mxikName: mxikData?.mxik_name,
           },
-           pricing: {
-             ...pricingData,
-             recommendedPrice: pricingData.sellingPrice,
-           },
+          pricing: {
+            ...pricingData,
+            recommendedPrice: pricingData.sellingPrice,
+          },
         },
       });
 
@@ -524,22 +578,26 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
 
       updateTaskProgress(5, 'completed');
       updateTaskStatus('completed', generatedInfos);
-      toast.success(`"${product.title}" kartochkasi tayyor!`);
+      toast.success(`"${normalizedProductName}" kartochkasi tayyor!`);
       
       if (onSuccess) onSuccess();
     } catch (error: any) {
       console.error('Background card creation error:', error);
       updateTaskStatus('failed');
-      toast.error(`"${product.title}" yaratishda xato`);
+      toast.error(`"${normalizeProductName(product.title)}" yaratishda xato`);
     }
   }, [shopId, onSuccess]);
 
   const startBackgroundCardCreation = () => {
-    if (!pricing || !selectedProduct || !capturedImage) {
+    // Endi capturedImage talab qilinmaydi - web rasmdan foydalanish mumkin
+    if (!pricing || !selectedProduct) {
       toast.error('Ma\'lumotlar to\'liq emas');
       return;
     }
 
+    // Web rasmni yoki captured rasmni tanlash
+    const productImage = capturedImage || selectedProduct.image || null;
+    
     // Create new background task
     const taskId = `task-${Date.now()}`;
     const newTask: BackgroundTask = {
