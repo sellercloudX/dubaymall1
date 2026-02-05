@@ -44,17 +44,39 @@ export default function Marketplace() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQueryState] = useState(searchParams.get('search') || '');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedCategory, setSelectedCategory] = useState<string>(searchParams.get('category') || 'all');
   const [priceRange, setPriceRange] = useState([0, 10000000]);
   const [sortBy, setSortBy] = useState('newest');
 
   const setSearchQuery = (query: string) => {
     setSearchQueryState(query);
+    const newParams = new URLSearchParams(searchParams);
     if (query) {
-      setSearchParams({ search: query });
+      newParams.set('search', query);
     } else {
-      setSearchParams({});
+      newParams.delete('search');
     }
+    setSearchParams(newParams);
+  };
+
+  // Sync category with URL params
+  useEffect(() => {
+    const categoryFromUrl = searchParams.get('category');
+    if (categoryFromUrl && categoryFromUrl !== selectedCategory) {
+      setSelectedCategory(categoryFromUrl);
+    }
+  }, [searchParams]);
+
+  // Update URL when category changes
+  const handleCategoryChange = (categoryId: string) => {
+    setSelectedCategory(categoryId);
+    const newParams = new URLSearchParams(searchParams);
+    if (categoryId && categoryId !== 'all') {
+      newParams.set('category', categoryId);
+    } else {
+      newParams.delete('category');
+    }
+    setSearchParams(newParams);
   };
 
   useEffect(() => {
@@ -116,7 +138,7 @@ export default function Marketplace() {
 
   const clearFilters = () => {
     setSearchQuery('');
-    setSelectedCategory('all');
+    handleCategoryChange('all');
     setPriceRange([0, 10000000]);
     setSortBy('newest');
   };
@@ -195,7 +217,7 @@ export default function Marketplace() {
                         variant={selectedCategory === 'all' ? 'default' : 'outline'}
                         size="sm"
                         className="w-full justify-start"
-                        onClick={() => setSelectedCategory('all')}
+                        onClick={() => handleCategoryChange('all')}
                       >
                         Barchasi
                       </Button>
@@ -205,7 +227,7 @@ export default function Marketplace() {
                           variant={selectedCategory === cat.id ? 'default' : 'outline'}
                           size="sm"
                           className="w-full justify-start"
-                          onClick={() => setSelectedCategory(cat.id)}
+                          onClick={() => handleCategoryChange(cat.id)}
                         >
                           {cat.name}
                         </Button>

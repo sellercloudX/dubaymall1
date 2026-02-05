@@ -1,27 +1,28 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Layout } from '@/components/Layout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { MyOrders } from '@/components/orders/MyOrders';
-import { Store, Users, ShoppingCart, TrendingUp, Plus, Loader2, Package } from 'lucide-react';
-
-type UserRole = 'seller' | 'blogger' | 'buyer' | 'admin';
-
-interface RoleData {
-  role: UserRole;
-}
+import { toast } from 'sonner';
+import { User, CreditCard, Package, History, Loader2, Save } from 'lucide-react';
 
 export default function Dashboard() {
   const { user, loading: authLoading } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
-  const [roles, setRoles] = useState<UserRole[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [profile, setProfile] = useState({
+    full_name: '',
+    phone: '',
+  });
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -30,35 +31,48 @@ export default function Dashboard() {
     }
 
     if (user) {
-      fetchUserRoles();
+      fetchProfile();
     }
   }, [user, authLoading, navigate]);
 
-  const fetchUserRoles = async () => {
+  const fetchProfile = async () => {
     if (!user) return;
 
     const { data, error } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id);
+      .from('profiles')
+      .select('full_name, phone')
+      .eq('user_id', user.id)
+      .single();
 
     if (!error && data) {
-      setRoles((data as RoleData[]).map(r => r.role));
+      setProfile({
+        full_name: data.full_name || '',
+        phone: data.phone || '',
+      });
     }
     setLoading(false);
   };
 
-  const addRole = async (role: UserRole) => {
-    if (!user || roles.includes(role)) return;
+  const handleSaveProfile = useCallback(async () => {
+    if (!user) return;
+    setSaving(true);
 
     const { error } = await supabase
-      .from('user_roles')
-      .insert({ user_id: user.id, role });
+      .from('profiles')
+      .update({
+        full_name: profile.full_name,
+        phone: profile.phone,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('user_id', user.id);
 
-    if (!error) {
-      setRoles([...roles, role]);
+    if (error) {
+      toast.error('Xatolik yuz berdi');
+    } else {
+      toast.success('Profil saqlandi');
     }
-  };
+    setSaving(false);
+  }, [user, profile]);
 
   if (authLoading || loading) {
     return (
@@ -70,158 +84,146 @@ export default function Dashboard() {
     );
   }
 
-  const isSeller = roles.includes('seller');
-  const isBlogger = roles.includes('blogger');
-
   return (
     <Layout>
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">{t.dashboard}</h1>
-          <p className="text-muted-foreground mt-2">
-            Xush kelibsiz, {user?.email}
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold">Shaxsiy kabinet</h1>
+          <p className="text-muted-foreground">
+            {user?.email}
           </p>
         </div>
 
-        <Tabs defaultValue="orders" className="space-y-6">
+        <Tabs defaultValue="profile" className="space-y-6">
           <TabsList>
+            <TabsTrigger value="profile" className="gap-2">
+              <User className="h-4 w-4" />
+              <span className="hidden sm:inline">Profil</span>
+            </TabsTrigger>
             <TabsTrigger value="orders" className="gap-2">
               <Package className="h-4 w-4" />
-              Buyurtmalarim
+              <span className="hidden sm:inline">Faol buyurtmalar</span>
             </TabsTrigger>
-            <TabsTrigger value="roles" className="gap-2">
-              <Users className="h-4 w-4" />
-              Rollar
+            <TabsTrigger value="history" className="gap-2">
+              <History className="h-4 w-4" />
+              <span className="hidden sm:inline">Tarix</span>
+            </TabsTrigger>
+            <TabsTrigger value="payment" className="gap-2">
+              <CreditCard className="h-4 w-4" />
+              <span className="hidden sm:inline">To'lov</span>
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="orders">
-            <MyOrders />
+          <TabsContent value="profile">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Shaxsiy ma'lumotlar</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="fullName">Ism Familiya</Label>
+                    <Input
+                      id="fullName"
+                      value={profile.full_name}
+                      onChange={(e) => setProfile(prev => ({ ...prev, full_name: e.target.value }))}
+                      placeholder="Ism Familiya"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Telefon raqam</Label>
+                    <Input
+                      id="phone"
+                      value={profile.phone}
+                      onChange={(e) => setProfile(prev => ({ ...prev, phone: e.target.value }))}
+                      placeholder="+998 90 123 45 67"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Email</Label>
+                    <Input value={user?.email || ''} disabled className="bg-muted" />
+                  </div>
+                </div>
+                <Button onClick={handleSaveProfile} disabled={saving} className="mt-4">
+                  {saving ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="mr-2 h-4 w-4" />
+                  )}
+                  Saqlash
+                </Button>
+              </CardContent>
+            </Card>
           </TabsContent>
 
-          <TabsContent value="roles">
-            {/* Quick Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium">Buyurtmalar</CardTitle>
-                  <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">0</div>
-                  <p className="text-xs text-muted-foreground">Jami buyurtmalar</p>
-                </CardContent>
-              </Card>
-              
-              {isSeller && (
-                <>
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <CardTitle className="text-sm font-medium">Mahsulotlar</CardTitle>
-                      <Store className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">0</div>
-                      <p className="text-xs text-muted-foreground">Faol mahsulotlar</p>
-                    </CardContent>
+          <TabsContent value="orders">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Faol buyurtmalar</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <MyOrders />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="history">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Buyurtmalar tarixi</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <MyOrders />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="payment">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">To'lov usullari</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-muted-foreground text-sm">
+                  Buyurtma berishda to'lov usulini tanlash mumkin:
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Card className="p-4 border-2">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <CreditCard className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium">Click</p>
+                        <p className="text-xs text-muted-foreground">Online to'lov</p>
+                      </div>
+                    </div>
                   </Card>
-                  
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <CardTitle className="text-sm font-medium">Sotuvlar</CardTitle>
-                      <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">0 so'm</div>
-                      <p className="text-xs text-muted-foreground">Bu oy</p>
-                    </CardContent>
+                  <Card className="p-4 border-2">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                        <CreditCard className="h-5 w-5 text-green-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium">Payme</p>
+                        <p className="text-xs text-muted-foreground">Online to'lov</p>
+                      </div>
+                    </div>
                   </Card>
-                </>
-              )}
-              
-              {isBlogger && (
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-sm font-medium">Komissiya</CardTitle>
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">0 so'm</div>
-                    <p className="text-xs text-muted-foreground">Jami daromad</p>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-
-            {/* Role Selection */}
-            <div className="mb-8">
-              <h2 className="text-xl font-semibold mb-4">{t.selectRole}</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card className={`cursor-pointer transition-all ${isSeller ? 'ring-2 ring-primary' : 'hover:shadow-lg'}`}>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <Store className="h-8 w-8 text-primary" />
-                      {isSeller && <span className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded">Faol</span>}
+                  <Card className="p-4 border-2">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                        <Package className="h-5 w-5 text-purple-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium">Naqd pul</p>
+                        <p className="text-xs text-muted-foreground">Yetkazib berishda</p>
+                      </div>
                     </div>
-                    <CardTitle>{t.seller}</CardTitle>
-                    <CardDescription>{t.sellerDesc}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {!isSeller && (
-                      <Button onClick={() => addRole('seller')} className="w-full">
-                        <Plus className="mr-2 h-4 w-4" />
-                        Sotuvchi bo'lish
-                      </Button>
-                    )}
-                    {isSeller && (
-                      <Button variant="outline" className="w-full" onClick={() => navigate('/seller')}>
-                        Do'konni boshqarish
-                      </Button>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <Card className={`cursor-pointer transition-all ${isBlogger ? 'ring-2 ring-primary' : 'hover:shadow-lg'}`}>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <Users className="h-8 w-8 text-accent" />
-                      {isBlogger && <span className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded">Faol</span>}
-                    </div>
-                    <CardTitle>{t.blogger}</CardTitle>
-                    <CardDescription>{t.bloggerDesc}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {!isBlogger && (
-                      <Button onClick={() => addRole('blogger')} variant="outline" className="w-full">
-                        <Plus className="mr-2 h-4 w-4" />
-                        Blogger bo'lish
-                      </Button>
-                    )}
-                    {isBlogger && (
-                      <Button variant="outline" className="w-full" onClick={() => navigate('/blogger')}>
-                        Affiliate paneli
-                      </Button>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <Card className="ring-2 ring-primary/20">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <ShoppingCart className="h-8 w-8 text-success" />
-                      <span className="text-xs bg-success text-success-foreground px-2 py-1 rounded">Asosiy</span>
-                    </div>
-                    <CardTitle>{t.buyer}</CardTitle>
-                    <CardDescription>{t.buyerDesc}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Button variant="outline" className="w-full" onClick={() => navigate('/marketplace')}>
-                      Marketplace'ga o'tish
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
+                  </Card>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>
