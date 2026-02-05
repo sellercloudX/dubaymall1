@@ -141,7 +141,7 @@ export function useMarketplaceConnections(): UseMarketplaceConnectionsReturn {
         c.marketplace === marketplace 
           ? {
               ...c,
-              products_count: productsResult.total || c.products_count,
+               products_count: productsResult.data?.length || c.products_count,
               orders_count: ordersResult.total || ordersResult.data?.length || c.orders_count,
               last_sync_at: new Date().toISOString(),
             }
