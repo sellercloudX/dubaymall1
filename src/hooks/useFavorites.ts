@@ -44,8 +44,12 @@ export function useFavorites() {
   });
 
   const favorites = data?.favorites || [];
-  // Always create a fresh Set to handle React Query persistence deserialization
-  const favoriteIds = new Set<string>(data?.favoriteIds || []);
+  // Always create a fresh Set - handle all possible serialization formats from cache
+  const rawFavoriteIds = data?.favoriteIds;
+  const favoriteIdsArray = Array.isArray(rawFavoriteIds) 
+    ? rawFavoriteIds 
+    : (rawFavoriteIds && typeof rawFavoriteIds === 'object' ? Object.values(rawFavoriteIds) : []);
+  const favoriteIds = new Set<string>(favoriteIdsArray as string[]);
 
   const addMutation = useMutation({
     mutationFn: async (productId: string) => {
