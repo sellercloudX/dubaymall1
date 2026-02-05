@@ -83,67 +83,67 @@ export function MobileAnalytics({ connections, connectedMarketplaces, fetchMarke
   }
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-4 space-y-4 overflow-x-hidden">
       {/* Summary Stats */}
       <div className="grid grid-cols-2 gap-3">
-        <Card className="bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/20">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
+        <Card className="bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/20 overflow-hidden">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-1.5 mb-1.5">
               <DollarSign className="h-4 w-4 text-green-600" />
               <span className="text-xs text-muted-foreground">Daromad</span>
             </div>
             {isLoading ? (
-              <Skeleton className="h-7 w-24" />
+              <Skeleton className="h-6 w-20" />
             ) : (
-              <div className="text-xl font-bold text-green-700 dark:text-green-400">
+              <div className="text-lg font-bold text-green-700 dark:text-green-400 truncate">
                 {formatPrice(totals.revenue)}
               </div>
             )}
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
+        <Card className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20 overflow-hidden">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-1.5 mb-1.5">
               <ShoppingCart className="h-4 w-4 text-blue-600" />
               <span className="text-xs text-muted-foreground">Buyurtmalar</span>
             </div>
             {isLoading ? (
-              <Skeleton className="h-7 w-16" />
+              <Skeleton className="h-6 w-14" />
             ) : (
-              <div className="text-xl font-bold text-blue-700 dark:text-blue-400">
+              <div className="text-lg font-bold text-blue-700 dark:text-blue-400">
                 {totals.orders}
               </div>
             )}
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-purple-500/10 to-purple-500/5 border-purple-500/20">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
+        <Card className="bg-gradient-to-br from-purple-500/10 to-purple-500/5 border-purple-500/20 overflow-hidden">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-1.5 mb-1.5">
               <Package className="h-4 w-4 text-purple-600" />
               <span className="text-xs text-muted-foreground">Mahsulotlar</span>
             </div>
             {isLoading ? (
-              <Skeleton className="h-7 w-16" />
+              <Skeleton className="h-6 w-14" />
             ) : (
-              <div className="text-xl font-bold text-purple-700 dark:text-purple-400">
+              <div className="text-lg font-bold text-purple-700 dark:text-purple-400">
                 {totals.products}
               </div>
             )}
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-orange-500/10 to-orange-500/5 border-orange-500/20">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
+        <Card className="bg-gradient-to-br from-orange-500/10 to-orange-500/5 border-orange-500/20 overflow-hidden">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-1.5 mb-1.5">
               <TrendingUp className="h-4 w-4 text-orange-600" />
               <span className="text-xs text-muted-foreground">O'rtacha</span>
             </div>
             {isLoading ? (
-              <Skeleton className="h-7 w-20" />
+              <Skeleton className="h-6 w-16" />
             ) : (
-              <div className="text-xl font-bold text-orange-700 dark:text-orange-400">
+              <div className="text-lg font-bold text-orange-700 dark:text-orange-400 truncate">
                 {totals.orders > 0 ? formatPrice(Math.round(totals.revenue / totals.orders)) : '—'}
               </div>
             )}
@@ -162,19 +162,19 @@ export function MobileAnalytics({ connections, connectedMarketplaces, fetchMarke
           stats.map((stat) => (
             <Card key={stat.marketplace} className="overflow-hidden">
               <CardContent className="p-0">
-                <div className="flex items-center p-4">
-                  <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center text-2xl mr-4">
+                <div className="flex items-center p-3 gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center text-xl shrink-0">
                     {MARKETPLACE_EMOJI[stat.marketplace] || '📦'}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-semibold capitalize">{stat.marketplace}</div>
-                    <div className="text-xs text-muted-foreground">
+                    <div className="font-semibold capitalize text-sm truncate">{stat.marketplace}</div>
+                    <div className="text-xs text-muted-foreground truncate">
                       {stat.productsCount} mahsulot • {stat.ordersCount} buyurtma
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="font-bold text-primary">{formatPrice(stat.revenue)}</div>
-                    <div className="text-xs text-muted-foreground">so'm</div>
+                  <div className="text-right shrink-0">
+                    <div className="font-bold text-primary text-sm">{formatPrice(stat.revenue)}</div>
+                    <div className="text-[10px] text-muted-foreground">so'm</div>
                   </div>
                 </div>
               </CardContent>

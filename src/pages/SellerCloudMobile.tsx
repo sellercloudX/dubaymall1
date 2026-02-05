@@ -123,14 +123,14 @@ export default function SellerCloudMobile() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen bg-background pb-16 overflow-x-hidden">
       <MobileSellerCloudHeader 
         connectedCount={connectedMarketplaces.length}
         onRefresh={refetch}
         isLoading={connectionsLoading}
       />
       
-      <main className="pt-16">
+      <main className="pt-14">
         {renderContent()}
       </main>
       

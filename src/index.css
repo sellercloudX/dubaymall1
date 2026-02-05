@@ -365,6 +365,42 @@
     display: none;
   }
 
+  /* Scrollbar Hide utility (commonly used) */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Mobile Text Overflow Fix */
+  .mobile-truncate {
+    @apply truncate max-w-full;
+  }
+
+  /* Mobile Safe Container */
+  .mobile-safe {
+    @apply overflow-x-hidden w-full max-w-full;
+  }
+
+  /* Mobile Card Fix */
+  .mobile-card {
+    @apply overflow-hidden break-words;
+  }
+
+  /* Mobile Button Group */
+  .mobile-btn-group {
+    @apply flex flex-wrap gap-2;
+  }
+
+  /* Fix text breaking */
+  .break-anywhere {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
   /* Gradient Border */
   .gradient-border {
     @apply relative;
