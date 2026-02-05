@@ -46,10 +46,10 @@ export function MobileProducts({ connectedMarketplaces }: MobileProductsProps) {
      if (connectedMarketplaces.length > 0 && !selectedMp) {
        setSelectedMp(connectedMarketplaces[0]);
      }
-   }, [connectedMarketplaces]);
+   }, [connectedMarketplaces, selectedMp]);
  
    const products = productsData?.data || [];
-   const total = productsData?.total || 0;
+   const total = products.length;
    const lastUpdated = dataUpdatedAt ? new Date(dataUpdatedAt) : null;
  
    const handleRefresh = () => {
@@ -96,14 +96,15 @@ export function MobileProducts({ connectedMarketplaces }: MobileProductsProps) {
         {/* Top row with title and refresh */}
         <div className="flex items-center justify-between">
           <div>
-             <span className="font-medium text-sm">{productsWithKeys.length} / {total}</span>
+             <span className="font-bold text-lg">{productsWithKeys.length}</span>
+             <span className="text-sm text-muted-foreground ml-1">mahsulot</span>
             {lastUpdated && (
               <span className="text-xs text-muted-foreground ml-2">
                 • {lastUpdated.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })}
               </span>
             )}
              {!isOnline && (
-                <span className="text-xs text-amber-600 ml-2 inline-flex items-center gap-1">
+               <span className="text-xs text-amber-600 ml-2 inline-flex items-center gap-1">
                  <WifiOff className="h-3 w-3" /> Offline
                </span>
              )}

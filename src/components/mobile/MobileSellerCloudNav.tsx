@@ -1,7 +1,7 @@
-import { BarChart3, Scan, Package, ShoppingCart } from 'lucide-react';
+ import { BarChart3, Scan, Package, ShoppingCart, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-type TabType = 'analytics' | 'scanner' | 'products' | 'orders';
+ type TabType = 'analytics' | 'scanner' | 'products' | 'orders' | 'trends';
 
 interface MobileSellerCloudNavProps {
   activeTab: TabType;
@@ -13,6 +13,7 @@ const navItems = [
   { id: 'scanner' as const, icon: Scan, label: 'AI Scanner' },
   { id: 'products' as const, icon: Package, label: 'Mahsulotlar' },
   { id: 'orders' as const, icon: ShoppingCart, label: 'Buyurtmalar' },
+   { id: 'trends' as const, icon: TrendingUp, label: 'Trendlar' },
 ];
 
 export function MobileSellerCloudNav({ activeTab, onTabChange }: MobileSellerCloudNavProps) {

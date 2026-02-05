@@ -1,8 +1,8 @@
- import { useEffect } from 'react';
+ import { useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
- import { TrendingUp, DollarSign, Package, ShoppingCart, Globe, RefreshCw, WifiOff, AlertTriangle } from 'lucide-react';
+ import { TrendingUp, DollarSign, Package, ShoppingCart, Globe, RefreshCw, WifiOff, AlertTriangle, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
  import { useMarketplaceStats, useMarketplaceProducts, useMarketplaceOrders, useInvalidateMarketplaceData } from '@/hooks/useMarketplaceData';
  import { Badge } from '@/components/ui/badge';
@@ -22,10 +22,8 @@ const MARKETPLACE_EMOJI: Record<string, string> = {
  export function MobileAnalytics({ connections, connectedMarketplaces }: MobileAnalyticsProps) {
    const isOnline = navigator.onLine;
    
-   // Use the first connected marketplace for stats
    const primaryMp = connectedMarketplaces[0] || null;
    
-   // TanStack Query hooks - proper caching & offline support
    const { 
      data: stats, 
      isLoading, 
@@ -39,12 +37,24 @@ const MARKETPLACE_EMOJI: Record<string, string> = {
  
    const lastUpdated = dataUpdatedAt ? new Date(dataUpdatedAt) : null;
    
-   // Calculate totals from stats
-   const totals = {
-     products: stats?.totalProducts || 0,
-     orders: stats?.totalOrders || 0,
-     revenue: stats?.totalRevenue || 0,
-   };
+   // Calculate totals from actual data
+   const totals = useMemo(() => {
+     const products = productsData?.data || [];
+     const orders = ordersData?.data || [];
+     
+     // Calculate total revenue from orders
+     const completedOrders = orders.filter(o => 
+       ['DELIVERED', 'PICKUP', 'DELIVERY', 'PROCESSING'].includes(o.status)
+     );
+     const revenue = completedOrders.reduce((sum, o) => sum + (o.totalUZS || o.total || 0), 0);
+     
+     return {
+       products: products.length,
+       orders: orders.length,
+       revenue: revenue,
+       avgCheck: completedOrders.length > 0 ? Math.round(revenue / completedOrders.length) : 0,
+     };
+   }, [productsData?.data, ordersData?.data]);
  
    const handleRefresh = () => {
      if (!isOnline) {
@@ -105,17 +115,35 @@ const MARKETPLACE_EMOJI: Record<string, string> = {
  
       {/* Summary Stats */}
       <div className="grid grid-cols-2 gap-3">
-        <Card className="bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/20 overflow-hidden">
+        <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20 overflow-hidden">
           <CardContent className="p-3">
             <div className="flex items-center gap-1.5 mb-1.5">
-              <DollarSign className="h-4 w-4 text-green-600" />
-              <span className="text-xs text-muted-foreground">Daromad</span>
+              <DollarSign className="h-4 w-4 text-primary" />
+              <span className="text-xs text-muted-foreground">Umumiy daromad</span>
             </div>
             {isLoading ? (
               <Skeleton className="h-6 w-20" />
             ) : (
-              <div className="text-lg font-bold text-green-700 dark:text-green-400 truncate">
+              <div className="text-xl font-bold text-primary truncate">
                 {formatPrice(totals.revenue)}
+                <span className="text-xs font-normal text-muted-foreground ml-1">so'm</span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-orange-500/10 to-orange-500/5 border-orange-500/20 overflow-hidden">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <Wallet className="h-4 w-4 text-orange-600" />
+              <span className="text-xs text-muted-foreground">O'rtacha chek</span>
+            </div>
+            {isLoading ? (
+              <Skeleton className="h-6 w-14" />
+            ) : (
+              <div className="text-xl font-bold text-orange-600 dark:text-orange-400 truncate">
+                {totals.avgCheck > 0 ? formatPrice(totals.avgCheck) : '—'}
+                <span className="text-xs font-normal text-muted-foreground ml-1">so'm</span>
               </div>
             )}
           </CardContent>
@@ -130,8 +158,9 @@ const MARKETPLACE_EMOJI: Record<string, string> = {
             {isLoading ? (
               <Skeleton className="h-6 w-14" />
             ) : (
-              <div className="text-lg font-bold text-blue-700 dark:text-blue-400">
+              <div className="text-xl font-bold text-blue-600 dark:text-blue-400">
                 {totals.orders}
+                <span className="text-xs font-normal text-muted-foreground ml-1">ta</span>
               </div>
             )}
           </CardContent>
@@ -146,24 +175,9 @@ const MARKETPLACE_EMOJI: Record<string, string> = {
             {isLoading ? (
               <Skeleton className="h-6 w-14" />
             ) : (
-              <div className="text-lg font-bold text-purple-700 dark:text-purple-400">
+              <div className="text-xl font-bold text-purple-600 dark:text-purple-400">
                 {totals.products}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-orange-500/10 to-orange-500/5 border-orange-500/20 overflow-hidden">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <TrendingUp className="h-4 w-4 text-orange-600" />
-              <span className="text-xs text-muted-foreground">O'rtacha</span>
-            </div>
-            {isLoading ? (
-              <Skeleton className="h-6 w-16" />
-            ) : (
-              <div className="text-lg font-bold text-orange-700 dark:text-orange-400 truncate">
-                {totals.orders > 0 ? formatPrice(Math.round(totals.revenue / totals.orders)) : '—'}
+                <span className="text-xs font-normal text-muted-foreground ml-1">ta</span>
               </div>
             )}
           </CardContent>
