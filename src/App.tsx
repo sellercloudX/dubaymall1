@@ -5,6 +5,21 @@ import { TooltipProvider } from "@/components/ui/tooltip";
  import { QueryClient } from "@tanstack/react-query";
  import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
  import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
+
+ // Clear corrupted cache on startup
+ try {
+   const cached = localStorage.getItem('sellercloud-cache');
+   if (cached) {
+     const parsed = JSON.parse(cached);
+     // Check if cache structure is valid
+     if (!parsed || typeof parsed !== 'object' || !parsed.clientState) {
+       localStorage.removeItem('sellercloud-cache');
+     }
+   }
+ } catch {
+   localStorage.removeItem('sellercloud-cache');
+ }
+
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AuthProvider } from "@/contexts/AuthContext";
