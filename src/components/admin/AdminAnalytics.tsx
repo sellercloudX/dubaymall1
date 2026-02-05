@@ -358,10 +358,15 @@ export function AdminAnalytics() {
         <CardContent>
           {analytics.growthByDay.some(d => d.users > 0 || d.shops > 0) ? (
             <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={analytics.growthByDay}>
+              <BarChart data={analytics.growthByDay} margin={{ left: 0, right: 16 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="date" tickFormatter={formatDate} className="text-xs" />
-                <YAxis className="text-xs" />
+                <YAxis 
+                  className="text-xs" 
+                  allowDecimals={false} 
+                  tickFormatter={(v) => Math.floor(v).toString()}
+                  domain={[0, 'auto']}
+                />
                 <Tooltip labelFormatter={formatDate} />
                 <Bar dataKey="users" name="Foydalanuvchilar" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="shops" name="Do'konlar" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />

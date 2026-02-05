@@ -15,7 +15,9 @@ export function Layout({ children, showFooter = true }: LayoutProps) {
   return (
     <div className="min-h-screen flex flex-col overflow-x-hidden">
       <Navbar />
-      <main className="flex-1 pb-14 md:pb-0">{children}</main>
+      {/* Extra padding on mobile to avoid bottom nav overlap */}
+      <main className="flex-1 pb-24 md:pb-0">{children}</main>
+      {/* Hide footer on mobile to prevent overlap with bottom nav */}
       {showFooter && <Footer />}
       <Suspense fallback={null}>
         <AIChat />
