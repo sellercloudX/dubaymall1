@@ -71,7 +71,7 @@ export function BloggerBalanceCard() {
       pendingCommissions.forEach((commission) => {
         const deliveryConfirmedAt = commission.orders?.delivery_confirmed_at;
         if (deliveryConfirmedAt) {
-          const availableAt = addDays(new Date(deliveryConfirmedAt), 14);
+          const availableAt = addDays(new Date(deliveryConfirmedAt), 10);
           const now = new Date();
           
           if (availableAt > now) {
@@ -114,12 +114,12 @@ export function BloggerBalanceCard() {
         <Card className="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-emerald-100 flex items-center gap-2">
-              <Wallet className="h-4 w-4" />
-              Mavjud balans
+              <Wallet className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Mavjud balans</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{availableBalance.toLocaleString()} so'm</p>
+            <p className="text-2xl md:text-3xl font-bold whitespace-nowrap">{availableBalance.toLocaleString()} so'm</p>
             <p className="text-emerald-100 text-sm mt-1">Yechib olish mumkin</p>
           </CardContent>
         </Card>
@@ -127,25 +127,25 @@ export function BloggerBalanceCard() {
         <Card className="bg-gradient-to-br from-amber-500 to-amber-600 text-white">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-amber-100 flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              Kutilayotgan
+              <Clock className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Kutilayotgan</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{totalPending.toLocaleString()} so'm</p>
-            <p className="text-amber-100 text-sm mt-1">14 kun kutish muddati</p>
+            <p className="text-2xl md:text-3xl font-bold whitespace-nowrap">{totalPending.toLocaleString()} so'm</p>
+            <p className="text-amber-100 text-sm mt-1">10 kun kutish muddati</p>
           </CardContent>
         </Card>
 
         <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-blue-100 flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Jami daromad
+              <TrendingUp className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Jami daromad</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{totalEarned.toLocaleString()} so'm</p>
+            <p className="text-2xl md:text-3xl font-bold whitespace-nowrap">{totalEarned.toLocaleString()} so'm</p>
             <p className="text-blue-100 text-sm mt-1">Boshidan beri</p>
           </CardContent>
         </Card>
@@ -164,10 +164,10 @@ export function BloggerBalanceCard() {
             {pendingCommissions.map((commission) => {
               const deliveryConfirmedAt = commission.orders?.delivery_confirmed_at;
               const availableAt = deliveryConfirmedAt 
-                ? addDays(new Date(deliveryConfirmedAt), 14) 
+                ? addDays(new Date(deliveryConfirmedAt), 10) 
                 : null;
               const progress = deliveryConfirmedAt && availableAt
-                ? Math.min(100, ((14 - differenceInDays(availableAt, new Date())) / 14) * 100)
+                ? Math.min(100, ((10 - differenceInDays(availableAt, new Date())) / 10) * 100)
                 : 0;
 
               return (
@@ -203,8 +203,8 @@ export function BloggerBalanceCard() {
                   
                   {!deliveryConfirmedAt && (
                     <p className="text-xs text-amber-600 flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      Buyurtma yetkazilgandan keyin 14 kun kutiladi
+                      <Clock className="h-3 w-3 flex-shrink-0" />
+                      <span>Buyurtma yetkazilgandan keyin 10 kun kutiladi</span>
                     </p>
                   )}
                 </div>
