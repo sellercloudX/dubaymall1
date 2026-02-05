@@ -81,19 +81,19 @@ export function AIChat({ context }: AIChatProps) {
 
   return (
     <>
-      {/* Floating Button */}
+      {/* Floating Button - positioned above bottom navigation on mobile */}
       <Button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg z-50"
+        className="fixed bottom-20 md:bottom-6 right-4 md:right-6 h-14 w-14 rounded-full shadow-lg z-50"
         size="icon"
         aria-label={isOpen ? "Chatni yopish" : "AI Chat ochish"}
       >
         {isOpen ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}
       </Button>
 
-      {/* Chat Window */}
+      {/* Chat Window - positioned above floating button */}
       {isOpen && (
-        <Card className="fixed bottom-24 right-6 w-[380px] h-[500px] shadow-2xl z-50 flex flex-col">
+        <Card className="fixed bottom-36 md:bottom-24 right-2 md:right-6 w-[calc(100vw-1rem)] md:w-[380px] max-w-[380px] h-[60vh] md:h-[500px] shadow-2xl z-50 flex flex-col">
           <CardHeader className="pb-3 border-b">
             <CardTitle className="flex items-center gap-2 text-lg">
               <Bot className="h-5 w-5 text-primary" />

@@ -12,6 +12,46 @@ interface ChatMessage {
   content: string;
 }
 
+// System prompt focused on Dubay Mall platform and e-commerce
+const PLATFORM_SYSTEM_PROMPT = `Siz Dubay Mall platformasining savdo yordamchi AI botisiz.
+
+🎯 ASOSIY MAQSAD: Foydalanuvchilarga savdo qilishda, mahsulot sotishda va xarid qilishda yordam berish.
+
+📌 DUBAY MALL PLATFORMASI HAQIDA:
+- O'zbekistonning eng yirik onlayn savdo platformasi
+- 50,000+ mahsulotlar, 5,000+ do'konlar
+- O'zbek, Rus, Ingliz tillarida interfeys
+- Payme, Click, Uzcard to'lov tizimlari
+
+🛒 SOTUVCHILAR UCHUN:
+- AI yordamida mahsulot qo'shish (rasm yuklash, avtomatik tavsif)
+- Dropshipping - Xitoydan import qilish
+- SellerCloudX - Uzum, WB, Ozon, Yandex integratsiyasi
+- Moliya boshqaruvi va buyurtma kuzatuvi
+- Komissiya: 3-8% (kategoriyaga qarab)
+
+📢 BLOGGERLAR UCHUN:
+- Affiliate dasturi - 10-25% komissiya
+- Shaxsiy referral havolalar
+- Real-time statistika
+- Tez pul yechib olish
+
+💡 SAVDO MASLAHATLARI:
+- Mahsulot nomini qisqa va aniq yozing
+- Sifatli rasmlar qo'ying (oq fon, yaxshi yorug'lik)
+- Batafsil tavsif yozing
+- Raqobatbardosh narx belgilang
+- Tez javob bering va sifatli xizmat ko'rsating
+
+QOIDALAR:
+1. Faqat savdo, sotish va xarid qilish mavzularida yordam bering
+2. Dubay Mall platformasi imkoniyatlarini targ'ib qiling
+3. Aniq, qisqa va foydali javoblar bering
+4. Agar bilmasangiz, bilmasligingizni ayting
+5. Foydalanuvchi qaysi tilda yozsa, shu tilda javob bering (UZ/RU/EN)
+6. Har doim pozitiv va motivatsion bo'ling
+7. Savdoni o'stirish bo'yicha maslahatlar bering`;
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -34,9 +74,9 @@ serve(async (req) => {
     );
 
     const token = authHeader.replace('Bearer ', '');
-    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     
-    if (claimsError || !claimsData?.claims) {
+    if (authError || !user) {
       return new Response(
         JSON.stringify({ error: 'Invalid authentication', success: false }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -95,60 +135,154 @@ serve(async (req) => {
       }
     }
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      console.error('LOVABLE_API_KEY not configured');
-      return new Response(
-        JSON.stringify({ error: 'Service unavailable', success: false }),
-        { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     // Build system prompt based on context
-    let systemPrompt = `Siz Dubay Mall platformasining yordamchi AI botisiz. 
-Siz O'zbek, Rus va Ingliz tillarida javob bera olasiz. Foydalanuvchi qaysi tilda yozsa, shu tilda javob bering.
-
-Dubay Mall - bu O'zbekiston va Markaziy Osiyo uchun e-commerce platforma. 
-
-Platformada quyidagi imkoniyatlar mavjud:
-- Sotuvchilar uchun: Do'kon yaratish, mahsulot qo'shish (AI orqali, qo'lda, dropshipping import)
-- Bloggerlar uchun: Affiliate dasturi, komissiya olish, mahsulotlarni reklama qilish
-- Xaridorlar uchun: Marketplace, savatcha, buyurtma berish
-
-Qoidalar:
-1. Doim iltifat bilan javob bering
-2. Aniq va qisqa javob bering
-3. Agar bilmasangiz, bilmasligingizni ayting
-4. Foydalanuvchiga yordam berishga harakat qiling`;
+    let systemPrompt = PLATFORM_SYSTEM_PROMPT;
 
     if (context?.userRole === 'seller') {
-      systemPrompt += `\n\nFoydalanuvchi sotuvchi. Unga do'kon boshqarish, mahsulot qo'shish, narx belgilash, affiliate dasturi haqida yordam bering.`;
+      systemPrompt += `\n\n👤 KONTEKST: Foydalanuvchi SOTUVCHI. Unga quyidagilarda yordam bering:
+- Do'kon boshqarish va optimizatsiya
+- Mahsulot qo'shish va tahrirash
+- Narx strategiyasi va raqobat tahlili
+- Buyurtma va moliya boshqaruvi
+- Affiliate dasturi orqali sotuvni oshirish`;
       if (context?.shopName) {
-        systemPrompt += `\nUning do'koni: ${context.shopName.slice(0, 100)}`;
+        systemPrompt += `\nUning do'koni: "${context.shopName.slice(0, 100)}"`;
       }
     } else if (context?.userRole === 'blogger') {
-      systemPrompt += `\n\nFoydalanuvchi blogger. Unga affiliate dasturi, komissiya hisoblash, mahsulotlarni tanlash haqida yordam bering.`;
+      systemPrompt += `\n\n👤 KONTEKST: Foydalanuvchi BLOGGER. Unga quyidagilarda yordam bering:
+- Eng daromadli mahsulotlarni tanlash
+- Affiliate havolalarni samarali tarqatish
+- Auditoriyaga mos mahsulotlar tavsiyasi
+- Komissiya hisobi va statistika
+- Kontent yaratish maslahatlari`;
+    } else {
+      systemPrompt += `\n\n👤 KONTEKST: Foydalanuvchi XARIDOR. Unga quyidagilarda yordam bering:
+- Mahsulot qidirish va tanlash
+- Narxlarni solishtirish
+- Xavfsiz xarid qilish
+- Yetkazib berish haqida ma'lumot
+- Sotuvchi yoki blogger bo'lish imkoniyatlari`;
     }
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-3-flash-preview',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          ...messages,
-        ],
-        temperature: 0.7,
-        max_tokens: 1000,
-      }),
-    });
+    // Try OpenAI first, then Claude, then Lovable AI as fallback
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+    const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 
-    if (!response.ok) {
-      console.error('AI API error:', response.status);
+    let assistantMessage = '';
+    let apiSuccess = false;
+
+    // Try OpenAI GPT-4o-mini (fast and efficient)
+    if (OPENAI_API_KEY && !apiSuccess) {
+      try {
+        console.log('Trying OpenAI API...');
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${OPENAI_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [
+              { role: 'system', content: systemPrompt },
+              ...messages,
+            ],
+            temperature: 0.7,
+            max_tokens: 1000,
+          }),
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          assistantMessage = result.choices?.[0]?.message?.content || '';
+          if (assistantMessage) {
+            apiSuccess = true;
+            console.log('OpenAI API success');
+          }
+        } else {
+          console.error('OpenAI API error:', response.status);
+        }
+      } catch (err) {
+        console.error('OpenAI API error:', err);
+      }
+    }
+
+    // Try Claude as fallback
+    if (ANTHROPIC_API_KEY && !apiSuccess) {
+      try {
+        console.log('Trying Anthropic Claude API...');
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'x-api-key': ANTHROPIC_API_KEY,
+            'content-type': 'application/json',
+            'anthropic-version': '2023-06-01',
+          },
+          body: JSON.stringify({
+            model: 'claude-3-haiku-20240307',
+            max_tokens: 1000,
+            system: systemPrompt,
+            messages: messages.map(m => ({
+              role: m.role === 'assistant' ? 'assistant' : 'user',
+              content: m.content,
+            })),
+          }),
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          assistantMessage = result.content?.[0]?.text || '';
+          if (assistantMessage) {
+            apiSuccess = true;
+            console.log('Claude API success');
+          }
+        } else {
+          console.error('Claude API error:', response.status);
+        }
+      } catch (err) {
+        console.error('Claude API error:', err);
+      }
+    }
+
+    // Try Lovable AI as final fallback
+    if (LOVABLE_API_KEY && !apiSuccess) {
+      try {
+        console.log('Trying Lovable AI Gateway...');
+        const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'google/gemini-3-flash-preview',
+            messages: [
+              { role: 'system', content: systemPrompt },
+              ...messages,
+            ],
+            temperature: 0.7,
+            max_tokens: 1000,
+          }),
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          assistantMessage = result.choices?.[0]?.message?.content || '';
+          if (assistantMessage) {
+            apiSuccess = true;
+            console.log('Lovable AI success');
+          }
+        } else {
+          console.error('Lovable AI error:', response.status);
+        }
+      } catch (err) {
+        console.error('Lovable AI error:', err);
+      }
+    }
+
+    if (!apiSuccess || !assistantMessage) {
+      console.error('All AI APIs failed');
       return new Response(JSON.stringify({ 
         message: 'Kechirasiz, hozir javob bera olmayapman. Keyinroq urinib ko\'ring.',
         success: false 
@@ -157,9 +291,6 @@ Qoidalar:
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-
-    const aiResult = await response.json();
-    const assistantMessage = aiResult.choices?.[0]?.message?.content || 'Kechirasiz, javob bera olmadim.';
 
     return new Response(JSON.stringify({ 
       message: assistantMessage,
