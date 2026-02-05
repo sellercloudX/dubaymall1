@@ -684,6 +684,51 @@ export type Database = {
         }
         Relationships: []
       }
+      mxik_codes: {
+        Row: {
+          code: string
+          created_at: string | null
+          group_code: string | null
+          group_name: string | null
+          id: string
+          is_active: boolean | null
+          name_ru: string | null
+          name_uz: string
+          search_vector: unknown
+          unit_code: string | null
+          unit_name: string | null
+          vat_rate: number | null
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          group_code?: string | null
+          group_name?: string | null
+          id?: string
+          is_active?: boolean | null
+          name_ru?: string | null
+          name_uz: string
+          search_vector?: unknown
+          unit_code?: string | null
+          unit_name?: string | null
+          vat_rate?: number | null
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          group_code?: string | null
+          group_name?: string | null
+          id?: string
+          is_active?: boolean | null
+          name_ru?: string | null
+          name_uz?: string
+          search_vector?: unknown
+          unit_code?: string | null
+          unit_name?: string | null
+          vat_rate?: number | null
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           created_at: string
@@ -970,6 +1015,8 @@ export type Database = {
           id: string
           images: string[] | null
           is_affiliate_enabled: boolean | null
+          mxik_code: string | null
+          mxik_name: string | null
           name: string
           original_price: number | null
           price: number
@@ -990,6 +1037,8 @@ export type Database = {
           id?: string
           images?: string[] | null
           is_affiliate_enabled?: boolean | null
+          mxik_code?: string | null
+          mxik_name?: string | null
           name: string
           original_price?: number | null
           price: number
@@ -1010,6 +1059,8 @@ export type Database = {
           id?: string
           images?: string[] | null
           is_affiliate_enabled?: boolean | null
+          mxik_code?: string | null
+          mxik_name?: string | null
           name?: string
           original_price?: number | null
           price?: number
@@ -1685,6 +1736,8 @@ export type Database = {
         Returns: boolean
       }
       process_pending_payouts: { Args: never; Returns: number }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
       track_affiliate_click: {
         Args: { p_link_code: string }
         Returns: undefined

@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import { 
   Camera, Search, Sparkles, Loader2, X, ImageIcon, 
   Check, Package, DollarSign, Globe, ArrowRight,
-  Calculator, Store, Wand2, FileText, Image as ImageLucide, Zap, 
+  Calculator, Store, Wand2, FileText, Image as ImageLucide, Zap, Hash,
   Clock, CheckCircle, AlertCircle
 } from 'lucide-react';
 
@@ -363,10 +363,31 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
         updateTaskProgress(2, 'failed');
       }
 
-      // Step 4: Infographic generation
+      // Step 4: MXIK lookup
+      updateTaskProgress(3, 'running');
+      let mxikData = null;
+      try {
+        const { data: mxikResult, error: mxikError } = await supabase.functions.invoke('lookup-mxik-code', {
+          body: {
+            productName: product.title,
+            category: analyzed?.category,
+            description: product.description || analyzed?.description,
+          },
+        });
+        if (!mxikError && mxikResult) {
+          mxikData = mxikResult;
+          updateTaskProgress(3, 'completed');
+        } else {
+          updateTaskProgress(3, 'failed');
+        }
+      } catch {
+        updateTaskProgress(3, 'failed');
+      }
+
+      // Step 5: Infographic generation
       const generatedInfos: string[] = [];
       if (shouldGenerateInfographics && productImage) {
-        updateTaskProgress(3, 'running');
+        updateTaskProgress(4, 'running');
         const styles = ['professional', 'minimalist', 'vibrant', 'luxury', 'tech', 'professional'];
 
         for (let i = 0; i < Math.min(infoCount, 6); i++) {
@@ -395,16 +416,16 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
 
         if (generatedInfos.length > 0) {
           imagesToUpload.push(...generatedInfos);
-          updateTaskProgress(3, 'completed');
+          updateTaskProgress(4, 'completed');
         } else {
-          updateTaskProgress(3, 'failed');
+          updateTaskProgress(4, 'failed');
         }
       } else {
-        updateTaskProgress(3, 'completed');
+        updateTaskProgress(4, 'completed');
       }
 
-      // Step 5: Create Yandex card
-      updateTaskProgress(4, 'running');
+      // Step 6: Create Yandex card
+      updateTaskProgress(5, 'running');
       
       const { error } = await supabase.functions.invoke('yandex-market-create-card', {
         body: {
@@ -422,6 +443,8 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
             sourceUrl: product.url,
             keywords: seoContent?.keywords,
             bulletPoints: seoContent?.bulletPoints || descriptions?.sellingPoints,
+            mxikCode: mxikData?.mxik_code,
+            mxikName: mxikData?.mxik_name,
           },
           pricing: pricingData,
         },
@@ -429,7 +452,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
 
       if (error) throw error;
 
-      updateTaskProgress(4, 'completed');
+      updateTaskProgress(5, 'completed');
       updateTaskStatus('completed', generatedInfos);
       toast.success(`"${product.title}" kartochkasi tayyor!`);
       
@@ -457,6 +480,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
         { name: 'Rasm tahlili', status: 'pending', model: 'GPT-4o Vision', icon: <Camera className="h-4 w-4" /> },
         { name: 'SEO kontent', status: 'pending', model: 'Claude Haiku', icon: <Search className="h-4 w-4" /> },
         { name: 'Tavsif yaratish', status: 'pending', model: 'Claude Sonnet', icon: <FileText className="h-4 w-4" /> },
+        { name: 'MXIK aniqlash', status: 'pending', model: 'Gemini Flash', icon: <Hash className="h-4 w-4" /> },
         { name: 'Infografikalar', status: 'pending', model: 'Gemini Image', icon: <ImageLucide className="h-4 w-4" /> },
         { name: 'Kartochka yaratish', status: 'pending', model: 'Yandex API', icon: <Store className="h-4 w-4" /> },
       ],
