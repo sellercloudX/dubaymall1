@@ -6,7 +6,7 @@ const corsHeaders = {
 };
 
 interface InfographicRequest {
-  productImage: string; // base64 or URL - ORIGINAL product image from AI Scanner
+  productImage: string;
   productName: string;
   category?: string;
   style?: "professional" | "minimalist" | "vibrant" | "luxury" | "tech";
@@ -14,10 +14,235 @@ interface InfographicRequest {
   count?: number;
 }
 
-// Fallback to OpenAI DALL-E when Lovable AI credits are exhausted
-async function generateWithOpenAI(
-  prompt: string,
+// ==================== FLUX PRO - PRIMARY AI ====================
+// Using Replicate API with black-forest-labs/flux-1.1-pro
+async function generateWithFluxPro(
+  productImage: string,
   productName: string,
+  category: string,
+  style: string,
+  variationConfig: { composition: string; focus: string; cameraAngle: string }
+): Promise<{ url: string; id: string; style: string; variation: string; composition: string } | null> {
+  const REPLICATE_API_TOKEN = Deno.env.get("REPLICATE_API_TOKEN");
+  
+  if (!REPLICATE_API_TOKEN) {
+    console.log("⚠️ REPLICATE_API_TOKEN not configured");
+    return null;
+  }
+
+  try {
+    console.log("🎨 PRIMARY: Using Flux Pro for infographic generation...");
+    
+    // Category-specific styling for Flux Pro
+    const categoryStyles: Record<string, string> = {
+      "Elektronika": "sleek dark gradient background, subtle blue tech glow, premium studio lighting, high-end product photography",
+      "Smartfonlar": "elegant dark gradient, soft blue purple ambient lighting, floating reflections, flagship device presentation",
+      "Kiyim-kechak": "soft neutral fabric texture background, fashion editorial lighting, soft shadows, lookbook style",
+      "Go'zallik": "luxurious soft pink gold bokeh background, beauty photography lighting, soft glow, cosmetic advertisement style",
+      "Sport": "dynamic gradient with energy vibes, athletic mood lighting, action feel, sports equipment showcase",
+      "Uy-ro'zg'or": "warm cozy home interior blur background, natural window lighting, lifestyle photography",
+      "Bolalar uchun": "playful soft pastel gradient background, cheerful mood, bright colors, child-safe product display",
+      "Kompyuterlar": "professional dark tech background with subtle grid patterns, RGB accents, gaming setup aesthetic",
+      "Audio": "premium dark background with subtle sound wave effects, studio quality, audiophile presentation",
+    };
+
+    const styleDescriptions: Record<string, string> = {
+      professional: "clean white light gray gradient studio background, professional product photography lighting, soft shadows, commercial quality",
+      minimalist: "pure white background, minimal composition, elegant simplicity, premium feel, Apple-style presentation",
+      vibrant: "colorful dynamic gradient background, eye-catching energy, bold modern feel, pop art influence",
+      luxury: "dark elegant background with golden warm accents, premium sophisticated lighting, high-end boutique style",
+      tech: "futuristic dark gradient with blue cyan tech accents, modern digital aesthetic, sci-fi inspired"
+    };
+
+    const bgStyle = categoryStyles[category] || styleDescriptions[style] || styleDescriptions.professional;
+
+    // ULTRA-PROFESSIONAL FLUX PRO PROMPT
+    const fluxPrompt = `PROFESSIONAL E-COMMERCE PRODUCT PHOTOGRAPHY for marketplace listing.
+
+PRODUCT: "${productName}"
+STYLE: ${style} ${category ? `for ${category} category` : ""}
+
+COMPOSITION REQUIREMENTS:
+- ${variationConfig.composition}
+- ${variationConfig.focus}
+- Camera angle: ${variationConfig.cameraAngle}
+
+BACKGROUND & ATMOSPHERE:
+${bgStyle}
+
+TECHNICAL SPECIFICATIONS:
+- Ultra high resolution, 8K quality details
+- Professional studio lighting setup with key light, fill light, and rim light
+- Soft natural shadows for depth and grounding
+- Subtle reflections to enhance premium feel
+- Clean crisp product edges
+- Perfect color accuracy and white balance
+- Ready for Uzum Market / Yandex Market listing
+- 3:4 portrait aspect ratio (1080x1440 pixels)
+
+ABSOLUTE RESTRICTIONS:
+- NO text, watermarks, logos, labels, or prices anywhere on image
+- NO people, hands, or body parts
+- NO cluttered or busy backgrounds
+- NO unrealistic colors or artificial looking elements
+
+OUTPUT: Professional product photograph that would sell on premium marketplaces.`;
+
+    // Create prediction with Flux 1.1 Pro
+    const createResponse = await fetch("https://api.replicate.com/v1/predictions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Token ${REPLICATE_API_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        version: "black-forest-labs/flux-1.1-pro",
+        input: {
+          prompt: fluxPrompt,
+          aspect_ratio: "3:4",
+          output_format: "webp",
+          output_quality: 95,
+          safety_tolerance: 2,
+          prompt_upsampling: true
+        }
+      }),
+    });
+
+    if (!createResponse.ok) {
+      const errorText = await createResponse.text();
+      console.error("Flux Pro create error:", createResponse.status, errorText);
+      return null;
+    }
+
+    const prediction = await createResponse.json();
+    console.log("📤 Flux Pro prediction started:", prediction.id);
+
+    // Poll for completion (max 120 seconds)
+    let result = prediction;
+    let attempts = 0;
+    const maxAttempts = 60;
+
+    while (result.status !== "succeeded" && result.status !== "failed" && attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      const pollResponse = await fetch(`https://api.replicate.com/v1/predictions/${prediction.id}`, {
+        headers: {
+          "Authorization": `Token ${REPLICATE_API_TOKEN}`,
+        },
+      });
+      
+      if (pollResponse.ok) {
+        result = await pollResponse.json();
+        console.log(`⏳ Flux Pro status: ${result.status} (attempt ${attempts + 1}/${maxAttempts})`);
+      }
+      attempts++;
+    }
+
+    if (result.status === "succeeded" && result.output) {
+      const imageUrl = Array.isArray(result.output) ? result.output[0] : result.output;
+      console.log("✅ Flux Pro infographic generated successfully");
+      return {
+        url: imageUrl,
+        id: `flux-pro-${Date.now()}`,
+        style: style,
+        variation: variationConfig.focus,
+        composition: variationConfig.cameraAngle
+      };
+    }
+
+    console.error("Flux Pro generation failed:", result.error || "Unknown error");
+    return null;
+  } catch (err) {
+    console.error("Flux Pro error:", err);
+    return null;
+  }
+}
+
+// ==================== FLUX REDUX - IMAGE-TO-IMAGE ====================
+// For transforming existing product images
+async function generateWithFluxRedux(
+  productImage: string,
+  productName: string,
+  style: string,
+  variationConfig: { composition: string; focus: string; cameraAngle: string }
+): Promise<{ url: string; id: string; style: string; variation: string; composition: string } | null> {
+  const REPLICATE_API_TOKEN = Deno.env.get("REPLICATE_API_TOKEN");
+  
+  if (!REPLICATE_API_TOKEN) {
+    return null;
+  }
+
+  try {
+    console.log("🖼️ Using Flux Redux for image-to-image transformation...");
+
+    // Upload image first if it's base64
+    let imageUrl = productImage;
+    if (productImage.startsWith('data:')) {
+      // For base64, we need to use the image directly in the prompt
+      // Flux Redux accepts image URLs, so we'll use text-to-image with detailed description
+      console.log("📸 Base64 image detected, using Flux Pro with detailed prompt instead");
+      return null; // Fall through to Flux Pro text-to-image
+    }
+
+    const createResponse = await fetch("https://api.replicate.com/v1/predictions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Token ${REPLICATE_API_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        version: "black-forest-labs/flux-redux-dev",
+        input: {
+          redux_image: imageUrl,
+          aspect_ratio: "3:4",
+          output_format: "webp",
+          output_quality: 95,
+          megapixels: "1"
+        }
+      }),
+    });
+
+    if (!createResponse.ok) {
+      console.error("Flux Redux error:", await createResponse.text());
+      return null;
+    }
+
+    const prediction = await createResponse.json();
+    
+    // Poll for completion
+    let result = prediction;
+    let attempts = 0;
+    while (result.status !== "succeeded" && result.status !== "failed" && attempts < 60) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      const pollResponse = await fetch(`https://api.replicate.com/v1/predictions/${prediction.id}`, {
+        headers: { "Authorization": `Token ${REPLICATE_API_TOKEN}` },
+      });
+      if (pollResponse.ok) result = await pollResponse.json();
+      attempts++;
+    }
+
+    if (result.status === "succeeded" && result.output) {
+      const outputUrl = Array.isArray(result.output) ? result.output[0] : result.output;
+      return {
+        url: outputUrl,
+        id: `flux-redux-${Date.now()}`,
+        style,
+        variation: variationConfig.focus,
+        composition: variationConfig.cameraAngle
+      };
+    }
+
+    return null;
+  } catch (err) {
+    console.error("Flux Redux error:", err);
+    return null;
+  }
+}
+
+// ==================== DALL-E 3 - FALLBACK ====================
+async function generateWithOpenAI(
+  productName: string,
+  category: string,
   style: string
 ): Promise<{ url: string; id: string; style: string; variation: string; composition: string } | null> {
   const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
@@ -28,12 +253,12 @@ async function generateWithOpenAI(
   }
 
   try {
-    console.log("🎨 Fallback: Using OpenAI DALL-E for infographic...");
+    console.log("🎨 FALLBACK: Using OpenAI DALL-E 3...");
     
-    // Simplified prompt for DALL-E
-    const dallePrompt = `Professional e-commerce product photo for "${productName}". 
-${style} style, clean studio background, premium lighting, high resolution product photography, 
-marketplace listing quality, no text or watermarks, 3:4 portrait aspect ratio.`;
+    const dallePrompt = `Professional e-commerce product photography of "${productName}".
+${style} style, ${category ? `${category} category,` : ""} clean studio background, premium lighting, 
+high resolution product photography, marketplace listing quality, no text or watermarks, 3:4 portrait ratio.
+Ultra realistic, commercial photography quality, ready for Uzum/Yandex marketplace.`;
 
     const response = await fetch("https://api.openai.com/v1/images/generations", {
       method: "POST",
@@ -45,15 +270,14 @@ marketplace listing quality, no text or watermarks, 3:4 portrait aspect ratio.`;
         model: "dall-e-3",
         prompt: dallePrompt,
         n: 1,
-        size: "1024x1792", // Closest to 3:4 ratio
-        quality: "standard",
+        size: "1024x1792",
+        quality: "hd",
         style: style === "vibrant" ? "vivid" : "natural"
       }),
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("DALL-E API error:", response.status, errorText);
+      console.error("DALL-E API error:", response.status, await response.text());
       return null;
     }
 
@@ -61,13 +285,13 @@ marketplace listing quality, no text or watermarks, 3:4 portrait aspect ratio.`;
     const imageUrl = data.data?.[0]?.url;
 
     if (imageUrl) {
-      console.log("✅ DALL-E infographic generated successfully");
+      console.log("✅ DALL-E 3 fallback successful");
       return {
         url: imageUrl,
-        id: `dalle-infographic-${Date.now()}`,
-        style: style,
+        id: `dalle-${Date.now()}`,
+        style,
         variation: "DALL-E generated",
-        composition: "AI-enhanced product visualization"
+        composition: "AI-enhanced"
       };
     }
 
@@ -85,7 +309,7 @@ serve(async (req) => {
 
   try {
     const request: InfographicRequest = await req.json();
-    const { productImage, productName, category, style = "professional", count = 1 } = request;
+    const { productImage, productName, category = "", style = "professional", count = 1 } = request;
 
     if (!productImage) {
       return new Response(
@@ -94,200 +318,100 @@ serve(async (req) => {
       );
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
-    }
-
     console.log(`🎨 Generating ${count} infographic(s) for: ${productName}`);
-    console.log(`📐 Target size: 1080x1440 (Uzum/Yandex marketplace format)`);
+    console.log(`📐 Target: 1080x1440 (3:4 marketplace format)`);
     console.log(`🎯 Style: ${style}, Category: ${category || "general"}`);
+    console.log(`🤖 AI Priority: Flux Pro → DALL-E 3`);
 
-    // Category-specific background styling (NO TEXT - Zero-Text Policy)
-    const categoryBackgrounds: Record<string, string> = {
-      "Elektronika": "sleek dark gradient background with subtle blue tech glow effects, premium studio lighting",
-      "Smartfonlar": "elegant dark gradient with soft blue/purple ambient lighting, floating reflections",
-      "Kiyim-kechak": "soft neutral fabric texture background, fashion editorial lighting, subtle shadows",
-      "Go'zallik": "luxurious soft pink/gold bokeh background, beauty product photography lighting",
-      "Sport": "dynamic gradient with energy vibes, athletic mood lighting",
-      "Uy-ro'zg'or": "warm cozy home interior blur background, natural lighting",
-      "Bolalar uchun": "playful soft pastel gradient background, cheerful mood",
-      "Kompyuterlar": "professional dark tech background with subtle grid patterns, RGB accents",
-      "Audio": "premium dark background with sound wave subtle effects, studio quality",
-    };
-
-    const styleBackgrounds: Record<string, string> = {
-      professional: "clean white/light gray gradient studio background, professional product photography lighting, soft shadows",
-      minimalist: "pure white background, minimal composition, elegant simplicity, premium feel",
-      vibrant: "colorful dynamic gradient background, eye-catching energy, bold modern feel",
-      luxury: "dark elegant background with golden/warm accents, premium sophisticated lighting",
-      tech: "futuristic dark gradient with blue/cyan tech accents, modern digital aesthetic"
-    };
-
-    const bgStyle = categoryBackgrounds[category || ""] || styleBackgrounds[style];
-
-    // Generate infographics using Lovable AI image editing
-    // This KEEPS the original product and only changes the background/lighting/composition
-    const results = [];
-
-    // Enhanced variation prompts - different compositions, zooms, and angles
-    // Each variation focuses on different aspects while keeping the EXACT same product
+    // Professional variation configs for different compositions
     const variationConfigs = [
       {
-        composition: "centered hero composition, product fills 80% of frame, dramatic lighting from above",
-        focus: "overall product showcase, full visibility",
+        composition: "centered hero composition, product fills 80% of frame, dramatic overhead lighting",
+        focus: "overall product showcase, full visibility, hero shot",
         cameraAngle: "straight-on frontal view"
       },
       {
-        composition: "slight 15-degree angle, dynamic perspective, product fills 70% of frame",
-        focus: "emphasize product depth and dimension",
-        cameraAngle: "three-quarter view showing product form"
+        composition: "dynamic 15-degree angle, product fills 70% of frame, depth emphasis",
+        focus: "product depth and three-dimensionality",
+        cameraAngle: "three-quarter perspective view"
       },
       {
-        composition: "close-up crop focusing on key product details, product fills 90% of frame",
-        focus: "highlight textures, materials, and craftsmanship",
-        cameraAngle: "macro detail shot"
+        composition: "close-up macro shot, product details fill 90% of frame, texture focus",
+        focus: "highlight textures, materials, craftsmanship details",
+        cameraAngle: "macro detail photography"
       },
       {
-        composition: "elegant offset composition, product positioned slightly right, negative space on left",
-        focus: "premium catalog style, editorial feel",
+        composition: "elegant offset layout, product right of center, premium negative space",
+        focus: "premium catalog style, editorial magazine feel",
         cameraAngle: "eye-level elegant angle"
       },
       {
-        composition: "dramatic low angle view, product appears powerful and prominent",
-        focus: "create impression of quality and importance",
-        cameraAngle: "slight upward perspective"
+        composition: "dramatic low angle, product appears powerful and prominent",
+        focus: "create impression of quality, importance, premium value",
+        cameraAngle: "slight upward hero perspective"
       },
       {
-        composition: "clean symmetrical layout, perfectly centered with balanced lighting",
-        focus: "professional product photography standard",
+        composition: "clean symmetrical centered layout, perfectly balanced composition",
+        focus: "professional product photography standard, catalog ready",
         cameraAngle: "direct frontal catalog view"
       }
     ];
 
+    const results = [];
+    let usedModel = "flux-pro";
+
     for (let i = 0; i < Math.min(count, 6); i++) {
-      try {
-        const config = variationConfigs[i % variationConfigs.length];
+      const config = variationConfigs[i % variationConfigs.length];
+      console.log(`📸 Generating infographic ${i + 1}/${count} - ${config.focus}...`);
 
-        const editPrompt = `Transform this product photo into a professional e-commerce marketplace infographic.
+      // PRIMARY: Try Flux Pro first
+      let result = await generateWithFluxPro(productImage, productName, category, style, config);
 
-ABSOLUTE REQUIREMENTS (MUST FOLLOW):
-- Keep the EXACT same product - do NOT change, replace, or alter the product in ANY way
-- The product model, shape, color, brand, and ALL details MUST remain 100% identical
-- Output size: 1080x1440 pixels (3:4 portrait aspect ratio for Uzum/Yandex marketplace)
-- ZERO TEXT on the image - no text, no watermarks, no logos, no labels, no prices
+      // FALLBACK 1: Try Flux Redux for image-to-image
+      if (!result && !productImage.startsWith('data:')) {
+        result = await generateWithFluxRedux(productImage, productName, style, config);
+        if (result) usedModel = "flux-redux";
+      }
 
-COMPOSITION FOR THIS VARIATION:
-- ${config.composition}
-- Focus: ${config.focus}
-- Camera angle: ${config.cameraAngle}
+      // FALLBACK 2: Try DALL-E 3
+      if (!result) {
+        result = await generateWithOpenAI(productName, category, style);
+        if (result) usedModel = "dall-e-3";
+      }
 
-BACKGROUND & STYLING:
-- ${bgStyle}
-- Professional e-commerce studio lighting setup
-- Soft shadows beneath product for depth and grounding
-- Subtle reflections to enhance premium feel
-- Clean separation between product and background
+      if (result) {
+        results.push(result);
+        console.log(`✅ Infographic ${i + 1} generated with ${usedModel}`);
+      }
 
-QUALITY REQUIREMENTS:
-- Ultra high resolution, sharp details
-- Professional product photography quality
-- Ready for Uzum Market / Yandex Market listing`;
-
-        console.log(`📸 Generating infographic ${i + 1}/${count} - ${config.focus}...`);
-
-        const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "google/gemini-2.5-flash-image",
-            messages: [
-              {
-                role: "user",
-                content: [
-                  {
-                    type: "text",
-                    text: editPrompt
-                  },
-                  {
-                    type: "image_url",
-                    image_url: {
-                      url: productImage // Original product image from AI Scanner
-                    }
-                  }
-                ]
-              }
-            ],
-            modalities: ["image", "text"]
-          }),
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`Infographic ${i + 1} API error:`, response.status, errorText);
-          
-          // If credits exhausted (402), try OpenAI DALL-E fallback
-          if (response.status === 402) {
-            console.log("⚠️ Lovable AI credits exhausted, trying OpenAI DALL-E fallback...");
-            const fallbackResult = await generateWithOpenAI(editPrompt, productName, style);
-            if (fallbackResult) {
-              results.push(fallbackResult);
-              console.log(`✅ Fallback infographic ${i + 1} generated with DALL-E`);
-            }
-          }
-          continue;
-        }
-
-        const data = await response.json();
-        const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-
-        if (imageUrl) {
-          results.push({
-            url: imageUrl,
-            id: `infographic-${i + 1}-${Date.now()}`,
-            style: style,
-            variation: config.focus,
-            composition: config.cameraAngle
-          });
-          console.log(`✅ Infographic ${i + 1} generated - ${config.cameraAngle}`);
-        }
-
-        // Small delay between requests to avoid rate limiting
-        if (i < count - 1) {
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-
-      } catch (err) {
-        console.error(`Error generating infographic ${i + 1}:`, err);
+      // Delay between requests to avoid rate limiting
+      if (i < count - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
 
     if (results.length === 0) {
-      console.log("⚠️ No infographics generated - returning graceful response");
+      console.log("⚠️ No infographics generated");
       return new Response(
         JSON.stringify({ 
           images: [],
-          aiModel: "fallback",
+          aiModel: "none",
           style,
           count: 0,
           dimensions: "1080x1440",
           format: "marketplace-optimized",
-          message: "Infografika generatsiyasi vaqtinchalik mavjud emas. Iltimos, keyinroq urinib ko'ring yoki mahsulot rasmini qo'lda yuklang."
+          message: "Infografika generatsiyasi vaqtinchalik mavjud emas. Keyinroq urinib ko'ring."
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log(`🎉 Generated ${results.length}/${count} infographics successfully`);
+    console.log(`🎉 Generated ${results.length}/${count} infographics with ${usedModel}`);
 
     return new Response(
       JSON.stringify({ 
         images: results,
-        aiModel: "gemini-2.5-flash-image",
+        aiModel: usedModel,
         style,
         count: results.length,
         dimensions: "1080x1440",
