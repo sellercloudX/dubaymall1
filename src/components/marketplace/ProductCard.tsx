@@ -246,22 +246,6 @@ export const ProductCard = memo(function ProductCard({ product }: ProductCardPro
 
         {/* Content */}
         <div className="p-2.5 flex flex-col flex-1">
-          {/* Product Name - First letter uppercase, 2 lines max */}
-          <h3 className="text-sm font-normal line-clamp-2 leading-tight text-foreground mb-1.5 min-h-[2.5rem]">
-            {formatProductName(product.name)}
-          </h3>
-
-          {/* Shop Name - Clickable link to shop */}
-          {product.shop && (
-            <Link 
-              to={`/shop/${product.shop.slug}`}
-              onClick={(e) => e.stopPropagation()}
-              className="text-[11px] text-muted-foreground hover:text-primary transition-colors mb-1.5 truncate"
-            >
-              {product.shop.name}
-            </Link>
-          )}
-
           {/* Price Section - Uzum style */}
           <div className="mb-1">
             {/* Current Price */}
@@ -281,13 +265,18 @@ export const ProductCard = memo(function ProductCard({ product }: ProductCardPro
           </div>
 
           {/* Monthly Payment Badge - Yellow like Uzum - 24 month formula */}
-          {monthlyPayment > 0 && (
+          {product.price > 0 && (
             <div className="mb-2">
               <span className="inline-block bg-yellow-300 dark:bg-yellow-400 text-yellow-900 text-[10px] font-medium px-1.5 py-0.5 rounded whitespace-nowrap">
-                {formatPrice(monthlyPayment)} so'm/oyiga
+                {formatPrice(Math.round((product.price * 1.6) / 24))} so'm/oyiga
               </span>
             </div>
           )}
+
+          {/* Product Name - First letter uppercase, 2 lines max, BELOW price */}
+          <h3 className="text-sm font-normal line-clamp-2 leading-tight text-foreground mb-2 flex-1">
+            {formatProductName(product.name)}
+          </h3>
 
           {/* Rating - Only show if has real reviews */}
           {hasReviews && (
