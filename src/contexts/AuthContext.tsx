@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, Session } from '@supabase/supabase-js';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import { User, Session, AuthChangeEvent } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
 interface AuthContextType {
@@ -17,25 +17,129 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const refreshAttempts = useRef(0);
+  const maxRefreshAttempts = 3;
 
   useEffect(() => {
+    let mounted = true;
+
+    // Handle auth state changes
+    const handleAuthChange = async (event: AuthChangeEvent, currentSession: Session | null) => {
+      if (!mounted) return;
+
+      console.log('[Auth] Event:', event);
+
+      switch (event) {
+        case 'SIGNED_IN':
+        case 'TOKEN_REFRESHED':
+          setSession(currentSession);
+          setUser(currentSession?.user ?? null);
+          refreshAttempts.current = 0; // Reset on successful auth
+          break;
+
+        case 'SIGNED_OUT':
+          setSession(null);
+          setUser(null);
+          refreshAttempts.current = 0;
+          break;
+
+        case 'USER_UPDATED':
+          setSession(currentSession);
+          setUser(currentSession?.user ?? null);
+          break;
+
+        case 'INITIAL_SESSION':
+          setSession(currentSession);
+          setUser(currentSession?.user ?? null);
+          break;
+
+        default:
+          // Handle any other events
+          if (currentSession) {
+            setSession(currentSession);
+            setUser(currentSession.user);
+          }
+      }
+
+      setLoading(false);
+    };
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
+        // Use setTimeout to prevent deadlock
+        setTimeout(() => {
+          handleAuthChange(event, session);
+        }, 0);
       }
     );
 
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    // THEN check for existing session with retry logic
+    const initializeSession = async () => {
+      try {
+        const { data: { session: existingSession }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('[Auth] Session error:', error.message);
+          
+          // If session retrieval failed, try to refresh
+          if (refreshAttempts.current < maxRefreshAttempts) {
+            refreshAttempts.current++;
+            console.log('[Auth] Attempting refresh:', refreshAttempts.current);
+            
+            const { data: { session: refreshedSession }, error: refreshError } = 
+              await supabase.auth.refreshSession();
+            
+            if (!refreshError && refreshedSession && mounted) {
+              setSession(refreshedSession);
+              setUser(refreshedSession.user);
+              refreshAttempts.current = 0;
+            } else if (mounted) {
+              // Only clear if we've exhausted attempts
+              if (refreshAttempts.current >= maxRefreshAttempts) {
+                setSession(null);
+                setUser(null);
+              }
+            }
+          }
+        } else if (mounted) {
+          setSession(existingSession);
+          setUser(existingSession?.user ?? null);
+        }
+      } catch (err) {
+        console.error('[Auth] Initialization error:', err);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
 
-    return () => subscription.unsubscribe();
+    initializeSession();
+
+    // Set up periodic session check to prevent silent logout
+    const sessionCheckInterval = setInterval(async () => {
+      if (!mounted) return;
+      
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      
+      // If we had a session but now don't, try to refresh
+      if (session && !currentSession) {
+        console.log('[Auth] Session lost, attempting recovery...');
+        const { data: { session: refreshedSession } } = await supabase.auth.refreshSession();
+        
+        if (refreshedSession && mounted) {
+          setSession(refreshedSession);
+          setUser(refreshedSession.user);
+        }
+      }
+    }, 60000); // Check every minute
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+      clearInterval(sessionCheckInterval);
+    };
   }, []);
 
   const signUp = async (email: string, password: string, fullName: string) => {
