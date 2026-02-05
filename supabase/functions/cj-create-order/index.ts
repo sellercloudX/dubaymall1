@@ -169,10 +169,42 @@ serve(async (req) => {
   }
 
   try {
+    // === AUTHENTICATION CHECK ===
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      console.log('Missing or invalid authorization header');
+      return new Response(
+        JSON.stringify({ success: false, error: 'Unauthorized - Authentication required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+
+    const authSupabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await authSupabase.auth.getClaims(token);
+    
+    if (claimsError || !claimsData?.claims) {
+      console.log('Invalid JWT token:', claimsError?.message);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Unauthorized - Invalid token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const userId = claimsData.claims.sub as string;
+    console.log('Authenticated user:', userId);
+    // === END AUTHENTICATION CHECK ===
+
     const url = new URL(req.url);
     const action = url.searchParams.get('action') || 'create';
 
-    // Get access token
+    // Get CJ access token
     const accessToken = await getCJAccessToken();
     
     if (!accessToken) {
@@ -185,8 +217,40 @@ serve(async (req) => {
       });
     }
 
+    // Service role client for DB operations
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
+
     if (action === 'track') {
-      const { cjOrderId } = await req.json();
+      const { cjOrderId, orderId } = await req.json();
+      
+      // Verify user has access to this order
+      if (orderId) {
+        const { data: orderCheck } = await supabase
+          .from('dropshipping_orders')
+          .select('id, shops!inner(user_id)')
+          .eq('order_id', orderId)
+          .single();
+        
+        if (!orderCheck || (orderCheck as any).shops?.user_id !== userId) {
+          // Check if user is admin
+          const { data: adminCheck } = await supabase
+            .from('admin_permissions')
+            .select('id')
+            .eq('user_id', userId)
+            .single();
+          
+          if (!adminCheck) {
+            return new Response(
+              JSON.stringify({ success: false, error: 'Access denied - You do not own this order' }),
+              { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+        }
+      }
+
       const trackingData = await getCJOrderTracking(accessToken, cjOrderId);
       
       return new Response(JSON.stringify({
@@ -205,17 +269,63 @@ serve(async (req) => {
       throw new Error('Missing required fields: orderId, items, shippingAddress');
     }
 
+    // === AUTHORIZATION CHECK - Verify user owns the shop for this order ===
+    const { data: orderData, error: orderError } = await supabase
+      .from('orders')
+      .select(`
+        id,
+        order_items (
+          product_id,
+          products (
+            shop_id,
+            shops (
+              user_id
+            )
+          )
+        )
+      `)
+      .eq('id', body.orderId)
+      .single();
+
+    if (orderError || !orderData) {
+      console.log('Order not found:', body.orderId);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Order not found' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check if user owns any of the products' shops or is admin
+    const orderItems = (orderData as any).order_items || [];
+    const userOwnsShop = orderItems.some((item: any) => 
+      item.products?.shops?.user_id === userId
+    );
+
+    if (!userOwnsShop) {
+      // Check if user is admin
+      const { data: adminCheck } = await supabase
+        .from('admin_permissions')
+        .select('id')
+        .eq('user_id', userId)
+        .single();
+      
+      if (!adminCheck) {
+        console.log('User does not own shop for order:', body.orderId, 'User:', userId);
+        return new Response(
+          JSON.stringify({ success: false, error: 'Access denied - You do not own this shop' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+    // === END AUTHORIZATION CHECK ===
+
+    console.log('User authorized to create CJ order for:', body.orderId);
+
     const createResult = await createCJOrder(accessToken, body);
     
     if (!createResult.result) {
       throw new Error(`CJ order failed: ${createResult.message}`);
     }
-
-    // Update database
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    );
 
     await supabase
       .from('dropshipping_orders')
