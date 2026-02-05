@@ -20,8 +20,8 @@ export default defineConfig(({ mode }) => ({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'robots.txt'],
       manifest: {
-        name: 'SuperEshop Hub',
-        short_name: 'SuperEshop',
+        name: 'Dubay Mall',
+        short_name: 'Dubay Mall',
         description: "O'zbekistonning eng yirik onlayn savdo platformasi",
         start_url: '/',
         display: 'standalone',

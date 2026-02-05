@@ -167,7 +167,7 @@ export default function SellerCloudX() {
             <div className="text-center mt-8">
               <Button variant="ghost" asChild>
                 <Link to="/seller">
-                  ← BazarHub do'koniga qaytish
+                  ← Dubay Mall do'koniga qaytish
                 </Link>
               </Button>
             </div>
@@ -200,7 +200,7 @@ export default function SellerCloudX() {
           </div>
           <Button variant="outline" asChild>
             <Link to="/seller">
-              BazarHub do'koni →
+              Dubay Mall do'koni →
             </Link>
           </Button>
         </div>

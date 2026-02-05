@@ -36,9 +36,9 @@ export default function Partnership() {
     },
     {
       id: 'seller',
-      title: 'BazarHub Do\'koni',
+      title: 'Dubay Mall Do\'koni',
       subtitle: 'O\'z onlayn do\'koningiz',
-      description: 'BazarHub marketplace\'da bepul do\'kon oching. Mahsulotlaringizni qo\'shing yoki dropshipping bilan ishlang.',
+      description: 'Dubay Mall marketplace\'da bepul do\'kon oching. Mahsulotlaringizni qo\'shing yoki dropshipping bilan ishlang.',
       icon: Store,
       gradient: 'from-primary to-primary/80',
       price: 'Bepul',

@@ -150,11 +150,11 @@ export default function ProductPage() {
     sku: product.id,
     brand: {
       '@type': 'Brand',
-      name: product.shop?.name || 'SuperEshop',
+      name: product.shop?.name || 'Dubay Mall',
     },
     offers: {
       '@type': 'Offer',
-      url: `https://supereshop.uz/product/${product.id}`,
+      url: `https://dubaymall.uz/product/${product.id}`,
       priceCurrency: 'UZS',
       price: product.price,
       availability: product.stock_quantity > 0 
@@ -162,7 +162,7 @@ export default function ProductPage() {
         : 'https://schema.org/OutOfStock',
       seller: {
         '@type': 'Organization',
-        name: product.shop?.name || 'SuperEshop Hub',
+        name: product.shop?.name || 'Dubay Mall',
       },
     },
     aggregateRating: ratingData?.total_reviews ? {
@@ -175,10 +175,10 @@ export default function ProductPage() {
   return (
     <Layout>
       <SEOHead
-        title={`${product.name} - SuperEshop Hub`}
-        description={product.description?.slice(0, 155) || `${product.name} - eng yaxshi narxlarda SuperEshop Hub'da xarid qiling`}
+        title={`${product.name} - Dubay Mall`}
+        description={product.description?.slice(0, 155) || `${product.name} - eng yaxshi narxlarda Dubay Mall'da xarid qiling`}
         image={images[0]}
-        url={`https://supereshop.uz/product/${product.id}`}
+        url={`https://dubaymall.uz/product/${product.id}`}
         type="product"
         product={{
           price: product.price,
