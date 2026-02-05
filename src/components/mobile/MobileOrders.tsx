@@ -18,6 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { toast } from 'sonner';
 
 interface MobileOrdersProps {
   connectedMarketplaces: string[];
@@ -42,10 +43,15 @@ const ORDER_STATUSES = [
 export function MobileOrders({ connectedMarketplaces, fetchMarketplaceData }: MobileOrdersProps) {
   const [orders, setOrders] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedMp, setSelectedMp] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [total, setTotal] = useState(0);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  
+  // Cache orders per marketplace
+  const [cachedOrders, setCachedOrders] = useState<Record<string, any[]>>({});
 
   useEffect(() => {
     if (connectedMarketplaces.length > 0 && !selectedMp) {
@@ -54,27 +60,53 @@ export function MobileOrders({ connectedMarketplaces, fetchMarketplaceData }: Mo
   }, [connectedMarketplaces]);
 
   useEffect(() => {
-    if (selectedMp) loadOrders();
+    if (selectedMp) {
+      const cacheKey = `${selectedMp}-${statusFilter}`;
+      if (cachedOrders[cacheKey]) {
+        setOrders(cachedOrders[cacheKey]);
+        setTotal(cachedOrders[cacheKey].length);
+        loadOrders(true);
+      } else {
+        loadOrders();
+      }
+    }
   }, [selectedMp, statusFilter]);
 
-  const loadOrders = async () => {
-    setIsLoading(true);
+  const loadOrders = async (background = false) => {
+    if (background) {
+      setIsRefreshing(true);
+    } else {
+      setIsLoading(true);
+    }
+    
     try {
       const options: Record<string, any> = { fetchAll: true };
       if (statusFilter !== 'all') options.status = statusFilter;
       
       const result = await fetchMarketplaceData(selectedMp, 'orders', options);
       if (result.success) {
-        setOrders(result.data || []);
-        setTotal(result.total || result.data?.length || 0);
+        const data = result.data || [];
+        setOrders(data);
+        setTotal(result.total || data.length);
+        setLastUpdated(new Date());
+        
+        // Update cache
+        const cacheKey = `${selectedMp}-${statusFilter}`;
+        setCachedOrders(prev => ({ ...prev, [cacheKey]: data }));
       }
     } catch (err) {
       console.error(err);
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   };
 
+  const handleRefresh = () => {
+    toast.info('Buyurtmalar yangilanmoqda...');
+    loadOrders();
+  };
+ 
   const formatPrice = (price?: number) => {
     if (!price) return '—';
     return new Intl.NumberFormat('uz-UZ').format(price) + ' so\'m';
@@ -139,16 +171,17 @@ export function MobileOrders({ connectedMarketplaces, fetchMarketplaceData }: Mo
               ))}
             </SelectContent>
           </Select>
-          <Button variant="outline" size="icon" onClick={loadOrders} disabled={isLoading} className="shrink-0 h-9 w-9">
-            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+          <Button variant="outline" size="icon" onClick={handleRefresh} disabled={isLoading || isRefreshing} className="shrink-0 h-9 w-9">
+            <RefreshCw className={`h-4 w-4 ${isLoading || isRefreshing ? 'animate-spin' : ''}`} />
           </Button>
         </div>
 
-        {total > 0 && (
-          <div className="text-xs text-muted-foreground">
-            {orders.length} / {total} buyurtma
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>{orders.length} ta buyurtma</span>
+          {lastUpdated && (
+            <span>{lastUpdated.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })}</span>
+          )}
           </div>
-        )}
       </div>
 
       {/* Orders List */}

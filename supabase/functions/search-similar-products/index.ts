@@ -15,44 +15,27 @@ interface ProductResult {
   description: string;
 }
 
-// Search across multiple platforms using web search
-async function searchWebForProducts(productName: string, category: string): Promise<ProductResult[]> {
+// Fast parallel search across multiple platforms
+async function searchWebForProducts(productName: string, category: string, imageBase64?: string): Promise<ProductResult[]> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) return [];
   
-  // Create comprehensive multi-platform search prompt
-  const searchPrompt = `You are an expert e-commerce product researcher. Your task is to find REAL, existing products across multiple online marketplaces.
+  const truncatedName = productName.slice(0, 150);
+  const truncatedCategory = category?.slice(0, 30) || '';
 
-SEARCH QUERY: "${productName.slice(0, 200)}" ${category ? `in category: ${category.slice(0, 50)}` : ''}
+  // Optimized prompt for speed
+  const searchPrompt = `Find 8 products similar to "${truncatedName}" ${truncatedCategory ? `(${truncatedCategory})` : ''} from these marketplaces:
+- Uzum Market (uzum.uz)
+- Yandex Market (market.yandex.ru)
+- Wildberries (wildberries.ru)
+- Ozon (ozon.ru)
+- AliExpress
+- Amazon
+- Kaspi.kz
 
-Search and find products from these platforms (prioritize platforms with good product images):
-1. **Uzum Market** (uzum.uz) - Uzbekistan's main marketplace
-2. **Yandex Market** (market.yandex.ru) - Russian marketplace
-3. **Wildberries** (wildberries.ru) - Large Russian marketplace  
-4. **Ozon** (ozon.ru) - Russian marketplace
-5. **AliExpress** (aliexpress.com/aliexpress.ru) - Chinese marketplace
-6. **Kaspi.kz** - Kazakhstan marketplace
-
-IMPORTANT: 
-- Find products with HIGH QUALITY product images (professional photos, infographics, white background)
-- Include products with multiple good images when possible
-- Provide REAL product URLs from these marketplaces
-- Include actual prices in local currency (som, rubles, tenge)
-- Focus on products that are identical or very similar to the search query
-
-Return EXACTLY 8-10 products in this JSON format (NO other text, just JSON array):
-[
-  {
-    "title": "Exact product name as shown on marketplace",
-    "price": "price with currency symbol (e.g., '45 000 сум', '2 500 ₽', '$15.99')",
-    "image": "direct URL to the main product image (must be https://)",
-    "source": "Platform name (Uzum Market, Yandex Market, Wildberries, Ozon, AliExpress, Kaspi)",
-    "url": "Full product page URL",
-    "description": "Brief product description (50-100 characters)"
-  }
-]
-
-Make sure images are real product images from the actual marketplace product pages.`;
-
+Return JSON array ONLY:
+[{"title":"name","price":"45000 so'm","image":"https://...jpg","source":"Uzum","url":"https://...","description":"short desc"}]`;
+ 
   try {
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -61,18 +44,13 @@ Make sure images are real product images from the actual marketplace product pag
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-2.5-flash-lite", // Faster model
         messages: [
-          {
-            role: "system",
-            content: "You are a product search expert. You have access to current marketplace data. Provide accurate, real product information."
-          },
-          {
-            role: "user",
-            content: searchPrompt
-          }
+          { role: "system", content: "Product search expert. Return JSON only." },
+          { role: "user", content: searchPrompt }
         ],
-        temperature: 0.3,
+        temperature: 0.2,
+        max_tokens: 2000,
       }),
     });
 
@@ -98,20 +76,12 @@ Make sure images are real product images from the actual marketplace product pag
   return [];
 }
 
-// Search specifically for high-quality images
-async function searchForProductImages(productName: string): Promise<string[]> {
+// Fast image search
+async function searchForProductImages(productName: string, category?: string): Promise<string[]> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) return [];
   
-  const imageSearchPrompt = `Find 5 high-quality product images for: "${productName.slice(0, 200)}"
-
-Look for:
-- Professional product photography
-- White/clean background images
-- Infographic images with features highlighted
-- Multiple angles if available
-
-Return JSON array of image URLs only:
-["url1", "url2", "url3", "url4", "url5"]`;
+  const prompt = `Find 5 HD product images for "${productName.slice(0, 100)}"${category ? ` (${category})` : ''}. Professional photos, white background. Return JSON: ["url1","url2","url3","url4","url5"]`;
 
   try {
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -121,9 +91,10 @@ Return JSON array of image URLs only:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [{ role: "user", content: imageSearchPrompt }],
+        model: "google/gemini-2.5-flash-lite",
+        messages: [{ role: "user", content: prompt }],
         temperature: 0.2,
+        max_tokens: 500,
       }),
     });
 
@@ -142,6 +113,14 @@ Return JSON array of image URLs only:
   return [];
 }
 
+// Validate and fix image URLs
+function validateImages(products: ProductResult[]): ProductResult[] {
+  return products.map(p => ({
+    ...p,
+    image: p.image?.startsWith('http') ? p.image : '',
+  })).filter(p => p.title && p.price);
+}
+ 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -174,19 +153,12 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const { productName, category, description, searchMode } = body;
+    const { productName, category, description, imageBase64 } = body;
 
     // Input validation
-    if (!productName || typeof productName !== 'string' || productName.length > 500) {
+    if (!productName || typeof productName !== 'string') {
       return new Response(
         JSON.stringify({ error: "Invalid product name", products: [] }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    if (category && (typeof category !== 'string' || category.length > 200)) {
-      return new Response(
-        JSON.stringify({ error: "Invalid category", products: [] }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -201,20 +173,23 @@ serve(async (req) => {
 
     console.log(`🔍 Multi-platform search for: ${productName} by user ${claimsData.claims.sub}`);
 
-    // Perform comprehensive web search across platforms
-    const products = await searchWebForProducts(productName, category || "");
+    // Run searches in parallel for speed
+    const [products, additionalImages] = await Promise.all([
+      searchWebForProducts(productName, category || "", imageBase64),
+      searchForProductImages(productName, category),
+    ]);
     
-    // Also get additional images
-    const additionalImages = await searchForProductImages(productName);
+    // Validate results
+    const validProducts = validateImages(products);
 
-    console.log(`✅ Found ${products.length} products, ${additionalImages.length} additional images`);
+    console.log(`✅ Found ${validProducts.length} products, ${additionalImages.length} images`);
 
     return new Response(
       JSON.stringify({ 
-        products,
+        products: validProducts,
         additionalImages,
         searchQuery: productName,
-        platforms: ["Uzum Market", "Yandex Market", "Wildberries", "Ozon", "AliExpress", "Kaspi"]
+        platforms: ["Uzum", "Yandex", "Wildberries", "Ozon", "AliExpress", "Amazon", "Kaspi"]
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

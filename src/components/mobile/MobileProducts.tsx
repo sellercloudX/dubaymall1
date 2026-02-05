@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Package, Search, RefreshCw, Image as ImageIcon } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface MobileProductsProps {
   connectedMarketplaces: string[];
@@ -21,9 +22,14 @@ const MARKETPLACE_EMOJI: Record<string, string> = {
 export function MobileProducts({ connectedMarketplaces, fetchMarketplaceData }: MobileProductsProps) {
   const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedMp, setSelectedMp] = useState('');
   const [search, setSearch] = useState('');
   const [total, setTotal] = useState(0);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  
+  // Cache products per marketplace
+  const [cachedProducts, setCachedProducts] = useState<Record<string, any[]>>({});
 
   useEffect(() => {
     if (connectedMarketplaces.length > 0 && !selectedMp) {
@@ -32,24 +38,50 @@ export function MobileProducts({ connectedMarketplaces, fetchMarketplaceData }: 
   }, [connectedMarketplaces]);
 
   useEffect(() => {
-    if (selectedMp) loadProducts();
+    if (selectedMp) {
+      // Use cache if available, then refresh in background
+      if (cachedProducts[selectedMp]) {
+        setProducts(cachedProducts[selectedMp]);
+        setTotal(cachedProducts[selectedMp].length);
+        // Background refresh
+        loadProducts(true);
+      } else {
+        loadProducts();
+      }
+    }
   }, [selectedMp]);
 
-  const loadProducts = async () => {
-    setIsLoading(true);
+  const loadProducts = async (background = false) => {
+    if (background) {
+      setIsRefreshing(true);
+    } else {
+      setIsLoading(true);
+    }
+    
     try {
       const result = await fetchMarketplaceData(selectedMp, 'products', { limit: 200, fetchAll: true });
       if (result.success) {
-        setProducts(result.data || []);
-        setTotal(result.total || result.data?.length || 0);
+        const data = result.data || [];
+        setProducts(data);
+        setTotal(result.total || data.length);
+        setLastUpdated(new Date());
+        
+        // Update cache
+        setCachedProducts(prev => ({ ...prev, [selectedMp]: data }));
       }
     } catch (err) {
       console.error(err);
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   };
 
+  const handleRefresh = () => {
+    toast.info('Yangilanmoqda...');
+    loadProducts();
+  };
+ 
   const filteredProducts = products.filter(p =>
     p.name?.toLowerCase().includes(search.toLowerCase()) ||
     p.offerId?.toLowerCase().includes(search.toLowerCase())
@@ -80,6 +112,27 @@ export function MobileProducts({ connectedMarketplaces, fetchMarketplaceData }: 
     <div className="flex flex-col h-full">
       {/* Sticky Header */}
       <div className="sticky top-14 bg-background z-30 px-3 py-3 border-b space-y-2.5">
+        {/* Top row with title and refresh */}
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="font-medium text-sm">{total} ta mahsulot</span>
+            {lastUpdated && (
+              <span className="text-xs text-muted-foreground ml-2">
+                • {lastUpdated.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
+          </div>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={handleRefresh}
+            disabled={isLoading || isRefreshing}
+            className="h-8 px-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
+ 
         {/* Marketplace Pills */}
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-3 px-3 scrollbar-hide">
           {connectedMarketplaces.map(mp => (
@@ -106,16 +159,7 @@ export function MobileProducts({ connectedMarketplaces, fetchMarketplaceData }: 
               className="pl-8 h-9 text-sm"
             />
           </div>
-          <Button variant="outline" size="icon" onClick={loadProducts} disabled={isLoading} className="shrink-0 h-9 w-9">
-            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-          </Button>
         </div>
-
-        {total > 0 && (
-          <div className="text-xs text-muted-foreground">
-            {filteredProducts.length} / {total} mahsulot
-          </div>
-        )}
       </div>
 
       {/* Products List */}

@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useRealtimeSellerStats } from './useRealtimeSubscription';
 
 interface SellerStats {
   totalRevenue: number;
@@ -24,6 +25,9 @@ interface SellerStats {
 }
 
 export function useSellerStats(shopId: string | null) {
+  // Enable real-time updates
+  useRealtimeSellerStats(shopId);
+ 
   return useQuery({
     queryKey: ['seller-stats', shopId],
     queryFn: async (): Promise<SellerStats> => {
@@ -154,6 +158,8 @@ export function useSellerStats(shopId: string | null) {
       };
     },
     enabled: !!shopId,
+    staleTime: 1000 * 30, // 30 seconds - more frequent updates
+    refetchInterval: 1000 * 60, // Auto-refresh every minute
   });
 }
 
