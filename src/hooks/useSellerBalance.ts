@@ -19,7 +19,17 @@ export function useSellerBalance() {
         .maybeSingle();
 
       if (error) throw error;
-      return data;
+      
+      // Calculate total withdrawn from withdrawal requests
+      const { data: withdrawalsData } = await supabase
+        .from('seller_withdrawal_requests')
+        .select('amount')
+        .eq('shop_id', shop.id)
+        .eq('status', 'completed');
+      
+      const totalWithdrawn = withdrawalsData?.reduce((sum, w) => sum + (w.amount || 0), 0) || 0;
+      
+      return { ...data, total_withdrawn: totalWithdrawn };
     },
     enabled: !!shop,
   });
