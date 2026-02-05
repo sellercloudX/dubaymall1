@@ -113,6 +113,9 @@ export default function Auth() {
             title: 'Muvaffaqiyat',
             description: t.registrationSuccess,
           });
+          // Switch to login mode after successful registration
+          setMode('login');
+          setFormData(prev => ({ ...prev, password: '', confirmPassword: '' }));
         }
       }
     } catch (error) {
