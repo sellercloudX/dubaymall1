@@ -573,6 +573,117 @@ export type Database = {
           },
         ]
       }
+      marketplace_orders_cache: {
+        Row: {
+          created_at: string
+          data: Json
+          id: string
+          marketplace: string
+          order_id: string
+          status: string | null
+          synced_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data?: Json
+          id?: string
+          marketplace: string
+          order_id: string
+          status?: string | null
+          synced_at?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          id?: string
+          marketplace?: string
+          order_id?: string
+          status?: string | null
+          synced_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      marketplace_products_cache: {
+        Row: {
+          created_at: string
+          data: Json
+          id: string
+          marketplace: string
+          offer_id: string
+          synced_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data?: Json
+          id?: string
+          marketplace: string
+          offer_id: string
+          synced_at?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          id?: string
+          marketplace?: string
+          offer_id?: string
+          synced_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      marketplace_stats_cache: {
+        Row: {
+          data: Json
+          id: string
+          low_stock_count: number | null
+          marketplace: string
+          pending_orders: number | null
+          stats_date: string
+          synced_at: string
+          total_orders: number | null
+          total_products: number | null
+          total_revenue: number | null
+          user_id: string
+        }
+        Insert: {
+          data?: Json
+          id?: string
+          low_stock_count?: number | null
+          marketplace: string
+          pending_orders?: number | null
+          stats_date?: string
+          synced_at?: string
+          total_orders?: number | null
+          total_products?: number | null
+          total_revenue?: number | null
+          user_id: string
+        }
+        Update: {
+          data?: Json
+          id?: string
+          low_stock_count?: number | null
+          marketplace?: string
+          pending_orders?: number | null
+          stats_date?: string
+          synced_at?: string
+          total_orders?: number | null
+          total_products?: number | null
+          total_revenue?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           created_at: string
