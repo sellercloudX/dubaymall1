@@ -73,90 +73,66 @@ OUTPUT: One stunning, marketplace-ready product photograph.`;
     }
   }
 
-  // TRY 1: Google AI Studio API (direct, user's own key)
+  // Google AI Studio with RETRY (up to 3 attempts, no Lovable AI fallback)
   if (GOOGLE_KEY) {
-    try {
-      console.log("🎨 GOOGLE AI STUDIO: Image editing with user's own API key...");
-      
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${GOOGLE_KEY}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{
-              parts: [
-                { text: editPrompt },
-                { inline_data: { mime_type: mimeType, data: base64Data } }
-              ]
-            }],
-            generationConfig: {
-              responseModalities: ["TEXT", "IMAGE"]
-            }
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const errText = await response.text();
-        console.error("Google AI Studio error:", response.status, errText);
-      } else {
-        const data = await response.json();
-        const parts = data.candidates?.[0]?.content?.parts || [];
+    const MAX_RETRIES = 3;
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        console.log(`🎨 GOOGLE AI STUDIO: Image editing attempt ${attempt}/${MAX_RETRIES}...`);
         
-        for (const part of parts) {
-          if (part.inlineData) {
-            const imageBase64 = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-            console.log("✅ Google AI Studio: Professional product photo created!");
-            return imageBase64;
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${GOOGLE_KEY}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{
+                parts: [
+                  { text: editPrompt },
+                  { inline_data: { mime_type: mimeType, data: base64Data } }
+                ]
+              }],
+              generationConfig: {
+                responseModalities: ["TEXT", "IMAGE"]
+              }
+            }),
           }
+        );
+
+        if (!response.ok) {
+          const errText = await response.text();
+          console.error(`Google AI Studio error (attempt ${attempt}):`, response.status, errText);
+          if (response.status === 429 && attempt < MAX_RETRIES) {
+            console.log(`⏳ Rate limited, waiting ${attempt * 5}s...`);
+            await new Promise(r => setTimeout(r, attempt * 5000));
+            continue;
+          }
+        } else {
+          const data = await response.json();
+          const parts = data.candidates?.[0]?.content?.parts || [];
+          
+          for (const part of parts) {
+            if (part.inlineData) {
+              const imageBase64 = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+              console.log(`✅ Google AI Studio: Photo created (attempt ${attempt})!`);
+              return imageBase64;
+            }
+          }
+          console.log(`⚠️ Google AI Studio: No image in response (attempt ${attempt})`);
         }
-        console.log("⚠️ Google AI Studio: No image in response");
+
+        if (attempt < MAX_RETRIES) {
+          console.log(`⏳ Retrying in ${attempt * 2}s...`);
+          await new Promise(r => setTimeout(r, attempt * 2000));
+        }
+      } catch (err) {
+        console.error(`Google AI Studio error (attempt ${attempt}):`, err);
+        if (attempt < MAX_RETRIES) {
+          await new Promise(r => setTimeout(r, attempt * 2000));
+        }
       }
-    } catch (err) {
-      console.error("Google AI Studio error:", err);
     }
-  }
-
-  // TRY 2: Lovable AI Gateway (fallback)
-  if (LOVABLE_KEY) {
-    try {
-      console.log("🎨 LOVABLE AI FALLBACK: Gemini image edit...");
-      
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash-image",
-          messages: [{
-            role: "user",
-            content: [
-              { type: "text", text: editPrompt },
-              { type: "image_url", image_url: { url: sourceImage } }
-            ]
-          }],
-          modalities: ["image", "text"]
-        }),
-      });
-
-      if (!response.ok) {
-        const errText = await response.text();
-        console.error("Lovable AI fallback error:", response.status, errText);
-        return null;
-      }
-
-      const data = await response.json();
-      const imageData = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-      if (imageData) {
-        console.log("✅ Lovable AI fallback: Image created!");
-        return imageData;
-      }
-    } catch (err) {
-      console.error("Lovable AI fallback error:", err);
-    }
+    console.log("❌ Google AI Studio: All 3 attempts failed");
   }
 
   return null;
@@ -291,67 +267,53 @@ async function generateWithGemini(
 ${category ? `Product category: ${category}.` : ""}
 Clean white studio background, professional lighting, high resolution, no text or watermarks, 3:4 portrait ratio, marketplace listing quality.`;
 
-  // TRY 1: Google AI Studio
+  // Google AI Studio with RETRY (up to 3 attempts)
   if (GOOGLE_KEY) {
-    try {
-      console.log("🎨 GOOGLE AI STUDIO TEXT-TO-IMAGE...");
-      
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${GOOGLE_KEY}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { responseModalities: ["TEXT", "IMAGE"] }
-          }),
-        }
-      );
+    const MAX_RETRIES = 3;
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        console.log(`🎨 GOOGLE AI STUDIO TEXT-TO-IMAGE attempt ${attempt}/${MAX_RETRIES}...`);
+        
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${GOOGLE_KEY}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { responseModalities: ["TEXT", "IMAGE"] }
+            }),
+          }
+        );
 
-      if (response.ok) {
-        const data = await response.json();
-        const parts = data.candidates?.[0]?.content?.parts || [];
-        for (const part of parts) {
-          if (part.inlineData) {
-            console.log("✅ Google AI Studio text-to-image success");
-            return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+        if (response.ok) {
+          const data = await response.json();
+          const parts = data.candidates?.[0]?.content?.parts || [];
+          for (const part of parts) {
+            if (part.inlineData) {
+              console.log(`✅ Google AI Studio text-to-image success (attempt ${attempt})`);
+              return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+            }
+          }
+          console.log(`⚠️ No image in response (attempt ${attempt})`);
+        } else {
+          const errText = await response.text();
+          console.error(`Google AI Studio text-to-image error (attempt ${attempt}):`, response.status, errText);
+          if (response.status === 429 && attempt < MAX_RETRIES) {
+            await new Promise(r => setTimeout(r, attempt * 5000));
+            continue;
           }
         }
-      } else {
-        console.error("Google AI Studio text-to-image error:", response.status);
-      }
-    } catch (err) {
-      console.error("Google AI Studio text-to-image error:", err);
-    }
-  }
 
-  // TRY 2: Lovable AI fallback
-  if (LOVABLE_KEY) {
-    try {
-      console.log("🎨 LOVABLE AI TEXT-TO-IMAGE FALLBACK...");
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash-image",
-          messages: [{ role: "user", content: prompt }],
-          modalities: ["image", "text"]
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const imageData = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-        if (imageData) {
-          console.log("✅ Lovable AI text-to-image fallback success");
-          return imageData;
+        if (attempt < MAX_RETRIES) {
+          await new Promise(r => setTimeout(r, attempt * 2000));
+        }
+      } catch (err) {
+        console.error(`Google AI Studio text-to-image error (attempt ${attempt}):`, err);
+        if (attempt < MAX_RETRIES) {
+          await new Promise(r => setTimeout(r, attempt * 2000));
         }
       }
-    } catch (err) {
-      console.error("Lovable AI text-to-image fallback error:", err);
     }
   }
 
