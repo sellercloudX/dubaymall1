@@ -33,6 +33,7 @@ interface AIProductFormProps {
   onCancel: () => void;
   isLoading?: boolean;
   onFileInputActive?: (active: boolean) => void;
+  onProcessingChange?: (processing: boolean) => void;
 }
 
 interface WebProduct {
@@ -139,7 +140,8 @@ async function generateAndAttachImages(
   shopId: string, 
   productName: string, 
   category: string,
-  existingImages: string[]
+  existingImages: string[],
+  sourceImageBase64?: string | null
 ) {
   const taskId = backgroundTaskManager.createTask(
     'ai-image-generation',
@@ -167,11 +169,16 @@ async function generateAndAttachImages(
       }
 
       updateProgress(30, `"${productName}" uchun kartochka yaratilmoqda`);
-      backgroundTaskManager.updateTask(taskId, { currentItem: 'Flux Pro bilan professional rasm yaratilmoqda...' });
+      backgroundTaskManager.updateTask(taskId, { currentItem: 'AI bilan professional rasm yaratilmoqda...' });
 
-      // Generate new image with Flux Pro
+      // Generate new image - pass source image if available for accurate generation
       const { data, error } = await supabase.functions.invoke('generate-product-image', {
-        body: { productName, category, style: 'marketplace' },
+        body: { 
+          productName, 
+          category, 
+          style: 'marketplace',
+          sourceImage: sourceImageBase64 || null
+        },
       });
 
       if (error) {
@@ -203,7 +210,7 @@ async function generateAndAttachImages(
   }
 }
 
-export function AIProductForm({ shopId, onSubmit, onCancel, isLoading, onFileInputActive }: AIProductFormProps) {
+export function AIProductForm({ shopId, onSubmit, onCancel, isLoading, onFileInputActive, onProcessingChange }: AIProductFormProps) {
   const { t } = useLanguage();
   const { categories } = useCategories();
   
@@ -262,15 +269,21 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading, onFileInp
 
   // Handle image capture from camera or gallery
   const handleImageCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    onFileInputActive?.(false);
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file) {
+      onFileInputActive?.(false);
+      return;
+    }
 
     const reader = new FileReader();
     reader.onloadend = async () => {
       const base64 = reader.result as string;
       setCapturedImage(base64);
+      // Only release file input lock AFTER we have the image
+      onFileInputActive?.(false);
+      onProcessingChange?.(true);
       await analyzeProductImage(base64);
+      onProcessingChange?.(false);
     };
     reader.readAsDataURL(file);
   };
@@ -490,12 +503,14 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading, onFileInp
         categories.find(c => c.id === formData.category_id)?.name_uz || '';
       
       // Fire and forget - runs in background with progress tracking
+      // Pass capturedImage so AI can generate based on actual scanned product
       generateAndAttachImages(
         productId,
         shopId,
         formData.name || '',
         categoryName,
-        productImages.filter(img => img !== capturedImage)
+        productImages.filter(img => img !== capturedImage),
+        capturedImage
       );
     }
     

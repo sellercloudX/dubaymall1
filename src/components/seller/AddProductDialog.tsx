@@ -28,6 +28,7 @@ export function AddProductDialog({ shopId, onSubmit }: AddProductDialogProps) {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('manual');
   const isFileInputActive = useRef(false);
+  const isProcessing = useRef(false);
 
   const handleSubmit = async (data: ProductInsert) => {
     setLoading(true);
@@ -39,10 +40,9 @@ export function AddProductDialog({ shopId, onSubmit }: AddProductDialogProps) {
     }
   };
 
-  // Prevent dialog from closing when camera/file picker is active (mobile issue)
+  // Prevent dialog from closing when camera/file picker or AI processing is active
   const handleOpenChange = (newOpen: boolean) => {
-    if (!newOpen && isFileInputActive.current) {
-      // Don't close while file input is active
+    if (!newOpen && (isFileInputActive.current || isProcessing.current)) {
       return;
     }
     setOpen(newOpen);
@@ -118,6 +118,7 @@ export function AddProductDialog({ shopId, onSubmit }: AddProductDialogProps) {
               onCancel={() => setOpen(false)}
               isLoading={loading}
               onFileInputActive={(active) => { isFileInputActive.current = active; }}
+              onProcessingChange={(processing) => { isProcessing.current = processing; }}
             />
           </TabsContent>
 
