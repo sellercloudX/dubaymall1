@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,6 +17,8 @@ import type { TablesInsert } from '@/integrations/supabase/types';
 
 type ProductInsert = TablesInsert<'products'>;
 
+const SESSION_KEY = 'seller_dialog_state';
+
 interface AddProductDialogProps {
   shopId: string;
   onSubmit: (data: ProductInsert) => Promise<void>;
@@ -28,29 +30,53 @@ export function AddProductDialog({ shopId, onSubmit }: AddProductDialogProps) {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('manual');
 
+  // Restore dialog state after mobile browser page reload (camera returns)
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem(SESSION_KEY);
+      if (saved) {
+        const state = JSON.parse(saved);
+        if (state?.dialogOpen && state?.activeTab) {
+          setActiveTab(state.activeTab);
+          setOpen(true);
+          sessionStorage.removeItem(SESSION_KEY);
+        }
+      }
+    } catch {
+      sessionStorage.removeItem(SESSION_KEY);
+    }
+  }, []);
+
+  // Save dialog state to sessionStorage when AI tab is active and camera is about to open
+  const saveDialogState = () => {
+    try {
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify({
+        dialogOpen: true,
+        activeTab,
+      }));
+    } catch { /* quota exceeded - ignore */ }
+  };
+
   const handleSubmit = async (data: ProductInsert) => {
     setLoading(true);
     try {
       await onSubmit(data);
-      // Explicitly close only after successful submit
+      sessionStorage.removeItem(SESSION_KEY);
       setOpen(false);
     } finally {
       setLoading(false);
     }
   };
 
-  // BULLETPROOF: In AI tab, block ALL automatic dialog closes.
-  // Dialog can ONLY close via explicit Cancel/Submit button clicks (which call setOpen(false) directly).
-  // This prevents mobile camera/gallery from triggering close via resize/focus/pointer events.
   const handleOpenChange = (newOpen: boolean) => {
     if (newOpen) {
       setOpen(true);
       return;
     }
-    // Block all automatic closes when AI tab is active
     if (activeTab === 'ai') {
       return;
     }
+    sessionStorage.removeItem(SESSION_KEY);
     setOpen(newOpen);
   };
 
@@ -112,7 +138,7 @@ export function AddProductDialog({ shopId, onSubmit }: AddProductDialogProps) {
             <ProductForm
               shopId={shopId}
               onSubmit={handleSubmit}
-              onCancel={() => setOpen(false)}
+              onCancel={() => { sessionStorage.removeItem(SESSION_KEY); setOpen(false); }}
               isLoading={loading}
             />
           </TabsContent>
@@ -121,8 +147,9 @@ export function AddProductDialog({ shopId, onSubmit }: AddProductDialogProps) {
             <AIProductForm
               shopId={shopId}
               onSubmit={handleSubmit}
-              onCancel={() => setOpen(false)}
+              onCancel={() => { sessionStorage.removeItem(SESSION_KEY); setOpen(false); }}
               isLoading={loading}
+              onBeforeCamera={saveDialogState}
             />
           </TabsContent>
 

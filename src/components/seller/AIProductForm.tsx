@@ -32,6 +32,7 @@ interface AIProductFormProps {
   onSubmit: (data: ProductInsert) => Promise<void>;
   onCancel: () => void;
   isLoading?: boolean;
+  onBeforeCamera?: () => void;
 }
 
 interface WebProduct {
@@ -208,7 +209,7 @@ async function generateAndAttachImages(
   }
 }
 
-export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProductFormProps) {
+export function AIProductForm({ shopId, onSubmit, onCancel, isLoading, onBeforeCamera }: AIProductFormProps) {
   const { t } = useLanguage();
   const { categories } = useCategories();
   
@@ -570,6 +571,7 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
                   className="h-32 flex-col gap-2 border-dashed border-2 hover:border-primary hover:bg-primary/5"
                   onClick={() => {
                     if (fileInputRef.current) {
+                      onBeforeCamera?.();
                       fileInputRef.current.setAttribute('capture', 'environment');
                       fileInputRef.current.click();
                     }
@@ -586,6 +588,7 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
                   className="h-32 flex-col gap-2 border-dashed border-2 hover:border-primary hover:bg-primary/5"
                   onClick={() => {
                     if (fileInputRef.current) {
+                      onBeforeCamera?.();
                       fileInputRef.current.removeAttribute('capture');
                       fileInputRef.current.click();
                     }
