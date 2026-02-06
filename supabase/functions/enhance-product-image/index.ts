@@ -354,12 +354,22 @@ serve(async (req) => {
     let enhancedImage: string | null = null;
     let usedModel = "flux-pro";
 
-    // PRIMARY: Try Flux Pro first
-    enhancedImage = await enhanceWithFluxPro(
+    // PRIMARY: Try Lovable AI image editing (actually edits the uploaded image)
+    enhancedImage = await enhanceWithLovableAI(
+      imageBase64,
       productName || "Product",
-      productDescription || "",
       category || "default"
     );
+
+    // SECONDARY: Try Flux Pro (generates new image from text - fallback)
+    if (!enhancedImage) {
+      enhancedImage = await enhanceWithFluxPro(
+        productName || "Product",
+        productDescription || "",
+        category || "default",
+        "professional"
+      );
+    }
 
     // FALLBACK: Try DALL-E 3 if Flux Pro fails
     if (!enhancedImage) {

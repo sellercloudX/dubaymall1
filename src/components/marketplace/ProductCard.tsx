@@ -248,6 +248,13 @@ export const ProductCard = memo(forwardRef<HTMLAnchorElement, ProductCardProps>(
               <Heart className={`h-4 w-4 ${isProductFavorite ? 'fill-current' : ''}`} />
             )}
           </button>
+
+          {/* Affiliate Bonus Badge - Top Left */}
+          {hasAffiliate && affiliateBonus > 0 && (
+            <div className="absolute top-2 left-2 bg-emerald-600 text-white text-[10px] font-medium px-1.5 py-0.5 rounded shadow-sm">
+              +{new Intl.NumberFormat('uz-UZ').format(affiliateBonus)} so'm
+            </div>
+          )}
         </div>
 
         {/* Content */}
