@@ -5,47 +5,48 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// ==================== GEMINI IMAGE EDITING - PRIMARY (when source image available) ====================
+// ==================== GEMINI IMAGE EDITING via Google AI Studio - PRIMARY ====================
 async function generateFromSourceImage(
   sourceImage: string,
   productName: string,
   category: string
 ): Promise<string | null> {
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  // Try Google AI Studio key first, then Lovable AI as fallback
+  const GOOGLE_KEY = Deno.env.get("GOOGLE_AI_STUDIO_KEY");
+  const LOVABLE_KEY = Deno.env.get("LOVABLE_API_KEY");
   
-  if (!LOVABLE_API_KEY) {
-    console.log("⚠️ LOVABLE_API_KEY not configured");
+  if (!GOOGLE_KEY && !LOVABLE_KEY) {
+    console.log("⚠️ No API keys configured for image editing");
     return null;
   }
 
-  try {
-    console.log("🎨 GEMINI IMAGE EDIT: Creating professional photo from scanned product...");
-    
-    const categoryHints: Record<string, string> = {
-      "elektronika": "on a sleek dark gradient surface with subtle blue tech glow accents, premium tech product showcase",
-      "kiyim": "on a clean white fashion lookbook background with soft natural lighting, fashion editorial style",
-      "oziq-ovqat": "on a warm rustic wooden surface with appetizing garnishes, food magazine quality",
-      "go'zallik": "on a soft pink-peach gradient with ethereal bokeh and golden hour lighting, luxury beauty ad",
-      "sport": "on a dynamic gradient background with energy-suggesting lighting, sports catalog style",
-      "uy": "in a cozy Scandinavian interior setting with natural daylight, IKEA catalog style",
-    };
+  const categoryHints: Record<string, string> = {
+    "elektronika": "on a sleek dark gradient surface with subtle blue tech glow accents, premium tech product showcase",
+    "kiyim": "on a clean white fashion lookbook background with soft natural lighting, fashion editorial style",
+    "oziq-ovqat": "on a warm rustic wooden surface with appetizing garnishes, food magazine quality",
+    "go'zallik": "on a soft pink-peach gradient with ethereal bokeh and golden hour lighting, luxury beauty ad",
+    "sport": "on a dynamic gradient background with energy-suggesting lighting, sports catalog style",
+    "uy": "in a cozy Scandinavian interior setting with natural daylight, IKEA catalog style",
+    "kompyuter": "on a sleek dark gradient surface with subtle blue tech glow accents, premium tech product showcase",
+    "smartfon": "on a sleek dark gradient surface with subtle blue tech glow accents, premium tech product showcase",
+  };
 
-    let envHint = "on a clean white-to-light-gray gradient studio background with professional three-point lighting";
-    const catLower = category.toLowerCase();
-    for (const [key, value] of Object.entries(categoryHints)) {
-      if (catLower.includes(key)) {
-        envHint = value;
-        break;
-      }
+  let envHint = "on a clean white-to-light-gray gradient studio background with professional three-point lighting";
+  const catLower = category.toLowerCase();
+  for (const [key, value] of Object.entries(categoryHints)) {
+    if (catLower.includes(key)) {
+      envHint = value;
+      break;
     }
+  }
 
-    const editPrompt = `Transform this product photo into a PREMIUM E-COMMERCE MARKETPLACE listing image.
+  const editPrompt = `Transform this product photo into a PREMIUM E-COMMERCE MARKETPLACE listing image.
 
 CRITICAL RULES:
 1. Keep the EXACT SAME PRODUCT from the original photo - do NOT change the product itself, its shape, color, brand, or design
 2. The product must be the HERO ELEMENT - centered, filling 70-80% of the frame
 3. Place the product ${envHint}
-4. Add subtle complementary elements around the product that enhance its appeal and encourage purchase (soft shadows, light reflections, category-appropriate props)
+4. Add subtle complementary elements around the product that enhance its appeal
 5. Use professional studio lighting: key light, fill light, rim light for premium depth
 6. Make it look like a high-end marketplace listing photo (Amazon, Uzum Market quality)
 
@@ -56,56 +57,109 @@ ABSOLUTE RESTRICTIONS:
 - NO text, watermarks, logos, labels, prices, or written words anywhere
 - NO people, hands, or body parts
 - The product appearance must remain IDENTICAL to the original
-- Output must be photorealistic, not illustrated or cartoonish
+- Output must be photorealistic
 - Portrait 3:4 aspect ratio
 
-OUTPUT: One stunning, marketplace-ready product photograph that makes customers want to buy immediately.`;
+OUTPUT: One stunning, marketplace-ready product photograph.`;
 
-    const messages: any[] = [
-      {
-        role: "user",
-        content: [
-          { type: "text", text: editPrompt },
-          {
-            type: "image_url",
-            image_url: { url: sourceImage }
-          }
-        ]
-      }
-    ];
-
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image",
-        messages,
-        modalities: ["image", "text"]
-      }),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error("Gemini Image Edit error:", response.status, errText);
-      return null;
+  // Extract base64 data from source image
+  let base64Data = sourceImage;
+  let mimeType = "image/jpeg";
+  if (sourceImage.startsWith("data:")) {
+    const match = sourceImage.match(/^data:([^;]+);base64,(.+)$/);
+    if (match) {
+      mimeType = match[1];
+      base64Data = match[2];
     }
-
-    const data = await response.json();
-    const imageData = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-
-    if (imageData) {
-      console.log("✅ Gemini Image Edit: Professional product photo created from source!");
-      return imageData;
-    }
-
-    return null;
-  } catch (err) {
-    console.error("Gemini Image Edit error:", err);
-    return null;
   }
+
+  // TRY 1: Google AI Studio API (direct, user's own key)
+  if (GOOGLE_KEY) {
+    try {
+      console.log("🎨 GOOGLE AI STUDIO: Image editing with user's own API key...");
+      
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${GOOGLE_KEY}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { text: editPrompt },
+                { inline_data: { mime_type: mimeType, data: base64Data } }
+              ]
+            }],
+            generationConfig: {
+              responseModalities: ["TEXT", "IMAGE"]
+            }
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error("Google AI Studio error:", response.status, errText);
+      } else {
+        const data = await response.json();
+        const parts = data.candidates?.[0]?.content?.parts || [];
+        
+        for (const part of parts) {
+          if (part.inlineData) {
+            const imageBase64 = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+            console.log("✅ Google AI Studio: Professional product photo created!");
+            return imageBase64;
+          }
+        }
+        console.log("⚠️ Google AI Studio: No image in response");
+      }
+    } catch (err) {
+      console.error("Google AI Studio error:", err);
+    }
+  }
+
+  // TRY 2: Lovable AI Gateway (fallback)
+  if (LOVABLE_KEY) {
+    try {
+      console.log("🎨 LOVABLE AI FALLBACK: Gemini image edit...");
+      
+      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash-image",
+          messages: [{
+            role: "user",
+            content: [
+              { type: "text", text: editPrompt },
+              { type: "image_url", image_url: { url: sourceImage } }
+            ]
+          }],
+          modalities: ["image", "text"]
+        }),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error("Lovable AI fallback error:", response.status, errText);
+        return null;
+      }
+
+      const data = await response.json();
+      const imageData = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+      if (imageData) {
+        console.log("✅ Lovable AI fallback: Image created!");
+        return imageData;
+      }
+    } catch (err) {
+      console.error("Lovable AI fallback error:", err);
+    }
+  }
+
+  return null;
 }
 
 // ==================== FLUX PRO - TEXT-TO-IMAGE (when no source image) ====================
@@ -220,56 +274,88 @@ RESTRICTIONS:
   }
 }
 
-// ==================== GEMINI TEXT-TO-IMAGE - FALLBACK ====================
+// ==================== GEMINI TEXT-TO-IMAGE via Google AI Studio - FALLBACK ====================
 async function generateWithGemini(
   productName: string,
   category: string
 ): Promise<string | null> {
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  const GOOGLE_KEY = Deno.env.get("GOOGLE_AI_STUDIO_KEY");
+  const LOVABLE_KEY = Deno.env.get("LOVABLE_API_KEY");
   
-  if (!LOVABLE_API_KEY) {
-    console.log("⚠️ LOVABLE_API_KEY not configured");
+  if (!GOOGLE_KEY && !LOVABLE_KEY) {
+    console.log("⚠️ No keys for text-to-image");
     return null;
   }
 
-  try {
-    console.log("🎨 GEMINI TEXT-TO-IMAGE: Fallback generation...");
-    
-    const prompt = `Create a professional e-commerce product photograph of "${productName}".
+  const prompt = `Create a professional e-commerce product photograph of "${productName}".
 ${category ? `Product category: ${category}.` : ""}
 Clean white studio background, professional lighting, high resolution, no text or watermarks, 3:4 portrait ratio, marketplace listing quality.`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image",
-        messages: [{ role: "user", content: prompt }],
-        modalities: ["image", "text"]
-      }),
-    });
+  // TRY 1: Google AI Studio
+  if (GOOGLE_KEY) {
+    try {
+      console.log("🎨 GOOGLE AI STUDIO TEXT-TO-IMAGE...");
+      
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${GOOGLE_KEY}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { responseModalities: ["TEXT", "IMAGE"] }
+          }),
+        }
+      );
 
-    if (!response.ok) {
-      console.error("Gemini fallback error:", response.status);
-      return null;
+      if (response.ok) {
+        const data = await response.json();
+        const parts = data.candidates?.[0]?.content?.parts || [];
+        for (const part of parts) {
+          if (part.inlineData) {
+            console.log("✅ Google AI Studio text-to-image success");
+            return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+          }
+        }
+      } else {
+        console.error("Google AI Studio text-to-image error:", response.status);
+      }
+    } catch (err) {
+      console.error("Google AI Studio text-to-image error:", err);
     }
-
-    const data = await response.json();
-    const imageData = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-
-    if (imageData) {
-      console.log("✅ Gemini text-to-image fallback successful");
-      return imageData;
-    }
-
-    return null;
-  } catch (err) {
-    console.error("Gemini fallback error:", err);
-    return null;
   }
+
+  // TRY 2: Lovable AI fallback
+  if (LOVABLE_KEY) {
+    try {
+      console.log("🎨 LOVABLE AI TEXT-TO-IMAGE FALLBACK...");
+      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash-image",
+          messages: [{ role: "user", content: prompt }],
+          modalities: ["image", "text"]
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const imageData = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+        if (imageData) {
+          console.log("✅ Lovable AI text-to-image fallback success");
+          return imageData;
+        }
+      }
+    } catch (err) {
+      console.error("Lovable AI text-to-image fallback error:", err);
+    }
+  }
+
+  return null;
 }
 
 serve(async (req) => {
