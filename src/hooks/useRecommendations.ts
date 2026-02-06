@@ -25,7 +25,7 @@ export function useRecommendations(currentProductId?: string, limit: number = 8)
           .from('products')
           .select('category_id, shop_id')
           .eq('id', currentProductId)
-          .single();
+          .maybeSingle();
 
         if (currentProduct?.category_id) {
           // Get products in the same category
