@@ -14,13 +14,56 @@ Categories: ${CATEGORIES.join(", ")}
 
 Return JSON: { productName, description (3-5 sentences), category, suggestedPrice, brand, model, searchKeywords[], confidence (0-100) }`;
 
-// PRIMARY: GPT-4o Vision
+// PRIMARY: Lovable AI (Gemini 2.5 Flash) - guaranteed to work
+async function analyzeWithGemini(img: string): Promise<any | null> {
+  const key = Deno.env.get("LOVABLE_API_KEY");
+  if (!key) { console.log("⚠️ No LOVABLE_API_KEY"); return null; }
+
+  try {
+    console.log("🔍 PRIMARY: Gemini 2.5 Flash Vision...");
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: [
+            { type: "text", text: "Identify this product from its appearance. Return ONLY valid JSON." },
+            { type: "image_url", image_url: { url: img } }
+          ]}
+        ],
+      }),
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text();
+      console.error("Gemini error:", res.status, errBody);
+      if (res.status === 429) return { error: "rate_limited" };
+      if (res.status === 402) return { error: "payment_required" };
+      return null;
+    }
+
+    const data = await res.json();
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) { console.error("Gemini: no content in response"); return null; }
+
+    const match = content.match(/\{[\s\S]*\}/);
+    if (!match) { console.error("Gemini: no JSON found in response:", content.substring(0, 200)); return null; }
+
+    const result = JSON.parse(match[0]);
+    console.log("✅ Gemini identified:", result.productName);
+    return { ...result, aiModel: "gemini-2.5-flash" };
+  } catch (err) { console.error("Gemini error:", err); return null; }
+}
+
+// FALLBACK 1: GPT-4o Vision
 async function analyzeWithGPT4o(img: string): Promise<any | null> {
   const key = Deno.env.get("OPENAI_API_KEY");
   if (!key) { console.log("⚠️ No OPENAI_API_KEY"); return null; }
 
   try {
-    console.log("🔍 PRIMARY: GPT-4o Vision...");
+    console.log("🔍 FALLBACK 1: GPT-4o Vision...");
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
@@ -38,8 +81,9 @@ async function analyzeWithGPT4o(img: string): Promise<any | null> {
     });
 
     if (!res.ok) {
-      console.error("GPT-4o error:", res.status);
-      return res.status === 429 ? { error: "rate_limited" } : null;
+      const errBody = await res.text();
+      console.error("GPT-4o error:", res.status, errBody);
+      return null;
     }
 
     const data = await res.json();
@@ -55,13 +99,13 @@ async function analyzeWithGPT4o(img: string): Promise<any | null> {
   } catch (err) { console.error("GPT-4o error:", err); return null; }
 }
 
-// FALLBACK 1: Claude 3.5 Sonnet
+// FALLBACK 2: Claude 3.5 Sonnet
 async function analyzeWithClaude(img: string): Promise<any | null> {
   const key = Deno.env.get("ANTHROPIC_API_KEY");
   if (!key) { console.log("⚠️ No ANTHROPIC_API_KEY"); return null; }
 
   try {
-    console.log("🔍 FALLBACK: Claude 3.5 Sonnet...");
+    console.log("🔍 FALLBACK 2: Claude 3.5 Sonnet...");
     let mediaType = "image/jpeg";
     let base64Data = img;
     
@@ -90,7 +134,11 @@ async function analyzeWithClaude(img: string): Promise<any | null> {
       }),
     });
 
-    if (!res.ok) { console.error("Claude error:", res.status); return null; }
+    if (!res.ok) {
+      const errBody = await res.text();
+      console.error("Claude error:", res.status, errBody);
+      return null;
+    }
 
     const data = await res.json();
     const content = data.content?.[0]?.text;
@@ -130,22 +178,26 @@ serve(async (req) => {
       });
     }
 
-    console.log("🔍 AI Priority: GPT-4o → Claude 3.5 Sonnet");
+    console.log(`📸 Image size: ${(imageBase64.length / 1024).toFixed(0)}KB`);
+    console.log("🔍 AI Priority: Gemini → GPT-4o → Claude");
 
-    // PRIMARY: GPT-4o Vision
-    let result = await analyzeWithGPT4o(imageBase64);
+    // PRIMARY: Gemini (Lovable AI)
+    let result = await analyzeWithGemini(imageBase64);
 
-    if (result?.error === "rate_limited") {
-      return new Response(JSON.stringify({ error: "Service busy, please try again" }), {
-        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
+    // If Gemini had a transient error, still try fallbacks
+    if (result?.error) {
+      console.log(`⚠️ Gemini returned ${result.error}, trying fallbacks...`);
+      result = null;
     }
 
-    // FALLBACK: Claude 3.5 Sonnet
+    // FALLBACK 1: GPT-4o
+    if (!result) result = await analyzeWithGPT4o(imageBase64);
+
+    // FALLBACK 2: Claude
     if (!result) result = await analyzeWithClaude(imageBase64);
 
     if (!result) {
-      return new Response(JSON.stringify({ error: "Could not identify product. Try a clearer image." }), {
+      return new Response(JSON.stringify({ error: "Mahsulotni aniqlab bo'lmadi. Aniqroq rasm oling." }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
@@ -156,7 +208,7 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error("Error:", error);
-    return new Response(JSON.stringify({ error: "Analysis failed" }), {
+    return new Response(JSON.stringify({ error: "Tahlil xatosi" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
   }
