@@ -31,6 +31,7 @@ interface AIProductFormProps {
   onSubmit: (data: ProductInsert) => Promise<void>;
   onCancel: () => void;
   isLoading?: boolean;
+  onFileInputActive?: (active: boolean) => void;
 }
 
 interface WebProduct {
@@ -66,7 +67,7 @@ function ProductImage({ src, alt, className }: { src?: string; alt: string; clas
   );
 }
 
-export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProductFormProps) {
+export function AIProductForm({ shopId, onSubmit, onCancel, isLoading, onFileInputActive }: AIProductFormProps) {
   const { t } = useLanguage();
   const { categories } = useCategories();
   
@@ -125,6 +126,7 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
 
   // Handle image capture from camera or gallery
   const handleImageCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    onFileInputActive?.(false); // Camera/gallery returned
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -435,6 +437,7 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
                   className="h-32 flex-col gap-2 border-dashed border-2 hover:border-primary hover:bg-primary/5"
                   onClick={() => {
                     if (fileInputRef.current) {
+                      onFileInputActive?.(true);
                       fileInputRef.current.setAttribute('capture', 'environment');
                       fileInputRef.current.click();
                     }
@@ -452,6 +455,7 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
                   className="h-32 flex-col gap-2 border-dashed border-2 hover:border-primary hover:bg-primary/5"
                   onClick={() => {
                     if (fileInputRef.current) {
+                      onFileInputActive?.(true);
                       fileInputRef.current.removeAttribute('capture');
                       fileInputRef.current.click();
                     }
