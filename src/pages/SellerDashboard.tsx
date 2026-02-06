@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -103,7 +103,14 @@ export default function SellerDashboard() {
     refetchProducts();
   };
 
-   if (authLoading || shopLoading || rolesLoading) {
+  // Track initial load - never go back to full-page loader after first load completes
+  // This prevents dialog unmount when auth token refreshes (e.g., returning from camera)
+  const initialLoadDone = useRef(false);
+  if (!authLoading && !shopLoading && !rolesLoading) {
+    initialLoadDone.current = true;
+  }
+
+  if (!initialLoadDone.current && (authLoading || shopLoading || rolesLoading)) {
     return (
       <Layout>
         <div className="flex items-center justify-center min-h-[60vh]">

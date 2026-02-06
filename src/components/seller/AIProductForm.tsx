@@ -32,8 +32,6 @@ interface AIProductFormProps {
   onSubmit: (data: ProductInsert) => Promise<void>;
   onCancel: () => void;
   isLoading?: boolean;
-  onFileInputActive?: (active: boolean) => void;
-  onProcessingChange?: (processing: boolean) => void;
 }
 
 interface WebProduct {
@@ -210,7 +208,7 @@ async function generateAndAttachImages(
   }
 }
 
-export function AIProductForm({ shopId, onSubmit, onCancel, isLoading, onFileInputActive, onProcessingChange }: AIProductFormProps) {
+export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProductFormProps) {
   const { t } = useLanguage();
   const { categories } = useCategories();
   
@@ -267,25 +265,58 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading, onFileInp
     }
   };
 
+  // Compress image to reduce memory pressure on mobile (prevents browser from killing tab)
+  const compressImage = (file: File, maxSize = 1200): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const canvas = document.createElement('canvas');
+        let { width, height } = img;
+        
+        // Scale down if larger than maxSize
+        if (width > maxSize || height > maxSize) {
+          if (width > height) {
+            height = Math.round((height / width) * maxSize);
+            width = maxSize;
+          } else {
+            width = Math.round((width / height) * maxSize);
+            height = maxSize;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { reject(new Error('Canvas not supported')); return; }
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // Compress to JPEG at 80% quality (~200-400KB instead of 5-10MB)
+        const compressed = canvas.toDataURL('image/jpeg', 0.8);
+        canvas.width = 0; canvas.height = 0; // Free memory
+        resolve(compressed);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Image load failed')); };
+      img.src = url;
+    });
+  };
+
   // Handle image capture from camera or gallery
   const handleImageCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) {
-      onFileInputActive?.(false);
-      return;
-    }
+    if (!file) return;
 
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      const base64 = reader.result as string;
-      setCapturedImage(base64);
-      // Only release file input lock AFTER we have the image
-      onFileInputActive?.(false);
-      onProcessingChange?.(true);
-      await analyzeProductImage(base64);
-      onProcessingChange?.(false);
-    };
-    reader.readAsDataURL(file);
+    try {
+      // Compress immediately to prevent mobile browser from running out of memory
+      const compressed = await compressImage(file);
+      setCapturedImage(compressed);
+      await analyzeProductImage(compressed);
+    } catch (err) {
+      console.error('Image capture error:', err);
+      toast.error('Rasmni yuklashda xatolik');
+      setProcessingStep('idle');
+    }
   };
 
   // AI Vision - Analyze image to identify product
@@ -539,7 +570,6 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading, onFileInp
                   className="h-32 flex-col gap-2 border-dashed border-2 hover:border-primary hover:bg-primary/5"
                   onClick={() => {
                     if (fileInputRef.current) {
-                      onFileInputActive?.(true);
                       fileInputRef.current.setAttribute('capture', 'environment');
                       fileInputRef.current.click();
                     }
@@ -556,7 +586,6 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading, onFileInp
                   className="h-32 flex-col gap-2 border-dashed border-2 hover:border-primary hover:bg-primary/5"
                   onClick={() => {
                     if (fileInputRef.current) {
-                      onFileInputActive?.(true);
                       fileInputRef.current.removeAttribute('capture');
                       fileInputRef.current.click();
                     }
