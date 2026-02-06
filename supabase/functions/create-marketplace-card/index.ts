@@ -30,6 +30,9 @@ serve(async (req) => {
       );
     }
 
+    // Store user's auth token to forward to sub-function calls
+    const userAuthToken = authHeader;
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
