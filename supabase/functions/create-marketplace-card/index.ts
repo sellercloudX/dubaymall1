@@ -136,7 +136,7 @@ serve(async (req) => {
       targetMarketplace: targetMarketplaces[0],
       contentType: "description",
       languages: ["uz", "ru"]
-    });
+    }, userAuthToken);
 
     let descriptions = null;
     if (descResponse.ok) {
