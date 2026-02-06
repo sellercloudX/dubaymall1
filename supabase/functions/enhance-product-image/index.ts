@@ -6,12 +6,83 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// ==================== FLUX PRO - PRIMARY IMAGE ENHANCEMENT ====================
+// ==================== LOVABLE AI - PRIMARY IMAGE EDITING ====================
+// Uses Gemini image model to ACTUALLY EDIT the uploaded image (background removal, quality improvement)
+async function enhanceWithLovableAI(
+  imageBase64: string,
+  productName: string,
+  category: string
+): Promise<string | null> {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) {
+    console.log("⚠️ LOVABLE_API_KEY not configured");
+    return null;
+  }
+
+  try {
+    console.log("🎨 PRIMARY: Lovable AI (Gemini Image Edit) - Real image editing...");
+    
+    const editPrompt = `Edit this product image for professional e-commerce listing:
+1. REMOVE the current background completely
+2. Replace with a clean, professional white/light gradient studio background
+3. KEEP the product EXACTLY the same - do NOT change, distort, or recreate the product
+4. Improve lighting: add professional studio lighting (key light, fill, rim light)
+5. Add subtle natural shadow beneath the product for depth
+6. Enhance color accuracy and sharpness
+7. Make it marketplace-ready (Uzum Market / Yandex Market standard)
+
+Product: "${productName}", Category: "${category}"
+
+CRITICAL: The product in the output must be IDENTICAL to the input image. Only change the background and lighting.`;
+
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash-image",
+        messages: [{
+          role: "user",
+          content: [
+            { type: "text", text: editPrompt },
+            { type: "image_url", image_url: { url: imageBase64 } }
+          ]
+        }],
+        modalities: ["image", "text"]
+      }),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error("Lovable AI image edit error:", res.status, errText);
+      if (res.status === 429) console.log("Rate limited");
+      if (res.status === 402) console.log("Credits exhausted");
+      return null;
+    }
+
+    const data = await res.json();
+    const editedImage = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    
+    if (editedImage) {
+      console.log("✅ Lovable AI image editing successful - background removed & enhanced");
+      return editedImage;
+    }
+    
+    console.log("⚠️ Lovable AI returned no image");
+    return null;
+  } catch (err) {
+    console.error("Lovable AI image edit error:", err);
+    return null;
+  }
+}
+
 async function enhanceWithFluxPro(
   productName: string,
   productDescription: string,
   category: string,
-  style: string
+  style: string = "professional"
 ): Promise<string | null> {
   const REPLICATE_API_TOKEN = Deno.env.get("REPLICATE_API_TOKEN");
   
@@ -21,7 +92,7 @@ async function enhanceWithFluxPro(
   }
 
   try {
-    console.log("🎨 PRIMARY: Using Flux Pro for image enhancement...");
+    console.log("🎨 SECONDARY: Using Flux Pro for image generation...");
     
     // Category-specific professional styling
     const categoryEnhancements: Record<string, string> = {
@@ -227,10 +298,9 @@ serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     
-    if (claimsError || !claimsData?.claims) {
+    if (authError || !user) {
       return new Response(
         JSON.stringify({ error: "Invalid authentication" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -278,19 +348,29 @@ serve(async (req) => {
       );
     }
 
-    console.log(`🖼️ Enhancing product image for user ${claimsData.claims.sub}`);
+    console.log(`🖼️ Enhancing product image for user ${user.id}`);
     console.log(`📦 Product: ${productName?.slice(0, 50)}, Category: ${category?.slice(0, 30)}`);
-    console.log(`🤖 AI Priority: Flux Pro → DALL-E 3`);
+    console.log(`🤖 AI Priority: Lovable AI (Gemini Image Edit) → Flux Pro → DALL-E 3`);
 
     let enhancedImage: string | null = null;
     let usedModel = "flux-pro";
 
-    // PRIMARY: Try Flux Pro first
-    enhancedImage = await enhanceWithFluxPro(
+    // PRIMARY: Try Lovable AI image editing (actually edits the uploaded image)
+    enhancedImage = await enhanceWithLovableAI(
+      imageBase64,
       productName || "Product",
-      productDescription || "",
       category || "default"
     );
+
+    // SECONDARY: Try Flux Pro (generates new image from text - fallback)
+    if (!enhancedImage) {
+      enhancedImage = await enhanceWithFluxPro(
+        productName || "Product",
+        productDescription || "",
+        category || "default",
+        "professional"
+      );
+    }
 
     // FALLBACK: Try DALL-E 3 if Flux Pro fails
     if (!enhancedImage) {

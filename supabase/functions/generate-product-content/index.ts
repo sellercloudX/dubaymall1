@@ -38,10 +38,9 @@ serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     
-    if (claimsError || !claimsData?.claims) {
+    if (authError || !user) {
       return new Response(
         JSON.stringify({ error: "Invalid authentication" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -100,7 +99,7 @@ serve(async (req) => {
     // Choose model based on content type
     const model = contentType === "seo" ? "claude-3-haiku-20240307" : "claude-3-5-sonnet-latest";
     
-    console.log(`📝 Generating ${contentType} content using ${model} for user ${claimsData.claims.sub}`);
+    console.log(`📝 Generating ${contentType} content using ${model} for user ${user.id}`);
 
     if (!ANTHROPIC_API_KEY) {
       return await fallbackToLovableAI(request, corsHeaders);

@@ -17,6 +17,8 @@ interface ProductCardProps {
     rating?: number;
     reviews_count?: number;
     preparation_days?: number;
+    is_affiliate_enabled?: boolean;
+    affiliate_commission_percent?: number;
   };
 }
 
@@ -153,6 +155,10 @@ export const ProductCard = memo(forwardRef<HTMLAnchorElement, ProductCardProps>(
   // Calculate delivery date
   const deliveryDate = calculateDeliveryDate(product.preparation_days);
 
+  // Affiliate/Blogger commission - show how much a blogger can earn
+  const hasAffiliate = product.is_affiliate_enabled && product.affiliate_commission_percent && product.affiliate_commission_percent > 0;
+  const affiliateBonus = hasAffiliate ? Math.round((product.price * (product.affiliate_commission_percent || 0)) / 100) : 0;
+
   return (
     <Link to={`/product/${product.id}`} className="block" ref={ref}>
       <div className="bg-card rounded-lg overflow-hidden border border-border/40 hover:shadow-lg transition-shadow duration-200 h-full flex flex-col">
@@ -242,6 +248,13 @@ export const ProductCard = memo(forwardRef<HTMLAnchorElement, ProductCardProps>(
               <Heart className={`h-4 w-4 ${isProductFavorite ? 'fill-current' : ''}`} />
             )}
           </button>
+
+          {/* Affiliate Bonus Badge - Top Left */}
+          {hasAffiliate && affiliateBonus > 0 && (
+            <div className="absolute top-2 left-2 bg-emerald-600 text-white text-[10px] font-medium px-1.5 py-0.5 rounded shadow-sm">
+              +{new Intl.NumberFormat('uz-UZ').format(affiliateBonus)} so'm
+            </div>
+          )}
         </div>
 
         {/* Content */}
