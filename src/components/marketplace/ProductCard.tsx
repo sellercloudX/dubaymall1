@@ -1,4 +1,4 @@
-import { memo, useState, useCallback, useRef } from 'react';
+import { memo, useState, useCallback, useRef, forwardRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useCart } from '@/contexts/CartContext';
@@ -48,7 +48,7 @@ const calculateInstallment = (price: number): number => {
 };
 
 // Uzum.uz style product card with image carousel
-export const ProductCard = memo(function ProductCard({ product }: ProductCardProps) {
+export const ProductCard = memo(forwardRef<HTMLAnchorElement, ProductCardProps>(function ProductCard({ product }, ref) {
   const { t } = useLanguage();
   const { addToCart } = useCart();
   const { user } = useAuth();
@@ -154,7 +154,7 @@ export const ProductCard = memo(function ProductCard({ product }: ProductCardPro
   const deliveryDate = calculateDeliveryDate(product.preparation_days);
 
   return (
-    <Link to={`/product/${product.id}`} className="block">
+    <Link to={`/product/${product.id}`} className="block" ref={ref}>
       <div className="bg-card rounded-lg overflow-hidden border border-border/40 hover:shadow-lg transition-shadow duration-200 h-full flex flex-col">
         {/* Image Container - 3:4 aspect ratio with carousel */}
         <div 
@@ -297,4 +297,4 @@ export const ProductCard = memo(function ProductCard({ product }: ProductCardPro
       </div>
     </Link>
   );
-});
+}));

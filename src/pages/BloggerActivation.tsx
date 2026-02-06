@@ -61,21 +61,21 @@
      
      try {
        // Check blogger role
-       const { data: roleData } = await supabase
-         .from('user_roles')
-         .select('role')
-         .eq('user_id', user.id)
-         .eq('role', 'blogger')
-         .single();
-       
-       setHasBloggerRole(!!roleData);
- 
-       // Fetch profile
-       const { data: profileData } = await supabase
-         .from('blogger_profiles')
-         .select('*')
-         .eq('user_id', user.id)
-         .single();
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .eq('role', 'blogger')
+          .maybeSingle();
+        
+        setHasBloggerRole(!!roleData);
+  
+        // Fetch profile
+        const { data: profileData } = await supabase
+          .from('blogger_profiles')
+          .select('*')
+          .eq('user_id', user.id)
+          .maybeSingle();
        
        if (profileData) {
          setProfile(profileData as BloggerProfile);

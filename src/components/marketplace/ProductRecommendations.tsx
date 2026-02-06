@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useRecommendations, useRecentlyViewed } from '@/hooks/useRecommendations';
 import { ProductCard } from './ProductCard';
@@ -10,11 +11,11 @@ interface ProductRecommendationsProps {
   type?: 'similar' | 'trending' | 'recent';
 }
 
-export function ProductRecommendations({ 
+export const ProductRecommendations = forwardRef<HTMLDivElement, ProductRecommendationsProps>(function ProductRecommendations({ 
   currentProductId, 
   title,
   type = 'similar' 
-}: ProductRecommendationsProps) {
+}, ref) {
   const { t } = useLanguage();
   const { recommendations, loading: recLoading } = useRecommendations(currentProductId, 8);
   const { recentProducts, loading: recentLoading } = useRecentlyViewed(8);
@@ -71,7 +72,7 @@ export function ProductRecommendations({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" ref={ref}>
       <div className="flex items-center gap-2">
         {getIcon()}
         <h2 className="text-xl font-semibold">{getTitle()}</h2>
@@ -84,4 +85,4 @@ export function ProductRecommendations({
       </div>
     </div>
   );
-}
+});
