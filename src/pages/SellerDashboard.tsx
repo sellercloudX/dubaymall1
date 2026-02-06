@@ -21,6 +21,10 @@ import { SellerAnalytics } from '@/components/seller/SellerAnalytics';
 import { SellerBalanceCard } from '@/components/seller/SellerBalanceCard';
 import { SellerOrders } from '@/components/seller/SellerOrders';
 import { ProductBoost } from '@/components/seller/ProductBoost';
+import { SellerPnL } from '@/components/seller/SellerPnL';
+import { PromoCalculator } from '@/components/seller/PromoCalculator';
+import { SalesDynamics } from '@/components/seller/SalesDynamics';
+import { BarcodeGenerator } from '@/components/seller/BarcodeGenerator';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import {
   Sheet,
@@ -32,7 +36,8 @@ import {
 import { toast } from 'sonner';
 import { 
   Store, Package, TrendingUp, Eye, ExternalLink, Loader2, 
-  Truck, BarChart3, Wallet, ShoppingCart, Globe, Crown, Rocket
+  Truck, BarChart3, Wallet, ShoppingCart, Globe, Crown, Rocket,
+  DollarSign, Calculator, ScanBarcode
 } from 'lucide-react';
 import type { Tables, TablesInsert } from '@/integrations/supabase/types';
 
@@ -253,6 +258,22 @@ export default function SellerDashboard() {
                   <Rocket className="h-4 w-4" />
                   <span className="hidden sm:inline">Reklama</span>
                 </TabsTrigger>
+                <TabsTrigger value="pnl" className="gap-2">
+                  <DollarSign className="h-4 w-4" />
+                  <span className="hidden sm:inline">PnL</span>
+                </TabsTrigger>
+                <TabsTrigger value="dynamics" className="gap-2">
+                  <TrendingUp className="h-4 w-4" />
+                  <span className="hidden sm:inline">Dinamika</span>
+                </TabsTrigger>
+                <TabsTrigger value="promo-calc" className="gap-2">
+                  <Calculator className="h-4 w-4" />
+                  <span className="hidden sm:inline">Kalkulyator</span>
+                </TabsTrigger>
+                <TabsTrigger value="barcode" className="gap-2">
+                  <ScanBarcode className="h-4 w-4" />
+                  <span className="hidden sm:inline">Shtrix-kod</span>
+                </TabsTrigger>
                 <TabsTrigger value="analytics" className="gap-2">
                   <BarChart3 className="h-4 w-4" />
                   <span className="hidden sm:inline">Analitika</span>
@@ -295,6 +316,22 @@ export default function SellerDashboard() {
 
           <TabsContent value="boost">
             <ProductBoost shopId={shop.id} />
+          </TabsContent>
+
+          <TabsContent value="pnl">
+            <SellerPnL shopId={shop.id} />
+          </TabsContent>
+
+          <TabsContent value="dynamics">
+            <SalesDynamics shopId={shop.id} />
+          </TabsContent>
+
+          <TabsContent value="promo-calc">
+            <PromoCalculator />
+          </TabsContent>
+
+          <TabsContent value="barcode">
+            <BarcodeGenerator shopId={shop.id} />
           </TabsContent>
 
           <TabsContent value="analytics">
