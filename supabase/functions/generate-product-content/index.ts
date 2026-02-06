@@ -99,7 +99,7 @@ serve(async (req) => {
     // Choose model based on content type
     const model = contentType === "seo" ? "claude-3-haiku-20240307" : "claude-3-5-sonnet-latest";
     
-    console.log(`📝 Generating ${contentType} content using ${model} for user ${claimsData.claims.sub}`);
+    console.log(`📝 Generating ${contentType} content using ${model} for user ${user.id}`);
 
     if (!ANTHROPIC_API_KEY) {
       return await fallbackToLovableAI(request, corsHeaders);

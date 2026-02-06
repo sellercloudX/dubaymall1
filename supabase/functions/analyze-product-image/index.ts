@@ -258,8 +258,22 @@ serve(async (req) => {
       });
     }
 
-    console.log(`✅ Identified with ${result.aiModel}: ${result.productName}`);
-    return new Response(JSON.stringify(result), {
+    // CRITICAL: Normalize field names - AI may return productName instead of name
+    const normalizedResult = {
+      name: result.productName || result.name || "Noma'lum mahsulot",
+      description: result.description || "",
+      category: result.category || "Aksessuarlar",
+      suggestedPrice: Number(result.suggestedPrice) || 100000,
+      brand: result.brand || "",
+      model: result.model || "",
+      specifications: result.specifications || {},
+      features: result.searchKeywords || result.features || [],
+      confidence: result.confidence || 50,
+      aiModel: result.aiModel,
+    };
+
+    console.log(`✅ Identified with ${normalizedResult.aiModel}: ${normalizedResult.name}`);
+    return new Response(JSON.stringify(normalizedResult), {
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
   } catch (error) {

@@ -277,9 +277,9 @@ serve(async (req) => {
       );
     }
 
-    console.log(`🖼️ Enhancing product image for user ${claimsData.claims.sub}`);
+    console.log(`🖼️ Enhancing product image for user ${user.id}`);
     console.log(`📦 Product: ${productName?.slice(0, 50)}, Category: ${category?.slice(0, 30)}`);
-    console.log(`🤖 AI Priority: Flux Pro → DALL-E 3`);
+    console.log(`🤖 AI Priority: Lovable AI (Gemini Image Edit) → Flux Pro → DALL-E 3`);
 
     let enhancedImage: string | null = null;
     let usedModel = "flux-pro";
