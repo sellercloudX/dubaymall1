@@ -48,7 +48,7 @@ const calculateInstallment = (price: number): number => {
 };
 
 // Uzum.uz style product card with image carousel
-export const ProductCard = memo(function ProductCard({ product }: ProductCardProps) {
+export const ProductCard = memo(forwardRef<HTMLAnchorElement, ProductCardProps>(function ProductCard({ product }, ref) {
   const { t } = useLanguage();
   const { addToCart } = useCart();
   const { user } = useAuth();
