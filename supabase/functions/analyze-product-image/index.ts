@@ -14,47 +14,103 @@ Categories: ${CATEGORIES.join(", ")}
 
 Return JSON: { productName, description (3-5 sentences), category, suggestedPrice, brand, model, searchKeywords[], confidence (0-100) }`;
 
-// PRIMARY: Lovable AI (Gemini 2.5 Flash) - guaranteed to work
+// PRIMARY: Google AI Studio (user's own key) → Lovable AI fallback
 async function analyzeWithGemini(img: string): Promise<any | null> {
-  const key = Deno.env.get("LOVABLE_API_KEY");
-  if (!key) { console.log("⚠️ No LOVABLE_API_KEY"); return null; }
+  const googleKey = Deno.env.get("GOOGLE_AI_STUDIO_KEY");
+  const lovableKey = Deno.env.get("LOVABLE_API_KEY");
 
-  try {
-    console.log("🔍 PRIMARY: Gemini 2.5 Flash Vision...");
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: [
-            { type: "text", text: "Identify this product from its appearance. Return ONLY valid JSON." },
-            { type: "image_url", image_url: { url: img } }
-          ]}
-        ],
-      }),
-    });
+  // Extract base64 data
+  let base64Data = img;
+  let mimeType = "image/jpeg";
+  if (img.startsWith("data:")) {
+    const m = img.match(/^data:([^;]+);base64,(.+)$/);
+    if (m) { mimeType = m[1]; base64Data = m[2]; }
+  }
 
-    if (!res.ok) {
-      const errBody = await res.text();
-      console.error("Gemini error:", res.status, errBody);
-      if (res.status === 429) return { error: "rate_limited" };
-      if (res.status === 402) return { error: "payment_required" };
-      return null;
-    }
+  const userPrompt = "Identify this product from its appearance. Return ONLY valid JSON.";
 
-    const data = await res.json();
-    const content = data.choices?.[0]?.message?.content;
-    if (!content) { console.error("Gemini: no content in response"); return null; }
+  // TRY 1: Google AI Studio (direct, no credit limits)
+  if (googleKey) {
+    try {
+      console.log("🔍 PRIMARY: Google AI Studio (user key)...");
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${googleKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+            contents: [{
+              parts: [
+                { text: userPrompt },
+                { inline_data: { mime_type: mimeType, data: base64Data } }
+              ]
+            }]
+          }),
+        }
+      );
 
-    const match = content.match(/\{[\s\S]*\}/);
-    if (!match) { console.error("Gemini: no JSON found in response:", content.substring(0, 200)); return null; }
+      if (!res.ok) {
+        const errBody = await res.text();
+        console.error("Google AI Studio error:", res.status, errBody);
+      } else {
+        const data = await res.json();
+        const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (content) {
+          const match = content.match(/\{[\s\S]*\}/);
+          if (match) {
+            const result = JSON.parse(match[0]);
+            console.log("✅ Google AI Studio identified:", result.productName);
+            return { ...result, aiModel: "google-ai-studio-gemini-2.5-flash" };
+          }
+        }
+        console.log("⚠️ Google AI Studio: no JSON in response");
+      }
+    } catch (err) { console.error("Google AI Studio error:", err); }
+  }
 
-    const result = JSON.parse(match[0]);
-    console.log("✅ Gemini identified:", result.productName);
-    return { ...result, aiModel: "gemini-2.5-flash" };
-  } catch (err) { console.error("Gemini error:", err); return null; }
+  // TRY 2: Lovable AI Gateway (fallback)
+  if (lovableKey) {
+    try {
+      console.log("🔍 FALLBACK: Lovable AI (Gemini)...");
+      const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            { role: "user", content: [
+              { type: "text", text: userPrompt },
+              { type: "image_url", image_url: { url: img } }
+            ]}
+          ],
+        }),
+      });
+
+      if (!res.ok) {
+        const errBody = await res.text();
+        console.error("Lovable AI error:", res.status, errBody);
+        if (res.status === 429) return { error: "rate_limited" };
+        if (res.status === 402) return { error: "payment_required" };
+        return null;
+      }
+
+      const data = await res.json();
+      const content = data.choices?.[0]?.message?.content;
+      if (!content) return null;
+
+      const match = content.match(/\{[\s\S]*\}/);
+      if (!match) return null;
+
+      const result = JSON.parse(match[0]);
+      console.log("✅ Lovable AI identified:", result.productName);
+      return { ...result, aiModel: "lovable-gemini-2.5-flash" };
+    } catch (err) { console.error("Lovable AI error:", err); return null; }
+  }
+
+  console.log("⚠️ No API keys configured for analysis");
+  return null;
 }
 
 // FALLBACK 1: GPT-4o Vision
