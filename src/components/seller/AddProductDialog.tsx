@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import {
@@ -27,22 +27,28 @@ export function AddProductDialog({ shopId, onSubmit }: AddProductDialogProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('manual');
-  const isFileInputActive = useRef(false);
-  const isProcessing = useRef(false);
 
   const handleSubmit = async (data: ProductInsert) => {
     setLoading(true);
     try {
       await onSubmit(data);
+      // Explicitly close only after successful submit
       setOpen(false);
     } finally {
       setLoading(false);
     }
   };
 
-  // Prevent dialog from closing when camera/file picker or AI processing is active
+  // BULLETPROOF: In AI tab, block ALL automatic dialog closes.
+  // Dialog can ONLY close via explicit Cancel/Submit button clicks (which call setOpen(false) directly).
+  // This prevents mobile camera/gallery from triggering close via resize/focus/pointer events.
   const handleOpenChange = (newOpen: boolean) => {
-    if (!newOpen && (isFileInputActive.current || isProcessing.current)) {
+    if (newOpen) {
+      setOpen(true);
+      return;
+    }
+    // Block all automatic closes when AI tab is active
+    if (activeTab === 'ai') {
       return;
     }
     setOpen(newOpen);
@@ -117,8 +123,6 @@ export function AddProductDialog({ shopId, onSubmit }: AddProductDialogProps) {
               onSubmit={handleSubmit}
               onCancel={() => setOpen(false)}
               isLoading={loading}
-              onFileInputActive={(active) => { isFileInputActive.current = active; }}
-              onProcessingChange={(processing) => { isProcessing.current = processing; }}
             />
           </TabsContent>
 
