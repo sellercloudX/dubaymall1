@@ -42,7 +42,7 @@ export default function Dashboard() {
       .from('profiles')
       .select('full_name, phone')
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
 
     if (!error && data) {
       setProfile({

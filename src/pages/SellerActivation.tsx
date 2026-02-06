@@ -67,21 +67,21 @@
      
      try {
        // Check seller role
-       const { data: roleData } = await supabase
-         .from('user_roles')
-         .select('role')
-         .eq('user_id', user.id)
-         .eq('role', 'seller')
-         .single();
-       
-       setHasSellerRole(!!roleData);
- 
-       // Fetch profile
-       const { data: profileData } = await supabase
-         .from('seller_profiles')
-         .select('*')
-         .eq('user_id', user.id)
-         .single();
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .eq('role', 'seller')
+          .maybeSingle();
+        
+        setHasSellerRole(!!roleData);
+  
+        // Fetch profile
+        const { data: profileData } = await supabase
+          .from('seller_profiles')
+          .select('*')
+          .eq('user_id', user.id)
+          .maybeSingle();
        
        if (profileData) {
          setProfile(profileData as SellerProfile);

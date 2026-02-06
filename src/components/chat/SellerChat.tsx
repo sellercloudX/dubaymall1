@@ -89,7 +89,7 @@ export function SellerChat({ isOpen, onClose, shop, productId, productName }: Se
         .select('id')
         .eq('customer_id', user.id)
         .eq('shop_id', shop.id)
-        .single();
+        .maybeSingle();
 
       if (existing) {
         setConversationId(existing.id);

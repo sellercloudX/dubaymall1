@@ -65,7 +65,7 @@ export default function CheckoutPage() {
           .from('profiles')
           .select('full_name, phone, region, city, address')
           .eq('user_id', user.id)
-          .single();
+          .maybeSingle();
 
         if (profile) {
           setFormData(prev => ({
