@@ -17,6 +17,8 @@ interface ProductCardProps {
     rating?: number;
     reviews_count?: number;
     preparation_days?: number;
+    is_affiliate_enabled?: boolean;
+    affiliate_commission_percent?: number;
   };
 }
 
