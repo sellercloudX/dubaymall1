@@ -30,6 +30,9 @@ serve(async (req) => {
       );
     }
 
+    // Store user's auth token to forward to sub-function calls
+    const userAuthToken = authHeader;
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
@@ -88,7 +91,7 @@ serve(async (req) => {
 
     // Step 1: Analyze product with GPT-4o Vision
     console.log("Step 1: Analyzing product image with GPT-4o Vision");
-    const analysisResponse = await callEdgeFunction("analyze-product-image", { imageBase64 });
+    const analysisResponse = await callEdgeFunction("analyze-product-image", { imageBase64 }, userAuthToken);
     
     if (!analysisResponse.ok) {
       throw new Error("Product analysis failed");
@@ -110,7 +113,7 @@ serve(async (req) => {
       targetMarketplace: targetMarketplaces[0],
       contentType: "seo",
       languages: ["uz", "ru"]
-    });
+    }, userAuthToken);
 
     let seoContent = null;
     if (seoResponse.ok) {
@@ -133,7 +136,7 @@ serve(async (req) => {
       targetMarketplace: targetMarketplaces[0],
       contentType: "description",
       languages: ["uz", "ru"]
-    });
+    }, userAuthToken);
 
     let descriptions = null;
     if (descResponse.ok) {
@@ -159,7 +162,7 @@ serve(async (req) => {
             category: productAnalysis.category,
             style: styles[i % styles.length],
             count: 1
-          });
+          }, userAuthToken);
 
           if (infoResponse.ok) {
             const infoResult = await infoResponse.json();
@@ -247,15 +250,15 @@ serve(async (req) => {
   }
 });
 
-// Helper to call other edge functions
-async function callEdgeFunction(functionName: string, body: any): Promise<Response> {
+// Helper to call other edge functions - forwards user's auth token
+async function callEdgeFunction(functionName: string, body: any, authToken?: string): Promise<Response> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY");
   
   return fetch(`${supabaseUrl}/functions/v1/${functionName}`, {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${supabaseKey}`,
+      "Authorization": authToken || `Bearer ${supabaseKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body)
