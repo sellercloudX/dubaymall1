@@ -2407,6 +2407,10 @@ export type Database = {
           total_reviews: number
         }[]
       }
+      has_admin_permission: {
+        Args: { _permission: string; _user_id: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["user_role"]
