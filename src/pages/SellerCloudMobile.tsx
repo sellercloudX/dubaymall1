@@ -8,14 +8,29 @@ import { MobileSellerCloudHeader } from '@/components/mobile/MobileSellerCloudHe
 import { MobileAnalytics } from '@/components/mobile/MobileAnalytics';
 import { MobileProducts } from '@/components/mobile/MobileProducts';
 import { MobileOrders } from '@/components/mobile/MobileOrders';
- import { MobileTrendHunter } from '@/components/mobile/MobileTrendHunter';
+import { MobileTrendHunter } from '@/components/mobile/MobileTrendHunter';
 import { AIScannerPro } from '@/components/seller/AIScannerPro';
- import { BackgroundTasksPanel } from '@/components/mobile/BackgroundTasksPanel';
-import { Loader2, Lock } from 'lucide-react';
+import { BackgroundTasksPanel } from '@/components/mobile/BackgroundTasksPanel';
+import { ABCAnalysis } from '@/components/sellercloud/ABCAnalysis';
+import { MinPriceProtection } from '@/components/sellercloud/MinPriceProtection';
+import { CardCloner } from '@/components/sellercloud/CardCloner';
+import { ProblematicProducts } from '@/components/sellercloud/ProblematicProducts';
+import { Loader2, Lock, BarChart3, Shield, Copy, AlertOctagon, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 
- type TabType = 'analytics' | 'scanner' | 'products' | 'orders' | 'trends';
+type TabType = 'analytics' | 'scanner' | 'products' | 'orders' | 'trends' | 'abc-analysis' | 'min-price' | 'card-clone' | 'problems';
+
+const moreSubTabs = [
+  { id: 'trends' as const, icon: TrendingUp, label: 'Trendlar' },
+  { id: 'abc-analysis' as const, icon: BarChart3, label: 'ABC-analiz' },
+  { id: 'min-price' as const, icon: Shield, label: 'Min narx' },
+  { id: 'card-clone' as const, icon: Copy, label: 'Klonlash' },
+  { id: 'problems' as const, icon: AlertOctagon, label: 'Muammolar' },
+];
+
+const moreTabIds: TabType[] = ['trends', 'abc-analysis', 'min-price', 'card-clone', 'problems'];
 
 export default function SellerCloudMobile() {
   const { user, loading: authLoading } = useAuth();
@@ -89,6 +104,8 @@ export default function SellerCloudMobile() {
     );
   }
 
+  const isMoreActive = moreTabIds.includes(activeTab);
+
   const renderContent = () => {
     switch (activeTab) {
       case 'analytics':
@@ -116,8 +133,46 @@ export default function SellerCloudMobile() {
             connectedMarketplaces={connectedMarketplaces}
           />
         );
-       case 'trends':
-         return <MobileTrendHunter />;
+      case 'trends':
+        return <MobileTrendHunter />;
+      case 'abc-analysis':
+        return (
+          <div className="p-4">
+            <ABCAnalysis
+              connectedMarketplaces={connectedMarketplaces}
+              fetchMarketplaceData={fetchMarketplaceData}
+              commissionPercent={subscription?.commission_percent || 4}
+            />
+          </div>
+        );
+      case 'min-price':
+        return (
+          <div className="p-4">
+            <MinPriceProtection
+              connectedMarketplaces={connectedMarketplaces}
+              fetchMarketplaceData={fetchMarketplaceData}
+              commissionPercent={subscription?.commission_percent || 4}
+            />
+          </div>
+        );
+      case 'card-clone':
+        return (
+          <div className="p-4">
+            <CardCloner
+              connectedMarketplaces={connectedMarketplaces}
+              fetchMarketplaceData={fetchMarketplaceData}
+            />
+          </div>
+        );
+      case 'problems':
+        return (
+          <div className="p-4">
+            <ProblematicProducts
+              connectedMarketplaces={connectedMarketplaces}
+              fetchMarketplaceData={fetchMarketplaceData}
+            />
+          </div>
+        );
       default:
         return null;
     }
@@ -132,6 +187,31 @@ export default function SellerCloudMobile() {
       />
       
       <main className="pt-14">
+        {/* More sub-tabs navigation */}
+        {isMoreActive && (
+          <div className="flex gap-2 px-4 py-3 overflow-x-auto no-scrollbar border-b bg-background/95 backdrop-blur-sm sticky top-14 z-40">
+            {moreSubTabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors",
+                    isActive
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground"
+                  )}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        
         {renderContent()}
       </main>
       
@@ -140,8 +220,8 @@ export default function SellerCloudMobile() {
         onTabChange={setActiveTab} 
       />
        
-       {/* Background Tasks Panel */}
-       <BackgroundTasksPanel />
+      {/* Background Tasks Panel */}
+      <BackgroundTasksPanel />
     </div>
   );
 }
