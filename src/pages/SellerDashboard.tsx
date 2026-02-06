@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { CreateShopDialog } from '@/components/seller/CreateShopDialog';
 import { AddProductDialog } from '@/components/seller/AddProductDialog';
 import { ProductList } from '@/components/seller/ProductList';
+import { PendingProductsBanner } from '@/components/seller/PendingProductsBanner';
 import { ProductForm } from '@/components/seller/ProductForm';
 import { DropshippingImport } from '@/components/seller/DropshippingImport';
 import { DropshippingProducts } from '@/components/seller/DropshippingProducts';
@@ -260,6 +261,7 @@ export default function SellerDashboard() {
           </div>
 
           <TabsContent value="products">
+            <PendingProductsBanner />
             <ProductList
               products={products}
               loading={productsLoading}

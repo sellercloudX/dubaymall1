@@ -22,6 +22,7 @@ import {
   Camera, Sparkles, Loader2, ImageIcon, Wand2, Check,
   Globe, Package, ArrowRight, RefreshCw, Zap, Upload, X
 } from 'lucide-react';
+import { backgroundTaskManager } from '@/lib/backgroundTaskManager';
 import type { TablesInsert } from '@/integrations/supabase/types';
 
 type ProductInsert = TablesInsert<'products'>;
@@ -132,7 +133,7 @@ async function uploadImageToStorage(imageUrl: string, shopId: string): Promise<s
   }
 }
 
-// Background image generation - runs after product is created
+// Background image generation - runs after product is created, tracked via backgroundTaskManager
 async function generateAndAttachImages(
   productId: string, 
   shopId: string, 
@@ -140,60 +141,65 @@ async function generateAndAttachImages(
   category: string,
   existingImages: string[]
 ) {
+  const taskId = backgroundTaskManager.createTask(
+    'ai-image-generation',
+    `"${productName}" uchun kartochka yaratilmoqda`,
+    { productId, productName },
+  );
+
   try {
-    console.log('🎨 Background: Starting image generation for', productName);
-    
-    // First, upload any existing external images to storage
-    const uploadedExisting: string[] = [];
-    for (const img of existingImages) {
-      const url = await uploadImageToStorage(img, shopId);
-      if (url) uploadedExisting.push(url);
-    }
+    await backgroundTaskManager.runTask(taskId, async (updateProgress) => {
+      updateProgress(10, `"${productName}" uchun kartochka yaratilmoqda`);
+      backgroundTaskManager.updateTask(taskId, { currentItem: 'Mavjud rasmlar yuklanmoqda...' });
 
-    // Update product with uploaded existing images
-    if (uploadedExisting.length > 0) {
-      await supabase
-        .from('products')
-        .update({ images: uploadedExisting })
-        .eq('id', productId);
-      console.log('✅ Background: Existing images uploaded:', uploadedExisting.length);
-    }
+      // Upload existing external images to storage
+      const uploadedExisting: string[] = [];
+      for (const img of existingImages) {
+        const url = await uploadImageToStorage(img, shopId);
+        if (url) uploadedExisting.push(url);
+      }
 
-    // Generate new image with Flux Pro
-    console.log('🎨 Background: Generating Flux Pro image...');
-    const { data, error } = await supabase.functions.invoke('generate-product-image', {
-      body: { 
-        productName,
-        category,
-        style: 'marketplace'
-      },
-    });
-
-    if (error) {
-      console.error('Background image generation error:', error);
-      toast.error(`"${productName}" uchun rasm yaratib bo'lmadi`, { duration: 5000 });
-      return;
-    }
-
-    if (data?.imageUrl) {
-      // Upload generated image to permanent storage
-      const storedUrl = await uploadImageToStorage(data.imageUrl, shopId);
-      
-      if (storedUrl) {
-        const allImages = [storedUrl, ...uploadedExisting];
-        
+      if (uploadedExisting.length > 0) {
         await supabase
           .from('products')
-          .update({ images: allImages })
+          .update({ images: uploadedExisting })
           .eq('id', productId);
-        
-        console.log('✅ Background: Product images updated!', allImages.length);
-        toast.success(`"${productName}" uchun professional rasm tayyor! 🎨`, { duration: 5000 });
       }
-    }
+
+      updateProgress(30, `"${productName}" uchun kartochka yaratilmoqda`);
+      backgroundTaskManager.updateTask(taskId, { currentItem: 'Flux Pro bilan professional rasm yaratilmoqda...' });
+
+      // Generate new image with Flux Pro
+      const { data, error } = await supabase.functions.invoke('generate-product-image', {
+        body: { productName, category, style: 'marketplace' },
+      });
+
+      if (error) {
+        console.error('Background image generation error:', error);
+        throw new Error('Rasm yaratib bo\'lmadi');
+      }
+
+      updateProgress(70, `"${productName}" uchun kartochka yaratilmoqda`);
+      backgroundTaskManager.updateTask(taskId, { currentItem: 'Rasm saqlanmoqda...' });
+
+      if (data?.imageUrl) {
+        const storedUrl = await uploadImageToStorage(data.imageUrl, shopId);
+        
+        if (storedUrl) {
+          const allImages = [storedUrl, ...uploadedExisting];
+          await supabase
+            .from('products')
+            .update({ images: allImages })
+            .eq('id', productId);
+          
+          console.log('✅ Background: Product images updated!', allImages.length);
+        }
+      }
+
+      updateProgress(100, `"${productName}" uchun kartochka yaratilmoqda`);
+    });
   } catch (err) {
     console.error('Background image task error:', err);
-    toast.error(`"${productName}" rasm xatolik yuz berdi`);
   }
 }
 
@@ -483,18 +489,13 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading, onFileInp
       const categoryName = analysisResult?.category || 
         categories.find(c => c.id === formData.category_id)?.name_uz || '';
       
-      toast.info(`🎨 "${formData.name}" uchun professional rasm fonda yaratilmoqda...`, { 
-        duration: 8000,
-        icon: '⏳'
-      });
-
-      // Fire and forget - runs in background
+      // Fire and forget - runs in background with progress tracking
       generateAndAttachImages(
         productId,
         shopId,
         formData.name || '',
         categoryName,
-        productImages.filter(img => img !== capturedImage) // exclude camera image (already uploaded)
+        productImages.filter(img => img !== capturedImage)
       );
     }
     
