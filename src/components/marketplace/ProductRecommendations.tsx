@@ -85,4 +85,4 @@ export const ProductRecommendations = forwardRef<HTMLDivElement, ProductRecommen
       </div>
     </div>
   );
-}
+});
