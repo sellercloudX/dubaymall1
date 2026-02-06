@@ -154,7 +154,7 @@ export const ProductCard = memo(forwardRef<HTMLAnchorElement, ProductCardProps>(
   const deliveryDate = calculateDeliveryDate(product.preparation_days);
 
   return (
-    <Link to={`/product/${product.id}`} className="block">
+    <Link to={`/product/${product.id}`} className="block" ref={ref}>
       <div className="bg-card rounded-lg overflow-hidden border border-border/40 hover:shadow-lg transition-shadow duration-200 h-full flex flex-col">
         {/* Image Container - 3:4 aspect ratio with carousel */}
         <div 
