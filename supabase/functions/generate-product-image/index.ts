@@ -5,21 +5,22 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// ==================== GEMINI IMAGE EDITING via Google AI Studio - PRIMARY ====================
-async function generateFromSourceImage(
-  sourceImage: string,
-  productName: string,
-  category: string
-): Promise<string | null> {
-  // Try Google AI Studio key first, then Lovable AI as fallback
-  const GOOGLE_KEY = Deno.env.get("GOOGLE_AI_STUDIO_KEY");
-  const LOVABLE_KEY = Deno.env.get("LOVABLE_API_KEY");
-  
-  if (!GOOGLE_KEY && !LOVABLE_KEY) {
-    console.log("⚠️ No API keys configured for image editing");
-    return null;
+// ==================== HELPER: Extract base64 ====================
+function extractBase64(img: string): { base64Data: string; mimeType: string } {
+  let base64Data = img;
+  let mimeType = "image/jpeg";
+  if (img.startsWith("data:")) {
+    const match = img.match(/^data:([^;]+);base64,(.+)$/);
+    if (match) {
+      mimeType = match[1];
+      base64Data = match[2];
+    }
   }
+  return { base64Data, mimeType };
+}
 
+// ==================== HELPER: Build edit prompt ====================
+function buildEditPrompt(productName: string, category: string): string {
   const categoryHints: Record<string, string> = {
     "elektronika": "on a sleek dark gradient surface with subtle blue tech glow accents, premium tech product showcase",
     "kiyim": "on a clean white fashion lookbook background with soft natural lighting, fashion editorial style",
@@ -34,54 +35,45 @@ async function generateFromSourceImage(
   let envHint = "on a clean white-to-light-gray gradient studio background with professional three-point lighting";
   const catLower = category.toLowerCase();
   for (const [key, value] of Object.entries(categoryHints)) {
-    if (catLower.includes(key)) {
-      envHint = value;
-      break;
-    }
+    if (catLower.includes(key)) { envHint = value; break; }
   }
 
-  const editPrompt = `Transform this product photo into a PREMIUM E-COMMERCE MARKETPLACE listing image.
+  return `Transform this product photo into a PREMIUM E-COMMERCE listing image.
 
-CRITICAL RULES:
-1. Keep the EXACT SAME PRODUCT from the original photo - do NOT change the product itself, its shape, color, brand, or design
-2. The product must be the HERO ELEMENT - centered, filling 70-80% of the frame
+RULES:
+1. Keep the EXACT SAME PRODUCT - do NOT change shape, color, brand or design
+2. Product must be centered, filling 70-80% of frame
 3. Place the product ${envHint}
-4. Add subtle complementary elements around the product that enhance its appeal
-5. Use professional studio lighting: key light, fill light, rim light for premium depth
-6. Make it look like a high-end marketplace listing photo (Amazon, Uzum Market quality)
+4. Professional studio lighting for premium depth
+5. High-end marketplace quality (Amazon, Uzum Market)
 
-PRODUCT: "${productName}"
-CATEGORY: ${category || "General"}
+PRODUCT: "${productName}" | CATEGORY: ${category || "General"}
 
-ABSOLUTE RESTRICTIONS:
-- NO text, watermarks, logos, labels, prices, or written words anywhere
-- NO people, hands, or body parts
-- The product appearance must remain IDENTICAL to the original
-- Output must be photorealistic
-- Portrait 3:4 aspect ratio
+RESTRICTIONS: NO text, NO watermarks, NO people, NO hands. Product appearance IDENTICAL to original. Photorealistic. Portrait 3:4 ratio.`;
+}
 
-OUTPUT: One stunning, marketplace-ready product photograph.`;
+// ==================== 1. GOOGLE AI STUDIO - Gemini Image Edit ====================
+async function tryGoogleAIStudio(
+  sourceImage: string,
+  productName: string,
+  category: string
+): Promise<string | null> {
+  const GOOGLE_KEY = Deno.env.get("GOOGLE_AI_STUDIO_KEY");
+  if (!GOOGLE_KEY) return null;
 
-  // Extract base64 data from source image
-  let base64Data = sourceImage;
-  let mimeType = "image/jpeg";
-  if (sourceImage.startsWith("data:")) {
-    const match = sourceImage.match(/^data:([^;]+);base64,(.+)$/);
-    if (match) {
-      mimeType = match[1];
-      base64Data = match[2];
-    }
-  }
+  const { base64Data, mimeType } = extractBase64(sourceImage);
+  const editPrompt = buildEditPrompt(productName, category);
 
-  // Google AI Studio with RETRY (up to 3 attempts, no Lovable AI fallback)
-  if (GOOGLE_KEY) {
-    const MAX_RETRIES = 3;
+  const models = ["gemini-2.5-flash-image", "gemini-2.0-flash-exp"];
+
+  for (const model of models) {
+    const MAX_RETRIES = 2;
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
-        console.log(`🎨 GOOGLE AI STUDIO: Image editing attempt ${attempt}/${MAX_RETRIES}...`);
-        
+        console.log(`🎨 GOOGLE AI STUDIO [${model}] attempt ${attempt}/${MAX_RETRIES}...`);
+
         const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${GOOGLE_KEY}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GOOGLE_KEY}`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -93,7 +85,7 @@ OUTPUT: One stunning, marketplace-ready product photograph.`;
                 ]
               }],
               generationConfig: {
-                responseModalities: ["TEXT", "IMAGE"]
+                responseModalities: ["IMAGE", "TEXT"]
               }
             }),
           }
@@ -101,97 +93,134 @@ OUTPUT: One stunning, marketplace-ready product photograph.`;
 
         if (!response.ok) {
           const errText = await response.text();
-          console.error(`Google AI Studio error (attempt ${attempt}):`, response.status, errText);
-          if (response.status === 429 && attempt < MAX_RETRIES) {
-            console.log(`⏳ Rate limited, waiting ${attempt * 5}s...`);
+          console.error(`Google [${model}] error (${attempt}):`, response.status, errText);
+          if (response.status === 429) {
             await new Promise(r => setTimeout(r, attempt * 5000));
             continue;
           }
-        } else {
-          const data = await response.json();
-          const parts = data.candidates?.[0]?.content?.parts || [];
-          
-          for (const part of parts) {
-            if (part.inlineData) {
-              const imageBase64 = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-              console.log(`✅ Google AI Studio: Photo created (attempt ${attempt})!`);
-              return imageBase64;
-            }
+          break; // other errors → try next model
+        }
+
+        const data = await response.json();
+        const parts = data.candidates?.[0]?.content?.parts || [];
+        const finishReason = data.candidates?.[0]?.finishReason;
+        
+        console.log(`📋 [${model}] finishReason: ${finishReason}, parts: ${parts.length}`);
+
+        for (const part of parts) {
+          if (part.inlineData) {
+            console.log(`✅ Google AI Studio [${model}]: Image created (attempt ${attempt})!`);
+            return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
           }
-          console.log(`⚠️ Google AI Studio: No image in response (attempt ${attempt})`);
+        }
+
+        // Log text response for debugging
+        const textParts = parts.filter((p: any) => p.text).map((p: any) => p.text).join(" ");
+        if (textParts) {
+          console.log(`📝 [${model}] returned text instead: ${textParts.substring(0, 200)}`);
         }
 
         if (attempt < MAX_RETRIES) {
-          console.log(`⏳ Retrying in ${attempt * 2}s...`);
           await new Promise(r => setTimeout(r, attempt * 2000));
         }
       } catch (err) {
-        console.error(`Google AI Studio error (attempt ${attempt}):`, err);
+        console.error(`Google [${model}] error (${attempt}):`, err);
         if (attempt < MAX_RETRIES) {
-          await new Promise(r => setTimeout(r, attempt * 2000));
+          await new Promise(r => setTimeout(r, 2000));
         }
       }
     }
-    console.log("❌ Google AI Studio: All 3 attempts failed");
+  }
+
+  console.log("❌ Google AI Studio: All models/attempts failed");
+  return null;
+}
+
+// ==================== 2. OPENAI - GPT-4o Vision + DALL-E 3 ====================
+async function tryOpenAIImageEdit(
+  sourceImage: string,
+  productName: string,
+  category: string
+): Promise<string | null> {
+  const OPENAI_KEY = Deno.env.get("OPENAI_API_KEY");
+  if (!OPENAI_KEY) return null;
+
+  try {
+    console.log("🎨 OPENAI: Analyzing product with GPT-4o then generating with DALL-E 3...");
+
+    // Step 1: Use GPT-4o Vision to get detailed product description
+    const visionRes = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${OPENAI_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "gpt-4o",
+        messages: [{
+          role: "user",
+          content: [
+            { type: "text", text: `Describe this product in extreme detail for image generation. Include: exact color, shape, material, brand markings, size proportions, texture. Product name: "${productName}". Category: ${category}. Return ONLY a detailed visual description, nothing else.` },
+            { type: "image_url", image_url: { url: sourceImage, detail: "high" } }
+          ]
+        }],
+        max_tokens: 500
+      }),
+    });
+
+    if (!visionRes.ok) {
+      console.error("GPT-4o Vision error:", visionRes.status);
+      return null;
+    }
+
+    const visionData = await visionRes.json();
+    const productDescription = visionData.choices?.[0]?.message?.content;
+    if (!productDescription) return null;
+
+    console.log("📝 GPT-4o described product:", productDescription.substring(0, 100));
+
+    // Step 2: Generate with DALL-E 3
+    const dalleRes = await fetch("https://api.openai.com/v1/images/generations", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${OPENAI_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "dall-e-3",
+        prompt: `Professional e-commerce product photograph. ${productDescription}. Clean studio background, professional three-point lighting, premium marketplace listing quality. NO text, NO watermarks, NO logos, NO people. Photorealistic. Portrait 3:4 ratio.`,
+        n: 1,
+        size: "1024x1792",
+        quality: "hd",
+        style: "natural"
+      }),
+    });
+
+    if (!dalleRes.ok) {
+      const errText = await dalleRes.text();
+      console.error("DALL-E 3 error:", dalleRes.status, errText);
+      return null;
+    }
+
+    const dalleData = await dalleRes.json();
+    const imageUrl = dalleData.data?.[0]?.url;
+    if (imageUrl) {
+      console.log("✅ OpenAI DALL-E 3: Image generated!");
+      return imageUrl;
+    }
+  } catch (err) {
+    console.error("OpenAI pipeline error:", err);
   }
 
   return null;
 }
 
-// ==================== FLUX PRO - TEXT-TO-IMAGE (when no source image) ====================
-async function generateWithFluxPro(
+// ==================== 3. FLUX PRO - TEXT-TO-IMAGE ====================
+async function tryFluxPro(
   productName: string,
-  category: string,
-  style: string
+  category: string
 ): Promise<string | null> {
   const REPLICATE_API_TOKEN = Deno.env.get("REPLICATE_API_TOKEN");
-  
-  if (!REPLICATE_API_TOKEN) {
-    console.log("⚠️ REPLICATE_API_TOKEN not configured");
-    return null;
-  }
+  if (!REPLICATE_API_TOKEN) return null;
 
   try {
-    console.log("🎨 FLUX PRO: Generating professional product image...");
-    
-    const categoryStyles: Record<string, string> = {
-      "electronics": `sleek dark gradient background with subtle blue tech glow, dramatic side lighting, premium flagship device presentation, Apple-style product photography, 8K ultra sharp details`,
-      "cosmetics": `soft pink-peach gradient background with ethereal bokeh, golden hour warm lighting, luxury beauty advertisement quality, Sephora-style presentation`,
-      "clothing": `clean minimalist studio background, soft natural window lighting, fashion editorial feel, Zara/H&M lookbook style, professional fashion photography`,
-      "food": `warm appetizing rustic wooden surface, natural soft window lighting with steam effects, food magazine cover quality`,
-      "home": `cozy Scandinavian interior lifestyle setting, natural daylight, IKEA catalog style presentation`,
-      "default": `clean white-to-light-gray gradient studio background, professional three-point lighting, premium e-commerce marketplace ready presentation`
-    };
+    console.log("🎨 FLUX PRO: Generating product image...");
 
-    const categoryLower = category.toLowerCase();
-    let stylePrompt = categoryStyles["default"];
-    
-    for (const [key, value] of Object.entries(categoryStyles)) {
-      if (categoryLower.includes(key) || key.includes(categoryLower)) {
-        stylePrompt = value;
-        break;
-      }
-    }
-
-    const fluxPrompt = `PROFESSIONAL E-COMMERCE PRODUCT PHOTOGRAPHY.
-
-PRODUCT: "${productName}"
-CATEGORY: ${category || "General"}
-
-VISUAL REQUIREMENTS:
-${stylePrompt}
-
-COMPOSITION:
-- Product centered, fills 70-80% of frame
-- Professional studio lighting with soft shadows
-- Premium marketplace quality (Uzum, Amazon)
-- Ultra high resolution, 8K quality
-- Portrait 3:4 ratio
-
-RESTRICTIONS:
-- NO text, watermarks, logos, prices
-- NO people or hands
-- Product must look 100% realistic and purchasable`;
+    const fluxPrompt = `Professional e-commerce product photography of "${productName}". Category: ${category || "General"}. Clean white studio background, professional three-point lighting, premium marketplace quality, ultra high resolution. NO text, NO watermarks, NO people. Photorealistic.`;
 
     const createResponse = await fetch("https://api.replicate.com/v1/predictions", {
       method: "POST",
@@ -213,7 +242,7 @@ RESTRICTIONS:
     });
 
     if (!createResponse.ok) {
-      console.error("Flux Pro create error:", createResponse.status);
+      console.error("Flux Pro error:", createResponse.status);
       return null;
     }
 
@@ -222,16 +251,14 @@ RESTRICTIONS:
 
     let result = prediction;
     let attempts = 0;
-    const maxAttempts = 60;
 
-    while (result.status !== "succeeded" && result.status !== "failed" && attempts < maxAttempts) {
+    while (result.status !== "succeeded" && result.status !== "failed" && attempts < 60) {
       await new Promise(resolve => setTimeout(resolve, 2000));
       const pollResponse = await fetch(`https://api.replicate.com/v1/predictions/${prediction.id}`, {
         headers: { "Authorization": `Token ${REPLICATE_API_TOKEN}` },
       });
       if (pollResponse.ok) {
         result = await pollResponse.json();
-        console.log(`⏳ Flux Pro: ${result.status} (${attempts + 1}/${maxAttempts})`);
       }
       attempts++;
     }
@@ -243,83 +270,60 @@ RESTRICTIONS:
     }
 
     console.error("Flux Pro failed:", result.error);
-    return null;
   } catch (err) {
     console.error("Flux Pro error:", err);
-    return null;
   }
+  return null;
 }
 
-// ==================== GEMINI TEXT-TO-IMAGE via Google AI Studio - FALLBACK ====================
-async function generateWithGemini(
+// ==================== 4. GOOGLE AI STUDIO - TEXT-TO-IMAGE ====================
+async function tryGoogleTextToImage(
   productName: string,
   category: string
 ): Promise<string | null> {
   const GOOGLE_KEY = Deno.env.get("GOOGLE_AI_STUDIO_KEY");
-  const LOVABLE_KEY = Deno.env.get("LOVABLE_API_KEY");
-  
-  if (!GOOGLE_KEY && !LOVABLE_KEY) {
-    console.log("⚠️ No keys for text-to-image");
-    return null;
-  }
+  if (!GOOGLE_KEY) return null;
 
-  const prompt = `Create a professional e-commerce product photograph of "${productName}".
-${category ? `Product category: ${category}.` : ""}
-Clean white studio background, professional lighting, high resolution, no text or watermarks, 3:4 portrait ratio, marketplace listing quality.`;
+  const prompt = `Create a professional e-commerce product photograph of "${productName}". Category: ${category || "General"}. Clean white studio background, professional lighting, high resolution, no text, no watermarks. Portrait 3:4 ratio.`;
 
-  // Google AI Studio with RETRY (up to 3 attempts)
-  if (GOOGLE_KEY) {
-    const MAX_RETRIES = 3;
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      try {
-        console.log(`🎨 GOOGLE AI STUDIO TEXT-TO-IMAGE attempt ${attempt}/${MAX_RETRIES}...`);
-        
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${GOOGLE_KEY}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: { responseModalities: ["TEXT", "IMAGE"] }
-            }),
-          }
-        );
+  const models = ["gemini-2.5-flash-image", "gemini-2.0-flash-exp"];
 
-        if (response.ok) {
-          const data = await response.json();
-          const parts = data.candidates?.[0]?.content?.parts || [];
-          for (const part of parts) {
-            if (part.inlineData) {
-              console.log(`✅ Google AI Studio text-to-image success (attempt ${attempt})`);
-              return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-            }
-          }
-          console.log(`⚠️ No image in response (attempt ${attempt})`);
-        } else {
-          const errText = await response.text();
-          console.error(`Google AI Studio text-to-image error (attempt ${attempt}):`, response.status, errText);
-          if (response.status === 429 && attempt < MAX_RETRIES) {
-            await new Promise(r => setTimeout(r, attempt * 5000));
-            continue;
+  for (const model of models) {
+    try {
+      console.log(`🎨 GOOGLE TEXT-TO-IMAGE [${model}]...`);
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GOOGLE_KEY}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { responseModalities: ["IMAGE", "TEXT"] }
+          }),
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        const parts = data.candidates?.[0]?.content?.parts || [];
+        for (const part of parts) {
+          if (part.inlineData) {
+            console.log(`✅ Google text-to-image [${model}] success`);
+            return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
           }
         }
-
-        if (attempt < MAX_RETRIES) {
-          await new Promise(r => setTimeout(r, attempt * 2000));
-        }
-      } catch (err) {
-        console.error(`Google AI Studio text-to-image error (attempt ${attempt}):`, err);
-        if (attempt < MAX_RETRIES) {
-          await new Promise(r => setTimeout(r, attempt * 2000));
-        }
+      } else {
+        console.error(`Google text-to-image [${model}] error:`, response.status);
       }
+    } catch (err) {
+      console.error(`Google text-to-image [${model}] error:`, err);
     }
   }
 
   return null;
 }
 
+// ==================== MAIN HANDLER ====================
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -329,66 +333,97 @@ serve(async (req) => {
     const body = await req.json();
     const { productName, category, style, sourceImage } = body;
 
-    if (!productName || typeof productName !== 'string') {
+    if (!productName || typeof productName !== "string") {
       return new Response(
         JSON.stringify({ error: "Product name is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log(`🖼️ Generating product image for: ${productName}`);
-    console.log(`📦 Category: ${category || 'General'}`);
-    console.log(`📸 Source image provided: ${!!sourceImage}`);
+    console.log(`🖼️ Image generation for: ${productName}`);
+    console.log(`📦 Category: ${category || "General"} | Source image: ${!!sourceImage}`);
 
     let imageUrl: string | null = null;
     let usedModel = "unknown";
 
     if (sourceImage) {
-      // When source image exists, try Gemini edit ONLY
-      // DO NOT fall back to text-to-image because it will generate a COMPLETELY DIFFERENT product
-      console.log("🤖 Strategy: Source image → Gemini Edit ONLY (no text-to-image fallback)");
-      
-      imageUrl = await generateFromSourceImage(sourceImage, productName, category || "");
-      if (imageUrl) {
-        usedModel = "gemini-image-edit";
-      } else {
-        // Gemini edit failed - return original source image instead of generating a fake one
-        console.log("⚠️ Gemini edit failed. Returning ORIGINAL source image to preserve product accuracy.");
+      // SOURCE IMAGE → Try image editing with all available providers
+      console.log("🤖 Strategy: Google Gemini Edit → OpenAI (GPT-4o+DALL-E) → Original");
+
+      // 1. Google AI Studio (Gemini image edit) - 2 models × 2 retries
+      imageUrl = await tryGoogleAIStudio(sourceImage, productName, category || "");
+      if (imageUrl) { usedModel = "gemini-image-edit"; }
+
+      // 2. OpenAI GPT-4o Vision + DALL-E 3
+      if (!imageUrl) {
+        imageUrl = await tryOpenAIImageEdit(sourceImage, productName, category || "");
+        if (imageUrl) { usedModel = "openai-dalle3"; }
+      }
+
+      // 3. All AI failed → return original image
+      if (!imageUrl) {
+        console.log("⚠️ All AI failed. Returning ORIGINAL source image.");
         return new Response(
-          JSON.stringify({ 
-            imageUrl: sourceImage, 
-            aiModel: "original-preserved", 
-            message: "Original image preserved (AI enhancement unavailable)" 
+          JSON.stringify({
+            imageUrl: sourceImage,
+            aiModel: "original-preserved",
+            message: "Original image preserved (AI enhancement unavailable)"
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
     } else {
-      // No source image - text-to-image is fine since there's nothing to preserve
-      console.log("🤖 Strategy: Text → Flux Pro → Gemini Text fallback");
-      
-      imageUrl = await generateWithFluxPro(productName, category || "", style || "marketplace");
-      if (imageUrl) usedModel = "flux-pro";
+      // NO SOURCE IMAGE → Text-to-image
+      console.log("🤖 Strategy: Flux Pro → Google Gemini Text → DALL-E 3");
 
+      // 1. Flux Pro
+      imageUrl = await tryFluxPro(productName, category || "");
+      if (imageUrl) { usedModel = "flux-pro"; }
+
+      // 2. Google AI Studio text-to-image
       if (!imageUrl) {
-        imageUrl = await generateWithGemini(productName, category || "");
-        if (imageUrl) usedModel = "gemini-text-to-image";
+        imageUrl = await tryGoogleTextToImage(productName, category || "");
+        if (imageUrl) { usedModel = "gemini-text-to-image"; }
+      }
+
+      // 3. DALL-E 3 (without source image, just from name)
+      if (!imageUrl) {
+        const OPENAI_KEY = Deno.env.get("OPENAI_API_KEY");
+        if (OPENAI_KEY) {
+          try {
+            console.log("🎨 DALL-E 3 TEXT-TO-IMAGE...");
+            const dalleRes = await fetch("https://api.openai.com/v1/images/generations", {
+              method: "POST",
+              headers: { Authorization: `Bearer ${OPENAI_KEY}`, "Content-Type": "application/json" },
+              body: JSON.stringify({
+                model: "dall-e-3",
+                prompt: `Professional e-commerce product photo of "${productName}". Category: ${category || "General"}. Clean studio background, professional lighting, no text, no watermarks. Photorealistic.`,
+                n: 1,
+                size: "1024x1792",
+                quality: "hd",
+                style: "natural"
+              }),
+            });
+            if (dalleRes.ok) {
+              const dalleData = await dalleRes.json();
+              imageUrl = dalleData.data?.[0]?.url;
+              if (imageUrl) { usedModel = "dalle-3"; }
+            }
+          } catch (err) {
+            console.error("DALL-E 3 error:", err);
+          }
+        }
       }
     }
 
     if (!imageUrl) {
-      console.error("All AI models failed");
       return new Response(
-        JSON.stringify({ 
-          error: "Image generation failed. Please try again later.",
-          suggestion: "You can manually upload an image instead."
-        }),
+        JSON.stringify({ error: "Rasm yaratib bo'lmadi. Qayta urinib ko'ring.", suggestion: "Rasmni qo'lda yuklashingiz mumkin." }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     console.log(`✅ Image generated with ${usedModel}`);
-
     return new Response(
       JSON.stringify({ imageUrl, aiModel: usedModel, message: "Image generated successfully" }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -396,7 +431,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error:", error);
     return new Response(
-      JSON.stringify({ error: "Image generation failed" }),
+      JSON.stringify({ error: "Rasm yaratish xatoligi" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
