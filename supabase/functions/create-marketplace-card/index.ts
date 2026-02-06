@@ -91,7 +91,7 @@ serve(async (req) => {
 
     // Step 1: Analyze product with GPT-4o Vision
     console.log("Step 1: Analyzing product image with GPT-4o Vision");
-    const analysisResponse = await callEdgeFunction("analyze-product-image", { imageBase64 });
+    const analysisResponse = await callEdgeFunction("analyze-product-image", { imageBase64 }, userAuthToken);
     
     if (!analysisResponse.ok) {
       throw new Error("Product analysis failed");
