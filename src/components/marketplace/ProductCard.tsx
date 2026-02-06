@@ -297,4 +297,4 @@ export const ProductCard = memo(forwardRef<HTMLAnchorElement, ProductCardProps>(
       </div>
     </Link>
   );
-});
+}));
