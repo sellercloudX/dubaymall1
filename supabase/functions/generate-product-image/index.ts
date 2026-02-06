@@ -79,7 +79,7 @@ OUTPUT: One stunning, marketplace-ready product photograph.`;
       console.log("🎨 GOOGLE AI STUDIO: Image editing with user's own API key...");
       
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${GOOGLE_KEY}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${GOOGLE_KEY}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -297,7 +297,7 @@ Clean white studio background, professional lighting, high resolution, no text o
       console.log("🎨 GOOGLE AI STUDIO TEXT-TO-IMAGE...");
       
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${GOOGLE_KEY}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${GOOGLE_KEY}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
