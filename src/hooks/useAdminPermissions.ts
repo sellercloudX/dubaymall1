@@ -43,16 +43,28 @@
    const { data: allAdmins, isLoading: loadingAdmins } = useQuery({
      queryKey: ['all-admin-permissions'],
      queryFn: async () => {
-       const { data, error } = await supabase
-         .from('admin_permissions')
-         .select(`
-           *,
-           profiles:user_id(full_name, phone)
-         `)
-         .order('created_at', { ascending: false });
-       
-       if (error) throw error;
-       return data;
+        // Fetch admin permissions
+        const { data: permsData, error: permsError } = await supabase
+          .from('admin_permissions')
+          .select('*')
+          .order('created_at', { ascending: false });
+        
+        if (permsError) throw permsError;
+        
+        // Fetch profiles separately to avoid FK join issue
+        const userIds = permsData?.map(p => p.user_id) || [];
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('user_id, full_name, phone')
+          .in('user_id', userIds);
+        
+        // Merge profiles into admin permissions
+        const merged = permsData?.map(perm => ({
+          ...perm,
+          profiles: profilesData?.find(p => p.user_id === perm.user_id) || null,
+        }));
+        
+        return merged;
      },
      enabled: !!permissions?.is_super_admin,
    });
