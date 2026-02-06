@@ -162,7 +162,7 @@ serve(async (req) => {
             category: productAnalysis.category,
             style: styles[i % styles.length],
             count: 1
-          });
+          }, userAuthToken);
 
           if (infoResponse.ok) {
             const infoResult = await infoResponse.json();
