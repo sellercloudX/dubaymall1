@@ -216,6 +216,7 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading, onBeforeC
   // Camera/Gallery input
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Processing state
   const [processingStep, setProcessingStep] = useState<ProcessingStep>('idle');
@@ -491,62 +492,71 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading, onBeforeC
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Guard against duplicate submissions
+    if (isSubmitting || isLoading) return;
+    
     if (!formData.name) {
       toast.error('Mahsulot nomini kiriting');
       return;
     }
     
-    // Immediately upload any already-available images (base64 camera capture)
-    const quickImages: string[] = [];
-    if (capturedImage) {
-      const url = await uploadImageToStorage(capturedImage, shopId);
-      if (url) quickImages.push(url);
-    }
-
-    // Create product right away with camera image (or empty images)
-    const productData: ProductInsert = {
-      shop_id: shopId,
-      name: formData.name || '',
-      description: formData.description,
-      price: formData.price || 0,
-      stock_quantity: formData.stock_quantity || 0,
-      category_id: formData.category_id,
-      status: 'active',
-      source: 'ai' as const,
-      images: quickImages,
-    };
-
-    await onSubmit(productData);
-
-    // Get the created product ID to attach images later
-    const { data: createdProducts } = await supabase
-      .from('products')
-      .select('id')
-      .eq('shop_id', shopId)
-      .eq('name', formData.name || '')
-      .order('created_at', { ascending: false })
-      .limit(1);
-
-    const productId = createdProducts?.[0]?.id;
-
-    if (productId) {
-      // Start background image generation - dialog will close, this continues
-      const categoryName = analysisResult?.category || 
-        categories.find(c => c.id === formData.category_id)?.name_uz || '';
-      
-      // Fire and forget - runs in background with progress tracking
-      // Pass capturedImage so AI can generate based on actual scanned product
-      generateAndAttachImages(
-        productId,
-        shopId,
-        formData.name || '',
-        categoryName,
-        productImages.filter(img => img !== capturedImage),
-        capturedImage
-      );
-    }
+    setIsSubmitting(true);
     
-    setProcessingStep('idle');
+    try {
+      // Immediately upload any already-available images (base64 camera capture)
+      const quickImages: string[] = [];
+      if (capturedImage) {
+        const url = await uploadImageToStorage(capturedImage, shopId);
+        if (url) quickImages.push(url);
+      }
+
+      // Create product right away with camera image (or empty images)
+      const productData: ProductInsert = {
+        shop_id: shopId,
+        name: formData.name || '',
+        description: formData.description,
+        price: formData.price || 0,
+        stock_quantity: formData.stock_quantity || 0,
+        category_id: formData.category_id,
+        status: 'active',
+        source: 'ai' as const,
+        images: quickImages,
+      };
+
+      await onSubmit(productData);
+
+      // Get the created product ID to attach images later
+      const { data: createdProducts } = await supabase
+        .from('products')
+        .select('id')
+        .eq('shop_id', shopId)
+        .eq('name', formData.name || '')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      const productId = createdProducts?.[0]?.id;
+
+      if (productId) {
+        const categoryName = analysisResult?.category || 
+          categories.find(c => c.id === formData.category_id)?.name_uz || '';
+        
+        generateAndAttachImages(
+          productId,
+          shopId,
+          formData.name || '',
+          categoryName,
+          productImages.filter(img => img !== capturedImage),
+          capturedImage
+        );
+      }
+      
+      setProcessingStep('idle');
+    } catch (error) {
+      console.error('Submit error:', error);
+      toast.error('Mahsulot qo\'shishda xatolik');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const isProcessing = processingStep !== 'idle' && processingStep !== 'done';
@@ -829,14 +839,14 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading, onBeforeC
         <Button
           type="submit"
           className="flex-1"
-          disabled={isLoading || isProcessing || !formData.name}
+          disabled={isLoading || isSubmitting || isProcessing || !formData.name}
         >
-          {isLoading ? (
+          {(isLoading || isSubmitting) ? (
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
           ) : (
             <Package className="h-4 w-4 mr-2" />
           )}
-          Mahsulotni qo'shish
+          {isSubmitting ? 'Saqlanmoqda...' : 'Mahsulotni qo\'shish'}
         </Button>
       </div>
     </form>
