@@ -113,7 +113,7 @@ serve(async (req) => {
       targetMarketplace: targetMarketplaces[0],
       contentType: "seo",
       languages: ["uz", "ru"]
-    });
+    }, userAuthToken);
 
     let seoContent = null;
     if (seoResponse.ok) {
