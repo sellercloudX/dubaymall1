@@ -72,7 +72,7 @@ export const ProductRecommendations = forwardRef<HTMLDivElement, ProductRecommen
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" ref={ref}>
       <div className="flex items-center gap-2">
         {getIcon()}
         <h2 className="text-xl font-semibold">{getTitle()}</h2>
