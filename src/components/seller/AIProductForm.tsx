@@ -67,6 +67,136 @@ function ProductImage({ src, alt, className }: { src?: string; alt: string; clas
   );
 }
 
+// Upload image to Supabase Storage (handles base64, external URLs)
+async function uploadImageToStorage(imageUrl: string, shopId: string): Promise<string | null> {
+  try {
+    // Already in our storage - skip
+    if (imageUrl.includes('supabase') && imageUrl.includes('product-images')) {
+      return imageUrl;
+    }
+
+    let blob: Blob;
+    let contentType = 'image/jpeg';
+    
+    if (imageUrl.startsWith('data:')) {
+      const base64Data = imageUrl.split(',')[1];
+      const mimeMatch = imageUrl.match(/data:([^;]+);/);
+      contentType = mimeMatch?.[1] || 'image/jpeg';
+      const byteCharacters = atob(base64Data);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      blob = new Blob([new Uint8Array(byteNumbers)], { type: contentType });
+    } else if (imageUrl.startsWith('http')) {
+      try {
+        const response = await fetch(imageUrl);
+        if (!response.ok) {
+          console.error('Failed to download image:', response.status);
+          return null;
+        }
+        blob = await response.blob();
+        contentType = blob.type || 'image/webp';
+      } catch (fetchError) {
+        console.error('Image download error:', fetchError);
+        return null;
+      }
+    } else {
+      return imageUrl;
+    }
+
+    const ext = contentType.includes('webp') ? 'webp' : contentType.includes('png') ? 'png' : 'jpg';
+    const fileName = `${shopId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
+
+    const { error } = await supabase.storage
+      .from('product-images')
+      .upload(fileName, blob, {
+        contentType,
+        upsert: false,
+      });
+
+    if (error) {
+      console.error('Storage upload error:', error);
+      return null;
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('product-images')
+      .getPublicUrl(fileName);
+
+    console.log('✅ Image uploaded to storage:', publicUrl);
+    return publicUrl;
+  } catch (error) {
+    console.error('Image upload error:', error);
+    return null;
+  }
+}
+
+// Background image generation - runs after product is created
+async function generateAndAttachImages(
+  productId: string, 
+  shopId: string, 
+  productName: string, 
+  category: string,
+  existingImages: string[]
+) {
+  try {
+    console.log('🎨 Background: Starting image generation for', productName);
+    
+    // First, upload any existing external images to storage
+    const uploadedExisting: string[] = [];
+    for (const img of existingImages) {
+      const url = await uploadImageToStorage(img, shopId);
+      if (url) uploadedExisting.push(url);
+    }
+
+    // Update product with uploaded existing images
+    if (uploadedExisting.length > 0) {
+      await supabase
+        .from('products')
+        .update({ images: uploadedExisting })
+        .eq('id', productId);
+      console.log('✅ Background: Existing images uploaded:', uploadedExisting.length);
+    }
+
+    // Generate new image with Flux Pro
+    console.log('🎨 Background: Generating Flux Pro image...');
+    const { data, error } = await supabase.functions.invoke('generate-product-image', {
+      body: { 
+        productName,
+        category,
+        style: 'marketplace'
+      },
+    });
+
+    if (error) {
+      console.error('Background image generation error:', error);
+      toast.error(`"${productName}" uchun rasm yaratib bo'lmadi`, { duration: 5000 });
+      return;
+    }
+
+    if (data?.imageUrl) {
+      // Upload generated image to permanent storage
+      const storedUrl = await uploadImageToStorage(data.imageUrl, shopId);
+      
+      if (storedUrl) {
+        const allImages = [storedUrl, ...uploadedExisting];
+        
+        await supabase
+          .from('products')
+          .update({ images: allImages })
+          .eq('id', productId);
+        
+        console.log('✅ Background: Product images updated!', allImages.length);
+        toast.success(`"${productName}" uchun professional rasm tayyor! 🎨`, { duration: 5000 });
+      }
+    }
+  } catch (err) {
+    console.error('Background image task error:', err);
+    toast.error(`"${productName}" rasm xatolik yuz berdi`);
+  }
+}
+
 export function AIProductForm({ shopId, onSubmit, onCancel, isLoading, onFileInputActive }: AIProductFormProps) {
   const { t } = useLanguage();
   const { categories } = useCategories();
@@ -126,23 +256,20 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading, onFileInp
 
   // Handle image capture from camera or gallery
   const handleImageCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    onFileInputActive?.(false); // Camera/gallery returned
+    onFileInputActive?.(false);
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Convert to base64
     const reader = new FileReader();
     reader.onloadend = async () => {
       const base64 = reader.result as string;
       setCapturedImage(base64);
-      
-      // Immediately start analysis
       await analyzeProductImage(base64);
     };
     reader.readAsDataURL(file);
   };
 
-  // AI Vision - Analyze image to identify product (Google Lens style)
+  // AI Vision - Analyze image to identify product
   const analyzeProductImage = async (imageBase64: string) => {
     setProcessingStep('analyzing');
     setWebProducts([]);
@@ -151,12 +278,8 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading, onFileInp
     setAnalysisResult(null);
 
     try {
-      // Call Vision AI to analyze the image
       const { data, error } = await supabase.functions.invoke('analyze-product-image', {
-        body: { 
-          imageBase64,
-          mode: 'identify' // Google Lens mode - identify product from image
-        },
+        body: { imageBase64, mode: 'identify' },
       });
 
       if (error) throw error;
@@ -169,7 +292,6 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading, onFileInp
           suggestedPrice: data.suggestedPrice || 0
         });
 
-        // Update form with AI-detected data
         setFormData(prev => ({
           ...prev,
           name: data.productName,
@@ -177,7 +299,6 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading, onFileInp
           price: data.suggestedPrice || 0,
         }));
 
-        // Match category
         if (data.category) {
           const matchedCategory = categories.find(
             cat => cat.name_uz?.toLowerCase().includes(data.category.toLowerCase()) ||
@@ -190,8 +311,6 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading, onFileInp
         }
 
         toast.success(`Mahsulot aniqlandi: ${data.productName}`);
-        
-        // Now search for similar products on web
         await searchSimilarProducts(data.productName, data.category, imageBase64);
       } else {
         toast.error('Mahsulotni aniqlab bo\'lmadi. Iltimos, aniqroq rasm oling.');
@@ -204,18 +323,13 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading, onFileInp
     }
   };
 
-  // Search for similar products across web (after AI identification)
+  // Search for similar products across web
   const searchSimilarProducts = async (productName: string, category: string, imageBase64?: string) => {
     setProcessingStep('searching');
 
     try {
       const { data, error } = await supabase.functions.invoke('search-similar-products', {
-        body: { 
-          productName,
-          category,
-          description: analysisResult?.description || '',
-          imageBase64 // Optional: for visual similarity matching
-        },
+        body: { productName, category, description: analysisResult?.description || '', imageBase64 },
       });
 
       if (error) throw error;
@@ -226,25 +340,16 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading, onFileInp
       if (products.length > 0) {
         toast.success(`${products.length} ta o'xshash mahsulot topildi!`);
         
-        // Auto-select best match if image quality is good
-        const bestMatch = products.find((p: WebProduct) => 
-          p.image && p.image.startsWith('http') && !p.image.includes('unsplash')
-        );
+        const goodImages = products
+          .filter((p: WebProduct) => p.image && p.image.startsWith('http'))
+          .map((p: WebProduct) => p.image)
+          .slice(0, 4);
         
-        if (bestMatch) {
-          // Show high-quality marketplace images
-          const goodImages = products
-            .filter((p: WebProduct) => p.image && p.image.startsWith('http'))
-            .map((p: WebProduct) => p.image)
-            .slice(0, 4);
-          
-          if (goodImages.length > 0) {
-            setProductImages(goodImages);
-          }
+        if (goodImages.length > 0) {
+          setProductImages(goodImages);
         }
       } else {
-        toast.info('Web\'da o\'xshash mahsulot topilmadi. Rasm generatsiya qilinadi...');
-        await generateProductImage(productName);
+        toast.info('Web\'da o\'xshash mahsulot topilmadi.');
       }
       
       setProcessingStep('done');
@@ -258,7 +363,6 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading, onFileInp
   const selectProduct = (product: WebProduct) => {
     setSelectedProduct(product);
     
-    // Parse price from string
     const priceMatch = product.price.match(/[\d\s,]+/);
     const priceValue = priceMatch 
       ? parseInt(priceMatch[0].replace(/\s/g, '').replace(',', '')) 
@@ -271,7 +375,6 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading, onFileInp
       price: priceValue,
     }));
 
-    // Use product's image if it's high quality
     if (product.image && product.image.startsWith('http')) {
       setProductImages(prev => {
         if (!prev.includes(product.image)) {
@@ -282,7 +385,7 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading, onFileInp
     }
   };
 
-  // Generate professional product image with Flux Pro
+  // Generate professional product image with Flux Pro (preview only)
   const generateProductImage = useCallback(async (productName?: string) => {
     setIsGeneratingImages(true);
     setProcessingStep('generating');
@@ -334,73 +437,6 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading, onFileInp
     }
   };
 
-  // Upload image to Supabase Storage (handles base64, external URLs, and existing URLs)
-  const uploadImageToStorage = async (imageUrl: string): Promise<string | null> => {
-    try {
-      // Already in our storage - skip
-      if (imageUrl.includes('supabase') && imageUrl.includes('product-images')) {
-        return imageUrl;
-      }
-
-      let blob: Blob;
-      let contentType = 'image/jpeg';
-      
-      if (imageUrl.startsWith('data:')) {
-        // Handle base64 images
-        const base64Data = imageUrl.split(',')[1];
-        const mimeMatch = imageUrl.match(/data:([^;]+);/);
-        contentType = mimeMatch?.[1] || 'image/jpeg';
-        const byteCharacters = atob(base64Data);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        blob = new Blob([new Uint8Array(byteNumbers)], { type: contentType });
-      } else if (imageUrl.startsWith('http')) {
-        // Download external image (Replicate, CDN, etc.) and upload to our storage
-        try {
-          const response = await fetch(imageUrl);
-          if (!response.ok) {
-            console.error('Failed to download image:', response.status);
-            return null;
-          }
-          blob = await response.blob();
-          contentType = blob.type || 'image/webp';
-        } catch (fetchError) {
-          console.error('Image download error:', fetchError);
-          return null;
-        }
-      } else {
-        return imageUrl;
-      }
-
-      const ext = contentType.includes('webp') ? 'webp' : contentType.includes('png') ? 'png' : 'jpg';
-      const fileName = `${shopId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
-
-      const { error } = await supabase.storage
-        .from('product-images')
-        .upload(fileName, blob, {
-          contentType,
-          upsert: false,
-        });
-
-      if (error) {
-        console.error('Storage upload error:', error);
-        return null;
-      }
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('product-images')
-        .getPublicUrl(fileName);
-
-      console.log('✅ Image uploaded to storage:', publicUrl);
-      return publicUrl;
-    } catch (error) {
-      console.error('Image upload error:', error);
-      return null;
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -409,15 +445,15 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading, onFileInp
       return;
     }
     
-    setProcessingStep('uploading');
-    
-    const uploadedImages: string[] = [];
-    for (const img of productImages) {
-      const url = await uploadImageToStorage(img);
-      if (url) uploadedImages.push(url);
+    // Immediately upload any already-available images (base64 camera capture)
+    const quickImages: string[] = [];
+    if (capturedImage) {
+      const url = await uploadImageToStorage(capturedImage, shopId);
+      if (url) quickImages.push(url);
     }
 
-    await onSubmit({
+    // Create product right away with camera image (or empty images)
+    const productData: ProductInsert = {
       shop_id: shopId,
       name: formData.name || '',
       description: formData.description,
@@ -425,9 +461,42 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading, onFileInp
       stock_quantity: formData.stock_quantity || 0,
       category_id: formData.category_id,
       status: 'active',
-      source: 'ai',
-      images: uploadedImages,
-    });
+      source: 'ai' as const,
+      images: quickImages,
+    };
+
+    await onSubmit(productData);
+
+    // Get the created product ID to attach images later
+    const { data: createdProducts } = await supabase
+      .from('products')
+      .select('id')
+      .eq('shop_id', shopId)
+      .eq('name', formData.name || '')
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    const productId = createdProducts?.[0]?.id;
+
+    if (productId) {
+      // Start background image generation - dialog will close, this continues
+      const categoryName = analysisResult?.category || 
+        categories.find(c => c.id === formData.category_id)?.name_uz || '';
+      
+      toast.info(`🎨 "${formData.name}" uchun professional rasm fonda yaratilmoqda...`, { 
+        duration: 8000,
+        icon: '⏳'
+      });
+
+      // Fire and forget - runs in background
+      generateAndAttachImages(
+        productId,
+        shopId,
+        formData.name || '',
+        categoryName,
+        productImages.filter(img => img !== capturedImage) // exclude camera image (already uploaded)
+      );
+    }
     
     setProcessingStep('idle');
   };
@@ -448,7 +517,6 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading, onFileInp
           {!capturedImage ? (
             <>
               <div className="grid grid-cols-2 gap-3">
-                {/* Camera button */}
                 <Button
                   type="button"
                   variant="outline"
@@ -466,7 +534,6 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading, onFileInp
                   <span className="text-xs text-muted-foreground">Rasmga oling</span>
                 </Button>
                 
-                {/* Gallery button */}
                 <Button
                   type="button"
                   variant="outline"
@@ -585,24 +652,6 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading, onFileInp
                 ))}
               </div>
             </ScrollArea>
-            
-            {/* Generate new image option */}
-            <div className="mt-4 pt-4 border-t">
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                onClick={() => generateProductImage()}
-                disabled={isGeneratingImages}
-              >
-                {isGeneratingImages ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Wand2 className="h-4 w-4 mr-2" />
-                )}
-                Flux Pro bilan yangi professional rasm yaratish
-              </Button>
-            </div>
           </CardContent>
         </Card>
       )}
@@ -619,7 +668,7 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading, onFileInp
               )}
             </div>
             
-            {/* Product Images */}
+            {/* Product Images Preview */}
             {productImages.length > 0 && (
               <div className="mb-4">
                 <Label className="mb-2 block">Rasmlar ({productImages.length})</Label>
@@ -638,46 +687,20 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading, onFileInp
                       )}
                     </div>
                   ))}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="w-20 h-20"
-                    onClick={() => generateProductImage()}
-                    disabled={isGeneratingImages}
-                  >
-                    {isGeneratingImages ? (
-                      <Loader2 className="h-6 w-6 animate-spin" />
-                    ) : (
-                      <Wand2 className="h-6 w-6" />
-                    )}
-                  </Button>
                 </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  💡 Professional rasm mahsulot saqlanganidan keyin fonda yaratiladi
+                </p>
               </div>
             )}
             
-            {/* No images yet */}
+            {/* No images info */}
             {productImages.length === 0 && (
-              <div className="mb-4">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="w-full"
-                  onClick={() => generateProductImage()}
-                  disabled={isGeneratingImages}
-                >
-                  {isGeneratingImages ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Flux Pro ishlamoqda...
-                    </>
-                  ) : (
-                    <>
-                      <Zap className="h-4 w-4 mr-2" />
-                      Flux Pro bilan professional rasm yaratish
-                    </>
-                  )}
-                </Button>
+              <div className="mb-4 p-3 bg-muted/50 rounded-lg">
+                <p className="text-sm text-muted-foreground flex items-center gap-2">
+                  <Zap className="h-4 w-4 text-amber-500" />
+                  Mahsulot saqlanganida Flux Pro bilan professional rasm fonda yaratiladi
+                </p>
               </div>
             )}
             
