@@ -353,7 +353,7 @@ serve(async (req) => {
     console.log(`🤖 AI Priority: Lovable AI (Gemini Image Edit) → Flux Pro → DALL-E 3`);
 
     let enhancedImage: string | null = null;
-    let usedModel = "flux-pro";
+    let usedModel = "none";
 
     // PRIMARY: Try Lovable AI image editing (actually edits the uploaded image)
     enhancedImage = await enhanceWithLovableAI(
@@ -361,6 +361,7 @@ serve(async (req) => {
       productName || "Product",
       category || "default"
     );
+    if (enhancedImage) usedModel = "lovable-gemini-image";
 
     // SECONDARY: Try Flux Pro (generates new image from text - fallback)
     if (!enhancedImage) {
