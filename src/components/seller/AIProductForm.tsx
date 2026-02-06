@@ -23,6 +23,7 @@ import {
   Globe, Package, ArrowRight, RefreshCw, Zap, Upload, X
 } from 'lucide-react';
 import { backgroundTaskManager } from '@/lib/backgroundTaskManager';
+import { InlineCamera } from './InlineCamera';
 import type { TablesInsert } from '@/integrations/supabase/types';
 
 type ProductInsert = TablesInsert<'products'>;
@@ -32,7 +33,6 @@ interface AIProductFormProps {
   onSubmit: (data: ProductInsert) => Promise<void>;
   onCancel: () => void;
   isLoading?: boolean;
-  onBeforeCamera?: () => void;
 }
 
 interface WebProduct {
@@ -209,7 +209,7 @@ async function generateAndAttachImages(
   }
 }
 
-export function AIProductForm({ shopId, onSubmit, onCancel, isLoading, onBeforeCamera }: AIProductFormProps) {
+export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProductFormProps) {
   const { t } = useLanguage();
   const { categories } = useCategories();
   
@@ -217,6 +217,7 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading, onBeforeC
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showInlineCamera, setShowInlineCamera] = useState(false);
   
   // Processing state
   const [processingStep, setProcessingStep] = useState<ProcessingStep>('idle');
@@ -574,58 +575,64 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading, onBeforeC
         <CardContent className="space-y-4">
           {!capturedImage ? (
             <>
-              <div className="grid grid-cols-2 gap-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-32 flex-col gap-2 border-dashed border-2 hover:border-primary hover:bg-primary/5"
-                  onClick={() => {
-                    if (fileInputRef.current) {
-                      onBeforeCamera?.();
-                      fileInputRef.current.setAttribute('capture', 'environment');
-                      fileInputRef.current.click();
-                    }
+              {showInlineCamera ? (
+                <InlineCamera
+                  onCapture={async (base64) => {
+                    setShowInlineCamera(false);
+                    setCapturedImage(base64);
+                    await analyzeProductImage(base64);
                   }}
-                >
-                  <Camera className="h-8 w-8 text-primary" />
-                  <span className="font-medium">Kamera</span>
-                  <span className="text-xs text-muted-foreground">Rasmga oling</span>
-                </Button>
-                
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-32 flex-col gap-2 border-dashed border-2 hover:border-primary hover:bg-primary/5"
-                  onClick={() => {
-                    if (fileInputRef.current) {
-                      onBeforeCamera?.();
-                      fileInputRef.current.removeAttribute('capture');
-                      fileInputRef.current.click();
-                    }
-                  }}
-                >
-                  <Upload className="h-8 w-8 text-primary" />
-                  <span className="font-medium">Galereya</span>
-                  <span className="text-xs text-muted-foreground">Rasmni tanlang</span>
-                </Button>
-              </div>
-              
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleImageCapture}
-              />
-              
-              <div className="text-center p-4 bg-muted/50 rounded-lg">
-                <p className="text-sm text-muted-foreground">
-                  📸 Mahsulotni rasmga oling yoki galereyadan tanlang
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  AI mahsulotni <strong>ko'rinishidan</strong> tanib oladi va web'dan topadi
-                </p>
-              </div>
+                  onClose={() => setShowInlineCamera(false)}
+                />
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-32 flex-col gap-2 border-dashed border-2 hover:border-primary hover:bg-primary/5"
+                      onClick={() => setShowInlineCamera(true)}
+                    >
+                      <Camera className="h-8 w-8 text-primary" />
+                      <span className="font-medium">Kamera</span>
+                      <span className="text-xs text-muted-foreground">Rasmga oling</span>
+                    </Button>
+                    
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-32 flex-col gap-2 border-dashed border-2 hover:border-primary hover:bg-primary/5"
+                      onClick={() => {
+                        if (fileInputRef.current) {
+                          fileInputRef.current.removeAttribute('capture');
+                          fileInputRef.current.click();
+                        }
+                      }}
+                    >
+                      <Upload className="h-8 w-8 text-primary" />
+                      <span className="font-medium">Galereya</span>
+                      <span className="text-xs text-muted-foreground">Rasmni tanlang</span>
+                    </Button>
+                  </div>
+                  
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleImageCapture}
+                  />
+                  
+                  <div className="text-center p-4 bg-muted/50 rounded-lg">
+                    <p className="text-sm text-muted-foreground">
+                      📸 Mahsulotni rasmga oling yoki galereyadan tanlang
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      AI mahsulotni <strong>ko'rinishidan</strong> tanib oladi va web'dan topadi
+                    </p>
+                  </div>
+                </>
+              )}
             </>
           ) : (
             <div className="relative">
