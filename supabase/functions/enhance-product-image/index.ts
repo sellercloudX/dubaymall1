@@ -78,10 +78,11 @@ CRITICAL: The product in the output must be IDENTICAL to the input image. Only c
   }
 }
 
-// ==================== FLUX PRO - SECONDARY IMAGE ENHANCEMENT ====================
+async function enhanceWithFluxPro(
+  productName: string,
   productDescription: string,
   category: string,
-  style: string
+  style: string = "professional"
 ): Promise<string | null> {
   const REPLICATE_API_TOKEN = Deno.env.get("REPLICATE_API_TOKEN");
   
@@ -91,7 +92,7 @@ CRITICAL: The product in the output must be IDENTICAL to the input image. Only c
   }
 
   try {
-    console.log("🎨 PRIMARY: Using Flux Pro for image enhancement...");
+    console.log("🎨 SECONDARY: Using Flux Pro for image generation...");
     
     // Category-specific professional styling
     const categoryEnhancements: Record<string, string> = {
