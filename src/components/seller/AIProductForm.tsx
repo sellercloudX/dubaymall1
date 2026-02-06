@@ -334,49 +334,67 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading, onFileInp
     }
   };
 
-  // Upload image to storage
+  // Upload image to Supabase Storage (handles base64, external URLs, and existing URLs)
   const uploadImageToStorage = async (imageUrl: string): Promise<string | null> => {
     try {
+      // Already in our storage - skip
       if (imageUrl.includes('supabase') && imageUrl.includes('product-images')) {
         return imageUrl;
       }
-      
-      if (imageUrl.startsWith('http') && !imageUrl.startsWith('data:')) {
-        return imageUrl;
-      }
+
+      let blob: Blob;
+      let contentType = 'image/jpeg';
       
       if (imageUrl.startsWith('data:')) {
+        // Handle base64 images
         const base64Data = imageUrl.split(',')[1];
+        const mimeMatch = imageUrl.match(/data:([^;]+);/);
+        contentType = mimeMatch?.[1] || 'image/jpeg';
         const byteCharacters = atob(base64Data);
         const byteNumbers = new Array(byteCharacters.length);
         for (let i = 0; i < byteCharacters.length; i++) {
           byteNumbers[i] = byteCharacters.charCodeAt(i);
         }
-        const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], { type: 'image/jpeg' });
-
-        const fileName = `${shopId}/${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
-
-        const { error } = await supabase.storage
-          .from('product-images')
-          .upload(fileName, blob, {
-            contentType: 'image/jpeg',
-            upsert: false,
-          });
-
-        if (error) {
-          console.error('Storage upload error:', error);
+        blob = new Blob([new Uint8Array(byteNumbers)], { type: contentType });
+      } else if (imageUrl.startsWith('http')) {
+        // Download external image (Replicate, CDN, etc.) and upload to our storage
+        try {
+          const response = await fetch(imageUrl);
+          if (!response.ok) {
+            console.error('Failed to download image:', response.status);
+            return null;
+          }
+          blob = await response.blob();
+          contentType = blob.type || 'image/webp';
+        } catch (fetchError) {
+          console.error('Image download error:', fetchError);
           return null;
         }
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('product-images')
-          .getPublicUrl(fileName);
-
-        return publicUrl;
+      } else {
+        return imageUrl;
       }
-      
-      return imageUrl;
+
+      const ext = contentType.includes('webp') ? 'webp' : contentType.includes('png') ? 'png' : 'jpg';
+      const fileName = `${shopId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
+
+      const { error } = await supabase.storage
+        .from('product-images')
+        .upload(fileName, blob, {
+          contentType,
+          upsert: false,
+        });
+
+      if (error) {
+        console.error('Storage upload error:', error);
+        return null;
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(fileName);
+
+      console.log('✅ Image uploaded to storage:', publicUrl);
+      return publicUrl;
     } catch (error) {
       console.error('Image upload error:', error);
       return null;
