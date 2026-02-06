@@ -2416,11 +2416,19 @@ export type Database = {
       }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       process_pending_payouts: { Args: never; Returns: number }
+      seller_has_order_products: {
+        Args: { _order_id: string; _user_id: string }
+        Returns: boolean
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       track_affiliate_click: {
         Args: { p_link_code: string }
         Returns: undefined
+      }
+      user_owns_order: {
+        Args: { _order_id: string; _user_id: string }
+        Returns: boolean
       }
       verify_delivery_otp: {
         Args: { p_order_id: string; p_otp: string }
