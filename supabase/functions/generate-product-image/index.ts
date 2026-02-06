@@ -296,24 +296,36 @@ serve(async (req) => {
     let usedModel = "unknown";
 
     if (sourceImage) {
-      // PRIMARY: When we have a scanned photo, use Gemini to create professional version
-      console.log("🤖 Strategy: Source image → Gemini Edit → Flux Pro fallback → Gemini Text fallback");
+      // When source image exists, try Gemini edit ONLY
+      // DO NOT fall back to text-to-image because it will generate a COMPLETELY DIFFERENT product
+      console.log("🤖 Strategy: Source image → Gemini Edit ONLY (no text-to-image fallback)");
       
       imageUrl = await generateFromSourceImage(sourceImage, productName, category || "");
-      if (imageUrl) usedModel = "gemini-image-edit";
-    }
-
-    if (!imageUrl) {
-      // FALLBACK 1: Flux Pro text-to-image
+      if (imageUrl) {
+        usedModel = "gemini-image-edit";
+      } else {
+        // Gemini edit failed - return original source image instead of generating a fake one
+        console.log("⚠️ Gemini edit failed. Returning ORIGINAL source image to preserve product accuracy.");
+        return new Response(
+          JSON.stringify({ 
+            imageUrl: sourceImage, 
+            aiModel: "original-preserved", 
+            message: "Original image preserved (AI enhancement unavailable)" 
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    } else {
+      // No source image - text-to-image is fine since there's nothing to preserve
       console.log("🤖 Strategy: Text → Flux Pro → Gemini Text fallback");
+      
       imageUrl = await generateWithFluxPro(productName, category || "", style || "marketplace");
       if (imageUrl) usedModel = "flux-pro";
-    }
 
-    if (!imageUrl) {
-      // FALLBACK 2: Gemini text-to-image
-      imageUrl = await generateWithGemini(productName, category || "");
-      if (imageUrl) usedModel = "gemini-text-to-image";
+      if (!imageUrl) {
+        imageUrl = await generateWithGemini(productName, category || "");
+        if (imageUrl) usedModel = "gemini-text-to-image";
+      }
     }
 
     if (!imageUrl) {
