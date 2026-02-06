@@ -168,7 +168,7 @@ export function ProductList({ products, loading, onEdit, onDelete, onRefresh }: 
             {products.map((product) => (
               <TableRow key={product.id}>
                 <TableCell>
-                  <Link to={`/product/${product.id}`} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+                  <div className="flex items-center gap-3">
                     {product.images && product.images.length > 0 ? (
                       <img
                         src={product.images[0]}
@@ -181,14 +181,14 @@ export function ProductList({ products, loading, onEdit, onDelete, onRefresh }: 
                       </div>
                     )}
                     <div>
-                      <p className="font-medium hover:text-primary transition-colors">{product.name}</p>
+                      <p className="font-medium">{product.name}</p>
                       {product.source !== 'manual' && (
                         <Badge variant="outline" className="text-xs">
                           {product.source === 'ai' ? t.sourceAI : t.sourceDropshipping}
                         </Badge>
                       )}
                     </div>
-                  </Link>
+                  </div>
                 </TableCell>
                 <TableCell>
                   <div>
