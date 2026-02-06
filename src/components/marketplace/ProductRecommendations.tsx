@@ -11,11 +11,11 @@ interface ProductRecommendationsProps {
   type?: 'similar' | 'trending' | 'recent';
 }
 
-export function ProductRecommendations({ 
+export const ProductRecommendations = forwardRef<HTMLDivElement, ProductRecommendationsProps>(function ProductRecommendations({ 
   currentProductId, 
   title,
   type = 'similar' 
-}: ProductRecommendationsProps) {
+}, ref) {
   const { t } = useLanguage();
   const { recommendations, loading: recLoading } = useRecommendations(currentProductId, 8);
   const { recentProducts, loading: recentLoading } = useRecentlyViewed(8);
