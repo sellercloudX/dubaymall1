@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import {
@@ -27,6 +27,7 @@ export function AddProductDialog({ shopId, onSubmit }: AddProductDialogProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('manual');
+  const isFileInputActive = useRef(false);
 
   const handleSubmit = async (data: ProductInsert) => {
     setLoading(true);
@@ -38,15 +39,43 @@ export function AddProductDialog({ shopId, onSubmit }: AddProductDialogProps) {
     }
   };
 
+  // Prevent dialog from closing when camera/file picker is active (mobile issue)
+  const handleOpenChange = (newOpen: boolean) => {
+    if (!newOpen && isFileInputActive.current) {
+      // Don't close while file input is active
+      return;
+    }
+    setOpen(newOpen);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button>
           <Plus className="mr-2 h-4 w-4" />
           {t.addProduct}
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent 
+        className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto"
+        onPointerDownOutside={(e) => {
+          // Prevent closing when interacting outside (mobile camera returns)
+          if (activeTab === 'ai') {
+            e.preventDefault();
+          }
+        }}
+        onInteractOutside={(e) => {
+          if (activeTab === 'ai') {
+            e.preventDefault();
+          }
+        }}
+        onFocusOutside={(e) => {
+          // Prevent closing on focus loss (camera app steals focus)
+          if (activeTab === 'ai') {
+            e.preventDefault();
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle>{t.addProduct}</DialogTitle>
           <DialogDescription>
@@ -88,6 +117,7 @@ export function AddProductDialog({ shopId, onSubmit }: AddProductDialogProps) {
               onSubmit={handleSubmit}
               onCancel={() => setOpen(false)}
               isLoading={loading}
+              onFileInputActive={(active) => { isFileInputActive.current = active; }}
             />
           </TabsContent>
 
