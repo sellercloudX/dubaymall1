@@ -20,6 +20,10 @@ import { NotificationCenter } from '@/components/sellercloud/NotificationCenter'
 import { ReportsExport } from '@/components/sellercloud/ReportsExport';
 import { SubscriptionBilling } from '@/components/sellercloud/SubscriptionBilling';
 import { FinancialDashboard } from '@/components/sellercloud/FinancialDashboard';
+import { ABCAnalysis } from '@/components/sellercloud/ABCAnalysis';
+import { MinPriceProtection } from '@/components/sellercloud/MinPriceProtection';
+import { CardCloner } from '@/components/sellercloud/CardCloner';
+import { ProblematicProducts } from '@/components/sellercloud/ProblematicProducts';
 import { AIScannerPro } from '@/components/seller/AIScannerPro';
 import { useMarketplaceConnections } from '@/hooks/useMarketplaceConnections';
 import { useSellerCloudSubscription } from '@/hooks/useSellerCloudSubscription';
@@ -28,7 +32,8 @@ import { toast } from 'sonner';
 import { 
   Loader2, Globe, Package, ShoppingCart, BarChart3, 
   Scan, Crown, Check, ArrowRight, ArrowDownUp, DollarSign,
-  Upload, Bell, FileSpreadsheet, CreditCard, Calculator, AlertTriangle
+  Upload, Bell, FileSpreadsheet, CreditCard, Calculator, AlertTriangle,
+  Shield, Copy, AlertOctagon
 } from 'lucide-react';
 
 export default function SellerCloudX() {
@@ -306,6 +311,22 @@ export default function SellerCloudX() {
               <Calculator className="h-4 w-4" />
               <span className="hidden sm:inline">Moliya</span>
             </TabsTrigger>
+            <TabsTrigger value="abc-analysis" className="gap-2">
+              <BarChart3 className="h-4 w-4" />
+              <span className="hidden sm:inline">ABC-analiz</span>
+            </TabsTrigger>
+            <TabsTrigger value="min-price" className="gap-2">
+              <Shield className="h-4 w-4" />
+              <span className="hidden sm:inline">Min narx</span>
+            </TabsTrigger>
+            <TabsTrigger value="card-clone" className="gap-2">
+              <Copy className="h-4 w-4" />
+              <span className="hidden sm:inline">Klonlash</span>
+            </TabsTrigger>
+            <TabsTrigger value="problems" className="gap-2">
+              <AlertOctagon className="h-4 w-4" />
+              <span className="hidden sm:inline">Muammolar</span>
+            </TabsTrigger>
             <TabsTrigger value="subscription" className="gap-2">
               <CreditCard className="h-4 w-4" />
               <span className="hidden sm:inline">Obuna</span>
@@ -391,6 +412,36 @@ export default function SellerCloudX() {
               fetchMarketplaceData={fetchMarketplaceData}
               monthlyFee={subscription?.monthly_fee || 499}
               commissionPercent={subscription?.commission_percent || 4}
+            />
+          </TabsContent>
+
+          <TabsContent value="abc-analysis">
+            <ABCAnalysis
+              connectedMarketplaces={connectedMarketplaces}
+              fetchMarketplaceData={fetchMarketplaceData}
+              commissionPercent={subscription?.commission_percent || 4}
+            />
+          </TabsContent>
+
+          <TabsContent value="min-price">
+            <MinPriceProtection
+              connectedMarketplaces={connectedMarketplaces}
+              fetchMarketplaceData={fetchMarketplaceData}
+              commissionPercent={subscription?.commission_percent || 4}
+            />
+          </TabsContent>
+
+          <TabsContent value="card-clone">
+            <CardCloner
+              connectedMarketplaces={connectedMarketplaces}
+              fetchMarketplaceData={fetchMarketplaceData}
+            />
+          </TabsContent>
+
+          <TabsContent value="problems">
+            <ProblematicProducts
+              connectedMarketplaces={connectedMarketplaces}
+              fetchMarketplaceData={fetchMarketplaceData}
             />
           </TabsContent>
 
