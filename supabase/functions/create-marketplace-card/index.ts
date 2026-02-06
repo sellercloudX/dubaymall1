@@ -250,15 +250,15 @@ serve(async (req) => {
   }
 });
 
-// Helper to call other edge functions
-async function callEdgeFunction(functionName: string, body: any): Promise<Response> {
+// Helper to call other edge functions - forwards user's auth token
+async function callEdgeFunction(functionName: string, body: any, authToken?: string): Promise<Response> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY");
   
   return fetch(`${supabaseUrl}/functions/v1/${functionName}`, {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${supabaseKey}`,
+      "Authorization": authToken || `Bearer ${supabaseKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body)

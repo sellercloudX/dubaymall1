@@ -370,6 +370,7 @@ serve(async (req) => {
         category || "default",
         "professional"
       );
+      if (enhancedImage) usedModel = "flux-pro";
     }
 
     // FALLBACK: Try DALL-E 3 if Flux Pro fails
