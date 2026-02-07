@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMarketplaceConnections } from '@/hooks/useMarketplaceConnections';
 import { useSellerCloudSubscription } from '@/hooks/useSellerCloudSubscription';
+import { useMarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 import { MobileSellerCloudNav } from '@/components/mobile/MobileSellerCloudNav';
 import { MobileSellerCloudHeader } from '@/components/mobile/MobileSellerCloudHeader';
 import { MobileAnalytics } from '@/components/mobile/MobileAnalytics';
@@ -40,7 +41,6 @@ export default function SellerCloudMobile() {
   const { 
     connections, 
     isLoading: connectionsLoading,
-    fetchMarketplaceData,
     refetch
   } = useMarketplaceConnections();
   
@@ -50,6 +50,9 @@ export default function SellerCloudMobile() {
   } = useSellerCloudSubscription();
   
   const connectedMarketplaces = connections.map(c => c.marketplace);
+  
+  // Centralized data store — fetches once, cached for all tabs
+  const store = useMarketplaceDataStore(connectedMarketplaces);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -65,7 +68,6 @@ export default function SellerCloudMobile() {
     );
   }
 
-  // Show subscription required screen
   if (!subscription) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
@@ -73,33 +75,22 @@ export default function SellerCloudMobile() {
           <Lock className="h-10 w-10 text-amber-500" />
         </div>
         <h1 className="text-2xl font-bold text-center mb-2">SellerCloudX Pro</h1>
-        <p className="text-muted-foreground text-center mb-6">
-          Barcha marketplacelarni bitta joydan boshqaring
-        </p>
-        <Button size="lg" onClick={() => navigate('/seller-cloud')}>
-          Obuna bo'lish
-        </Button>
-        <Button variant="ghost" className="mt-4" onClick={() => navigate('/')}>
-          Bosh sahifaga qaytish
-        </Button>
+        <p className="text-muted-foreground text-center mb-6">Barcha marketplacelarni bitta joydan boshqaring</p>
+        <Button size="lg" onClick={() => navigate('/seller-cloud')}>Obuna bo'lish</Button>
+        <Button variant="ghost" className="mt-4" onClick={() => navigate('/')}>Bosh sahifaga qaytish</Button>
       </div>
     );
   }
 
-  // Access restricted
   if (accessStatus && !accessStatus.is_active) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
-        <Card className="border-destructive max-w-sm">
-          <CardContent className="pt-6 text-center">
-            <Lock className="h-12 w-12 text-destructive mx-auto mb-4" />
-            <h2 className="text-lg font-semibold mb-2">Akkount cheklangan</h2>
-            <p className="text-sm text-muted-foreground mb-4">{accessStatus.message}</p>
-            <Button variant="destructive" onClick={() => navigate('/seller-cloud')}>
-              To'lovga o'tish
-            </Button>
-          </CardContent>
-        </Card>
+        <Card className="border-destructive max-w-sm"><CardContent className="pt-6 text-center">
+          <Lock className="h-12 w-12 text-destructive mx-auto mb-4" />
+          <h2 className="text-lg font-semibold mb-2">Akkount cheklangan</h2>
+          <p className="text-sm text-muted-foreground mb-4">{accessStatus.message}</p>
+          <Button variant="destructive" onClick={() => navigate('/seller-cloud')}>To'lovga o'tish</Button>
+        </CardContent></Card>
       </div>
     );
   }
@@ -109,70 +100,23 @@ export default function SellerCloudMobile() {
   const renderContent = () => {
     switch (activeTab) {
       case 'analytics':
-        return (
-          <MobileAnalytics 
-            connections={connections}
-            connectedMarketplaces={connectedMarketplaces}
-          />
-        );
+        return <MobileAnalytics connections={connections} connectedMarketplaces={connectedMarketplaces} />;
       case 'scanner':
-        return (
-          <div className="p-4">
-            <AIScannerPro shopId="sellercloud" />
-          </div>
-        );
+        return <div className="p-4"><AIScannerPro shopId="sellercloud" /></div>;
       case 'products':
-        return (
-          <MobileProducts
-            connectedMarketplaces={connectedMarketplaces}
-          />
-        );
+        return <MobileProducts connectedMarketplaces={connectedMarketplaces} />;
       case 'orders':
-        return (
-          <MobileOrders
-            connectedMarketplaces={connectedMarketplaces}
-          />
-        );
+        return <MobileOrders connectedMarketplaces={connectedMarketplaces} />;
       case 'trends':
         return <MobileTrendHunter />;
       case 'abc-analysis':
-        return (
-          <div className="p-4">
-            <ABCAnalysis
-              connectedMarketplaces={connectedMarketplaces}
-              fetchMarketplaceData={fetchMarketplaceData}
-              commissionPercent={subscription?.commission_percent || 4}
-            />
-          </div>
-        );
+        return <div className="p-4"><ABCAnalysis connectedMarketplaces={connectedMarketplaces} store={store} commissionPercent={subscription?.commission_percent || 4} /></div>;
       case 'min-price':
-        return (
-          <div className="p-4">
-            <MinPriceProtection
-              connectedMarketplaces={connectedMarketplaces}
-              fetchMarketplaceData={fetchMarketplaceData}
-              commissionPercent={subscription?.commission_percent || 4}
-            />
-          </div>
-        );
+        return <div className="p-4"><MinPriceProtection connectedMarketplaces={connectedMarketplaces} store={store} commissionPercent={subscription?.commission_percent || 4} /></div>;
       case 'card-clone':
-        return (
-          <div className="p-4">
-            <CardCloner
-              connectedMarketplaces={connectedMarketplaces}
-              fetchMarketplaceData={fetchMarketplaceData}
-            />
-          </div>
-        );
+        return <div className="p-4"><CardCloner connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'problems':
-        return (
-          <div className="p-4">
-            <ProblematicProducts
-              connectedMarketplaces={connectedMarketplaces}
-              fetchMarketplaceData={fetchMarketplaceData}
-            />
-          </div>
-        );
+        return <div className="p-4"><ProblematicProducts connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       default:
         return null;
     }
@@ -180,47 +124,26 @@ export default function SellerCloudMobile() {
 
   return (
     <div className="min-h-screen bg-background pb-16 overflow-x-hidden">
-      <MobileSellerCloudHeader 
-        connectedCount={connectedMarketplaces.length}
-        onRefresh={refetch}
-        isLoading={connectionsLoading}
-      />
-      
+      <MobileSellerCloudHeader connectedCount={connectedMarketplaces.length} onRefresh={refetch} isLoading={connectionsLoading} />
       <main className="pt-14">
-        {/* More sub-tabs navigation */}
         {isMoreActive && (
           <div className="flex gap-2 px-4 py-3 overflow-x-auto no-scrollbar border-b bg-background/95 backdrop-blur-sm sticky top-14 z-40">
             {moreSubTabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
               return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors",
-                    isActive
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground"
-                  )}
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  {tab.label}
+                <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                  className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors",
+                    isActive ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
+                  <Icon className="h-3.5 w-3.5" />{tab.label}
                 </button>
               );
             })}
           </div>
         )}
-        
         {renderContent()}
       </main>
-      
-      <MobileSellerCloudNav 
-        activeTab={activeTab} 
-        onTabChange={setActiveTab} 
-      />
-       
-      {/* Background Tasks Panel */}
+      <MobileSellerCloudNav activeTab={activeTab} onTabChange={setActiveTab} />
       <BackgroundTasksPanel />
     </div>
   );

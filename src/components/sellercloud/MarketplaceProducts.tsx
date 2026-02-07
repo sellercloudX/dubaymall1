@@ -5,31 +5,14 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
 } from '@/components/ui/table';
 import { Package, Plus, RefreshCw, Loader2, Image, AlertCircle } from 'lucide-react';
-
-interface MarketplaceProduct {
-  offerId: string;
-  name: string;
-  price?: number;
-  shopSku?: string;
-  category?: string;
-  pictures?: string[];
-  availability?: string;
-  stockFBO?: number;
-  stockFBS?: number;
-  stockCount?: number;
-}
+import type { MarketplaceDataStore, MarketplaceProduct } from '@/hooks/useMarketplaceDataStore';
 
 interface MarketplaceProductsProps {
   connectedMarketplaces: string[];
-  fetchMarketplaceData: (marketplace: string, dataType: string, options?: Record<string, any>) => Promise<any>;
+  store: MarketplaceDataStore;
 }
 
 const MARKETPLACE_NAMES: Record<string, string> = {
@@ -39,13 +22,9 @@ const MARKETPLACE_NAMES: Record<string, string> = {
   ozon: 'Ozon',
 };
 
-export function MarketplaceProducts({ connectedMarketplaces, fetchMarketplaceData }: MarketplaceProductsProps) {
-  const [products, setProducts] = useState<MarketplaceProduct[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+export function MarketplaceProducts({ connectedMarketplaces, store }: MarketplaceProductsProps) {
   const [selectedMarketplace, setSelectedMarketplace] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [total, setTotal] = useState(0);
 
   useEffect(() => {
     if (connectedMarketplaces.length > 0 && !selectedMarketplace) {
@@ -53,39 +32,9 @@ export function MarketplaceProducts({ connectedMarketplaces, fetchMarketplaceDat
     }
   }, [connectedMarketplaces, selectedMarketplace]);
 
-  useEffect(() => {
-    if (selectedMarketplace) {
-      loadProducts();
-    }
-  }, [selectedMarketplace]);
-
-  const loadProducts = async () => {
-    if (!selectedMarketplace) return;
-    
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      // Fetch ALL products with fetchAll flag
-      const result = await fetchMarketplaceData(selectedMarketplace, 'products', { 
-        limit: 200, 
-        fetchAll: true 
-      });
-      
-      if (result.success) {
-        setProducts(result.data || []);
-        setTotal(result.total || result.data?.length || 0);
-      } else {
-        setError(result.error || 'Mahsulotlarni yuklashda xatolik');
-        setProducts([]);
-      }
-    } catch (err: any) {
-      setError(err.message || 'Noma\'lum xatolik');
-      setProducts([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const products = store.getProducts(selectedMarketplace);
+  const isLoading = store.isLoadingProducts;
+  const total = products.length;
 
   const filteredProducts = products.filter(p => 
     p.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -167,10 +116,10 @@ export function MarketplaceProducts({ connectedMarketplaces, fetchMarketplaceDat
           <Button 
             variant="outline" 
             size="sm"
-            onClick={loadProducts}
-            disabled={isLoading}
+            onClick={() => store.refetchProducts(selectedMarketplace)}
+            disabled={store.isFetching}
           >
-            {isLoading ? (
+            {store.isFetching ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <RefreshCw className="h-4 w-4" />
@@ -182,21 +131,6 @@ export function MarketplaceProducts({ connectedMarketplaces, fetchMarketplaceDat
           </Button>
         </div>
       </div>
-
-      {/* Error state */}
-      {error && (
-        <Card className="border-destructive">
-          <CardContent className="py-4">
-            <div className="flex items-center gap-2 text-destructive">
-              <AlertCircle className="h-5 w-5" />
-              <span>{error}</span>
-              <Button variant="outline" size="sm" onClick={loadProducts} className="ml-auto">
-                Qayta urinish
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Products table */}
       <Card>
@@ -303,7 +237,6 @@ export function MarketplaceProducts({ connectedMarketplaces, fetchMarketplaceDat
             </div>
           )}
 
-          {/* Results count */}
           {!isLoading && filteredProducts.length > 0 && (
             <div className="mt-4 text-sm text-muted-foreground text-center">
               Ko'rsatilmoqda: {filteredProducts.length} / {total} mahsulot
