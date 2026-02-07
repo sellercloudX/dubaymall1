@@ -97,7 +97,7 @@ serve(async (req) => {
           `https://api.partner.market.yandex.ru/campaigns/${campaignId}`,
           {
             headers: {
-              "Authorization": `OAuth oauth_token="${apiKey}"`,
+              "Api-Key": apiKey,
               "Content-Type": "application/json",
             },
           }
@@ -139,7 +139,7 @@ serve(async (req) => {
           `https://api.partner.market.yandex.ru/campaigns/${campaignId}/offer-mapping-entries?limit=1`,
           {
             headers: {
-              "Authorization": `OAuth oauth_token="${apiKey}"`,
+              "Api-Key": apiKey,
               "Content-Type": "application/json",
             },
           }
@@ -165,7 +165,7 @@ serve(async (req) => {
           `https://api.partner.market.yandex.ru/campaigns/${campaignId}/orders?fromDate=${fromDate}&toDate=${toDate}&status=PROCESSING,DELIVERY,DELIVERED`,
           {
             headers: {
-              "Authorization": `OAuth oauth_token="${apiKey}"`,
+              "Api-Key": apiKey,
               "Content-Type": "application/json",
             },
           }

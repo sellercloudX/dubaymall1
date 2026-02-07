@@ -429,10 +429,10 @@ MUHIM: Faqat JSON formatda javob ber:
         weight: packageDimensions.weight,  // kg (grammda emas!)
       },
       
-      // 5. NARX
+      // 5. NARX (Yandex Market UZ = UZS valyutasi)
       basicPrice: {
         value: pricing.recommendedPrice,
-        currencyId: "RUR",
+        currencyId: "UZS",
       },
       
       // 6. KAFOLAT

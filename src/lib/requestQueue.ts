@@ -92,9 +92,10 @@
  }
  
 // Client-side queues - prevents browser freezing, NOT server limits
-// Server handles unlimited concurrent requests from different users
-export const marketplaceQueue = new RequestQueue(5); // 5 parallel per user tab
-export const aiQueue = new RequestQueue(3); // AI operations per user
+// Yandex Market allows max 4 parallel requests per businessId
+// Keep client-side at 2 to leave headroom for edge function's internal calls
+export const marketplaceQueue = new RequestQueue(2); // 2 parallel per user tab
+export const aiQueue = new RequestQueue(2); // AI operations per user
 export const generalQueue = new RequestQueue(10); // General requests
 
 // For bulk operations - use server-side batch processing instead

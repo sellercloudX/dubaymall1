@@ -8,6 +8,34 @@ const corsHeaders = {
 
 // Note: Yandex Market for Uzbekistan already returns prices in UZS (som)
 // No currency conversion needed - prices are displayed as-is
+// IMPORTANT: Yandex Market allows max 4 parallel requests per businessId
+// We must serialize API calls within a single edge function invocation
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Retry wrapper for Yandex API calls with rate limit handling
+async function fetchWithRetry(
+  url: string, 
+  options: RequestInit, 
+  maxRetries = 3
+): Promise<Response> {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const response = await fetch(url, options);
+    
+    // 420 = rate limit hit, 429 = too many requests
+    if (response.status === 420 || response.status === 429) {
+      const waitTime = Math.min(1000 * Math.pow(2, attempt), 5000); // 1s, 2s, 4s
+      console.warn(`Rate limit hit (${response.status}), waiting ${waitTime}ms before retry ${attempt + 1}/${maxRetries}`);
+      await sleep(waitTime);
+      continue;
+    }
+    
+    return response;
+  }
+  
+  // Final attempt without retry
+  return fetch(url, options);
+}
 
 interface YandexProduct {
   offerId: string;
@@ -152,7 +180,7 @@ serve(async (req) => {
               body.page_token = pageToken;
             }
             
-            response = await fetch(apiPath, { 
+            response = await fetchWithRetry(apiPath, { 
               method: 'POST',
               headers,
               body: JSON.stringify(body)
@@ -167,7 +195,7 @@ serve(async (req) => {
               body.page_token = pageToken;
             }
             
-            response = await fetch(apiPath, { 
+            response = await fetchWithRetry(apiPath, { 
               method: 'POST',
               headers,
               body: JSON.stringify(body)
@@ -311,14 +339,20 @@ serve(async (req) => {
           // If not fetching all, break after first page
           if (!fetchAll) break;
           
+          // Add delay between pages to avoid rate limiting
+          if (pageToken) {
+            await sleep(500);
+          }
+          
         } while (pageToken && currentPage < 50); // Max 50 pages safety limit
 
         console.log(`Total mapped ${allProducts.length} products`);
         
-        // Try to get stocks from dedicated endpoint
+        // Try to get stocks from dedicated endpoint (with delay to avoid rate limit)
         if (campaignId && allProducts.length > 0) {
           try {
-            const stocksResponse = await fetch(
+            await sleep(800); // Wait before making another API call
+            const stocksResponse = await fetchWithRetry(
               `https://api.partner.market.yandex.ru/campaigns/${campaignId}/offers/stocks`,
               {
                 method: 'POST',
@@ -400,7 +434,7 @@ serve(async (req) => {
 
           console.log(`Calling orders API page ${orderPage}: ${url}`);
 
-          const response = await fetch(url, { headers });
+          const response = await fetchWithRetry(url, { headers });
 
           if (!response.ok) {
             const errorText = await response.text();
@@ -469,6 +503,7 @@ serve(async (req) => {
             hasMoreOrders = false;
           } else {
             orderPage++;
+            await sleep(500); // Delay between pages to avoid rate limiting
           }
         }
 
@@ -485,7 +520,7 @@ serve(async (req) => {
           result = { success: false, error: "Campaign ID required for stocks" };
         } else {
           try {
-            const stocksResponse = await fetch(
+            const stocksResponse = await fetchWithRetry(
               `https://api.partner.market.yandex.ru/campaigns/${campaignId}/offers/stocks`,
               {
                 method: 'POST',
@@ -537,7 +572,7 @@ serve(async (req) => {
         }
       } else if (dataType === "stats") {
         // Fetch statistics from Yandex Market
-        const response = await fetch(
+        const response = await fetchWithRetry(
           `https://api.partner.market.yandex.ru/campaigns/${campaignId}/stats/orders`,
           { headers }
         );
@@ -553,7 +588,7 @@ serve(async (req) => {
           };
         } else {
           // Try alternative stats endpoint
-          const offersResponse = await fetch(
+          const offersResponse = await fetchWithRetry(
             `https://api.partner.market.yandex.ru/campaigns/${campaignId}/stats/offers?limit=100`,
             { headers }
           );
@@ -573,7 +608,7 @@ serve(async (req) => {
         }
       } else if (dataType === "balance") {
         // Fetch balance/financial info
-        const response = await fetch(
+        const response = await fetchWithRetry(
           `https://api.partner.market.yandex.ru/campaigns/${campaignId}/balance`,
           { headers }
         );
