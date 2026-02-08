@@ -89,13 +89,15 @@
          total: result.total || result.data?.length || 0,
        };
      },
-     enabled: !!marketplace,
-     staleTime: 1000 * 60 * 5, // 5 minutes - data is fresh
-     gcTime: 1000 * 60 * 60 * 24, // 24 hours in cache for offline
-     refetchOnWindowFocus: false,
-     retry: 3,
-     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
-     networkMode: 'offlineFirst', // Show cached data immediately
+      enabled: !!marketplace,
+      staleTime: 1000 * 60 * 30, // 30 min — prevent refetch on tab switch
+      gcTime: 1000 * 60 * 60 * 24, // 24 hours in cache for offline
+      refetchOnWindowFocus: false,
+      refetchOnMount: false, // Don't refetch when tab switches
+      refetchInterval: 1000 * 60 * 10, // Auto-refresh every 10 min
+      retry: 3,
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+      networkMode: 'offlineFirst', // Show cached data immediately
        select: (data) => ({
          data: data.data || [],
          total: data.data?.length || 0, // Always use actual fetched count
@@ -122,12 +124,14 @@
          total: result.total || result.data?.length || 0,
        };
      },
-     enabled: !!marketplace,
-     staleTime: 1000 * 60 * 2, // 2 minutes for orders - more frequent
-     gcTime: 1000 * 60 * 60 * 24, // 24 hours in cache
-     refetchOnWindowFocus: false,
-     retry: 2,
-     networkMode: 'offlineFirst',
+      enabled: !!marketplace,
+      staleTime: 1000 * 60 * 30, // 30 min — prevent refetch on tab switch
+      gcTime: 1000 * 60 * 60 * 24, // 24 hours in cache
+      refetchOnWindowFocus: false,
+      refetchOnMount: false, // Don't refetch when tab switches
+      refetchInterval: 1000 * 60 * 5, // Auto-refresh every 5 min
+      retry: 2,
+      networkMode: 'offlineFirst',
    });
  }
  

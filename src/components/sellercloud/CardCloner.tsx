@@ -126,61 +126,63 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 overflow-hidden">
       {/* Source/Target Selection */}
-      <div className="grid md:grid-cols-2 gap-6">
-        <Card><CardHeader><CardTitle className="text-base">Manba marketplace</CardTitle><CardDescription>Qaysi marketplace dan klonlash?</CardDescription></CardHeader>
-          <CardContent><div className="space-y-2">{connectedMarketplaces.map(mp => {
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Card className="overflow-hidden"><CardHeader className="p-3 sm:p-6"><CardTitle className="text-sm sm:text-base">Manba</CardTitle><CardDescription className="text-xs">Qayerdan klonlash?</CardDescription></CardHeader>
+          <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0"><div className="space-y-2">{connectedMarketplaces.map(mp => {
             const info = MARKETPLACE_INFO[mp] || { name: mp, logo: '📦', color: 'from-gray-500 to-gray-600' };
             return (<button key={mp} onClick={() => setSourceMarketplace(mp)}
-              className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-all ${sourceMarketplace === mp ? 'border-primary bg-primary/5' : 'border-transparent hover:bg-muted'}`}>
-              <span className="text-2xl">{info.logo}</span><div className="text-left"><div className="font-medium">{info.name}</div><div className="text-xs text-muted-foreground">{store.getProducts(mp).length} mahsulot</div></div>
-              {sourceMarketplace === mp && <Check className="h-5 w-5 text-primary ml-auto" />}
+              className={`w-full flex items-center gap-3 p-2.5 rounded-lg border-2 transition-all ${sourceMarketplace === mp ? 'border-primary bg-primary/5' : 'border-transparent hover:bg-muted'}`}>
+              <span className="text-xl shrink-0">{info.logo}</span><div className="text-left min-w-0"><div className="font-medium text-sm truncate">{info.name}</div><div className="text-xs text-muted-foreground">{store.getProducts(mp).length} mahsulot</div></div>
+              {sourceMarketplace === mp && <Check className="h-4 w-4 text-primary ml-auto shrink-0" />}
             </button>);
           })}</div></CardContent>
         </Card>
-        <Card><CardHeader><CardTitle className="text-base">Maqsad marketplace</CardTitle><CardDescription>Qaysi marketplace(lar)ga klonlash?</CardDescription></CardHeader>
-          <CardContent><div className="space-y-2">{availableTargets.length === 0 ? <p className="text-sm text-muted-foreground">Boshqa ulangan marketplace yo'q</p>
+        <Card className="overflow-hidden"><CardHeader className="p-3 sm:p-6"><CardTitle className="text-sm sm:text-base">Maqsad</CardTitle><CardDescription className="text-xs">Qayerga klonlash?</CardDescription></CardHeader>
+          <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0"><div className="space-y-2">{availableTargets.length === 0 ? <p className="text-xs text-muted-foreground">Boshqa ulangan marketplace yo'q</p>
             : availableTargets.map(mp => {
               const info = MARKETPLACE_INFO[mp] || { name: mp, logo: '📦', color: 'from-gray-500 to-gray-600' };
               const isSelected = targetMarketplaces.includes(mp);
               return (<button key={mp} onClick={() => toggleTarget(mp)}
-                className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-all ${isSelected ? 'border-primary bg-primary/5' : 'border-transparent hover:bg-muted'}`}>
-                <span className="text-2xl">{info.logo}</span><div className="text-left"><div className="font-medium">{info.name}</div></div>
-                {isSelected && <Check className="h-5 w-5 text-primary ml-auto" />}
+                className={`w-full flex items-center gap-3 p-2.5 rounded-lg border-2 transition-all ${isSelected ? 'border-primary bg-primary/5' : 'border-transparent hover:bg-muted'}`}>
+                <span className="text-xl shrink-0">{info.logo}</span><div className="text-left min-w-0"><div className="font-medium text-sm truncate">{info.name}</div></div>
+                {isSelected && <Check className="h-4 w-4 text-primary ml-auto shrink-0" />}
               </button>);
             })}</div></CardContent>
         </Card>
       </div>
 
       {/* Products Selection */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div><CardTitle className="flex items-center gap-2"><Package className="h-5 w-5" />Mahsulotlarni tanlang</CardTitle>
-            <CardDescription>{selectedIds.size} ta tanlandi / {products.length} ta jami</CardDescription></div>
-            <div className="flex gap-2">
-              <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Qidirish..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-9 w-40" /></div>
-              <Button variant="outline" size="sm" onClick={selectAll}>
-                {filteredProducts.every(p => selectedIds.has(p.offerId)) ? 'Barchasini bekor qilish' : 'Barchasini tanlash'}
+      <Card className="overflow-hidden">
+        <CardHeader className="p-3 sm:p-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+            <div className="min-w-0">
+              <CardTitle className="flex items-center gap-2 text-sm sm:text-base"><Package className="h-4 w-4 shrink-0" /><span className="truncate">Mahsulotlar</span></CardTitle>
+              <CardDescription className="text-xs">{selectedIds.size} / {products.length} tanlandi</CardDescription>
+            </div>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <div className="relative flex-1 sm:flex-initial"><Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input placeholder="Qidirish..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-8 h-8 text-sm w-full sm:w-36" /></div>
+              <Button variant="outline" size="sm" onClick={selectAll} className="shrink-0 text-xs h-8">
+                {filteredProducts.every(p => selectedIds.has(p.offerId)) ? 'Bekor' : 'Barchasi'}
               </Button>
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          {isLoading ? <div className="space-y-3">{[1,2,3].map(i => <Skeleton key={i} className="h-16 w-full" />)}</div>
-          : filteredProducts.length === 0 ? <div className="text-center py-8 text-muted-foreground"><Package className="h-12 w-12 mx-auto mb-3 opacity-50" /><p>Mahsulotlar topilmadi</p></div>
-          : <div className="space-y-2 max-h-[400px] overflow-y-auto">
+        <CardContent className="p-0 sm:p-6 sm:pt-0">
+          {isLoading ? <div className="space-y-2 p-3">{[1,2,3].map(i => <Skeleton key={i} className="h-14 w-full" />)}</div>
+          : filteredProducts.length === 0 ? <div className="text-center py-8 text-muted-foreground"><Package className="h-12 w-12 mx-auto mb-3 opacity-50" /><p className="text-sm">Topilmadi</p></div>
+          : <div className="space-y-1.5 max-h-[400px] overflow-y-auto px-3 pb-3">
             {filteredProducts.map(product => (
-              <div key={product.offerId} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${selectedIds.has(product.offerId) ? 'bg-primary/5 border-primary/30' : 'hover:bg-muted'}`}
+              <div key={product.offerId} className={`flex items-center gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-colors ${selectedIds.has(product.offerId) ? 'bg-primary/5 border-primary/30' : 'hover:bg-muted'}`}
                 onClick={() => toggleProduct(product.offerId)}>
-                <Checkbox checked={selectedIds.has(product.offerId)} />
-                <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex items-center justify-center flex-shrink-0">
-                  {product.pictures.length > 0 ? <img src={product.pictures[0]} alt="" className="w-full h-full object-cover" /> : <Image className="h-5 w-5 text-muted-foreground" />}
+                <Checkbox checked={selectedIds.has(product.offerId)} className="shrink-0" />
+                <div className="w-10 h-10 rounded-lg overflow-hidden bg-muted flex items-center justify-center shrink-0">
+                  {product.pictures.length > 0 ? <img src={product.pictures[0]} alt="" className="w-full h-full object-cover" /> : <Image className="h-4 w-4 text-muted-foreground" />}
                 </div>
-                <div className="flex-1 min-w-0"><div className="font-medium text-sm truncate">{product.name}</div><code className="text-xs text-muted-foreground">{product.shopSku}</code></div>
-                <div className="font-medium text-sm whitespace-nowrap">{formatPrice(product.price)}</div>
+                <div className="flex-1 min-w-0"><div className="font-medium text-sm truncate">{product.name}</div><code className="text-[10px] text-muted-foreground truncate block">{product.shopSku}</code></div>
+                <div className="font-medium text-xs whitespace-nowrap shrink-0">{formatPrice(product.price)}</div>
               </div>
             ))}
           </div>}
@@ -189,16 +191,17 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
 
       {/* Clone Action */}
       {isCloning ? (
-        <Card><CardContent className="py-8"><div className="text-center mb-4"><Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-primary" /><div className="font-medium">Klonlanmoqda...</div></div>
-          <Progress value={cloneProgress} className="h-2" /><div className="text-sm text-center mt-2 text-muted-foreground">{cloneProgress}%</div></CardContent></Card>
+        <Card className="overflow-hidden"><CardContent className="py-6"><div className="text-center mb-3"><Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-primary" /><div className="font-medium text-sm">Klonlanmoqda...</div></div>
+          <Progress value={cloneProgress} className="h-2" /><div className="text-xs text-center mt-1.5 text-muted-foreground">{cloneProgress}%</div></CardContent></Card>
       ) : cloneResults ? (
-        <Card className="border-green-500/30"><CardContent className="py-6 text-center"><Check className="h-12 w-12 text-green-500 mx-auto mb-3" /><div className="text-lg font-bold mb-1">{cloneResults.success} ta mahsulot klonlandi</div>
-          {cloneResults.failed > 0 && <div className="text-sm text-red-500">{cloneResults.failed} ta xato</div>}
-          <Button className="mt-4" onClick={() => setCloneResults(null)}>Yangi klonlash</Button></CardContent></Card>
+        <Card className="border-green-500/30 overflow-hidden"><CardContent className="py-6 text-center"><Check className="h-10 w-10 text-green-500 mx-auto mb-2" /><div className="text-base font-bold mb-1">{cloneResults.success} ta klonlandi</div>
+          {cloneResults.failed > 0 && <div className="text-xs text-red-500">{cloneResults.failed} ta xato</div>}
+          <Button className="mt-3" size="sm" onClick={() => setCloneResults(null)}>Yangi klonlash</Button></CardContent></Card>
       ) : (
-        <Card><CardContent className="py-6"><Button className="w-full" size="lg" disabled={selectedIds.size === 0 || targetMarketplaces.length === 0} onClick={handleClone}>
-          <Zap className="h-5 w-5 mr-2" />{selectedIds.size} ta mahsulotni {targetMarketplaces.length} ta marketplace ga klonlash
-          <ArrowRight className="h-5 w-5 ml-2" /></Button></CardContent></Card>
+        <Card className="overflow-hidden"><CardContent className="p-3 sm:py-6"><Button className="w-full" size="default" disabled={selectedIds.size === 0 || targetMarketplaces.length === 0} onClick={handleClone}>
+          <Zap className="h-4 w-4 mr-1.5 shrink-0" />
+          <span className="truncate">{selectedIds.size} ta → {targetMarketplaces.length} marketplace</span>
+          <ArrowRight className="h-4 w-4 ml-1.5 shrink-0" /></Button></CardContent></Card>
       )}
     </div>
   );

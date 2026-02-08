@@ -3,12 +3,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   AlertTriangle, TrendingDown, RotateCcw,
-  Package, RefreshCw, ShoppingCart, XCircle,
-  AlertOctagon, Clock, BarChart3
+  Package, RefreshCw, XCircle,
+  AlertOctagon, Clock
 } from 'lucide-react';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 
@@ -76,34 +75,34 @@ export function ProblematicProducts({ connectedMarketplaces, store }: Problemati
         if (sold === 0 && !isInactive && price > 0) {
           allProblems.push({ id: product.offerId, name: product.name || 'Nomsiz', sku: product.shopSku || product.offerId,
             marketplace, price, stock, problemType: 'no_sales', severity: 'critical',
-            description: 'Bu mahsulot hech qachon sotilmagan', metric: '0 ta sotilgan',
-            suggestion: 'Narxni tushiring, rasmlarni yaxshilang yoki reklamaga qo\'shing' });
+            description: 'Hech qachon sotilmagan', metric: '0 ta sotilgan',
+            suggestion: 'Narxni tushiring yoki reklamaga qo\'shing' });
         } else if (sold > 0 && sold < avgSalesPerProduct * 0.3 && avgSalesPerProduct > 1) {
           allProblems.push({ id: product.offerId, name: product.name || 'Nomsiz', sku: product.shopSku || product.offerId,
             marketplace, price, stock, problemType: 'low_sales', severity: 'warning',
-            description: 'O\'rtachadan ancha kam sotilgan', metric: `${sold} ta (o'rtacha: ${Math.round(avgSalesPerProduct)})`,
-            suggestion: 'Promo-aksiyaga qo\'shing yoki tavsifni yaxshilang' });
+            description: 'O\'rtachadan kam sotilgan', metric: `${sold} ta (o'rtacha: ${Math.round(avgSalesPerProduct)})`,
+            suggestion: 'Promo-aksiyaga qo\'shing' });
         }
 
         if (stock > 0 && stock <= 3 && !isInactive) {
           allProblems.push({ id: product.offerId, name: product.name || 'Nomsiz', sku: product.shopSku || product.offerId,
             marketplace, price, stock, problemType: 'low_stock', severity: stock <= 1 ? 'critical' : 'warning',
             description: 'Zaxira tugamoqda', metric: `${stock} dona qoldi`,
-            suggestion: 'Tezda to\'ldiring, aks holda sotuvdan chiqadi' });
+            suggestion: 'Tezda to\'ldiring' });
         }
 
         if (stock > 50 && sold === 0) {
           allProblems.push({ id: product.offerId, name: product.name || 'Nomsiz', sku: product.shopSku || product.offerId,
             marketplace, price, stock, problemType: 'overstock', severity: 'info',
-            description: 'Ortiqcha zaxira, sotilmayapti', metric: `${stock} dona`,
-            suggestion: 'Chegirma qiling yoki boshqa kanalda soting' });
+            description: 'Ortiqcha zaxira', metric: `${stock} dona`,
+            suggestion: 'Chegirma qiling' });
         }
 
         if (isInactive) {
           allProblems.push({ id: product.offerId, name: product.name || 'Nomsiz', sku: product.shopSku || product.offerId,
             marketplace, price, stock, problemType: 'inactive', severity: 'warning',
-            description: 'Mahsulot nofaol holatda', metric: availability || 'INACTIVE',
-            suggestion: 'Faollashtiring yoki o\'chirib tashlang' });
+            description: 'Nofaol holatda', metric: availability || 'INACTIVE',
+            suggestion: 'Faollashtiring yoki o\'chiring' });
         }
       });
     }
@@ -125,54 +124,63 @@ export function ProblematicProducts({ connectedMarketplaces, store }: Problemati
 
   const criticalCount = problems.filter(p => p.severity === 'critical').length;
   const warningCount = problems.filter(p => p.severity === 'warning').length;
-
   const displayProblems = activeTab === 'all' ? problems : (byType[activeTab] || []);
 
-  const formatPrice = (price: number) => new Intl.NumberFormat('uz-UZ').format(price) + ' so\'m';
+  const formatPrice = (price: number) => {
+    if (price >= 1000000) return (price / 1000000).toFixed(1) + ' mln';
+    if (price >= 1000) return (price / 1000).toFixed(0) + ' ming';
+    return new Intl.NumberFormat('uz-UZ').format(price) + ' so\'m';
+  };
 
   if (connectedMarketplaces.length === 0) {
     return (<Card><CardContent className="py-12 text-center"><AlertOctagon className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" /><h3 className="text-lg font-semibold mb-2">Muammoli mahsulotlar</h3><p className="text-muted-foreground">Avval marketplace ulang</p></CardContent></Card>);
   }
 
   if (isLoading) {
-    return (<div className="space-y-4"><div className="grid grid-cols-3 gap-4">{[1,2,3].map(i => <Skeleton key={i} className="h-28" />)}</div><Skeleton className="h-96" /></div>);
+    return (<div className="space-y-4"><div className="grid grid-cols-3 gap-3">{[1,2,3].map(i => <Skeleton key={i} className="h-24" />)}</div><Skeleton className="h-96" /></div>);
   }
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-3 gap-4">
-        <Card className={criticalCount > 0 ? 'border-red-500/30' : ''}><CardContent className="pt-4">
-          <div className="flex items-center gap-2 text-red-600 mb-1"><AlertOctagon className="h-4 w-4" /><span className="text-sm">Kritik</span></div>
-          <div className="text-2xl font-bold text-red-600">{criticalCount}</div>
+    <div className="space-y-4 overflow-hidden">
+      {/* KPI Cards */}
+      <div className="grid grid-cols-3 gap-3">
+        <Card className={`overflow-hidden ${criticalCount > 0 ? 'border-red-500/30' : ''}`}><CardContent className="p-3">
+          <div className="flex items-center gap-1.5 text-red-600 mb-1"><AlertOctagon className="h-3.5 w-3.5 shrink-0" /><span className="text-xs truncate">Kritik</span></div>
+          <div className="text-xl font-bold text-red-600">{criticalCount}</div>
         </CardContent></Card>
-        <Card><CardContent className="pt-4">
-          <div className="flex items-center gap-2 text-amber-600 mb-1"><AlertTriangle className="h-4 w-4" /><span className="text-sm">Ogohlantirish</span></div>
-          <div className="text-2xl font-bold text-amber-600">{warningCount}</div>
+        <Card className="overflow-hidden"><CardContent className="p-3">
+          <div className="flex items-center gap-1.5 text-amber-600 mb-1"><AlertTriangle className="h-3.5 w-3.5 shrink-0" /><span className="text-xs truncate">Ogohlant.</span></div>
+          <div className="text-xl font-bold text-amber-600">{warningCount}</div>
         </CardContent></Card>
-        <Card><CardContent className="pt-4">
-          <div className="flex items-center gap-2 text-muted-foreground mb-1"><Package className="h-4 w-4" /><span className="text-sm">Jami</span></div>
-          <div className="text-2xl font-bold">{problems.length}</div>
+        <Card className="overflow-hidden"><CardContent className="p-3">
+          <div className="flex items-center gap-1.5 text-muted-foreground mb-1"><Package className="h-3.5 w-3.5 shrink-0" /><span className="text-xs truncate">Jami</span></div>
+          <div className="text-xl font-bold">{problems.length}</div>
         </CardContent></Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div><CardTitle className="flex items-center gap-2"><AlertOctagon className="h-5 w-5" />Muammolar ro'yxati</CardTitle>
-            <CardDescription>{problems.length} ta muammo topildi</CardDescription></div>
-            <Button variant="outline" size="sm" onClick={() => store.refetchAll()} disabled={store.isFetching}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${store.isFetching ? 'animate-spin' : ''}`} />Yangilash
+      {/* Problems List */}
+      <Card className="overflow-hidden">
+        <CardHeader className="p-3 sm:p-6">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+                <AlertOctagon className="h-4 w-4 shrink-0" /><span className="truncate">Muammolar</span>
+              </CardTitle>
+              <CardDescription className="text-xs">{problems.length} ta topildi</CardDescription>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => store.refetchAll()} disabled={store.isFetching} className="shrink-0">
+              <RefreshCw className={`h-4 w-4 ${store.isFetching ? 'animate-spin' : ''}`} />
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="flex flex-wrap h-auto gap-1 mb-4">
-              <TabsTrigger value="all">Barchasi ({problems.length})</TabsTrigger>
+            <TabsList className="flex flex-wrap h-auto gap-1 mb-3 w-full">
+              <TabsTrigger value="all" className="text-xs flex-shrink-0">Barchasi ({problems.length})</TabsTrigger>
               {Object.entries(PROBLEM_TYPES).map(([key, val]) => {
                 const count = byType[key]?.length || 0;
                 if (count === 0) return null;
-                return <TabsTrigger key={key} value={key}>{val.label} ({count})</TabsTrigger>;
+                return <TabsTrigger key={key} value={key} className="text-xs flex-shrink-0">{val.label} ({count})</TabsTrigger>;
               })}
             </TabsList>
           </Tabs>
@@ -180,25 +188,28 @@ export function ProblematicProducts({ connectedMarketplaces, store }: Problemati
           {displayProblems.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground"><Package className="h-12 w-12 mx-auto mb-3 opacity-50" /><p>Muammolar topilmadi 🎉</p></div>
           ) : (
-            <div className="space-y-3 max-h-[600px] overflow-y-auto">
+            <div className="space-y-2 max-h-[500px] overflow-y-auto">
               {displayProblems.map((problem, idx) => {
                 const typeInfo = PROBLEM_TYPES[problem.problemType];
                 const Icon = typeInfo?.icon || AlertTriangle;
                 return (
-                  <div key={`${problem.id}-${problem.marketplace}-${problem.problemType}-${idx}`} className="p-4 rounded-lg border">
-                    <div className="flex items-start gap-3">
-                      <div className={`mt-1 ${typeInfo?.color || 'text-muted-foreground'}`}><Icon className="h-5 w-5" /></div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Badge className={`${SEVERITY_BADGE[problem.severity]} text-white text-xs`}>{problem.severity === 'critical' ? 'Kritik' : problem.severity === 'warning' ? 'Ogohlantirish' : 'Info'}</Badge>
-                          <Badge variant="outline" className="text-xs">{MARKETPLACE_NAMES[problem.marketplace]}</Badge>
+                  <div key={`${problem.id}-${problem.marketplace}-${problem.problemType}-${idx}`} className="p-3 rounded-lg border overflow-hidden">
+                    <div className="flex items-start gap-2">
+                      <div className={`mt-0.5 shrink-0 ${typeInfo?.color || 'text-muted-foreground'}`}><Icon className="h-4 w-4" /></div>
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <Badge className={`${SEVERITY_BADGE[problem.severity]} text-white text-[10px] px-1.5`}>{problem.severity === 'critical' ? 'Kritik' : problem.severity === 'warning' ? 'Ogohlant.' : 'Info'}</Badge>
+                          <Badge variant="outline" className="text-[10px]">{MARKETPLACE_NAMES[problem.marketplace]}</Badge>
                         </div>
                         <div className="font-medium text-sm truncate">{problem.name}</div>
-                        <div className="text-xs text-muted-foreground mt-1">{problem.description}</div>
-                        <div className="text-xs font-medium mt-1">{problem.metric}</div>
-                        <div className="text-xs text-blue-600 mt-2">💡 {problem.suggestion}</div>
+                        <div className="text-xs text-muted-foreground">{problem.description}</div>
+                        <div className="text-xs font-medium">{problem.metric}</div>
+                        <div className="text-[11px] text-blue-600">💡 {problem.suggestion}</div>
                       </div>
-                      <div className="text-right whitespace-nowrap"><div className="font-bold text-sm">{formatPrice(problem.price)}</div><div className="text-xs text-muted-foreground">{problem.stock} dona</div></div>
+                      <div className="text-right shrink-0 ml-1">
+                        <div className="font-bold text-xs whitespace-nowrap">{formatPrice(problem.price)}</div>
+                        <div className="text-[10px] text-muted-foreground">{problem.stock} dona</div>
+                      </div>
                     </div>
                   </div>
                 );
