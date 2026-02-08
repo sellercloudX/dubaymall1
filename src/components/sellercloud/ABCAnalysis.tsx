@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from '@/components/ui/table';
@@ -12,6 +13,7 @@ import {
   Package, RefreshCw, ArrowUpRight, ArrowDownRight,
   Calculator
 } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 
 interface ABCAnalysisProps {
@@ -21,20 +23,11 @@ interface ABCAnalysisProps {
 }
 
 interface ProductPnL {
-  id: string;
-  name: string;
-  sku: string;
-  marketplace: string;
-  price: number;
-  totalSold: number;
-  totalRevenue: number;
-  estimatedCost: number;
-  commissionAmount: number;
-  logisticsCost: number;
-  netProfit: number;
-  profitMargin: number;
-  abcGroup: 'A' | 'B' | 'C';
-  revenueShare: number;
+  id: string; name: string; sku: string; marketplace: string;
+  price: number; totalSold: number; totalRevenue: number;
+  estimatedCost: number; commissionAmount: number; logisticsCost: number;
+  netProfit: number; profitMargin: number;
+  abcGroup: 'A' | 'B' | 'C'; revenueShare: number;
 }
 
 const MARKETPLACE_NAMES: Record<string, string> = {
@@ -49,22 +42,20 @@ const ABC_COLORS = {
 
 export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 4 }: ABCAnalysisProps) {
   const [selectedGroup, setSelectedGroup] = useState<'all' | 'A' | 'B' | 'C'>('all');
+  const isMobile = useIsMobile();
   const isLoading = store.isLoading;
 
   const products = useMemo(() => {
     if (isLoading) return [];
-
     const allProducts: ProductPnL[] = [];
 
     for (const marketplace of connectedMarketplaces) {
       const productsList = store.getProducts(marketplace);
       const orders = store.getOrders(marketplace);
 
-      // Build sales map from orders
       const salesMap = new Map<string, { qty: number; revenue: number }>();
       orders.forEach(order => {
-        const items = order.items || [];
-        items.forEach(item => {
+        (order.items || []).forEach(item => {
           const key = item.offerId;
           if (!key) return;
           const existing = salesMap.get(key) || { qty: 0, revenue: 0 };
@@ -141,80 +132,128 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
   }
 
   if (isLoading) {
-    return (<div className="space-y-4"><div className="grid grid-cols-2 md:grid-cols-4 gap-4">{[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-28" />)}</div><Skeleton className="h-96" /></div>);
+    return (<div className="space-y-4"><div className="grid grid-cols-2 gap-4">{[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24" />)}</div><Skeleton className="h-96" /></div>);
   }
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/20">
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2 text-green-600 mb-1"><ArrowUpRight className="h-4 w-4" /><span className="text-sm font-medium">Foydali</span></div>
-            <div className="text-2xl font-bold">{profitableCount}</div><div className="text-xs text-muted-foreground">mahsulot</div>
+    <div className="space-y-4 overflow-hidden">
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 gap-3">
+        <Card className="bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/20 overflow-hidden">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-1.5 text-green-600 mb-1"><ArrowUpRight className="h-3.5 w-3.5 shrink-0" /><span className="text-xs font-medium truncate">Foydali</span></div>
+            <div className="text-xl font-bold">{profitableCount}</div><div className="text-[10px] text-muted-foreground">mahsulot</div>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-red-500/10 to-red-500/5 border-red-500/20">
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2 text-red-600 mb-1"><ArrowDownRight className="h-4 w-4" /><span className="text-sm font-medium">Zarardagi</span></div>
-            <div className="text-2xl font-bold">{unprofitableCount}</div><div className="text-xs text-muted-foreground">mahsulot</div>
+        <Card className="bg-gradient-to-br from-red-500/10 to-red-500/5 border-red-500/20 overflow-hidden">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-1.5 text-red-600 mb-1"><ArrowDownRight className="h-3.5 w-3.5 shrink-0" /><span className="text-xs font-medium truncate">Zarardagi</span></div>
+            <div className="text-xl font-bold">{unprofitableCount}</div><div className="text-[10px] text-muted-foreground">mahsulot</div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2 text-muted-foreground mb-1"><DollarSign className="h-4 w-4" /><span className="text-sm font-medium">Jami daromad</span></div>
-            <div className="text-2xl font-bold">{formatPrice(totalRevenue)}</div><div className="text-xs text-muted-foreground">so'm</div>
+        <Card className="overflow-hidden">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-1.5 text-muted-foreground mb-1"><DollarSign className="h-3.5 w-3.5 shrink-0" /><span className="text-xs font-medium truncate">Jami daromad</span></div>
+            <div className="text-xl font-bold truncate">{formatPrice(totalRevenue)}</div><div className="text-[10px] text-muted-foreground">so'm</div>
           </CardContent>
         </Card>
-        <Card className={totalProfit >= 0 ? 'bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20' : 'bg-gradient-to-br from-orange-500/10 to-orange-500/5 border-orange-500/20'}>
-          <CardContent className="pt-4">
-            <div className={`flex items-center gap-2 mb-1 ${totalProfit >= 0 ? 'text-emerald-600' : 'text-orange-600'}`}>
-              {totalProfit >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}<span className="text-sm font-medium">Sof foyda</span>
+        <Card className={`overflow-hidden ${totalProfit >= 0 ? 'bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20' : 'bg-gradient-to-br from-orange-500/10 to-orange-500/5 border-orange-500/20'}`}>
+          <CardContent className="p-3">
+            <div className={`flex items-center gap-1.5 mb-1 ${totalProfit >= 0 ? 'text-emerald-600' : 'text-orange-600'}`}>
+              {totalProfit >= 0 ? <TrendingUp className="h-3.5 w-3.5 shrink-0" /> : <TrendingDown className="h-3.5 w-3.5 shrink-0" />}<span className="text-xs font-medium truncate">Sof foyda</span>
             </div>
-            <div className="text-2xl font-bold">{formatPrice(totalProfit)}</div><div className="text-xs text-muted-foreground">so'm</div>
+            <div className="text-xl font-bold truncate">{formatPrice(totalProfit)}</div><div className="text-[10px] text-muted-foreground">so'm</div>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-4">
-        {(['A', 'B', 'C'] as const).map(group => {
-          const items = grouped[group];
-          const groupRevenue = items.reduce((s, p) => s + p.totalRevenue, 0);
-          const groupProfit = items.reduce((s, p) => s + p.netProfit, 0);
-          const colors = ABC_COLORS[group];
-          const label = group === 'A' ? 'Yulduzlar (80% daromad)' : group === 'B' ? "O'rtacha (15% daromad)" : 'Sust (5% daromad)';
-          return (
-            <Card key={group} className={`cursor-pointer transition-all ${colors.bg} ${colors.border} border-2 ${selectedGroup === group ? 'ring-2 ring-primary' : ''}`}
-              onClick={() => setSelectedGroup(selectedGroup === group ? 'all' : group)}>
-              <CardContent className="pt-4">
-                <div className="flex items-center justify-between mb-3"><Badge className={`${colors.badge} text-white text-lg px-3 py-1`}>{group}</Badge><span className="text-sm text-muted-foreground">{items.length} ta</span></div>
-                <div className={`text-sm font-medium ${colors.text} mb-2`}>{label}</div>
-                <div className="space-y-1 text-sm">
-                  <div className="flex justify-between"><span className="text-muted-foreground">Daromad:</span><span className="font-medium">{formatPrice(groupRevenue)} so'm</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">Foyda:</span><span className={`font-medium ${groupProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatPrice(groupProfit)} so'm</span></div>
-                </div>
-                <Progress value={totalRevenue > 0 ? (groupRevenue / totalRevenue) * 100 : 0} className="h-1.5 mt-3" />
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+      {/* ABC Groups */}
+      <ScrollArea className="w-full">
+        <div className="flex gap-3 pb-2" style={{ minWidth: isMobile ? '600px' : 'auto' }}>
+          {(['A', 'B', 'C'] as const).map(group => {
+            const items = grouped[group];
+            const groupRevenue = items.reduce((s, p) => s + p.totalRevenue, 0);
+            const groupProfit = items.reduce((s, p) => s + p.netProfit, 0);
+            const colors = ABC_COLORS[group];
+            const label = group === 'A' ? 'Yulduzlar (80%)' : group === 'B' ? "O'rtacha (15%)" : 'Sust (5%)';
+            return (
+              <Card key={group} className={`cursor-pointer transition-all flex-1 min-w-[180px] ${colors.bg} ${colors.border} border-2 ${selectedGroup === group ? 'ring-2 ring-primary' : ''}`}
+                onClick={() => setSelectedGroup(selectedGroup === group ? 'all' : group)}>
+                <CardContent className="p-3">
+                  <div className="flex items-center justify-between mb-2"><Badge className={`${colors.badge} text-white text-sm px-2 py-0.5`}>{group}</Badge><span className="text-xs text-muted-foreground">{items.length} ta</span></div>
+                  <div className={`text-xs font-medium ${colors.text} mb-2`}>{label}</div>
+                  <div className="space-y-1 text-xs">
+                    <div className="flex justify-between"><span className="text-muted-foreground">Daromad:</span><span className="font-medium whitespace-nowrap">{formatPrice(groupRevenue)}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Foyda:</span><span className={`font-medium whitespace-nowrap ${groupProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatPrice(groupProfit)}</span></div>
+                  </div>
+                  <Progress value={totalRevenue > 0 ? (groupRevenue / totalRevenue) * 100 : 0} className="h-1 mt-2" />
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+        <ScrollBar orientation="horizontal" />
+      </ScrollArea>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div><CardTitle className="flex items-center gap-2"><Calculator className="h-5 w-5" />Mahsulot bo'yicha PnL
-              {selectedGroup !== 'all' && <Badge className={`${ABC_COLORS[selectedGroup].badge} text-white ml-2`}>{selectedGroup} guruh</Badge>}
-            </CardTitle><CardDescription>Har bir mahsulot uchun foyda/zarar hisobi ({filteredProducts.length} ta)</CardDescription></div>
-            <Button variant="outline" size="sm" onClick={() => store.refetchAll()} disabled={store.isFetching}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${store.isFetching ? 'animate-spin' : ''}`} />Yangilash
+      {/* Products List */}
+      <Card className="overflow-hidden">
+        <CardHeader className="p-3 sm:p-6">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+                <Calculator className="h-4 w-4 shrink-0" />
+                <span className="truncate">PnL</span>
+                {selectedGroup !== 'all' && <Badge className={`${ABC_COLORS[selectedGroup].badge} text-white`}>{selectedGroup}</Badge>}
+              </CardTitle>
+              <CardDescription className="text-xs">{filteredProducts.length} ta mahsulot</CardDescription>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => store.refetchAll()} disabled={store.isFetching} className="shrink-0">
+              <RefreshCw className={`h-4 w-4 ${store.isFetching ? 'animate-spin' : ''}`} />
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0 sm:p-6 sm:pt-0">
           {filteredProducts.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground"><Package className="h-12 w-12 mx-auto mb-3 opacity-50" /><p>Mahsulotlar topilmadi</p></div>
+          ) : isMobile ? (
+            /* Mobile card layout */
+            <div className="space-y-2 px-3 pb-3 max-h-[500px] overflow-y-auto">
+              {filteredProducts.slice(0, 50).map(product => {
+                const colors = ABC_COLORS[product.abcGroup];
+                return (
+                  <div key={`${product.id}-${product.marketplace}`} className="p-3 rounded-lg border space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium line-clamp-1">{product.name}</div>
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <Badge className={`${colors.badge} text-white text-[10px] px-1.5`}>{product.abcGroup}</Badge>
+                          <Badge variant="outline" className="text-[10px]">{MARKETPLACE_NAMES[product.marketplace]}</Badge>
+                          <code className="text-[10px] text-muted-foreground truncate">{product.sku}</code>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-xs">
+                      <div><span className="text-muted-foreground">Sotildi:</span><div className="font-medium">{product.totalSold} ta</div></div>
+                      <div><span className="text-muted-foreground">Daromad:</span><div className="font-medium whitespace-nowrap">{formatPrice(product.totalRevenue)}</div></div>
+                      <div>
+                        <span className="text-muted-foreground">Foyda:</span>
+                        <div className={`font-bold whitespace-nowrap ${product.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {product.netProfit >= 0 ? '+' : ''}{formatPrice(product.netProfit)}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Marja:</span>
+                      <span className={`font-medium ${product.profitMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>{product.profitMargin.toFixed(0)}%</span>
+                    </div>
+                  </div>
+                );
+              })}
+              {filteredProducts.length > 50 && <div className="text-xs text-muted-foreground text-center py-2">50 / {filteredProducts.length} ko'rsatilmoqda</div>}
+            </div>
           ) : (
-            <div className="overflow-x-auto">
+            /* Desktop table layout */
+            <ScrollArea className="w-full">
               <Table>
                 <TableHeader><TableRow>
                   <TableHead className="w-10">ABC</TableHead><TableHead className="min-w-[180px]">Mahsulot</TableHead>
@@ -231,20 +270,21 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
                         <TableCell><Badge className={`${colors.badge} text-white`}>{product.abcGroup}</Badge></TableCell>
                         <TableCell><div className="font-medium text-sm line-clamp-1">{product.name}</div><code className="text-xs text-muted-foreground">{product.sku}</code></TableCell>
                         <TableCell className="text-center"><Badge variant="outline" className="text-xs">{MARKETPLACE_NAMES[product.marketplace]}</Badge></TableCell>
-                        <TableCell className="text-right text-sm">{formatPrice(product.price)}</TableCell>
+                        <TableCell className="text-right text-sm whitespace-nowrap">{formatPrice(product.price)}</TableCell>
                         <TableCell className="text-center font-medium">{product.totalSold}</TableCell>
-                        <TableCell className="text-right text-sm font-medium">{formatPrice(product.totalRevenue)}</TableCell>
-                        <TableCell className="text-right text-sm text-muted-foreground">{formatPrice(product.estimatedCost)}</TableCell>
-                        <TableCell className="text-right text-sm text-muted-foreground">{formatPrice(product.commissionAmount)}</TableCell>
-                        <TableCell className="text-right"><span className={`font-bold text-sm ${product.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>{product.netProfit >= 0 ? '+' : ''}{formatPrice(product.netProfit)}</span></TableCell>
+                        <TableCell className="text-right text-sm font-medium whitespace-nowrap">{formatPrice(product.totalRevenue)}</TableCell>
+                        <TableCell className="text-right text-sm text-muted-foreground whitespace-nowrap">{formatPrice(product.estimatedCost)}</TableCell>
+                        <TableCell className="text-right text-sm text-muted-foreground whitespace-nowrap">{formatPrice(product.commissionAmount)}</TableCell>
+                        <TableCell className="text-right"><span className={`font-bold text-sm whitespace-nowrap ${product.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>{product.netProfit >= 0 ? '+' : ''}{formatPrice(product.netProfit)}</span></TableCell>
                         <TableCell className="text-right"><span className={`text-sm font-medium ${product.profitMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>{product.profitMargin.toFixed(0)}%</span></TableCell>
                       </TableRow>
                     );
                   })}
                 </TableBody>
               </Table>
-              {filteredProducts.length > 100 && <div className="mt-4 text-sm text-muted-foreground text-center">Ko'rsatilmoqda: 100 / {filteredProducts.length}</div>}
-            </div>
+              <ScrollBar orientation="horizontal" />
+              {filteredProducts.length > 100 && <div className="mt-4 text-sm text-muted-foreground text-center">100 / {filteredProducts.length}</div>}
+            </ScrollArea>
           )}
         </CardContent>
       </Card>
