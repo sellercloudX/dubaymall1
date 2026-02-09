@@ -155,9 +155,7 @@ export const ProductCard = memo(forwardRef<HTMLAnchorElement, ProductCardProps>(
   // Calculate delivery date
   const deliveryDate = calculateDeliveryDate(product.preparation_days);
 
-  // Affiliate/Blogger commission - show how much a blogger can earn
-  const hasAffiliate = product.is_affiliate_enabled && product.affiliate_commission_percent && product.affiliate_commission_percent > 0;
-  const affiliateBonus = hasAffiliate ? Math.round((product.price * (product.affiliate_commission_percent || 0)) / 100) : 0;
+  // Affiliate/Blogger commission removed from public card — only visible in Blogger dashboard
 
   return (
     <Link to={`/product/${product.id}`} className="block" ref={ref}>
@@ -249,12 +247,6 @@ export const ProductCard = memo(forwardRef<HTMLAnchorElement, ProductCardProps>(
             )}
           </button>
 
-          {/* Affiliate Bonus Badge - Top Left */}
-          {hasAffiliate && affiliateBonus > 0 && (
-            <div className="absolute top-2 left-2 bg-emerald-600 text-white text-[10px] font-medium px-1.5 py-0.5 rounded shadow-sm">
-              +{new Intl.NumberFormat('uz-UZ').format(affiliateBonus)} so'm
-            </div>
-          )}
         </div>
 
         {/* Content */}

@@ -150,6 +150,13 @@ export default function CheckoutPage() {
       // Save address to profile for future use
       await saveAddressToProfile();
 
+      // Calculate shipping cost for the order
+      const orderShippingCost = items.reduce((sum, item) => {
+        if (item.product?.free_shipping) return sum;
+        return sum + (item.product?.shipping_price || 0) * item.quantity;
+      }, 0);
+      const orderGrandTotal = totalPrice + orderShippingCost;
+
       // Generate order number
       const orderNum = 'ORD-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-' + 
         Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -165,7 +172,7 @@ export default function CheckoutPage() {
         .insert({
           user_id: user.id,
           order_number: orderNum,
-          total_amount: totalPrice,
+          total_amount: orderGrandTotal,
           shipping_address: {
             name: formData.name,
             phone: formData.phone,
@@ -500,17 +507,38 @@ export default function CheckoutPage() {
                     <span className="text-muted-foreground">{t.productsCount || 'Mahsulotlar'}</span>
                     <span>{totalItems} dona</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">{t.delivery || 'Yetkazib berish'}</span>
-                    <span className="text-green-600">{t.free || 'Bepul'}</span>
-                  </div>
+                  {(() => {
+                    const shippingTotal = items.reduce((sum, item) => {
+                      if (item.product?.free_shipping) return sum;
+                      return sum + (item.product?.shipping_price || 0) * item.quantity;
+                    }, 0);
+                    return (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">{t.delivery || 'Yetkazib berish'}</span>
+                        {shippingTotal > 0 ? (
+                          <span>{formatPrice(shippingTotal)}</span>
+                        ) : (
+                          <span className="text-green-600">{t.free || 'Bepul'}</span>
+                        )}
+                      </div>
+                    );
+                  })()}
                   
                   <Separator />
                   
-                  <div className="flex justify-between text-lg font-bold">
-                    <span>{t.total || 'Jami'}</span>
-                    <span className="text-primary whitespace-nowrap">{formatPrice(totalPrice)}</span>
-                  </div>
+                  {(() => {
+                    const shippingCost = items.reduce((sum, item) => {
+                      if (item.product?.free_shipping) return sum;
+                      return sum + (item.product?.shipping_price || 0) * item.quantity;
+                    }, 0);
+                    const grandTotal = totalPrice + shippingCost;
+                    return (
+                      <div className="flex justify-between text-lg font-bold">
+                        <span>{t.total || 'Jami'}</span>
+                        <span className="text-primary whitespace-nowrap">{formatPrice(grandTotal)}</span>
+                      </div>
+                    );
+                  })()}
                   
                   {/* Installment info */}
                   {formData.paymentMethod.startsWith('installment_') && (

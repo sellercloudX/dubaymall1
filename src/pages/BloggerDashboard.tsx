@@ -1,12 +1,13 @@
 import React from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
- import { useUserRoles } from '@/hooks/useUserRoles';
+import { useUserRoles } from '@/hooks/useUserRoles';
+import { useActivationStatus } from '@/hooks/useActivationStatus';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import { DollarSign, MousePointer, ShoppingCart, Wallet, BarChart3 } from 'lucide-react';
+import { DollarSign, MousePointer, ShoppingCart, Wallet, BarChart3, AlertTriangle } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import AffiliateProducts from '@/components/blogger/AffiliateProducts';
 import MyAffiliateLinks from '@/components/blogger/MyAffiliateLinks';
@@ -21,10 +22,11 @@ export default function BloggerDashboard() {
   const { t } = useLanguage();
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-   const { isBlogger, loading: rolesLoading } = useUserRoles();
+  const { isBlogger, isSeller, loading: rolesLoading } = useUserRoles();
+  const { isBloggerApproved, loading: activationLoading } = useActivationStatus();
   const { stats, loading: statsLoading } = useBloggerStats();
 
-   if (authLoading || rolesLoading) {
+  if (authLoading || rolesLoading || activationLoading) {
     return (
       <Layout>
         <div className="flex justify-center items-center min-h-[50vh]">
@@ -39,21 +41,57 @@ export default function BloggerDashboard() {
     return null;
   }
 
-   if (!isBlogger) {
-     return (
-       <Layout>
-         <div className="container py-16 text-center">
-           <h1 className="text-2xl font-bold mb-4">Blogger kabinetiga kirish</h1>
-           <p className="text-muted-foreground mb-6">
-             Blogger sifatida ishlash uchun avval aktivatsiyadan o'ting
-           </p>
-           <Button asChild>
-             <Link to="/blogger-activation">Aktivatsiya</Link>
-           </Button>
-         </div>
-       </Layout>
-     );
-   }
+  // If user is a seller, redirect them — sellers shouldn't access blogger dashboard
+  if (isSeller) {
+    return (
+      <Layout>
+        <div className="container py-16 text-center">
+          <AlertTriangle className="h-12 w-12 mx-auto text-amber-500 mb-4" />
+          <h1 className="text-2xl font-bold mb-4">Ruxsat yo'q</h1>
+          <p className="text-muted-foreground mb-6">
+            Sotuvchi sifatida ro'yxatdan o'tgansiz. Blogger kabineti faqat bloggerlar uchun.
+          </p>
+          <Button asChild>
+            <Link to="/seller">Sotuvchi kabinetiga o'tish</Link>
+          </Button>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!isBlogger) {
+    return (
+      <Layout>
+        <div className="container py-16 text-center">
+          <h1 className="text-2xl font-bold mb-4">Blogger kabinetiga kirish</h1>
+          <p className="text-muted-foreground mb-6">
+            Blogger sifatida ishlash uchun avval aktivatsiyadan o'ting
+          </p>
+          <Button asChild>
+            <Link to="/blogger-activation">Aktivatsiya</Link>
+          </Button>
+        </div>
+      </Layout>
+    );
+  }
+
+  // Activation not approved yet
+  if (!isBloggerApproved) {
+    return (
+      <Layout>
+        <div className="container py-16 text-center">
+          <AlertTriangle className="h-12 w-12 mx-auto text-amber-500 mb-4" />
+          <h1 className="text-2xl font-bold mb-4">Aktivatsiya tasdiqlanmagan</h1>
+          <p className="text-muted-foreground mb-6">
+            Sizning blogger profilingiz hali admin tomonidan tasdiqlanmagan. Iltimos kuting yoki aktivatsiya sahifasini tekshiring.
+          </p>
+          <Button asChild>
+            <Link to="/blogger-activation">Aktivatsiya holatini ko'rish</Link>
+          </Button>
+        </div>
+      </Layout>
+    );
+  }
  
   return (
     <Layout>

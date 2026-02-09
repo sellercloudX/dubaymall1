@@ -15,6 +15,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Loader2 } from 'lucide-react';
 import { MxikLookup } from './MxikLookup';
+import { ProductImageUpload } from './ProductImageUpload';
 import type { TablesInsert } from '@/integrations/supabase/types';
 
 type ProductInsert = TablesInsert<'products'> & {
@@ -176,6 +177,14 @@ export function ProductForm({ shopId, initialData, onSubmit, onCancel, isLoading
               <SelectItem value="out_of_stock">{t.statusOutOfStock}</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+
+        <div className="sm:col-span-2 space-y-2 pt-4 border-t">
+          <Label>Mahsulot rasmlari</Label>
+          <ProductImageUpload
+            images={formData.images || []}
+            onChange={(images) => setFormData(prev => ({ ...prev, images }))}
+          />
         </div>
 
         <div className="sm:col-span-2 pt-4 border-t">
