@@ -10,11 +10,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { 
   ShoppingCart, Package, Truck, CheckCircle, Clock, 
-  Eye, MapPin, Phone, User, Copy
+  Eye, MapPin, Phone, User, Copy, Printer
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { DeliveryOTPGenerator } from '@/components/delivery/DeliveryOTPGenerator';
+import { OrderReceipt } from '@/components/orders/OrderReceipt';
 
 interface OrderItem {
   id: string;
@@ -44,6 +45,7 @@ export function SellerOrders() {
   const queryClient = useQueryClient();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [showReceipt, setShowReceipt] = useState(false);
 
   const { data: orders, isLoading } = useQuery({
     queryKey: ['seller-orders', shop?.id],
@@ -431,6 +433,21 @@ export function SellerOrders() {
                   <p className="text-sm text-muted-foreground">{selectedOrder.notes}</p>
                 </div>
               )}
+
+              {/* Receipt */}
+              <div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setShowReceipt(!showReceipt)}
+                  className="gap-1 mb-3"
+                >
+                  <Printer className="h-3 w-3" /> {showReceipt ? 'Kvitansiyani yashirish' : 'Kvitansiya'}
+                </Button>
+                {showReceipt && orderItems && (
+                  <OrderReceipt order={selectedOrder} items={orderItems} />
+                )}
+              </div>
             </div>
           )}
         </DialogContent>

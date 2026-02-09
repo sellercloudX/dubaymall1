@@ -2,7 +2,8 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
- import { useUserRoles } from '@/hooks/useUserRoles';
+import { useUserRoles } from '@/hooks/useUserRoles';
+import { useActivationStatus } from '@/hooks/useActivationStatus';
 import { useShop } from '@/hooks/useShop';
 import { useProducts } from '@/hooks/useProducts';
 import { Layout } from '@/components/Layout';
@@ -47,7 +48,8 @@ export default function SellerDashboard() {
   const { user, loading: authLoading } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
-   const { isSeller, loading: rolesLoading } = useUserRoles();
+  const { isSeller, loading: rolesLoading } = useUserRoles();
+  const { isSellerApproved, loading: activationLoading } = useActivationStatus();
   const { shop, loading: shopLoading, refetch: refetchShop } = useShop();
   const { products, loading: productsLoading, createProduct, updateProduct, deleteProduct, refetch: refetchProducts } = useProducts(shop?.id || null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -111,11 +113,11 @@ export default function SellerDashboard() {
   // Track initial load - never go back to full-page loader after first load completes
   // This prevents dialog unmount when auth token refreshes (e.g., returning from camera)
   const initialLoadDone = useRef(false);
-  if (!authLoading && !shopLoading && !rolesLoading) {
+  if (!authLoading && !shopLoading && !rolesLoading && !activationLoading) {
     initialLoadDone.current = true;
   }
 
-  if (!initialLoadDone.current && (authLoading || shopLoading || rolesLoading)) {
+  if (!initialLoadDone.current && (authLoading || shopLoading || rolesLoading || activationLoading)) {
     return (
       <Layout>
         <div className="flex items-center justify-center min-h-[60vh]">
@@ -125,9 +127,27 @@ export default function SellerDashboard() {
     );
   }
 
-   if (!isSeller) {
-     return null; // Will redirect
-   }
+  if (!isSeller) {
+    return null; // Will redirect
+  }
+
+  // Seller activation not approved
+  if (!isSellerApproved) {
+    return (
+      <Layout>
+        <div className="container py-16 text-center">
+          <Store className="h-12 w-12 mx-auto text-amber-500 mb-4" />
+          <h1 className="text-2xl font-bold mb-4">Aktivatsiya tasdiqlanmagan</h1>
+          <p className="text-muted-foreground mb-6">
+            Sizning sotuvchi profilingiz hali admin tomonidan tasdiqlanmagan. Iltimos kuting yoki aktivatsiya sahifasini tekshiring.
+          </p>
+          <Button asChild>
+            <Link to="/seller-activation">Aktivatsiya holatini ko'rish</Link>
+          </Button>
+        </div>
+      </Layout>
+    );
+  }
  
   if (!shop) {
     return (

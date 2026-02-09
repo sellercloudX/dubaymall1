@@ -81,7 +81,7 @@ export default function SellerCloudX() {
     }
   }, [user, authLoading, navigate]);
   
-  const hasAccess = accessStatus?.is_active ?? true;
+  const hasAccess = accessStatus?.is_active ?? false;
 
   if (authLoading) {
     return (
@@ -183,49 +183,61 @@ export default function SellerCloudX() {
           </CardContent></Card>
         )}
 
-        <Tabs defaultValue="marketplaces" className="space-y-6">
-          <TabsList className="flex flex-wrap h-auto gap-1 p-1">
-            <TabsTrigger value="marketplaces" className="gap-2"><Globe className="h-4 w-4" /><span className="hidden sm:inline">Marketplacelar</span></TabsTrigger>
-            <TabsTrigger value="scanner" className="gap-2"><Scan className="h-4 w-4" /><span className="hidden sm:inline">AI Scanner</span></TabsTrigger>
-            <TabsTrigger value="products" className="gap-2"><Package className="h-4 w-4" /><span className="hidden sm:inline">Mahsulotlar</span></TabsTrigger>
-            <TabsTrigger value="orders" className="gap-2"><ShoppingCart className="h-4 w-4" /><span className="hidden sm:inline">Buyurtmalar</span></TabsTrigger>
-            <TabsTrigger value="inventory" className="gap-2"><ArrowDownUp className="h-4 w-4" /><span className="hidden sm:inline">Zaxira</span></TabsTrigger>
-            <TabsTrigger value="pricing" className="gap-2"><DollarSign className="h-4 w-4" /><span className="hidden sm:inline">Narxlar</span></TabsTrigger>
-            <TabsTrigger value="publish" className="gap-2"><Upload className="h-4 w-4" /><span className="hidden sm:inline">Joylash</span></TabsTrigger>
-            <TabsTrigger value="analytics" className="gap-2"><BarChart3 className="h-4 w-4" /><span className="hidden sm:inline">Analitika</span></TabsTrigger>
-            <TabsTrigger value="financials" className="gap-2"><Calculator className="h-4 w-4" /><span className="hidden sm:inline">Moliya</span></TabsTrigger>
-            <TabsTrigger value="abc-analysis" className="gap-2"><BarChart3 className="h-4 w-4" /><span className="hidden sm:inline">ABC-analiz</span></TabsTrigger>
-            <TabsTrigger value="min-price" className="gap-2"><Shield className="h-4 w-4" /><span className="hidden sm:inline">Min narx</span></TabsTrigger>
-            <TabsTrigger value="card-clone" className="gap-2"><Copy className="h-4 w-4" /><span className="hidden sm:inline">Klonlash</span></TabsTrigger>
-            <TabsTrigger value="problems" className="gap-2"><AlertOctagon className="h-4 w-4" /><span className="hidden sm:inline">Muammolar</span></TabsTrigger>
-            <TabsTrigger value="subscription" className="gap-2"><CreditCard className="h-4 w-4" /><span className="hidden sm:inline">Obuna</span></TabsTrigger>
-            <TabsTrigger value="reports" className="gap-2"><FileSpreadsheet className="h-4 w-4" /><span className="hidden sm:inline">Hisobotlar</span></TabsTrigger>
-            <TabsTrigger value="notifications" className="gap-2"><Bell className="h-4 w-4" /><span className="hidden sm:inline">Bildirishnoma</span></TabsTrigger>
-          </TabsList>
+        {!hasAccess ? (
+          // When access is restricted, only show subscription tab
+          <Tabs defaultValue="subscription" className="space-y-6">
+            <TabsList className="flex flex-wrap h-auto gap-1 p-1">
+              <TabsTrigger value="subscription" className="gap-2"><CreditCard className="h-4 w-4" /><span className="hidden sm:inline">Obuna</span></TabsTrigger>
+              <TabsTrigger value="notifications" className="gap-2"><Bell className="h-4 w-4" /><span className="hidden sm:inline">Bildirishnoma</span></TabsTrigger>
+            </TabsList>
+            <TabsContent value="subscription"><SubscriptionBilling totalSalesVolume={totalRevenue} /></TabsContent>
+            <TabsContent value="notifications"><NotificationCenter /></TabsContent>
+          </Tabs>
+        ) : (
+          <Tabs defaultValue="marketplaces" className="space-y-6">
+            <TabsList className="flex flex-wrap h-auto gap-1 p-1">
+              <TabsTrigger value="marketplaces" className="gap-2"><Globe className="h-4 w-4" /><span className="hidden sm:inline">Marketplacelar</span></TabsTrigger>
+              <TabsTrigger value="scanner" className="gap-2"><Scan className="h-4 w-4" /><span className="hidden sm:inline">AI Scanner</span></TabsTrigger>
+              <TabsTrigger value="products" className="gap-2"><Package className="h-4 w-4" /><span className="hidden sm:inline">Mahsulotlar</span></TabsTrigger>
+              <TabsTrigger value="orders" className="gap-2"><ShoppingCart className="h-4 w-4" /><span className="hidden sm:inline">Buyurtmalar</span></TabsTrigger>
+              <TabsTrigger value="inventory" className="gap-2"><ArrowDownUp className="h-4 w-4" /><span className="hidden sm:inline">Zaxira</span></TabsTrigger>
+              <TabsTrigger value="pricing" className="gap-2"><DollarSign className="h-4 w-4" /><span className="hidden sm:inline">Narxlar</span></TabsTrigger>
+              <TabsTrigger value="publish" className="gap-2"><Upload className="h-4 w-4" /><span className="hidden sm:inline">Joylash</span></TabsTrigger>
+              <TabsTrigger value="analytics" className="gap-2"><BarChart3 className="h-4 w-4" /><span className="hidden sm:inline">Analitika</span></TabsTrigger>
+              <TabsTrigger value="financials" className="gap-2"><Calculator className="h-4 w-4" /><span className="hidden sm:inline">Moliya</span></TabsTrigger>
+              <TabsTrigger value="abc-analysis" className="gap-2"><BarChart3 className="h-4 w-4" /><span className="hidden sm:inline">ABC-analiz</span></TabsTrigger>
+              <TabsTrigger value="min-price" className="gap-2"><Shield className="h-4 w-4" /><span className="hidden sm:inline">Min narx</span></TabsTrigger>
+              <TabsTrigger value="card-clone" className="gap-2"><Copy className="h-4 w-4" /><span className="hidden sm:inline">Klonlash</span></TabsTrigger>
+              <TabsTrigger value="problems" className="gap-2"><AlertOctagon className="h-4 w-4" /><span className="hidden sm:inline">Muammolar</span></TabsTrigger>
+              <TabsTrigger value="subscription" className="gap-2"><CreditCard className="h-4 w-4" /><span className="hidden sm:inline">Obuna</span></TabsTrigger>
+              <TabsTrigger value="reports" className="gap-2"><FileSpreadsheet className="h-4 w-4" /><span className="hidden sm:inline">Hisobotlar</span></TabsTrigger>
+              <TabsTrigger value="notifications" className="gap-2"><Bell className="h-4 w-4" /><span className="hidden sm:inline">Bildirishnoma</span></TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="marketplaces">
-            <MarketplaceOAuth connections={connections} isLoading={connectionsLoading} connectMarketplace={connectMarketplace} syncMarketplace={syncMarketplace} onConnect={handleMarketplaceConnect} />
-          </TabsContent>
-          <TabsContent value="scanner">
-            {connectedMarketplaces.length > 0 ? <AIScannerPro shopId="sellercloud" /> : (
-              <Card><CardContent className="py-12 text-center"><Scan className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" /><h3 className="text-lg font-semibold mb-2">AI Scanner Pro</h3><p className="text-muted-foreground mb-4">Avval kamida bitta marketplace ulang</p></CardContent></Card>
-            )}
-          </TabsContent>
-          <TabsContent value="products"><MarketplaceProducts connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
-          <TabsContent value="orders"><MarketplaceOrders connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
-          <TabsContent value="inventory"><InventorySync connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
-          <TabsContent value="pricing"><PriceManager connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
-          <TabsContent value="publish"><MultiPublish connectedMarketplaces={connectedMarketplaces} /></TabsContent>
-          <TabsContent value="analytics"><MarketplaceAnalytics connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
-          <TabsContent value="financials"><FinancialDashboard connectedMarketplaces={connectedMarketplaces} store={store} monthlyFee={subscription?.monthly_fee || 499} commissionPercent={subscription?.commission_percent || 4} /></TabsContent>
-          <TabsContent value="abc-analysis"><ABCAnalysis connectedMarketplaces={connectedMarketplaces} store={store} commissionPercent={subscription?.commission_percent || 4} /></TabsContent>
-          <TabsContent value="min-price"><MinPriceProtection connectedMarketplaces={connectedMarketplaces} store={store} commissionPercent={subscription?.commission_percent || 4} /></TabsContent>
-          <TabsContent value="card-clone"><CardCloner connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
-          <TabsContent value="problems"><ProblematicProducts connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
-          <TabsContent value="subscription"><SubscriptionBilling totalSalesVolume={totalRevenue} /></TabsContent>
-          <TabsContent value="reports"><ReportsExport connectedMarketplaces={connectedMarketplaces} /></TabsContent>
-          <TabsContent value="notifications"><NotificationCenter /></TabsContent>
-        </Tabs>
+            <TabsContent value="marketplaces">
+              <MarketplaceOAuth connections={connections} isLoading={connectionsLoading} connectMarketplace={connectMarketplace} syncMarketplace={syncMarketplace} onConnect={handleMarketplaceConnect} />
+            </TabsContent>
+            <TabsContent value="scanner">
+              {connectedMarketplaces.length > 0 ? <AIScannerPro shopId="sellercloud" /> : (
+                <Card><CardContent className="py-12 text-center"><Scan className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" /><h3 className="text-lg font-semibold mb-2">AI Scanner Pro</h3><p className="text-muted-foreground mb-4">Avval kamida bitta marketplace ulang</p></CardContent></Card>
+              )}
+            </TabsContent>
+            <TabsContent value="products"><MarketplaceProducts connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
+            <TabsContent value="orders"><MarketplaceOrders connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
+            <TabsContent value="inventory"><InventorySync connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
+            <TabsContent value="pricing"><PriceManager connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
+            <TabsContent value="publish"><MultiPublish connectedMarketplaces={connectedMarketplaces} /></TabsContent>
+            <TabsContent value="analytics"><MarketplaceAnalytics connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
+            <TabsContent value="financials"><FinancialDashboard connectedMarketplaces={connectedMarketplaces} store={store} monthlyFee={subscription?.monthly_fee || 499} commissionPercent={subscription?.commission_percent || 4} /></TabsContent>
+            <TabsContent value="abc-analysis"><ABCAnalysis connectedMarketplaces={connectedMarketplaces} store={store} commissionPercent={subscription?.commission_percent || 4} /></TabsContent>
+            <TabsContent value="min-price"><MinPriceProtection connectedMarketplaces={connectedMarketplaces} store={store} commissionPercent={subscription?.commission_percent || 4} /></TabsContent>
+            <TabsContent value="card-clone"><CardCloner connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
+            <TabsContent value="problems"><ProblematicProducts connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
+            <TabsContent value="subscription"><SubscriptionBilling totalSalesVolume={totalRevenue} /></TabsContent>
+            <TabsContent value="reports"><ReportsExport connectedMarketplaces={connectedMarketplaces} /></TabsContent>
+            <TabsContent value="notifications"><NotificationCenter /></TabsContent>
+          </Tabs>
+        )}
       </div>
       <Footer />
     </>
