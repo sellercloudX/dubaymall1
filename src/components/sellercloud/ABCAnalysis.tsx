@@ -72,16 +72,24 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
         const sales = salesMap.get(product.offerId) || { qty: 0, revenue: 0 };
         const price = product.price || 0;
         const totalRevenue = sales.revenue || sales.qty * price;
-        const estimatedCost = totalRevenue * 0.6;
-        const commissionAmount = totalRevenue * (commissionPercent / 100);
-        const logisticsCost = totalRevenue * 0.05;
-        const netProfit = totalRevenue - estimatedCost - commissionAmount - logisticsCost;
+        // Real Yandex Market tariffs for Uzbekistan
+        const commissionRate = commissionPercent / 100; // from subscription (4% or 2%)
+        const yandexCommissionRate = 0.20; // Yandex standard 20% commission
+        const logisticsPerOrder = 4000; // Average logistics ~4000 so'm per item
+        const taxRate = 0.04; // 4% tax
+        
+        const commissionAmount = totalRevenue * yandexCommissionRate;
+        const logisticsCost = sales.qty * logisticsPerOrder;
+        const taxAmount = totalRevenue * taxRate;
+        const platformFee = totalRevenue * commissionRate; // SellerCloudX fee
+        const totalCosts = commissionAmount + logisticsCost + taxAmount + platformFee;
+        const netProfit = totalRevenue - totalCosts;
         const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
 
         allProducts.push({
           id: product.offerId, name: product.name || 'Nomsiz',
           sku: product.shopSku || product.offerId, marketplace, price,
-          totalSold: sales.qty, totalRevenue, estimatedCost,
+          totalSold: sales.qty, totalRevenue, estimatedCost: totalCosts,
           commissionAmount, logisticsCost, netProfit, profitMargin,
           abcGroup: 'C', revenueShare: 0,
         });
@@ -252,7 +260,7 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
                   <TableHead className="w-10">ABC</TableHead><TableHead className="min-w-[180px]">Mahsulot</TableHead>
                   <TableHead className="w-16 text-center">MP</TableHead><TableHead className="w-20 text-right">Narxi</TableHead>
                   <TableHead className="w-16 text-center">Sotildi</TableHead><TableHead className="w-24 text-right">Daromad</TableHead>
-                  <TableHead className="w-24 text-right">Tannarx</TableHead><TableHead className="w-20 text-right">Komissiya</TableHead>
+                  <TableHead className="w-24 text-right">Xarajatlar</TableHead><TableHead className="w-20 text-right">Komissiya</TableHead>
                   <TableHead className="w-24 text-right">Sof foyda</TableHead><TableHead className="w-16 text-right">Marja</TableHead>
                 </TableRow></TableHeader>
                 <TableBody>

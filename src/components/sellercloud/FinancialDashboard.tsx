@@ -43,13 +43,16 @@ export function FinancialDashboard({
 
     const totalRevenue = marketplaceBreakdown.reduce((s, m) => s + m.revenue, 0);
     const totalOrders = marketplaceBreakdown.reduce((s, m) => s + m.orders, 0);
-    const platformFee = monthlyFee * USD_TO_UZS;
-    const commissionFee = totalRevenue * (commissionPercent / 100);
-    const totalExpenses = platformFee + commissionFee;
+    const platformFee = monthlyFee * USD_TO_UZS; // SellerCloudX monthly fee
+    const platformCommission = totalRevenue * (commissionPercent / 100); // SellerCloudX commission
+    const yandexCommission = totalRevenue * 0.20; // Yandex Market 20% standard commission
+    const yandexTax = totalRevenue * 0.04; // 4% tax
+    const estimatedLogistics = totalOrders * 4000; // ~4000 so'm per order logistics
+    const totalExpenses = platformFee + platformCommission + yandexCommission + yandexTax + estimatedLogistics;
     const netProfit = totalRevenue - totalExpenses;
     const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
 
-    return { totalRevenue, totalOrders, platformFee, commissionFee, totalExpenses, netProfit, profitMargin, marketplaceBreakdown };
+    return { totalRevenue, totalOrders, platformFee, platformCommission, yandexCommission, yandexTax, estimatedLogistics, totalExpenses, netProfit, profitMargin, marketplaceBreakdown };
   }, [connectedMarketplaces, store.dataVersion, isLoading, monthlyFee, commissionPercent]);
 
   const formatPrice = (price: number) => {
@@ -132,9 +135,23 @@ export function FinancialDashboard({
           <div className="flex items-center justify-between p-3 rounded-lg border gap-2">
             <div className="flex items-center gap-2 min-w-0">
               <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0"><Percent className="h-4 w-4 text-amber-500" /></div>
-              <div className="min-w-0"><div className="font-medium text-sm truncate">Komissiya</div><div className="text-xs text-muted-foreground truncate">{commissionPercent}%</div></div>
+              <div className="min-w-0"><div className="font-medium text-sm truncate">SellerCloudX komissiya</div><div className="text-xs text-muted-foreground truncate">{commissionPercent}%</div></div>
             </div>
-            <div className="text-right shrink-0"><div className="font-bold text-sm whitespace-nowrap">{formatFullPrice(summary.commissionFee)}</div></div>
+            <div className="text-right shrink-0"><div className="font-bold text-sm whitespace-nowrap">{formatFullPrice(summary.platformCommission)}</div></div>
+          </div>
+          <div className="flex items-center justify-between p-3 rounded-lg border gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-yellow-500/10 flex items-center justify-center shrink-0"><Receipt className="h-4 w-4 text-yellow-500" /></div>
+              <div className="min-w-0"><div className="font-medium text-sm truncate">Yandex komissiya</div><div className="text-xs text-muted-foreground truncate">20%</div></div>
+            </div>
+            <div className="text-right shrink-0"><div className="font-bold text-sm whitespace-nowrap">{formatFullPrice(summary.yandexCommission)}</div></div>
+          </div>
+          <div className="flex items-center justify-between p-3 rounded-lg border gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center shrink-0"><DollarSign className="h-4 w-4 text-purple-500" /></div>
+              <div className="min-w-0"><div className="font-medium text-sm truncate">Soliq + Logistika</div><div className="text-xs text-muted-foreground truncate">4% + ~4000/buyurtma</div></div>
+            </div>
+            <div className="text-right shrink-0"><div className="font-bold text-sm whitespace-nowrap">{formatFullPrice(summary.yandexTax + summary.estimatedLogistics)}</div></div>
           </div>
           <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border-2 border-primary/20 gap-2">
             <div className="flex items-center gap-2 min-w-0">

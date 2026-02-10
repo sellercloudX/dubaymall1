@@ -106,7 +106,7 @@ export default function SellerCloudMobile() {
       case 'products':
         return <MobileProducts connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'orders':
-        return <MobileOrders connectedMarketplaces={connectedMarketplaces} />;
+        return <MobileOrders connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'trends':
         return <MobileTrendHunter />;
       case 'abc-analysis':
