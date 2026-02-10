@@ -78,30 +78,40 @@
  export function useMarketplaceProducts(marketplace: string | null) {
    return useQuery({
      queryKey: ['marketplace-products', marketplace],
-     queryFn: async () => {
-       if (!marketplace) return { data: [], total: 0 };
-       const result = await fetchMarketplaceData(marketplace, 'products', { 
-         limit: 500, // Increased limit for better data completeness
-         fetchAll: true 
-       });
-       return {
-         data: (result.data || []) as MarketplaceProduct[],
-         total: result.total || result.data?.length || 0,
-       };
-     },
-      enabled: !!marketplace,
-      staleTime: 1000 * 60 * 30, // 30 min — prevent refetch on tab switch
-      gcTime: 1000 * 60 * 60 * 24, // 24 hours in cache for offline
-      refetchOnWindowFocus: false,
-      refetchOnMount: false, // Don't refetch when tab switches
-      refetchInterval: 1000 * 60 * 10, // Auto-refresh every 10 min
-      retry: 3,
-      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
-      networkMode: 'offlineFirst', // Show cached data immediately
-       select: (data) => ({
-         data: data.data || [],
-         total: data.data?.length || 0, // Always use actual fetched count
-       }),
+    queryFn: async () => {
+      if (!marketplace) return { data: [], total: 0 };
+      const result = await fetchMarketplaceData(marketplace, 'products', { 
+        limit: 500,
+        fetchAll: true 
+      });
+      // Deduplicate by offerId — server does it too but ensure no client duplicates
+      const raw = (result.data || []) as MarketplaceProduct[];
+      const seen = new Set<string>();
+      const deduped: MarketplaceProduct[] = [];
+      for (const p of raw) {
+        const key = p.offerId || p.shopSku;
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        deduped.push(p);
+      }
+      return {
+        data: deduped,
+        total: deduped.length,
+      };
+    },
+     enabled: !!marketplace,
+     staleTime: 1000 * 60 * 30,
+     gcTime: 1000 * 60 * 60 * 24,
+     refetchOnWindowFocus: false,
+     refetchOnMount: false,
+     refetchInterval: 1000 * 60 * 10,
+     retry: 3,
+     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+     networkMode: 'offlineFirst',
+      select: (data) => ({
+        data: data.data || [],
+        total: data.data?.length || 0,
+      }),
    });
  }
  
