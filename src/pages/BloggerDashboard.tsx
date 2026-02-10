@@ -46,7 +46,7 @@ export default function BloggerDashboard() {
     return (
       <Layout>
         <div className="container py-16 text-center">
-          <AlertTriangle className="h-12 w-12 mx-auto text-amber-500 mb-4" />
+          <AlertTriangle className="h-12 w-12 mx-auto text-warning mb-4" />
           <h1 className="text-2xl font-bold mb-4">Ruxsat yo'q</h1>
           <p className="text-muted-foreground mb-6">
             Sotuvchi sifatida ro'yxatdan o'tgansiz. Blogger kabineti faqat bloggerlar uchun.
