@@ -16,7 +16,7 @@ const navItems = [
   { id: 'more' as const, icon: MoreHorizontal, label: "Ko'proq" },
 ];
 
-const moreTabIds: TabType[] = ['trends', 'abc-analysis', 'min-price', 'card-clone', 'problems'];
+const moreTabIds: TabType[] = ['trends', 'abc-analysis', 'min-price', 'card-clone', 'problems', 'financials', 'calculator'];
 
 export function MobileSellerCloudNav({ activeTab, onTabChange }: MobileSellerCloudNavProps) {
   const isMoreActive = moreTabIds.includes(activeTab);
