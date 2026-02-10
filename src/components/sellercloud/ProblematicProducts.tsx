@@ -66,7 +66,7 @@ export function ProblematicProducts({ connectedMarketplaces, store }: Problemati
         ? orders.length / productsList.length : 0;
 
       productsList.forEach(product => {
-        const stock = (product.stockFBO || 0) + (product.stockFBS || 0) + (product.stockCount || 0);
+        const stock = product.stockCount || ((product.stockFBO || 0) + (product.stockFBS || 0));
         const sold = salesCount.get(product.offerId) || 0;
         const price = product.price || 0;
         const availability = product.availability?.toUpperCase();

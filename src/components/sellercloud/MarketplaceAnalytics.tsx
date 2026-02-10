@@ -27,7 +27,9 @@ export function MarketplaceAnalytics({ connectedMarketplaces, store }: Marketpla
       const orders = store.getOrders(marketplace);
       const productsCount = products.length;
       const ordersCount = orders.length;
-      const totalRevenue = orders.reduce((sum, order) => sum + (order.totalUZS || order.total || 0), 0);
+      // Only count revenue from non-cancelled orders
+      const activeOrders = orders.filter(o => !['CANCELLED', 'RETURNED'].includes(o.status));
+      const totalRevenue = activeOrders.reduce((sum, order) => sum + (order.totalUZS || order.total || 0), 0);
 
       return { marketplace, productsCount, ordersCount, totalRevenue };
     });

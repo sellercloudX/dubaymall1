@@ -32,10 +32,12 @@ export function FinancialDashboard({
 
     const marketplaceBreakdown = connectedMarketplaces.map(marketplace => {
       const orders = store.getOrders(marketplace);
-      const mpRevenue = orders.reduce((sum, order) => sum + (order.totalUZS || order.total || 0), 0);
+      // Only count revenue from non-cancelled orders
+      const activeOrders = orders.filter(o => !['CANCELLED', 'RETURNED'].includes(o.status));
+      const mpRevenue = activeOrders.reduce((sum, order) => sum + (order.totalUZS || order.total || 0), 0);
       return {
-        marketplace, revenue: mpRevenue, orders: orders.length,
-        avgOrder: orders.length > 0 ? Math.round(mpRevenue / orders.length) : 0,
+        marketplace, revenue: mpRevenue, orders: activeOrders.length,
+        avgOrder: activeOrders.length > 0 ? Math.round(mpRevenue / activeOrders.length) : 0,
       };
     });
 
