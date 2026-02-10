@@ -23,17 +23,19 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
-type TabType = 'analytics' | 'scanner' | 'products' | 'orders' | 'trends' | 'abc-analysis' | 'min-price' | 'card-clone' | 'problems';
+type TabType = 'analytics' | 'scanner' | 'products' | 'orders' | 'trends' | 'abc-analysis' | 'min-price' | 'card-clone' | 'problems' | 'financials' | 'calculator';
 
 const moreSubTabs = [
   { id: 'trends' as const, icon: TrendingUp, label: 'Trendlar' },
+  { id: 'financials' as const, icon: DollarSign, label: 'Moliya' },
+  { id: 'calculator' as const, icon: Calculator, label: 'Kalkulyator' },
   { id: 'abc-analysis' as const, icon: BarChart3, label: 'ABC-analiz' },
   { id: 'min-price' as const, icon: Shield, label: 'Min narx' },
   { id: 'card-clone' as const, icon: Copy, label: 'Klonlash' },
   { id: 'problems' as const, icon: AlertOctagon, label: 'Muammolar' },
 ];
 
-const moreTabIds: TabType[] = ['trends', 'abc-analysis', 'min-price', 'card-clone', 'problems'];
+const moreTabIds: TabType[] = ['trends', 'abc-analysis', 'min-price', 'card-clone', 'problems', 'financials', 'calculator'];
 
 export default function SellerCloudMobile() {
   const { user, loading: authLoading } = useAuth();
