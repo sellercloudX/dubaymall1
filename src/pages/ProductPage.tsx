@@ -451,7 +451,7 @@ export default function ProductPage() {
             )}
 
             {/* Installment Calculator */}
-            <Card className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30 border-purple-200 dark:border-purple-800">
+            <Card className="bg-gradient-to-r from-primary/5 to-accent/10 border-primary/20">
               <CardContent className="p-4 space-y-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
