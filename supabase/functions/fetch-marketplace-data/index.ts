@@ -346,7 +346,31 @@ serve(async (req) => {
           
         } while (pageToken && currentPage < 50); // Max 50 pages safety limit
 
-        console.log(`Total mapped ${allProducts.length} products`);
+        console.log(`Total raw products before dedup: ${allProducts.length}`);
+        
+        // SERVER-SIDE DEDUPLICATION by offerId — prevent duplicates from pagination overlap
+        const dedupMap = new Map<string, YandexProduct>();
+        for (const p of allProducts) {
+          const key = p.offerId || p.shopSku;
+          if (!key) continue;
+          if (!dedupMap.has(key)) {
+            dedupMap.set(key, p);
+          } else {
+            // Merge stock counts from duplicate entries
+            const existing = dedupMap.get(key)!;
+            existing.stockFBO = (existing.stockFBO || 0) + (p.stockFBO || 0);
+            existing.stockFBS = (existing.stockFBS || 0) + (p.stockFBS || 0);
+            existing.stockCount = (existing.stockCount || 0) + (p.stockCount || 0);
+            // Keep richer data (longer name, pictures, price)
+            if (!existing.name && p.name) existing.name = p.name;
+            if ((!existing.pictures || existing.pictures.length === 0) && p.pictures && p.pictures.length > 0) {
+              existing.pictures = p.pictures;
+            }
+            if (!existing.price && p.price) existing.price = p.price;
+          }
+        }
+        allProducts = Array.from(dedupMap.values());
+        console.log(`After dedup: ${allProducts.length} unique products`);
         
         // Try to get stocks from dedicated endpoint (with delay to avoid rate limit)
         if (campaignId && allProducts.length > 0) {
@@ -377,7 +401,6 @@ serve(async (req) => {
                   const count = items.reduce((sum: number, s: any) => sum + (s.count || 0), 0);
                   
                   const existing = stockMap.get(offerId) || { fbo: 0, fbs: 0 };
-                  // Yandex warehouses are FBO, seller warehouses are FBS
                   if (wh.warehouseId < 100000) {
                     existing.fbo += count;
                   } else {
@@ -387,7 +410,7 @@ serve(async (req) => {
                 });
               });
               
-              // Update products with accurate stock data
+              // REPLACE (not add) stock data with accurate dedicated endpoint data
               allProducts = allProducts.map(p => {
                 const stocks = stockMap.get(p.offerId);
                 if (stocks) {
@@ -411,7 +434,7 @@ serve(async (req) => {
         result = {
           success: true,
           data: allProducts,
-          total: total || allProducts.length,
+          total: allProducts.length,
           page,
           limit,
         };
