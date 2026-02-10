@@ -207,9 +207,9 @@
                <div className="flex items-center gap-4">
                  {profile.status === 'pending' && (
                    <>
-                     <Clock className="h-8 w-8 text-amber-500" />
-                     <div>
-                       <Badge variant="outline" className="bg-amber-500/10 text-amber-600">
+                      <Clock className="h-8 w-8 text-warning" />
+                      <div>
+                        <Badge variant="outline" className="bg-warning/10 text-warning">
                          Tekshiruvda
                        </Badge>
                        <p className="text-sm text-muted-foreground mt-1">
