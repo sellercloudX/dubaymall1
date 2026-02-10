@@ -8,13 +8,15 @@ import { DeliveryOTPConfirm } from '@/components/delivery/DeliveryOTPConfirm';
 import { Package, Truck, Clock, CheckCircle, ShoppingCart } from 'lucide-react';
 import { format } from 'date-fns';
 
-const statusConfig: Record<string, { color: string; label: string; icon: any }> = {
-  pending: { color: 'bg-yellow-500', label: 'Kutilmoqda', icon: Clock },
-  processing: { color: 'bg-blue-500', label: 'Tayyorlanmoqda', icon: Package },
-  shipped: { color: 'bg-purple-500', label: "Jo'natildi", icon: Truck },
-  out_for_delivery: { color: 'bg-orange-500', label: 'Yetkazilmoqda', icon: Truck },
-  delivered: { color: 'bg-green-500', label: 'Yetkazildi', icon: CheckCircle },
-  cancelled: { color: 'bg-red-500', label: 'Bekor qilindi', icon: ShoppingCart },
+const ORDER_STEPS = ['pending', 'processing', 'shipped', 'out_for_delivery', 'delivered'];
+
+const statusConfig: Record<string, { color: string; label: string; icon: any; step: number }> = {
+  pending: { color: 'bg-warning text-warning-foreground', label: 'Kutilmoqda', icon: Clock, step: 0 },
+  processing: { color: 'bg-primary text-primary-foreground', label: 'Tayyorlanmoqda', icon: Package, step: 1 },
+  shipped: { color: 'bg-accent text-accent-foreground', label: "Jo'natildi", icon: Truck, step: 2 },
+  out_for_delivery: { color: 'bg-secondary text-secondary-foreground', label: 'Yetkazilmoqda', icon: Truck, step: 3 },
+  delivered: { color: 'bg-primary text-primary-foreground', label: 'Yetkazildi', icon: CheckCircle, step: 4 },
+  cancelled: { color: 'bg-destructive text-destructive-foreground', label: 'Bekor qilindi', icon: ShoppingCart, step: -1 },
 };
 
 export function MyOrders() {
@@ -82,17 +84,17 @@ export function MyOrders() {
       {pendingDeliveryOrders.length > 0 && (
         <div className="space-y-4">
           <h3 className="text-lg font-semibold flex items-center gap-2">
-            <Truck className="h-5 w-5 text-orange-500" />
+            <Truck className="h-5 w-5 text-warning" />
             Yetkazib berishni tasdiqlang
           </h3>
           {pendingDeliveryOrders.map(order => (
-            <Card key={order.id} className="border-orange-200 bg-orange-50/50">
+            <Card key={order.id} className="border-warning/30 bg-warning/5">
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base">
                     Buyurtma #{order.order_number}
                   </CardTitle>
-                  <Badge className="bg-orange-500">Yetkazilmoqda</Badge>
+                  <Badge className="bg-warning text-warning-foreground">Yetkazilmoqda</Badge>
                 </div>
               </CardHeader>
               <CardContent>
@@ -114,6 +116,9 @@ export function MyOrders() {
           const StatusIcon = statusConfig[order.status]?.icon || Clock;
           const isDelivered = !!order.delivery_confirmed_at;
 
+          const currentStep = statusConfig[order.status]?.step ?? 0;
+          const isCancelled = order.status === 'cancelled';
+
           return (
             <Card key={order.id}>
               <CardHeader className="pb-2">
@@ -132,14 +137,34 @@ export function MyOrders() {
                       {statusConfig[order.status]?.label}
                     </Badge>
                     {isDelivered && (
-                      <p className="text-xs text-green-600 mt-1">
+                      <p className="text-xs text-primary mt-1">
                         ✓ OTP bilan tasdiqlangan
                       </p>
                     )}
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-4">
+                {/* Progress tracker */}
+                {!isCancelled && (
+                  <div className="flex items-center gap-1 py-2">
+                    {ORDER_STEPS.map((step, i) => {
+                      const done = i <= currentStep;
+                      const StepIcon = statusConfig[step]?.icon || Clock;
+                      return (
+                        <div key={step} className="flex items-center flex-1">
+                          <div className={`flex items-center justify-center h-6 w-6 rounded-full shrink-0 ${done ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                            <StepIcon className="h-3 w-3" />
+                          </div>
+                          {i < ORDER_STEPS.length - 1 && (
+                            <div className={`h-0.5 flex-1 mx-1 rounded ${i < currentStep ? 'bg-primary' : 'bg-muted'}`} />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
                 {order.order_items?.map((item: any) => (
                   <div key={item.id} className="flex justify-between text-sm">
                     <span>{item.product_name} × {item.quantity}</span>
@@ -151,6 +176,14 @@ export function MyOrders() {
                   <span>Jami</span>
                   <span className="text-primary">{formatPrice(order.total_amount)}</span>
                 </div>
+
+                {/* Payment info */}
+                {order.payment_method && (
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>To'lov: {order.payment_method === 'cash' ? 'Naqd' : order.payment_method.toUpperCase()}</span>
+                    <span>{order.payment_status === 'paid' ? '✓ To\'langan' : order.payment_status === 'cash_on_delivery' ? 'Yetkazganda' : 'Kutilmoqda'}</span>
+                  </div>
+                )}
               </CardContent>
             </Card>
           );

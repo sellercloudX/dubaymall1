@@ -2456,6 +2456,44 @@ export type Database = {
       }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       process_pending_payouts: { Args: never; Returns: number }
+      search_products_fuzzy: {
+        Args: {
+          category_filter?: string
+          page_limit?: number
+          page_offset?: number
+          search_term: string
+          sort_type?: string
+        }
+        Returns: {
+          affiliate_commission_percent: number
+          category_id: string
+          created_at: string
+          description: string
+          free_shipping: boolean
+          id: string
+          images: string[]
+          is_affiliate_enabled: boolean
+          mxik_code: string
+          mxik_name: string
+          name: string
+          original_price: number
+          preparation_days: number
+          price: number
+          shipping_price: number
+          shop_id: string
+          shop_name: string
+          shop_slug: string
+          similarity_score: number
+          source: string
+          source_url: string
+          specifications: Json
+          status: string
+          stock_quantity: number
+          updated_at: string
+          view_count: number
+          weight_kg: number
+        }[]
+      }
       seller_has_order_products: {
         Args: { _order_id: string; _user_id: string }
         Returns: boolean
