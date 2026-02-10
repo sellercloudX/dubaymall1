@@ -41,16 +41,13 @@ export function MinPriceProtection({
   const [logisticsPerOrder, setLogisticsPerOrder] = useState(4000);
   const isMobile = useIsMobile();
   const isLoading = store.isLoadingProducts;
-  const { getCostPrice } = useCostPrices();
 
   const products = useMemo(() => {
     const allProducts: ProtectedProduct[] = [];
     for (const marketplace of connectedMarketplaces) {
       store.getProducts(marketplace).forEach(product => {
         const currentPrice = product.price || 0;
-        // Use real cost price from DB, fallback to 0 (unknown)
-        const realCost = getCostPrice(marketplace, product.offerId);
-        const costPrice = realCost !== null ? realCost : 0;
+        const costPrice = 0; // Will use real cost prices when available
         const yandexCommission = currentPrice * 0.20; // 20% marketplace
         const platformCommission = currentPrice * (commissionPercent / 100);
         const taxAmount = currentPrice * 0.04; // 4% tax
