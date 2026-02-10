@@ -241,7 +241,7 @@ export default function ProductPage() {
     sku: product.id,
     brand: {
       '@type': 'Brand',
-      name: product.shop?.name || 'BazarHub',
+      name: product.shop?.name || 'Dubay Mall',
     },
     offers: {
       '@type': 'Offer',
@@ -257,7 +257,7 @@ export default function ProductPage() {
   return (
     <Layout>
       <SEOHead
-        title={`${formatProductName(product.name)} - BazarHub`}
+        title={`${formatProductName(product.name)} - Dubay Mall`}
         description={product.description?.slice(0, 155) || `${formatProductName(product.name)} - eng yaxshi narxlarda`}
         image={images[0]}
         url={window.location.href}
@@ -421,7 +421,7 @@ export default function ProductPage() {
                           {[1,2,3,4,5].map(i => (
                             <Star 
                               key={i} 
-                              className={`h-4 w-4 ${i <= Math.round(ratingData?.average_rating || 0) ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} 
+                              className={`h-4 w-4 ${i <= Math.round(ratingData?.average_rating || 0) ? 'fill-warning text-warning' : 'text-muted-foreground'}`} 
                             />
                           ))}
                         </div>
@@ -441,7 +441,7 @@ export default function ProductPage() {
                   
                   {/* Weekly buyers indicator */}
                   {weeklyBuyers > 0 && (
-                    <div className="flex items-center gap-2 mt-3 text-sm text-green-600 dark:text-green-400">
+                    <div className="flex items-center gap-2 mt-3 text-sm text-primary">
                       <TrendingUp className="h-4 w-4" />
                       <span>Bu haftada {weeklyBuyers} kishi sotib oldi</span>
                     </div>
@@ -451,11 +451,11 @@ export default function ProductPage() {
             )}
 
             {/* Installment Calculator */}
-            <Card className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30 border-purple-200 dark:border-purple-800">
+            <Card className="bg-gradient-to-r from-primary/5 to-accent/10 border-primary/20">
               <CardContent className="p-4 space-y-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                    <span className="text-white text-lg">💳</span>
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+                    <span className="text-primary-foreground text-lg">💳</span>
                   </div>
                   <div className="flex-1">
                     <p className="font-medium text-sm">Muddatli to'lovga xaridlarga</p>
@@ -482,7 +482,7 @@ export default function ProductPage() {
                 
                 {/* Monthly payment display */}
                 <div className="flex items-center justify-between">
-                  <div className="bg-yellow-300 text-yellow-900 px-3 py-1.5 rounded font-bold whitespace-nowrap">
+                  <div className="bg-accent text-accent-foreground px-3 py-1.5 rounded font-bold whitespace-nowrap">
                     {new Intl.NumberFormat('uz-UZ').format(calculateInstallment(product.price, selectedInstallment))} so'm
                   </div>
                   <span className="text-sm text-muted-foreground">× {selectedInstallment} oy</span>
@@ -579,7 +579,7 @@ export default function ProductPage() {
                           {[1,2,3,4,5].map(i => (
                             <Star 
                               key={i} 
-                              className={`h-3 w-3 ${i <= review.rating ? 'fill-yellow-400 text-yellow-400' : 'text-muted'}`} 
+                              className={`h-3 w-3 ${i <= review.rating ? 'fill-warning text-warning' : 'text-muted'}`} 
                             />
                           ))}
                         </div>
@@ -615,7 +615,7 @@ export default function ProductPage() {
                   <div className="flex-1">
                     <p className="font-semibold">{product.shop.name}</p>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                      <Star className="h-4 w-4 fill-warning text-warning" />
                       <span>4.8</span>
                       <span>·</span>
                       <span>1000+ ta baho</span>
