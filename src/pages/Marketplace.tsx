@@ -6,6 +6,7 @@ import { useCategories } from '@/hooks/useCategories';
 import { supabase } from '@/integrations/supabase/client';
 import { ProductCard } from '@/components/marketplace/ProductCard';
 import { SearchAutocomplete } from '@/components/marketplace/SearchAutocomplete';
+import { SEOHead } from '@/components/SEOHead';
 import { ProductRecommendations } from '@/components/marketplace/ProductRecommendations';
 import { HeroBanner } from '@/components/marketplace/HeroBanner';
 import { FlashSaleBanner } from '@/components/marketplace/FlashSaleBanner';
