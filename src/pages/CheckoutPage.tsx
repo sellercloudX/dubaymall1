@@ -282,7 +282,7 @@ export default function CheckoutPage() {
           <ShoppingCart className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
           <h2 className="text-2xl font-bold mb-4">{t.cartEmpty || 'Savatcha bo\'sh'}</h2>
           <Button asChild>
-            <Link to="/marketplace">{t.marketplace}</Link>
+            <Link to="/">{t.marketplace}</Link>
           </Button>
         </div>
       </Layout>
