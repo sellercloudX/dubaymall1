@@ -144,7 +144,7 @@ export default function BloggerDashboard() {
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 Jami bosishlar
               </CardTitle>
-              <MousePointer className="h-4 w-4 text-blue-600" />
+              <MousePointer className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-foreground">
