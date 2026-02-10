@@ -220,10 +220,10 @@
                  )}
                  {profile.status === 'rejected' && (
                    <>
-                     <XCircle className="h-8 w-8 text-red-500" />
-                     <div>
-                       <Badge variant="destructive">Rad etildi</Badge>
-                       <p className="text-sm text-red-600 mt-1">
+                      <XCircle className="h-8 w-8 text-destructive" />
+                      <div>
+                        <Badge variant="destructive">Rad etildi</Badge>
+                        <p className="text-sm text-destructive mt-1">
                          {profile.rejection_reason || 'Ma\'lumotlarni to\'g\'irlab qaytadan yuboring'}
                        </p>
                      </div>
