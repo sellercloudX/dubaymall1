@@ -160,9 +160,11 @@ serve(async (req) => {
       }
 
       if (dataType === "products") {
-        let allProducts: YandexProduct[] = [];
+        // Use a Map for dedup during fetching — prevents accumulating duplicates
+        const productMap = new Map<string, YandexProduct>();
         let total = 0;
         let pageToken: string | undefined;
+        let prevPageToken: string | undefined;
         let currentPage = 0;
         const pageLimit = fetchAll ? 200 : limit;
 
@@ -211,23 +213,32 @@ serve(async (req) => {
           }
 
           const data = await response.json();
-          console.log("Products API response sample:", JSON.stringify(data).substring(0, 1500));
           
           // Get next page token
-          pageToken = data.result?.paging?.nextPageToken;
+          const newPageToken = data.result?.paging?.nextPageToken;
           total = data.result?.paging?.total || total;
           
-          let pageProducts: YandexProduct[] = [];
+          // CRITICAL: Detect pagination loop — same token means API is repeating
+          if (newPageToken && newPageToken === prevPageToken) {
+            console.log(`Pagination loop detected at page ${currentPage}, same token returned. Stopping.`);
+            break;
+          }
+          prevPageToken = pageToken;
+          pageToken = newPageToken;
+          
+          let newProductsOnPage = 0;
           
           if (useOffersEndpoint) {
             const offers = data.result?.offers || data.offers || [];
             console.log(`Found ${offers.length} offers on page ${currentPage}`);
             
-            pageProducts = offers.map((offer: any) => {
-              // Yandex Market UZ returns prices in UZS directly
-              const price = offer.basicPrice?.value || offer.price?.value || offer.price || 0;
+            if (offers.length === 0) break; // No more data
+            
+            offers.forEach((offer: any) => {
+              const offerId = offer.offerId || '';
+              if (!offerId || productMap.has(offerId)) return;
               
-              // Get stock from all warehouses (FBO + FBS)
+              const price = offer.basicPrice?.value || offer.price?.value || offer.price || 0;
               let stockFBO = 0;
               let stockFBS = 0;
               
@@ -235,8 +246,6 @@ serve(async (req) => {
                 offer.warehouses.forEach((wh: any) => {
                   const stocks = wh.stocks || [];
                   const warehouseStock = stocks.reduce((s: number, st: any) => s + (st.count || 0), 0);
-                  
-                  // Check warehouse type - FBO (Yandex) vs FBS (Seller)
                   if (wh.warehouseId && wh.warehouseId < 100000) {
                     stockFBO += warehouseStock;
                   } else {
@@ -247,62 +256,54 @@ serve(async (req) => {
                 stockFBS = offer.stocks.reduce((sum: number, s: any) => sum + (s.count || 0), 0);
               }
               
-              const pictures = offer.pictures || offer.urls || [];
-              
-              return {
-                offerId: offer.offerId || '',
+              newProductsOnPage++;
+              productMap.set(offerId, {
+                offerId,
                 name: offer.name || offer.marketModelName || '',
-                price: price,
-                shopSku: offer.shopSku || offer.offerId || '',
+                price,
+                shopSku: offer.shopSku || offerId,
                 category: offer.category?.name || offer.marketCategoryName || '',
-                pictures: pictures,
+                pictures: offer.pictures || offer.urls || [],
                 availability: offer.cardStatus || offer.status || 'UNKNOWN',
                 stockFBO,
                 stockFBS,
                 stockCount: stockFBO + stockFBS,
-              };
+              });
             });
           } else {
             const offerMappings = data.result?.offerMappings || [];
             console.log(`Found ${offerMappings.length} offer mappings on page ${currentPage}`);
             
-            pageProducts = offerMappings.map((entry: any) => {
+            if (offerMappings.length === 0) break; // No more data
+            
+            offerMappings.forEach((entry: any) => {
               const offer = entry.offer || {};
               const mapping = entry.mapping || {};
               const awaitingMapping = entry.awaitingModerationMapping || {};
               
-              const pictures = offer.pictures || offer.urls || mapping.pictures || [];
-              // Yandex Market UZ returns prices in UZS directly
+              const offerId = offer.offerId || offer.shopSku || '';
+              if (!offerId || productMap.has(offerId)) return;
+              
               const price = offer.basicPrice?.value || 
                            offer.price?.value || 
                            offer.price ||
                            mapping.price?.value || 0;
               
-              // Get stock from all sources
               let stockFBO = 0;
               let stockFBS = 0;
               
-              // Check offer stocks
               if (offer.stocks && Array.isArray(offer.stocks)) {
                 offer.stocks.forEach((s: any) => {
                   const count = s.count || s.available || 0;
-                  if (s.type === 'FBO' || s.warehouseType === 'FBO') {
-                    stockFBO += count;
-                  } else {
-                    stockFBS += count;
-                  }
+                  if (s.type === 'FBO' || s.warehouseType === 'FBO') stockFBO += count;
+                  else stockFBS += count;
                 });
               }
-              
-              // Check mapping stocks
               if (mapping.stocks && Array.isArray(mapping.stocks)) {
                 mapping.stocks.forEach((s: any) => {
                   const count = s.count || s.available || 0;
-                  if (s.type === 'FBO' || s.warehouseType === 'FBO') {
-                    stockFBO += count;
-                  } else {
-                    stockFBS += count;
-                  }
+                  if (s.type === 'FBO' || s.warehouseType === 'FBO') stockFBO += count;
+                  else stockFBS += count;
                 });
               }
               
@@ -318,22 +319,30 @@ serve(async (req) => {
                               offer.category || 
                               '';
               
-              return {
-                offerId: offer.offerId || offer.shopSku || '',
+              newProductsOnPage++;
+              productMap.set(offerId, {
+                offerId,
                 name: offer.name || mapping.marketSkuName || mapping.marketModelName || '',
-                price: price,
-                shopSku: offer.shopSku || offer.offerId || '',
-                category: category,
-                pictures: pictures,
+                price,
+                shopSku: offer.shopSku || offerId,
+                category,
+                pictures: offer.pictures || offer.urls || mapping.pictures || [],
                 availability: statusValue,
                 stockFBO,
                 stockFBS,
                 stockCount: stockFBO + stockFBS,
-              };
+              });
             });
           }
 
-          allProducts = [...allProducts, ...pageProducts];
+          console.log(`Page ${currentPage}: ${newProductsOnPage} new unique products (total unique: ${productMap.size})`);
+          
+          // If no new unique products found on this page, stop — we've seen them all
+          if (newProductsOnPage === 0) {
+            console.log(`No new products on page ${currentPage}, stopping pagination.`);
+            break;
+          }
+          
           currentPage++;
           
           // If not fetching all, break after first page
@@ -345,6 +354,8 @@ serve(async (req) => {
           }
           
         } while (pageToken && currentPage < 50); // Max 50 pages safety limit
+        
+        let allProducts = Array.from(productMap.values());
 
         console.log(`Total raw products before dedup: ${allProducts.length}`);
         
