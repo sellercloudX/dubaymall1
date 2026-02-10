@@ -241,7 +241,7 @@ export default function ProductPage() {
     sku: product.id,
     brand: {
       '@type': 'Brand',
-      name: product.shop?.name || 'BazarHub',
+      name: product.shop?.name || 'Dubay Mall',
     },
     offers: {
       '@type': 'Offer',
