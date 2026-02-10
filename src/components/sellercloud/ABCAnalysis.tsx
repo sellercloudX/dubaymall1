@@ -53,6 +53,7 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
       const productsList = store.getProducts(marketplace);
       const orders = store.getOrders(marketplace);
 
+      // Build sales map ONLY from real order items — no mock/estimated data
       const salesMap = new Map<string, { qty: number; revenue: number }>();
       orders.forEach(order => {
         (order.items || []).forEach(item => {
@@ -60,20 +61,12 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
           if (!key) return;
           const existing = salesMap.get(key) || { qty: 0, revenue: 0 };
           existing.qty += item.count || 1;
-          existing.revenue += item.priceUZS || item.price || 0;
+          // Use item price × count for accurate revenue per item
+          existing.revenue += (item.priceUZS || item.price || 0) * (item.count || 1);
           salesMap.set(key, existing);
         });
       });
-
-      if (salesMap.size === 0 && orders.length > 0) {
-        const totalOrderRevenue = orders.reduce((s, o) => s + (o.totalUZS || o.total || 0), 0);
-        productsList.forEach(p => {
-          salesMap.set(p.offerId, {
-            qty: Math.max(1, Math.floor(orders.length / Math.max(1, productsList.length))),
-            revenue: Math.round(totalOrderRevenue / Math.max(1, productsList.length)),
-          });
-        });
-      }
+      // NO fallback mock data — only real sales from order items are used
 
       productsList.forEach(product => {
         const sales = salesMap.get(product.offerId) || { qty: 0, revenue: 0 };
