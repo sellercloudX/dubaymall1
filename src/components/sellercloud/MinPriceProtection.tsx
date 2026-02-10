@@ -170,7 +170,7 @@ export function MinPriceProtection({
                     <div><span className="text-muted-foreground">Joriy:</span><div className="font-medium whitespace-nowrap">{formatPrice(product.currentPrice)}</div></div>
                     <div><span className="text-muted-foreground">Min:</span><div className="font-medium whitespace-nowrap">{formatPrice(product.minPrice)}</div></div>
                     <div><span className="text-muted-foreground">Farq:</span>
-                      <div className={`font-bold whitespace-nowrap ${product.priceGap >= 0 ? 'text-green-600' : 'text-red-600'}`}>{product.priceGap >= 0 ? '+' : ''}{formatPrice(product.priceGap)}</div>
+                      <div className={`font-bold whitespace-nowrap ${product.priceGap >= 0 ? 'text-success' : 'text-destructive'}`}>{product.priceGap >= 0 ? '+' : ''}{formatPrice(product.priceGap)}</div>
                     </div>
                   </div>
                 </div>
