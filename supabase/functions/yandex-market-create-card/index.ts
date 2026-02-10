@@ -278,15 +278,23 @@ serve(async (req) => {
 
     console.log("🚀 Creating Yandex Market card for:", product.name);
 
+    // Supabase client for DB operations
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
     // Mahsulot kategoriyasini aniqlash
     const productCategory = detectProductCategory(product.name, product.description);
     const yandexCategory = YANDEX_CATEGORY_IDS[productCategory] || YANDEX_CATEGORY_IDS["default"];
-    const mxikData = MXIK_DATABASE[productCategory] || MXIK_DATABASE["default"];
+    
+    // MXIK: use passed data or lookup from DB
+    const mxikData = (product.mxikCode && product.mxikName)
+      ? { code: product.mxikCode, name_uz: product.mxikName, name_ru: '' }
+      : await lookupMxikFromDB(supabase, product.name, product.category);
+    
     const packageDimensions = estimatePackageDimensions(productCategory);
     const shortSKU = generateShortSKU(product.name, product.color, product.model);
     const barcode = product.barcode || generateEAN13();
 
-    console.log("📦 Category:", productCategory, "Yandex ID:", yandexCategory.id, "SKU:", shortSKU);
+    console.log("📦 Category:", productCategory, "MXIK:", mxikData.code, "SKU:", shortSKU);
 
     // AI orqali 100 ballik kartochka uchun to'liq optimizatsiya
     const optimizationPrompt = `Sen Yandex Market uchun professional e-commerce mutaxassisisan. 
