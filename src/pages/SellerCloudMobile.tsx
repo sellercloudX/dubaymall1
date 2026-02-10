@@ -100,11 +100,11 @@ export default function SellerCloudMobile() {
   const renderContent = () => {
     switch (activeTab) {
       case 'analytics':
-        return <MobileAnalytics connections={connections} connectedMarketplaces={connectedMarketplaces} />;
+        return <MobileAnalytics connections={connections} connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'scanner':
         return <div className="p-4"><AIScannerPro shopId="sellercloud" /></div>;
       case 'products':
-        return <MobileProducts connectedMarketplaces={connectedMarketplaces} />;
+        return <MobileProducts connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'orders':
         return <MobileOrders connectedMarketplaces={connectedMarketplaces} />;
       case 'trends':
