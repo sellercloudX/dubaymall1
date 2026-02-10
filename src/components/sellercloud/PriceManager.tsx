@@ -44,7 +44,7 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
       });
     }
     return allProducts;
-  }, [connectedMarketplaces, store.allProducts.length]);
+  }, [connectedMarketplaces, store.dataVersion]);
 
   const formatPrice = (price?: number) => {
     if (!price && price !== 0) return '—';
