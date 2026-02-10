@@ -49,17 +49,21 @@ export function MinPriceProtection({
     for (const marketplace of connectedMarketplaces) {
       store.getProducts(marketplace).forEach(product => {
         const currentPrice = product.price || 0;
-        const costPrice = currentPrice * (costPercent / 100);
-        const commissionAmount = currentPrice * (commissionPercent / 100);
-        const logisticsCost = currentPrice * (logisticsPercent / 100);
-        const totalCosts = costPrice + commissionAmount + logisticsCost;
+        // Use real cost price from DB, fallback to 0 (unknown)
+        const realCost = getCostPrice(marketplace, product.offerId);
+        const costPrice = realCost !== null ? realCost : 0;
+        const yandexCommission = currentPrice * 0.20; // 20% marketplace
+        const platformCommission = currentPrice * (commissionPercent / 100);
+        const taxAmount = currentPrice * 0.04; // 4% tax
+        const totalCosts = costPrice + yandexCommission + platformCommission + taxAmount + logisticsPerOrder;
         const minPrice = Math.ceil(totalCosts / (1 - defaultMargin / 100));
         const isBelowMin = currentPrice < minPrice && currentPrice > 0;
 
         allProducts.push({
           id: product.offerId, name: product.name || 'Nomsiz',
           sku: product.shopSku || product.offerId, marketplace, currentPrice,
-          costPrice, commissionAmount, logisticsCost, minPrice,
+          costPrice, commissionAmount: yandexCommission + platformCommission + taxAmount,
+          logisticsCost: logisticsPerOrder, minPrice,
           customMinPrice: null, isProtected: globalProtection, isBelowMin,
           priceGap: currentPrice - minPrice,
         });
@@ -71,7 +75,7 @@ export function MinPriceProtection({
       return a.priceGap - b.priceGap;
     });
     return allProducts;
-  }, [connectedMarketplaces, store.dataVersion, costPercent, commissionPercent, logisticsPercent, defaultMargin, globalProtection]);
+  }, [connectedMarketplaces, store.dataVersion, commissionPercent, logisticsPerOrder, defaultMargin, globalProtection, getCostPrice]);
 
   const formatPrice = (price: number) => {
     if (Math.abs(price) >= 1000000) return (price / 1000000).toFixed(1) + ' mln';
