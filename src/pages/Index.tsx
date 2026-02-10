@@ -344,7 +344,7 @@ export default function Index() {
               className="text-lg px-8 py-6 bg-transparent border-2 border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10" 
               asChild
             >
-              <Link to="/marketplace">
+              <Link to="/">
                 Marketplace'ni ko'rish
               </Link>
             </Button>

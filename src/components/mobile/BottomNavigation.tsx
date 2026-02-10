@@ -20,10 +20,10 @@ export function BottomNavigation() {
   const { user } = useAuth();
 
   const navItems: NavItem[] = [
-    { icon: Home, label: 'Bosh sahifa', path: '/' },
-    { icon: Search, label: 'Qidirish', path: '/marketplace' },
-    { icon: ShoppingCart, label: 'Savat', path: '/cart', badge: totalItems },
+    { icon: Home, label: 'Marketplace', path: '/' },
     { icon: Heart, label: 'Sevimli', path: '/favorites', requiresAuth: true },
+    { icon: ShoppingCart, label: 'Savat', path: '/cart', badge: totalItems },
+    { icon: Search, label: 'Hamkorlik', path: '/partnership' },
     { icon: User, label: 'Profil', path: user ? '/dashboard' : '/auth' },
   ];
 
