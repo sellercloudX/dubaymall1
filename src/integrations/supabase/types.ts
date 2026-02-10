@@ -2454,6 +2454,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_view_count: { Args: { product_id: string }; Returns: undefined }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       process_pending_payouts: { Args: never; Returns: number }
       search_products_fuzzy: {
