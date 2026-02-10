@@ -151,7 +151,7 @@ export function MinPriceProtection({
           {isMobile ? (
             <div className="space-y-2 px-3 pb-3 max-h-[500px] overflow-y-auto">
               {products.slice(0, 50).map(product => (
-                <div key={`${product.id}-${product.marketplace}`} className={`p-3 rounded-lg border space-y-1.5 ${product.isBelowMin ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800' : ''}`}>
+                <div key={`${product.id}-${product.marketplace}`} className={`p-3 rounded-lg border space-y-1.5 ${product.isBelowMin ? 'bg-destructive/5 border-destructive/20' : ''}`}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium line-clamp-1">{product.name}</div>
