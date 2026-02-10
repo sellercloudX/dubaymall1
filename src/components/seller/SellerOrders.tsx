@@ -217,7 +217,7 @@ export function SellerOrders() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-blue-600">{orderStats.processing}</p>
+             <p className="text-2xl font-bold text-primary">{orderStats.processing}</p>
           </CardContent>
         </Card>
         <Card>
