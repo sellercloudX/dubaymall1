@@ -52,7 +52,7 @@ export function FinancialDashboard({
     const netProfit = totalRevenue - totalExpenses;
     const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
 
-    return { totalRevenue, totalOrders, platformFee, commissionFee, totalExpenses, netProfit, profitMargin, marketplaceBreakdown };
+    return { totalRevenue, totalOrders, platformFee, platformCommission, yandexCommission, yandexTax, estimatedLogistics, totalExpenses, netProfit, profitMargin, marketplaceBreakdown };
   }, [connectedMarketplaces, store.dataVersion, isLoading, monthlyFee, commissionPercent]);
 
   const formatPrice = (price: number) => {
