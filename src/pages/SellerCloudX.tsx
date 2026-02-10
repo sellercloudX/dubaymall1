@@ -234,7 +234,7 @@ export default function SellerCloudX() {
             <TabsContent value="card-clone"><CardCloner connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
             <TabsContent value="problems"><ProblematicProducts connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
             <TabsContent value="subscription"><SubscriptionBilling totalSalesVolume={totalRevenue} /></TabsContent>
-            <TabsContent value="reports"><ReportsExport connectedMarketplaces={connectedMarketplaces} /></TabsContent>
+            <TabsContent value="reports"><ReportsExport connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
             <TabsContent value="notifications"><NotificationCenter /></TabsContent>
           </Tabs>
         )}
