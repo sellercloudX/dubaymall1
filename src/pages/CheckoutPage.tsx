@@ -518,7 +518,7 @@ export default function CheckoutPage() {
                         {shippingTotal > 0 ? (
                           <span>{formatPrice(shippingTotal)}</span>
                         ) : (
-                          <span className="text-green-600">{t.free || 'Bepul'}</span>
+                          <span className="text-primary">{t.free || 'Bepul'}</span>
                         )}
                       </div>
                     );
