@@ -136,7 +136,7 @@ export default function SellerDashboard() {
     return (
       <Layout>
         <div className="container py-16 text-center">
-          <Store className="h-12 w-12 mx-auto text-amber-500 mb-4" />
+          <Store className="h-12 w-12 mx-auto text-warning mb-4" />
           <h1 className="text-2xl font-bold mb-4">Aktivatsiya tasdiqlanmagan</h1>
           <p className="text-muted-foreground mb-6">
             Sizning sotuvchi profilingiz hali admin tomonidan tasdiqlanmagan. Iltimos kuting yoki aktivatsiya sahifasini tekshiring.
@@ -192,10 +192,10 @@ export default function SellerDashboard() {
         </div>
 
         {/* SellerCloudX Promo */}
-        <Card className="mb-6 border-amber-500/30 bg-gradient-to-r from-amber-500/5 to-orange-500/5">
+        <Card className="mb-6 border-warning/30 bg-gradient-to-r from-warning/5 to-destructive/5">
           <CardContent className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-warning to-destructive flex items-center justify-center">
                 <Globe className="h-5 w-5 text-white" />
               </div>
               <div>
@@ -208,7 +208,7 @@ export default function SellerDashboard() {
                 </p>
               </div>
             </div>
-            <Button asChild className="bg-gradient-to-r from-amber-500 to-orange-500 hover:opacity-90">
+            <Button asChild className="bg-gradient-to-r from-warning to-destructive hover:opacity-90">
               <Link to="/seller-cloud">
                 <Crown className="mr-2 h-4 w-4" />
                 O'tish

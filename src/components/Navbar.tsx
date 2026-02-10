@@ -41,7 +41,7 @@ export function Navbar() {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-6">
-            <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors">
+            <Link to="/marketplace" className="text-muted-foreground hover:text-foreground transition-colors">
                {t.marketplace}
             </Link>
             
@@ -61,10 +61,16 @@ export function Navbar() {
             {!rolesLoading && (
               <>
                 {showSellerLink && (
-                  <Link to="/seller" className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5">
-                    <Store className="h-4 w-4" />
-                    {t.myShop}
-                  </Link>
+                  <>
+                    <Link to="/seller" className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5">
+                      <Store className="h-4 w-4" />
+                      {t.myShop}
+                    </Link>
+                    <Link to="/seller-cloud" className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5">
+                      <Crown className="h-4 w-4" />
+                      SellerCloudX
+                    </Link>
+                  </>
                 )}
                 {showBloggerLink && (
                   <Link to="/blogger" className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5">
@@ -207,14 +213,24 @@ export function Navbar() {
               {user && !rolesLoading && (
                 <>
                   {showSellerLink && (
-                    <Link
-                      to="/seller"
-                      className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2 py-2"
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      <Store className="h-4 w-4" />
-                      {t.myShop}
-                    </Link>
+                    <>
+                      <Link
+                        to="/seller"
+                        className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2 py-2"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        <Store className="h-4 w-4" />
+                        {t.myShop}
+                      </Link>
+                      <Link
+                        to="/seller-cloud"
+                        className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2 py-2"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        <Crown className="h-4 w-4" />
+                        SellerCloudX
+                      </Link>
+                    </>
                   )}
                   {showBloggerLink && (
                     <Link

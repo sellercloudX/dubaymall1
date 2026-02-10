@@ -14,6 +14,7 @@ import {
   Percent, RefreshCw, TrendingDown, Settings
 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useCostPrices } from '@/hooks/useCostPrices';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 
 interface MinPriceProtectionProps {
@@ -41,13 +42,15 @@ export function MinPriceProtection({
   const [logisticsPerOrder, setLogisticsPerOrder] = useState(4000);
   const isMobile = useIsMobile();
   const isLoading = store.isLoadingProducts;
+  const { getCostPrice } = useCostPrices();
 
   const products = useMemo(() => {
     const allProducts: ProtectedProduct[] = [];
     for (const marketplace of connectedMarketplaces) {
       store.getProducts(marketplace).forEach(product => {
         const currentPrice = product.price || 0;
-        const costPrice = 0; // Will use real cost prices when available
+        const realCost = getCostPrice(marketplace, product.offerId);
+        const costPrice = realCost !== null ? realCost : 0;
         const yandexCommission = currentPrice * 0.20; // 20% marketplace
         const platformCommission = currentPrice * (commissionPercent / 100);
         const taxAmount = currentPrice * 0.04; // 4% tax
@@ -71,7 +74,7 @@ export function MinPriceProtection({
       return a.priceGap - b.priceGap;
     });
     return allProducts;
-  }, [connectedMarketplaces, store.dataVersion, commissionPercent, logisticsPerOrder, defaultMargin, globalProtection]);
+  }, [connectedMarketplaces, store.dataVersion, commissionPercent, logisticsPerOrder, defaultMargin, globalProtection, getCostPrice]);
 
   const formatPrice = (price: number) => {
     if (Math.abs(price) >= 1000000) return (price / 1000000).toFixed(1) + ' mln';
@@ -98,15 +101,15 @@ export function MinPriceProtection({
           <div className="flex items-center gap-1.5 text-muted-foreground mb-1"><Shield className="h-3.5 w-3.5 shrink-0" /><span className="text-xs truncate">Jami</span></div>
           <div className="text-xl font-bold">{products.length}</div><div className="text-[10px] text-muted-foreground">mahsulot</div>
         </CardContent></Card>
-        <Card className={`overflow-hidden ${belowMinCount > 0 ? 'border-red-500/30' : ''}`}>
+        <Card className={`overflow-hidden ${belowMinCount > 0 ? 'border-destructive/30' : ''}`}>
           <CardContent className="p-3">
-            <div className="flex items-center gap-1.5 text-red-600 mb-1"><ShieldAlert className="h-3.5 w-3.5 shrink-0" /><span className="text-xs truncate">Min dan past</span></div>
-            <div className="text-xl font-bold text-red-600">{belowMinCount}</div><div className="text-[10px] text-muted-foreground">xavfli</div>
+            <div className="flex items-center gap-1.5 text-destructive mb-1"><ShieldAlert className="h-3.5 w-3.5 shrink-0" /><span className="text-xs truncate">Min dan past</span></div>
+            <div className="text-xl font-bold text-destructive">{belowMinCount}</div><div className="text-[10px] text-muted-foreground">xavfli</div>
           </CardContent>
         </Card>
         <Card className="overflow-hidden"><CardContent className="p-3">
-          <div className="flex items-center gap-1.5 text-green-600 mb-1"><ShieldCheck className="h-3.5 w-3.5 shrink-0" /><span className="text-xs truncate">Himoyalangan</span></div>
-          <div className="text-xl font-bold text-green-600">{protectedCount}</div><div className="text-[10px] text-muted-foreground">mahsulot</div>
+          <div className="flex items-center gap-1.5 text-success mb-1"><ShieldCheck className="h-3.5 w-3.5 shrink-0" /><span className="text-xs truncate">Himoyalangan</span></div>
+          <div className="text-xl font-bold text-success">{protectedCount}</div><div className="text-[10px] text-muted-foreground">mahsulot</div>
         </CardContent></Card>
         <Card className="overflow-hidden"><CardContent className="p-3">
           <div className="flex items-center gap-1.5 text-muted-foreground mb-1"><Percent className="h-3.5 w-3.5 shrink-0" /><span className="text-xs truncate">Min marja</span></div>
@@ -148,7 +151,7 @@ export function MinPriceProtection({
           {isMobile ? (
             <div className="space-y-2 px-3 pb-3 max-h-[500px] overflow-y-auto">
               {products.slice(0, 50).map(product => (
-                <div key={`${product.id}-${product.marketplace}`} className={`p-3 rounded-lg border space-y-1.5 ${product.isBelowMin ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800' : ''}`}>
+                <div key={`${product.id}-${product.marketplace}`} className={`p-3 rounded-lg border space-y-1.5 ${product.isBelowMin ? 'bg-destructive/5 border-destructive/20' : ''}`}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium line-clamp-1">{product.name}</div>
@@ -160,14 +163,14 @@ export function MinPriceProtection({
                     {product.isBelowMin ? (
                       <Badge variant="destructive" className="text-[10px] shrink-0"><TrendingDown className="h-3 w-3 mr-0.5" />Xavfli</Badge>
                     ) : (
-                      <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300 text-[10px] shrink-0"><ShieldCheck className="h-3 w-3 mr-0.5" />OK</Badge>
+                      <Badge variant="outline" className="bg-success/10 text-success border-success/30 text-[10px] shrink-0"><ShieldCheck className="h-3 w-3 mr-0.5" />OK</Badge>
                     )}
                   </div>
                   <div className="grid grid-cols-3 gap-2 text-xs">
                     <div><span className="text-muted-foreground">Joriy:</span><div className="font-medium whitespace-nowrap">{formatPrice(product.currentPrice)}</div></div>
                     <div><span className="text-muted-foreground">Min:</span><div className="font-medium whitespace-nowrap">{formatPrice(product.minPrice)}</div></div>
                     <div><span className="text-muted-foreground">Farq:</span>
-                      <div className={`font-bold whitespace-nowrap ${product.priceGap >= 0 ? 'text-green-600' : 'text-red-600'}`}>{product.priceGap >= 0 ? '+' : ''}{formatPrice(product.priceGap)}</div>
+                      <div className={`font-bold whitespace-nowrap ${product.priceGap >= 0 ? 'text-success' : 'text-destructive'}`}>{product.priceGap >= 0 ? '+' : ''}{formatPrice(product.priceGap)}</div>
                     </div>
                   </div>
                 </div>
@@ -187,15 +190,15 @@ export function MinPriceProtection({
                 </TableRow></TableHeader>
                 <TableBody>
                   {products.slice(0, 100).map(product => (
-                    <TableRow key={`${product.id}-${product.marketplace}`} className={product.isBelowMin ? 'bg-red-50 dark:bg-red-950/20' : ''}>
+                    <TableRow key={`${product.id}-${product.marketplace}`} className={product.isBelowMin ? 'bg-destructive/5' : ''}>
                       <TableCell><div className="font-medium text-sm line-clamp-1">{product.name}</div><code className="text-xs text-muted-foreground">{product.sku}</code></TableCell>
                       <TableCell className="text-center"><Badge variant="outline" className="text-xs">{MARKETPLACE_NAMES[product.marketplace]}</Badge></TableCell>
                       <TableCell className="text-right font-medium whitespace-nowrap">{formatPrice(product.currentPrice)} so'm</TableCell>
                       <TableCell className="text-right whitespace-nowrap">{formatPrice(product.minPrice)} so'm</TableCell>
-                      <TableCell className="text-right"><span className={`font-medium whitespace-nowrap ${product.priceGap >= 0 ? 'text-green-600' : 'text-red-600'}`}>{product.priceGap >= 0 ? '+' : ''}{formatPrice(product.priceGap)}</span></TableCell>
+                      <TableCell className="text-right"><span className={`font-medium whitespace-nowrap ${product.priceGap >= 0 ? 'text-success' : 'text-destructive'}`}>{product.priceGap >= 0 ? '+' : ''}{formatPrice(product.priceGap)}</span></TableCell>
                       <TableCell className="text-center">
                         {product.isBelowMin ? <Badge variant="destructive" className="whitespace-nowrap"><TrendingDown className="h-3 w-3 mr-1" />Xavfli</Badge>
-                          : <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300 whitespace-nowrap"><ShieldCheck className="h-3 w-3 mr-1" />OK</Badge>}
+                          : <Badge variant="outline" className="bg-success/10 text-success border-success/30 whitespace-nowrap"><ShieldCheck className="h-3 w-3 mr-1" />OK</Badge>}
                       </TableCell>
                     </TableRow>
                   ))}
