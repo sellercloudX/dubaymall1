@@ -71,45 +71,40 @@ const YANDEX_CATEGORY_IDS: Record<string, { id: number; name: string }> = {
   "default": { id: 198119, name: "Электроника" },
 };
 
-// MXIK kodlar bazasi
-const MXIK_DATABASE: Record<string, { code: string; name_uz: string; name_ru: string }> = {
-  "electronics": { code: "26301200", name_uz: "Elektron qurilmalar", name_ru: "Электронные устройства" },
-  "phone": { code: "26301100", name_uz: "Mobil telefonlar", name_ru: "Мобильные телефоны" },
-  "laptop": { code: "26201100", name_uz: "Noutbuklar", name_ru: "Ноутбуки" },
-  "tablet": { code: "26201200", name_uz: "Planshetlar", name_ru: "Планшеты" },
-  "headphones": { code: "26401100", name_uz: "Quloqchinlar", name_ru: "Наушники" },
-  "speaker": { code: "26401200", name_uz: "Karnaylar", name_ru: "Колонки" },
-  "watch": { code: "26521100", name_uz: "Soatlar", name_ru: "Часы" },
-  "smartwatch": { code: "26521200", name_uz: "Aqlli soatlar", name_ru: "Умные часы" },
-  "camera": { code: "26701100", name_uz: "Kameralar", name_ru: "Камеры" },
-  "tv": { code: "26401300", name_uz: "Televizorlar", name_ru: "Телевизоры" },
-  "refrigerator": { code: "27511100", name_uz: "Muzlatgichlar", name_ru: "Холодильники" },
-  "washing_machine": { code: "27511200", name_uz: "Kir yuvish mashinalari", name_ru: "Стиральные машины" },
-  "air_conditioner": { code: "28251100", name_uz: "Konditsionerlar", name_ru: "Кондиционеры" },
-  "vacuum": { code: "27512100", name_uz: "Changyutgichlar", name_ru: "Пылесосы" },
-  "iron": { code: "27512200", name_uz: "Dazmollar", name_ru: "Утюги" },
-  "kettle": { code: "27512300", name_uz: "Choynaklar", name_ru: "Чайники" },
-  "blender": { code: "27512400", name_uz: "Blenderlar", name_ru: "Блендеры" },
-  "microwave": { code: "27512500", name_uz: "Mikroto'lqinli pechlar", name_ru: "Микроволновые печи" },
-  "clothing": { code: "14201100", name_uz: "Kiyimlar", name_ru: "Одежда" },
-  "shoes": { code: "15201100", name_uz: "Poyabzallar", name_ru: "Обувь" },
-  "bag": { code: "15121100", name_uz: "Sumkalar", name_ru: "Сумки" },
-  "cosmetics": { code: "20421100", name_uz: "Kosmetika", name_ru: "Косметика" },
-  "perfume": { code: "20421200", name_uz: "Parfyumeriya", name_ru: "Парфюмерия" },
-  "toys": { code: "32401100", name_uz: "O'yinchoqlar", name_ru: "Игрушки" },
-  "sports": { code: "32301100", name_uz: "Sport anjomlari", name_ru: "Спортивные товары" },
-  "furniture": { code: "31091100", name_uz: "Mebel", name_ru: "Мебель" },
-  "tools": { code: "25731100", name_uz: "Asboblar", name_ru: "Инструменты" },
-  "auto": { code: "29301100", name_uz: "Avtomobil ehtiyot qismlari", name_ru: "Автозапчасти" },
-  "health": { code: "21201100", name_uz: "Salomatlik mahsulotlari", name_ru: "Товары для здоровья" },
-  "massage": { code: "26601100", name_uz: "Massaj qurilmalari", name_ru: "Массажные устройства" },
-  "food": { code: "10891100", name_uz: "Oziq-ovqat mahsulotlari", name_ru: "Продукты питания" },
-  "pet": { code: "10921100", name_uz: "Hayvonlar uchun mahsulotlar", name_ru: "Товары для животных" },
-  "books": { code: "58111100", name_uz: "Kitoblar", name_ru: "Книги" },
-  "stationery": { code: "17231100", name_uz: "Kantselariya", name_ru: "Канцелярия" },
-  "garden": { code: "01291100", name_uz: "Bog' mahsulotlari", name_ru: "Садовые товары" },
-  "default": { code: "46901100", name_uz: "Boshqa tovarlar", name_ru: "Прочие товары" },
-};
+// Dynamic MXIK lookup from database
+async function lookupMxikFromDB(
+  supabase: any,
+  productName: string,
+  category?: string
+): Promise<{ code: string; name_uz: string; name_ru: string }> {
+  const DEFAULT_MXIK = { code: "46901100001000000", name_uz: "Boshqa tovarlar", name_ru: "Прочие товары" };
+
+  try {
+    const keywords = productName
+      .toLowerCase()
+      .replace(/[^\w\s\u0400-\u04FFa-zA-Z]/g, ' ')
+      .split(/\s+/)
+      .filter((w: string) => w.length > 2)
+      .slice(0, 3);
+
+    for (const keyword of keywords) {
+      const { data } = await supabase
+        .from('mxik_codes')
+        .select('code, name_uz, name_ru')
+        .or(`name_uz.ilike.%${keyword}%,name_ru.ilike.%${keyword}%`)
+        .eq('is_active', true)
+        .limit(1);
+
+      if (data && data.length > 0) {
+        return data[0];
+      }
+    }
+  } catch (e) {
+    console.error('MXIK DB lookup failed:', e);
+  }
+
+  return DEFAULT_MXIK;
+}
 
 // Mahsulot turini aniqlash funksiyasi
 function detectProductCategory(name: string, description?: string): string {
