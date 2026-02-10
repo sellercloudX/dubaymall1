@@ -337,9 +337,12 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
 
       if (error) throw error;
 
-      if (data?.productName) {
+      // Edge function returns `name` (normalized), handle both field names
+      const productName = data?.name || data?.productName;
+
+      if (productName) {
         setAnalysisResult({
-          productName: data.productName,
+          productName,
           category: data.category || '',
           description: data.description || '',
           suggestedPrice: data.suggestedPrice || 0
@@ -347,7 +350,7 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
 
         setFormData(prev => ({
           ...prev,
-          name: data.productName,
+          name: productName,
           description: data.description || '',
           price: data.suggestedPrice || 0,
         }));
@@ -363,8 +366,8 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
           }
         }
 
-        toast.success(`Mahsulot aniqlandi: ${data.productName}`);
-        await searchSimilarProducts(data.productName, data.category, imageBase64);
+        toast.success(`Mahsulot aniqlandi: ${productName}`);
+        await searchSimilarProducts(productName, data.category, imageBase64);
       } else {
         toast.error('Mahsulotni aniqlab bo\'lmadi. Iltimos, aniqroq rasm oling.');
         setProcessingStep('idle');
