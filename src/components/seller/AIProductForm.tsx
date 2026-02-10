@@ -448,7 +448,8 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
         body: { 
           productName: productName || formData.name || analysisResult?.productName,
           category: analysisResult?.category || categories.find(c => c.id === formData.category_id)?.name_uz || '',
-          style: 'marketplace'
+          style: 'marketplace',
+          sourceImage: capturedImage || null, // Kamera rasmini uzatish — AI aynan shu mahsulotni professional qiladi
         },
       });
 
@@ -467,7 +468,7 @@ export function AIProductForm({ shopId, onSubmit, onCancel, isLoading }: AIProdu
     } finally {
       setIsGeneratingImages(false);
     }
-  }, [formData.name, formData.category_id, categories, analysisResult]);
+  }, [formData.name, formData.category_id, categories, analysisResult, capturedImage]);
 
   // Clear captured image and reset
   const clearCapture = () => {
