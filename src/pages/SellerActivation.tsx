@@ -161,9 +161,9 @@
      return (
        <Layout>
          <div className="container max-w-2xl mx-auto px-4 py-8">
-           <Card className="border-green-500/50">
-             <CardContent className="pt-6 text-center">
-               <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto mb-4" />
+            <Card className="border-primary/50">
+              <CardContent className="pt-6 text-center">
+                <CheckCircle2 className="h-16 w-16 text-primary mx-auto mb-4" />
                <h2 className="text-2xl font-bold mb-2">Akkount aktivlashtirilgan!</h2>
                <p className="text-muted-foreground mb-6">
                  Siz endi sotuvchi sifatida ishlashingiz mumkin
