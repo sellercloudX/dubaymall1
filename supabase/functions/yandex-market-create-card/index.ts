@@ -530,9 +530,7 @@ MUHIM: Faqat JSON formatda javob ber:
       console.error("❌ Yandex API error:", yandexResponse.status, responseText);
     }
 
-    // Mahalliy bazaga saqlash
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-
+    // Mahalliy bazaga saqlash (supabase client already created above)
     const { data: savedProduct, error: saveError } = await supabase
       .from("products")
       .insert({
@@ -545,6 +543,8 @@ MUHIM: Faqat JSON formatda javob ber:
         source_url: product.sourceUrl,
         images: productImages,
         status: "active",
+        mxik_code: mxikData.code,
+        mxik_name: mxikData.name_uz,
         specifications: {
           yandex_offer_id: shortSKU,
           yandex_business_id: businessId,
@@ -554,8 +554,6 @@ MUHIM: Faqat JSON formatda javob ber:
           yandex_card_quality: cardQuality,
           yandex_quality_breakdown: qualityBreakdown,
           barcode: barcode,
-          mxik_code: mxikData.code,
-          mxik_name: mxikData.name_uz,
           optimized_name: optimizedData.name,
           vendor: optimizedData.vendor,
           model: optimizedData.model,
