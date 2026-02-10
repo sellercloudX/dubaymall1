@@ -293,8 +293,8 @@ export default function CheckoutPage() {
     return (
       <Layout>
         <div className="container mx-auto px-4 py-20 text-center max-w-md">
-          <div className="bg-emerald-100 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
-            <CheckCircle className="h-10 w-10 text-emerald-600" />
+          <div className="bg-primary/10 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
+            <CheckCircle className="h-10 w-10 text-primary" />
           </div>
           <h2 className="text-2xl font-bold mb-2">{t.orderSuccess || 'Buyurtma qabul qilindi!'}</h2>
           <p className="text-muted-foreground mb-6">
