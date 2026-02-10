@@ -8,13 +8,15 @@ import { DeliveryOTPConfirm } from '@/components/delivery/DeliveryOTPConfirm';
 import { Package, Truck, Clock, CheckCircle, ShoppingCart } from 'lucide-react';
 import { format } from 'date-fns';
 
-const statusConfig: Record<string, { color: string; label: string; icon: any }> = {
-  pending: { color: 'bg-yellow-500', label: 'Kutilmoqda', icon: Clock },
-  processing: { color: 'bg-blue-500', label: 'Tayyorlanmoqda', icon: Package },
-  shipped: { color: 'bg-purple-500', label: "Jo'natildi", icon: Truck },
-  out_for_delivery: { color: 'bg-orange-500', label: 'Yetkazilmoqda', icon: Truck },
-  delivered: { color: 'bg-green-500', label: 'Yetkazildi', icon: CheckCircle },
-  cancelled: { color: 'bg-red-500', label: 'Bekor qilindi', icon: ShoppingCart },
+const ORDER_STEPS = ['pending', 'processing', 'shipped', 'out_for_delivery', 'delivered'];
+
+const statusConfig: Record<string, { color: string; label: string; icon: any; step: number }> = {
+  pending: { color: 'bg-warning text-warning-foreground', label: 'Kutilmoqda', icon: Clock, step: 0 },
+  processing: { color: 'bg-primary text-primary-foreground', label: 'Tayyorlanmoqda', icon: Package, step: 1 },
+  shipped: { color: 'bg-accent text-accent-foreground', label: "Jo'natildi", icon: Truck, step: 2 },
+  out_for_delivery: { color: 'bg-secondary text-secondary-foreground', label: 'Yetkazilmoqda', icon: Truck, step: 3 },
+  delivered: { color: 'bg-primary text-primary-foreground', label: 'Yetkazildi', icon: CheckCircle, step: 4 },
+  cancelled: { color: 'bg-destructive text-destructive-foreground', label: 'Bekor qilindi', icon: ShoppingCart, step: -1 },
 };
 
 export function MyOrders() {
