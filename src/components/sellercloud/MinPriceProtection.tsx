@@ -14,7 +14,6 @@ import {
   Percent, RefreshCw, TrendingDown, Settings
 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { useCostPrices } from '@/hooks/useCostPrices';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 
 interface MinPriceProtectionProps {
