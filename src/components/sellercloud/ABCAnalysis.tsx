@@ -260,7 +260,7 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
                   <TableHead className="w-10">ABC</TableHead><TableHead className="min-w-[180px]">Mahsulot</TableHead>
                   <TableHead className="w-16 text-center">MP</TableHead><TableHead className="w-20 text-right">Narxi</TableHead>
                   <TableHead className="w-16 text-center">Sotildi</TableHead><TableHead className="w-24 text-right">Daromad</TableHead>
-                  <TableHead className="w-24 text-right">Tannarx</TableHead><TableHead className="w-20 text-right">Komissiya</TableHead>
+                  <TableHead className="w-24 text-right">Xarajatlar</TableHead><TableHead className="w-20 text-right">Komissiya</TableHead>
                   <TableHead className="w-24 text-right">Sof foyda</TableHead><TableHead className="w-16 text-right">Marja</TableHead>
                 </TableRow></TableHeader>
                 <TableBody>
