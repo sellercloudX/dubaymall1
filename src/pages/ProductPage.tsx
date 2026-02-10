@@ -257,7 +257,7 @@ export default function ProductPage() {
   return (
     <Layout>
       <SEOHead
-        title={`${formatProductName(product.name)} - BazarHub`}
+        title={`${formatProductName(product.name)} - Dubay Mall`}
         description={product.description?.slice(0, 155) || `${formatProductName(product.name)} - eng yaxshi narxlarda`}
         image={images[0]}
         url={window.location.href}
