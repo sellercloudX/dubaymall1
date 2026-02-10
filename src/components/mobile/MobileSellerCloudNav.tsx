@@ -1,7 +1,7 @@
 import { BarChart3, Scan, Package, ShoppingCart, TrendingUp, MoreHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-type TabType = 'analytics' | 'scanner' | 'products' | 'orders' | 'trends' | 'abc-analysis' | 'min-price' | 'card-clone' | 'problems';
+type TabType = 'analytics' | 'scanner' | 'products' | 'orders' | 'trends' | 'abc-analysis' | 'min-price' | 'card-clone' | 'problems' | 'financials' | 'calculator';
 
 interface MobileSellerCloudNavProps {
   activeTab: TabType;
