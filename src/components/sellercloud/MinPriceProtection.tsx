@@ -190,15 +190,15 @@ export function MinPriceProtection({
                 </TableRow></TableHeader>
                 <TableBody>
                   {products.slice(0, 100).map(product => (
-                    <TableRow key={`${product.id}-${product.marketplace}`} className={product.isBelowMin ? 'bg-red-50 dark:bg-red-950/20' : ''}>
+                    <TableRow key={`${product.id}-${product.marketplace}`} className={product.isBelowMin ? 'bg-destructive/5' : ''}>
                       <TableCell><div className="font-medium text-sm line-clamp-1">{product.name}</div><code className="text-xs text-muted-foreground">{product.sku}</code></TableCell>
                       <TableCell className="text-center"><Badge variant="outline" className="text-xs">{MARKETPLACE_NAMES[product.marketplace]}</Badge></TableCell>
                       <TableCell className="text-right font-medium whitespace-nowrap">{formatPrice(product.currentPrice)} so'm</TableCell>
                       <TableCell className="text-right whitespace-nowrap">{formatPrice(product.minPrice)} so'm</TableCell>
-                      <TableCell className="text-right"><span className={`font-medium whitespace-nowrap ${product.priceGap >= 0 ? 'text-green-600' : 'text-red-600'}`}>{product.priceGap >= 0 ? '+' : ''}{formatPrice(product.priceGap)}</span></TableCell>
+                      <TableCell className="text-right"><span className={`font-medium whitespace-nowrap ${product.priceGap >= 0 ? 'text-success' : 'text-destructive'}`}>{product.priceGap >= 0 ? '+' : ''}{formatPrice(product.priceGap)}</span></TableCell>
                       <TableCell className="text-center">
                         {product.isBelowMin ? <Badge variant="destructive" className="whitespace-nowrap"><TrendingDown className="h-3 w-3 mr-1" />Xavfli</Badge>
-                          : <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300 whitespace-nowrap"><ShieldCheck className="h-3 w-3 mr-1" />OK</Badge>}
+                          : <Badge variant="outline" className="bg-success/10 text-success border-success/30 whitespace-nowrap"><ShieldCheck className="h-3 w-3 mr-1" />OK</Badge>}
                       </TableCell>
                     </TableRow>
                   ))}
