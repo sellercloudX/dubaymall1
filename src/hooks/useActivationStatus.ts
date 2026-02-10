@@ -16,19 +16,21 @@ export function useActivationStatus(): ActivationState {
   const { user } = useAuth();
   const [sellerStatus, setSellerStatus] = useState<ActivationStatus>('none');
   const [bloggerStatus, setBloggerStatus] = useState<ActivationStatus>('none');
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user) {
       setSellerStatus('none');
       setBloggerStatus('none');
+      setIsAdmin(false);
       setLoading(false);
       return;
     }
 
     const fetchStatuses = async () => {
       try {
-        const [sellerResult, bloggerResult] = await Promise.all([
+        const [sellerResult, bloggerResult, adminResult] = await Promise.all([
           supabase
             .from('seller_profiles')
             .select('status')
@@ -39,8 +41,15 @@ export function useActivationStatus(): ActivationState {
             .select('status')
             .eq('user_id', user.id)
             .maybeSingle(),
+          supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', user.id)
+            .eq('role', 'admin')
+            .maybeSingle(),
         ]);
 
+        setIsAdmin(!!adminResult.data);
         setSellerStatus(
           (sellerResult.data?.status as ActivationStatus) || 'none'
         );
@@ -60,8 +69,8 @@ export function useActivationStatus(): ActivationState {
   return {
     sellerStatus,
     bloggerStatus,
-    isSellerApproved: sellerStatus === 'approved',
-    isBloggerApproved: bloggerStatus === 'approved',
+    isSellerApproved: isAdmin || sellerStatus === 'approved',
+    isBloggerApproved: isAdmin || bloggerStatus === 'approved',
     loading,
   };
 }
