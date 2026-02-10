@@ -28,6 +28,7 @@ import { PageLoader } from "@/components/PageLoader";
 import { InstallPWA } from "@/components/InstallPWA";
 
 // Lazy load pages for code splitting
+const Index = lazy(() => import("./pages/Index"));
 const Auth = lazy(() => import("./pages/Auth"));
  const PartnerAuth = lazy(() => import("./pages/PartnerAuth"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
