@@ -101,15 +101,15 @@ export function MinPriceProtection({
           <div className="flex items-center gap-1.5 text-muted-foreground mb-1"><Shield className="h-3.5 w-3.5 shrink-0" /><span className="text-xs truncate">Jami</span></div>
           <div className="text-xl font-bold">{products.length}</div><div className="text-[10px] text-muted-foreground">mahsulot</div>
         </CardContent></Card>
-        <Card className={`overflow-hidden ${belowMinCount > 0 ? 'border-red-500/30' : ''}`}>
+        <Card className={`overflow-hidden ${belowMinCount > 0 ? 'border-destructive/30' : ''}`}>
           <CardContent className="p-3">
-            <div className="flex items-center gap-1.5 text-red-600 mb-1"><ShieldAlert className="h-3.5 w-3.5 shrink-0" /><span className="text-xs truncate">Min dan past</span></div>
-            <div className="text-xl font-bold text-red-600">{belowMinCount}</div><div className="text-[10px] text-muted-foreground">xavfli</div>
+            <div className="flex items-center gap-1.5 text-destructive mb-1"><ShieldAlert className="h-3.5 w-3.5 shrink-0" /><span className="text-xs truncate">Min dan past</span></div>
+            <div className="text-xl font-bold text-destructive">{belowMinCount}</div><div className="text-[10px] text-muted-foreground">xavfli</div>
           </CardContent>
         </Card>
         <Card className="overflow-hidden"><CardContent className="p-3">
-          <div className="flex items-center gap-1.5 text-green-600 mb-1"><ShieldCheck className="h-3.5 w-3.5 shrink-0" /><span className="text-xs truncate">Himoyalangan</span></div>
-          <div className="text-xl font-bold text-green-600">{protectedCount}</div><div className="text-[10px] text-muted-foreground">mahsulot</div>
+          <div className="flex items-center gap-1.5 text-success mb-1"><ShieldCheck className="h-3.5 w-3.5 shrink-0" /><span className="text-xs truncate">Himoyalangan</span></div>
+          <div className="text-xl font-bold text-success">{protectedCount}</div><div className="text-[10px] text-muted-foreground">mahsulot</div>
         </CardContent></Card>
         <Card className="overflow-hidden"><CardContent className="p-3">
           <div className="flex items-center gap-1.5 text-muted-foreground mb-1"><Percent className="h-3.5 w-3.5 shrink-0" /><span className="text-xs truncate">Min marja</span></div>
