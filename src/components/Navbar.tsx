@@ -61,16 +61,16 @@ export function Navbar() {
             {!rolesLoading && (
               <>
                 {showSellerLink && (
-                  <Link to="/seller" className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5">
-                    <Store className="h-4 w-4" />
-                    {t.myShop}
-                  </Link>
-                )}
-                {showBloggerLink && (
-                  <Link to="/blogger" className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5">
-                    <Users className="h-4 w-4" />
-                    Blogger
-                  </Link>
+                  <>
+                    <Link to="/seller" className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5">
+                      <Store className="h-4 w-4" />
+                      {t.myShop}
+                    </Link>
+                    <Link to="/seller-cloud" className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5">
+                      <Crown className="h-4 w-4" />
+                      SellerCloudX
+                    </Link>
+                  </>
                 )}
                 {showAdminLink && (
                   <Link to="/admin" className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
