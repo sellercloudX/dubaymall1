@@ -615,7 +615,7 @@ export default function ProductPage() {
                   <div className="flex-1">
                     <p className="font-semibold">{product.shop.name}</p>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                      <Star className="h-4 w-4 fill-warning text-warning" />
                       <span>4.8</span>
                       <span>·</span>
                       <span>1000+ ta baho</span>
