@@ -39,10 +39,10 @@ export function MinPriceProtection({
 }: MinPriceProtectionProps) {
   const [globalProtection, setGlobalProtection] = useState(true);
   const [defaultMargin, setDefaultMargin] = useState(10);
-  const [logisticsPercent, setLogisticsPercent] = useState(5);
-  const [costPercent, setCostPercent] = useState(60);
+  const [logisticsPerOrder, setLogisticsPerOrder] = useState(4000);
   const isMobile = useIsMobile();
   const isLoading = store.isLoadingProducts;
+  const { getCostPrice } = useCostPrices();
 
   const products = useMemo(() => {
     const allProducts: ProtectedProduct[] = [];
