@@ -24,6 +24,7 @@ import { ABCAnalysis } from '@/components/sellercloud/ABCAnalysis';
 import { MinPriceProtection } from '@/components/sellercloud/MinPriceProtection';
 import { CardCloner } from '@/components/sellercloud/CardCloner';
 import { ProblematicProducts } from '@/components/sellercloud/ProblematicProducts';
+import { ProfitCalculator } from '@/components/sellercloud/ProfitCalculator';
 import { AIScannerPro } from '@/components/seller/AIScannerPro';
 import { useMarketplaceConnections } from '@/hooks/useMarketplaceConnections';
 import { useSellerCloudSubscription } from '@/hooks/useSellerCloudSubscription';
