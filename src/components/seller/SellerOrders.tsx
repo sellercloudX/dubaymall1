@@ -207,7 +207,7 @@ export function SellerOrders() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-amber-600">{orderStats.pending}</p>
+             <p className="text-2xl font-bold text-warning">{orderStats.pending}</p>
           </CardContent>
         </Card>
         <Card>
