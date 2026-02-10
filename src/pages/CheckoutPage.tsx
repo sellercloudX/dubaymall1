@@ -542,11 +542,11 @@ export default function CheckoutPage() {
                   
                   {/* Installment info */}
                   {formData.paymentMethod.startsWith('installment_') && (
-                    <div className="mt-3 p-3 bg-yellow-50 dark:bg-yellow-950 rounded-lg">
-                      <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                    <div className="mt-3 p-3 bg-warning/10 rounded-lg">
+                      <p className="text-sm font-medium text-warning-foreground">
                         {formData.paymentMethod === 'installment_12' ? '12 oylik' : '24 oylik'} muddatli to'lov
                       </p>
-                      <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
+                      <p className="text-xs text-muted-foreground mt-1">
                         Oylik to'lov: <span className="font-bold">
                           {formatPrice(
                             formData.paymentMethod === 'installment_12' 
