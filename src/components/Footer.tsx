@@ -39,7 +39,7 @@ export function Footer() {
           <div className="space-y-3">
             <h4 className="font-semibold text-foreground">Xaridorlar uchun</h4>
             <nav className="flex flex-col gap-2">
-              <Link to="/marketplace" className="text-sm text-muted-foreground hover:text-primary transition-colors">
+              <Link to="/" className="text-sm text-muted-foreground hover:text-primary transition-colors">
                 Marketplace
               </Link>
               <Link to="/cart" className="text-sm text-muted-foreground hover:text-primary transition-colors">

@@ -156,7 +156,7 @@ export default function Index() {
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-up" style={{ animationDelay: '0.3s' }}>
               <Button size="lg" className="text-lg px-8 py-6 shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all btn-glow group" asChild>
-                <Link to="/marketplace">
+                <Link to="/">
                   <ShoppingBag className="mr-2 h-5 w-5 group-hover:scale-110 transition-transform" />
                   Xarid qilish
                 </Link>
@@ -344,7 +344,7 @@ export default function Index() {
               className="text-lg px-8 py-6 bg-transparent border-2 border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10" 
               asChild
             >
-              <Link to="/marketplace">
+              <Link to="/">
                 Marketplace'ni ko'rish
               </Link>
             </Button>

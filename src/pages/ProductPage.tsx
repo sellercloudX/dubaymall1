@@ -222,7 +222,7 @@ export default function ProductPage() {
           <Package className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
           <h2 className="text-2xl font-bold mb-2">{t.noData}</h2>
           <Button asChild>
-            <Link to="/marketplace">{t.marketplace}</Link>
+            <Link to="/">{t.marketplace}</Link>
           </Button>
         </div>
       </Layout>
@@ -292,7 +292,7 @@ export default function ProductPage() {
       <div className="container mx-auto px-4 py-4 md:py-8 pb-24">
         {/* Desktop Breadcrumb */}
         <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground mb-6">
-          <Link to="/marketplace" className="hover:text-primary">{t.marketplace}</Link>
+          <Link to="/" className="hover:text-primary">{t.marketplace}</Link>
           <span>/</span>
           {product.category && (
             <>
