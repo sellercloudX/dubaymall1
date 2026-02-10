@@ -163,7 +163,7 @@ export function MinPriceProtection({
                     {product.isBelowMin ? (
                       <Badge variant="destructive" className="text-[10px] shrink-0"><TrendingDown className="h-3 w-3 mr-0.5" />Xavfli</Badge>
                     ) : (
-                      <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300 text-[10px] shrink-0"><ShieldCheck className="h-3 w-3 mr-0.5" />OK</Badge>
+                      <Badge variant="outline" className="bg-success/10 text-success border-success/30 text-[10px] shrink-0"><ShieldCheck className="h-3 w-3 mr-0.5" />OK</Badge>
                     )}
                   </div>
                   <div className="grid grid-cols-3 gap-2 text-xs">
