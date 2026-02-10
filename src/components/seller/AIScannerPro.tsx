@@ -400,34 +400,65 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
       // Step 1: Already done - mark complete
       updateTaskProgress(0, 'completed');
 
-      // MUHIM: Web rasmlarni afzal ko'ramiz (sifatliroq)
-      // Kameradan olingan rasmlar sifatsiz bo'lishi mumkin
+      // Mahsulot nomini normallashtirish (lotin harflarga)
+      const normalizedProductName = normalizeProductName(product.title);
+
+      // MUHIM: Kamera rasmini AI orqali professional rasmga aylantirish
+      // sourceImage sifatida kamera rasmini uzatamiz — AI aynan shu mahsulotni
+      // professional fonlarda yaratadi (generic rasm EMAS)
       let imageUrl: string | undefined;
       const imagesToUpload: string[] = [];
 
-      // 1. Avval web'dan topilgan rasmni tekshiramiz (eng sifatli)
-      if (product.image && product.image.startsWith('http')) {
+      // Kamera yoki web rasmni AI bilan yaxshilash
+      const sourceImageForAI = productImage || product.image || null;
+      
+      if (sourceImageForAI) {
+        try {
+          console.log('🎨 AI bilan professional rasm yaratilmoqda (aynan shu mahsulot)...');
+          const { data: enhancedData, error: enhanceError } = await supabase.functions.invoke('generate-product-image', {
+            body: {
+              productName: normalizedProductName,
+              category: analyzed?.category || '',
+              style: 'marketplace',
+              sourceImage: sourceImageForAI, // MUHIM: kamera rasmini uzatish
+            },
+          });
+
+          if (!enhanceError && enhancedData?.imageUrl) {
+            // AI yaratgan rasmni storage'ga yuklash
+            const enhancedUrl = await uploadImageToStorage(
+              enhancedData.imageUrl.startsWith('data:') ? enhancedData.imageUrl : enhancedData.imageUrl
+            );
+            if (enhancedUrl) {
+              imageUrl = enhancedUrl;
+              imagesToUpload.push(enhancedUrl);
+              console.log('✅ AI professional rasm tayyor:', enhancedData.aiModel);
+            }
+          }
+        } catch (enhanceErr) {
+          console.error('AI image enhancement failed:', enhanceErr);
+        }
+      }
+
+      // Fallback: web rasmni ishlatish
+      if (!imageUrl && product.image && product.image.startsWith('http')) {
         imageUrl = product.image;
         imagesToUpload.push(product.image);
       }
       
-      // 2. Agar productImage ham URL bo'lsa va farqli bo'lsa, qo'shamiz
-      if (productImage && productImage.startsWith('http') && productImage !== product.image) {
-        if (!imageUrl) imageUrl = productImage;
-        imagesToUpload.push(productImage);
-      }
-      
-      // 3. Agar faqat base64 rasm bo'lsa (kamera), uni oxirgi variant sifatida yuklaymiz
-      if (!imageUrl && productImage && productImage.startsWith('data:')) {
-        const uploadedUrl = await uploadImageToStorage(productImage);
-        if (uploadedUrl) {
-          imageUrl = uploadedUrl;
-          imagesToUpload.push(uploadedUrl);
+      // Fallback: kamera rasmni yuklash
+      if (!imageUrl && productImage) {
+        if (productImage.startsWith('data:')) {
+          const uploadedUrl = await uploadImageToStorage(productImage);
+          if (uploadedUrl) {
+            imageUrl = uploadedUrl;
+            imagesToUpload.push(uploadedUrl);
+          }
+        } else if (productImage.startsWith('http')) {
+          imageUrl = productImage;
+          imagesToUpload.push(productImage);
         }
       }
-
-      // Mahsulot nomini normallashtirish (lotin harflarga)
-      const normalizedProductName = normalizeProductName(product.title);
 
       // Step 2: SEO content
       updateTaskProgress(1, 'running');
