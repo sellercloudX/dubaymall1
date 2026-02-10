@@ -137,10 +137,10 @@ export function MinPriceProtection({
             <Switch checked={globalProtection} onCheckedChange={setGlobalProtection} />
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div><div className="text-xs mb-1">Tannarx %</div><div className="flex items-center gap-1"><Input type="number" value={costPercent} onChange={e => setCostPercent(Number(e.target.value))} className="w-full h-8 text-sm" min={10} max={95} /><span className="text-xs shrink-0">%</span></div></div>
+            <div><div className="text-xs mb-1">Logistika (so'm)</div><div className="flex items-center gap-1"><Input type="number" value={logisticsPerOrder} onChange={e => setLogisticsPerOrder(Number(e.target.value))} className="w-full h-8 text-sm" min={0} max={50000} /><span className="text-xs shrink-0">so'm</span></div></div>
             <div><div className="text-xs mb-1">Komissiya %</div><div className="flex items-center gap-1"><Input type="number" value={commissionPercent} className="w-full h-8 text-sm" disabled /><span className="text-xs shrink-0">%</span></div></div>
-            <div><div className="text-xs mb-1">Logistika %</div><div className="flex items-center gap-1"><Input type="number" value={logisticsPercent} onChange={e => setLogisticsPercent(Number(e.target.value))} className="w-full h-8 text-sm" min={0} max={30} /><span className="text-xs shrink-0">%</span></div></div>
             <div><div className="text-xs mb-1">Min marja %</div><div className="flex items-center gap-1"><Input type="number" value={defaultMargin} onChange={e => setDefaultMargin(Number(e.target.value))} className="w-full h-8 text-sm" min={1} max={50} /><span className="text-xs shrink-0">%</span></div></div>
+            <div><div className="text-xs mb-1 text-muted-foreground">Tannarx</div><div className="text-xs text-muted-foreground">Mahsulotlar tabidan kiritiladi</div></div>
           </div>
         </CardContent>
       </Card>
