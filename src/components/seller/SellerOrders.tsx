@@ -138,15 +138,15 @@ export function SellerOrders() {
       case 'pending':
         return <Badge variant="secondary"><Clock className="h-3 w-3 mr-1" /> Kutilmoqda</Badge>;
       case 'confirmed':
-        return <Badge className="bg-blue-600"><Package className="h-3 w-3 mr-1" /> Tasdiqlangan</Badge>;
+        return <Badge className="bg-primary text-primary-foreground"><Package className="h-3 w-3 mr-1" /> Tasdiqlangan</Badge>;
       case 'processing':
-        return <Badge className="bg-amber-600"><Package className="h-3 w-3 mr-1" /> Tayyorlanmoqda</Badge>;
+        return <Badge className="bg-warning text-warning-foreground"><Package className="h-3 w-3 mr-1" /> Tayyorlanmoqda</Badge>;
       case 'shipped':
-        return <Badge className="bg-purple-600"><Truck className="h-3 w-3 mr-1" /> Jo'natildi</Badge>;
+        return <Badge className="bg-accent text-accent-foreground"><Truck className="h-3 w-3 mr-1" /> Jo'natildi</Badge>;
       case 'out_for_delivery':
-        return <Badge className="bg-orange-600"><Truck className="h-3 w-3 mr-1" /> Yetkazilmoqda</Badge>;
+        return <Badge className="bg-secondary text-secondary-foreground"><Truck className="h-3 w-3 mr-1" /> Yetkazilmoqda</Badge>;
       case 'delivered':
-        return <Badge className="bg-emerald-600"><CheckCircle className="h-3 w-3 mr-1" /> Yetkazildi</Badge>;
+        return <Badge className="bg-primary text-primary-foreground"><CheckCircle className="h-3 w-3 mr-1" /> Yetkazildi</Badge>;
       case 'cancelled':
         return <Badge variant="destructive">Bekor qilindi</Badge>;
       default:
