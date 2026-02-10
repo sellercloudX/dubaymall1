@@ -172,7 +172,7 @@ export default function CartPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">{t.delivery}</span>
-                  <span className="text-emerald-600">{t.free}</span>
+                  <span className="text-primary">{t.free}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between text-lg font-bold">

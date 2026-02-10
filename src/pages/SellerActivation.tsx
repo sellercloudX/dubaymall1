@@ -161,9 +161,9 @@
      return (
        <Layout>
          <div className="container max-w-2xl mx-auto px-4 py-8">
-           <Card className="border-green-500/50">
-             <CardContent className="pt-6 text-center">
-               <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto mb-4" />
+            <Card className="border-primary/50">
+              <CardContent className="pt-6 text-center">
+                <CheckCircle2 className="h-16 w-16 text-primary mx-auto mb-4" />
                <h2 className="text-2xl font-bold mb-2">Akkount aktivlashtirilgan!</h2>
                <p className="text-muted-foreground mb-6">
                  Siz endi sotuvchi sifatida ishlashingiz mumkin
@@ -194,17 +194,17 @@
  
          {/* Status Card */}
          {profile && (
-           <Card className={`mb-6 ${
-             profile.status === 'pending' ? 'border-amber-500/50' : 
-             profile.status === 'rejected' ? 'border-red-500/50' : ''
-           }`}>
+            <Card className={`mb-6 ${
+              profile.status === 'pending' ? 'border-warning/50' : 
+              profile.status === 'rejected' ? 'border-destructive/50' : ''
+            }`}>
              <CardContent className="pt-6">
                <div className="flex items-center gap-4">
                  {profile.status === 'pending' && (
                    <>
-                     <Clock className="h-8 w-8 text-amber-500" />
-                     <div>
-                       <Badge variant="outline" className="bg-amber-500/10 text-amber-600">
+                      <Clock className="h-8 w-8 text-warning" />
+                      <div>
+                        <Badge variant="outline" className="bg-warning/10 text-warning">
                          Tekshiruvda
                        </Badge>
                        <p className="text-sm text-muted-foreground mt-1">
@@ -215,10 +215,10 @@
                  )}
                  {profile.status === 'rejected' && (
                    <>
-                     <XCircle className="h-8 w-8 text-red-500" />
-                     <div>
-                       <Badge variant="destructive">Rad etildi</Badge>
-                       <p className="text-sm text-red-600 mt-1">
+                      <XCircle className="h-8 w-8 text-destructive" />
+                      <div>
+                        <Badge variant="destructive">Rad etildi</Badge>
+                        <p className="text-sm text-destructive mt-1">
                          {profile.rejection_reason || 'Ma\'lumotlarni to\'g\'irlab qaytadan yuboring'}
                        </p>
                      </div>
