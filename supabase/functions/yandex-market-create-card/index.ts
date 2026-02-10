@@ -19,6 +19,8 @@ interface ProductData {
   color?: string;
   model?: string;
   barcode?: string;
+  mxikCode?: string;
+  mxikName?: string;
 }
 
 interface PricingData {
