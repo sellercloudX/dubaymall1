@@ -198,6 +198,9 @@ export function useMarketplaceDataStore(connectedMarketplaces: string[]) {
     totalProducts,
     totalOrders,
 
+    // Stable version for memo dependencies (changes when data updates)
+    dataVersion,
+
     // Loading states
     isLoading,
     isLoadingProducts,
