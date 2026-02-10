@@ -100,7 +100,7 @@ function App() {
               <BrowserRouter>
                 <Suspense fallback={<PageLoader />}>
                   <Routes>
-                    <Route path="/" element={<Index />} />
+                    <Route path="/" element={<Marketplace />} />
                     <Route path="/auth" element={<Auth />} />
                     <Route path="/partner-auth" element={<PartnerAuth />} />
                     <Route path="/dashboard" element={<Dashboard />} />
@@ -109,7 +109,6 @@ function App() {
                     <Route path="/seller-cloud-mobile" element={<SellerCloudMobile />} />
                     <Route path="/admin" element={<AdminDashboard />} />
                     <Route path="/shop/:slug" element={<ShopPage />} />
-                    <Route path="/marketplace" element={<Marketplace />} />
                     <Route path="/product/:id" element={<ProductPage />} />
                     <Route path="/cart" element={<CartPage />} />
                     <Route path="/checkout" element={<CheckoutPage />} />
