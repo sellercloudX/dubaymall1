@@ -89,7 +89,7 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
         allProducts.push({
           id: product.offerId, name: product.name || 'Nomsiz',
           sku: product.shopSku || product.offerId, marketplace, price,
-          totalSold: sales.qty, totalRevenue, estimatedCost,
+          totalSold: sales.qty, totalRevenue, estimatedCost: totalCosts,
           commissionAmount, logisticsCost, netProfit, profitMargin,
           abcGroup: 'C', revenueShare: 0,
         });

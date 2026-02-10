@@ -43,9 +43,12 @@ export function FinancialDashboard({
 
     const totalRevenue = marketplaceBreakdown.reduce((s, m) => s + m.revenue, 0);
     const totalOrders = marketplaceBreakdown.reduce((s, m) => s + m.orders, 0);
-    const platformFee = monthlyFee * USD_TO_UZS;
-    const commissionFee = totalRevenue * (commissionPercent / 100);
-    const totalExpenses = platformFee + commissionFee;
+    const platformFee = monthlyFee * USD_TO_UZS; // SellerCloudX monthly fee
+    const platformCommission = totalRevenue * (commissionPercent / 100); // SellerCloudX commission
+    const yandexCommission = totalRevenue * 0.20; // Yandex Market 20% standard commission
+    const yandexTax = totalRevenue * 0.04; // 4% tax
+    const estimatedLogistics = totalOrders * 4000; // ~4000 so'm per order logistics
+    const totalExpenses = platformFee + platformCommission + yandexCommission + yandexTax + estimatedLogistics;
     const netProfit = totalRevenue - totalExpenses;
     const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
 
