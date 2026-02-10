@@ -441,7 +441,7 @@ export default function ProductPage() {
                   
                   {/* Weekly buyers indicator */}
                   {weeklyBuyers > 0 && (
-                    <div className="flex items-center gap-2 mt-3 text-sm text-green-600 dark:text-green-400">
+                    <div className="flex items-center gap-2 mt-3 text-sm text-primary">
                       <TrendingUp className="h-4 w-4" />
                       <span>Bu haftada {weeklyBuyers} kishi sotib oldi</span>
                     </div>
