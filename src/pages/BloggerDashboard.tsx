@@ -110,7 +110,7 @@ export default function BloggerDashboard() {
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 Mavjud balans
               </CardTitle>
-              <Wallet className="h-4 w-4 text-emerald-600" />
+              <Wallet className="h-4 w-4 text-success" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-foreground">
