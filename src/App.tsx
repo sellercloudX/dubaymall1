@@ -100,7 +100,7 @@ function App() {
               <BrowserRouter>
                 <Suspense fallback={<PageLoader />}>
                   <Routes>
-                    <Route path="/" element={<Marketplace />} />
+                    <Route path="/" element={<Index />} />
                     <Route path="/auth" element={<Auth />} />
                     <Route path="/partner-auth" element={<PartnerAuth />} />
                     <Route path="/dashboard" element={<Dashboard />} />
