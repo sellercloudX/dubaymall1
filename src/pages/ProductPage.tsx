@@ -110,7 +110,7 @@ export default function ProductPage() {
       fetchOrderStats();
       addToRecentlyViewed(id);
       // Increment view count
-      supabase.rpc('increment_view_count', { product_id: id }).catch(() => {});
+      supabase.from('products').update({ view_count: (product?.view_count || 0) + 1 }).eq('id', id).then(() => {});
     }
   }, [id]);
 
