@@ -292,7 +292,7 @@ export default function ProductPage() {
       <div className="container mx-auto px-4 py-4 md:py-8 pb-24">
         {/* Desktop Breadcrumb */}
         <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground mb-6">
-          <Link to="/marketplace" className="hover:text-primary">{t.marketplace}</Link>
+          <Link to="/" className="hover:text-primary">{t.marketplace}</Link>
           <span>/</span>
           {product.category && (
             <>

@@ -97,7 +97,7 @@ export function HeroBanner() {
             </p>
           </div>
           <Button variant="secondary" size="lg" asChild>
-            <Link to="/marketplace">
+            <Link to="/">
               Xarid qilish
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>

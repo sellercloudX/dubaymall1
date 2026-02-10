@@ -308,7 +308,7 @@ export default function CheckoutPage() {
               <Link to="/dashboard">{t.myOrders || 'Buyurtmalarim'}</Link>
             </Button>
             <Button asChild>
-              <Link to="/marketplace">{t.continueShopping || 'Xaridni davom ettirish'}</Link>
+              <Link to="/">{t.continueShopping || 'Xaridni davom ettirish'}</Link>
             </Button>
           </div>
         </div>

@@ -63,7 +63,7 @@ export default function CartPage() {
             {t.cartEmptyDesc || 'Hali hech narsa qo\'shmagansiz'}
           </p>
           <Button asChild>
-            <Link to="/marketplace">{t.marketplace}</Link>
+            <Link to="/">{t.marketplace}</Link>
           </Button>
         </div>
       </Layout>
