@@ -84,7 +84,7 @@ export function MyOrders() {
       {pendingDeliveryOrders.length > 0 && (
         <div className="space-y-4">
           <h3 className="text-lg font-semibold flex items-center gap-2">
-            <Truck className="h-5 w-5 text-orange-500" />
+            <Truck className="h-5 w-5 text-warning" />
             Yetkazib berishni tasdiqlang
           </h3>
           {pendingDeliveryOrders.map(order => (
