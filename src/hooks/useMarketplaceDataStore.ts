@@ -139,6 +139,10 @@ export function useMarketplaceDataStore(connectedMarketplaces: string[]) {
   const isLoading = isLoadingProducts || isLoadingOrders;
   const isFetching = productQueries.some(q => q.isFetching) || orderQueries.some(q => q.isFetching);
 
+  // Stable data version counter for memo dependencies
+  const dataVersion = productQueries.reduce((v, q) => v + (q.dataUpdatedAt || 0), 0)
+    + orderQueries.reduce((v, q) => v + (q.dataUpdatedAt || 0), 0);
+
   // Products by marketplace
   const getProducts = (mp: string): MarketplaceProduct[] => {
     const query = productQueries.find(q => q.data?.marketplace === mp);
