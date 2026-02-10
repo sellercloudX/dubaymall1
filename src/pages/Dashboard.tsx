@@ -8,10 +8,28 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { MyOrders } from '@/components/orders/MyOrders';
 import { toast } from 'sonner';
-import { User, CreditCard, Package, History, Loader2, Save } from 'lucide-react';
+import { User, CreditCard, Package, History, Loader2, Save, MapPin } from 'lucide-react';
+
+const REGIONS = [
+  "Toshkent shahri",
+  "Toshkent viloyati",
+  "Andijon",
+  "Buxoro",
+  "Farg'ona",
+  "Jizzax",
+  "Xorazm",
+  "Namangan",
+  "Navoiy",
+  "Qashqadaryo",
+  "Samarqand",
+  "Sirdaryo",
+  "Surxondaryo",
+  "Qoraqalpog'iston",
+];
 
 export default function Dashboard() {
   const { user, loading: authLoading } = useAuth();
@@ -22,6 +40,9 @@ export default function Dashboard() {
   const [profile, setProfile] = useState({
     full_name: '',
     phone: '',
+    region: '',
+    city: '',
+    address: '',
   });
 
   useEffect(() => {
@@ -40,7 +61,7 @@ export default function Dashboard() {
 
     const { data, error } = await supabase
       .from('profiles')
-      .select('full_name, phone')
+      .select('full_name, phone, region, city, address')
       .eq('user_id', user.id)
       .maybeSingle();
 
@@ -48,6 +69,9 @@ export default function Dashboard() {
       setProfile({
         full_name: data.full_name || '',
         phone: data.phone || '',
+        region: data.region || '',
+        city: data.city || '',
+        address: data.address || '',
       });
     }
     setLoading(false);
@@ -62,6 +86,9 @@ export default function Dashboard() {
       .update({
         full_name: profile.full_name,
         phone: profile.phone,
+        region: profile.region,
+        city: profile.city,
+        address: profile.address,
         updated_at: new Date().toISOString(),
       })
       .eq('user_id', user.id);
@@ -95,18 +122,14 @@ export default function Dashboard() {
         </div>
 
         <Tabs defaultValue="profile" className="space-y-6">
-          <TabsList>
+          <TabsList className="flex-wrap">
             <TabsTrigger value="profile" className="gap-2">
               <User className="h-4 w-4" />
               <span className="hidden sm:inline">Profil</span>
             </TabsTrigger>
             <TabsTrigger value="orders" className="gap-2">
               <Package className="h-4 w-4" />
-              <span className="hidden sm:inline">Faol buyurtmalar</span>
-            </TabsTrigger>
-            <TabsTrigger value="history" className="gap-2">
-              <History className="h-4 w-4" />
-              <span className="hidden sm:inline">Tarix</span>
+              <span className="hidden sm:inline">Buyurtmalar</span>
             </TabsTrigger>
             <TabsTrigger value="payment" className="gap-2">
               <CreditCard className="h-4 w-4" />
@@ -143,6 +166,40 @@ export default function Dashboard() {
                     <Label>Email</Label>
                     <Input value={user?.email || ''} disabled className="bg-muted" />
                   </div>
+                  <div className="space-y-2">
+                    <Label>Viloyat</Label>
+                    <Select
+                      value={profile.region}
+                      onValueChange={(val) => setProfile(prev => ({ ...prev, region: val }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Viloyatni tanlang" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {REGIONS.map((r) => (
+                          <SelectItem key={r} value={r}>{r}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="city">Shahar / Tuman</Label>
+                    <Input
+                      id="city"
+                      value={profile.city}
+                      onChange={(e) => setProfile(prev => ({ ...prev, city: e.target.value }))}
+                      placeholder="Shahar yoki tuman nomi"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="address">Manzil</Label>
+                    <Input
+                      id="address"
+                      value={profile.address}
+                      onChange={(e) => setProfile(prev => ({ ...prev, address: e.target.value }))}
+                      placeholder="Ko'cha, uy, xonadon"
+                    />
+                  </div>
                 </div>
                 <Button onClick={handleSaveProfile} disabled={saving} className="mt-4">
                   {saving ? (
@@ -159,18 +216,10 @@ export default function Dashboard() {
           <TabsContent value="orders">
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Faol buyurtmalar</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <MyOrders />
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="history">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Buyurtmalar tarixi</CardTitle>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  Buyurtmalarim
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <MyOrders />
@@ -190,8 +239,8 @@ export default function Dashboard() {
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Card className="p-4 border-2">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <CreditCard className="h-5 w-5 text-blue-600" />
+                      <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                        <CreditCard className="h-5 w-5 text-primary" />
                       </div>
                       <div>
                         <p className="font-medium">Click</p>
@@ -201,8 +250,8 @@ export default function Dashboard() {
                   </Card>
                   <Card className="p-4 border-2">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                        <CreditCard className="h-5 w-5 text-green-600" />
+                      <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                        <CreditCard className="h-5 w-5 text-primary" />
                       </div>
                       <div>
                         <p className="font-medium">Payme</p>
@@ -212,8 +261,8 @@ export default function Dashboard() {
                   </Card>
                   <Card className="p-4 border-2">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                        <Package className="h-5 w-5 text-purple-600" />
+                      <div className="w-10 h-10 bg-muted rounded-lg flex items-center justify-center">
+                        <Package className="h-5 w-5 text-muted-foreground" />
                       </div>
                       <div>
                         <p className="font-medium">Naqd pul</p>
