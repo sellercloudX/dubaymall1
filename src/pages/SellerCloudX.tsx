@@ -127,7 +127,7 @@ export default function SellerCloudX() {
                 <ul className="space-y-3">
                   {["4 ta marketplace: Uzum, Yandex, Wildberries, Ozon","OAuth orqali bir tugmada ulash","AI bilan avtomatik kartochka yaratish","Barcha marketplacelar analitikasi","Buyurtmalarni markazlashtirilgan boshqarish","Zaxira sinxronizatsiyasi","Narxlarni avtomatik optimallashtirish","24/7 texnik yordam"].map((feature, idx) => (
                     <li key={idx} className="flex items-start gap-3 text-sm">
-                      <Check className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" /><span>{feature}</span>
+                      <Check className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" /><span>{feature}</span>
                     </li>
                   ))}
                 </ul>
