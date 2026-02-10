@@ -199,10 +199,10 @@
  
          {/* Status Card */}
          {profile && (
-           <Card className={`mb-6 ${
-             profile.status === 'pending' ? 'border-amber-500/50' : 
-             profile.status === 'rejected' ? 'border-red-500/50' : ''
-           }`}>
+            <Card className={`mb-6 ${
+              profile.status === 'pending' ? 'border-warning/50' : 
+              profile.status === 'rejected' ? 'border-destructive/50' : ''
+            }`}>
              <CardContent className="pt-6">
                <div className="flex items-center gap-4">
                  {profile.status === 'pending' && (
