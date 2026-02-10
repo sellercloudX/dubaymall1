@@ -165,6 +165,10 @@ export default function Marketplace() {
 
   return (
     <Layout>
+      <SEOHead 
+        title="Dubay Mall - O'zbekiston onlayn bozori" 
+        description="Minglab mahsulotlar eng arzon narxlarda. Tez yetkazib berish, ishonchli sotuvchilar." 
+      />
       <div className="container mx-auto px-4 py-6">
         <HeroBanner />
         <FlashSaleBanner />

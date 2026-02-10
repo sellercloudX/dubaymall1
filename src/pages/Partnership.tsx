@@ -84,6 +84,10 @@ export default function Partnership() {
 
   return (
     <Layout>
+      <SEOHead 
+        title="Hamkorlik - Dubay Mall" 
+        description="Sotuvchi, blogger yoki marketplace integratori sifatida Dubay Mall bilan hamkorlik qiling." 
+      />
       {/* Hero Section */}
       <section className="relative overflow-hidden py-16 md:py-24">
         <div className="absolute inset-0 bg-mesh" />
