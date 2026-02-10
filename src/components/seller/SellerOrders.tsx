@@ -157,9 +157,11 @@ export function SellerOrders() {
   const getPaymentBadge = (status: string) => {
     switch (status) {
       case 'paid':
-        return <Badge className="bg-emerald-600">To'langan</Badge>;
+        return <Badge className="bg-primary text-primary-foreground">To'langan</Badge>;
       case 'pending':
         return <Badge variant="secondary">Kutilmoqda</Badge>;
+      case 'cash_on_delivery':
+        return <Badge variant="outline">Yetkazganda</Badge>;
       case 'failed':
         return <Badge variant="destructive">Muvaffaqiyatsiz</Badge>;
       default:
