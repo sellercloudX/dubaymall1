@@ -1,13 +1,19 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
+import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Upload, Globe, Check, X, Loader2, 
   Package, ArrowRight, FileText, Image
 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { useShop } from '@/hooks/useShop';
+import { useProducts } from '@/hooks/useProducts';
+import { toast } from 'sonner';
 
 interface MultiPublishProps {
   connectedMarketplaces: string[];
@@ -20,49 +26,19 @@ const MARKETPLACE_INFO: Record<string, { name: string; logo: string; color: stri
   ozon: { name: 'Ozon', logo: '🔵', color: 'from-blue-500 to-cyan-500' },
 };
 
-interface DraftProduct {
-  id: string;
-  name: string;
-  images: string[];
-  price: number;
-  category: string;
-  description: string;
-  status: 'draft' | 'ready' | 'publishing' | 'published' | 'error';
-  publishedTo: string[];
-  errors: Record<string, string>;
-}
-
-const MOCK_DRAFTS: DraftProduct[] = [
-  {
-    id: '1',
-    name: 'Xiaomi Redmi Note 13 Pro',
-    images: ['img1.jpg', 'img2.jpg', 'img3.jpg'],
-    price: 299,
-    category: 'Telefonlar',
-    description: 'Yangi Xiaomi telefoni...',
-    status: 'ready',
-    publishedTo: [],
-    errors: {},
-  },
-  {
-    id: '2',
-    name: 'Samsung Galaxy Buds FE',
-    images: ['img1.jpg', 'img2.jpg'],
-    price: 89,
-    category: 'Quloqchinlar',
-    description: 'Samsung simsiz quloqchinlari...',
-    status: 'draft',
-    publishedTo: [],
-    errors: {},
-  },
-];
-
 export function MultiPublish({ connectedMarketplaces }: MultiPublishProps) {
-  const [drafts, setDrafts] = useState<DraftProduct[]>(MOCK_DRAFTS);
+  const { shop } = useShop();
+  const { products, loading: productsLoading } = useProducts(shop?.id || null);
   const [selectedMarketplaces, setSelectedMarketplaces] = useState<string[]>(connectedMarketplaces);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishProgress, setPublishProgress] = useState(0);
+
+  // Use real products from the database
+  const publishableProducts = useMemo(() => 
+    products.filter(p => p.status === 'active'),
+    [products]
+  );
 
   const toggleMarketplace = (mp: string) => {
     setSelectedMarketplaces(prev => 
@@ -84,11 +60,34 @@ export function MultiPublish({ connectedMarketplaces }: MultiPublishProps) {
     
     const total = selectedProducts.length * selectedMarketplaces.length;
     let completed = 0;
+    let errors = 0;
     
-    // Simulate publishing
     for (const productId of selectedProducts) {
+      const product = publishableProducts.find(p => p.id === productId);
+      if (!product) continue;
+
       for (const mp of selectedMarketplaces) {
-        await new Promise(resolve => setTimeout(resolve, 500));
+        try {
+          const { error } = await supabase.functions.invoke('create-marketplace-card', {
+            body: {
+              marketplace: mp,
+              product: {
+                name: product.name,
+                description: product.description,
+                price: product.price,
+                images: product.images || [],
+                category: '',
+              },
+            },
+          });
+          if (error) {
+            errors++;
+            console.error(`Publish error for ${product.name} → ${mp}:`, error);
+          }
+        } catch (err) {
+          errors++;
+          console.error(`Publish error:`, err);
+        }
         completed++;
         setPublishProgress((completed / total) * 100);
       }
@@ -96,6 +95,12 @@ export function MultiPublish({ connectedMarketplaces }: MultiPublishProps) {
     
     setIsPublishing(false);
     setSelectedProducts([]);
+    
+    if (errors > 0) {
+      toast.warning(`${completed - errors}/${total} ta kartochka yaratildi, ${errors} ta xatolik`);
+    } else {
+      toast.success(`${total} ta kartochka muvaffaqiyatli yaratildi!`);
+    }
   };
 
   if (connectedMarketplaces.length === 0) {
@@ -121,23 +126,20 @@ export function MultiPublish({ connectedMarketplaces }: MultiPublishProps) {
             <Globe className="h-5 w-5" />
             Joylash marketplacelari
           </CardTitle>
-          <CardDescription>
-            Mahsulotlarni qaysi marketplacelarga joylashni tanlang
-          </CardDescription>
+          <CardDescription>Mahsulotlarni qaysi marketplacelarga joylashni tanlang</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid gap-3 md:grid-cols-4">
             {connectedMarketplaces.map(mp => {
               const info = MARKETPLACE_INFO[mp];
+              if (!info) return null;
               const isSelected = selectedMarketplaces.includes(mp);
               return (
                 <div
                   key={mp}
                   onClick={() => toggleMarketplace(mp)}
                   className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                    isSelected 
-                      ? 'border-primary bg-primary/5' 
-                      : 'border-transparent bg-muted/50 hover:bg-muted'
+                    isSelected ? 'border-primary bg-primary/5' : 'border-transparent bg-muted/50 hover:bg-muted'
                   }`}
                 >
                   <div className="flex items-center gap-3">
@@ -169,78 +171,79 @@ export function MultiPublish({ connectedMarketplaces }: MultiPublishProps) {
                 Joylash uchun mahsulotlar
               </CardTitle>
               <CardDescription>
-                {drafts.length} ta qoralama mahsulot
+                {publishableProducts.length} ta aktiv mahsulot
               </CardDescription>
             </div>
             {selectedProducts.length > 0 && (
-              <Badge variant="secondary">
-                {selectedProducts.length} ta tanlangan
-              </Badge>
+              <Badge variant="secondary">{selectedProducts.length} ta tanlangan</Badge>
             )}
           </div>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {drafts.map(draft => {
-              const isSelected = selectedProducts.includes(draft.id);
-              return (
-                <div
-                  key={draft.id}
-                  onClick={() => toggleProduct(draft.id)}
-                  className={`p-4 rounded-lg border cursor-pointer transition-all ${
-                    isSelected 
-                      ? 'border-primary bg-primary/5' 
-                      : 'border-border hover:bg-muted/50'
-                  }`}
-                >
-                  <div className="flex items-center gap-4">
-                    <Checkbox checked={isSelected} />
-                    <div className="w-16 h-16 rounded-lg bg-muted flex items-center justify-center">
-                      <Image className="h-6 w-6 text-muted-foreground" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="font-medium">{draft.name}</div>
-                      <div className="text-sm text-muted-foreground">{draft.category}</div>
-                      <div className="flex items-center gap-4 mt-1">
-                        <Badge variant="outline" className="text-xs">
-                          <Image className="h-3 w-3 mr-1" />
-                          {draft.images.length} rasm
-                        </Badge>
-                        <Badge variant="outline" className="text-xs">
-                          <FileText className="h-3 w-3 mr-1" />
-                          Tavsif bor
-                        </Badge>
+          {productsLoading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-4 p-4 border rounded-lg">
+                  <Skeleton className="w-16 h-16 rounded-lg" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-2/3" />
+                    <Skeleton className="h-3 w-1/3" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : publishableProducts.length === 0 ? (
+            <div className="text-center py-8">
+              <Package className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+              <p className="text-muted-foreground">Aktiv mahsulotlar yo'q</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {publishableProducts.map(product => {
+                const isSelected = selectedProducts.includes(product.id);
+                const imageUrl = product.images?.[0];
+                return (
+                  <div
+                    key={product.id}
+                    onClick={() => toggleProduct(product.id)}
+                    className={`p-4 rounded-lg border cursor-pointer transition-all ${
+                      isSelected ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-4">
+                      <Checkbox checked={isSelected} />
+                      <div className="w-16 h-16 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
+                        {imageUrl ? (
+                          <img src={imageUrl} alt={product.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <Image className="h-6 w-6 text-muted-foreground" />
+                        )}
                       </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-bold">${draft.price}</div>
-                      <Badge 
-                        variant={draft.status === 'ready' ? 'default' : 'secondary'}
-                        className="mt-1"
-                      >
-                        {draft.status === 'ready' ? 'Tayyor' : 'Qoralama'}
-                      </Badge>
+                      <div className="flex-1">
+                        <div className="font-medium">{product.name}</div>
+                        <div className="flex items-center gap-4 mt-1">
+                          <Badge variant="outline" className="text-xs">
+                            <Image className="h-3 w-3 mr-1" />
+                            {product.images?.length || 0} rasm
+                          </Badge>
+                          {product.description && (
+                            <Badge variant="outline" className="text-xs">
+                              <FileText className="h-3 w-3 mr-1" />
+                              Tavsif bor
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold">{product.price?.toLocaleString()} so'm</div>
+                        <Badge variant="default" className="mt-1 text-xs">Aktiv</Badge>
+                      </div>
                     </div>
                   </div>
-                  
-                  {/* Published Status */}
-                  {draft.publishedTo.length > 0 && (
-                    <div className="mt-3 pt-3 border-t">
-                      <div className="text-xs text-muted-foreground mb-2">Joylangan:</div>
-                      <div className="flex gap-2">
-                        {draft.publishedTo.map(mp => (
-                          <Badge key={mp} variant="secondary" className="text-xs">
-                            <Check className="h-3 w-3 mr-1 text-green-500" />
-                            {MARKETPLACE_INFO[mp]?.name}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -255,7 +258,7 @@ export function MultiPublish({ connectedMarketplaces }: MultiPublishProps) {
               </div>
               <Progress value={publishProgress} />
               <p className="text-sm text-muted-foreground">
-                {selectedProducts.length} mahsulot × {selectedMarketplaces.length} marketplace = {selectedProducts.length * selectedMarketplaces.length} ta kartochka
+                {selectedProducts.length} mahsulot × {selectedMarketplaces.length} marketplace
               </p>
             </div>
           ) : (
