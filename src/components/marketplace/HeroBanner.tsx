@@ -65,9 +65,9 @@ export function HeroBanner() {
   const getBannerLink = (banner: Banner): string => {
     if (banner.link_url) return banner.link_url;
     if (banner.link_type === 'product' && banner.link_id) return `/product/${banner.link_id}`;
-    if (banner.link_type === 'category' && banner.link_id) return `/marketplace?category=${banner.link_id}`;
+    if (banner.link_type === 'category' && banner.link_id) return `/?category=${banner.link_id}`;
     if (banner.link_type === 'shop' && banner.link_id) return `/shop/${banner.link_id}`;
-    return '/marketplace';
+    return '/';
   };
 
   if (loading) {

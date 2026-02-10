@@ -89,7 +89,7 @@ export function SearchAutocomplete({ onSearch, placeholder, className }: SearchA
     if (onSearch) {
       onSearch(searchTerm);
     } else {
-      navigate(`/marketplace?search=${encodeURIComponent(searchTerm)}`);
+      navigate(`/?search=${encodeURIComponent(searchTerm)}`);
     }
   };
 

@@ -293,8 +293,8 @@ export default function CheckoutPage() {
     return (
       <Layout>
         <div className="container mx-auto px-4 py-20 text-center max-w-md">
-          <div className="bg-emerald-100 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
-            <CheckCircle className="h-10 w-10 text-emerald-600" />
+          <div className="bg-primary/10 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
+            <CheckCircle className="h-10 w-10 text-primary" />
           </div>
           <h2 className="text-2xl font-bold mb-2">{t.orderSuccess || 'Buyurtma qabul qilindi!'}</h2>
           <p className="text-muted-foreground mb-6">
@@ -518,7 +518,7 @@ export default function CheckoutPage() {
                         {shippingTotal > 0 ? (
                           <span>{formatPrice(shippingTotal)}</span>
                         ) : (
-                          <span className="text-green-600">{t.free || 'Bepul'}</span>
+                          <span className="text-primary">{t.free || 'Bepul'}</span>
                         )}
                       </div>
                     );
@@ -542,11 +542,11 @@ export default function CheckoutPage() {
                   
                   {/* Installment info */}
                   {formData.paymentMethod.startsWith('installment_') && (
-                    <div className="mt-3 p-3 bg-yellow-50 dark:bg-yellow-950 rounded-lg">
-                      <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                    <div className="mt-3 p-3 bg-warning/10 rounded-lg">
+                      <p className="text-sm font-medium text-warning-foreground">
                         {formData.paymentMethod === 'installment_12' ? '12 oylik' : '24 oylik'} muddatli to'lov
                       </p>
-                      <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
+                      <p className="text-xs text-muted-foreground mt-1">
                         Oylik to'lov: <span className="font-bold">
                           {formatPrice(
                             formData.paymentMethod === 'installment_12' 
