@@ -116,6 +116,9 @@ export function MyOrders() {
           const StatusIcon = statusConfig[order.status]?.icon || Clock;
           const isDelivered = !!order.delivery_confirmed_at;
 
+          const currentStep = statusConfig[order.status]?.step ?? 0;
+          const isCancelled = order.status === 'cancelled';
+
           return (
             <Card key={order.id}>
               <CardHeader className="pb-2">
@@ -134,14 +137,34 @@ export function MyOrders() {
                       {statusConfig[order.status]?.label}
                     </Badge>
                     {isDelivered && (
-                      <p className="text-xs text-green-600 mt-1">
+                      <p className="text-xs text-primary mt-1">
                         ✓ OTP bilan tasdiqlangan
                       </p>
                     )}
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-4">
+                {/* Progress tracker */}
+                {!isCancelled && (
+                  <div className="flex items-center gap-1 py-2">
+                    {ORDER_STEPS.map((step, i) => {
+                      const done = i <= currentStep;
+                      const StepIcon = statusConfig[step]?.icon || Clock;
+                      return (
+                        <div key={step} className="flex items-center flex-1">
+                          <div className={`flex items-center justify-center h-6 w-6 rounded-full shrink-0 ${done ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                            <StepIcon className="h-3 w-3" />
+                          </div>
+                          {i < ORDER_STEPS.length - 1 && (
+                            <div className={`h-0.5 flex-1 mx-1 rounded ${i < currentStep ? 'bg-primary' : 'bg-muted'}`} />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
                 {order.order_items?.map((item: any) => (
                   <div key={item.id} className="flex justify-between text-sm">
                     <span>{item.product_name} × {item.quantity}</span>
@@ -153,6 +176,14 @@ export function MyOrders() {
                   <span>Jami</span>
                   <span className="text-primary">{formatPrice(order.total_amount)}</span>
                 </div>
+
+                {/* Payment info */}
+                {order.payment_method && (
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>To'lov: {order.payment_method === 'cash' ? 'Naqd' : order.payment_method.toUpperCase()}</span>
+                    <span>{order.payment_status === 'paid' ? '✓ To\'langan' : order.payment_status === 'cash_on_delivery' ? 'Yetkazganda' : 'Kutilmoqda'}</span>
+                  </div>
+                )}
               </CardContent>
             </Card>
           );
