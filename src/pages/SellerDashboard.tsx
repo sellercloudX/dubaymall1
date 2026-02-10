@@ -208,7 +208,7 @@ export default function SellerDashboard() {
                 </p>
               </div>
             </div>
-            <Button asChild className="bg-gradient-to-r from-amber-500 to-orange-500 hover:opacity-90">
+            <Button asChild className="bg-gradient-to-r from-warning to-destructive hover:opacity-90">
               <Link to="/seller-cloud">
                 <Crown className="mr-2 h-4 w-4" />
                 O'tish

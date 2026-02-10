@@ -213,14 +213,24 @@ export function Navbar() {
               {user && !rolesLoading && (
                 <>
                   {showSellerLink && (
-                    <Link
-                      to="/seller"
-                      className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2 py-2"
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      <Store className="h-4 w-4" />
-                      {t.myShop}
-                    </Link>
+                    <>
+                      <Link
+                        to="/seller"
+                        className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2 py-2"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        <Store className="h-4 w-4" />
+                        {t.myShop}
+                      </Link>
+                      <Link
+                        to="/seller-cloud"
+                        className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2 py-2"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        <Crown className="h-4 w-4" />
+                        SellerCloudX
+                      </Link>
+                    </>
                   )}
                   {showBloggerLink && (
                     <Link
