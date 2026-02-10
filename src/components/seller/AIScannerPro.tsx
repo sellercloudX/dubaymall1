@@ -460,9 +460,6 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
         }
       }
 
-      // Mahsulot nomini normallashtirish (lotin harflarga)
-      const normalizedProductName = normalizeProductName(product.title);
-
       // Step 2: SEO content
       updateTaskProgress(1, 'running');
       let seoContent = null;
