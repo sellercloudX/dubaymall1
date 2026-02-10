@@ -348,7 +348,8 @@ serve(async (req) => {
 
         console.log(`Total raw products before dedup: ${allProducts.length}`);
         
-        // SERVER-SIDE DEDUPLICATION by offerId — prevent duplicates from pagination overlap
+        // SERVER-SIDE DEDUPLICATION by offerId — keep first occurrence only
+        // Stock data will be overwritten by the dedicated stocks endpoint below
         const dedupMap = new Map<string, YandexProduct>();
         for (const p of allProducts) {
           const key = p.offerId || p.shopSku;
@@ -356,17 +357,14 @@ serve(async (req) => {
           if (!dedupMap.has(key)) {
             dedupMap.set(key, p);
           } else {
-            // Merge stock counts from duplicate entries
+            // Keep richer data (longer name, pictures, price) but do NOT add stocks
             const existing = dedupMap.get(key)!;
-            existing.stockFBO = (existing.stockFBO || 0) + (p.stockFBO || 0);
-            existing.stockFBS = (existing.stockFBS || 0) + (p.stockFBS || 0);
-            existing.stockCount = (existing.stockCount || 0) + (p.stockCount || 0);
-            // Keep richer data (longer name, pictures, price)
             if (!existing.name && p.name) existing.name = p.name;
             if ((!existing.pictures || existing.pictures.length === 0) && p.pictures && p.pictures.length > 0) {
               existing.pictures = p.pictures;
             }
             if (!existing.price && p.price) existing.price = p.price;
+            if (!existing.category && p.category) existing.category = p.category;
           }
         }
         allProducts = Array.from(dedupMap.values());
