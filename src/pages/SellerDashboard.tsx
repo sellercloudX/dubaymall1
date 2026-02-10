@@ -136,7 +136,7 @@ export default function SellerDashboard() {
     return (
       <Layout>
         <div className="container py-16 text-center">
-          <Store className="h-12 w-12 mx-auto text-amber-500 mb-4" />
+          <Store className="h-12 w-12 mx-auto text-warning mb-4" />
           <h1 className="text-2xl font-bold mb-4">Aktivatsiya tasdiqlanmagan</h1>
           <p className="text-muted-foreground mb-6">
             Sizning sotuvchi profilingiz hali admin tomonidan tasdiqlanmagan. Iltimos kuting yoki aktivatsiya sahifasini tekshiring.
