@@ -113,7 +113,7 @@ export function ProblematicProducts({ connectedMarketplaces, store }: Problemati
     });
 
     return allProblems;
-  }, [connectedMarketplaces, store.allProducts.length, store.allOrders.length, isLoading]);
+  }, [connectedMarketplaces, store.dataVersion, isLoading]);
 
   const byType = useMemo(() => {
     const map: Record<string, ProblemProduct[]> = {};

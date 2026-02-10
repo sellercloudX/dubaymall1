@@ -62,7 +62,7 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
       marketplace: sourceMarketplace,
       selected: selectedIds.has(p.offerId),
     }));
-  }, [sourceMarketplace, store.allProducts.length, selectedIds]);
+  }, [sourceMarketplace, store.dataVersion, selectedIds]);
 
   const availableTargets = connectedMarketplaces.filter(mp => mp !== sourceMarketplace);
 
