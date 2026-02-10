@@ -421,7 +421,7 @@ export default function ProductPage() {
                           {[1,2,3,4,5].map(i => (
                             <Star 
                               key={i} 
-                              className={`h-4 w-4 ${i <= Math.round(ratingData?.average_rating || 0) ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} 
+                              className={`h-4 w-4 ${i <= Math.round(ratingData?.average_rating || 0) ? 'fill-warning text-warning' : 'text-muted-foreground'}`} 
                             />
                           ))}
                         </div>
