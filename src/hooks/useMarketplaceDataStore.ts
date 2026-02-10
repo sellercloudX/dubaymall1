@@ -75,10 +75,27 @@ export function useMarketplaceDataStore(connectedMarketplaces: string[]) {
           limit: 200,
           fetchAll: true,
         });
+        // Deduplicate by offerId — keep first occurrence (most complete data)
+        const raw = (result.data || []) as MarketplaceProduct[];
+        const seen = new Map<string, MarketplaceProduct>();
+        for (const p of raw) {
+          const key = p.offerId || p.shopSku || p.name;
+          if (!key) continue;
+          if (!seen.has(key)) {
+            seen.set(key, p);
+          } else {
+            // Merge stock counts from duplicates
+            const existing = seen.get(key)!;
+            existing.stockFBO = (existing.stockFBO || 0) + (p.stockFBO || 0);
+            existing.stockFBS = (existing.stockFBS || 0) + (p.stockFBS || 0);
+            existing.stockCount = (existing.stockCount || 0) + (p.stockCount || 0);
+          }
+        }
+        const deduped = Array.from(seen.values());
         return {
           marketplace: mp,
-          data: (result.data || []) as MarketplaceProduct[],
-          total: result.data?.length || 0,
+          data: deduped,
+          total: deduped.length,
         };
       },
       staleTime: 1000 * 60 * 30, // 30 min — prevent refetch on mount
