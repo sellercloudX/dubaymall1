@@ -579,7 +579,7 @@ export default function ProductPage() {
                           {[1,2,3,4,5].map(i => (
                             <Star 
                               key={i} 
-                              className={`h-3 w-3 ${i <= review.rating ? 'fill-yellow-400 text-yellow-400' : 'text-muted'}`} 
+                              className={`h-3 w-3 ${i <= review.rating ? 'fill-warning text-warning' : 'text-muted'}`} 
                             />
                           ))}
                         </div>
