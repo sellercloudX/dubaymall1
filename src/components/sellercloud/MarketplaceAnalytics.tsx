@@ -40,7 +40,7 @@ export function MarketplaceAnalytics({ connectedMarketplaces, store }: Marketpla
       stats: marketplaceStats,
       totals: { products: totalProducts, orders: totalOrders, revenue: totalRevenue },
     };
-  }, [connectedMarketplaces, store.allProducts.length, store.allOrders.length]);
+  }, [connectedMarketplaces, store.dataVersion]);
 
   const formatPrice = (price: number) => {
     if (price >= 1000000) return (price / 1000000).toFixed(1) + ' mln so\'m';

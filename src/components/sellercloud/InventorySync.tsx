@@ -56,7 +56,7 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
       });
     }
     return allProducts;
-  }, [connectedMarketplaces, store.allProducts.length]);
+  }, [connectedMarketplaces, store.dataVersion]);
 
   const lowStockCount = products.filter(p => p.lowStockAlert).length;
   const outOfStockCount = products.filter(p => p.totalStock === 0).length;

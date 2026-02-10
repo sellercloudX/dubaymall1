@@ -107,7 +107,7 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
     });
 
     return allProducts;
-  }, [connectedMarketplaces, store.allProducts.length, store.allOrders.length, isLoading, commissionPercent]);
+  }, [connectedMarketplaces, store.dataVersion, isLoading, commissionPercent]);
 
   const formatPrice = (price: number) => {
     if (Math.abs(price) >= 1000000) return (price / 1000000).toFixed(1) + ' mln';

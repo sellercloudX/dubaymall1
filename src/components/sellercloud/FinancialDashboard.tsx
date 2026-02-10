@@ -48,7 +48,7 @@ export function FinancialDashboard({
     const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
 
     return { totalRevenue, totalOrders, platformFee, commissionFee, totalExpenses, netProfit, profitMargin, marketplaceBreakdown };
-  }, [connectedMarketplaces, store.allOrders.length, isLoading, monthlyFee, commissionPercent]);
+  }, [connectedMarketplaces, store.dataVersion, isLoading, monthlyFee, commissionPercent]);
 
   const formatPrice = (price: number) => {
     if (Math.abs(price) >= 1000000) return (price / 1000000).toFixed(1) + ' mln';

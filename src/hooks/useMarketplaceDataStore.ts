@@ -75,10 +75,27 @@ export function useMarketplaceDataStore(connectedMarketplaces: string[]) {
           limit: 200,
           fetchAll: true,
         });
+        // Deduplicate by offerId — keep first occurrence (most complete data)
+        const raw = (result.data || []) as MarketplaceProduct[];
+        const seen = new Map<string, MarketplaceProduct>();
+        for (const p of raw) {
+          const key = p.offerId || p.shopSku || p.name;
+          if (!key) continue;
+          if (!seen.has(key)) {
+            seen.set(key, p);
+          } else {
+            // Merge stock counts from duplicates
+            const existing = seen.get(key)!;
+            existing.stockFBO = (existing.stockFBO || 0) + (p.stockFBO || 0);
+            existing.stockFBS = (existing.stockFBS || 0) + (p.stockFBS || 0);
+            existing.stockCount = (existing.stockCount || 0) + (p.stockCount || 0);
+          }
+        }
+        const deduped = Array.from(seen.values());
         return {
           marketplace: mp,
-          data: (result.data || []) as MarketplaceProduct[],
-          total: result.data?.length || 0,
+          data: deduped,
+          total: deduped.length,
         };
       },
       staleTime: 1000 * 60 * 30, // 30 min — prevent refetch on mount
@@ -121,6 +138,10 @@ export function useMarketplaceDataStore(connectedMarketplaces: string[]) {
   const isLoadingOrders = orderQueries.some(q => q.isLoading);
   const isLoading = isLoadingProducts || isLoadingOrders;
   const isFetching = productQueries.some(q => q.isFetching) || orderQueries.some(q => q.isFetching);
+
+  // Stable data version counter for memo dependencies
+  const dataVersion = productQueries.reduce((v, q) => v + (q.dataUpdatedAt || 0), 0)
+    + orderQueries.reduce((v, q) => v + (q.dataUpdatedAt || 0), 0);
 
   // Products by marketplace
   const getProducts = (mp: string): MarketplaceProduct[] => {
@@ -176,6 +197,9 @@ export function useMarketplaceDataStore(connectedMarketplaces: string[]) {
     allOrders,
     totalProducts,
     totalOrders,
+
+    // Stable version for memo dependencies (changes when data updates)
+    dataVersion,
 
     // Loading states
     isLoading,
