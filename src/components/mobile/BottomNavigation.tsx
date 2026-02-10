@@ -23,7 +23,7 @@ export function BottomNavigation() {
     { icon: Home, label: 'Marketplace', path: '/' },
     { icon: Heart, label: 'Sevimli', path: '/favorites', requiresAuth: true },
     { icon: ShoppingCart, label: 'Savat', path: '/cart', badge: totalItems },
-    { icon: Search, label: 'Hamkorlik', path: '/partnership' },
+    { icon: Handshake, label: 'Hamkorlik', path: '/partnership' },
     { icon: User, label: 'Profil', path: user ? '/dashboard' : '/auth' },
   ];
 
