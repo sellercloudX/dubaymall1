@@ -100,61 +100,27 @@ export default function Marketplace() {
     if (reset) setLoading(true);
     else setLoadingMore(true);
     
-    const from = pageNum * PAGE_SIZE;
-    const to = from + PAGE_SIZE - 1;
+    const offset = pageNum * PAGE_SIZE;
 
-    let query = supabase
-      .from('products')
-      .select(`*, shop:shops(name, slug)`)
-      .eq('status', 'active')
-      .range(from, to);
-
-    if (selectedCategory && selectedCategory !== 'all') {
-      query = query.eq('category_id', selectedCategory);
-    }
-
-    if (searchQuery) {
-      query = query.ilike('name', `%${searchQuery}%`);
-    }
-
-    switch (sortBy) {
-      case 'newest': query = query.order('created_at', { ascending: false }); break;
-      case 'price_low': query = query.order('price', { ascending: true }); break;
-      case 'price_high': query = query.order('price', { ascending: false }); break;
-      case 'popular': query = query.order('view_count', { ascending: false }); break;
-    }
-
-    const { data, error } = await query;
+    // Use fuzzy search RPC for typo-tolerant matching
+    const { data, error } = await supabase.rpc('search_products_fuzzy', {
+      search_term: searchQuery || '',
+      category_filter: selectedCategory !== 'all' ? selectedCategory : null,
+      sort_type: sortBy,
+      page_offset: offset,
+      page_limit: PAGE_SIZE,
+    });
 
     if (!error && data) {
-      // Fetch ratings
-      const productIds = data.map(p => p.id);
-      const { data: reviewsData } = await supabase
-        .from('reviews')
-        .select('product_id, rating')
-        .in('product_id', productIds);
-      
-      const ratingsMap = new Map<string, { total: number; count: number }>();
-      reviewsData?.forEach(review => {
-        const existing = ratingsMap.get(review.product_id) || { total: 0, count: 0 };
-        existing.total += review.rating;
-        existing.count += 1;
-        ratingsMap.set(review.product_id, existing);
-      });
-      
-      const productsWithRatings = data.map(product => {
-        const ratingInfo = ratingsMap.get(product.id);
-        return {
-          ...product,
-          rating: ratingInfo ? ratingInfo.total / ratingInfo.count : undefined,
-          reviews_count: ratingInfo?.count || 0,
-        };
-      }) as Product[];
+      const productsWithShop = (data as any[]).map(p => ({
+        ...p,
+        shop: p.shop_name ? { name: p.shop_name, slug: p.shop_slug } : undefined,
+      })) as Product[];
 
       if (reset) {
-        setProducts(productsWithRatings);
+        setProducts(productsWithShop);
       } else {
-        setProducts(prev => [...prev, ...productsWithRatings]);
+        setProducts(prev => [...prev, ...productsWithShop]);
       }
       setHasMore(data.length === PAGE_SIZE);
     }
