@@ -357,29 +357,7 @@ serve(async (req) => {
         
         let allProducts = Array.from(productMap.values());
 
-        console.log(`Total raw products before dedup: ${allProducts.length}`);
-        
-        // SERVER-SIDE DEDUPLICATION by offerId — keep first occurrence only
-        // Stock data will be overwritten by the dedicated stocks endpoint below
-        const dedupMap = new Map<string, YandexProduct>();
-        for (const p of allProducts) {
-          const key = p.offerId || p.shopSku;
-          if (!key) continue;
-          if (!dedupMap.has(key)) {
-            dedupMap.set(key, p);
-          } else {
-            // Keep richer data (longer name, pictures, price) but do NOT add stocks
-            const existing = dedupMap.get(key)!;
-            if (!existing.name && p.name) existing.name = p.name;
-            if ((!existing.pictures || existing.pictures.length === 0) && p.pictures && p.pictures.length > 0) {
-              existing.pictures = p.pictures;
-            }
-            if (!existing.price && p.price) existing.price = p.price;
-            if (!existing.category && p.category) existing.category = p.category;
-          }
-        }
-        allProducts = Array.from(dedupMap.values());
-        console.log(`After dedup: ${allProducts.length} unique products`);
+        console.log(`Total unique products: ${allProducts.length}`);
         
         // Try to get stocks from dedicated endpoint (with delay to avoid rate limit)
         if (campaignId && allProducts.length > 0) {
