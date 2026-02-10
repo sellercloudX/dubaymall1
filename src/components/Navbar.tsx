@@ -84,6 +84,8 @@ export function Navbar() {
                     Admin
                   </Link>
                 )}
+              </>
+            )}
           </div>
 
           {/* Right Side - Desktop */}
