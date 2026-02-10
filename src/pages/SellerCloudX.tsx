@@ -232,6 +232,7 @@ export default function SellerCloudX() {
             <TabsContent value="analytics"><MarketplaceAnalytics connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
             <TabsContent value="financials"><FinancialDashboard connectedMarketplaces={connectedMarketplaces} store={store} monthlyFee={subscription?.monthly_fee || 499} commissionPercent={subscription?.commission_percent || 4} /></TabsContent>
             <TabsContent value="abc-analysis"><ABCAnalysis connectedMarketplaces={connectedMarketplaces} store={store} commissionPercent={subscription?.commission_percent || 4} /></TabsContent>
+            <TabsContent value="calculator"><ProfitCalculator commissionPercent={subscription?.commission_percent || 4} /></TabsContent>
             <TabsContent value="min-price"><MinPriceProtection connectedMarketplaces={connectedMarketplaces} store={store} commissionPercent={subscription?.commission_percent || 4} /></TabsContent>
             <TabsContent value="card-clone"><CardCloner connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
             <TabsContent value="problems"><ProblematicProducts connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
