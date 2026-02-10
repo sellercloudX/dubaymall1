@@ -74,7 +74,7 @@ export function MinPriceProtection({
       return a.priceGap - b.priceGap;
     });
     return allProducts;
-  }, [connectedMarketplaces, store.dataVersion, commissionPercent, logisticsPerOrder, defaultMargin, globalProtection]);
+  }, [connectedMarketplaces, store.dataVersion, commissionPercent, logisticsPerOrder, defaultMargin, globalProtection, getCostPrice]);
 
   const formatPrice = (price: number) => {
     if (Math.abs(price) >= 1000000) return (price / 1000000).toFixed(1) + ' mln';

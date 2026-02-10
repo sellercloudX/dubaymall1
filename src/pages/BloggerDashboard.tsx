@@ -161,7 +161,7 @@ export default function BloggerDashboard() {
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 Konversiyalar
               </CardTitle>
-              <ShoppingCart className="h-4 w-4 text-purple-600" />
+              <ShoppingCart className="h-4 w-4 text-accent" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-foreground">
