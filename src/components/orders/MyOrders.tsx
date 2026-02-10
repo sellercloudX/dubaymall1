@@ -88,13 +88,13 @@ export function MyOrders() {
             Yetkazib berishni tasdiqlang
           </h3>
           {pendingDeliveryOrders.map(order => (
-            <Card key={order.id} className="border-orange-200 bg-orange-50/50">
+            <Card key={order.id} className="border-warning/30 bg-warning/5">
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base">
                     Buyurtma #{order.order_number}
                   </CardTitle>
-                  <Badge className="bg-orange-500">Yetkazilmoqda</Badge>
+                  <Badge className="bg-warning text-warning-foreground">Yetkazilmoqda</Badge>
                 </div>
               </CardHeader>
               <CardContent>
