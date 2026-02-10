@@ -60,7 +60,7 @@ export default function FavoritesPage() {
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
               Sizga yoqqan mahsulotlarni ❤️ belgisi bilan saqlang va keyinroq osonlik bilan toping
             </p>
-            <Button onClick={() => navigate('/marketplace')} size="lg">
+            <Button onClick={() => navigate('/')} size="lg">
               <ShoppingBag className="mr-2 h-5 w-5" />
               Marketplace'ga o'tish
             </Button>

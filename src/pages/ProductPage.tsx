@@ -639,7 +639,7 @@ export default function ProductPage() {
             <h2 className="text-xl font-bold mb-4">Shuningdek qarang</h2>
             <Card>
               <CardContent className="p-4">
-                <Link to={`/marketplace?category=${product.category.id}`} className="flex items-center justify-between">
+                <Link to={`/?category=${product.category.id}`} className="flex items-center justify-between">
                   <div>
                     <p className="font-medium">{product.category.name_uz}</p>
                     <p className="text-sm text-muted-foreground">Turkum</p>

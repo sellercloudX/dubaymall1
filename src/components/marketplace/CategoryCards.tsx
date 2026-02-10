@@ -77,7 +77,7 @@ export function CategoryCards() {
           return (
             <Link
               key={category.id}
-              to={`/marketplace?category=${category.id}`}
+              to={`/?category=${category.id}`}
               className="group"
             >
               <div className="flex flex-col items-center">

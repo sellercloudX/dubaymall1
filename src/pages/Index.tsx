@@ -45,7 +45,7 @@ export default function Index() {
     url: 'https://dubaymall.uz',
     potentialAction: {
       '@type': 'SearchAction',
-      target: 'https://dubaymall.uz/marketplace?search={search_term_string}',
+      target: 'https://dubaymall.uz/?search={search_term_string}',
       'query-input': 'required name=search_term_string',
     },
   };
