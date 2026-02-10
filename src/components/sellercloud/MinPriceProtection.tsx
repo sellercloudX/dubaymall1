@@ -14,6 +14,7 @@ import {
   Percent, RefreshCw, TrendingDown, Settings
 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useCostPrices } from '@/hooks/useCostPrices';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 
 interface MinPriceProtectionProps {
@@ -38,27 +39,31 @@ export function MinPriceProtection({
 }: MinPriceProtectionProps) {
   const [globalProtection, setGlobalProtection] = useState(true);
   const [defaultMargin, setDefaultMargin] = useState(10);
-  const [logisticsPercent, setLogisticsPercent] = useState(5);
-  const [costPercent, setCostPercent] = useState(60);
+  const [logisticsPerOrder, setLogisticsPerOrder] = useState(4000);
   const isMobile = useIsMobile();
   const isLoading = store.isLoadingProducts;
+  const { getCostPrice } = useCostPrices();
 
   const products = useMemo(() => {
     const allProducts: ProtectedProduct[] = [];
     for (const marketplace of connectedMarketplaces) {
       store.getProducts(marketplace).forEach(product => {
         const currentPrice = product.price || 0;
-        const costPrice = currentPrice * (costPercent / 100);
-        const commissionAmount = currentPrice * (commissionPercent / 100);
-        const logisticsCost = currentPrice * (logisticsPercent / 100);
-        const totalCosts = costPrice + commissionAmount + logisticsCost;
+        // Use real cost price from DB, fallback to 0 (unknown)
+        const realCost = getCostPrice(marketplace, product.offerId);
+        const costPrice = realCost !== null ? realCost : 0;
+        const yandexCommission = currentPrice * 0.20; // 20% marketplace
+        const platformCommission = currentPrice * (commissionPercent / 100);
+        const taxAmount = currentPrice * 0.04; // 4% tax
+        const totalCosts = costPrice + yandexCommission + platformCommission + taxAmount + logisticsPerOrder;
         const minPrice = Math.ceil(totalCosts / (1 - defaultMargin / 100));
         const isBelowMin = currentPrice < minPrice && currentPrice > 0;
 
         allProducts.push({
           id: product.offerId, name: product.name || 'Nomsiz',
           sku: product.shopSku || product.offerId, marketplace, currentPrice,
-          costPrice, commissionAmount, logisticsCost, minPrice,
+          costPrice, commissionAmount: yandexCommission + platformCommission + taxAmount,
+          logisticsCost: logisticsPerOrder, minPrice,
           customMinPrice: null, isProtected: globalProtection, isBelowMin,
           priceGap: currentPrice - minPrice,
         });
@@ -70,7 +75,7 @@ export function MinPriceProtection({
       return a.priceGap - b.priceGap;
     });
     return allProducts;
-  }, [connectedMarketplaces, store.dataVersion, costPercent, commissionPercent, logisticsPercent, defaultMargin, globalProtection]);
+  }, [connectedMarketplaces, store.dataVersion, commissionPercent, logisticsPerOrder, defaultMargin, globalProtection, getCostPrice]);
 
   const formatPrice = (price: number) => {
     if (Math.abs(price) >= 1000000) return (price / 1000000).toFixed(1) + ' mln';
@@ -132,10 +137,10 @@ export function MinPriceProtection({
             <Switch checked={globalProtection} onCheckedChange={setGlobalProtection} />
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div><div className="text-xs mb-1">Tannarx %</div><div className="flex items-center gap-1"><Input type="number" value={costPercent} onChange={e => setCostPercent(Number(e.target.value))} className="w-full h-8 text-sm" min={10} max={95} /><span className="text-xs shrink-0">%</span></div></div>
+            <div><div className="text-xs mb-1">Logistika (so'm)</div><div className="flex items-center gap-1"><Input type="number" value={logisticsPerOrder} onChange={e => setLogisticsPerOrder(Number(e.target.value))} className="w-full h-8 text-sm" min={0} max={50000} /><span className="text-xs shrink-0">so'm</span></div></div>
             <div><div className="text-xs mb-1">Komissiya %</div><div className="flex items-center gap-1"><Input type="number" value={commissionPercent} className="w-full h-8 text-sm" disabled /><span className="text-xs shrink-0">%</span></div></div>
-            <div><div className="text-xs mb-1">Logistika %</div><div className="flex items-center gap-1"><Input type="number" value={logisticsPercent} onChange={e => setLogisticsPercent(Number(e.target.value))} className="w-full h-8 text-sm" min={0} max={30} /><span className="text-xs shrink-0">%</span></div></div>
             <div><div className="text-xs mb-1">Min marja %</div><div className="flex items-center gap-1"><Input type="number" value={defaultMargin} onChange={e => setDefaultMargin(Number(e.target.value))} className="w-full h-8 text-sm" min={1} max={50} /><span className="text-xs shrink-0">%</span></div></div>
+            <div><div className="text-xs mb-1 text-muted-foreground">Tannarx</div><div className="text-xs text-muted-foreground">Mahsulotlar tabidan kiritiladi</div></div>
           </div>
         </CardContent>
       </Card>

@@ -24,6 +24,7 @@ import { ABCAnalysis } from '@/components/sellercloud/ABCAnalysis';
 import { MinPriceProtection } from '@/components/sellercloud/MinPriceProtection';
 import { CardCloner } from '@/components/sellercloud/CardCloner';
 import { ProblematicProducts } from '@/components/sellercloud/ProblematicProducts';
+import { ProfitCalculator } from '@/components/sellercloud/ProfitCalculator';
 import { AIScannerPro } from '@/components/seller/AIScannerPro';
 import { useMarketplaceConnections } from '@/hooks/useMarketplaceConnections';
 import { useSellerCloudSubscription } from '@/hooks/useSellerCloudSubscription';
@@ -205,6 +206,7 @@ export default function SellerCloudX() {
               <TabsTrigger value="publish" className="gap-2"><Upload className="h-4 w-4" /><span className="hidden sm:inline">Joylash</span></TabsTrigger>
               <TabsTrigger value="analytics" className="gap-2"><BarChart3 className="h-4 w-4" /><span className="hidden sm:inline">Analitika</span></TabsTrigger>
               <TabsTrigger value="financials" className="gap-2"><Calculator className="h-4 w-4" /><span className="hidden sm:inline">Moliya</span></TabsTrigger>
+              <TabsTrigger value="calculator" className="gap-2"><Calculator className="h-4 w-4" /><span className="hidden sm:inline">Kalkulyator</span></TabsTrigger>
               <TabsTrigger value="abc-analysis" className="gap-2"><BarChart3 className="h-4 w-4" /><span className="hidden sm:inline">ABC-analiz</span></TabsTrigger>
               <TabsTrigger value="min-price" className="gap-2"><Shield className="h-4 w-4" /><span className="hidden sm:inline">Min narx</span></TabsTrigger>
               <TabsTrigger value="card-clone" className="gap-2"><Copy className="h-4 w-4" /><span className="hidden sm:inline">Klonlash</span></TabsTrigger>
@@ -230,6 +232,7 @@ export default function SellerCloudX() {
             <TabsContent value="analytics"><MarketplaceAnalytics connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
             <TabsContent value="financials"><FinancialDashboard connectedMarketplaces={connectedMarketplaces} store={store} monthlyFee={subscription?.monthly_fee || 499} commissionPercent={subscription?.commission_percent || 4} /></TabsContent>
             <TabsContent value="abc-analysis"><ABCAnalysis connectedMarketplaces={connectedMarketplaces} store={store} commissionPercent={subscription?.commission_percent || 4} /></TabsContent>
+            <TabsContent value="calculator"><ProfitCalculator commissionPercent={subscription?.commission_percent || 4} /></TabsContent>
             <TabsContent value="min-price"><MinPriceProtection connectedMarketplaces={connectedMarketplaces} store={store} commissionPercent={subscription?.commission_percent || 4} /></TabsContent>
             <TabsContent value="card-clone"><CardCloner connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
             <TabsContent value="problems"><ProblematicProducts connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>

@@ -884,6 +884,42 @@ export type Database = {
           },
         ]
       }
+      marketplace_cost_prices: {
+        Row: {
+          cost_price: number
+          created_at: string
+          currency: string
+          id: string
+          marketplace: string
+          notes: string | null
+          offer_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cost_price?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          marketplace: string
+          notes?: string | null
+          offer_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cost_price?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          marketplace?: string
+          notes?: string | null
+          offer_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       marketplace_orders_cache: {
         Row: {
           created_at: string

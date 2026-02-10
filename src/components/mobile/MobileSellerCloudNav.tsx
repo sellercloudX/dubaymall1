@@ -1,7 +1,7 @@
 import { BarChart3, Scan, Package, ShoppingCart, TrendingUp, MoreHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-type TabType = 'analytics' | 'scanner' | 'products' | 'orders' | 'trends' | 'abc-analysis' | 'min-price' | 'card-clone' | 'problems';
+type TabType = 'analytics' | 'scanner' | 'products' | 'orders' | 'trends' | 'abc-analysis' | 'min-price' | 'card-clone' | 'problems' | 'financials' | 'calculator';
 
 interface MobileSellerCloudNavProps {
   activeTab: TabType;
@@ -16,7 +16,7 @@ const navItems = [
   { id: 'more' as const, icon: MoreHorizontal, label: "Ko'proq" },
 ];
 
-const moreTabIds: TabType[] = ['trends', 'abc-analysis', 'min-price', 'card-clone', 'problems'];
+const moreTabIds: TabType[] = ['trends', 'abc-analysis', 'min-price', 'card-clone', 'problems', 'financials', 'calculator'];
 
 export function MobileSellerCloudNav({ activeTab, onTabChange }: MobileSellerCloudNavProps) {
   const isMoreActive = moreTabIds.includes(activeTab);

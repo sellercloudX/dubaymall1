@@ -16,22 +16,26 @@ import { ABCAnalysis } from '@/components/sellercloud/ABCAnalysis';
 import { MinPriceProtection } from '@/components/sellercloud/MinPriceProtection';
 import { CardCloner } from '@/components/sellercloud/CardCloner';
 import { ProblematicProducts } from '@/components/sellercloud/ProblematicProducts';
-import { Loader2, Lock, BarChart3, Shield, Copy, AlertOctagon, TrendingUp } from 'lucide-react';
+import { FinancialDashboard } from '@/components/sellercloud/FinancialDashboard';
+import { ProfitCalculator } from '@/components/sellercloud/ProfitCalculator';
+import { Loader2, Lock, BarChart3, Shield, Copy, AlertOctagon, TrendingUp, Calculator, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
-type TabType = 'analytics' | 'scanner' | 'products' | 'orders' | 'trends' | 'abc-analysis' | 'min-price' | 'card-clone' | 'problems';
+type TabType = 'analytics' | 'scanner' | 'products' | 'orders' | 'trends' | 'abc-analysis' | 'min-price' | 'card-clone' | 'problems' | 'financials' | 'calculator';
 
 const moreSubTabs = [
   { id: 'trends' as const, icon: TrendingUp, label: 'Trendlar' },
+  { id: 'financials' as const, icon: DollarSign, label: 'Moliya' },
+  { id: 'calculator' as const, icon: Calculator, label: 'Kalkulyator' },
   { id: 'abc-analysis' as const, icon: BarChart3, label: 'ABC-analiz' },
   { id: 'min-price' as const, icon: Shield, label: 'Min narx' },
   { id: 'card-clone' as const, icon: Copy, label: 'Klonlash' },
   { id: 'problems' as const, icon: AlertOctagon, label: 'Muammolar' },
 ];
 
-const moreTabIds: TabType[] = ['trends', 'abc-analysis', 'min-price', 'card-clone', 'problems'];
+const moreTabIds: TabType[] = ['trends', 'abc-analysis', 'min-price', 'card-clone', 'problems', 'financials', 'calculator'];
 
 export default function SellerCloudMobile() {
   const { user, loading: authLoading } = useAuth();
@@ -117,6 +121,10 @@ export default function SellerCloudMobile() {
         return <div className="p-4"><CardCloner connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'problems':
         return <div className="p-4"><ProblematicProducts connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
+      case 'financials':
+        return <div className="p-4"><FinancialDashboard connectedMarketplaces={connectedMarketplaces} store={store} monthlyFee={subscription?.monthly_fee || 499} commissionPercent={subscription?.commission_percent || 4} /></div>;
+      case 'calculator':
+        return <div className="p-4"><ProfitCalculator commissionPercent={subscription?.commission_percent || 4} /></div>;
       default:
         return null;
     }
