@@ -192,7 +192,7 @@ export default function SellerDashboard() {
         </div>
 
         {/* SellerCloudX Promo */}
-        <Card className="mb-6 border-amber-500/30 bg-gradient-to-r from-amber-500/5 to-orange-500/5">
+        <Card className="mb-6 border-warning/30 bg-gradient-to-r from-warning/5 to-destructive/5">
           <CardContent className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center">
