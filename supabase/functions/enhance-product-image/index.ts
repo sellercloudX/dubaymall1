@@ -6,34 +6,59 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// ==================== LOVABLE AI - PRIMARY IMAGE EDITING ====================
-// Uses Gemini image model to ACTUALLY EDIT the uploaded image (background removal, quality improvement)
+// ==================== CATEGORY-SPECIFIC EDIT PROMPT ====================
+function getEditPrompt(productName: string, category: string): string {
+  const cat = (category || "").toLowerCase();
+
+  if (cat.includes("kosmetik") || cat.includes("beauty") || cat.includes("go'zallik") || cat.includes("parfum")) {
+    return `Edit this product photo for a premium beauty marketplace listing:
+- REMOVE background → soft pink-to-white gradient with subtle golden particles
+- Add luxury beauty photography lighting (soft, warm, flattering)
+- Enhance packaging colors and glossy reflections
+- KEEP product EXACTLY identical
+Product: "${productName}"`;
+  }
+
+  if (cat.includes("elektron") || cat.includes("phone") || cat.includes("smartfon") || cat.includes("kompyuter") || cat.includes("audio")) {
+    return `Edit this product photo for a premium tech marketplace listing:
+- REMOVE background → sleek dark gradient with subtle blue ambient glow
+- Add dramatic rim lighting around product edges
+- Enhance screen brightness and metal/glass reflections
+- KEEP product EXACTLY identical
+Product: "${productName}"`;
+  }
+
+  if (cat.includes("kiyim") || cat.includes("fashion") || cat.includes("poyabzal")) {
+    return `Edit this product photo for a fashion marketplace listing:
+- REMOVE background → clean white-to-light-gray gradient
+- Add soft diffused lighting showing fabric texture
+- True-to-life color accuracy
+- KEEP product EXACTLY identical
+Product: "${productName}"`;
+  }
+
+  return `Edit this product photo for a professional e-commerce listing:
+- REMOVE background → clean white studio gradient
+- Add professional three-point studio lighting
+- Add subtle shadow beneath for depth
+- Enhance sharpness and color accuracy
+- KEEP product EXACTLY identical
+Product: "${productName}", Category: "${category}"`;
+}
+
+// ==================== 1. LOVABLE AI — PRIMARY ====================
 async function enhanceWithLovableAI(
   imageBase64: string,
   productName: string,
   category: string
 ): Promise<string | null> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) {
-    console.log("⚠️ LOVABLE_API_KEY not configured");
-    return null;
-  }
+  if (!LOVABLE_API_KEY) return null;
+
+  const prompt = getEditPrompt(productName, category);
 
   try {
-    console.log("🎨 PRIMARY: Lovable AI (Gemini Image Edit) - Real image editing...");
-    
-    const editPrompt = `Edit this product image for professional e-commerce listing:
-1. REMOVE the current background completely
-2. Replace with a clean, professional white/light gradient studio background
-3. KEEP the product EXACTLY the same - do NOT change, distort, or recreate the product
-4. Improve lighting: add professional studio lighting (key light, fill, rim light)
-5. Add subtle natural shadow beneath the product for depth
-6. Enhance color accuracy and sharpness
-7. Make it marketplace-ready (Uzum Market / Yandex Market standard)
-
-Product: "${productName}", Category: "${category}"
-
-CRITICAL: The product in the output must be IDENTICAL to the input image. Only change the background and lighting.`;
+    console.log("🎨 PRIMARY: Lovable AI (Gemini Image Edit)...");
 
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -46,7 +71,7 @@ CRITICAL: The product in the output must be IDENTICAL to the input image. Only c
         messages: [{
           role: "user",
           content: [
-            { type: "text", text: editPrompt },
+            { type: "text", text: prompt },
             { type: "image_url", image_url: { url: imageBase64 } }
           ]
         }],
@@ -55,201 +80,97 @@ CRITICAL: The product in the output must be IDENTICAL to the input image. Only c
     });
 
     if (!res.ok) {
-      const errText = await res.text();
-      console.error("Lovable AI image edit error:", res.status, errText);
-      if (res.status === 429) console.log("Rate limited");
-      if (res.status === 402) console.log("Credits exhausted");
+      console.error("Lovable AI error:", res.status);
       return null;
     }
 
     const data = await res.json();
     const editedImage = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-    
+
     if (editedImage) {
-      console.log("✅ Lovable AI image editing successful - background removed & enhanced");
+      console.log("✅ Lovable AI image editing successful");
       return editedImage;
     }
-    
-    console.log("⚠️ Lovable AI returned no image");
     return null;
   } catch (err) {
-    console.error("Lovable AI image edit error:", err);
+    console.error("Lovable AI error:", err);
     return null;
   }
 }
 
-async function enhanceWithFluxPro(
+// ==================== 2. GOOGLE AI STUDIO — SECONDARY ====================
+async function enhanceWithGoogle(
+  imageBase64: string,
   productName: string,
-  productDescription: string,
-  category: string,
-  style: string = "professional"
+  category: string
 ): Promise<string | null> {
-  const REPLICATE_API_TOKEN = Deno.env.get("REPLICATE_API_TOKEN");
-  
-  if (!REPLICATE_API_TOKEN) {
-    console.log("⚠️ REPLICATE_API_TOKEN not configured");
-    return null;
+  const GOOGLE_KEY = Deno.env.get("GOOGLE_AI_STUDIO_KEY");
+  if (!GOOGLE_KEY) return null;
+
+  let base64Data = imageBase64;
+  let mimeType = "image/jpeg";
+  if (imageBase64.startsWith("data:")) {
+    const match = imageBase64.match(/^data:([^;]+);base64,(.+)$/);
+    if (match) { mimeType = match[1]; base64Data = match[2]; }
   }
+
+  const prompt = getEditPrompt(productName, category);
 
   try {
-    console.log("🎨 SECONDARY: Using Flux Pro for image generation...");
-    
-    // Category-specific professional styling
-    const categoryEnhancements: Record<string, string> = {
-      "cosmetics": `soft pink peach gradient background with subtle bokeh, scattered flower petals around product, 
-        citrus slices decoration, water droplets for freshness, soft glow and golden particles, 
-        beauty product photography lighting, luxury cosmetic advertisement style`,
-      
-      "electronics": `dark gradient blue black background with tech glow effects, light trails around product,
-        subtle circuit pattern reflections, dramatic side lighting, neon blue accents,
-        premium tech product photography, flagship device presentation style`,
-      
-      "clothing": `clean studio backdrop, soft natural lighting, fashion editorial feel,
-        subtle fabric texture visible, elegant shadows for depth, lookbook style presentation,
-        professional fashion photography, runway quality lighting`,
-      
-      "food": `warm appetizing setting, wooden surface texture, natural window lighting,
-        fresh ingredient props around product, steam effect for warm items, water droplets for freshness,
-        food photography styling, appetizing warm color grading`,
-      
-      "home": `cozy home interior background, natural light from window, complementary decor elements,
-        lifestyle photography feel, warm inviting atmosphere, catalog style presentation,
-        interior design magazine quality`,
-      
-      "default": `clean gradient studio background, professional product photography lighting,
-        soft shadows beneath product, subtle reflections, elegant platform surface,
-        premium e-commerce presentation, marketplace listing ready`
-    };
-
-    const enhancement = categoryEnhancements[category.toLowerCase()] || categoryEnhancements["default"];
-
-    // ULTRA-PROFESSIONAL FLUX PRO ENHANCEMENT PROMPT
-    const fluxPrompt = `PROFESSIONAL E-COMMERCE PRODUCT PHOTOGRAPHY ENHANCEMENT.
-
-PRODUCT: "${productName}"
-${productDescription ? `DESCRIPTION: ${productDescription}` : ""}
-CATEGORY: ${category || "General"}
-
-ENHANCEMENT REQUIREMENTS:
-${enhancement}
-
-COMPOSITION:
-- Product centered and prominent, fills 70-80% of frame
-- Professional studio lighting setup (key light, fill light, rim light)
-- Soft natural shadows for depth and grounding
-- Clean crisp product edges with perfect focus
-- Premium marketplace presentation quality
-
-TECHNICAL SPECIFICATIONS:
-- Ultra high resolution, 8K quality details
-- Perfect color accuracy and white balance
-- Ready for Uzum Market / Yandex Market listing
-- 3:4 portrait aspect ratio (1080x1440 pixels)
-- Commercial photography quality
-
-ABSOLUTE RESTRICTIONS:
-- NO text, watermarks, logos, labels, or prices
-- NO people, hands, or body parts visible
-- NO cluttered or distracting backgrounds
-- NO unrealistic colors or over-saturation
-- The product itself must look EXACTLY realistic
-
-OUTPUT: Premium marketplace-ready product photograph.`;
-
-    // Create prediction with Flux 1.1 Pro
-    const createResponse = await fetch("https://api.replicate.com/v1/predictions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Token ${REPLICATE_API_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        version: "black-forest-labs/flux-1.1-pro",
-        input: {
-          prompt: fluxPrompt,
-          aspect_ratio: "3:4",
-          output_format: "webp",
-          output_quality: 95,
-          safety_tolerance: 2,
-          prompt_upsampling: true
-        }
-      }),
-    });
-
-    if (!createResponse.ok) {
-      const errorText = await createResponse.text();
-      console.error("Flux Pro create error:", createResponse.status, errorText);
-      return null;
-    }
-
-    const prediction = await createResponse.json();
-    console.log("📤 Flux Pro enhancement started:", prediction.id);
-
-    // Poll for completion (max 120 seconds)
-    let result = prediction;
-    let attempts = 0;
-    const maxAttempts = 60;
-
-    while (result.status !== "succeeded" && result.status !== "failed" && attempts < maxAttempts) {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      const pollResponse = await fetch(`https://api.replicate.com/v1/predictions/${prediction.id}`, {
-        headers: {
-          "Authorization": `Token ${REPLICATE_API_TOKEN}`,
-        },
-      });
-      
-      if (pollResponse.ok) {
-        result = await pollResponse.json();
-        console.log(`⏳ Flux Pro status: ${result.status} (attempt ${attempts + 1}/${maxAttempts})`);
+    console.log("🎨 SECONDARY: Google AI Studio (Gemini)...");
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${GOOGLE_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: prompt },
+              { inline_data: { mime_type: mimeType, data: base64Data } }
+            ]
+          }],
+          generationConfig: { responseModalities: ["IMAGE", "TEXT"] }
+        }),
       }
-      attempts++;
-    }
+    );
 
-    if (result.status === "succeeded" && result.output) {
-      const imageUrl = Array.isArray(result.output) ? result.output[0] : result.output;
-      console.log("✅ Flux Pro enhancement completed successfully");
-      return imageUrl;
-    }
+    if (!response.ok) return null;
 
-    console.error("Flux Pro enhancement failed:", result.error || "Unknown error");
+    const data = await response.json();
+    const parts = data.candidates?.[0]?.content?.parts || [];
+    for (const part of parts) {
+      if (part.inlineData) {
+        console.log("✅ Google AI Studio image editing successful");
+        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+      }
+    }
     return null;
   } catch (err) {
-    console.error("Flux Pro enhancement error:", err);
+    console.error("Google AI Studio error:", err);
     return null;
   }
 }
 
-// ==================== DALL-E 3 - FALLBACK ====================
+// ==================== 3. DALL-E 3 — FALLBACK ====================
 async function enhanceWithDallE(
   productName: string,
   category: string
 ): Promise<string | null> {
   const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-  
-  if (!OPENAI_API_KEY) {
-    console.log("⚠️ OPENAI_API_KEY not configured for fallback");
-    return null;
-  }
+  if (!OPENAI_API_KEY) return null;
 
   try {
-    console.log("🎨 FALLBACK: Using DALL-E 3 for enhancement...");
-    
-    const dallePrompt = `Professional e-commerce product photography of "${productName}".
-${category ? `Category: ${category}.` : ""}
-Clean studio background, premium lighting, high resolution product photography, 
-marketplace listing quality, no text or watermarks, 3:4 portrait ratio.
-Ultra realistic, commercial photography quality, ready for premium marketplace.`;
-
+    console.log("🎨 FALLBACK: DALL-E 3...");
     const response = await fetch("https://api.openai.com/v1/images/generations", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${OPENAI_API_KEY}`,
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         model: "dall-e-3",
-        prompt: dallePrompt,
+        prompt: `Professional e-commerce product photo of "${productName}". ${category ? `Category: ${category}.` : ""} Clean studio background, professional lighting, no text, no watermarks. Photorealistic.`,
         n: 1,
         size: "1024x1792",
         quality: "hd",
@@ -257,33 +178,28 @@ Ultra realistic, commercial photography quality, ready for premium marketplace.`
       }),
     });
 
-    if (!response.ok) {
-      console.error("DALL-E API error:", response.status);
-      return null;
-    }
+    if (!response.ok) return null;
 
     const data = await response.json();
     const imageUrl = data.data?.[0]?.url;
-
     if (imageUrl) {
       console.log("✅ DALL-E 3 fallback successful");
       return imageUrl;
     }
-
     return null;
   } catch (err) {
-    console.error("DALL-E fallback error:", err);
+    console.error("DALL-E error:", err);
     return null;
   }
 }
 
+// ==================== MAIN HANDLER ====================
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Authentication check
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(
@@ -299,7 +215,6 @@ serve(async (req) => {
     );
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
     if (authError || !user) {
       return new Response(
         JSON.stringify({ error: "Invalid authentication" }),
@@ -308,25 +223,15 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const { imageBase64, productName, productDescription, category } = body;
+    const { imageBase64, productName, category } = body;
 
-    // Input validation
-    if (!imageBase64 || typeof imageBase64 !== 'string') {
+    if (!imageBase64 || typeof imageBase64 !== "string") {
       return new Response(
         JSON.stringify({ error: "Image is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Validate base64 format
-    if (!imageBase64.startsWith('data:image/') && !imageBase64.match(/^[A-Za-z0-9+/=]+$/)) {
-      return new Response(
-        JSON.stringify({ error: "Invalid image format" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Limit image size (roughly 10MB base64)
     if (imageBase64.length > 14000000) {
       return new Response(
         JSON.stringify({ error: "Image too large" }),
@@ -334,64 +239,40 @@ serve(async (req) => {
       );
     }
 
-    if (productName && (typeof productName !== 'string' || productName.length > 500)) {
-      return new Response(
-        JSON.stringify({ error: "Invalid product name" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    if (category && (typeof category !== 'string' || category.length > 100)) {
-      return new Response(
-        JSON.stringify({ error: "Invalid category" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     console.log(`🖼️ Enhancing product image for user ${user.id}`);
     console.log(`📦 Product: ${productName?.slice(0, 50)}, Category: ${category?.slice(0, 30)}`);
-    console.log(`🤖 AI Priority: Lovable AI (Gemini Image Edit) → Flux Pro → DALL-E 3`);
+    console.log(`🤖 AI Priority: Lovable AI → Google AI Studio → DALL-E 3`);
 
     let enhancedImage: string | null = null;
     let usedModel = "none";
 
-    // PRIMARY: Try Lovable AI image editing (actually edits the uploaded image)
-    enhancedImage = await enhanceWithLovableAI(
-      imageBase64,
-      productName || "Product",
-      category || "default"
-    );
-    if (enhancedImage) usedModel = "lovable-gemini-image";
+    // 1. Lovable AI
+    enhancedImage = await enhanceWithLovableAI(imageBase64, productName || "Product", category || "default");
+    if (enhancedImage) usedModel = "lovable-gemini-edit";
 
-    // SECONDARY: Try Flux Pro (generates new image from text - fallback)
+    // 2. Google AI Studio
     if (!enhancedImage) {
-      enhancedImage = await enhanceWithFluxPro(
-        productName || "Product",
-        productDescription || "",
-        category || "default",
-        "professional"
-      );
-      if (enhancedImage) usedModel = "flux-pro";
+      enhancedImage = await enhanceWithGoogle(imageBase64, productName || "Product", category || "default");
+      if (enhancedImage) usedModel = "google-gemini-edit";
     }
 
-    // FALLBACK: Try DALL-E 3 if Flux Pro fails
+    // 3. DALL-E 3
     if (!enhancedImage) {
       enhancedImage = await enhanceWithDallE(productName || "Product", category || "");
       if (enhancedImage) usedModel = "dall-e-3";
     }
 
     if (!enhancedImage) {
-      console.error("All AI models failed for image enhancement");
       return new Response(
         JSON.stringify({ error: "Image enhancement failed. Please try again later." }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log(`✅ Image enhanced successfully with ${usedModel}`);
+    console.log(`✅ Image enhanced with ${usedModel}`);
 
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         enhancedImageBase64: enhancedImage,
         aiModel: usedModel,
         message: "Image enhanced successfully"
