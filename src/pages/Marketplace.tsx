@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -16,7 +16,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Package,
   X,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Loader2
 } from 'lucide-react';
 import {
   Sheet,
@@ -41,16 +42,22 @@ type Product = Tables<'products'> & {
   reviews_count?: number;
 };
 
+const PAGE_SIZE = 20;
+
 export default function Marketplace() {
   const { t } = useLanguage();
   const { categories } = useCategories();
   const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(0);
   const [searchQuery, setSearchQueryState] = useState(searchParams.get('search') || '');
   const [selectedCategory, setSelectedCategory] = useState<string>(searchParams.get('category') || 'all');
   const [priceRange, setPriceRange] = useState([0, 10000000]);
   const [sortBy, setSortBy] = useState('newest');
+  const observerRef = useRef<IntersectionObserver | null>(null);
 
   const setSearchQuery = (query: string) => {
     setSearchQueryState(query);
@@ -63,7 +70,6 @@ export default function Marketplace() {
     setSearchParams(newParams);
   };
 
-  // Sync category with URL params
   useEffect(() => {
     const categoryFromUrl = searchParams.get('category');
     if (categoryFromUrl && categoryFromUrl !== selectedCategory) {
@@ -71,7 +77,6 @@ export default function Marketplace() {
     }
   }, [searchParams]);
 
-  // Update URL when category changes
   const handleCategoryChange = (categoryId: string) => {
     setSelectedCategory(categoryId);
     const newParams = new URLSearchParams(searchParams);
@@ -83,57 +88,52 @@ export default function Marketplace() {
     setSearchParams(newParams);
   };
 
+  // Reset pagination when filters change
   useEffect(() => {
-    fetchProducts();
+    setProducts([]);
+    setPage(0);
+    setHasMore(true);
+    fetchProducts(0, true);
   }, [selectedCategory, sortBy, searchQuery]);
 
-  const fetchProducts = async () => {
-    setLoading(true);
+  const fetchProducts = async (pageNum: number, reset = false) => {
+    if (reset) setLoading(true);
+    else setLoadingMore(true);
     
+    const from = pageNum * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+
     let query = supabase
       .from('products')
-      .select(`
-        *,
-        shop:shops(name, slug)
-      `)
-      .eq('status', 'active');
+      .select(`*, shop:shops(name, slug)`)
+      .eq('status', 'active')
+      .range(from, to);
 
     if (selectedCategory && selectedCategory !== 'all') {
       query = query.eq('category_id', selectedCategory);
     }
 
-    // Search in database
     if (searchQuery) {
       query = query.ilike('name', `%${searchQuery}%`);
     }
 
-    // Sorting
     switch (sortBy) {
-      case 'newest':
-        query = query.order('created_at', { ascending: false });
-        break;
-      case 'price_low':
-        query = query.order('price', { ascending: true });
-        break;
-      case 'price_high':
-        query = query.order('price', { ascending: false });
-        break;
-      case 'popular':
-        query = query.order('view_count', { ascending: false });
-        break;
+      case 'newest': query = query.order('created_at', { ascending: false }); break;
+      case 'price_low': query = query.order('price', { ascending: true }); break;
+      case 'price_high': query = query.order('price', { ascending: false }); break;
+      case 'popular': query = query.order('view_count', { ascending: false }); break;
     }
 
     const { data, error } = await query;
 
     if (!error && data) {
-      // Fetch ratings for all products
+      // Fetch ratings
       const productIds = data.map(p => p.id);
       const { data: reviewsData } = await supabase
         .from('reviews')
         .select('product_id, rating')
         .in('product_id', productIds);
       
-      // Calculate ratings per product
       const ratingsMap = new Map<string, { total: number; count: number }>();
       reviewsData?.forEach(review => {
         const existing = ratingsMap.get(review.product_id) || { total: 0, count: 0 };
@@ -142,7 +142,6 @@ export default function Marketplace() {
         ratingsMap.set(review.product_id, existing);
       });
       
-      // Attach ratings to products
       const productsWithRatings = data.map(product => {
         const ratingInfo = ratingsMap.get(product.id);
         return {
@@ -150,16 +149,38 @@ export default function Marketplace() {
           rating: ratingInfo ? ratingInfo.total / ratingInfo.count : undefined,
           reviews_count: ratingInfo?.count || 0,
         };
-      });
-      
-      setProducts(productsWithRatings as Product[]);
+      }) as Product[];
+
+      if (reset) {
+        setProducts(productsWithRatings);
+      } else {
+        setProducts(prev => [...prev, ...productsWithRatings]);
+      }
+      setHasMore(data.length === PAGE_SIZE);
     }
+    
     setLoading(false);
+    setLoadingMore(false);
   };
 
+  // Infinite scroll observer
+  const lastProductRef = useCallback((node: HTMLDivElement | null) => {
+    if (loadingMore) return;
+    if (observerRef.current) observerRef.current.disconnect();
+    
+    observerRef.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && hasMore && !loading) {
+        const nextPage = page + 1;
+        setPage(nextPage);
+        fetchProducts(nextPage);
+      }
+    }, { threshold: 0.1 });
+
+    if (node) observerRef.current.observe(node);
+  }, [loadingMore, hasMore, loading, page]);
+
   const filteredProducts = products.filter(product => {
-    const matchesPrice = product.price >= priceRange[0] && product.price <= priceRange[1];
-    return matchesPrice;
+    return product.price >= priceRange[0] && product.price <= priceRange[1];
   });
 
   const formatPrice = (price: number) => {
@@ -178,13 +199,8 @@ export default function Marketplace() {
   return (
     <Layout>
       <div className="container mx-auto px-4 py-6">
-        {/* Hero Banner */}
         <HeroBanner />
-
-        {/* Flash Sale */}
         <FlashSaleBanner />
-
-        {/* Categories */}
         <CategoryCards />
 
         {/* Search and Filters */}
@@ -231,7 +247,6 @@ export default function Marketplace() {
                 </SheetHeader>
                 
                 <div className="mt-6 space-y-6">
-                  {/* Categories */}
                   <div>
                     <h4 className="font-medium mb-3">Kategoriya</h4>
                     <div className="space-y-2">
@@ -257,7 +272,6 @@ export default function Marketplace() {
                     </div>
                   </div>
 
-                  {/* Price Range */}
                   <div>
                     <h4 className="font-medium mb-3">Narx oralig'i</h4>
                     <Slider
@@ -285,25 +299,19 @@ export default function Marketplace() {
             {selectedCategory !== 'all' && (
               <Badge variant="secondary" className="gap-1">
                 {categories.find(c => c.id === selectedCategory)?.name}
-                <X 
-                  className="h-3 w-3 cursor-pointer" 
-                  onClick={() => setSelectedCategory('all')}
-                />
+                <X className="h-3 w-3 cursor-pointer" onClick={() => handleCategoryChange('all')} />
               </Badge>
             )}
             {(priceRange[0] > 0 || priceRange[1] < 10000000) && (
               <Badge variant="secondary" className="gap-1">
                 {formatPrice(priceRange[0])} - {formatPrice(priceRange[1])} so'm
-                <X 
-                  className="h-3 w-3 cursor-pointer" 
-                  onClick={() => setPriceRange([0, 10000000])}
-                />
+                <X className="h-3 w-3 cursor-pointer" onClick={() => setPriceRange([0, 10000000])} />
               </Badge>
             )}
           </div>
         )}
 
-        {/* Products Grid - Uzum.uz style: 2 cols mobile, 3 tablet, 4-5 desktop */}
+        {/* Products Grid with Infinite Scroll */}
         {loading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
             {[...Array(10)].map((_, i) => (
@@ -335,16 +343,34 @@ export default function Marketplace() {
         ) : (
           <>
             <p className="text-sm text-muted-foreground mb-3">
-              {filteredProducts.length} ta mahsulot topildi
+              {filteredProducts.length}+ ta mahsulot topildi
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
-              {filteredProducts.map((product) => (
-                <ProductCard key={product.id} product={product} />
+              {filteredProducts.map((product, index) => (
+                <div
+                  key={product.id}
+                  ref={index === filteredProducts.length - 1 ? lastProductRef : null}
+                >
+                  <ProductCard product={product} />
+                </div>
               ))}
             </div>
 
+            {/* Loading more indicator */}
+            {loadingMore && (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            )}
+
+            {!hasMore && filteredProducts.length > 0 && (
+              <p className="text-center text-sm text-muted-foreground py-8">
+                Barcha mahsulotlar ko'rsatildi
+              </p>
+            )}
+
             {/* Trending Products */}
-            {!searchQuery && selectedCategory === 'all' && (
+            {!searchQuery && selectedCategory === 'all' && !loadingMore && (
               <div className="mt-16">
                 <ProductRecommendations type="trending" title="Trendda" />
               </div>

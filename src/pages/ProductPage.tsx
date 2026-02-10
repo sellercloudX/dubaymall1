@@ -482,7 +482,7 @@ export default function ProductPage() {
                 
                 {/* Monthly payment display */}
                 <div className="flex items-center justify-between">
-                  <div className="bg-yellow-300 text-yellow-900 px-3 py-1.5 rounded font-bold whitespace-nowrap">
+                  <div className="bg-accent text-accent-foreground px-3 py-1.5 rounded font-bold whitespace-nowrap">
                     {new Intl.NumberFormat('uz-UZ').format(calculateInstallment(product.price, selectedInstallment))} so'm
                   </div>
                   <span className="text-sm text-muted-foreground">× {selectedInstallment} oy</span>
