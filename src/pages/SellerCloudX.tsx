@@ -206,6 +206,7 @@ export default function SellerCloudX() {
               <TabsTrigger value="publish" className="gap-2"><Upload className="h-4 w-4" /><span className="hidden sm:inline">Joylash</span></TabsTrigger>
               <TabsTrigger value="analytics" className="gap-2"><BarChart3 className="h-4 w-4" /><span className="hidden sm:inline">Analitika</span></TabsTrigger>
               <TabsTrigger value="financials" className="gap-2"><Calculator className="h-4 w-4" /><span className="hidden sm:inline">Moliya</span></TabsTrigger>
+              <TabsTrigger value="calculator" className="gap-2"><Calculator className="h-4 w-4" /><span className="hidden sm:inline">Kalkulyator</span></TabsTrigger>
               <TabsTrigger value="abc-analysis" className="gap-2"><BarChart3 className="h-4 w-4" /><span className="hidden sm:inline">ABC-analiz</span></TabsTrigger>
               <TabsTrigger value="min-price" className="gap-2"><Shield className="h-4 w-4" /><span className="hidden sm:inline">Min narx</span></TabsTrigger>
               <TabsTrigger value="card-clone" className="gap-2"><Copy className="h-4 w-4" /><span className="hidden sm:inline">Klonlash</span></TabsTrigger>
