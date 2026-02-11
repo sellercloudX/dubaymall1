@@ -70,15 +70,13 @@
    });
  
    const addAdmin = useMutation({
-     mutationFn: async ({ userId, perms }: { userId: string; perms: Partial<AdminPermissions> }) => {
-       // First add admin role
-       const { error: roleError } = await supabase
-         .from('user_roles')
-         .insert({ user_id: userId, role: 'admin' })
-         .select()
-         .single();
-       
-       if (roleError && !roleError.message.includes('duplicate')) throw roleError;
+      mutationFn: async ({ userId, perms }: { userId: string; perms: Partial<AdminPermissions> }) => {
+        // First add admin role (upsert to avoid duplicate key errors)
+        const { error: roleError } = await supabase
+          .from('user_roles')
+          .upsert({ user_id: userId, role: 'admin' }, { onConflict: 'user_id,role', ignoreDuplicates: true });
+        
+        if (roleError) throw roleError;
  
        // Then add permissions
        const { error } = await supabase
