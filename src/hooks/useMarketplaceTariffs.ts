@@ -14,7 +14,7 @@ export interface TariffInfo {
 /**
  * Fetches real Yandex Market tariffs for connected products.
  * Uses POST /v2/tariffs/calculate API via edge function.
- * Cached for 30 min — same lifecycle as product data.
+ * Sends real marketCategoryId per product for accurate results.
  */
 export function useMarketplaceTariffs(
   connectedMarketplaces: string[],
@@ -26,66 +26,72 @@ export function useMarketplaceTariffs(
       const tariffMap = new Map<string, TariffInfo>();
 
       for (const mp of connectedMarketplaces) {
-        if (mp !== 'yandex') continue; // Only Yandex supports tariff calc
+        if (mp !== 'yandex') continue;
 
         const products = store.getProducts(mp);
         if (products.length === 0) continue;
 
-        // Build unique category+price combos to minimize API calls
-        const uniqueOffers: Array<{ categoryId: number; price: number; offerId: string }> = [];
+        // Build unique category+price combos with real categoryIds
+        const uniqueOffers: Array<{ categoryId: number; price: number; offerId: string }>[] = [];
+        const batch: Array<{ categoryId: number; price: number; offerId: string }> = [];
         const seen = new Set<string>();
 
         for (const p of products) {
-          // Use category from product data
-          const catKey = `${p.category || 'unknown'}-${p.price || 0}`;
-          if (seen.has(catKey)) {
-            // Reuse tariff from same category+price
-            const existing = uniqueOffers.find(o => `${o.categoryId}-${o.price}` === catKey);
-            if (existing) {
-              // Will map later
-            }
-            continue;
-          }
+          const catId = p.marketCategoryId || 0;
+          const price = p.price || 0;
+          const catKey = `${catId}-${price}`;
+          
+          if (seen.has(catKey)) continue;
           seen.add(catKey);
-          uniqueOffers.push({
-            categoryId: 0, // Will be determined by Yandex from price/dimensions
-            price: p.price || 0,
-            offerId: p.offerId,
-          });
+          
+          // Only include products with valid categoryId
+          if (catId > 0 && price > 0) {
+            batch.push({
+              categoryId: catId,
+              price,
+              offerId: p.offerId,
+            });
+          }
+        }
+
+        if (batch.length === 0) {
+          console.log('No products with valid categoryId for tariff calc');
+          continue;
         }
 
         // Send batch (max 200)
-        const batch = uniqueOffers.slice(0, 200);
-        if (batch.length === 0) continue;
+        const sendBatch = batch.slice(0, 200);
+        console.log(`Sending tariff calc for ${sendBatch.length} unique category+price combos`);
 
         try {
           const { data, error } = await supabase.functions.invoke('fetch-marketplace-data', {
             body: {
               marketplace: mp,
               dataType: 'tariffs',
-              offers: batch.map(o => ({
-                categoryId: o.categoryId || 91491, // default electronics category
+              offers: sendBatch.map(o => ({
+                categoryId: o.categoryId,
                 price: o.price,
               })),
             },
           });
 
           if (error || !data?.success) {
-            console.warn('Tariff fetch failed:', error || data?.error);
+            console.warn('Tariff fetch failed:', error || data?.error, data?.details);
             continue;
           }
 
           const tariffResults = data.data || [];
+          console.log(`Got ${tariffResults.length} tariff results`);
 
           // Map tariff results back to products
           tariffResults.forEach((t: any, idx: number) => {
-            if (idx >= batch.length) return;
-            const offerId = batch[idx].offerId;
+            if (idx >= sendBatch.length) return;
+            const offerId = sendBatch[idx].offerId;
             tariffMap.set(offerId, {
               offerId,
               agencyCommission: t.agencyCommission || 0,
               fulfillment: t.fulfillment || 0,
-              delivery: t.delivery || 0,
+              delivery: (t.delivery || 0) + (t.sorting || 0),
               totalTariff: t.totalTariff || 0,
               tariffPercent: t.tariffPercent || 0,
             });
@@ -94,13 +100,26 @@ export function useMarketplaceTariffs(
           // Map same tariff to products with same category+price
           for (const p of products) {
             if (tariffMap.has(p.offerId)) continue;
-            // Find a product with same price that has tariff data
+            const catId = p.marketCategoryId || 0;
+            const price = p.price || 0;
+            
+            // Find a product with same category+price that has tariff data
             const similar = products.find(
-              sp => sp.price === p.price && tariffMap.has(sp.offerId)
+              sp => (sp.marketCategoryId || 0) === catId && sp.price === price && tariffMap.has(sp.offerId)
             );
             if (similar) {
               const t = tariffMap.get(similar.offerId)!;
               tariffMap.set(p.offerId, { ...t, offerId: p.offerId });
+            } else if (price > 0) {
+              // Try to find any product with same price range (±20%)
+              const priceMatch = products.find(
+                sp => tariffMap.has(sp.offerId) && 
+                      Math.abs((sp.price || 0) - price) / price < 0.2
+              );
+              if (priceMatch) {
+                const t = tariffMap.get(priceMatch.offerId)!;
+                tariffMap.set(p.offerId, { ...t, offerId: p.offerId });
+              }
             }
           }
         } catch (e) {

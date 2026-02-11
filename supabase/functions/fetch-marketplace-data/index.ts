@@ -43,6 +43,7 @@ interface YandexProduct {
   price?: number;
   shopSku?: string;
   category?: string;
+  marketCategoryId?: number;
   pictures?: string[];
   availability?: string;
   stockFBO?: number;
@@ -264,6 +265,7 @@ serve(async (req) => {
                 price,
                 shopSku: offer.shopSku || offerId,
                 category: offer.category?.name || offer.marketCategoryName || '',
+                marketCategoryId: offer.marketCategoryId || offer.category?.id || 0,
                 pictures: offer.pictures || offer.urls || [],
                 availability: offer.cardStatus || offer.status || 'UNKNOWN',
                 stockFBO,
@@ -327,6 +329,7 @@ serve(async (req) => {
                 price,
                 shopSku: offer.shopSku || offerId,
                 category,
+                marketCategoryId: mapping.marketCategoryId || offer.marketCategoryId || 0,
                 pictures: offer.pictures || offer.urls || mapping.pictures || [],
                 availability: statusValue,
                 stockFBO,
@@ -639,19 +642,17 @@ serve(async (req) => {
         }
     } else if (dataType === "tariffs") {
         // Calculate real Yandex Market tariffs per product
-        // Uses 'offers' array from the initial request body (already parsed at line 91)
         try {
-          // tariffOffers comes from the initial request body (parsed at line 91)
-          
-          // Build offers array for tariffs API
-          let offersForCalc = (tariffOffers || []).slice(0, 200).map((o: any) => ({
-            categoryId: o.categoryId,
-            price: o.price,
+          const offersForCalc = (tariffOffers || []).slice(0, 200).map((o: any) => ({
+            categoryId: o.categoryId || 91491,
+            price: o.price || 0,
             length: o.length || 20,
             width: o.width || 15,
             height: o.height || 10,
             weight: o.weight || 0.5,
           }));
+
+          console.log(`Tariff calc: ${offersForCalc.length} offers, campaignId: ${campaignId}`);
 
           if (offersForCalc.length === 0) {
             result = { success: true, data: [], message: "No offers provided" };
@@ -663,17 +664,23 @@ serve(async (req) => {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({
-                  parameters: { campaignId: Number(campaignId) },
+                  parameters: { 
+                    campaignId: Number(campaignId),
+                    currency: 'UZS',
+                  },
                   offers: offersForCalc,
                 }),
               }
             );
 
+            console.log(`Tariff API response status: ${tariffResponse.status}`);
+
             if (tariffResponse.ok) {
               const tariffData = await tariffResponse.json();
               const tariffResults = tariffData.result?.offers || [];
               
-              // Parse tariff results into a clean format
+              console.log(`Got ${tariffResults.length} tariff results`);
+              
               const parsed = tariffResults.map((t: any, idx: number) => {
                 const tariffs = t.tariffs || [];
                 let agencyCommission = 0;
@@ -685,10 +692,10 @@ serve(async (req) => {
                 tariffs.forEach((tariff: any) => {
                   const amount = tariff.amount || 0;
                   const type = tariff.type || '';
-                  if (type === 'AGENCY_COMMISSION' || type === 'FEE') agencyCommission += amount;
-                  else if (type === 'FULFILLMENT' || type === 'FF_PROCESSING') fulfillment += amount;
-                  else if (type === 'DELIVERY_TO_CUSTOMER' || type === 'SORTING') delivery += amount;
-                  else if (type === 'SORTING_CENTER') sorting += amount;
+                  if (type === 'AGENCY_COMMISSION' || type === 'PAYMENT_TRANSFER') agencyCommission += amount;
+                  else if (type === 'FEE') agencyCommission += amount;
+                  else if (type === 'DELIVERY_TO_CUSTOMER' || type === 'CROSSREGIONAL_DELIVERY' || type === 'EXPRESS_DELIVERY' || type === 'MIDDLE_MILE') delivery += amount;
+                  else if (type === 'SORTING') sorting += amount;
                   else other += amount;
                 });
                 
@@ -709,16 +716,65 @@ serve(async (req) => {
                 };
               });
               
+              console.log(`Parsed tariffs sample:`, JSON.stringify(parsed[0] || {}));
               result = { success: true, data: parsed };
             } else {
               const errText = await tariffResponse.text();
               console.error("Tariff calc error:", tariffResponse.status, errText);
-              result = { success: false, error: `Tariff calculation failed: ${tariffResponse.status}` };
+              result = { success: false, error: `Tariff calculation failed: ${tariffResponse.status}`, details: errText };
             }
           }
         } catch (e) {
           console.error("Tariff calc error:", e);
           result = { success: false, error: "Tariff calculation error" };
+        }
+      } else if (dataType === "update-prices") {
+        // Update product prices via Yandex Market API
+        // POST /businesses/{businessId}/offer-prices/updates
+        try {
+          const { offers: priceOffers } = requestBody;
+          
+          if (!priceOffers || priceOffers.length === 0) {
+            result = { success: false, error: "No offers provided for price update" };
+          } else if (!effectiveBusinessId) {
+            result = { success: false, error: "Business ID required for price updates" };
+          } else {
+            console.log(`Updating prices for ${priceOffers.length} offers, businessId: ${effectiveBusinessId}`);
+            
+            const priceUpdateBody = {
+              offers: priceOffers.map((o: any) => ({
+                offerId: o.offerId,
+                price: {
+                  value: o.price,
+                  currencyId: 'UZS',
+                },
+              })),
+            };
+            
+            await sleep(500);
+            const priceResponse = await fetchWithRetry(
+              `https://api.partner.market.yandex.ru/businesses/${effectiveBusinessId}/offer-prices/updates`,
+              {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(priceUpdateBody),
+              }
+            );
+            
+            console.log(`Price update response status: ${priceResponse.status}`);
+            
+            if (priceResponse.ok) {
+              const priceData = await priceResponse.json();
+              result = { success: true, data: priceData, updated: priceOffers.length };
+            } else {
+              const errText = await priceResponse.text();
+              console.error("Price update error:", priceResponse.status, errText);
+              result = { success: false, error: `Price update failed: ${priceResponse.status}`, details: errText };
+            }
+          }
+        } catch (e) {
+          console.error("Price update error:", e);
+          result = { success: false, error: "Price update error" };
         }
       }
 
