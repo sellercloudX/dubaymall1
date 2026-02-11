@@ -67,6 +67,7 @@ export default function SellerCloudMobile() {
   const {
     subscription,
     accessStatus,
+    createSubscription,
   } = useSellerCloudSubscription();
   
   const connectedMarketplaces = connections.map(c => c.marketplace);
@@ -102,7 +103,14 @@ export default function SellerCloudMobile() {
         </div>
         <h1 className="text-2xl font-bold text-center mb-2">SellerCloudX Pro</h1>
         <p className="text-muted-foreground text-center mb-6">Barcha marketplacelarni bitta joydan boshqaring</p>
-        <Button size="lg" onClick={() => navigate('/seller-cloud')}>Obuna bo'lish</Button>
+        <Button size="lg" onClick={async () => {
+          const result = await createSubscription('pro');
+          if (result.success) {
+            toast.success('Obuna so\'rovi yuborildi! Admin tasdiqlashini kuting.');
+          } else {
+            toast.error(result.error || 'Xatolik yuz berdi');
+          }
+        }}>Obuna bo'lish</Button>
         <Button variant="ghost" className="mt-4" onClick={() => navigate('/')}>Bosh sahifaga qaytish</Button>
       </div>
     );

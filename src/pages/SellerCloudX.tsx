@@ -53,12 +53,13 @@ export default function SellerCloudX() {
     refetch
   } = useMarketplaceConnections();
   
-  const {
-    subscription,
-    accessStatus,
-    totalDebt,
-    isLoading: subscriptionLoading,
-  } = useSellerCloudSubscription();
+   const {
+     subscription,
+     accessStatus,
+     totalDebt,
+     isLoading: subscriptionLoading,
+     createSubscription,
+   } = useSellerCloudSubscription();
   
   const connectedMarketplaces = connections.map(c => c.marketplace);
   
@@ -133,7 +134,14 @@ export default function SellerCloudX() {
                     </li>
                   ))}
                 </ul>
-                <Button className="w-full" size="lg">Obunani boshlash<ArrowRight className="ml-2 h-4 w-4" /></Button>
+                <Button className="w-full" size="lg" onClick={async () => {
+                  const result = await createSubscription('pro');
+                  if (result.success) {
+                    toast.success('Obuna so\'rovi yuborildi! Admin tasdiqlashini kuting.');
+                  } else {
+                    toast.error(result.error || 'Xatolik yuz berdi');
+                  }
+                }}>Obunani boshlash<ArrowRight className="ml-2 h-4 w-4" /></Button>
                 <p className="text-xs text-center text-muted-foreground">7 kunlik bepul sinov davri. Istalgan vaqtda bekor qilish mumkin.</p>
               </CardContent>
             </Card>

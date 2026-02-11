@@ -10,7 +10,7 @@
  import { supabase } from '@/integrations/supabase/client';
  import { useQuery, useQueryClient } from '@tanstack/react-query';
  import { toast } from 'sonner';
- import { Store, Users, CheckCircle, XCircle, Clock, Search, Eye, ExternalLink } from 'lucide-react';
+ import { Store, Users, CheckCircle, XCircle, Clock, Search, Eye, ExternalLink, Globe } from 'lucide-react';
  import { format } from 'date-fns';
  
  export function ActivationsManagement() {
@@ -47,8 +47,73 @@
        if (error) throw error;
        return data;
      }
+    });
+
+   // Fetch SellerCloudX subscriptions
+   const { data: cloudSubscriptions, isLoading: loadingCloud } = useQuery({
+     queryKey: ['admin-cloud-subscriptions'],
+     queryFn: async () => {
+       const { data, error } = await supabase
+         .from('sellercloud_subscriptions')
+         .select('*')
+         .order('created_at', { ascending: false });
+       
+       if (error) throw error;
+       
+       // Fetch profile info for each subscription
+       const userIds = data?.map(s => s.user_id) || [];
+       const { data: profiles } = await supabase
+         .from('profiles')
+         .select('user_id, full_name, phone')
+         .in('user_id', userIds);
+       
+       return data?.map(sub => ({
+         ...sub,
+         profile: profiles?.find(p => p.user_id === sub.user_id),
+       })) || [];
+     }
    });
- 
+
+   const handleApproveCloud = async (subscriptionId: string) => {
+     try {
+       const { error } = await supabase
+         .from('sellercloud_subscriptions')
+         .update({
+           is_active: true,
+           admin_override: true,
+           admin_notes: 'Admin tomonidan aktivlashtirildi',
+         })
+         .eq('id', subscriptionId);
+
+       if (error) throw error;
+       toast.success('SellerCloudX aktivlashtirildi');
+       queryClient.invalidateQueries({ queryKey: ['admin-cloud-subscriptions'] });
+       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+       setShowDetailDialog(false);
+     } catch (err: any) {
+       toast.error('Xatolik: ' + err.message);
+     }
+   };
+
+   const handleDeactivateCloud = async (subscriptionId: string) => {
+     try {
+       const { error } = await supabase
+         .from('sellercloud_subscriptions')
+         .update({
+           is_active: false,
+           admin_override: false,
+         })
+         .eq('id', subscriptionId);
+
+       if (error) throw error;
+       toast.success('SellerCloudX deaktivlashtirildi');
+       queryClient.invalidateQueries({ queryKey: ['admin-cloud-subscriptions'] });
+       setShowDetailDialog(false);
+     } catch (err: any) {
+       toast.error('Xatolik: ' + err.message);
+     }
+   };
+
    const handleApprove = async (type: 'seller' | 'blogger', id: string, userId: string) => {
      try {
        const table = type === 'seller' ? 'seller_profiles' : 'blogger_profiles';
@@ -147,10 +212,13 @@
      (b.profiles as any)?.full_name?.toLowerCase().includes(search.toLowerCase())
    );
  
-   const pendingCount = {
-     sellers: sellerProfiles?.filter(s => s.status === 'pending').length || 0,
-     bloggers: bloggerProfiles?.filter(b => b.status === 'pending').length || 0,
-   };
+    const pendingCloudCount = cloudSubscriptions?.filter(s => !s.is_active && !s.admin_override).length || 0;
+
+    const pendingCount = {
+      sellers: sellerProfiles?.filter(s => s.status === 'pending').length || 0,
+      bloggers: bloggerProfiles?.filter(b => b.status === 'pending').length || 0,
+      cloud: pendingCloudCount,
+    };
  
    return (
      <Card>
@@ -182,8 +250,15 @@
                {pendingCount.bloggers > 0 && (
                  <Badge variant="destructive" className="ml-1">{pendingCount.bloggers}</Badge>
                )}
-             </TabsTrigger>
-           </TabsList>
+              </TabsTrigger>
+              <TabsTrigger value="cloud" className="gap-2">
+                <Globe className="h-4 w-4" />
+                SellerCloudX
+                {pendingCount.cloud > 0 && (
+                  <Badge variant="destructive" className="ml-1">{pendingCount.cloud}</Badge>
+                )}
+              </TabsTrigger>
+            </TabsList>
  
            <TabsContent value="sellers">
              {loadingSellers ? (
@@ -273,16 +348,67 @@
                  </TableBody>
                </Table>
              )}
-           </TabsContent>
-         </Tabs>
+            </TabsContent>
+
+            {/* SellerCloudX Tab */}
+            <TabsContent value="cloud">
+              {loadingCloud ? (
+                <p className="text-center py-8 text-muted-foreground">Yuklanmoqda...</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Foydalanuvchi</TableHead>
+                      <TableHead>Tarif</TableHead>
+                      <TableHead>Oylik to'lov</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Sana</TableHead>
+                      <TableHead>Amal</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {cloudSubscriptions?.map((sub: any) => (
+                      <TableRow key={sub.id}>
+                        <TableCell className="font-medium">{sub.profile?.full_name || 'Noma\'lum'}</TableCell>
+                        <TableCell><Badge variant="secondary">{sub.plan_type?.toUpperCase()}</Badge></TableCell>
+                        <TableCell>${sub.monthly_fee}</TableCell>
+                        <TableCell>
+                          {sub.is_active ? (
+                            <Badge className="bg-emerald-500 text-white"><CheckCircle className="h-3 w-3 mr-1" /> Faol</Badge>
+                          ) : (
+                            <Badge variant="outline" className="border-amber-500 text-amber-600"><Clock className="h-3 w-3 mr-1" /> Kutilmoqda</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>{format(new Date(sub.created_at), 'dd.MM.yy')}</TableCell>
+                        <TableCell>
+                          {sub.is_active ? (
+                            <Button size="sm" variant="outline" onClick={() => handleDeactivateCloud(sub.id)}>
+                              <XCircle className="h-3 w-3 mr-1" /> O'chirish
+                            </Button>
+                          ) : (
+                            <Button size="sm" onClick={() => handleApproveCloud(sub.id)}>
+                              <CheckCircle className="h-3 w-3 mr-1" /> Aktivlashtirish
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+              {cloudSubscriptions?.length === 0 && (
+                <p className="text-center text-muted-foreground py-8">SellerCloudX so'rovlari yo'q</p>
+              )}
+            </TabsContent>
+          </Tabs>
  
-         {/* Detail Dialog */}
-         <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
-           <DialogContent className="max-w-lg">
-             <DialogHeader>
-               <DialogTitle>
-                 {selectedItem?.type === 'seller' ? 'Sotuvchi ma\'lumotlari' : 'Blogger ma\'lumotlari'}
-               </DialogTitle>
+          {/* Detail Dialog */}
+          <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>
+                  {selectedItem?.type === 'seller' ? 'Sotuvchi ma\'lumotlari' : 'Blogger ma\'lumotlari'}
+                </DialogTitle>
              </DialogHeader>
              
              {selectedItem && (
