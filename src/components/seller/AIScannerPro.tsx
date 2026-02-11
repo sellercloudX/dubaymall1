@@ -108,8 +108,11 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
   const [selectedProduct, setSelectedProduct] = useState<WebProduct | null>(null);
   const [costPrice, setCostPrice] = useState<number>(0);
   const [targetMargin, setTargetMargin] = useState<number>(20);
+  const [commissionPercent, setCommissionPercent] = useState<number>(20);
+  const [logisticsCost, setLogisticsCost] = useState<number>(4000);
   const [pricing, setPricing] = useState<PricingCalculation | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
+  const [isRealTariff, setIsRealTariff] = useState(false);
   const [generateInfographics, setGenerateInfographics] = useState(true);
   const [infographicCount, setInfographicCount] = useState(6);
   
@@ -195,88 +198,71 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
 
 
 
-  const calculatePricing = async () => {
+  const calculatePricing = () => {
     if (!costPrice || costPrice <= 0) {
       toast.error('Iltimos, tannarxni kiriting');
       return;
     }
 
-    setIsCalculating(true);
+    const taxRate = TAX_RATE;
+    const totalDeductionRate = (commissionPercent + taxRate + targetMargin) / 100;
     
+    if (totalDeductionRate >= 1) {
+      toast.error('Marja + komissiya + soliq 100% dan oshib ketdi. Marjani kamaytiring.');
+      return;
+    }
+    
+    const sellingPrice = (costPrice + logisticsCost) / (1 - totalDeductionRate);
+    const commissionAmount = sellingPrice * (commissionPercent / 100);
+    const taxAmount = sellingPrice * (taxRate / 100);
+    const netProfit = sellingPrice * (targetMargin / 100);
+    const roundedSellingPrice = Math.ceil(sellingPrice / 100) * 100;
+
+    setPricing({
+      costPrice,
+      sellingPrice: roundedSellingPrice,
+      marketplaceCommission: Math.round(commissionAmount),
+      marketplaceCommissionPercent: Math.round(commissionPercent * 10) / 10,
+      logisticsCost: Math.round(logisticsCost),
+      logisticsType: isRealTariff ? 'Yandex API (real)' : 'Qo\'lda kiritilgan',
+      taxAmount: Math.round(taxAmount),
+      taxPercent: taxRate,
+      netProfit: Math.round(netProfit),
+      netProfitPercent: targetMargin,
+      categoryType: analyzedProduct?.category || 'Standart',
+    });
+  };
+
+  // Fetch real tariffs from Yandex API
+  const fetchRealTariffs = async () => {
+    const categoryId = (analyzedProduct as any)?.marketCategoryId || 0;
+    const estimatedPrice = costPrice > 0 ? costPrice * 2 : 100000;
+    
+    setIsCalculating(true);
     try {
-      // Estimate a rough selling price for tariff calculation
-      const estimatedPrice = costPrice * (1 + targetMargin / 100) * 1.3;
-      const category = analyzedProduct?.category || '';
-      const categoryId = (analyzedProduct as any)?.marketCategoryId || 0;
-
-      let commissionRate = 20; // fallback
-      let logisticsCost = 4000; // fallback
-      let logisticsType = 'Taxminiy';
-      let categoryType = 'Standart kategoriya';
-      let isRealTariff = false;
-
-      // Try to fetch real tariffs from Yandex API
-      if (categoryId > 0) {
-        try {
-          const { data, error } = await supabase.functions.invoke('fetch-marketplace-data', {
-            body: {
-              marketplace: 'yandex',
-              dataType: 'tariffs',
-              offers: [{ categoryId, price: Math.round(estimatedPrice) }],
-            },
-          });
-
-          if (!error && data?.success && data.data?.length > 0) {
-            const t = data.data[0];
-            commissionRate = t.agencyCommission && estimatedPrice > 0
-              ? (t.agencyCommission / estimatedPrice) * 100
-              : commissionRate;
-            const logistics = (t.fulfillment || 0) + (t.delivery || 0) + (t.sorting || 0);
-            if (logistics > 0) logisticsCost = logistics;
-            logisticsType = 'Yandex API (real)';
-            categoryType = `Kategoriya #${categoryId}`;
-            isRealTariff = true;
-            console.log('✅ Real tarif olindi:', { commissionRate: commissionRate.toFixed(1), logisticsCost });
-          }
-        } catch (e) {
-          console.warn('Tarif API xatosi, fallback ishlatiladi:', e);
-        }
-      }
-
-      const taxRate = TAX_RATE;
-
-      // Reverse calculation:
-      // SellingPrice × (1 - commission% - tax% - margin%) = CostPrice + Logistics
-      const totalDeductionRate = (commissionRate + taxRate + targetMargin) / 100;
-      
-      if (totalDeductionRate >= 1) {
-        toast.error('Marja + komissiya + soliq 100% dan oshib ketdi. Marjani kamaytiring.');
-        setIsCalculating(false);
-        return;
-      }
-      
-      const sellingPrice = (costPrice + logisticsCost) / (1 - totalDeductionRate);
-      const commissionAmount = sellingPrice * (commissionRate / 100);
-      const taxAmount = sellingPrice * (taxRate / 100);
-      const netProfit = sellingPrice * (targetMargin / 100);
-      const roundedSellingPrice = Math.ceil(sellingPrice / 100) * 100;
-
-      setPricing({
-        costPrice,
-        sellingPrice: roundedSellingPrice,
-        marketplaceCommission: Math.round(commissionAmount),
-        marketplaceCommissionPercent: Math.round(commissionRate * 10) / 10,
-        logisticsCost: Math.round(logisticsCost),
-        logisticsType: isRealTariff ? logisticsType : logisticsType,
-        taxAmount: Math.round(taxAmount),
-        taxPercent: taxRate,
-        netProfit: Math.round(netProfit),
-        netProfitPercent: targetMargin,
-        categoryType,
+      const { data, error } = await supabase.functions.invoke('fetch-marketplace-data', {
+        body: {
+          marketplace: 'yandex',
+          dataType: 'tariffs',
+          offers: [{ categoryId: categoryId > 0 ? categoryId : 91491, price: Math.round(estimatedPrice) }],
+        },
       });
-    } catch (err) {
-      console.error('Narx hisoblash xatosi:', err);
-      toast.error('Narx hisoblashda xato');
+
+      if (!error && data?.success && data.data?.length > 0) {
+        const t = data.data[0];
+        if (t.agencyCommission && estimatedPrice > 0) {
+          setCommissionPercent(Math.round((t.agencyCommission / estimatedPrice) * 1000) / 10);
+        }
+        const logistics = (t.fulfillment || 0) + (t.delivery || 0) + (t.sorting || 0);
+        if (logistics > 0) setLogisticsCost(logistics);
+        setIsRealTariff(true);
+        toast.success('Real tariflar API dan olindi!');
+      } else {
+        toast.error('Tarif ma\'lumotlari olinmadi');
+      }
+    } catch (e) {
+      console.warn('Tarif API xatosi:', e);
+      toast.error('API xatosi');
     } finally {
       setIsCalculating(false);
     }
@@ -892,16 +878,15 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
               </div>
             </div>
 
-            {/* Cost Price & Margin Input */}
+            {/* Cost Price, Margin, Commission, Logistics */}
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label htmlFor="costPrice" className="text-xs font-medium flex items-center gap-1 mb-1">
+                  <Label className="text-xs font-medium flex items-center gap-1 mb-1">
                     <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
                     Tannarx (so'm)
                   </Label>
                   <Input
-                    id="costPrice"
                     type="number"
                     placeholder="8500"
                     value={costPrice || ''}
@@ -910,12 +895,11 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="targetMargin" className="text-xs font-medium flex items-center gap-1 mb-1">
+                  <Label className="text-xs font-medium flex items-center gap-1 mb-1">
                     <Calculator className="h-3.5 w-3.5 text-muted-foreground" />
                     Marja (%)
                   </Label>
                   <Input
-                    id="targetMargin"
                     type="number"
                     min={1}
                     max={90}
@@ -925,10 +909,42 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
                   />
                 </div>
               </div>
-              <Button onClick={calculatePricing} disabled={!costPrice || isCalculating} className="w-full">
-                {isCalculating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Calculator className="mr-2 h-4 w-4" />}
-                {isCalculating ? 'API dan tariflar olinmoqda...' : 'Narx hisoblash'}
-              </Button>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs font-medium flex items-center gap-1 mb-1">
+                    Komissiya (%)
+                    {isRealTariff && <Badge variant="outline" className="text-[9px] px-1 py-0 ml-1 border-primary/30 text-primary">API</Badge>}
+                  </Label>
+                  <Input
+                    type="number"
+                    value={commissionPercent}
+                    onChange={(e) => { setCommissionPercent(Number(e.target.value)); setIsRealTariff(false); }}
+                    className="h-9"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium flex items-center gap-1 mb-1">
+                    Logistika (so'm)
+                    {isRealTariff && <Badge variant="outline" className="text-[9px] px-1 py-0 ml-1 border-primary/30 text-primary">API</Badge>}
+                  </Label>
+                  <Input
+                    type="number"
+                    value={logisticsCost || ''}
+                    onChange={(e) => { setLogisticsCost(Number(e.target.value)); setIsRealTariff(false); }}
+                    className="h-9"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={calculatePricing} disabled={!costPrice} className="flex-1">
+                  <Calculator className="mr-2 h-4 w-4" />
+                  Narx hisoblash
+                </Button>
+                <Button variant="secondary" size="default" onClick={fetchRealTariffs} disabled={isCalculating}>
+                  {isCalculating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4 mr-1" />}
+                  API tarif
+                </Button>
+              </div>
             </div>
 
             {/* Pricing Breakdown */}
