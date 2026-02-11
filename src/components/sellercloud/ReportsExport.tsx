@@ -63,6 +63,18 @@ export function ReportsExport({ connectedMarketplaces, store }: ReportsExportPro
   }, [marketplacesToUse, store.dataVersion]);
 
   const handleGenerateReport = async (reportId: string) => {
+    // Check if data is loaded
+    let hasData = false;
+    for (const mp of marketplacesToUse) {
+      if (store.getProducts(mp).length > 0 || store.getOrders(mp).length > 0) {
+        hasData = true;
+        break;
+      }
+    }
+    if (!hasData) {
+      toast.error('Ma\'lumotlar hali yuklanmagan. Marketplace ma\'lumotlari yuklanishini kuting.');
+      return;
+    }
     setIsGenerating(true);
     try {
       const dateStr = format(new Date(), 'yyyy-MM-dd');
