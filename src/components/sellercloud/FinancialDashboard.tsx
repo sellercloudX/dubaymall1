@@ -79,14 +79,17 @@ export function FinancialDashboard({
     const platformFee = monthlyFee * USD_TO_UZS;
     const platformCommission = totalRevenue * (commissionPercent / 100);
     const yandexTax = totalRevenue * 0.04;
-    const totalExpenses = totalProductCost + platformFee + platformCommission + totalYandexFees + yandexTax;
+    // PnL faqat marketplace xarajatlari — SellerCloudX to'lovini qo'shmaymiz
+    // chunki u bir marta oylik to'lov, mahsulotga taqsimlab bo'lmaydi
+    const totalExpenses = totalProductCost + totalYandexFees + yandexTax;
     const netProfit = totalRevenue - totalExpenses;
+    const sellerCloudTotal = platformFee + platformCommission;
     const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
     const costCoverage = totalProductCount > 0 ? Math.round((costPricesCovered / totalProductCount) * 100) : 0;
     const tariffCoverage = totalProductCount > 0 ? Math.round((realTariffCount / totalProductCount) * 100) : 0;
     const yandexFeePercent = totalRevenue > 0 ? ((totalYandexFees / totalRevenue) * 100).toFixed(1) : '0';
 
-    return { totalRevenue, totalOrders, platformFee, platformCommission, totalYandexFees, yandexFeePercent, yandexTax, totalExpenses, netProfit, profitMargin, marketplaceBreakdown, totalProductCost, costCoverage, tariffCoverage };
+    return { totalRevenue, totalOrders, platformFee, platformCommission, sellerCloudTotal, totalYandexFees, yandexFeePercent, yandexTax, totalExpenses, netProfit, profitMargin, marketplaceBreakdown, totalProductCost, costCoverage, tariffCoverage };
   }, [connectedMarketplaces, store.dataVersion, isLoading, monthlyFee, commissionPercent, getCostPrice, tariffMap]);
 
   const formatPrice = (price: number) => {
@@ -198,13 +201,16 @@ export function FinancialDashboard({
             </div>
             <div className="text-right shrink-0"><div className="font-bold text-sm whitespace-nowrap">{formatFullPrice(summary.yandexTax)}</div></div>
           </div>
-          {/* Platform fees */}
-          <div className="flex items-center justify-between p-3 rounded-lg border gap-2">
+          {/* Platform fees - shown separately, not in PnL */}
+          <div className="flex items-center justify-between p-3 rounded-lg border border-dashed gap-2">
             <div className="flex items-center gap-2 min-w-0">
               <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0"><Wallet className="h-4 w-4 text-primary" /></div>
-              <div className="min-w-0"><div className="font-medium text-sm truncate">SellerCloudX</div><div className="text-xs text-muted-foreground">${monthlyFee}/oy + {commissionPercent}%</div></div>
+              <div className="min-w-0">
+                <div className="font-medium text-sm truncate">SellerCloudX <Badge variant="outline" className="text-[10px] ml-1">PnL ga kirmaydi</Badge></div>
+                <div className="text-xs text-muted-foreground">${monthlyFee}/oy + {commissionPercent}%</div>
+              </div>
             </div>
-            <div className="text-right shrink-0"><div className="font-bold text-sm whitespace-nowrap">{formatFullPrice(summary.platformFee + summary.platformCommission)}</div></div>
+            <div className="text-right shrink-0"><div className="font-bold text-sm whitespace-nowrap text-muted-foreground">{formatFullPrice(summary.sellerCloudTotal)}</div></div>
           </div>
           {/* Total */}
           <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border-2 border-primary/20 gap-2">

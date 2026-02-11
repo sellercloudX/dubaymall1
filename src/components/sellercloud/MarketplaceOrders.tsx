@@ -151,7 +151,20 @@ export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceO
                       <div className="p-4 cursor-pointer hover:bg-muted/50 transition-colors">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                           <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <Package className="h-5 w-5 text-muted-foreground shrink-0" />
+                            {(() => {
+                              const firstItem = order.items?.[0];
+                              const product = firstItem ? store.getProducts(selectedMarketplace).find(p => p.offerId === firstItem.offerId) : null;
+                              const imgUrl = product?.pictures?.[0];
+                              return (
+                                <div className="w-10 h-10 rounded bg-muted flex items-center justify-center overflow-hidden shrink-0">
+                                  {imgUrl ? (
+                                    <img src={imgUrl} alt="" className="w-full h-full object-cover" />
+                                  ) : (
+                                    <Package className="h-5 w-5 text-muted-foreground" />
+                                  )}
+                                </div>
+                              );
+                            })()}
                             <div className="min-w-0 flex-1">
                               <div className="font-semibold text-sm line-clamp-1">
                                 {order.items?.[0]?.offerName || `Buyurtma #${order.id}`}

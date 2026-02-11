@@ -20,10 +20,10 @@ const MARKETPLACE_NAMES: Record<string, string> = {
 };
 
 const CHART_COLORS = [
-  'hsl(var(--primary))',
-  'hsl(var(--accent-foreground))',
-  'hsl(var(--muted-foreground))',
-  'hsl(var(--destructive))',
+  'hsl(var(--chart-1, var(--primary)))',
+  'hsl(var(--chart-2, 220 70% 50%))',
+  'hsl(var(--chart-3, 340 75% 55%))',
+  'hsl(var(--chart-4, 30 80% 55%))',
 ];
 
 export function MarketplaceAnalytics({ connectedMarketplaces, store }: MarketplaceAnalyticsProps) {
