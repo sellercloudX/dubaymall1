@@ -50,10 +50,14 @@ function generateFallbackProducts(productName: string, category?: string): Produ
       price = `¥${Math.round(basePrice / 1800)}`;
     }
 
+    // Use picsum.photos for reliable placeholder images
+    const keyword = productName.split(' ').slice(0, 2).join('-').toLowerCase().replace(/[^a-z0-9-]/g, '');
+    const seed = `${keyword}-${source.name.toLowerCase().replace(/\s/g, '')}-${index}`;
+
     return {
       title: `${productName} - ${source.name}`,
       price,
-      image: `https://images.unsplash.com/photo-${1500000000000 + index * 100000}?w=400&h=400&fit=crop`,
+      image: `https://picsum.photos/seed/${seed}/400/400`,
       source: source.name,
       url: `https://${source.domain}/product/${100000 + index}`,
       description: `${productName} - sifatli va arzon narxlarda ${source.name} dan`
@@ -87,7 +91,11 @@ Generate 8 realistic product listings that would appear on these marketplaces:
 For each product provide:
 - title: Product name in Uzbek/Russian
 - price: Realistic price (e.g., "45 000 so'm", "1 500 ₽", "$12.99", "¥89")
-- image: Use placeholder format "https://images.unsplash.com/photo-1[random-id]?w=400&h=400&fit=crop" for beauty/cosmetics, or similar generic product image URL
+- image: IMPORTANT! Use REAL working image URLs. Use these patterns:
+  * For electronics: "https://cdn.dummyjson.com/products/images/smartphones/[1-5]/thumbnail.png" or similar real placeholder services
+  * Use "https://picsum.photos/seed/[product-keyword]/400/400" for realistic photos (replace [product-keyword] with a relevant English keyword)
+  * Example: "https://picsum.photos/seed/wireless-earbuds/400/400", "https://picsum.photos/seed/led-light/400/400"
+  * NEVER use unsplash photo IDs as they are usually broken
 - source: Marketplace name
 - url: Example URL format like "https://uzum.uz/product/123456" or "https://market.yandex.uz/product/789"
 - description: Short product description (1-2 sentences)

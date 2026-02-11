@@ -394,6 +394,13 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
           completedAt: status !== 'processing' ? new Date() : undefined
         };
       }));
+      
+      // Auto-remove completed/failed tasks after 8 seconds
+      if (status === 'completed' || status === 'failed') {
+        setTimeout(() => {
+          setBackgroundTasks(prev => prev.filter(t => t.id !== taskId));
+        }, 8000);
+      }
     };
 
     try {
@@ -691,26 +698,27 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
       {/* Progress Header */}
       <Card>
         <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-primary" />
-                AI Scanner Pro
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="min-w-0">
+              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                <Sparkles className="h-5 w-5 text-primary shrink-0" />
+                <span className="truncate">AI Scanner Pro</span>
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-xs sm:text-sm truncate">
                 Rasmdan mahsulot kartochkasini Yandex Market'ga yuklash
               </CardDescription>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               {backgroundTasks.length > 0 && (
                 <Button 
                   variant="outline" 
                   size="sm"
                   onClick={() => setShowBackgroundPanel(!showBackgroundPanel)}
-                  className="relative"
+                  className="relative text-xs"
                 >
-                  <Clock className="h-4 w-4 mr-1" />
-                  Fon ishlari
+                  <Clock className="h-3.5 w-3.5 mr-1" />
+                  <span className="hidden sm:inline">Fon ishlari</span>
+                  <span className="sm:hidden">Fon</span>
                   {processingTasks > 0 && (
                     <Badge className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
                       {processingTasks}
@@ -718,15 +726,15 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
                   )}
                 </Button>
               )}
-              <Badge variant="outline">
-                {getStepNumber()} / 5 qadam
+              <Badge variant="outline" className="text-xs whitespace-nowrap">
+                {getStepNumber()} / 5
               </Badge>
             </div>
           </div>
         </CardHeader>
         <CardContent>
           <Progress value={getProgress()} className="h-2" />
-          <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+          <div className="flex justify-between mt-2 text-[10px] sm:text-xs text-muted-foreground">
             <span>Rasm</span>
             <span>Tahlil</span>
             <span>Qidiruv</span>
