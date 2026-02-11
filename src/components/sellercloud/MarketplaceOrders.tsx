@@ -150,13 +150,29 @@ export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceO
                     <CollapsibleTrigger asChild>
                       <div className="p-4 cursor-pointer hover:bg-muted/50 transition-colors">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                          <div className="flex items-center gap-3">
-                            <div>
-                              <div className="font-semibold">#{order.id}</div>
-                              <div className="text-sm text-muted-foreground">{formatDate(order.createdAt)}</div>
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <Package className="h-5 w-5 text-muted-foreground shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <div className="font-semibold text-sm line-clamp-1">
+                                {order.items?.[0]?.offerName || `Buyurtma #${order.id}`}
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <span>#{order.id}</span>
+                                <span>•</span>
+                                <span>{formatDate(order.createdAt)}</span>
+                                {order.items?.[0]?.offerId && (
+                                  <>
+                                    <span>•</span>
+                                    <code className="text-[10px]">{order.items[0].offerId}</code>
+                                  </>
+                                )}
+                              </div>
+                              {order.items && order.items.length > 1 && (
+                                <span className="text-xs text-muted-foreground">+{order.items.length - 1} ta boshqa mahsulot</span>
+                              )}
                             </div>
                           </div>
-                          <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-4 shrink-0">
                             {order.buyer && (
                               <div className="flex items-center gap-1 text-sm text-muted-foreground">
                                 <User className="h-4 w-4" />

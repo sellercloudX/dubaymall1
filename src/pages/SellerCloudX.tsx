@@ -240,7 +240,7 @@ export default function SellerCloudX() {
 
             {/* Settings - sub-tabs */}
             <TabsContent value="settings">
-              <SettingsSubTabs totalRevenue={totalRevenue} />
+              <SettingsSubTabs totalRevenue={totalRevenue} connectedMarketplaces={connectedMarketplaces} store={store} />
             </TabsContent>
           </Tabs>
         )}
@@ -295,7 +295,9 @@ function ToolsSubTabs({ connectedMarketplaces, store, subscription }: {
   );
 }
 
-function SettingsSubTabs({ totalRevenue }: { totalRevenue: number }) {
+function SettingsSubTabs({ totalRevenue, connectedMarketplaces, store }: { 
+  totalRevenue: number; connectedMarketplaces: string[]; store: any;
+}) {
   return (
     <Tabs defaultValue="subscription" className="space-y-4">
       <TabsList className="h-auto gap-1 p-1">
@@ -304,7 +306,7 @@ function SettingsSubTabs({ totalRevenue }: { totalRevenue: number }) {
         <TabsTrigger value="notifications" className="text-xs gap-1"><Bell className="h-3.5 w-3.5" />Bildirishnoma</TabsTrigger>
       </TabsList>
       <TabsContent value="subscription"><SubscriptionBilling totalSalesVolume={totalRevenue} /></TabsContent>
-      <TabsContent value="reports"><ReportsExport connectedMarketplaces={[]} store={{} as any} /></TabsContent>
+      <TabsContent value="reports"><ReportsExport connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
       <TabsContent value="notifications"><NotificationCenter /></TabsContent>
     </Tabs>
   );
