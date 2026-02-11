@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BarChart3, TrendingUp, DollarSign, Package, ShoppingCart, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 
 interface MarketplaceAnalyticsProps {
@@ -18,16 +19,22 @@ const MARKETPLACE_NAMES: Record<string, string> = {
   ozon: 'Ozon',
 };
 
+const CHART_COLORS = [
+  'hsl(var(--primary))',
+  'hsl(var(--accent-foreground))',
+  'hsl(var(--muted-foreground))',
+  'hsl(var(--destructive))',
+];
+
 export function MarketplaceAnalytics({ connectedMarketplaces, store }: MarketplaceAnalyticsProps) {
   const isLoading = store.isLoading;
 
-  const { stats, totals } = useMemo(() => {
+  const { stats, totals, revenueChartData, orderStatusData } = useMemo(() => {
     const marketplaceStats = connectedMarketplaces.map(marketplace => {
       const products = store.getProducts(marketplace);
       const orders = store.getOrders(marketplace);
       const productsCount = products.length;
       const ordersCount = orders.length;
-      // Only count revenue from non-cancelled orders
       const activeOrders = orders.filter(o => !['CANCELLED', 'RETURNED'].includes(o.status));
       const totalRevenue = activeOrders.reduce((sum, order) => sum + (order.totalUZS || order.total || 0), 0);
 
@@ -38,9 +45,32 @@ export function MarketplaceAnalytics({ connectedMarketplaces, store }: Marketpla
     const totalOrders = marketplaceStats.reduce((s, m) => s + m.ordersCount, 0);
     const totalRevenue = marketplaceStats.reduce((s, m) => s + m.totalRevenue, 0);
 
+    // Revenue bar chart data
+    const revenueChart = marketplaceStats.map(s => ({
+      name: MARKETPLACE_NAMES[s.marketplace]?.split(' ')[0] || s.marketplace,
+      revenue: Math.round(s.totalRevenue / 1000), // in thousands
+      orders: s.ordersCount,
+      products: s.productsCount,
+    }));
+
+    // Order status pie chart
+    const statusCounts: Record<string, number> = {};
+    connectedMarketplaces.forEach(mp => {
+      store.getOrders(mp).forEach(o => {
+        const label = o.status === 'DELIVERED' ? 'Yetkazildi' :
+          o.status === 'PROCESSING' ? 'Jarayonda' :
+          o.status === 'DELIVERY' ? 'Yo\'lda' :
+          o.status === 'CANCELLED' ? 'Bekor' : 'Boshqa';
+        statusCounts[label] = (statusCounts[label] || 0) + 1;
+      });
+    });
+    const orderStatus = Object.entries(statusCounts).map(([name, value]) => ({ name, value }));
+
     return {
       stats: marketplaceStats,
       totals: { products: totalProducts, orders: totalOrders, revenue: totalRevenue },
+      revenueChartData: revenueChart,
+      orderStatusData: orderStatus,
     };
   }, [connectedMarketplaces, store.dataVersion]);
 
@@ -63,6 +93,7 @@ export function MarketplaceAnalytics({ connectedMarketplaces, store }: Marketpla
 
   return (
     <div className="space-y-6">
+      {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-4">
@@ -112,6 +143,69 @@ export function MarketplaceAnalytics({ connectedMarketplaces, store }: Marketpla
         </Card>
       </div>
 
+      {/* Charts row */}
+      <div className="grid md:grid-cols-2 gap-6">
+        {/* Revenue by marketplace */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Marketplace bo'yicha daromad (ming so'm)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? <Skeleton className="h-48 w-full" /> : revenueChartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={revenueChartData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="name" className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
+                  <YAxis className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
+                  <Tooltip
+                    contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: '8px', color: 'hsl(var(--popover-foreground))' }}
+                    formatter={(value: number) => [`${value} ming so'm`, 'Daromad']}
+                  />
+                  <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">Ma'lumot yo'q</div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Order status pie */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Buyurtma holatlari</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? <Skeleton className="h-48 w-full" /> : orderStatusData.length > 0 ? (
+              <div className="flex items-center gap-4">
+                <ResponsiveContainer width="50%" height={200}>
+                  <PieChart>
+                    <Pie data={orderStatusData} dataKey="value" cx="50%" cy="50%" outerRadius={70} innerRadius={40}>
+                      {orderStatusData.map((_, idx) => (
+                        <Cell key={idx} fill={CHART_COLORS[idx % CHART_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: '8px', color: 'hsl(var(--popover-foreground))' }} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="space-y-2">
+                  {orderStatusData.map((item, idx) => (
+                    <div key={item.name} className="flex items-center gap-2 text-sm">
+                      <div className="w-3 h-3 rounded-full" style={{ background: CHART_COLORS[idx % CHART_COLORS.length] }} />
+                      <span className="text-muted-foreground">{item.name}</span>
+                      <span className="font-medium">{item.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">Ma'lumot yo'q</div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Marketplace breakdown */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
