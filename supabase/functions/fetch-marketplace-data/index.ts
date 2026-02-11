@@ -88,7 +88,8 @@ serve(async (req) => {
       );
     }
 
-    const { marketplace, dataType, limit = 200, page = 1, fromDate, toDate, status, fetchAll = false } = await req.json();
+    const requestBody = await req.json();
+    const { marketplace, dataType, limit = 200, page = 1, fromDate, toDate, status, fetchAll = false, offers: tariffOffers } = requestBody;
 
     if (!marketplace || !dataType) {
       return new Response(
@@ -636,14 +637,14 @@ serve(async (req) => {
         } else {
           result = { success: false, error: "Failed to fetch balance" };
         }
-      } else if (dataType === "tariffs") {
+    } else if (dataType === "tariffs") {
         // Calculate real Yandex Market tariffs per product
-        // POST /v2/tariffs/calculate
+        // Uses 'offers' array from the initial request body (already parsed at line 91)
         try {
-          const { offers: tariffOffers } = await req.json().catch(() => ({ offers: [] }));
+          // tariffOffers comes from the initial request body (parsed at line 91)
           
           // Build offers array for tariffs API
-          const offersForCalc = (tariffOffers || []).slice(0, 200).map((o: any) => ({
+          let offersForCalc = (tariffOffers || []).slice(0, 200).map((o: any) => ({
             categoryId: o.categoryId,
             price: o.price,
             length: o.length || 20,
@@ -653,8 +654,9 @@ serve(async (req) => {
           }));
 
           if (offersForCalc.length === 0) {
-            result = { success: false, error: "No offers provided for tariff calculation" };
+            result = { success: true, data: [], message: "No offers provided" };
           } else {
+            await sleep(500);
             const tariffResponse = await fetchWithRetry(
               'https://api.partner.market.yandex.ru/v2/tariffs/calculate',
               {
@@ -669,7 +671,45 @@ serve(async (req) => {
 
             if (tariffResponse.ok) {
               const tariffData = await tariffResponse.json();
-              result = { success: true, data: tariffData.result?.offers || [] };
+              const tariffResults = tariffData.result?.offers || [];
+              
+              // Parse tariff results into a clean format
+              const parsed = tariffResults.map((t: any, idx: number) => {
+                const tariffs = t.tariffs || [];
+                let agencyCommission = 0;
+                let fulfillment = 0;
+                let delivery = 0;
+                let sorting = 0;
+                let other = 0;
+                
+                tariffs.forEach((tariff: any) => {
+                  const amount = tariff.amount || 0;
+                  const type = tariff.type || '';
+                  if (type === 'AGENCY_COMMISSION' || type === 'FEE') agencyCommission += amount;
+                  else if (type === 'FULFILLMENT' || type === 'FF_PROCESSING') fulfillment += amount;
+                  else if (type === 'DELIVERY_TO_CUSTOMER' || type === 'SORTING') delivery += amount;
+                  else if (type === 'SORTING_CENTER') sorting += amount;
+                  else other += amount;
+                });
+                
+                return {
+                  index: idx,
+                  categoryId: offersForCalc[idx]?.categoryId,
+                  price: offersForCalc[idx]?.price,
+                  agencyCommission,
+                  fulfillment,
+                  delivery,
+                  sorting,
+                  other,
+                  totalTariff: agencyCommission + fulfillment + delivery + sorting + other,
+                  tariffPercent: offersForCalc[idx]?.price > 0 
+                    ? ((agencyCommission + fulfillment + delivery + sorting + other) / offersForCalc[idx].price * 100)
+                    : 0,
+                  rawTariffs: tariffs,
+                };
+              });
+              
+              result = { success: true, data: parsed };
             } else {
               const errText = await tariffResponse.text();
               console.error("Tariff calc error:", tariffResponse.status, errText);

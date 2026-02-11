@@ -11,10 +11,11 @@ import {
 import {
   BarChart3, TrendingUp, TrendingDown, DollarSign,
   Package, RefreshCw, ArrowUpRight, ArrowDownRight,
-  Calculator
+  Calculator, CheckCircle2
 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useCostPrices } from '@/hooks/useCostPrices';
+import { useMarketplaceTariffs, getTariffForProduct } from '@/hooks/useMarketplaceTariffs';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 
 interface ABCAnalysisProps {
@@ -29,6 +30,7 @@ interface ProductPnL {
   estimatedCost: number; commissionAmount: number; logisticsCost: number;
   netProfit: number; profitMargin: number;
   abcGroup: 'A' | 'B' | 'C'; revenueShare: number;
+  isRealTariff: boolean;
 }
 
 const MARKETPLACE_NAMES: Record<string, string> = {
@@ -46,6 +48,7 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
   const isMobile = useIsMobile();
   const isLoading = store.isLoading;
   const { getCostPrice } = useCostPrices();
+  const { data: tariffMap } = useMarketplaceTariffs(connectedMarketplaces, store);
 
   const products = useMemo(() => {
     if (isLoading) return [];
@@ -55,7 +58,7 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
       const productsList = store.getProducts(marketplace);
       const orders = store.getOrders(marketplace);
 
-      // Build sales map ONLY from real order items — no mock/estimated data
+      // Build sales map from real order items only
       const salesMap = new Map<string, { qty: number; revenue: number }>();
       orders.forEach(order => {
         (order.items || []).forEach(item => {
@@ -63,35 +66,27 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
           if (!key) return;
           const existing = salesMap.get(key) || { qty: 0, revenue: 0 };
           existing.qty += item.count || 1;
-          // Use item price × count for accurate revenue per item
           existing.revenue += (item.priceUZS || item.price || 0) * (item.count || 1);
           salesMap.set(key, existing);
         });
       });
-      // NO fallback mock data — only real sales from order items are used
 
       productsList.forEach(product => {
         const sales = salesMap.get(product.offerId) || { qty: 0, revenue: 0 };
         const price = product.price || 0;
         const totalRevenue = sales.revenue || sales.qty * price;
         
-        // Real tannarx from cost prices DB, fallback to estimate
+        // Real tannarx from DB
         const realCostPrice = getCostPrice(marketplace, product.offerId);
-        const productCost = realCostPrice !== null 
-          ? realCostPrice * sales.qty  // Real tannarx × quantity
-          : 0; // No cost entered = 0 (will show as unknown)
+        const productCost = realCostPrice !== null ? realCostPrice * sales.qty : 0;
         
-        // Real Yandex Market tariffs for Uzbekistan
-        const commissionRate = commissionPercent / 100;
-        const yandexCommissionRate = 0.20;
-        const logisticsPerOrder = 4000;
-        const taxRate = 0.04;
+        // Real tariff from Yandex API
+        const tariff = getTariffForProduct(tariffMap, product.offerId, price);
+        const yandexFees = tariff.totalFee * sales.qty;
         
-        const commissionAmount = totalRevenue * yandexCommissionRate;
-        const logisticsCost = sales.qty * logisticsPerOrder;
-        const taxAmount = totalRevenue * taxRate;
-        const platformFee = totalRevenue * commissionRate;
-        const totalCosts = productCost + commissionAmount + logisticsCost + taxAmount + platformFee;
+        const taxAmount = totalRevenue * 0.04;
+        const platformFee = totalRevenue * (commissionPercent / 100);
+        const totalCosts = productCost + yandexFees + taxAmount + platformFee;
         const netProfit = totalRevenue - totalCosts;
         const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
 
@@ -99,8 +94,11 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
           id: product.offerId, name: product.name || 'Nomsiz',
           sku: product.shopSku || product.offerId, marketplace, price,
           totalSold: sales.qty, totalRevenue, estimatedCost: totalCosts,
-          commissionAmount, logisticsCost, netProfit, profitMargin,
+          commissionAmount: tariff.commission * sales.qty, 
+          logisticsCost: tariff.logistics * sales.qty,
+          netProfit, profitMargin,
           abcGroup: 'C', revenueShare: 0,
+          isRealTariff: tariff.isReal,
         });
       });
     }
@@ -117,7 +115,7 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
     });
 
     return allProducts;
-  }, [connectedMarketplaces, store.dataVersion, isLoading, commissionPercent]);
+  }, [connectedMarketplaces, store.dataVersion, isLoading, commissionPercent, tariffMap]);
 
   const formatPrice = (price: number) => {
     if (Math.abs(price) >= 1000000) return (price / 1000000).toFixed(1) + ' mln';
@@ -136,6 +134,7 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
   const totalProfit = products.reduce((s, p) => s + p.netProfit, 0);
   const profitableCount = products.filter(p => p.netProfit > 0).length;
   const unprofitableCount = products.filter(p => p.netProfit <= 0).length;
+  const realTariffCount = products.filter(p => p.isRealTariff).length;
 
   if (connectedMarketplaces.length === 0) {
     return (<Card><CardContent className="py-12 text-center"><BarChart3 className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" /><h3 className="text-lg font-semibold mb-2">ABC-analiz & PnL</h3><p className="text-muted-foreground">Avval marketplace ulang</p></CardContent></Card>);
@@ -176,6 +175,16 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
           </CardContent>
         </Card>
       </div>
+
+      {/* Tariff info badge */}
+      {realTariffCount > 0 && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/5 border border-primary/20">
+          <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+          <span className="text-xs text-primary">
+            {realTariffCount} ta mahsulotda real Yandex tarif qo'llanildi
+          </span>
+        </div>
+      )}
 
       {/* ABC Groups */}
       <ScrollArea className="w-full">
@@ -226,7 +235,6 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
           {filteredProducts.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground"><Package className="h-12 w-12 mx-auto mb-3 opacity-50" /><p>Mahsulotlar topilmadi</p></div>
           ) : isMobile ? (
-            /* Mobile card layout */
             <div className="space-y-2 px-3 pb-3 max-h-[500px] overflow-y-auto">
               {filteredProducts.slice(0, 50).map(product => {
                 const colors = ABC_COLORS[product.abcGroup];
@@ -235,10 +243,14 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         <div className="text-sm font-medium line-clamp-1">{product.name}</div>
-                        <div className="flex items-center gap-1.5 mt-1">
+                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                           <Badge className={`${colors.badge} text-white text-[10px] px-1.5`}>{product.abcGroup}</Badge>
                           <Badge variant="outline" className="text-[10px]">{MARKETPLACE_NAMES[product.marketplace]}</Badge>
-                          <code className="text-[10px] text-muted-foreground truncate">{product.sku}</code>
+                          {product.isRealTariff && (
+                            <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
+                              <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />Tarif
+                            </Badge>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -262,7 +274,6 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
               {filteredProducts.length > 50 && <div className="text-xs text-muted-foreground text-center py-2">50 / {filteredProducts.length} ko'rsatilmoqda</div>}
             </div>
           ) : (
-            /* Desktop table layout */
             <ScrollArea className="w-full">
               <Table>
                 <TableHeader><TableRow>
@@ -278,7 +289,13 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
                     return (
                       <TableRow key={`${product.id}-${product.marketplace}`}>
                         <TableCell><Badge className={`${colors.badge} text-white`}>{product.abcGroup}</Badge></TableCell>
-                        <TableCell><div className="font-medium text-sm line-clamp-1">{product.name}</div><code className="text-xs text-muted-foreground">{product.sku}</code></TableCell>
+                        <TableCell>
+                          <div className="font-medium text-sm line-clamp-1">{product.name}</div>
+                          <div className="flex items-center gap-1">
+                            <code className="text-xs text-muted-foreground">{product.sku}</code>
+                            {product.isRealTariff && <CheckCircle2 className="h-3 w-3 text-primary shrink-0" />}
+                          </div>
+                        </TableCell>
                         <TableCell className="text-center"><Badge variant="outline" className="text-xs">{MARKETPLACE_NAMES[product.marketplace]}</Badge></TableCell>
                         <TableCell className="text-right text-sm whitespace-nowrap">{formatPrice(product.price)}</TableCell>
                         <TableCell className="text-center font-medium">{product.totalSold}</TableCell>
