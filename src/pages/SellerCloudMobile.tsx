@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useMarketplaceConnections } from '@/hooks/useMarketplaceConnections';
 import { useSellerCloudSubscription } from '@/hooks/useSellerCloudSubscription';
 import { useMarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
-import { MobileSellerCloudNav } from '@/components/mobile/MobileSellerCloudNav';
+import { MobileSellerCloudNav, type MobileTabType } from '@/components/mobile/MobileSellerCloudNav';
 import { MobileSellerCloudHeader } from '@/components/mobile/MobileSellerCloudHeader';
 import { MobileAnalytics } from '@/components/mobile/MobileAnalytics';
 import { MobileProducts } from '@/components/mobile/MobileProducts';
@@ -18,12 +18,18 @@ import { CardCloner } from '@/components/sellercloud/CardCloner';
 import { ProblematicProducts } from '@/components/sellercloud/ProblematicProducts';
 import { FinancialDashboard } from '@/components/sellercloud/FinancialDashboard';
 import { ProfitCalculator } from '@/components/sellercloud/ProfitCalculator';
-import { Loader2, Lock, BarChart3, Shield, Copy, AlertOctagon, TrendingUp, Calculator, DollarSign } from 'lucide-react';
+import { MarketplaceOAuth } from '@/components/sellercloud/MarketplaceOAuth';
+import { InventorySync } from '@/components/sellercloud/InventorySync';
+import { PriceManager } from '@/components/sellercloud/PriceManager';
+import { MultiPublish } from '@/components/sellercloud/MultiPublish';
+import { ReportsExport } from '@/components/sellercloud/ReportsExport';
+import { NotificationCenter } from '@/components/sellercloud/NotificationCenter';
+import { SubscriptionBilling } from '@/components/sellercloud/SubscriptionBilling';
+import { Loader2, Lock, TrendingUp, Calculator, DollarSign, BarChart3, Shield, Copy, AlertOctagon, ArrowDownUp, Tag, Upload, FileSpreadsheet, Bell, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-
-type TabType = 'analytics' | 'scanner' | 'products' | 'orders' | 'trends' | 'abc-analysis' | 'min-price' | 'card-clone' | 'problems' | 'financials' | 'calculator';
+import { toast } from 'sonner';
 
 const moreSubTabs = [
   { id: 'trends' as const, icon: TrendingUp, label: 'Trendlar' },
@@ -33,18 +39,26 @@ const moreSubTabs = [
   { id: 'min-price' as const, icon: Shield, label: 'Min narx' },
   { id: 'card-clone' as const, icon: Copy, label: 'Klonlash' },
   { id: 'problems' as const, icon: AlertOctagon, label: 'Muammolar' },
+  { id: 'inventory' as const, icon: ArrowDownUp, label: 'Zaxira' },
+  { id: 'pricing' as const, icon: Tag, label: 'Narxlar' },
+  { id: 'publish' as const, icon: Upload, label: 'Joylash' },
+  { id: 'reports' as const, icon: FileSpreadsheet, label: 'Hisobotlar' },
+  { id: 'notifications' as const, icon: Bell, label: 'Bildirishnoma' },
+  { id: 'subscription' as const, icon: CreditCard, label: 'Obuna' },
 ];
 
-const moreTabIds: TabType[] = ['trends', 'abc-analysis', 'min-price', 'card-clone', 'problems', 'financials', 'calculator'];
+const primaryTabIds: MobileTabType[] = ['marketplaces', 'analytics', 'scanner', 'products', 'orders'];
 
 export default function SellerCloudMobile() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<TabType>('analytics');
+  const [activeTab, setActiveTab] = useState<MobileTabType>('analytics');
   
   const { 
     connections, 
     isLoading: connectionsLoading,
+    connectMarketplace,
+    syncMarketplace,
     refetch
   } = useMarketplaceConnections();
   
@@ -54,9 +68,15 @@ export default function SellerCloudMobile() {
   } = useSellerCloudSubscription();
   
   const connectedMarketplaces = connections.map(c => c.marketplace);
+  const totalRevenue = connections.reduce((sum, c) => sum + (c.total_revenue || 0), 0);
   
   // Centralized data store — fetches once, cached for all tabs
   const store = useMarketplaceDataStore(connectedMarketplaces);
+
+  const handleMarketplaceConnect = async () => {
+    await refetch();
+    toast.success('Marketplace ma\'lumotlari yangilandi');
+  };
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -99,10 +119,22 @@ export default function SellerCloudMobile() {
     );
   }
 
-  const isMoreActive = moreTabIds.includes(activeTab);
+  const isMoreActive = !primaryTabIds.includes(activeTab);
 
   const renderContent = () => {
     switch (activeTab) {
+      case 'marketplaces':
+        return (
+          <div className="p-4">
+            <MarketplaceOAuth 
+              connections={connections} 
+              isLoading={connectionsLoading} 
+              connectMarketplace={connectMarketplace} 
+              syncMarketplace={syncMarketplace} 
+              onConnect={handleMarketplaceConnect} 
+            />
+          </div>
+        );
       case 'analytics':
         return <MobileAnalytics connections={connections} connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'scanner':
@@ -125,6 +157,18 @@ export default function SellerCloudMobile() {
         return <div className="p-4"><FinancialDashboard connectedMarketplaces={connectedMarketplaces} store={store} monthlyFee={subscription?.monthly_fee || 499} commissionPercent={subscription?.commission_percent || 4} /></div>;
       case 'calculator':
         return <div className="p-4"><ProfitCalculator commissionPercent={subscription?.commission_percent || 4} /></div>;
+      case 'inventory':
+        return <div className="p-4"><InventorySync connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
+      case 'pricing':
+        return <div className="p-4"><PriceManager connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
+      case 'publish':
+        return <div className="p-4"><MultiPublish connectedMarketplaces={connectedMarketplaces} /></div>;
+      case 'reports':
+        return <div className="p-4"><ReportsExport connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
+      case 'notifications':
+        return <div className="p-4"><NotificationCenter /></div>;
+      case 'subscription':
+        return <div className="p-4"><SubscriptionBilling totalSalesVolume={totalRevenue} /></div>;
       default:
         return null;
     }
