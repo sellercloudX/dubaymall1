@@ -1,14 +1,19 @@
-import { BarChart3, Scan, Package, ShoppingCart, TrendingUp, MoreHorizontal } from 'lucide-react';
+import { BarChart3, Scan, Package, ShoppingCart, MoreHorizontal, Globe } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-type TabType = 'analytics' | 'scanner' | 'products' | 'orders' | 'trends' | 'abc-analysis' | 'min-price' | 'card-clone' | 'problems' | 'financials' | 'calculator';
+export type MobileTabType = 
+  | 'marketplaces' | 'analytics' | 'scanner' | 'products' | 'orders' 
+  | 'trends' | 'abc-analysis' | 'min-price' | 'card-clone' | 'problems' 
+  | 'financials' | 'calculator' | 'inventory' | 'pricing' | 'publish' 
+  | 'reports' | 'notifications' | 'subscription';
 
 interface MobileSellerCloudNavProps {
-  activeTab: TabType;
-  onTabChange: (tab: TabType) => void;
+  activeTab: MobileTabType;
+  onTabChange: (tab: MobileTabType) => void;
 }
 
 const navItems = [
+  { id: 'marketplaces' as const, icon: Globe, label: 'Marketplace' },
   { id: 'analytics' as const, icon: BarChart3, label: 'Analitika' },
   { id: 'scanner' as const, icon: Scan, label: 'Scanner' },
   { id: 'products' as const, icon: Package, label: 'Mahsulot' },
@@ -16,10 +21,10 @@ const navItems = [
   { id: 'more' as const, icon: MoreHorizontal, label: "Ko'proq" },
 ];
 
-const moreTabIds: TabType[] = ['trends', 'abc-analysis', 'min-price', 'card-clone', 'problems', 'financials', 'calculator'];
+const primaryTabIds: MobileTabType[] = ['marketplaces', 'analytics', 'scanner', 'products', 'orders'];
 
 export function MobileSellerCloudNav({ activeTab, onTabChange }: MobileSellerCloudNavProps) {
-  const isMoreActive = moreTabIds.includes(activeTab);
+  const isMoreActive = !primaryTabIds.includes(activeTab);
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t safe-area-bottom">
@@ -33,12 +38,11 @@ export function MobileSellerCloudNav({ activeTab, onTabChange }: MobileSellerClo
               key={item.id}
               onClick={() => {
                 if (item.id === 'more') {
-                  // Toggle to trends as default "more" tab, or cycle
                   if (!isMoreActive) {
                     onTabChange('trends');
                   }
                 } else {
-                  onTabChange(item.id as TabType);
+                  onTabChange(item.id as MobileTabType);
                 }
               }}
               className={cn(
