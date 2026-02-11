@@ -137,9 +137,9 @@ export default function CheckoutPage() {
       return;
     }
 
-    // Validate phone number format
-    const phoneRegex = /^\+998\s?\d{2}\s?\d{3}\s?\d{2}\s?\d{2}$/;
-    if (!phoneRegex.test(formData.phone.replace(/\s/g, '').replace('+998', '+998 '))) {
+    // Validate phone number format - strip all non-digits, check length
+    const digitsOnly = formData.phone.replace(/\D/g, '');
+    if (digitsOnly.length < 9 || digitsOnly.length > 12) {
       toast.error('Telefon raqami noto\'g\'ri formatda. Masalan: +998 90 123 45 67');
       return;
     }
