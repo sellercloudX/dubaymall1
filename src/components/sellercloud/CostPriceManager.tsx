@@ -8,7 +8,7 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from '@/components/ui/table';
-import { DollarSign, Save, Search, Package, CheckCircle2, AlertCircle } from 'lucide-react';
+import { DollarSign, Save, Search, Package, CheckCircle2, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useCostPrices } from '@/hooks/useCostPrices';
 import { toast } from 'sonner';
@@ -88,6 +88,9 @@ export function CostPriceManager({ connectedMarketplaces, store }: CostPriceMana
     setSaving(false);
   };
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 50;
+
   const changedCount = Object.keys(editingPrices).filter(k => editingPrices[k] && !isNaN(Number(editingPrices[k]))).length;
 
   const formatPrice = (price: number) => new Intl.NumberFormat('uz-UZ').format(price);
@@ -131,7 +134,7 @@ export function CostPriceManager({ connectedMarketplaces, store }: CostPriceMana
         <div className="flex gap-2 overflow-x-auto no-scrollbar">
           {connectedMarketplaces.map(mp => (
             <Button key={mp} variant={selectedMp === mp ? 'default' : 'outline'} size="sm"
-              onClick={() => { setSelectedMp(mp); setSearch(''); setEditingPrices({}); }}
+              onClick={() => { setSelectedMp(mp); setSearch(''); setEditingPrices({}); setCurrentPage(1); }}
               className="shrink-0 text-xs">
               {mp === 'yandex' ? '🟡' : mp === 'uzum' ? '🟣' : mp === 'wildberries' ? '🔵' : '🟢'} {MARKETPLACE_NAMES[mp]}
             </Button>
@@ -175,40 +178,55 @@ export function CostPriceManager({ connectedMarketplaces, store }: CostPriceMana
           ) : isMobile ? (
             /* Mobile card layout */
             <div className="space-y-2 px-3 pb-3 max-h-[60vh] overflow-y-auto">
-              {products.map(product => {
-                const existingCost = getCostPrice(selectedMp, product.offerId);
-                const editValue = editingPrices[product.offerId];
-                const displayValue = editValue !== undefined ? editValue : (existingCost !== null ? String(existingCost) : '');
-                const hasCost = existingCost !== null;
+              {(() => {
+                const totalPages = Math.ceil(products.length / ITEMS_PER_PAGE);
+                const startIdx = (currentPage - 1) * ITEMS_PER_PAGE;
+                const pageProducts = products.slice(startIdx, startIdx + ITEMS_PER_PAGE);
                 return (
-                  <div key={product.offerId} className="p-3 rounded-lg border space-y-2">
-                    <div className="min-w-0">
-                      <div className="text-sm font-medium line-clamp-1">{product.name || 'Nomsiz'}</div>
-                      <div className="flex items-center gap-2 mt-1">
-                        <code className="text-[10px] text-muted-foreground">{product.offerId}</code>
-                        {hasCost && <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">✓</Badge>}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="text-xs text-muted-foreground shrink-0">Sotish: <span className="font-medium text-foreground">{formatPrice(product.price || 0)}</span></div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="number"
-                        placeholder="Tannarx kiriting..."
-                        value={displayValue}
-                        onChange={e => handlePriceChange(product.offerId, e.target.value)}
-                        className="h-9 text-sm flex-1"
-                      />
-                      {editValue !== undefined && editValue !== '' && (
-                        <Button size="sm" variant="outline" onClick={() => handleSaveSingle(product.offerId)} className="shrink-0 h-9">
-                          <Save className="h-3.5 w-3.5" />
+                  <>
+                    {pageProducts.map(product => {
+                      const existingCost = getCostPrice(selectedMp, product.offerId);
+                      const editValue = editingPrices[product.offerId];
+                      const displayValue = editValue !== undefined ? editValue : (existingCost !== null ? String(existingCost) : '');
+                      const hasCost = existingCost !== null;
+                      return (
+                        <div key={product.offerId} className="p-3 rounded-lg border space-y-2">
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium line-clamp-1">{product.name || 'Nomsiz'}</div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <code className="text-[10px] text-muted-foreground">{product.offerId}</code>
+                              {hasCost && <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">✓</Badge>}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="text-xs text-muted-foreground shrink-0">Sotish: <span className="font-medium text-foreground">{formatPrice(product.price || 0)}</span></div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Input type="number" placeholder="Tannarx kiriting..." value={displayValue}
+                              onChange={e => handlePriceChange(product.offerId, e.target.value)} className="h-9 text-sm flex-1" />
+                            {editValue !== undefined && editValue !== '' && (
+                              <Button size="sm" variant="outline" onClick={() => handleSaveSingle(product.offerId)} className="shrink-0 h-9">
+                                <Save className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {totalPages > 1 && (
+                      <div className="flex items-center justify-between pt-3">
+                        <Button size="sm" variant="outline" disabled={currentPage <= 1} onClick={() => setCurrentPage(p => p - 1)}>
+                          <ChevronLeft className="h-4 w-4 mr-1" />Oldingi
                         </Button>
-                      )}
-                    </div>
-                  </div>
+                        <span className="text-sm text-muted-foreground">{currentPage} / {totalPages} ({products.length} ta)</span>
+                        <Button size="sm" variant="outline" disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => p + 1)}>
+                          Keyingi<ChevronRight className="h-4 w-4 ml-1" />
+                        </Button>
+                      </div>
+                    )}
+                  </>
                 );
-              })}
+              })()}
             </div>
           ) : (
             /* Desktop table */
@@ -225,7 +243,11 @@ export function CostPriceManager({ connectedMarketplaces, store }: CostPriceMana
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {products.slice(0, 100).map(product => {
+                {(() => {
+                  const totalPages = Math.ceil(products.length / ITEMS_PER_PAGE);
+                  const startIdx = (currentPage - 1) * ITEMS_PER_PAGE;
+                  const pageProducts = products.slice(startIdx, startIdx + ITEMS_PER_PAGE);
+                  return pageProducts.map(product => {
                     const existingCost = getCostPrice(selectedMp, product.offerId);
                     const editValue = editingPrices[product.offerId];
                     const displayValue = editValue !== undefined ? editValue : (existingCost !== null ? String(existingCost) : '');
@@ -246,19 +268,12 @@ export function CostPriceManager({ connectedMarketplaces, store }: CostPriceMana
                         <TableCell><code className="text-xs">{product.shopSku || '—'}</code></TableCell>
                         <TableCell className="text-right font-medium whitespace-nowrap">{formatPrice(product.price || 0)}</TableCell>
                         <TableCell>
-                          <Input
-                            type="number"
-                            placeholder="Tannarx..."
-                            value={displayValue}
-                            onChange={e => handlePriceChange(product.offerId, e.target.value)}
-                            className="h-8 text-sm w-full"
-                          />
+                          <Input type="number" placeholder="Tannarx..." value={displayValue}
+                            onChange={e => handlePriceChange(product.offerId, e.target.value)} className="h-8 text-sm w-full" />
                         </TableCell>
                         <TableCell className="text-right">
                           {margin !== null ? (
-                            <span className={`font-medium text-sm ${margin >= 0 ? 'text-primary' : 'text-destructive'}`}>
-                              {margin.toFixed(0)}%
-                            </span>
+                            <span className={`font-medium text-sm ${margin >= 0 ? 'text-primary' : 'text-destructive'}`}>{margin.toFixed(0)}%</span>
                           ) : <span className="text-muted-foreground">—</span>}
                         </TableCell>
                         <TableCell>
@@ -270,11 +285,24 @@ export function CostPriceManager({ connectedMarketplaces, store }: CostPriceMana
                         </TableCell>
                       </TableRow>
                     );
-                  })}
+                  });
+                })()}
                 </TableBody>
               </Table>
               <ScrollBar orientation="horizontal" />
-              {products.length > 100 && <div className="mt-4 text-sm text-muted-foreground text-center">100 / {products.length}</div>}
+              {products.length > ITEMS_PER_PAGE && (
+                <div className="flex items-center justify-between p-4">
+                  <Button size="sm" variant="outline" disabled={currentPage <= 1} onClick={() => setCurrentPage(p => p - 1)}>
+                    <ChevronLeft className="h-4 w-4 mr-1" />Oldingi
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    {(currentPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, products.length)} / {products.length} ta
+                  </span>
+                  <Button size="sm" variant="outline" disabled={currentPage >= Math.ceil(products.length / ITEMS_PER_PAGE)} onClick={() => setCurrentPage(p => p + 1)}>
+                    Keyingi<ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
+              )}
             </ScrollArea>
           )}
         </CardContent>
