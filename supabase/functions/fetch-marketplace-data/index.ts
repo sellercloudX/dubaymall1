@@ -467,10 +467,11 @@ serve(async (req) => {
           }
 
           // Yandex Market UZ returns prices in UZS directly - no conversion needed
+          // IMPORTANT: Yandex uses buyerTotal/buyerItemsTotal, NOT 'total'
           const pageOrders: YandexOrder[] = orders.map((order: any) => {
-            const total = order.total || 0;
-            const itemsTotal = order.itemsTotal || 0;
+            const itemsTotal = order.buyerItemsTotal || order.itemsTotal || 0;
             const deliveryTotal = order.deliveryTotal || 0;
+            const total = order.buyerTotal || order.buyerItemsTotalBeforeDiscount || (itemsTotal + deliveryTotal) || 0;
             
             return {
               id: order.id,
@@ -483,6 +484,8 @@ serve(async (req) => {
               itemsTotalUZS: itemsTotal,
               deliveryTotal: deliveryTotal,
               deliveryTotalUZS: deliveryTotal,
+              paymentType: order.paymentType,
+              paymentMethod: order.paymentMethod,
               buyer: {
                 firstName: order.buyer?.firstName || '',
                 lastName: order.buyer?.lastName || '',
@@ -491,13 +494,14 @@ serve(async (req) => {
               deliveryAddress: order.delivery?.address,
               deliveryRegion: order.delivery?.region?.name,
               items: order.items?.map((item: any) => {
-                const itemPrice = item.price || 0;
+                const itemPrice = item.buyerPrice || item.price || 0;
                 return {
                   offerId: item.offerId,
                   offerName: item.offerName,
                   count: item.count,
                   price: itemPrice,
                   priceUZS: itemPrice,
+                  categoryId: item.marketCategoryId,
                 };
               }),
             };
@@ -631,6 +635,50 @@ serve(async (req) => {
           };
         } else {
           result = { success: false, error: "Failed to fetch balance" };
+        }
+      } else if (dataType === "tariffs") {
+        // Calculate real Yandex Market tariffs per product
+        // POST /v2/tariffs/calculate
+        try {
+          const { offers: tariffOffers } = await req.json().catch(() => ({ offers: [] }));
+          
+          // Build offers array for tariffs API
+          const offersForCalc = (tariffOffers || []).slice(0, 200).map((o: any) => ({
+            categoryId: o.categoryId,
+            price: o.price,
+            length: o.length || 20,
+            width: o.width || 15,
+            height: o.height || 10,
+            weight: o.weight || 0.5,
+          }));
+
+          if (offersForCalc.length === 0) {
+            result = { success: false, error: "No offers provided for tariff calculation" };
+          } else {
+            const tariffResponse = await fetchWithRetry(
+              'https://api.partner.market.yandex.ru/v2/tariffs/calculate',
+              {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                  parameters: { campaignId: Number(campaignId) },
+                  offers: offersForCalc,
+                }),
+              }
+            );
+
+            if (tariffResponse.ok) {
+              const tariffData = await tariffResponse.json();
+              result = { success: true, data: tariffData.result?.offers || [] };
+            } else {
+              const errText = await tariffResponse.text();
+              console.error("Tariff calc error:", tariffResponse.status, errText);
+              result = { success: false, error: `Tariff calculation failed: ${tariffResponse.status}` };
+            }
+          }
+        } catch (e) {
+          console.error("Tariff calc error:", e);
+          result = { success: false, error: "Tariff calculation error" };
         }
       }
 

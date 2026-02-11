@@ -106,7 +106,7 @@ export function MobileAnalytics({ connections, connectedMarketplaces, store }: M
           <h2 className="font-semibold">Analitika</h2>
           <div className="flex items-center gap-2">
             {!isOnline && (
-              <span className="text-xs text-yellow-600 flex items-center gap-1">
+              <span className="text-xs text-destructive flex items-center gap-1">
                 <WifiOff className="h-3 w-3" /> Offline
               </span>
             )}
@@ -134,14 +134,14 @@ export function MobileAnalytics({ connections, connectedMarketplaces, store }: M
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-orange-500/10 to-orange-500/5 border-orange-500/20 overflow-hidden">
+        <Card className="bg-gradient-to-br from-accent/30 to-accent/10 border-accent/30 overflow-hidden">
           <CardContent className="p-3">
             <div className="flex items-center gap-1.5 mb-1.5">
-              <Wallet className="h-4 w-4 text-orange-600" />
+              <Wallet className="h-4 w-4 text-accent-foreground" />
               <span className="text-xs text-muted-foreground">O'rtacha chek</span>
             </div>
             {isLoading ? <Skeleton className="h-6 w-14" /> : (
-              <div className="text-xl font-bold text-orange-600 dark:text-orange-400 truncate">
+              <div className="text-xl font-bold text-accent-foreground truncate">
                 {stats.avgCheck > 0 ? formatPrice(stats.avgCheck) : '—'}
                 <span className="text-xs font-normal text-muted-foreground ml-1">so'm</span>
               </div>
@@ -149,14 +149,14 @@ export function MobileAnalytics({ connections, connectedMarketplaces, store }: M
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20 overflow-hidden">
+        <Card className="bg-gradient-to-br from-secondary/50 to-secondary/20 border-secondary/40 overflow-hidden">
           <CardContent className="p-3">
             <div className="flex items-center gap-1.5 mb-1.5">
-              <ShoppingCart className="h-4 w-4 text-blue-600" />
+              <ShoppingCart className="h-4 w-4 text-secondary-foreground" />
               <span className="text-xs text-muted-foreground">Buyurtmalar</span>
             </div>
             {isLoading ? <Skeleton className="h-6 w-14" /> : (
-              <div className="text-xl font-bold text-blue-600 dark:text-blue-400">
+              <div className="text-xl font-bold text-secondary-foreground">
                 {stats.totalOrders}
                 <span className="text-xs font-normal text-muted-foreground ml-1">ta</span>
               </div>
@@ -164,14 +164,14 @@ export function MobileAnalytics({ connections, connectedMarketplaces, store }: M
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-purple-500/10 to-purple-500/5 border-purple-500/20 overflow-hidden">
+        <Card className="bg-gradient-to-br from-muted to-muted/50 border-muted-foreground/20 overflow-hidden">
           <CardContent className="p-3">
             <div className="flex items-center gap-1.5 mb-1.5">
-              <Package className="h-4 w-4 text-purple-600" />
+              <Package className="h-4 w-4 text-muted-foreground" />
               <span className="text-xs text-muted-foreground">Mahsulotlar</span>
             </div>
             {isLoading ? <Skeleton className="h-6 w-14" /> : (
-              <div className="text-xl font-bold text-purple-600 dark:text-purple-400">
+              <div className="text-xl font-bold text-foreground">
                 {stats.totalProducts}
                 <span className="text-xs font-normal text-muted-foreground ml-1">ta</span>
               </div>
@@ -181,9 +181,9 @@ export function MobileAnalytics({ connections, connectedMarketplaces, store }: M
       </div>
 
       {(stats.lowStockProducts > 0 || stats.outOfStockProducts > 0) && (
-        <Card className="border-yellow-500/30 bg-yellow-500/5">
+        <Card className="border-destructive/30 bg-destructive/5">
           <CardContent className="p-3 flex items-center gap-3">
-            <AlertTriangle className="h-5 w-5 text-yellow-600 shrink-0" />
+            <AlertTriangle className="h-5 w-5 text-destructive shrink-0" />
             <div className="flex-1 min-w-0">
               <div className="text-sm font-medium">Zaxira ogohlantirishi</div>
               <div className="text-xs text-muted-foreground">
@@ -202,7 +202,7 @@ export function MobileAnalytics({ connections, connectedMarketplaces, store }: M
           <div className="flex flex-wrap gap-2">
             {stats.pendingOrders > 0 && <Badge variant="secondary" className="text-xs">Kutilmoqda: {stats.pendingOrders}</Badge>}
             {stats.processingOrders > 0 && <Badge variant="default" className="text-xs">Jarayonda: {stats.processingOrders}</Badge>}
-            {stats.deliveredOrders > 0 && <Badge variant="outline" className="text-xs border-green-500 text-green-600">Yetkazilgan: {stats.deliveredOrders}</Badge>}
+            {stats.deliveredOrders > 0 && <Badge variant="outline" className="text-xs border-primary text-primary">Yetkazilgan: {stats.deliveredOrders}</Badge>}
             {stats.cancelledOrders > 0 && <Badge variant="destructive" className="text-xs">Bekor: {stats.cancelledOrders}</Badge>}
           </div>
         </div>
