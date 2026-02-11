@@ -9,7 +9,7 @@ import { MobileSellerCloudHeader } from '@/components/mobile/MobileSellerCloudHe
 import { MobileAnalytics } from '@/components/mobile/MobileAnalytics';
 import { MobileProducts } from '@/components/mobile/MobileProducts';
 import { MobileOrders } from '@/components/mobile/MobileOrders';
-import { MobileTrendHunter } from '@/components/mobile/MobileTrendHunter';
+
 import { AIScannerPro } from '@/components/seller/AIScannerPro';
 import { BackgroundTasksPanel } from '@/components/mobile/BackgroundTasksPanel';
 import { ABCAnalysis } from '@/components/sellercloud/ABCAnalysis';
@@ -33,7 +33,6 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
 const moreSubTabs = [
-  { id: 'trends' as const, icon: TrendingUp, label: 'Trendlar' },
   { id: 'financials' as const, icon: DollarSign, label: 'Moliya' },
   { id: 'calculator' as const, icon: Calculator, label: 'Kalkulyator' },
   { id: 'abc-analysis' as const, icon: BarChart3, label: 'ABC-analiz' },
@@ -153,8 +152,6 @@ export default function SellerCloudMobile() {
         return <MobileProducts connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'orders':
         return <MobileOrders connectedMarketplaces={connectedMarketplaces} store={store} />;
-      case 'trends':
-        return <MobileTrendHunter />;
       case 'abc-analysis':
         return <div className="p-4"><ABCAnalysis connectedMarketplaces={connectedMarketplaces} store={store} commissionPercent={subscription?.commission_percent || 4} /></div>;
       case 'cost-prices':

@@ -92,7 +92,7 @@ interface BackgroundTask {
   completedAt?: Date;
 }
 
-type Step = 'capture' | 'analyzing' | 'search' | 'select' | 'pricing';
+type Step = 'capture' | 'analyzing' | 'pricing';
 
 interface AIScannerProProps {
   shopId: string;
@@ -167,12 +167,12 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
  };
 
   const getStepNumber = () => {
-    const steps: Step[] = ['capture', 'analyzing', 'search', 'select', 'pricing'];
+    const steps: Step[] = ['capture', 'analyzing', 'pricing'];
     return steps.indexOf(currentStep) + 1;
   };
 
   const getProgress = () => {
-    return (getStepNumber() / 5) * 100;
+    return (getStepNumber() / 3) * 100;
   };
 
   const handleImageCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -198,23 +198,20 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
 
       setAnalyzedProduct(analysisData);
       
-      setCurrentStep('search');
-      const { data: searchData, error: searchError } = await supabase.functions.invoke('search-similar-products', {
-        body: { 
-          productName: analysisData.name,
-          category: analysisData.category,
-          description: analysisData.description
-        },
+      // Mahsulot nomini normallashtirish
+      const normalizedName = normalizeProductName(analysisData.name);
+      
+      // To'g'ridan-to'g'ri pricing bosqichiga o'tish (search/select olib tashlandi)
+      setSelectedProduct({
+        title: normalizedName,
+        description: analysisData.description,
+        price: analysisData.suggestedPrice?.toString() || '0',
+        image: imageBase64,
+        source: 'AI Analysis',
+        url: '',
       });
-
-      if (searchError) {
-        console.error('Search error:', searchError);
-        setWebProducts([]);
-      } else {
-        setWebProducts(searchData?.products || []);
-      }
-
-      setCurrentStep('select');
+      
+      setCurrentStep('pricing');
       toast.success('Mahsulot tahlil qilindi!');
     } catch (error: any) {
       console.error('Analysis error:', error);
@@ -223,20 +220,8 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
     }
   };
 
-  const handleProductSelect = (product: WebProduct | null) => {
-    // MUHIM: Tanlangan mahsulotning sifatli rasmini saqlash
-    // Kameradan olingan rasm o'rniga web'dan topilgan sifatli rasmni ishlatamiz
-    if (product && product.image && product.image.startsWith('http')) {
-      // Web rasmni asosiy rasm sifatida belgilash
-      setCapturedImage(product.image);
-    }
-    setSelectedProduct(product);
-    setCurrentStep('pricing');
-  };
-
   // Mahsulot nomini o'zbek lotin harflariga o'tkazish
   const normalizeProductName = (name: string): string => {
-    // Kirill harflarini lotin harflariga o'tkazish (transliteration)
     const cyrillicToLatin: Record<string, string> = {
       'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'yo',
       'ж': 'j', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
@@ -251,37 +236,10 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
       'Ы': 'I', 'Ь': '', 'Э': 'E', 'Ю': 'Yu', 'Я': 'Ya', 'Ў': 'O\'', 'Қ': 'Q',
       'Ғ': 'G\'', 'Ҳ': 'H',
     };
-    
     return name.split('').map(char => cyrillicToLatin[char] || char).join('');
   };
 
-  const useAnalyzedProduct = () => {
-    if (analyzedProduct) {
-      // Web'dan topilgan birinchi sifatli rasmni qo'llash
-      const bestImage = webProducts.length > 0 && webProducts[0].image?.startsWith('http') 
-        ? webProducts[0].image 
-        : capturedImage || '';
-      
-      // Mahsulot nomini normallashtirish (lotin harflarga)
-      const normalizedName = normalizeProductName(analyzedProduct.name);
-      
-      setSelectedProduct({
-        title: normalizedName,
-        description: analyzedProduct.description,
-        price: analyzedProduct.suggestedPrice.toString(),
-        image: bestImage,
-        source: 'AI Analysis',
-        url: '',
-      });
-      
-      // Agar web'dan rasm topilgan bo'lsa, uni asosiy rasm sifatida belgilash
-      if (bestImage.startsWith('http')) {
-        setCapturedImage(bestImage);
-      }
-      
-      setCurrentStep('pricing');
-    }
-  };
+
 
   const calculatePricing = () => {
     if (!costPrice || costPrice <= 0) {
@@ -727,7 +685,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
                 </Button>
               )}
               <Badge variant="outline" className="text-xs whitespace-nowrap">
-                {getStepNumber()} / 5
+                {getStepNumber()} / 3
               </Badge>
             </div>
           </div>
@@ -737,8 +695,6 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
           <div className="flex justify-between mt-2 text-[10px] sm:text-xs text-muted-foreground">
             <span>Rasm</span>
             <span>Tahlil</span>
-            <span>Qidiruv</span>
-            <span>Tanlash</span>
             <span>Narx</span>
           </div>
         </CardContent>
@@ -903,127 +859,8 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
         </Card>
       )}
 
-      {/* Step 3: Searching */}
-      {currentStep === 'search' && (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <Search className="h-12 w-12 animate-pulse mx-auto text-primary mb-4" />
-            <p className="text-lg font-medium">O'xshash mahsulotlar qidirilmoqda...</p>
-            <p className="text-sm text-muted-foreground">Internetda shu mahsulotga o'xshashlar topilmoqda</p>
-          </CardContent>
-        </Card>
-      )}
 
-      {/* Step 4: Select Product */}
-      {currentStep === 'select' && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              Mahsulotni tanlang
-            </CardTitle>
-            <CardDescription>
-              Birini tanlang yoki AI tahlilidan foydalaning
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Analyzed Product Card - Clean layout */}
-            {capturedImage && (
-              <div className="p-4 bg-gradient-to-r from-primary/5 to-primary/10 rounded-xl border border-primary/20">
-                <div className="flex gap-4 items-start">
-                  <div className="relative">
-                    <img 
-                      src={capturedImage} 
-                      alt="Captured" 
-                      className="w-20 h-20 object-cover rounded-lg border-2 border-background shadow-md"
-                    />
-                    <div className="absolute -top-1 -right-1 w-5 h-5 bg-primary rounded-full flex items-center justify-center">
-                      <Check className="h-3 w-3 text-primary-foreground" />
-                    </div>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-semibold text-base line-clamp-2">{analyzedProduct?.name}</h4>
-                    <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
-                      {analyzedProduct?.description}
-                    </p>
-                    <Badge variant="secondary" className="mt-2">
-                      {analyzedProduct?.category}
-                    </Badge>
-                  </div>
-                </div>
-                <Button 
-                  className="w-full mt-4" 
-                  variant="default"
-                  onClick={useAnalyzedProduct}
-                >
-                  <Sparkles className="mr-2 h-4 w-4" />
-                  AI tahlilidan foydalanish
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </div>
-            )}
 
-            <Separator />
-
-            {/* Similar Products Section */}
-            {webProducts.length > 0 ? (
-              <div>
-                <h4 className="font-medium mb-3 flex items-center gap-2">
-                  <Globe className="h-4 w-4" />
-                  O'xshash mahsulotlar ({webProducts.length} ta):
-                </h4>
-                <ScrollArea className="h-[280px]">
-                  <div className="space-y-2">
-                    {webProducts.map((product, index) => (
-                      <div
-                        key={index}
-                        className="flex gap-3 p-3 border rounded-lg hover:border-primary hover:bg-primary/5 cursor-pointer transition-all"
-                        onClick={() => handleProductSelect(product)}
-                      >
-                        <ProductImageWithFallback 
-                          src={product.image} 
-                          alt={product.title} 
-                        />
-                        <div className="flex-1 min-w-0">
-                          <h5 className="font-medium text-sm line-clamp-2">{product.title}</h5>
-                          <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
-                            {product.description}
-                          </p>
-                          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                            <Badge variant="outline" className="text-xs py-0">
-                              {product.source}
-                            </Badge>
-                            {product.price && (
-                              <span className="text-sm font-bold text-primary">
-                                {product.price}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <Button variant="ghost" size="icon" className="flex-shrink-0">
-                          <ArrowRight className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              </div>
-            ) : (
-              <div className="text-center py-6 text-muted-foreground">
-                <Globe className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">Qidirilmoqda...</p>
-              </div>
-            )}
-
-            <div className="flex justify-between pt-4">
-              <Button variant="outline" onClick={resetScanner}>
-                <X className="mr-2 h-4 w-4" />
-                Bekor qilish
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Step 5: Pricing */}
       {currentStep === 'pricing' && selectedProduct && (
@@ -1185,7 +1022,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
             )}
 
             <div className="flex gap-3 pt-4">
-              <Button variant="outline" onClick={() => setCurrentStep('select')}>
+              <Button variant="outline" onClick={() => setCurrentStep('capture')}>
                 Orqaga
               </Button>
               <Button 
