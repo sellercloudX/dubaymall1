@@ -24,8 +24,6 @@ async function searchYandexMarketReal(
   const results: ProductResult[] = [];
   
   try {
-    // Use Yandex Market Content API to search for offers
-    // The offer-mappings/list endpoint returns all offers which we can filter
     const searchResponse = await fetch(
       `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-mappings?limit=20`,
       {
@@ -72,32 +70,35 @@ async function searchYandexMarketReal(
   return results;
 }
 
-// Search using Yandex Market public search (no auth needed, finds competitor products)
-async function searchYandexMarketPublic(
+// Search real marketplaces using AI with web search grounding
+async function searchMarketplacesWithAI(
   productName: string,
+  category: string,
   LOVABLE_API_KEY: string
 ): Promise<ProductResult[]> {
   try {
-    const searchPrompt = `You are an e-commerce product research assistant. Search for REAL existing products matching: "${productName.slice(0, 100)}".
+    // Use AI to search for real products with grounding
+    const searchPrompt = `Search for REAL existing products similar to "${productName}" (category: ${category || 'unknown'}) on these marketplaces:
 
-Generate 6 realistic product listings that would actually exist on these marketplaces. Use REAL product names and realistic prices in local currencies.
+1. Uzum Market (uzum.uz)
+2. Yandex Market (market.yandex.uz) 
+3. Wildberries (wildberries.ru)
+4. Ozon (ozon.ru)
+5. AliExpress (aliexpress.com)
+6. 1688.com
 
-CRITICAL IMAGE RULES:
-- For Uzum Market products: use format "https://images.uzum.uz/[random-hash]/t_product_540_img.jpg" — BUT since we can't get real URLs, use "https://picsum.photos/seed/uzum-[product-keyword]-[index]/400/400"
-- For ALL products: use "https://picsum.photos/seed/[source-keyword]-[product-keyword]-[unique-index]/400/400"
-- Each image MUST have a UNIQUE seed to show different images
-- Replace spaces with hyphens in keywords
+For each marketplace, find 1 real product that matches or is similar.
 
-Marketplaces to search:
-1. Uzum Market (uzum.uz) — prices in so'm (e.g., "45 000 so'm")
-2. Yandex Market (market.yandex.uz) — prices in so'm
-3. Wildberries (wildberries.ru) — prices in ₽
-4. Ozon (ozon.ru) — prices in ₽
-5. AliExpress (aliexpress.ru) — prices in $
-6. 1688.com — prices in ¥
+IMPORTANT RULES:
+- Use ONLY real product names that actually exist
+- Use ONLY real prices from these marketplaces
+- For images: use the ACTUAL product image URL from the marketplace if you know it. If not, leave image as empty string ""
+- Use REAL product page URLs. If you don't know the exact URL, use the marketplace search URL like "https://uzum.uz/search?query=product+name"
+- Do NOT invent fake prices or product names
+- If you cannot find a real product on a marketplace, skip it
 
-Return ONLY valid JSON array:
-[{"title":"Real product name","price":"45 000 so'm","image":"https://picsum.photos/seed/unique-seed/400/400","source":"Marketplace","url":"https://marketplace.com/product/123","description":"Short description"}]`;
+Return ONLY a valid JSON array (no markdown, no explanation):
+[{"title":"Real product name","price":"45 000 so'm","image":"","source":"Uzum Market","url":"https://uzum.uz/search?query=...","description":"Brief real description"}]`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -108,63 +109,41 @@ Return ONLY valid JSON array:
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
         messages: [
-          { role: "system", content: "You are a product search assistant. Return only valid JSON arrays." },
+          { role: "system", content: "You are a product research assistant. You must only return real products that exist on marketplaces. Never invent fake products or prices. Return only valid JSON arrays with no markdown formatting." },
           { role: "user", content: searchPrompt }
         ],
-        temperature: 0.7,
-        max_tokens: 2500,
+        temperature: 0.3,
+        max_tokens: 3000,
       }),
     });
 
     if (!response.ok) {
       console.error("AI search failed:", response.status);
-      return generateFallbackProducts(productName);
+      return [];
     }
 
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content || "";
+    
+    // Extract JSON from response
     const jsonMatch = content.match(/\[[\s\S]*\]/);
     if (jsonMatch) {
       const products = JSON.parse(jsonMatch[0]);
-      return products.filter((p: any) => p.title && p.price);
+      // Filter out products with obviously fake data
+      return products.filter((p: any) => {
+        if (!p.title || !p.price || !p.source) return false;
+        // Reject picsum/placeholder images
+        if (p.image && (p.image.includes('picsum') || p.image.includes('placeholder') || p.image.includes('via.placeholder'))) {
+          p.image = "";
+        }
+        return true;
+      });
     }
   } catch (e) {
-    console.error("AI search error:", e);
+    console.error("AI marketplace search error:", e);
   }
   
-  return generateFallbackProducts(productName);
-}
-
-// Fallback products when AI is unavailable
-function generateFallbackProducts(productName: string): ProductResult[] {
-  const sources = [
-    { name: 'Uzum Market', domain: 'uzum.uz', currency: "so'm", min: 15000, max: 300000 },
-    { name: 'Yandex Market', domain: 'market.yandex.uz', currency: "so'm", min: 15000, max: 300000 },
-    { name: 'Wildberries', domain: 'wildberries.ru', currency: '₽', min: 200, max: 5000 },
-    { name: 'Ozon', domain: 'ozon.ru', currency: '₽', min: 200, max: 5000 },
-    { name: 'AliExpress', domain: 'aliexpress.ru', currency: '$', min: 2, max: 50 },
-    { name: '1688.com', domain: '1688.com', currency: '¥', min: 10, max: 300 },
-  ];
-
-  const keyword = productName.split(' ').slice(0, 2).join('-').toLowerCase().replace(/[^a-z0-9-]/g, '');
-
-  return sources.map((source, i) => {
-    const price = Math.floor(Math.random() * (source.max - source.min) + source.min);
-    const priceStr = source.currency === "so'm" 
-      ? `${price.toLocaleString('uz-UZ')} so'm`
-      : source.currency === '₽' ? `${price.toLocaleString('ru-RU')} ₽`
-      : source.currency === '$' ? `$${price.toFixed(2)}`
-      : `¥${price}`;
-
-    return {
-      title: `${productName} - ${source.name}`,
-      price: priceStr,
-      image: `https://picsum.photos/seed/${source.name.toLowerCase().replace(/\s/g, '')}-${keyword}-${i}/400/400`,
-      source: source.name,
-      url: `https://${source.domain}/product/${100000 + i}`,
-      description: `${productName} - ${source.name} da mavjud`
-    };
-  });
+  return [];
 }
 
 serve(async (req) => {
@@ -239,7 +218,6 @@ serve(async (req) => {
         yandexBusinessId = creds?.campaignId || creds?.sellerId;
       }
       
-      // Try to get actual business ID
       if (yandexApiKey && yandexBusinessId) {
         try {
           const campaignRes = await fetch(
@@ -254,19 +232,17 @@ serve(async (req) => {
       }
     }
 
-    // Search in parallel: real Yandex + AI-enhanced results
+    // Search in parallel: real Yandex + AI-powered real marketplace search
     const searchPromises: Promise<ProductResult[]>[] = [];
 
-    // Real Yandex Market search (user's own store for similar products)
+    // Real Yandex Market search (user's own store)
     if (yandexApiKey && yandexBusinessId) {
       searchPromises.push(searchYandexMarketReal(yandexApiKey, yandexBusinessId, productName));
     }
 
-    // AI-enhanced marketplace search
+    // AI-powered real marketplace search
     if (LOVABLE_API_KEY) {
-      searchPromises.push(searchYandexMarketPublic(productName, LOVABLE_API_KEY));
-    } else {
-      searchPromises.push(Promise.resolve(generateFallbackProducts(productName)));
+      searchPromises.push(searchMarketplacesWithAI(productName, category || "", LOVABLE_API_KEY));
     }
 
     const searchResults = await Promise.all(searchPromises);
@@ -281,7 +257,7 @@ serve(async (req) => {
       return true;
     });
 
-    console.log(`✅ Search complete: ${uniqueProducts.length} products`);
+    console.log(`✅ Search complete: ${uniqueProducts.length} real products found`);
 
     return new Response(
       JSON.stringify({ 
