@@ -253,20 +253,20 @@ export const ProductCard = memo(forwardRef<HTMLAnchorElement, ProductCardProps>(
         <div className="p-2.5 flex flex-col flex-1">
           {/* Price Section - Uzum style */}
           <div className="mb-1">
-            {/* Current Price */}
-            <div className="flex items-baseline gap-1">
+            <div className="flex items-baseline gap-2">
+              {/* Current Price */}
               <span className="text-lg font-bold text-primary whitespace-nowrap">
                 {formatPrice(product.price)}
               </span>
               <span className="text-xs text-primary font-medium">so'm</span>
+              
+              {/* Original Price (struck through) - inline right */}
+              {product.original_price && product.original_price > product.price && (
+                <span className="text-xs text-muted-foreground line-through whitespace-nowrap ml-auto">
+                  {formatPrice(product.original_price)} so'm
+                </span>
+              )}
             </div>
-            
-            {/* Original Price (struck through) */}
-            {product.original_price && product.original_price > product.price && (
-              <span className="text-xs text-muted-foreground line-through whitespace-nowrap">
-                {formatPrice(product.original_price)} so'm
-              </span>
-            )}
           </div>
 
           {/* Monthly Payment Badge - Yellow like Uzum - 24 month formula: (price * 1.6) / 24 */}
