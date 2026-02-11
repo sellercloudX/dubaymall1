@@ -60,7 +60,8 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
 
       // Build sales map from real order items only
       const salesMap = new Map<string, { qty: number; revenue: number }>();
-      orders.forEach(order => {
+      const activeOrders = orders.filter(o => !['CANCELLED', 'RETURNED'].includes(o.status));
+      activeOrders.forEach(order => {
         (order.items || []).forEach(item => {
           const key = item.offerId;
           if (!key) return;
