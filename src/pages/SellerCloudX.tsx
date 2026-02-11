@@ -26,6 +26,7 @@ import { MinPriceProtection } from '@/components/sellercloud/MinPriceProtection'
 import { CardCloner } from '@/components/sellercloud/CardCloner';
 import { ProblematicProducts } from '@/components/sellercloud/ProblematicProducts';
 import { ProfitCalculator } from '@/components/sellercloud/ProfitCalculator';
+import { CostPriceManager } from '@/components/sellercloud/CostPriceManager';
 import { AIScannerPro } from '@/components/seller/AIScannerPro';
 import { useMarketplaceConnections } from '@/hooks/useMarketplaceConnections';
 import { useSellerCloudSubscription } from '@/hooks/useSellerCloudSubscription';
@@ -251,11 +252,13 @@ function AnalyticsSubTabs({ connectedMarketplaces, store, subscription, totalRev
         <TabsTrigger value="overview" className="text-xs gap-1"><BarChart3 className="h-3.5 w-3.5" />Umumiy</TabsTrigger>
         <TabsTrigger value="financials" className="text-xs gap-1"><Calculator className="h-3.5 w-3.5" />Moliya</TabsTrigger>
         <TabsTrigger value="abc" className="text-xs gap-1"><BarChart3 className="h-3.5 w-3.5" />ABC-analiz</TabsTrigger>
+        <TabsTrigger value="cost-prices" className="text-xs gap-1"><DollarSign className="h-3.5 w-3.5" />Tannarx</TabsTrigger>
         <TabsTrigger value="calculator" className="text-xs gap-1"><Calculator className="h-3.5 w-3.5" />Kalkulyator</TabsTrigger>
       </TabsList>
       <TabsContent value="overview"><MarketplaceAnalytics connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
       <TabsContent value="financials"><FinancialDashboard connectedMarketplaces={connectedMarketplaces} store={store} monthlyFee={subscription?.monthly_fee || 499} commissionPercent={subscription?.commission_percent || 4} /></TabsContent>
       <TabsContent value="abc"><ABCAnalysis connectedMarketplaces={connectedMarketplaces} store={store} commissionPercent={subscription?.commission_percent || 4} /></TabsContent>
+      <TabsContent value="cost-prices"><CostPriceManager connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
       <TabsContent value="calculator"><ProfitCalculator commissionPercent={subscription?.commission_percent || 4} /></TabsContent>
     </Tabs>
   );

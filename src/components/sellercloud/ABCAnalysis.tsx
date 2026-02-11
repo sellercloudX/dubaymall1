@@ -14,6 +14,7 @@ import {
   Calculator
 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useCostPrices } from '@/hooks/useCostPrices';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 
 interface ABCAnalysisProps {
@@ -44,6 +45,7 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
   const [selectedGroup, setSelectedGroup] = useState<'all' | 'A' | 'B' | 'C'>('all');
   const isMobile = useIsMobile();
   const isLoading = store.isLoading;
+  const { getCostPrice } = useCostPrices();
 
   const products = useMemo(() => {
     if (isLoading) return [];
@@ -72,17 +74,24 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
         const sales = salesMap.get(product.offerId) || { qty: 0, revenue: 0 };
         const price = product.price || 0;
         const totalRevenue = sales.revenue || sales.qty * price;
+        
+        // Real tannarx from cost prices DB, fallback to estimate
+        const realCostPrice = getCostPrice(marketplace, product.offerId);
+        const productCost = realCostPrice !== null 
+          ? realCostPrice * sales.qty  // Real tannarx × quantity
+          : 0; // No cost entered = 0 (will show as unknown)
+        
         // Real Yandex Market tariffs for Uzbekistan
-        const commissionRate = commissionPercent / 100; // from subscription (4% or 2%)
-        const yandexCommissionRate = 0.20; // Yandex standard 20% commission
-        const logisticsPerOrder = 4000; // Average logistics ~4000 so'm per item
-        const taxRate = 0.04; // 4% tax
+        const commissionRate = commissionPercent / 100;
+        const yandexCommissionRate = 0.20;
+        const logisticsPerOrder = 4000;
+        const taxRate = 0.04;
         
         const commissionAmount = totalRevenue * yandexCommissionRate;
         const logisticsCost = sales.qty * logisticsPerOrder;
         const taxAmount = totalRevenue * taxRate;
-        const platformFee = totalRevenue * commissionRate; // SellerCloudX fee
-        const totalCosts = commissionAmount + logisticsCost + taxAmount + platformFee;
+        const platformFee = totalRevenue * commissionRate;
+        const totalCosts = productCost + commissionAmount + logisticsCost + taxAmount + platformFee;
         const netProfit = totalRevenue - totalCosts;
         const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
 

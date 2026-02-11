@@ -25,7 +25,8 @@ import { MultiPublish } from '@/components/sellercloud/MultiPublish';
 import { ReportsExport } from '@/components/sellercloud/ReportsExport';
 import { NotificationCenter } from '@/components/sellercloud/NotificationCenter';
 import { SubscriptionBilling } from '@/components/sellercloud/SubscriptionBilling';
-import { Loader2, Lock, TrendingUp, Calculator, DollarSign, BarChart3, Shield, Copy, AlertOctagon, ArrowDownUp, Tag, Upload, FileSpreadsheet, Bell, CreditCard } from 'lucide-react';
+import { CostPriceManager } from '@/components/sellercloud/CostPriceManager';
+import { Loader2, Lock, TrendingUp, Calculator, DollarSign, BarChart3, Shield, Copy, AlertOctagon, ArrowDownUp, Tag, Upload, FileSpreadsheet, Bell, CreditCard, Coins } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -36,6 +37,7 @@ const moreSubTabs = [
   { id: 'financials' as const, icon: DollarSign, label: 'Moliya' },
   { id: 'calculator' as const, icon: Calculator, label: 'Kalkulyator' },
   { id: 'abc-analysis' as const, icon: BarChart3, label: 'ABC-analiz' },
+  { id: 'cost-prices' as const, icon: Coins, label: 'Tannarx' },
   { id: 'min-price' as const, icon: Shield, label: 'Min narx' },
   { id: 'card-clone' as const, icon: Copy, label: 'Klonlash' },
   { id: 'problems' as const, icon: AlertOctagon, label: 'Muammolar' },
@@ -147,6 +149,8 @@ export default function SellerCloudMobile() {
         return <MobileTrendHunter />;
       case 'abc-analysis':
         return <div className="p-4"><ABCAnalysis connectedMarketplaces={connectedMarketplaces} store={store} commissionPercent={subscription?.commission_percent || 4} /></div>;
+      case 'cost-prices':
+        return <div className="p-4"><CostPriceManager connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'min-price':
         return <div className="p-4"><MinPriceProtection connectedMarketplaces={connectedMarketplaces} store={store} commissionPercent={subscription?.commission_percent || 4} /></div>;
       case 'card-clone':

@@ -5,8 +5,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import {
   DollarSign, TrendingUp, TrendingDown,
-  Wallet, Receipt, RefreshCw, Calculator, Percent
+  Wallet, Receipt, RefreshCw, Calculator, Percent, Package
 } from 'lucide-react';
+import { useCostPrices } from '@/hooks/useCostPrices';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 
 interface FinancialDashboardProps {
@@ -26,15 +27,33 @@ export function FinancialDashboard({
   connectedMarketplaces, store, monthlyFee = 499, commissionPercent = 4
 }: FinancialDashboardProps) {
   const isLoading = store.isLoadingOrders;
+  const { getCostPrice } = useCostPrices();
 
   const summary = useMemo(() => {
     if (isLoading) return null;
 
+    let totalProductCost = 0;
+    let costPricesCovered = 0;
+    let totalProductCount = 0;
+
     const marketplaceBreakdown = connectedMarketplaces.map(marketplace => {
       const orders = store.getOrders(marketplace);
-      // Only count revenue from non-cancelled orders
       const activeOrders = orders.filter(o => !['CANCELLED', 'RETURNED'].includes(o.status));
       const mpRevenue = activeOrders.reduce((sum, order) => sum + (order.totalUZS || order.total || 0), 0);
+
+      // Calculate real product costs from order items + cost prices DB
+      activeOrders.forEach(order => {
+        (order.items || []).forEach(item => {
+          const cost = getCostPrice(marketplace, item.offerId);
+          const qty = item.count || 1;
+          totalProductCount += qty;
+          if (cost !== null) {
+            totalProductCost += cost * qty;
+            costPricesCovered += qty;
+          }
+        });
+      });
+
       return {
         marketplace, revenue: mpRevenue, orders: activeOrders.length,
         avgOrder: activeOrders.length > 0 ? Math.round(mpRevenue / activeOrders.length) : 0,
@@ -43,17 +62,18 @@ export function FinancialDashboard({
 
     const totalRevenue = marketplaceBreakdown.reduce((s, m) => s + m.revenue, 0);
     const totalOrders = marketplaceBreakdown.reduce((s, m) => s + m.orders, 0);
-    const platformFee = monthlyFee * USD_TO_UZS; // SellerCloudX monthly fee
-    const platformCommission = totalRevenue * (commissionPercent / 100); // SellerCloudX commission
-    const yandexCommission = totalRevenue * 0.20; // Yandex Market 20% standard commission
-    const yandexTax = totalRevenue * 0.04; // 4% tax
-    const estimatedLogistics = totalOrders * 4000; // ~4000 so'm per order logistics
-    const totalExpenses = platformFee + platformCommission + yandexCommission + yandexTax + estimatedLogistics;
+    const platformFee = monthlyFee * USD_TO_UZS;
+    const platformCommission = totalRevenue * (commissionPercent / 100);
+    const yandexCommission = totalRevenue * 0.20;
+    const yandexTax = totalRevenue * 0.04;
+    const estimatedLogistics = totalOrders * 4000;
+    const totalExpenses = totalProductCost + platformFee + platformCommission + yandexCommission + yandexTax + estimatedLogistics;
     const netProfit = totalRevenue - totalExpenses;
     const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+    const costCoverage = totalProductCount > 0 ? Math.round((costPricesCovered / totalProductCount) * 100) : 0;
 
-    return { totalRevenue, totalOrders, platformFee, platformCommission, yandexCommission, yandexTax, estimatedLogistics, totalExpenses, netProfit, profitMargin, marketplaceBreakdown };
-  }, [connectedMarketplaces, store.dataVersion, isLoading, monthlyFee, commissionPercent]);
+    return { totalRevenue, totalOrders, platformFee, platformCommission, yandexCommission, yandexTax, estimatedLogistics, totalExpenses, netProfit, profitMargin, marketplaceBreakdown, totalProductCost, costCoverage };
+  }, [connectedMarketplaces, store.dataVersion, isLoading, monthlyFee, commissionPercent, getCostPrice]);
 
   const formatPrice = (price: number) => {
     if (Math.abs(price) >= 1000000) return (price / 1000000).toFixed(1) + ' mln';
@@ -125,6 +145,17 @@ export function FinancialDashboard({
           </div>
         </CardHeader>
         <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0 space-y-3">
+          {/* Tannarx - product costs */}
+          <div className="flex items-center justify-between p-3 rounded-lg border gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-destructive/10 flex items-center justify-center shrink-0"><Package className="h-4 w-4 text-destructive" /></div>
+              <div className="min-w-0">
+                <div className="font-medium text-sm truncate">Mahsulot tannarxi</div>
+                <div className="text-xs text-muted-foreground">{summary.costCoverage}% mahsulotda kiritilgan</div>
+              </div>
+            </div>
+            <div className="text-right shrink-0"><div className="font-bold text-sm whitespace-nowrap">{formatFullPrice(summary.totalProductCost)}</div></div>
+          </div>
           <div className="flex items-center justify-between p-3 rounded-lg border gap-2">
             <div className="flex items-center gap-2 min-w-0">
               <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0"><Wallet className="h-4 w-4 text-primary" /></div>
