@@ -23,34 +23,48 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
      queryFn: async () => {
        const { data: sellerProfiles } = await supabase
          .from('seller_profiles')
-         .select(`
-           *,
-           profiles:user_id(full_name, phone, avatar_url),
-           shops:shop_id(id, name, slug, logo_url, description)
-         `)
+         .select('*')
          .order('created_at', { ascending: false });
- 
+
+       if (!sellerProfiles?.length) return [];
+
+       // Fetch profiles and shops separately (no FK joins)
+       const userIds = sellerProfiles.map(s => s.user_id);
+       const shopIds = sellerProfiles.map(s => s.shop_id).filter(Boolean) as string[];
+
+       const [profilesRes, shopsRes] = await Promise.all([
+         supabase.from('profiles').select('user_id, full_name, phone, avatar_url').in('user_id', userIds),
+         shopIds.length > 0 ? supabase.from('shops').select('id, name, slug, logo_url, description').in('id', shopIds) : Promise.resolve({ data: [] }),
+       ]);
+
+       const profilesMap = Object.fromEntries((profilesRes.data || []).map(p => [p.user_id, p]));
+       const shopsMap = Object.fromEntries((shopsRes.data || []).map(s => [s.id, s]));
+
        // Get stats for each seller
        const enrichedSellers = await Promise.all(
-         (sellerProfiles || []).map(async (seller) => {
-           if (!seller.shop_id) return { ...seller, stats: null };
+         sellerProfiles.map(async (seller) => {
+           const profile = profilesMap[seller.user_id] || null;
+           const shop = seller.shop_id ? shopsMap[seller.shop_id] || null : null;
+
+           if (!seller.shop_id) return { ...seller, profiles: profile, shops: shop, stats: null };
            
             const [productsRes, balanceRes] = await Promise.all([
              supabase.from('products').select('id', { count: 'exact', head: true }).eq('shop_id', seller.shop_id),
              supabase.from('seller_balances').select('*').eq('shop_id', seller.shop_id).maybeSingle(),
            ]);
- 
-           // Get order financials
+
            const { data: financials } = await supabase
              .from('order_financials')
              .select('order_total, platform_commission_amount, seller_net_amount')
              .eq('shop_id', seller.shop_id);
- 
+
            const totalRevenue = financials?.reduce((sum, f) => sum + Number(f.order_total), 0) || 0;
            const platformEarnings = financials?.reduce((sum, f) => sum + Number(f.platform_commission_amount), 0) || 0;
- 
+
            return {
              ...seller,
+             profiles: profile,
+             shops: shop,
              stats: {
                productsCount: productsRes.count || 0,
                totalRevenue,
@@ -71,27 +85,33 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
      queryFn: async () => {
        const { data: bloggerProfiles } = await supabase
          .from('blogger_profiles')
-         .select(`
-           *,
-           profiles:user_id(full_name, phone, avatar_url)
-         `)
+         .select('*')
          .order('created_at', { ascending: false });
- 
-       // Get stats for each blogger
+
+       if (!bloggerProfiles?.length) return [];
+
+       const userIds = bloggerProfiles.map(b => b.user_id);
+       const { data: profilesData } = await supabase
+         .from('profiles')
+         .select('user_id, full_name, phone, avatar_url')
+         .in('user_id', userIds);
+       const profilesMap = Object.fromEntries((profilesData || []).map(p => [p.user_id, p]));
+
        const enrichedBloggers = await Promise.all(
-         (bloggerProfiles || []).map(async (blogger) => {
+         bloggerProfiles.map(async (blogger) => {
            const [linksRes, balanceRes, commissionsRes] = await Promise.all([
              supabase.from('affiliate_links').select('clicks, conversions, total_commission').eq('blogger_id', blogger.user_id),
              supabase.from('blogger_balances').select('*').eq('user_id', blogger.user_id).maybeSingle(),
              supabase.from('commissions').select('commission_amount').eq('blogger_id', blogger.user_id),
            ]);
- 
+
            const totalClicks = linksRes.data?.reduce((sum, l) => sum + (l.clicks || 0), 0) || 0;
            const totalConversions = linksRes.data?.reduce((sum, l) => sum + (l.conversions || 0), 0) || 0;
            const totalEarned = commissionsRes.data?.reduce((sum, c) => sum + Number(c.commission_amount), 0) || 0;
- 
+
            return {
              ...blogger,
+             profiles: profilesMap[blogger.user_id] || null,
              stats: {
                linksCount: linksRes.data?.length || 0,
                totalClicks,
@@ -102,42 +122,48 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
            };
          })
        );
- 
+
        return enrichedBloggers;
      },
    });
- 
+
    // Fetch SellerCloudX subscribers
    const { data: sellerCloudUsers, isLoading: scLoading } = useQuery({
      queryKey: ['admin-sellercloud-detailed'],
      queryFn: async () => {
        const { data: subscriptions } = await supabase
          .from('sellercloud_subscriptions')
-         .select(`
-           *,
-           profiles:user_id(full_name, phone, avatar_url)
-         `)
+         .select('*')
          .order('created_at', { ascending: false });
- 
-       // Get billing info for each
+
+       if (!subscriptions?.length) return [];
+
+       const userIds = subscriptions.map(s => s.user_id);
+       const { data: profilesData } = await supabase
+         .from('profiles')
+         .select('user_id, full_name, phone, avatar_url')
+         .in('user_id', userIds);
+       const profilesMap = Object.fromEntries((profilesData || []).map(p => [p.user_id, p]));
+
        const enriched = await Promise.all(
-         (subscriptions || []).map(async (sub) => {
+         subscriptions.map(async (sub) => {
            const { data: billing } = await supabase
              .from('sellercloud_billing')
              .select('*')
              .eq('user_id', sub.user_id)
              .order('created_at', { ascending: false });
- 
+
            const { data: connections } = await supabase
              .from('marketplace_connections')
              .select('marketplace, is_active, total_revenue, products_count, orders_count')
              .eq('user_id', sub.user_id);
- 
+
            const totalDebt = billing?.filter(b => b.status !== 'paid').reduce((sum, b) => sum + Number(b.balance_due), 0) || 0;
            const totalPaid = billing?.filter(b => b.status === 'paid').reduce((sum, b) => sum + Number(b.total_paid), 0) || 0;
- 
+
            return {
              ...sub,
+             profiles: profilesMap[sub.user_id] || null,
              stats: {
                totalDebt,
                totalPaid,
@@ -147,7 +173,7 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
            };
          })
        );
- 
+
        return enriched;
      },
    });
