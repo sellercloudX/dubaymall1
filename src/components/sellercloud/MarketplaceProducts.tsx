@@ -55,7 +55,7 @@ export function MarketplaceProducts({ connectedMarketplaces, store }: Marketplac
       case 'READY':
       case 'HAS_CARD_CAN_UPDATE':
       case 'HAS_CARD_NO_UPDATE':
-        return <Badge variant="default" className="bg-green-500 whitespace-nowrap">Faol</Badge>;
+        return <Badge variant="default" className="whitespace-nowrap">Faol</Badge>;
       case 'INACTIVE':
       case 'UNPUBLISHED':
       case 'DISABLED_BY_PARTNER':
@@ -68,7 +68,7 @@ export function MarketplaceProducts({ connectedMarketplaces, store }: Marketplac
       case 'PROCESSING':
       case 'CREATING_CARD':
       case 'NO_CARD':
-        return <Badge variant="outline" className="bg-yellow-100 text-yellow-800 whitespace-nowrap">Moderatsiya</Badge>;
+        return <Badge variant="outline" className="bg-accent text-accent-foreground whitespace-nowrap">Moderatsiya</Badge>;
       case 'ARCHIVED':
         return <Badge variant="secondary" className="whitespace-nowrap">Arxiv</Badge>;
       default:

@@ -35,9 +35,9 @@ const MARKETPLACE_NAMES: Record<string, string> = {
 };
 
 const ABC_COLORS = {
-  A: { bg: 'bg-green-500/10', text: 'text-green-600', border: 'border-green-500/30', badge: 'bg-green-500' },
-  B: { bg: 'bg-amber-500/10', text: 'text-amber-600', border: 'border-amber-500/30', badge: 'bg-amber-500' },
-  C: { bg: 'bg-red-500/10', text: 'text-red-600', border: 'border-red-500/30', badge: 'bg-red-500' },
+  A: { bg: 'bg-primary/10', text: 'text-primary', border: 'border-primary/30', badge: 'bg-primary' },
+  B: { bg: 'bg-accent/50', text: 'text-accent-foreground', border: 'border-accent', badge: 'bg-accent' },
+  C: { bg: 'bg-destructive/10', text: 'text-destructive', border: 'border-destructive/30', badge: 'bg-destructive' },
 };
 
 export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 4 }: ABCAnalysisProps) {
@@ -140,15 +140,15 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
     <div className="space-y-4 overflow-hidden">
       {/* KPI Cards */}
       <div className="grid grid-cols-2 gap-3">
-        <Card className="bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/20 overflow-hidden">
+        <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20 overflow-hidden">
           <CardContent className="p-3">
-            <div className="flex items-center gap-1.5 text-green-600 mb-1"><ArrowUpRight className="h-3.5 w-3.5 shrink-0" /><span className="text-xs font-medium truncate">Foydali</span></div>
+            <div className="flex items-center gap-1.5 text-primary mb-1"><ArrowUpRight className="h-3.5 w-3.5 shrink-0" /><span className="text-xs font-medium truncate">Foydali</span></div>
             <div className="text-xl font-bold">{profitableCount}</div><div className="text-[10px] text-muted-foreground">mahsulot</div>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-red-500/10 to-red-500/5 border-red-500/20 overflow-hidden">
+        <Card className="bg-gradient-to-br from-destructive/10 to-destructive/5 border-destructive/20 overflow-hidden">
           <CardContent className="p-3">
-            <div className="flex items-center gap-1.5 text-red-600 mb-1"><ArrowDownRight className="h-3.5 w-3.5 shrink-0" /><span className="text-xs font-medium truncate">Zarardagi</span></div>
+            <div className="flex items-center gap-1.5 text-destructive mb-1"><ArrowDownRight className="h-3.5 w-3.5 shrink-0" /><span className="text-xs font-medium truncate">Zarardagi</span></div>
             <div className="text-xl font-bold">{unprofitableCount}</div><div className="text-[10px] text-muted-foreground">mahsulot</div>
           </CardContent>
         </Card>
@@ -158,9 +158,9 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
             <div className="text-xl font-bold truncate">{formatPrice(totalRevenue)}</div><div className="text-[10px] text-muted-foreground">so'm</div>
           </CardContent>
         </Card>
-        <Card className={`overflow-hidden ${totalProfit >= 0 ? 'bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20' : 'bg-gradient-to-br from-orange-500/10 to-orange-500/5 border-orange-500/20'}`}>
+        <Card className={`overflow-hidden ${totalProfit >= 0 ? 'bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20' : 'bg-gradient-to-br from-destructive/10 to-destructive/5 border-destructive/20'}`}>
           <CardContent className="p-3">
-            <div className={`flex items-center gap-1.5 mb-1 ${totalProfit >= 0 ? 'text-emerald-600' : 'text-orange-600'}`}>
+            <div className={`flex items-center gap-1.5 mb-1 ${totalProfit >= 0 ? 'text-primary' : 'text-destructive'}`}>
               {totalProfit >= 0 ? <TrendingUp className="h-3.5 w-3.5 shrink-0" /> : <TrendingDown className="h-3.5 w-3.5 shrink-0" />}<span className="text-xs font-medium truncate">Sof foyda</span>
             </div>
             <div className="text-xl font-bold truncate">{formatPrice(totalProfit)}</div><div className="text-[10px] text-muted-foreground">so'm</div>
@@ -185,7 +185,7 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
                   <div className={`text-xs font-medium ${colors.text} mb-2`}>{label}</div>
                   <div className="space-y-1 text-xs">
                     <div className="flex justify-between"><span className="text-muted-foreground">Daromad:</span><span className="font-medium whitespace-nowrap">{formatPrice(groupRevenue)}</span></div>
-                    <div className="flex justify-between"><span className="text-muted-foreground">Foyda:</span><span className={`font-medium whitespace-nowrap ${groupProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatPrice(groupProfit)}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Foyda:</span><span className={`font-medium whitespace-nowrap ${groupProfit >= 0 ? 'text-primary' : 'text-destructive'}`}>{formatPrice(groupProfit)}</span></div>
                   </div>
                   <Progress value={totalRevenue > 0 ? (groupRevenue / totalRevenue) * 100 : 0} className="h-1 mt-2" />
                 </CardContent>
@@ -238,14 +238,14 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
                       <div><span className="text-muted-foreground">Daromad:</span><div className="font-medium whitespace-nowrap">{formatPrice(product.totalRevenue)}</div></div>
                       <div>
                         <span className="text-muted-foreground">Foyda:</span>
-                        <div className={`font-bold whitespace-nowrap ${product.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        <div className={`font-bold whitespace-nowrap ${product.netProfit >= 0 ? 'text-primary' : 'text-destructive'}`}>
                           {product.netProfit >= 0 ? '+' : ''}{formatPrice(product.netProfit)}
                         </div>
                       </div>
                     </div>
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-muted-foreground">Marja:</span>
-                      <span className={`font-medium ${product.profitMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>{product.profitMargin.toFixed(0)}%</span>
+                      <span className={`font-medium ${product.profitMargin >= 0 ? 'text-primary' : 'text-destructive'}`}>{product.profitMargin.toFixed(0)}%</span>
                     </div>
                   </div>
                 );
@@ -276,8 +276,8 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
                         <TableCell className="text-right text-sm font-medium whitespace-nowrap">{formatPrice(product.totalRevenue)}</TableCell>
                         <TableCell className="text-right text-sm text-muted-foreground whitespace-nowrap">{formatPrice(product.estimatedCost)}</TableCell>
                         <TableCell className="text-right text-sm text-muted-foreground whitespace-nowrap">{formatPrice(product.commissionAmount)}</TableCell>
-                        <TableCell className="text-right"><span className={`font-bold text-sm whitespace-nowrap ${product.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>{product.netProfit >= 0 ? '+' : ''}{formatPrice(product.netProfit)}</span></TableCell>
-                        <TableCell className="text-right"><span className={`text-sm font-medium ${product.profitMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>{product.profitMargin.toFixed(0)}%</span></TableCell>
+                        <TableCell className="text-right"><span className={`font-bold text-sm whitespace-nowrap ${product.netProfit >= 0 ? 'text-primary' : 'text-destructive'}`}>{product.netProfit >= 0 ? '+' : ''}{formatPrice(product.netProfit)}</span></TableCell>
+                        <TableCell className="text-right"><span className={`text-sm font-medium ${product.profitMargin >= 0 ? 'text-primary' : 'text-destructive'}`}>{product.profitMargin.toFixed(0)}%</span></TableCell>
                       </TableRow>
                     );
                   })}

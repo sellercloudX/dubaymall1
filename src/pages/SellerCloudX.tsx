@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Separator } from '@/components/ui/separator';
 import { MarketplaceOAuth } from '@/components/sellercloud/MarketplaceOAuth';
 import { MarketplaceProducts } from '@/components/sellercloud/MarketplaceProducts';
 import { MarketplaceOrders } from '@/components/sellercloud/MarketplaceOrders';
@@ -34,7 +35,7 @@ import {
   Loader2, Globe, Package, ShoppingCart, BarChart3, 
   Scan, Crown, Check, ArrowRight, ArrowDownUp, DollarSign,
   Upload, Bell, FileSpreadsheet, CreditCard, Calculator, AlertTriangle,
-  Shield, Copy, AlertOctagon
+  Shield, Copy, AlertOctagon, Wrench
 } from 'lucide-react';
 
 export default function SellerCloudX() {
@@ -103,7 +104,7 @@ export default function SellerCloudX() {
         <div className="container mx-auto px-4 py-12">
           <div className="max-w-4xl mx-auto">
             <div className="text-center mb-12">
-              <Badge className="mb-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white">
+              <Badge className="mb-4 bg-gradient-to-r from-primary to-primary/80 text-primary-foreground">
                 <Crown className="h-3 w-3 mr-1" />Premium
               </Badge>
               <h1 className="text-4xl font-bold mb-4">SellerCloudX</h1>
@@ -113,7 +114,7 @@ export default function SellerCloudX() {
             </div>
             <Card className="max-w-lg mx-auto border-2 border-primary/20 shadow-xl">
               <CardHeader className="text-center pb-2">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center mx-auto mb-4">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center mx-auto mb-4">
                   <Globe className="h-8 w-8 text-white" />
                 </div>
                 <CardTitle className="text-2xl">SellerCloudX Pro</CardTitle>
@@ -151,7 +152,7 @@ export default function SellerCloudX() {
       <div className="container mx-auto px-4 py-8">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">
               <Globe className="h-6 w-6 text-white" />
             </div>
             <div>
@@ -196,24 +197,15 @@ export default function SellerCloudX() {
           </Tabs>
         ) : (
           <Tabs defaultValue="marketplaces" className="space-y-6">
+            {/* Primary navigation - main sections */}
             <TabsList className="flex flex-wrap h-auto gap-1 p-1">
-              <TabsTrigger value="marketplaces" className="gap-2"><Globe className="h-4 w-4" /><span className="hidden sm:inline">Marketplacelar</span></TabsTrigger>
-              <TabsTrigger value="scanner" className="gap-2"><Scan className="h-4 w-4" /><span className="hidden sm:inline">AI Scanner</span></TabsTrigger>
-              <TabsTrigger value="products" className="gap-2"><Package className="h-4 w-4" /><span className="hidden sm:inline">Mahsulotlar</span></TabsTrigger>
-              <TabsTrigger value="orders" className="gap-2"><ShoppingCart className="h-4 w-4" /><span className="hidden sm:inline">Buyurtmalar</span></TabsTrigger>
-              <TabsTrigger value="inventory" className="gap-2"><ArrowDownUp className="h-4 w-4" /><span className="hidden sm:inline">Zaxira</span></TabsTrigger>
-              <TabsTrigger value="pricing" className="gap-2"><DollarSign className="h-4 w-4" /><span className="hidden sm:inline">Narxlar</span></TabsTrigger>
-              <TabsTrigger value="publish" className="gap-2"><Upload className="h-4 w-4" /><span className="hidden sm:inline">Joylash</span></TabsTrigger>
-              <TabsTrigger value="analytics" className="gap-2"><BarChart3 className="h-4 w-4" /><span className="hidden sm:inline">Analitika</span></TabsTrigger>
-              <TabsTrigger value="financials" className="gap-2"><Calculator className="h-4 w-4" /><span className="hidden sm:inline">Moliya</span></TabsTrigger>
-              <TabsTrigger value="calculator" className="gap-2"><Calculator className="h-4 w-4" /><span className="hidden sm:inline">Kalkulyator</span></TabsTrigger>
-              <TabsTrigger value="abc-analysis" className="gap-2"><BarChart3 className="h-4 w-4" /><span className="hidden sm:inline">ABC-analiz</span></TabsTrigger>
-              <TabsTrigger value="min-price" className="gap-2"><Shield className="h-4 w-4" /><span className="hidden sm:inline">Min narx</span></TabsTrigger>
-              <TabsTrigger value="card-clone" className="gap-2"><Copy className="h-4 w-4" /><span className="hidden sm:inline">Klonlash</span></TabsTrigger>
-              <TabsTrigger value="problems" className="gap-2"><AlertOctagon className="h-4 w-4" /><span className="hidden sm:inline">Muammolar</span></TabsTrigger>
-              <TabsTrigger value="subscription" className="gap-2"><CreditCard className="h-4 w-4" /><span className="hidden sm:inline">Obuna</span></TabsTrigger>
-              <TabsTrigger value="reports" className="gap-2"><FileSpreadsheet className="h-4 w-4" /><span className="hidden sm:inline">Hisobotlar</span></TabsTrigger>
-              <TabsTrigger value="notifications" className="gap-2"><Bell className="h-4 w-4" /><span className="hidden sm:inline">Bildirishnoma</span></TabsTrigger>
+              <TabsTrigger value="marketplaces" className="gap-1.5"><Globe className="h-4 w-4" /><span className="hidden sm:inline">Marketplacelar</span></TabsTrigger>
+              <TabsTrigger value="scanner" className="gap-1.5"><Scan className="h-4 w-4" /><span className="hidden sm:inline">AI Scanner</span></TabsTrigger>
+              <TabsTrigger value="products" className="gap-1.5"><Package className="h-4 w-4" /><span className="hidden sm:inline">Mahsulotlar</span></TabsTrigger>
+              <TabsTrigger value="orders" className="gap-1.5"><ShoppingCart className="h-4 w-4" /><span className="hidden sm:inline">Buyurtmalar</span></TabsTrigger>
+              <TabsTrigger value="analytics" className="gap-1.5"><BarChart3 className="h-4 w-4" /><span className="hidden sm:inline">Analitika</span></TabsTrigger>
+              <TabsTrigger value="tools" className="gap-1.5"><Wrench className="h-4 w-4" /><span className="hidden sm:inline">Asboblar</span></TabsTrigger>
+              <TabsTrigger value="settings" className="gap-1.5"><CreditCard className="h-4 w-4" /><span className="hidden sm:inline">Sozlamalar</span></TabsTrigger>
             </TabsList>
 
             <TabsContent value="marketplaces">
@@ -226,23 +218,83 @@ export default function SellerCloudX() {
             </TabsContent>
             <TabsContent value="products"><MarketplaceProducts connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
             <TabsContent value="orders"><MarketplaceOrders connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
-            <TabsContent value="inventory"><InventorySync connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
-            <TabsContent value="pricing"><PriceManager connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
-            <TabsContent value="publish"><MultiPublish connectedMarketplaces={connectedMarketplaces} /></TabsContent>
-            <TabsContent value="analytics"><MarketplaceAnalytics connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
-            <TabsContent value="financials"><FinancialDashboard connectedMarketplaces={connectedMarketplaces} store={store} monthlyFee={subscription?.monthly_fee || 499} commissionPercent={subscription?.commission_percent || 4} /></TabsContent>
-            <TabsContent value="abc-analysis"><ABCAnalysis connectedMarketplaces={connectedMarketplaces} store={store} commissionPercent={subscription?.commission_percent || 4} /></TabsContent>
-            <TabsContent value="calculator"><ProfitCalculator commissionPercent={subscription?.commission_percent || 4} /></TabsContent>
-            <TabsContent value="min-price"><MinPriceProtection connectedMarketplaces={connectedMarketplaces} store={store} commissionPercent={subscription?.commission_percent || 4} /></TabsContent>
-            <TabsContent value="card-clone"><CardCloner connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
-            <TabsContent value="problems"><ProblematicProducts connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
-            <TabsContent value="subscription"><SubscriptionBilling totalSalesVolume={totalRevenue} /></TabsContent>
-            <TabsContent value="reports"><ReportsExport connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
-            <TabsContent value="notifications"><NotificationCenter /></TabsContent>
+            
+            {/* Analytics - sub-tabs */}
+            <TabsContent value="analytics">
+              <AnalyticsSubTabs connectedMarketplaces={connectedMarketplaces} store={store} subscription={subscription} totalRevenue={totalRevenue} />
+            </TabsContent>
+
+            {/* Tools - sub-tabs */}
+            <TabsContent value="tools">
+              <ToolsSubTabs connectedMarketplaces={connectedMarketplaces} store={store} subscription={subscription} />
+            </TabsContent>
+
+            {/* Settings - sub-tabs */}
+            <TabsContent value="settings">
+              <SettingsSubTabs totalRevenue={totalRevenue} />
+            </TabsContent>
           </Tabs>
         )}
       </div>
       <Footer />
     </>
+  );
+}
+
+// Sub-tab components for grouped navigation
+function AnalyticsSubTabs({ connectedMarketplaces, store, subscription, totalRevenue }: { 
+  connectedMarketplaces: string[]; store: any; subscription: any; totalRevenue: number;
+}) {
+  return (
+    <Tabs defaultValue="overview" className="space-y-4">
+      <TabsList className="h-auto gap-1 p-1">
+        <TabsTrigger value="overview" className="text-xs gap-1"><BarChart3 className="h-3.5 w-3.5" />Umumiy</TabsTrigger>
+        <TabsTrigger value="financials" className="text-xs gap-1"><Calculator className="h-3.5 w-3.5" />Moliya</TabsTrigger>
+        <TabsTrigger value="abc" className="text-xs gap-1"><BarChart3 className="h-3.5 w-3.5" />ABC-analiz</TabsTrigger>
+        <TabsTrigger value="calculator" className="text-xs gap-1"><Calculator className="h-3.5 w-3.5" />Kalkulyator</TabsTrigger>
+      </TabsList>
+      <TabsContent value="overview"><MarketplaceAnalytics connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
+      <TabsContent value="financials"><FinancialDashboard connectedMarketplaces={connectedMarketplaces} store={store} monthlyFee={subscription?.monthly_fee || 499} commissionPercent={subscription?.commission_percent || 4} /></TabsContent>
+      <TabsContent value="abc"><ABCAnalysis connectedMarketplaces={connectedMarketplaces} store={store} commissionPercent={subscription?.commission_percent || 4} /></TabsContent>
+      <TabsContent value="calculator"><ProfitCalculator commissionPercent={subscription?.commission_percent || 4} /></TabsContent>
+    </Tabs>
+  );
+}
+
+function ToolsSubTabs({ connectedMarketplaces, store, subscription }: { 
+  connectedMarketplaces: string[]; store: any; subscription: any;
+}) {
+  return (
+    <Tabs defaultValue="inventory" className="space-y-4">
+      <TabsList className="h-auto gap-1 p-1">
+        <TabsTrigger value="inventory" className="text-xs gap-1"><ArrowDownUp className="h-3.5 w-3.5" />Zaxira</TabsTrigger>
+        <TabsTrigger value="pricing" className="text-xs gap-1"><DollarSign className="h-3.5 w-3.5" />Narxlar</TabsTrigger>
+        <TabsTrigger value="publish" className="text-xs gap-1"><Upload className="h-3.5 w-3.5" />Joylash</TabsTrigger>
+        <TabsTrigger value="min-price" className="text-xs gap-1"><Shield className="h-3.5 w-3.5" />Min narx</TabsTrigger>
+        <TabsTrigger value="clone" className="text-xs gap-1"><Copy className="h-3.5 w-3.5" />Klonlash</TabsTrigger>
+        <TabsTrigger value="problems" className="text-xs gap-1"><AlertOctagon className="h-3.5 w-3.5" />Muammolar</TabsTrigger>
+      </TabsList>
+      <TabsContent value="inventory"><InventorySync connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
+      <TabsContent value="pricing"><PriceManager connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
+      <TabsContent value="publish"><MultiPublish connectedMarketplaces={connectedMarketplaces} /></TabsContent>
+      <TabsContent value="min-price"><MinPriceProtection connectedMarketplaces={connectedMarketplaces} store={store} commissionPercent={subscription?.commission_percent || 4} /></TabsContent>
+      <TabsContent value="clone"><CardCloner connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
+      <TabsContent value="problems"><ProblematicProducts connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
+    </Tabs>
+  );
+}
+
+function SettingsSubTabs({ totalRevenue }: { totalRevenue: number }) {
+  return (
+    <Tabs defaultValue="subscription" className="space-y-4">
+      <TabsList className="h-auto gap-1 p-1">
+        <TabsTrigger value="subscription" className="text-xs gap-1"><CreditCard className="h-3.5 w-3.5" />Obuna</TabsTrigger>
+        <TabsTrigger value="reports" className="text-xs gap-1"><FileSpreadsheet className="h-3.5 w-3.5" />Hisobotlar</TabsTrigger>
+        <TabsTrigger value="notifications" className="text-xs gap-1"><Bell className="h-3.5 w-3.5" />Bildirishnoma</TabsTrigger>
+      </TabsList>
+      <TabsContent value="subscription"><SubscriptionBilling totalSalesVolume={totalRevenue} /></TabsContent>
+      <TabsContent value="reports"><ReportsExport connectedMarketplaces={[]} store={{} as any} /></TabsContent>
+      <TabsContent value="notifications"><NotificationCenter /></TabsContent>
+    </Tabs>
   );
 }

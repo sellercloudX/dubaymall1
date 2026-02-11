@@ -108,7 +108,7 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Crown className="h-5 w-5 text-amber-500" />
+              <Crown className="h-5 w-5 text-primary" />
               SellerCloudX Obuna rejalari
             </CardTitle>
             <CardDescription>
@@ -133,11 +133,11 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
                 <div className="text-sm text-muted-foreground">+ savdodan 4%</div>
               </div>
               <ul className="space-y-2 text-sm">
-                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-500" /> 4 ta marketplace</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-500" /> Cheksiz mahsulotlar</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-500" /> AI Scanner Pro</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-500" /> Zaxira sinxronizatsiya</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-500" /> 24/7 qo'llab-quvvatlash</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" /> 4 ta marketplace</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" /> Cheksiz mahsulotlar</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" /> AI Scanner Pro</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" /> Zaxira sinxronizatsiya</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" /> 24/7 qo'llab-quvvatlash</li>
               </ul>
               <Button 
                 className="w-full" 
@@ -161,11 +161,11 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
                 <div className="text-sm text-muted-foreground">+ savdodan 2%</div>
               </div>
               <ul className="space-y-2 text-sm">
-                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-500" /> Pro'dagi barcha imkoniyatlar</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-500" /> Maxsus integratsiyalar</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-500" /> Shaxsiy menejer</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-500" /> API kirish</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-500" /> SLA kafolati</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" /> Pro'dagi barcha imkoniyatlar</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" /> Maxsus integratsiyalar</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" /> Shaxsiy menejer</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" /> API kirish</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" /> SLA kafolati</li>
               </ul>
               <Button variant="outline" className="w-full">
                 Bog'lanish
@@ -255,9 +255,9 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
     
     switch (accessStatus.reason) {
       case 'active':
-        return <Badge className="bg-green-500"><CheckCircle2 className="h-3 w-3 mr-1" /> Faol</Badge>;
+        return <Badge className="bg-primary text-primary-foreground"><CheckCircle2 className="h-3 w-3 mr-1" /> Faol</Badge>;
       case 'admin_override':
-        return <Badge className="bg-purple-500"><Crown className="h-3 w-3 mr-1" /> Premium</Badge>;
+        return <Badge className="bg-accent text-accent-foreground"><Crown className="h-3 w-3 mr-1" /> Premium</Badge>;
       case 'debt':
         return <Badge variant="destructive"><AlertTriangle className="h-3 w-3 mr-1" /> Qarzdorlik</Badge>;
       default:
@@ -332,12 +332,12 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
                 )}
               </div>
             </div>
-            <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
+            <div className="p-4 rounded-lg bg-accent/50 border border-accent">
               <div className="text-sm text-muted-foreground flex items-center gap-2">
                 <Receipt className="h-4 w-4" />
                 Joriy oy
               </div>
-              <div className="text-xl font-bold mt-1 text-amber-600">{formatPrice(currentBillingTotal)}</div>
+              <div className="text-xl font-bold mt-1 text-accent-foreground">{formatPrice(currentBillingTotal)}</div>
               <div className="text-xs text-muted-foreground">To'lanishi kerak</div>
             </div>
           </div>
