@@ -4,47 +4,27 @@ import { supabase } from '@/integrations/supabase/client';
 interface Review {
   id: string;
   product_id: string;
-  user_id: string;
   rating: number;
   comment: string | null;
   is_verified_purchase: boolean;
   created_at: string;
-  profiles?: {
-    full_name: string | null;
-    avatar_url: string | null;
-  };
+  reviewer_name?: string | null;
+  reviewer_avatar?: string | null;
 }
 
 export function useProductReviews(productId: string) {
   return useQuery({
     queryKey: ['reviews', productId],
     queryFn: async () => {
-      // First get reviews
+      // Use reviews_public view which includes reviewer display info without exposing user_id
       const { data: reviews, error } = await supabase
-        .from('reviews')
+        .from('reviews_public' as any)
         .select('*')
         .eq('product_id', productId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      if (!reviews?.length) return [];
-
-      // Get unique user IDs
-      const userIds = [...new Set(reviews.map(r => r.user_id))];
-
-      // Fetch profiles for those users
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('user_id, full_name, avatar_url')
-        .in('user_id', userIds);
-
-      // Map profiles to reviews
-      const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
-
-      return reviews.map(review => ({
-        ...review,
-        profiles: profileMap.get(review.user_id) || null,
-      })) as Review[];
+      return (reviews || []) as unknown as Review[];
     },
     enabled: !!productId,
   });

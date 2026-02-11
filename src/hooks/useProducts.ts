@@ -141,13 +141,13 @@ export function usePublicProducts(filters?: {
       if (data && data.length > 0) {
         const productIds = data.map(p => p.id);
         const { data: reviewsData } = await supabase
-          .from('reviews')
+          .from('reviews_public' as any)
           .select('product_id, rating')
           .in('product_id', productIds);
         
         // Calculate ratings per product
         const ratingsMap = new Map<string, { total: number; count: number }>();
-        reviewsData?.forEach(review => {
+        (reviewsData as any[])?.forEach((review: any) => {
           const existing = ratingsMap.get(review.product_id) || { total: 0, count: 0 };
           existing.total += review.rating;
           existing.count += 1;
