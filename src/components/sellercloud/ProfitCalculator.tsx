@@ -2,18 +2,67 @@ import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Calculator, TrendingUp, TrendingDown, DollarSign, Percent, Truck } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Calculator, TrendingUp, TrendingDown, DollarSign, Percent, Truck, Loader2, CheckCircle2, Zap } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ProfitCalculatorProps {
   commissionPercent?: number;
+  categoryId?: number;
 }
 
-export function ProfitCalculator({ commissionPercent = 4 }: ProfitCalculatorProps) {
+export function ProfitCalculator({ commissionPercent = 4, categoryId }: ProfitCalculatorProps) {
   const [sellingPrice, setSellingPrice] = useState(0);
   const [costPrice, setCostPrice] = useState(0);
   const [logistics, setLogistics] = useState(4000);
+  const [yandexCommissionPercent, setYandexCommissionPercent] = useState(20);
+  const [targetMargin, setTargetMargin] = useState(20);
+  const [isLoadingTariff, setIsLoadingTariff] = useState(false);
+  const [isRealTariff, setIsRealTariff] = useState(false);
 
-  const yandexCommission = sellingPrice * 0.20;
+  // Fetch real tariffs from API based on selling price and category
+  const fetchRealTariffs = async () => {
+    if (!sellingPrice || sellingPrice <= 0) return;
+    setIsLoadingTariff(true);
+    try {
+      const catId = categoryId || 0;
+      if (catId > 0) {
+        const { data, error } = await supabase.functions.invoke('fetch-marketplace-data', {
+          body: {
+            marketplace: 'yandex',
+            dataType: 'tariffs',
+            offers: [{ categoryId: catId, price: Math.round(sellingPrice) }],
+          },
+        });
+
+        if (!error && data?.success && data.data?.length > 0) {
+          const t = data.data[0];
+          if (t.agencyCommission && sellingPrice > 0) {
+            setYandexCommissionPercent(Math.round((t.agencyCommission / sellingPrice) * 1000) / 10);
+          }
+          const realLogistics = (t.fulfillment || 0) + (t.delivery || 0) + (t.sorting || 0);
+          if (realLogistics > 0) setLogistics(realLogistics);
+          setIsRealTariff(true);
+        }
+      }
+    } catch (e) {
+      console.warn('Tarif API xatosi:', e);
+    } finally {
+      setIsLoadingTariff(false);
+    }
+  };
+
+  // Auto-calculate selling price from cost + margin + tariffs
+  const autoCalculatePrice = () => {
+    if (!costPrice || costPrice <= 0) return;
+    const taxRate = 4;
+    const totalDeduction = (yandexCommissionPercent + taxRate + commissionPercent + targetMargin) / 100;
+    if (totalDeduction >= 1) return;
+    const calculated = (costPrice + logistics) / (1 - totalDeduction);
+    setSellingPrice(Math.ceil(calculated / 100) * 100);
+  };
+
+  const yandexCommission = sellingPrice * (yandexCommissionPercent / 100);
   const tax = sellingPrice * 0.04;
   const platformFee = sellingPrice * (commissionPercent / 100);
   const totalExpenses = costPrice + yandexCommission + tax + platformFee + logistics;
@@ -32,20 +81,10 @@ export function ProfitCalculator({ commissionPercent = 4 }: ProfitCalculatorProp
             <Calculator className="h-5 w-5 text-primary" />
             Foyda kalkulyatori
           </CardTitle>
-          <CardDescription className="text-xs">Sotishdan oldin foydani hisoblang</CardDescription>
+          <CardDescription className="text-xs">Tannarx va marjani kiriting — real API tariflar bilan sotuv narxi hisoblanadi</CardDescription>
         </CardHeader>
         <CardContent className="p-4 pt-2 space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="text-xs font-medium mb-1 block">Sotish narxi (so'm)</label>
-              <Input
-                type="number"
-                value={sellingPrice || ''}
-                onChange={e => setSellingPrice(Number(e.target.value))}
-                placeholder="150 000"
-                className="h-9"
-              />
-            </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div>
               <label className="text-xs font-medium mb-1 block">Tannarx (so'm)</label>
               <Input
@@ -57,15 +96,62 @@ export function ProfitCalculator({ commissionPercent = 4 }: ProfitCalculatorProp
               />
             </div>
             <div>
-              <label className="text-xs font-medium mb-1 block">Logistika (so'm)</label>
+              <label className="text-xs font-medium mb-1 block">Marja (%)</label>
               <Input
                 type="number"
-                value={logistics || ''}
-                onChange={e => setLogistics(Number(e.target.value))}
-                placeholder="4 000"
+                value={targetMargin}
+                onChange={e => setTargetMargin(Number(e.target.value) || 20)}
+                min={1}
+                max={90}
                 className="h-9"
               />
             </div>
+            <div>
+              <label className="text-xs font-medium mb-1 block flex items-center gap-1">
+                Komissiya (%)
+                {isRealTariff && <CheckCircle2 className="h-3 w-3 text-primary" />}
+              </label>
+              <Input
+                type="number"
+                value={yandexCommissionPercent}
+                onChange={e => { setYandexCommissionPercent(Number(e.target.value)); setIsRealTariff(false); }}
+                className="h-9"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium mb-1 block flex items-center gap-1">
+                Logistika (so'm)
+                {isRealTariff && <CheckCircle2 className="h-3 w-3 text-primary" />}
+              </label>
+              <Input
+                type="number"
+                value={logistics || ''}
+                onChange={e => { setLogistics(Number(e.target.value)); setIsRealTariff(false); }}
+                className="h-9"
+              />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={autoCalculatePrice} disabled={!costPrice} className="flex-1">
+              <Calculator className="h-3.5 w-3.5 mr-1" />
+              Narx hisoblash
+            </Button>
+            {categoryId && categoryId > 0 && (
+              <Button size="sm" variant="secondary" onClick={fetchRealTariffs} disabled={isLoadingTariff || !sellingPrice}>
+                {isLoadingTariff ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Zap className="h-3.5 w-3.5 mr-1" />}
+                API tarif
+              </Button>
+            )}
+          </div>
+          <div>
+            <label className="text-xs font-medium mb-1 block">Sotish narxi (so'm)</label>
+            <Input
+              type="number"
+              value={sellingPrice || ''}
+              onChange={e => setSellingPrice(Number(e.target.value))}
+              placeholder="150 000"
+              className="h-9 text-base font-bold"
+            />
           </div>
         </CardContent>
       </Card>
@@ -120,7 +206,7 @@ export function ProfitCalculator({ commissionPercent = 4 }: ProfitCalculatorProp
             <div className="text-xs font-medium mb-2">Xarajatlar tarkibi</div>
             {[
               { label: 'Tovar tannarxi', value: costPrice, color: 'bg-orange-500' },
-              { label: 'Yandex komissiya (20%)', value: yandexCommission, color: 'bg-yellow-500' },
+              { label: `Yandex komissiya (${yandexCommissionPercent}%)`, value: yandexCommission, color: 'bg-yellow-500' },
               { label: `SellerCloudX (${commissionPercent}%)`, value: platformFee, color: 'bg-blue-500' },
               { label: 'Soliq (4%)', value: tax, color: 'bg-purple-500' },
               { label: 'Logistika', value: logistics, color: 'bg-slate-500' },

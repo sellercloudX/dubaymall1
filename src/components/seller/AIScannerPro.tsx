@@ -107,7 +107,9 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
   const [webProducts, setWebProducts] = useState<WebProduct[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<WebProduct | null>(null);
   const [costPrice, setCostPrice] = useState<number>(0);
+  const [targetMargin, setTargetMargin] = useState<number>(20);
   const [pricing, setPricing] = useState<PricingCalculation | null>(null);
+  const [isCalculating, setIsCalculating] = useState(false);
   const [generateInfographics, setGenerateInfographics] = useState(true);
   const [infographicCount, setInfographicCount] = useState(6);
   
@@ -115,56 +117,8 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
   const [backgroundTasks, setBackgroundTasks] = useState<BackgroundTask[]>([]);
   const [showBackgroundPanel, setShowBackgroundPanel] = useState(false);
 
- // Yandex Market real tariffs (Uzbekistan)
- // Based on official Yandex Market documentation
- const YANDEX_TARIFFS = {
-   // Commission by category (% of selling price)
-   commissions: {
-     largeAppliances: 8,  // Katta maishiy texnika
-     default: 20,         // Boshqa kategoriyalar
-   },
-   // Tax rate (% of selling price)  
-   taxRate: 4,
-   // Logistics by gabarit (fixed so'm)
-   logistics: {
-     small: { maxVolume: 5, price: 2000, label: 'Kichik (5L gacha)' },
-     medium: { maxVolume: 25, price: 4000, label: 'O\'rta (25L gacha)' },
-     large: { maxVolume: 100, price: 8000, label: 'Katta (100L gacha)' },
-     xlarge: { maxVolume: Infinity, price: 20000, label: 'Juda katta (100L+)' },
-   },
-   // Target net profit (% of selling price)
-   targetNetProfit: 30,
- };
- 
- // Determine logistics tier based on estimated product volume
- const getLogisticsTier = (category?: string): { price: number; label: string } => {
-   // Default to medium size for most products
-   const categoryLower = (category || '').toLowerCase();
-   
-   if (categoryLower.includes('telefon') || categoryLower.includes('aksessuar') || categoryLower.includes('phone')) {
-     return { price: 2000, label: 'Kichik (5L gacha)' };
-   }
-   if (categoryLower.includes('kiyim') || categoryLower.includes('poyabzal') || categoryLower.includes('clothes')) {
-     return { price: 4000, label: 'O\'rta (25L gacha)' };
-   }
-   if (categoryLower.includes('maishiy') || categoryLower.includes('texnika') || categoryLower.includes('appliance')) {
-     return { price: 8000, label: 'Katta (100L gacha)' };
-   }
-   if (categoryLower.includes('mebel') || categoryLower.includes('furniture') || categoryLower.includes('shkaf')) {
-     return { price: 20000, label: 'Juda katta (100L+)' };
-   }
-   return { price: 4000, label: 'O\'rta (25L gacha)' };
- };
- 
- // Determine commission rate based on category
- const getCommissionRate = (category?: string): { rate: number; type: string } => {
-   const categoryLower = (category || '').toLowerCase();
-   if (categoryLower.includes('maishiy') || categoryLower.includes('katta texnika') || 
-       categoryLower.includes('muzlatgich') || categoryLower.includes('kir yuvish')) {
-     return { rate: 8, type: 'Katta maishiy texnika' };
-   }
-   return { rate: 20, type: 'Standart kategoriya' };
- };
+ // Tax rate (% of selling price)
+ const TAX_RATE = 4;
 
   const getStepNumber = () => {
     const steps: Step[] = ['capture', 'analyzing', 'pricing'];
@@ -241,50 +195,91 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
 
 
 
-  const calculatePricing = () => {
+  const calculatePricing = async () => {
     if (!costPrice || costPrice <= 0) {
       toast.error('Iltimos, tannarxni kiriting');
       return;
     }
 
-     // Get category-based rates
-     const category = analyzedProduct?.category;
-     const { rate: commissionRate, type: categoryType } = getCommissionRate(category);
-     const { price: logisticsCost, label: logisticsType } = getLogisticsTier(category);
-     const taxRate = YANDEX_TARIFFS.taxRate;
-     const targetProfitRate = YANDEX_TARIFFS.targetNetProfit;
- 
-     // Reverse calculation formula:
-     // SellingPrice = CostPrice + Commission + Logistics + Tax + Profit
-     // Where Commission, Tax, Profit are % of SellingPrice
-     // SellingPrice = CostPrice + Logistics + SellingPrice × (commissionRate + taxRate + profitRate)
-     // SellingPrice × (1 - totalDeductions) = CostPrice + Logistics
-     // SellingPrice = (CostPrice + Logistics) / (1 - totalDeductions)
-     
-     const totalDeductionRate = (commissionRate + taxRate + targetProfitRate) / 100;
-     const sellingPrice = (costPrice + logisticsCost) / (1 - totalDeductionRate);
-     
-     // Calculate actual amounts based on selling price
-     const commissionAmount = sellingPrice * (commissionRate / 100);
-     const taxAmount = sellingPrice * (taxRate / 100);
-     const netProfit = sellingPrice * (targetProfitRate / 100);
-     
-     // Round to nearest 100 so'm
-     const roundedSellingPrice = Math.ceil(sellingPrice / 100) * 100;
- 
-     setPricing({
-       costPrice,
-       sellingPrice: roundedSellingPrice,
-       marketplaceCommission: Math.round(commissionAmount),
-       marketplaceCommissionPercent: commissionRate,
-       logisticsCost,
-       logisticsType,
-       taxAmount: Math.round(taxAmount),
-       taxPercent: taxRate,
-       netProfit: Math.round(netProfit),
-       netProfitPercent: targetProfitRate,
-       categoryType,
-     });
+    setIsCalculating(true);
+    
+    try {
+      // Estimate a rough selling price for tariff calculation
+      const estimatedPrice = costPrice * (1 + targetMargin / 100) * 1.3;
+      const category = analyzedProduct?.category || '';
+      const categoryId = (analyzedProduct as any)?.marketCategoryId || 0;
+
+      let commissionRate = 20; // fallback
+      let logisticsCost = 4000; // fallback
+      let logisticsType = 'Taxminiy';
+      let categoryType = 'Standart kategoriya';
+      let isRealTariff = false;
+
+      // Try to fetch real tariffs from Yandex API
+      if (categoryId > 0) {
+        try {
+          const { data, error } = await supabase.functions.invoke('fetch-marketplace-data', {
+            body: {
+              marketplace: 'yandex',
+              dataType: 'tariffs',
+              offers: [{ categoryId, price: Math.round(estimatedPrice) }],
+            },
+          });
+
+          if (!error && data?.success && data.data?.length > 0) {
+            const t = data.data[0];
+            commissionRate = t.agencyCommission && estimatedPrice > 0
+              ? (t.agencyCommission / estimatedPrice) * 100
+              : commissionRate;
+            const logistics = (t.fulfillment || 0) + (t.delivery || 0) + (t.sorting || 0);
+            if (logistics > 0) logisticsCost = logistics;
+            logisticsType = 'Yandex API (real)';
+            categoryType = `Kategoriya #${categoryId}`;
+            isRealTariff = true;
+            console.log('✅ Real tarif olindi:', { commissionRate: commissionRate.toFixed(1), logisticsCost });
+          }
+        } catch (e) {
+          console.warn('Tarif API xatosi, fallback ishlatiladi:', e);
+        }
+      }
+
+      const taxRate = TAX_RATE;
+
+      // Reverse calculation:
+      // SellingPrice × (1 - commission% - tax% - margin%) = CostPrice + Logistics
+      const totalDeductionRate = (commissionRate + taxRate + targetMargin) / 100;
+      
+      if (totalDeductionRate >= 1) {
+        toast.error('Marja + komissiya + soliq 100% dan oshib ketdi. Marjani kamaytiring.');
+        setIsCalculating(false);
+        return;
+      }
+      
+      const sellingPrice = (costPrice + logisticsCost) / (1 - totalDeductionRate);
+      const commissionAmount = sellingPrice * (commissionRate / 100);
+      const taxAmount = sellingPrice * (taxRate / 100);
+      const netProfit = sellingPrice * (targetMargin / 100);
+      const roundedSellingPrice = Math.ceil(sellingPrice / 100) * 100;
+
+      setPricing({
+        costPrice,
+        sellingPrice: roundedSellingPrice,
+        marketplaceCommission: Math.round(commissionAmount),
+        marketplaceCommissionPercent: Math.round(commissionRate * 10) / 10,
+        logisticsCost: Math.round(logisticsCost),
+        logisticsType: isRealTariff ? logisticsType : logisticsType,
+        taxAmount: Math.round(taxAmount),
+        taxPercent: taxRate,
+        netProfit: Math.round(netProfit),
+        netProfitPercent: targetMargin,
+        categoryType,
+      });
+    } catch (err) {
+      console.error('Narx hisoblash xatosi:', err);
+      toast.error('Narx hisoblashda xato');
+    } finally {
+      setIsCalculating(false);
+    }
   };
 
   const uploadImageToStorage = async (base64Image: string): Promise<string | null> => {
@@ -897,26 +892,43 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
               </div>
             </div>
 
-            {/* Cost Price Input */}
+            {/* Cost Price & Margin Input */}
             <div className="space-y-3">
-              <Label htmlFor="costPrice" className="text-sm font-medium flex items-center gap-2">
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-                Tannarx (so'm)
-              </Label>
-              <div className="flex gap-2">
-                <Input
-                  id="costPrice"
-                  type="number"
-                  placeholder="Masalan: 8500"
-                  value={costPrice || ''}
-                  onChange={(e) => setCostPrice(parseFloat(e.target.value) || 0)}
-                  className="text-base font-medium"
-                />
-                <Button onClick={calculatePricing} disabled={!costPrice}>
-                  <Calculator className="mr-2 h-4 w-4" />
-                  Hisoblash
-                </Button>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="costPrice" className="text-xs font-medium flex items-center gap-1 mb-1">
+                    <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
+                    Tannarx (so'm)
+                  </Label>
+                  <Input
+                    id="costPrice"
+                    type="number"
+                    placeholder="8500"
+                    value={costPrice || ''}
+                    onChange={(e) => setCostPrice(parseFloat(e.target.value) || 0)}
+                    className="text-base font-medium"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="targetMargin" className="text-xs font-medium flex items-center gap-1 mb-1">
+                    <Calculator className="h-3.5 w-3.5 text-muted-foreground" />
+                    Marja (%)
+                  </Label>
+                  <Input
+                    id="targetMargin"
+                    type="number"
+                    min={1}
+                    max={90}
+                    value={targetMargin}
+                    onChange={(e) => setTargetMargin(Number(e.target.value) || 20)}
+                    className="text-base font-medium"
+                  />
+                </div>
               </div>
+              <Button onClick={calculatePricing} disabled={!costPrice || isCalculating} className="w-full">
+                {isCalculating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Calculator className="mr-2 h-4 w-4" />}
+                {isCalculating ? 'API dan tariflar olinmoqda...' : 'Narx hisoblash'}
+              </Button>
             </div>
 
             {/* Pricing Breakdown */}
