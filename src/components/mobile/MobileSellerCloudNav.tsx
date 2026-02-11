@@ -5,7 +5,7 @@ export type MobileTabType =
   | 'marketplaces' | 'analytics' | 'scanner' | 'products' | 'orders' 
   | 'trends' | 'abc-analysis' | 'min-price' | 'card-clone' | 'problems' 
   | 'financials' | 'calculator' | 'inventory' | 'pricing' | 'publish' 
-  | 'reports' | 'notifications' | 'subscription';
+  | 'reports' | 'notifications' | 'subscription' | 'cost-prices';
 
 interface MobileSellerCloudNavProps {
   activeTab: MobileTabType;
