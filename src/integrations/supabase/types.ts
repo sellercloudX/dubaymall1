@@ -826,6 +826,7 @@ export type Database = {
           account_info: Json | null
           created_at: string
           credentials: Json
+          encrypted_credentials: string | null
           id: string
           is_active: boolean | null
           last_sync_at: string | null
@@ -841,6 +842,7 @@ export type Database = {
           account_info?: Json | null
           created_at?: string
           credentials?: Json
+          encrypted_credentials?: string | null
           id?: string
           is_active?: boolean | null
           last_sync_at?: string | null
@@ -856,6 +858,7 @@ export type Database = {
           account_info?: Json | null
           created_at?: string
           credentials?: Json
+          encrypted_credentials?: string | null
           id?: string
           is_active?: boolean | null
           last_sync_at?: string | null
@@ -2455,6 +2458,8 @@ export type Database = {
         Returns: boolean
       }
       check_sellercloud_access: { Args: { p_user_id: string }; Returns: Json }
+      decrypt_credentials: { Args: { p_encrypted: string }; Returns: Json }
+      encrypt_credentials: { Args: { p_credentials: Json }; Returns: string }
       generate_affiliate_code: { Args: never; Returns: string }
       generate_delivery_otp: { Args: { p_order_id: string }; Returns: string }
       generate_order_number: { Args: never; Returns: string }
