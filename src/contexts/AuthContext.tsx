@@ -117,28 +117,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     initializeSession();
 
-    // Set up periodic session check to prevent silent logout
-    const sessionCheckInterval = setInterval(async () => {
-      if (!mounted) return;
-      
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
-      
-      // If we had a session but now don't, try to refresh
-      if (session && !currentSession) {
-        console.log('[Auth] Session lost, attempting recovery...');
-        const { data: { session: refreshedSession } } = await supabase.auth.refreshSession();
-        
-        if (refreshedSession && mounted) {
-          setSession(refreshedSession);
-          setUser(refreshedSession.user);
-        }
-      }
-    }, 60000); // Check every minute
+    // Periodic session check removed — onAuthStateChange handles all session lifecycle events.
+    // The previous interval used a stale closure reference to `session`, causing false "session lost"
+    // detections that triggered unnecessary refreshSession() calls and sometimes logged the user out.
 
     return () => {
       mounted = false;
       subscription.unsubscribe();
-      clearInterval(sessionCheckInterval);
     };
   }, []);
 
