@@ -149,31 +149,31 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
   return (
     <div className="space-y-4 overflow-hidden">
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20 overflow-hidden">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-1.5 text-primary mb-1"><ArrowUpRight className="h-3.5 w-3.5 shrink-0" /><span className="text-xs font-medium truncate">Foydali</span></div>
-            <div className="text-xl font-bold">{profitableCount}</div><div className="text-[10px] text-muted-foreground">mahsulot</div>
+          <CardContent className="p-3 md:p-5">
+            <div className="flex items-center gap-1.5 text-primary mb-1 md:mb-2"><ArrowUpRight className="h-3.5 w-3.5 md:h-5 md:w-5 shrink-0" /><span className="text-xs md:text-sm font-medium truncate">Foydali</span></div>
+            <div className="text-xl md:text-2xl font-bold">{profitableCount}</div><div className="text-[10px] md:text-xs text-muted-foreground">mahsulot</div>
           </CardContent>
         </Card>
         <Card className="bg-gradient-to-br from-destructive/10 to-destructive/5 border-destructive/20 overflow-hidden">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-1.5 text-destructive mb-1"><ArrowDownRight className="h-3.5 w-3.5 shrink-0" /><span className="text-xs font-medium truncate">Zarardagi</span></div>
-            <div className="text-xl font-bold">{unprofitableCount}</div><div className="text-[10px] text-muted-foreground">mahsulot</div>
+          <CardContent className="p-3 md:p-5">
+            <div className="flex items-center gap-1.5 text-destructive mb-1 md:mb-2"><ArrowDownRight className="h-3.5 w-3.5 md:h-5 md:w-5 shrink-0" /><span className="text-xs md:text-sm font-medium truncate">Zarardagi</span></div>
+            <div className="text-xl md:text-2xl font-bold">{unprofitableCount}</div><div className="text-[10px] md:text-xs text-muted-foreground">mahsulot</div>
           </CardContent>
         </Card>
         <Card className="overflow-hidden">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-1.5 text-muted-foreground mb-1"><DollarSign className="h-3.5 w-3.5 shrink-0" /><span className="text-xs font-medium truncate">Jami daromad</span></div>
-            <div className="text-xl font-bold truncate">{formatPrice(totalRevenue)}</div><div className="text-[10px] text-muted-foreground">so'm</div>
+          <CardContent className="p-3 md:p-5">
+            <div className="flex items-center gap-1.5 text-muted-foreground mb-1 md:mb-2"><DollarSign className="h-3.5 w-3.5 md:h-5 md:w-5 shrink-0" /><span className="text-xs md:text-sm font-medium truncate">Jami daromad</span></div>
+            <div className="text-xl md:text-2xl font-bold truncate">{formatPrice(totalRevenue)}</div><div className="text-[10px] md:text-xs text-muted-foreground">so'm</div>
           </CardContent>
         </Card>
         <Card className={`overflow-hidden ${totalProfit >= 0 ? 'bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20' : 'bg-gradient-to-br from-destructive/10 to-destructive/5 border-destructive/20'}`}>
-          <CardContent className="p-3">
-            <div className={`flex items-center gap-1.5 mb-1 ${totalProfit >= 0 ? 'text-primary' : 'text-destructive'}`}>
-              {totalProfit >= 0 ? <TrendingUp className="h-3.5 w-3.5 shrink-0" /> : <TrendingDown className="h-3.5 w-3.5 shrink-0" />}<span className="text-xs font-medium truncate">Sof foyda</span>
+          <CardContent className="p-3 md:p-5">
+            <div className={`flex items-center gap-1.5 mb-1 md:mb-2 ${totalProfit >= 0 ? 'text-primary' : 'text-destructive'}`}>
+              {totalProfit >= 0 ? <TrendingUp className="h-3.5 w-3.5 md:h-5 md:w-5 shrink-0" /> : <TrendingDown className="h-3.5 w-3.5 md:h-5 md:w-5 shrink-0" />}<span className="text-xs md:text-sm font-medium truncate">Sof foyda</span>
             </div>
-            <div className="text-xl font-bold truncate">{formatPrice(totalProfit)}</div><div className="text-[10px] text-muted-foreground">so'm</div>
+            <div className="text-xl md:text-2xl font-bold truncate">{formatPrice(totalProfit)}</div><div className="text-[10px] md:text-xs text-muted-foreground">so'm</div>
           </CardContent>
         </Card>
       </div>
@@ -200,7 +200,7 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
             return (
               <Card key={group} className={`cursor-pointer transition-all flex-1 min-w-[180px] ${colors.bg} ${colors.border} border-2 ${selectedGroup === group ? 'ring-2 ring-primary' : ''}`}
                 onClick={() => setSelectedGroup(selectedGroup === group ? 'all' : group)}>
-                <CardContent className="p-3">
+                <CardContent className="p-3 md:p-5">
                   <div className="flex items-center justify-between mb-2"><Badge className={`${colors.badge} text-white text-sm px-2 py-0.5`}>{group}</Badge><span className="text-xs text-muted-foreground">{items.length} ta</span></div>
                   <div className={`text-xs font-medium ${colors.text} mb-2`}>{label}</div>
                   <div className="space-y-1 text-xs">
@@ -218,10 +218,10 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
 
       {/* Products List */}
       <Card className="overflow-hidden">
-        <CardHeader className="p-3 sm:p-6">
+        <CardHeader className="p-3 md:p-6">
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">
-              <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+              <CardTitle className="flex items-center gap-2 text-sm md:text-base">
                 <Calculator className="h-4 w-4 shrink-0" />
                 <span className="truncate">PnL</span>
                 {selectedGroup !== 'all' && <Badge className={`${ABC_COLORS[selectedGroup].badge} text-white`}>{selectedGroup}</Badge>}
@@ -233,7 +233,7 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="p-0 sm:p-6 sm:pt-0">
+        <CardContent className="p-0 md:p-6 md:pt-0">
           {filteredProducts.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground"><Package className="h-12 w-12 mx-auto mb-3 opacity-50" /><p>Mahsulotlar topilmadi</p></div>
           ) : isMobile ? (
