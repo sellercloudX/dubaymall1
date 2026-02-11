@@ -60,7 +60,7 @@ export function FinancialDashboard({
             costPricesCovered += qty;
           }
 
-          // Real tariff per product
+          // Real tariff per product — use actual sold price, not listing price
           const tariff = getTariffForProduct(tariffMap, item.offerId, itemPrice);
           totalYandexFees += tariff.totalFee * qty;
           if (tariff.isReal) realTariffCount += qty;

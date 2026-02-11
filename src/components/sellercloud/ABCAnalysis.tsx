@@ -80,8 +80,9 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
         const realCostPrice = getCostPrice(marketplace, product.offerId);
         const productCost = realCostPrice !== null ? realCostPrice * sales.qty : 0;
         
-        // Real tariff from Yandex API
-        const tariff = getTariffForProduct(tariffMap, product.offerId, price);
+        // Real tariff from Yandex API — use actual sold price (avg), not listing price
+        const avgSoldPrice = sales.qty > 0 ? sales.revenue / sales.qty : price;
+        const tariff = getTariffForProduct(tariffMap, product.offerId, avgSoldPrice);
         const yandexFees = tariff.totalFee * sales.qty;
         
         const taxAmount = totalRevenue * 0.04;
@@ -243,6 +244,7 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         <div className="text-sm font-medium line-clamp-1">{product.name}</div>
+                        <code className="text-[10px] text-muted-foreground block truncate">{product.sku}</code>
                         <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                           <Badge className={`${colors.badge} text-white text-[10px] px-1.5`}>{product.abcGroup}</Badge>
                           <Badge variant="outline" className="text-[10px]">{MARKETPLACE_NAMES[product.marketplace]}</Badge>
