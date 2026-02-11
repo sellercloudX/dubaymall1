@@ -3,11 +3,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
 import {
   DollarSign, TrendingUp, TrendingDown,
-  Wallet, Receipt, RefreshCw, Calculator, Percent, Package
+  Wallet, Receipt, RefreshCw, Calculator, Percent, Package, CheckCircle2
 } from 'lucide-react';
 import { useCostPrices } from '@/hooks/useCostPrices';
+import { useMarketplaceTariffs, getTariffForProduct } from '@/hooks/useMarketplaceTariffs';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 
 interface FinancialDashboardProps {
@@ -28,6 +30,7 @@ export function FinancialDashboard({
 }: FinancialDashboardProps) {
   const isLoading = store.isLoadingOrders;
   const { getCostPrice } = useCostPrices();
+  const { data: tariffMap, isLoading: tariffsLoading } = useMarketplaceTariffs(connectedMarketplaces, store);
 
   const summary = useMemo(() => {
     if (isLoading) return null;
@@ -35,22 +38,33 @@ export function FinancialDashboard({
     let totalProductCost = 0;
     let costPricesCovered = 0;
     let totalProductCount = 0;
+    let totalYandexFees = 0;
+    let realTariffCount = 0;
+    let estimatedTariffCount = 0;
 
     const marketplaceBreakdown = connectedMarketplaces.map(marketplace => {
       const orders = store.getOrders(marketplace);
       const activeOrders = orders.filter(o => !['CANCELLED', 'RETURNED'].includes(o.status));
       const mpRevenue = activeOrders.reduce((sum, order) => sum + (order.totalUZS || order.total || 0), 0);
 
-      // Calculate real product costs from order items + cost prices DB
+      // Calculate real product costs and tariffs from order items
       activeOrders.forEach(order => {
         (order.items || []).forEach(item => {
           const cost = getCostPrice(marketplace, item.offerId);
           const qty = item.count || 1;
+          const itemPrice = item.priceUZS || item.price || 0;
           totalProductCount += qty;
+          
           if (cost !== null) {
             totalProductCost += cost * qty;
             costPricesCovered += qty;
           }
+
+          // Real tariff per product
+          const tariff = getTariffForProduct(tariffMap, item.offerId, itemPrice);
+          totalYandexFees += tariff.totalFee * qty;
+          if (tariff.isReal) realTariffCount += qty;
+          else estimatedTariffCount += qty;
         });
       });
 
@@ -64,16 +78,16 @@ export function FinancialDashboard({
     const totalOrders = marketplaceBreakdown.reduce((s, m) => s + m.orders, 0);
     const platformFee = monthlyFee * USD_TO_UZS;
     const platformCommission = totalRevenue * (commissionPercent / 100);
-    const yandexCommission = totalRevenue * 0.20;
     const yandexTax = totalRevenue * 0.04;
-    const estimatedLogistics = totalOrders * 4000;
-    const totalExpenses = totalProductCost + platformFee + platformCommission + yandexCommission + yandexTax + estimatedLogistics;
+    const totalExpenses = totalProductCost + platformFee + platformCommission + totalYandexFees + yandexTax;
     const netProfit = totalRevenue - totalExpenses;
     const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
     const costCoverage = totalProductCount > 0 ? Math.round((costPricesCovered / totalProductCount) * 100) : 0;
+    const tariffCoverage = totalProductCount > 0 ? Math.round((realTariffCount / totalProductCount) * 100) : 0;
+    const yandexFeePercent = totalRevenue > 0 ? ((totalYandexFees / totalRevenue) * 100).toFixed(1) : '0';
 
-    return { totalRevenue, totalOrders, platformFee, platformCommission, yandexCommission, yandexTax, estimatedLogistics, totalExpenses, netProfit, profitMargin, marketplaceBreakdown, totalProductCost, costCoverage };
-  }, [connectedMarketplaces, store.dataVersion, isLoading, monthlyFee, commissionPercent, getCostPrice]);
+    return { totalRevenue, totalOrders, platformFee, platformCommission, totalYandexFees, yandexFeePercent, yandexTax, totalExpenses, netProfit, profitMargin, marketplaceBreakdown, totalProductCost, costCoverage, tariffCoverage };
+  }, [connectedMarketplaces, store.dataVersion, isLoading, monthlyFee, commissionPercent, getCostPrice, tariffMap]);
 
   const formatPrice = (price: number) => {
     if (Math.abs(price) >= 1000000) return (price / 1000000).toFixed(1) + ' mln';
@@ -137,7 +151,7 @@ export function FinancialDashboard({
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">
               <CardTitle className="flex items-center gap-2 text-sm sm:text-base"><Receipt className="h-4 w-4 shrink-0" /><span className="truncate">Xarajatlar</span></CardTitle>
-              <CardDescription className="text-xs truncate">Platformato'lovlari</CardDescription>
+              <CardDescription className="text-xs truncate">Real tarif ma'lumotlari</CardDescription>
             </div>
             <Button variant="outline" size="sm" onClick={() => store.refetchOrders()} disabled={store.isFetching} className="shrink-0">
               <RefreshCw className={`h-4 w-4 ${store.isFetching ? 'animate-spin' : ''}`} />
@@ -145,7 +159,7 @@ export function FinancialDashboard({
           </div>
         </CardHeader>
         <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0 space-y-3">
-          {/* Tannarx - product costs */}
+          {/* Tannarx */}
           <div className="flex items-center justify-between p-3 rounded-lg border gap-2">
             <div className="flex items-center gap-2 min-w-0">
               <div className="w-8 h-8 rounded-lg bg-destructive/10 flex items-center justify-center shrink-0"><Package className="h-4 w-4 text-destructive" /></div>
@@ -156,34 +170,43 @@ export function FinancialDashboard({
             </div>
             <div className="text-right shrink-0"><div className="font-bold text-sm whitespace-nowrap">{formatFullPrice(summary.totalProductCost)}</div></div>
           </div>
-          <div className="flex items-center justify-between p-3 rounded-lg border gap-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0"><Wallet className="h-4 w-4 text-primary" /></div>
-              <div className="min-w-0"><div className="font-medium text-sm truncate">Oylik to'lov</div><div className="text-xs text-muted-foreground">${monthlyFee}/oy</div></div>
-            </div>
-            <div className="text-right shrink-0"><div className="font-bold text-sm whitespace-nowrap">{formatFullPrice(summary.platformFee)}</div></div>
-          </div>
-          <div className="flex items-center justify-between p-3 rounded-lg border gap-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="w-8 h-8 rounded-lg bg-accent/50 flex items-center justify-center shrink-0"><Percent className="h-4 w-4 text-accent-foreground" /></div>
-              <div className="min-w-0"><div className="font-medium text-sm truncate">SellerCloudX komissiya</div><div className="text-xs text-muted-foreground truncate">{commissionPercent}%</div></div>
-            </div>
-            <div className="text-right shrink-0"><div className="font-bold text-sm whitespace-nowrap">{formatFullPrice(summary.platformCommission)}</div></div>
-          </div>
+          {/* Yandex Real Tariffs */}
           <div className="flex items-center justify-between p-3 rounded-lg border gap-2">
             <div className="flex items-center gap-2 min-w-0">
               <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center shrink-0"><Receipt className="h-4 w-4 text-secondary-foreground" /></div>
-              <div className="min-w-0"><div className="font-medium text-sm truncate">Yandex komissiya</div><div className="text-xs text-muted-foreground truncate">20%</div></div>
+              <div className="min-w-0">
+                <div className="font-medium text-sm truncate flex items-center gap-1.5">
+                  Yandex xizmat haqi
+                  {summary.tariffCoverage > 0 && (
+                    <Badge variant="outline" className="text-[10px] border-primary/30 text-primary px-1.5 py-0">
+                      <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />Real
+                    </Badge>
+                  )}
+                </div>
+                <div className="text-xs text-muted-foreground truncate">
+                  ~{summary.yandexFeePercent}% (komissiya + logistika)
+                </div>
+              </div>
             </div>
-            <div className="text-right shrink-0"><div className="font-bold text-sm whitespace-nowrap">{formatFullPrice(summary.yandexCommission)}</div></div>
+            <div className="text-right shrink-0"><div className="font-bold text-sm whitespace-nowrap">{formatFullPrice(summary.totalYandexFees)}</div></div>
           </div>
+          {/* Tax */}
           <div className="flex items-center justify-between p-3 rounded-lg border gap-2">
             <div className="flex items-center gap-2 min-w-0">
               <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0"><DollarSign className="h-4 w-4 text-muted-foreground" /></div>
-              <div className="min-w-0"><div className="font-medium text-sm truncate">Soliq + Logistika</div><div className="text-xs text-muted-foreground truncate">4% + ~4000/buyurtma</div></div>
+              <div className="min-w-0"><div className="font-medium text-sm truncate">Soliq</div><div className="text-xs text-muted-foreground">4%</div></div>
             </div>
-            <div className="text-right shrink-0"><div className="font-bold text-sm whitespace-nowrap">{formatFullPrice(summary.yandexTax + summary.estimatedLogistics)}</div></div>
+            <div className="text-right shrink-0"><div className="font-bold text-sm whitespace-nowrap">{formatFullPrice(summary.yandexTax)}</div></div>
           </div>
+          {/* Platform fees */}
+          <div className="flex items-center justify-between p-3 rounded-lg border gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0"><Wallet className="h-4 w-4 text-primary" /></div>
+              <div className="min-w-0"><div className="font-medium text-sm truncate">SellerCloudX</div><div className="text-xs text-muted-foreground">${monthlyFee}/oy + {commissionPercent}%</div></div>
+            </div>
+            <div className="text-right shrink-0"><div className="font-bold text-sm whitespace-nowrap">{formatFullPrice(summary.platformFee + summary.platformCommission)}</div></div>
+          </div>
+          {/* Total */}
           <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border-2 border-primary/20 gap-2">
             <div className="flex items-center gap-2 min-w-0">
               <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0"><Calculator className="h-4 w-4 text-primary" /></div>
