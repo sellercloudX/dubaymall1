@@ -87,8 +87,8 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
         const yandexFees = tariff.totalFee * sales.qty;
         
         const taxAmount = totalRevenue * 0.04;
-        const platformFee = totalRevenue * (commissionPercent / 100);
-        const totalCosts = productCost + yandexFees + taxAmount + platformFee;
+        // SellerCloudX commission excluded from per-product PnL (shown separately in FinancialDashboard)
+        const totalCosts = productCost + yandexFees + taxAmount;
         const netProfit = totalRevenue - totalCosts;
         const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
 

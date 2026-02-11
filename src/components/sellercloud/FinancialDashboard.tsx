@@ -41,11 +41,14 @@ export function FinancialDashboard({
     let totalYandexFees = 0;
     let realTariffCount = 0;
     let estimatedTariffCount = 0;
+    let totalItemRevenue = 0;
 
     const marketplaceBreakdown = connectedMarketplaces.map(marketplace => {
       const orders = store.getOrders(marketplace);
       const activeOrders = orders.filter(o => !['CANCELLED', 'RETURNED'].includes(o.status));
-      const mpRevenue = activeOrders.reduce((sum, order) => sum + (order.totalUZS || order.total || 0), 0);
+      
+      // Revenue from item-level data (not order.totalUZS which includes delivery)
+      let mpRevenue = 0;
 
       // Calculate real product costs and tariffs from order items
       activeOrders.forEach(order => {
@@ -53,7 +56,9 @@ export function FinancialDashboard({
           const cost = getCostPrice(marketplace, item.offerId);
           const qty = item.count || 1;
           const itemPrice = item.priceUZS || item.price || 0;
+          const itemRevenue = itemPrice * qty;
           totalProductCount += qty;
+          mpRevenue += itemRevenue;
           
           if (cost !== null) {
             totalProductCost += cost * qty;
@@ -68,13 +73,15 @@ export function FinancialDashboard({
         });
       });
 
+      totalItemRevenue += mpRevenue;
+
       return {
         marketplace, revenue: mpRevenue, orders: activeOrders.length,
         avgOrder: activeOrders.length > 0 ? Math.round(mpRevenue / activeOrders.length) : 0,
       };
     });
 
-    const totalRevenue = marketplaceBreakdown.reduce((s, m) => s + m.revenue, 0);
+    const totalRevenue = totalItemRevenue;
     const totalOrders = marketplaceBreakdown.reduce((s, m) => s + m.orders, 0);
     const platformFee = monthlyFee * USD_TO_UZS;
     const platformCommission = totalRevenue * (commissionPercent / 100);
