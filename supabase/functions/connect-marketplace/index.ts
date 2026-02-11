@@ -197,16 +197,34 @@ serve(async (req) => {
       );
     }
 
+    // Encrypt credentials before storing
+    const ENCRYPTION_KEY = Deno.env.get("CREDENTIALS_ENCRYPTION_KEY");
+    const credentialsPayload = {
+      apiKey: apiKey,
+      campaignId: campaignId || null,
+      sellerId: sellerId || null,
+    };
+
+    let encryptedCredentials: string | null = null;
+    if (ENCRYPTION_KEY) {
+      // Use the database function to encrypt
+      const { data: encData, error: encError } = await supabase
+        .rpc("encrypt_credentials", { p_credentials: credentialsPayload });
+      if (!encError && encData) {
+        encryptedCredentials = encData;
+        console.log("Credentials encrypted successfully");
+      } else {
+        console.error("Encryption failed, storing without encryption:", encError);
+      }
+    }
+
     // Store connection in database
     const connectionData = {
       user_id: user.id,
       shop_id: shopId || null,
       marketplace,
-      credentials: {
-        apiKey: apiKey, // In production, encrypt this!
-        campaignId: campaignId || null,
-        sellerId: sellerId || null,
-      },
+      credentials: encryptedCredentials ? {} : credentialsPayload, // Empty if encrypted
+      encrypted_credentials: encryptedCredentials,
       account_info: accountInfo,
       products_count: productsCount,
       orders_count: ordersCount,

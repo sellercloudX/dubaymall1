@@ -130,7 +130,24 @@ serve(async (req) => {
       );
     }
 
-    const credentials = connection.credentials as { apiKey: string; campaignId?: string; businessId?: string };
+    // Decrypt credentials if encrypted, otherwise use plain credentials
+    let credentials: { apiKey: string; campaignId?: string; businessId?: string; sellerId?: string };
+    
+    if (connection.encrypted_credentials) {
+      const { data: decData, error: decError } = await supabase
+        .rpc("decrypt_credentials", { p_encrypted: connection.encrypted_credentials });
+      if (decError || !decData) {
+        console.error("Failed to decrypt credentials:", decError);
+        return new Response(
+          JSON.stringify({ error: "Failed to decrypt credentials" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      credentials = decData as any;
+    } else {
+      credentials = connection.credentials as any;
+    }
+    
     const { apiKey, campaignId, businessId } = credentials;
 
     console.log(`Fetching ${dataType} from ${marketplace} for user ${user.id}, campaignId: ${campaignId}, businessId: ${businessId}`);
