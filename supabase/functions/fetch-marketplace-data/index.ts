@@ -168,7 +168,7 @@ serve(async (req) => {
         let pageToken: string | undefined;
         let prevPageToken: string | undefined;
         let currentPage = 0;
-        const pageLimit = fetchAll ? 200 : limit;
+        const pageLimit = fetchAll ? 100 : Math.min(limit, 100); // Yandex max 100 per request
 
         // Fetch products with pagination
         do {
@@ -176,18 +176,16 @@ serve(async (req) => {
           let useOffersEndpoint = false;
           
           if (effectiveBusinessId) {
-            const apiPath = `https://api.partner.market.yandex.ru/businesses/${effectiveBusinessId}/offer-mappings`;
-            console.log(`Calling Business API page ${currentPage}: ${apiPath}`);
-            
-            const body: any = { limit: pageLimit };
+            let apiPath = `https://api.partner.market.yandex.ru/v2/businesses/${effectiveBusinessId}/offer-mappings?limit=${pageLimit}`;
             if (pageToken) {
-              body.page_token = pageToken;
+              apiPath += `&page_token=${encodeURIComponent(pageToken)}`;
             }
+            console.log(`Calling Business API page ${currentPage}: ${apiPath}`);
             
             response = await fetchWithRetry(apiPath, { 
               method: 'POST',
               headers,
-              body: JSON.stringify(body)
+              body: JSON.stringify({})
             });
           } else {
             const apiPath = `https://api.partner.market.yandex.ru/campaigns/${campaignId}/offers`;
@@ -364,25 +362,34 @@ serve(async (req) => {
         console.log(`Total unique products: ${allProducts.length}`);
         
         // Try to get stocks from dedicated endpoint (with delay to avoid rate limit)
+        // Paginate to get ALL stocks, not just first 200
         if (campaignId && allProducts.length > 0) {
           try {
-            await sleep(800); // Wait before making another API call
-            const stocksResponse = await fetchWithRetry(
-              `https://api.partner.market.yandex.ru/campaigns/${campaignId}/offers/stocks`,
-              {
-                method: 'POST',
-                headers,
-                body: JSON.stringify({ limit: 200 })
-              }
-            );
-            
-            if (stocksResponse.ok) {
+            await sleep(800);
+            const stockMap = new Map<string, { fbo: number; fbs: number }>();
+            let stockPageToken: string | undefined;
+            let stockPage = 0;
+
+            do {
+              const stockBody: any = { limit: 200 };
+              if (stockPageToken) stockBody.page_token = stockPageToken;
+
+              const stocksResponse = await fetchWithRetry(
+                `https://api.partner.market.yandex.ru/campaigns/${campaignId}/offers/stocks`,
+                {
+                  method: 'POST',
+                  headers,
+                  body: JSON.stringify(stockBody)
+                }
+              );
+              
+              if (!stocksResponse.ok) break;
+
               const stocksData = await stocksResponse.json();
               const warehouseOffers = stocksData.result?.warehouses || [];
-              console.log(`Got stocks data from ${warehouseOffers.length} warehouses`);
+              stockPageToken = stocksData.result?.paging?.nextPageToken;
               
-              // Create a map of offerId -> stocks
-              const stockMap = new Map<string, { fbo: number; fbs: number }>();
+              console.log(`Stocks page ${stockPage}: ${warehouseOffers.length} warehouses`);
               
               warehouseOffers.forEach((wh: any) => {
                 const offers = wh.offers || [];
@@ -400,23 +407,26 @@ serve(async (req) => {
                   stockMap.set(offerId, existing);
                 });
               });
-              
-              // REPLACE (not add) stock data with accurate dedicated endpoint data
-              allProducts = allProducts.map(p => {
-                const stocks = stockMap.get(p.offerId);
-                if (stocks) {
-                  return {
-                    ...p,
-                    stockFBO: stocks.fbo,
-                    stockFBS: stocks.fbs,
-                    stockCount: stocks.fbo + stocks.fbs,
-                  };
-                }
-                return p;
-              });
-              
-              console.log(`Updated stocks for ${stockMap.size} products`);
-            }
+
+              stockPage++;
+              if (stockPageToken) await sleep(500);
+            } while (stockPageToken && stockPage < 20);
+            
+            // REPLACE stock data with accurate dedicated endpoint data
+            allProducts = allProducts.map(p => {
+              const stocks = stockMap.get(p.offerId);
+              if (stocks) {
+                return {
+                  ...p,
+                  stockFBO: stocks.fbo,
+                  stockFBS: stocks.fbs,
+                  stockCount: stocks.fbo + stocks.fbs,
+                };
+              }
+              return p;
+            });
+            
+            console.log(`Updated stocks for ${stockMap.size} products`);
           } catch (e) {
             console.error("Error fetching stocks:", e);
           }
