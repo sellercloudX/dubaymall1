@@ -229,51 +229,99 @@ serve(async (req) => {
   }
 
   try {
+    // Authentication check
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+
+    // Auth client to get user
+    const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: authHeader } }
+    });
+    const { data: { user }, error: authError } = await authClient.auth.getUser();
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: "Invalid authentication" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const { shopId, product, pricing } = await req.json() as {
       shopId: string;
       product: ProductData;
       pricing: PricingData;
     };
 
-    if (!shopId || !product || !pricing) {
+    if (!product || !pricing) {
       return new Response(
         JSON.stringify({ error: "Missing required fields" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Rasmni tekshirish
-    let productImages: string[] = [];
-    if (product.images && product.images.length > 0) {
-      productImages = product.images.filter(img => img && img.startsWith("http"));
-    }
-    if (product.image && product.image.startsWith("http")) {
-      if (!productImages.includes(product.image)) {
-        productImages.unshift(product.image);
+    // Service role client for DB operations
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // Get Yandex credentials from user's marketplace_connections
+    const { data: connection } = await supabase
+      .from("marketplace_connections")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("marketplace", "yandex")
+      .eq("is_active", true)
+      .limit(1)
+      .single();
+
+    let YANDEX_API_KEY: string | undefined;
+    let YANDEX_CAMPAIGN_ID: string | undefined;
+
+    if (connection) {
+      // Decrypt credentials if encrypted
+      if (connection.encrypted_credentials) {
+        const { data: decData, error: decError } = await supabase
+          .rpc("decrypt_credentials", { p_encrypted: connection.encrypted_credentials });
+        if (!decError && decData) {
+          const creds = decData as any;
+          YANDEX_API_KEY = creds.apiKey;
+          YANDEX_CAMPAIGN_ID = creds.campaignId || creds.sellerId;
+        }
+      } else {
+        const creds = connection.credentials as any;
+        YANDEX_API_KEY = creds?.apiKey;
+        YANDEX_CAMPAIGN_ID = creds?.campaignId || creds?.sellerId;
       }
     }
 
-    if (productImages.length === 0) {
+    // Fallback to env vars (legacy)
+    if (!YANDEX_API_KEY) YANDEX_API_KEY = Deno.env.get("YANDEX_MARKET_API_KEY");
+    if (!YANDEX_CAMPAIGN_ID) YANDEX_CAMPAIGN_ID = Deno.env.get("YANDEX_MARKET_CAMPAIGN_ID");
+
+    if (!YANDEX_API_KEY || !YANDEX_CAMPAIGN_ID) {
       return new Response(
-        JSON.stringify({ 
-          error: "Yandex Market uchun kamida 1 ta rasm URL kerak",
-          errorCode: "NO_IMAGE_URL",
-        }),
+        JSON.stringify({ error: "Yandex Market credentials not configured. Connect Yandex Market first." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const YANDEX_API_KEY = Deno.env.get("YANDEX_MARKET_API_KEY");
-    const YANDEX_CAMPAIGN_ID = Deno.env.get("YANDEX_MARKET_CAMPAIGN_ID");
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
-    if (!YANDEX_API_KEY || !YANDEX_CAMPAIGN_ID) {
-      return new Response(
-        JSON.stringify({ error: "Yandex Market credentials not configured" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    // Use actual shop_id from connection or get user's shop
+    let actualShopId = connection?.shop_id || shopId;
+    if (!actualShopId || actualShopId === "sellercloud") {
+      const { data: userShop } = await supabase
+        .from("shops")
+        .select("id")
+        .eq("owner_id", user.id)
+        .limit(1)
+        .single();
+      actualShopId = userShop?.id || null;
     }
 
     console.log("🚀 Creating Yandex Market card for:", product.name);
@@ -530,43 +578,50 @@ MUHIM: Faqat JSON formatda javob ber:
       console.error("❌ Yandex API error:", yandexResponse.status, responseText);
     }
 
-    // Mahalliy bazaga saqlash (supabase client already created above)
-    const { data: savedProduct, error: saveError } = await supabase
-      .from("products")
-      .insert({
-        shop_id: shopId,
-        name: product.name,
-        description: optimizedData.description || product.description,
-        price: pricing.recommendedPrice,
-        original_price: pricing.costPrice,
-        source: "ai",
-        source_url: product.sourceUrl,
-        images: productImages,
-        status: "active",
-        mxik_code: mxikData.code,
-        mxik_name: mxikData.name_uz,
-        specifications: {
-          yandex_offer_id: shortSKU,
-          yandex_business_id: businessId,
-          yandex_category_id: yandexCategory.id,
-          yandex_category_name: yandexCategory.name,
-          yandex_status: yandexResponse.ok ? "success" : "error",
-          yandex_card_quality: cardQuality,
-          yandex_quality_breakdown: qualityBreakdown,
-          barcode: barcode,
-          optimized_name: optimizedData.name,
-          vendor: optimizedData.vendor,
-          model: optimizedData.model,
-          dimensions: packageDimensions,
-          pricing: pricing,
-          parameters_count: optimizedData.parameterValues?.length || 0,
-        }
-      })
-      .select()
-      .single();
-
-    if (saveError) {
-      console.error("Failed to save product locally:", saveError);
+    // Mahalliy bazaga saqlash (faqat shop_id mavjud bo'lsa)
+    let savedProduct = null;
+    if (actualShopId) {
+      const { data, error: saveError } = await supabase
+        .from("products")
+        .insert({
+          shop_id: actualShopId,
+          name: product.name,
+          description: optimizedData.description || product.description,
+          price: pricing.recommendedPrice,
+          original_price: pricing.costPrice,
+          source: "ai",
+          source_url: product.sourceUrl,
+          images: productImages,
+          status: "active",
+          mxik_code: mxikData.code,
+          mxik_name: mxikData.name_uz,
+          specifications: {
+            yandex_offer_id: shortSKU,
+            yandex_business_id: businessId,
+            yandex_category_id: yandexCategory.id,
+            yandex_category_name: yandexCategory.name,
+            yandex_status: yandexResponse.ok ? "success" : "error",
+            yandex_card_quality: cardQuality,
+            yandex_quality_breakdown: qualityBreakdown,
+            barcode: barcode,
+            optimized_name: optimizedData.name,
+            vendor: optimizedData.vendor,
+            model: optimizedData.model,
+            dimensions: packageDimensions,
+            pricing: pricing,
+            parameters_count: optimizedData.parameterValues?.length || 0,
+          }
+        })
+        .select()
+        .single();
+      
+      if (saveError) {
+        console.error("Failed to save product locally:", saveError);
+      } else {
+        savedProduct = data;
+      }
+    } else {
+      console.log("No valid shop_id, skipping local save");
     }
 
     return new Response(
