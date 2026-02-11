@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 
 export type MobileTabType = 
   | 'marketplaces' | 'analytics' | 'scanner' | 'products' | 'orders' 
-  | 'trends' | 'abc-analysis' | 'min-price' | 'card-clone' | 'problems' 
+  | 'abc-analysis' | 'min-price' | 'card-clone' | 'problems' 
   | 'financials' | 'calculator' | 'inventory' | 'pricing' | 'publish' 
   | 'reports' | 'notifications' | 'subscription' | 'cost-prices';
 
@@ -39,7 +39,7 @@ export function MobileSellerCloudNav({ activeTab, onTabChange }: MobileSellerClo
               onClick={() => {
                 if (item.id === 'more') {
                   if (!isMoreActive) {
-                    onTabChange('trends');
+                    onTabChange('financials');
                   }
                 } else {
                   onTabChange(item.id as MobileTabType);

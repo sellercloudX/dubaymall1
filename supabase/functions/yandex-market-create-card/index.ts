@@ -326,8 +326,10 @@ serve(async (req) => {
 
     console.log("🚀 Creating Yandex Market card for:", product.name);
 
-    // Supabase client for DB operations
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    // Rasmlarni tayyorlash
+    const productImages: string[] = product.images && product.images.length > 0
+      ? product.images.filter((img: string) => img && img.startsWith('http'))
+      : (product.image && product.image.startsWith('http') ? [product.image] : []);
 
     // Mahsulot kategoriyasini aniqlash
     const productCategory = detectProductCategory(product.name, product.description);
