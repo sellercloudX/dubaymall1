@@ -578,7 +578,7 @@ export default function ProductPage() {
                   <Card key={review.id} className="w-[280px] flex-shrink-0">
                     <CardContent className="p-4">
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="font-medium text-sm">{review.profiles?.full_name || 'Anonim'}</span>
+                        <span className="font-medium text-sm">{review.reviewer_name || 'Anonim'}</span>
                         <div className="flex">
                           {[1,2,3,4,5].map(i => (
                             <Star 

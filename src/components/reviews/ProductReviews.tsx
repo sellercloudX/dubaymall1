@@ -188,7 +188,7 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
                     <Avatar>
-                      <AvatarImage src={review.profiles?.avatar_url || undefined} />
+                      <AvatarImage src={review.reviewer_avatar || undefined} />
                       <AvatarFallback>
                         <User className="h-4 w-4" />
                       </AvatarFallback>
@@ -196,7 +196,7 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-medium">
-                          {review.profiles?.full_name || 'Foydalanuvchi'}
+                          {review.reviewer_name || 'Foydalanuvchi'}
                         </span>
                         {review.is_verified_purchase && (
                           <Badge variant="secondary" className="text-xs gap-1">
@@ -213,7 +213,7 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
                       </div>
                     </div>
                   </div>
-                  {user?.id === review.user_id && (
+                  {user?.id && (
                     <Button
                       variant="ghost"
                       size="icon"
