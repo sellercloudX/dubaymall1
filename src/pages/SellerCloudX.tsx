@@ -87,7 +87,7 @@ export default function SellerCloudX() {
   
   const hasAccess = accessStatus?.is_active ?? false;
 
-  if (authLoading) {
+  if (authLoading || subscriptionLoading) {
     return (
       <>
         <Navbar />

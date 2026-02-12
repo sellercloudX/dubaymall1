@@ -236,29 +236,41 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
   // Fetch real tariffs from Yandex API
   const fetchRealTariffs = async () => {
     const categoryId = (analyzedProduct as any)?.marketCategoryId || 0;
-    const estimatedPrice = costPrice > 0 ? costPrice * 2 : 100000;
+    // Use a realistic selling price estimate for tariff calculation
+    const estimatedPrice = costPrice > 0 
+      ? Math.ceil((costPrice + logisticsCost) / (1 - (targetMargin + TAX_RATE) / 100) / 100) * 100
+      : 100000;
     
     setIsCalculating(true);
     try {
+      // Only send categoryId if we have a real one — don't use hardcoded fallback
+      const offers = categoryId > 0 
+        ? [{ categoryId, price: Math.round(estimatedPrice) }]
+        : [{ categoryId: 0, price: Math.round(estimatedPrice) }];
+
       const { data, error } = await supabase.functions.invoke('fetch-marketplace-data', {
         body: {
           marketplace: 'yandex',
           dataType: 'tariffs',
-          offers: [{ categoryId: categoryId > 0 ? categoryId : 91491, price: Math.round(estimatedPrice) }],
+          offers,
         },
       });
 
       if (!error && data?.success && data.data?.length > 0) {
         const t = data.data[0];
-        if (t.agencyCommission && estimatedPrice > 0) {
-          setCommissionPercent(Math.round((t.agencyCommission / estimatedPrice) * 1000) / 10);
+        // Use tariffPercent directly from API if available (most accurate)
+        if (t.tariffPercent && t.tariffPercent > 0) {
+          setCommissionPercent(Math.round(t.tariffPercent * 10) / 10);
+        } else if (t.totalTariff && estimatedPrice > 0) {
+          // Calculate total tariff as % of price
+          setCommissionPercent(Math.round((t.totalTariff / estimatedPrice) * 1000) / 10);
         }
         const logistics = (t.fulfillment || 0) + (t.delivery || 0) + (t.sorting || 0);
         if (logistics > 0) setLogisticsCost(logistics);
         setIsRealTariff(true);
         toast.success('Real tariflar API dan olindi!');
       } else {
-        toast.error('Tarif ma\'lumotlari olinmadi');
+        toast.error('Tarif ma\'lumotlari olinmadi. Qo\'lda kiriting.');
       }
     } catch (e) {
       console.warn('Tarif API xatosi:', e);
