@@ -821,6 +821,93 @@ export type Database = {
         }
         Relationships: []
       }
+      logistics_orders: {
+        Row: {
+          accepted_at: string | null
+          accepted_by: string | null
+          barcode: string
+          confirmation_code: string
+          courier_assigned_at: string | null
+          courier_id: string | null
+          created_at: string
+          customer_address: string | null
+          customer_name: string
+          customer_phone: string
+          customer_telegram: string | null
+          delivered_at: string | null
+          delivery_otp: string | null
+          delivery_otp_expires_at: string | null
+          delivery_type: string
+          dubaymall_order_id: string | null
+          id: string
+          notes: string | null
+          payment_amount: number | null
+          product_name: string | null
+          seller_name: string | null
+          status: string
+          status_history: Json | null
+          target_point_id: string | null
+          tracking_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          barcode: string
+          confirmation_code: string
+          courier_assigned_at?: string | null
+          courier_id?: string | null
+          created_at?: string
+          customer_address?: string | null
+          customer_name: string
+          customer_phone: string
+          customer_telegram?: string | null
+          delivered_at?: string | null
+          delivery_otp?: string | null
+          delivery_otp_expires_at?: string | null
+          delivery_type: string
+          dubaymall_order_id?: string | null
+          id?: string
+          notes?: string | null
+          payment_amount?: number | null
+          product_name?: string | null
+          seller_name?: string | null
+          status?: string
+          status_history?: Json | null
+          target_point_id?: string | null
+          tracking_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          barcode?: string
+          confirmation_code?: string
+          courier_assigned_at?: string | null
+          courier_id?: string | null
+          created_at?: string
+          customer_address?: string | null
+          customer_name?: string
+          customer_phone?: string
+          customer_telegram?: string | null
+          delivered_at?: string | null
+          delivery_otp?: string | null
+          delivery_otp_expires_at?: string | null
+          delivery_type?: string
+          dubaymall_order_id?: string | null
+          id?: string
+          notes?: string | null
+          payment_amount?: number | null
+          product_name?: string | null
+          seller_name?: string | null
+          status?: string
+          status_history?: Json | null
+          target_point_id?: string | null
+          tracking_url?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       marketplace_connections: {
         Row: {
           account_info: Json | null
@@ -2458,6 +2545,7 @@ export type Database = {
       decrypt_credentials: { Args: { p_encrypted: string }; Returns: Json }
       encrypt_credentials: { Args: { p_credentials: Json }; Returns: string }
       generate_affiliate_code: { Args: never; Returns: string }
+      generate_confirmation_code: { Args: never; Returns: string }
       generate_delivery_otp: { Args: { p_order_id: string }; Returns: string }
       generate_order_number: { Args: never; Returns: string }
       get_product_rating: {
@@ -2529,12 +2617,25 @@ export type Database = {
         Args: { p_link_code: string }
         Returns: undefined
       }
+      update_logistics_status: {
+        Args: {
+          p_actor_id?: string
+          p_barcode: string
+          p_new_status: string
+          p_note?: string
+        }
+        Returns: Json
+      }
       user_owns_order: {
         Args: { _order_id: string; _user_id: string }
         Returns: boolean
       }
       verify_delivery_otp: {
         Args: { p_order_id: string; p_otp: string }
+        Returns: Json
+      }
+      verify_logistics_otp: {
+        Args: { p_barcode: string; p_otp: string }
         Returns: Json
       }
     }
