@@ -84,7 +84,7 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
       shopSku: p.shopSku || p.offerId,
       pictures: p.pictures || [],
       category: p.category || '',
-      description: '',
+      description: p.description || '',
       marketplace: sourceMarketplace,
       selected: selectedIds.has(p.offerId),
     }));

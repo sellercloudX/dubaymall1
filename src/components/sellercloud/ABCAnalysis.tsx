@@ -48,7 +48,7 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
   const isMobile = useIsMobile();
   const isLoading = store.isLoading;
   const { getCostPrice } = useCostPrices();
-  const { data: tariffMap, dataUpdatedAt: tariffUpdatedAt } = useMarketplaceTariffs(connectedMarketplaces, store);
+  const { data: tariffMap, dataUpdatedAt: tariffUpdatedAt, isLoading: tariffsLoading } = useMarketplaceTariffs(connectedMarketplaces, store);
 
   const products = useMemo(() => {
     if (isLoading) return [];
@@ -141,8 +141,6 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
   if (connectedMarketplaces.length === 0) {
     return (<Card><CardContent className="py-12 text-center"><BarChart3 className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" /><h3 className="text-lg font-semibold mb-2">ABC-analiz & PnL</h3><p className="text-muted-foreground">Avval marketplace ulang</p></CardContent></Card>);
   }
-
-  const { isLoading: tariffsLoading } = useMarketplaceTariffs(connectedMarketplaces, store);
 
   if (isLoading || tariffsLoading) {
     return (<div className="space-y-4"><div className="grid grid-cols-2 gap-4">{[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24" />)}</div><Skeleton className="h-96" /></div>);

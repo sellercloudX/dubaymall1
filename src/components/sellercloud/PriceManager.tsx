@@ -51,13 +51,23 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
         const price = product.price || 0;
         const costPrice = getCostPrice(marketplace, product.offerId);
         const tariff = getTariffForProduct(tariffMap, product.offerId, price);
-        const tax = price * 0.04;
         
-        // Min price = (cost + tariff + tax) / (1 - minProfit/100)
-        const totalCost = (costPrice || 0) + tariff.totalFee + tax;
-        const calculatedMinPrice = costPrice !== null 
-          ? Math.ceil(totalCost / (1 - minProfit / 100))
-          : 0;
+        // Min price calculation: use COST PRICE as base for tariff estimation
+        // to avoid circular dependency (price -> tariff -> minPrice -> price)
+        // Formula: minPrice = costPrice / (1 - tariffPercent - taxPercent - marginPercent)
+        let calculatedMinPrice = 0;
+        if (costPrice !== null && costPrice > 0) {
+          // Get tariff percent from real data or estimate
+          const tariffPercent = tariff.isReal && price > 0
+            ? tariff.totalFee / price  // real tariff as fraction of price
+            : 0.15; // fallback 15%
+          const taxPercent = 0.04;
+          const marginPercent = minProfit / 100;
+          const denominator = 1 - tariffPercent - taxPercent - marginPercent;
+          if (denominator > 0.05) { // safety: don't divide by near-zero
+            calculatedMinPrice = Math.ceil(costPrice / denominator);
+          }
+        }
 
         allProducts.push({
           id: product.offerId,

@@ -45,6 +45,7 @@ interface YandexProduct {
   category?: string;
   marketCategoryId?: number;
   pictures?: string[];
+  description?: string;
   availability?: string;
   stockFBO?: number;
   stockFBS?: number;
@@ -282,6 +283,7 @@ serve(async (req) => {
                 category: offer.category?.name || offer.marketCategoryName || '',
                 marketCategoryId: offer.marketCategoryId || offer.category?.id || 0,
                 pictures: offer.pictures || offer.urls || [],
+                description: offer.description || '',
                 availability: offer.cardStatus || offer.status || 'UNKNOWN',
                 stockFBO,
                 stockFBS,
@@ -346,6 +348,7 @@ serve(async (req) => {
                 category,
                 marketCategoryId: mapping.marketCategoryId || offer.marketCategoryId || 0,
                 pictures: offer.pictures || offer.urls || mapping.pictures || [],
+                description: offer.description || '',
                 availability: statusValue,
                 stockFBO,
                 stockFBS,
