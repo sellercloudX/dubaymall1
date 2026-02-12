@@ -193,7 +193,7 @@ async function findLeafCategory(
 
   if (!tree) {
     console.warn("⚠️ Could not fetch category tree, using fallback");
-    return { id: 91491, name: "Смартфоны" }; // safe fallback
+    return { id: 91491, name: "Смартфоны" };
   }
 
   // 2. Flatten tree to get all leaf categories (no children)
@@ -211,42 +211,85 @@ async function findLeafCategory(
   collectLeaves(tree, "");
   console.log(`📂 Found ${leaves.length} leaf categories`);
 
-  // 3. Pre-filter: search for relevant categories by keywords
-  const searchText = `${productName} ${productDesc || ""}`.toLowerCase();
-  const keywords = searchText.split(/\s+/).filter(w => w.length > 2);
-  
-  // Score each leaf category by keyword matches
+  // 3. Use AI to extract RUSSIAN search keywords from product name
+  let searchKeywords: string[] = [];
+  if (lovableApiKey) {
+    try {
+      const kwResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${lovableApiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash-lite",
+          messages: [{ role: "user", content: `Mahsulot: "${productName}"
+Tavsif: "${productDesc || ''}"
+
+Bu mahsulotni Yandex Market kategoriyalarida topish uchun RUSCHA kalit so'zlar ber.
+Faqat mahsulot TURINI bildiruvchi so'zlar (brend, model, rang emas).
+
+Masalan:
+- "Estée Lauder Double Wear foundation" → ["тональный крем", "тональное средство", "макияж", "косметика"]
+- "iPhone 15 Pro" → ["смартфон", "мобильный телефон"]
+- "Nike Air Max krossovka" → ["кроссовки", "спортивная обувь", "обувь"]
+
+Javob FAQAT JSON array: ["so'z1", "so'z2", ...]` }],
+          temperature: 0, max_tokens: 150,
+        }),
+      });
+      if (kwResp.ok) {
+        const kwData = await kwResp.json();
+        const kwContent = kwData.choices?.[0]?.message?.content?.trim() || "";
+        const kwMatch = kwContent.match(/\[.*\]/s);
+        if (kwMatch) {
+          searchKeywords = JSON.parse(kwMatch[0]).filter((k: string) => typeof k === 'string' && k.length > 1);
+        }
+      }
+    } catch (e) {
+      console.error("AI keyword extraction error:", e);
+    }
+  }
+
+  // Fallback keywords from product name
+  if (searchKeywords.length === 0) {
+    searchKeywords = productName.toLowerCase().replace(/[^\w\s\u0400-\u04FF]/g, ' ').split(/\s+/).filter(w => w.length > 2);
+  }
+  console.log(`📂 Search keywords: ${searchKeywords.join(', ')}`);
+
+  // 4. Score categories by keyword matches
   const scored = leaves.map(leaf => {
     const leafText = `${leaf.name} ${leaf.path}`.toLowerCase();
     let score = 0;
-    for (const kw of keywords) {
-      if (leafText.includes(kw)) score += 2;
+    for (const kw of searchKeywords) {
+      const kwLower = kw.toLowerCase();
+      if (leafText.includes(kwLower)) score += 3;
+      // Partial match
+      if (kwLower.length > 4 && leafText.includes(kwLower.substring(0, kwLower.length - 2))) score += 1;
     }
     return { ...leaf, score };
-  }).filter(l => l.score > 0).sort((a, b) => b.score - a.score).slice(0, 30);
+  }).filter(l => l.score > 0).sort((a, b) => b.score - a.score).slice(0, 50);
 
   if (scored.length === 0) {
-    // If no keyword match, show top categories to AI
-    const sample = leaves.slice(0, 50);
+    const sample = leaves.slice(0, 80);
     scored.push(...sample.map(l => ({ ...l, score: 0 })));
   }
 
   console.log(`📂 Top candidates: ${scored.slice(0, 5).map(c => `${c.name}(${c.id})`).join(', ')}`);
 
-  // 4. Ask AI to select the best leaf category
+  // 5. Ask AI to select the best leaf category
   if (lovableApiKey && scored.length > 0) {
-    const categoryList = scored.map(c => `ID:${c.id} — ${c.path}`).join("\n");
+    const categoryList = scored.slice(0, 40).map(c => `ID:${c.id} — ${c.path}`).join("\n");
     
-    const prompt = `Mahsulot nomi: "${productName}"
+    const prompt = `Mahsulot: "${productName}"
 Tavsif: "${productDesc || 'Yo\'q'}"
 
-Quyidagi Yandex Market kategoriyalaridan eng mos LEAF kategoriyani tanla.
-FAQAT bitta ID raqamini yoz, boshqa hech narsa yo'q.
+Quyidagi Yandex Market kategoriyalaridan MAHSULOTGA ENG MOS LEAF kategoriyani tanla.
+Diqqat: kategoriya mahsulot TURIGA mos bo'lishi kerak!
+Masalan: tonal krem → "Тональные средства", lipstick → "Губная помада"
 
-Kategoriyalar:
+FAQAT bitta ID raqamini yoz:
+
 ${categoryList}
 
-Javob faqat raqam: `;
+Javob (faqat raqam):`;
 
     try {
       const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -278,7 +321,6 @@ Javob faqat raqam: `;
     }
   }
 
-  // Fallback: use first scored result
   if (scored.length > 0) {
     return { id: scored[0].id, name: scored[0].name };
   }
