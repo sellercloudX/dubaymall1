@@ -96,7 +96,7 @@ function detectCategory(name: string, desc?: string): string {
   const text = `${name} ${desc || ""}`.toLowerCase();
   const map: [string, string[]][] = [
     ["massage", ["массаж", "massaj", "massager"]],
-    ["phone", ["телефон", "phone", "смартфон", "iphone", "samsung galaxy"]],
+    ["phone", ["телефон", "phone", "смартфон", "iphone", "samsung galaxy", "galaxy"]],
     ["laptop", ["ноутбук", "laptop", "macbook"]],
     ["tablet", ["планшет", "tablet", "ipad"]],
     ["headphones", ["наушник", "headphone", "airpods", "quloqchin"]],
@@ -140,16 +140,153 @@ const YANDEX_CATEGORIES: Record<string, { id: number; name: string }> = {
   default: { id: 198119, name: "Электроника" },
 };
 
-async function lookupMXIK(supabase: any, name: string): Promise<{ code: string; name_uz: string }> {
-  const DEFAULT = { code: "46901100001000000", name_uz: "Boshqa tovarlar" };
+// ============ IMAGE PROXY: Download external images → Upload to Supabase Storage ============
+
+async function proxyImagesToStorage(
+  supabase: any,
+  userId: string,
+  imageUrls: string[],
+  supabaseUrl: string
+): Promise<string[]> {
+  const proxiedUrls: string[] = [];
+
+  for (const url of imageUrls) {
+    if (!url || typeof url !== 'string') continue;
+
+    // If already a Supabase storage URL from this project, keep it
+    if (url.includes(supabaseUrl) && url.includes('/storage/v1/object/public/')) {
+      console.log(`🖼️ Already Supabase URL, keeping: ${url.substring(0, 80)}`);
+      proxiedUrls.push(url);
+      continue;
+    }
+
+    // Block obviously invalid URLs
+    if (!url.startsWith('http://') && !url.startsWith('https://')) continue;
+    if (url.includes('dropbox.com') || url.includes('drive.google.com')) {
+      console.warn(`⚠️ Skipping unsupported URL: ${url.substring(0, 60)}`);
+      continue;
+    }
+
+    try {
+      // Download the image
+      console.log(`⬇️ Downloading: ${url.substring(0, 80)}...`);
+      const resp = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; YandexMarketBot/1.0)',
+          'Accept': 'image/*',
+        },
+      });
+
+      if (!resp.ok) {
+        console.warn(`⚠️ Failed to download (${resp.status}): ${url.substring(0, 60)}`);
+        continue;
+      }
+
+      const contentType = resp.headers.get('content-type') || 'image/jpeg';
+      if (!contentType.startsWith('image/')) {
+        console.warn(`⚠️ Not an image (${contentType}): ${url.substring(0, 60)}`);
+        continue;
+      }
+
+      const imageData = await resp.arrayBuffer();
+      if (imageData.byteLength < 1000) {
+        console.warn(`⚠️ Image too small (${imageData.byteLength}b): ${url.substring(0, 60)}`);
+        continue;
+      }
+
+      // Determine extension from content-type
+      const extMap: Record<string, string> = {
+        'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/png': 'png',
+        'image/webp': 'webp', 'image/heic': 'heic', 'image/gif': 'gif',
+      };
+      const ext = extMap[contentType] || 'jpg';
+      const fileName = `${userId}/yandex-${Date.now()}-${Math.random().toString(36).substring(2, 6)}.${ext}`;
+
+      // Upload to Supabase storage
+      const { error: uploadError } = await supabase.storage
+        .from('product-images')
+        .upload(fileName, imageData, {
+          contentType,
+          cacheControl: '31536000', // 1 year cache
+          upsert: false,
+        });
+
+      if (uploadError) {
+        console.error(`❌ Upload failed: ${uploadError.message}`);
+        // Try with the original URL as fallback
+        proxiedUrls.push(url);
+        continue;
+      }
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(fileName);
+
+      const publicUrl = urlData?.publicUrl;
+      if (publicUrl) {
+        console.log(`✅ Proxied: ${url.substring(0, 50)} → ${publicUrl.substring(0, 80)}`);
+        proxiedUrls.push(publicUrl);
+      } else {
+        proxiedUrls.push(url); // fallback
+      }
+    } catch (e) {
+      console.error(`❌ Proxy error for ${url.substring(0, 60)}:`, e);
+      // Don't add broken URLs
+    }
+  }
+
+  return proxiedUrls;
+}
+
+// ============ MXIK LOOKUP (IMPROVED) ============
+
+async function lookupMXIK(supabase: any, name: string, category: string): Promise<{ code: string; name_uz: string }> {
+  // Category-based defaults that are VALID in Yandex IKPU catalog
+  const CATEGORY_IKPU: Record<string, { code: string; name_uz: string }> = {
+    phone: { code: "84713012001000000", name_uz: "Uyali telefonlar (smartfonlar)" },
+    laptop: { code: "84713049001000000", name_uz: "Portativ kompyuterlar" },
+    tablet: { code: "84713012002000000", name_uz: "Planshet kompyuterlar" },
+    headphones: { code: "85183000001000000", name_uz: "Quloqchinlar" },
+    speaker: { code: "85182900001000000", name_uz: "Karnaylar" },
+    smartwatch: { code: "91022900001000000", name_uz: "Aqlli soatlar" },
+    watch: { code: "91022900002000000", name_uz: "Qo'l soatlari" },
+    camera: { code: "85258019001000000", name_uz: "Foto va videokameralar" },
+    tv: { code: "85287200001000000", name_uz: "Televizorlar" },
+    clothing: { code: "62034990001000000", name_uz: "Kiyim-kechak" },
+    shoes: { code: "64039900001000000", name_uz: "Poyabzallar" },
+    bag: { code: "42029290001000000", name_uz: "Sumkalar" },
+    cosmetics: { code: "33049900001000000", name_uz: "Kosmetika vositalari" },
+    perfume: { code: "33030000001000000", name_uz: "Parfyumeriya" },
+    toys: { code: "95030000001000000", name_uz: "O'yinchoqlar" },
+    tools: { code: "82055900001000000", name_uz: "Asbob-uskunalar" },
+    massage: { code: "90191010001000000", name_uz: "Massaj apparatlari" },
+    default: { code: "85176200001000000", name_uz: "Boshqa elektron qurilmalar" },
+  };
+
+  // First try to find exact match in our DB
   try {
     const keywords = name.toLowerCase().replace(/[^\w\s\u0400-\u04FF]/g, ' ').split(/\s+/).filter(w => w.length > 2).slice(0, 3);
     for (const kw of keywords) {
-      const { data } = await supabase.from('mxik_codes').select('code, name_uz').or(`name_uz.ilike.%${kw}%,name_ru.ilike.%${kw}%`).eq('is_active', true).limit(1);
-      if (data?.length) return data[0];
+      const { data } = await supabase
+        .from('mxik_codes')
+        .select('code, name_uz')
+        .or(`name_uz.ilike.%${kw}%,name_ru.ilike.%${kw}%`)
+        .eq('is_active', true)
+        .limit(1);
+      if (data?.length) {
+        console.log(`✅ MXIK found in DB: ${data[0].code} — ${data[0].name_uz}`);
+        return data[0];
+      }
     }
-  } catch (e) { console.error('MXIK lookup failed:', e); }
-  return DEFAULT;
+  } catch (e) {
+    console.error('MXIK lookup failed:', e);
+  }
+
+  // Use category-specific valid IKPU code
+  const fallback = CATEGORY_IKPU[category] || CATEGORY_IKPU.default;
+  console.log(`📋 Using category IKPU: ${fallback.code} (${fallback.name_uz})`);
+  return fallback;
 }
 
 async function getYandexCredentials(supabase: any, userId: string) {
@@ -202,7 +339,7 @@ async function fetchCategoryParameters(apiKey: string, categoryId: number): Prom
     }
     const data = await resp.json();
     const params = data.result?.parameters || [];
-    console.log(`📋 Raw params count: ${params.length}`);
+    console.log(`📋 Category ${categoryId}: ${params.length} parameters available`);
     return params;
   } catch (e) {
     console.error("Category params fetch error:", e);
@@ -218,74 +355,91 @@ async function optimizeWithAI(
   categoryParams: any[],
   lovableApiKey: string
 ): Promise<any> {
-  // Separate params into groups for clarity
   const requiredParams = categoryParams.filter((p: any) => p.required || p.constraintType === "REQUIRED");
   const recommendedParams = categoryParams.filter((p: any) => !p.required && p.constraintType !== "REQUIRED");
 
-  // Build DETAILED parameter list for AI - ALL parameters, not just 50
+  // Build COMPLETE parameter list — show ALL to AI
   const formatParam = (p: any) => {
     let desc = `  - parameterId: ${p.id}, name: "${p.name}", type: ${p.type || "TEXT"}`;
     if (p.unit) desc += `, unit: "${p.unit}"`;
     if (p.values?.length) {
-      const vals = p.values.slice(0, 15).map((v: any) => `{valueId:${v.id}, value:"${v.value}"}`).join(", ");
+      const vals = p.values.slice(0, 20).map((v: any) => `{valueId:${v.id}, value:"${v.value}"}`).join(", ");
       desc += `\n    OPTIONS: [${vals}]`;
-      if (p.values.length > 15) desc += ` ... +${p.values.length - 15} more`;
+      if (p.values.length > 20) desc += ` ... +${p.values.length - 20} more`;
     }
     return desc;
   };
 
   const requiredList = requiredParams.map(formatParam).join("\n");
-  const recommendedList = recommendedParams.slice(0, 60).map(formatParam).join("\n");
+  // Show MORE recommended params to AI (up to 80)
+  const recommendedList = recommendedParams.slice(0, 80).map(formatParam).join("\n");
 
-  const prompt = `Sen Yandex Market uchun PROFESSIONAL kartochka yaratuvchi AI san. Sening vazifang — mahsulot kartochkasini 95+ ball sifatida yaratish.
+  const prompt = `Sen Yandex Market uchun PROFESSIONAL kartochka yaratuvchi AI san. 
+MAQSAD: Kartochka sifatini 95+ ballga olib chiqish. Har bir ball muhim!
 
-MAHSULOT MA'LUMOTLARI:
+MAHSULOT:
 - Nomi: ${product.name}
-- Tavsif: ${product.description || "Tavsif yo'q — o'zing yoz!"}
+- Tavsif: ${product.description || "Tavsif yo'q — MAHSULOT NOMIDAN TO'LIQ TAVSIF YOZ!"}
 - Kategoriya: ${categoryName}
 - Brend: ${product.brand || "Mahsulot nomidan aniqla"}
-- Rang: ${product.color || "Mahsulot nomidan aniqla"}
+- Rang: ${product.color || "Mahsulot nomidan aniqla yoki 'черный' deb yoz"}
 - Model: ${product.model || "Mahsulot nomidan aniqla"}
 - Narx: ${product.price} UZS
 
-════════════════════════════════════════
-MAJBURIY PARAMETRLAR (BARCHASINI TO'LDIR!):
+════════════════════════════════════════════════════════
+*** MAJBURIY PARAMETRLAR — HAR BIRINI TO'LDIR! ***
 ${requiredList || "Yo'q"}
 
-TAVSIYA ETILGAN PARAMETRLAR (IMKON QADAR BARCHASINI TO'LDIR!):
+*** TAVSIYA ETILGAN — IMKON QADAR BARCHASINI TO'LDIR! ***
 ${recommendedList || "Yo'q"}
-════════════════════════════════════════
+════════════════════════════════════════════════════════
+
+BALLAR TIZIMI (YANDEX):
+- Asosiy xususiyatlar: 12 ball → BARCHA requiredlarni to'ldir
+- Filtrlar uchun qo'shimcha: 8 ball → Kamida 15 ta recommended to'ldir
+- Tovar haqida batafsil: 4 ball → Jami 20+ parametr to'ldir
+- Rasmlar: 43 ball → Biz hal qilamiz
+- Nom: 10 ball → 60-150 belgi SEO nom
+- Tavsif: 20 ball → 800+ belgi professional tavsif
 
 QOIDALAR:
-1. name_ru: Ruscha SEO-nom. ANIQ FORMAT: "[Tovar turi] [Brend] [Model] [Asosiy xususiyatlar]"
-   MINIMUM 60 belgi, MAKSIMUM 150 belgi.
-   Misol: "Смартфон Samsung Galaxy A55 5G 8/128 ГБ, экран Super AMOLED 6.6\", камера 50 Мп, аккумулятор 5000 мАч, синий"
+1. name_ru: "[Tovar turi] [Brend] [Model] [Xususiyatlar], [rang]" formatida.
+   MINIMUM 80 belgi. MAKSIMUM 150 belgi. 
+   Misol: "Смартфон Samsung Galaxy A55 5G 128 ГБ, экран Super AMOLED 6.6 дюйм, камера 50 Мп, аккумулятор 5000 мАч, цвет синий"
 
-2. name_uz: O'zbekcha nom LOTIN alifbosida, xuddi shunday batafsil, 60-150 belgi.
-   Misol: "Samsung Galaxy A55 5G smartfoni, 8/128 GB, Super AMOLED 6.6\" ekran, 50 MP kamera, 5000 mAh batareya, ko'k"
-
-3. description_ru: Batafsil ruscha tavsif, 800-3000 belgi. HTML TEGLARISIZ!
-   Tarkibi: Umumiy, Texnik xususiyatlar, Kamera, Batareya, Ekran, Qo'shimcha ma'lumot.
+2. name_uz: O'zbekcha LOTIN alifbosida, xuddi shunday batafsil, 80-150 belgi.
+   
+3. description_ru: *** JUDA MUHIM — 800+ belgi! ***
+   Professional ruscha tavsif. Tarkib:
+   - 1-paragraf: Umumiy tavsif (3-4 gap)
+   - 2-paragraf: Ekran va dizayn
+   - 3-paragraf: Protsessor va xotira
+   - 4-paragraf: Kamera tizimi
+   - 5-paragraf: Batareya va quvvatlash
+   - 6-paragraf: Qo'shimcha imkoniyatlar
+   *** HTML TEGLARISIZ! Faqat oddiy matn! ***
 
 4. description_uz: O'zbekcha (LOTIN) batafsil tavsif, 600-2000 belgi. HTML TEGLARISIZ!
 
-5. vendor: Brend nomi (Samsung, Apple, Xiaomi va h.k.)
-6. vendorCode: Model artikuli (masalan "SM-A556E")
+5. vendor: Aniq brend nomi
+6. vendorCode: Aniq model artikuli (masalan "SM-A556E")
 7. manufacturerCountry: Ishlab chiqarilgan mamlakat ruscha
 
-8. parameterValues: *** ENG MUHIM QISM! ***
-   Har bir parametr uchun:
-   - Agar OPTIONS ro'yxati bo'lsa → valueId ishlatilsin (faqat ro'yxatdagi qiymatlardan!)
-   - Agar TEXT turi bo'lsa → value ishlatilsin
-   - Agar raqamli bo'lsa → value raqam sifatida berilsin
+8. parameterValues: *** ENG MUHIM! BALL SHUNGA BOG'LIQ! ***
+   - Agar OPTIONS ro'yxati bo'lsa → valueId ishlatilsin (FAQAT ro'yxatdagi qiymatlardan!)
+   - Agar TEXT/STRING turi bo'lsa → value ishlatilsin
+   - Agar NUMBER turi bo'lsa → value RAQAM sifatida berilsin
    
-   *** BARCHA MAJBURIY PARAMETRLARNI TO'LDIR ***
-   *** TAVSIYA ETILGANLARDAN HAM KAMIDA 20 TASINI TO'LDIR ***
-   *** JAMI KAMIDA 25 TA PARAMETR BO'LISHI SHART ***
+   *** BARCHA MAJBURIY PARAMETRLARNI TO'LDIR — BU 12 BALL! ***
+   *** TAVSIYA ETILGANLARDAN KAMIDA 25 TASINI TO'LDIR — BU 12 BALL! ***
+   *** JAMI KAMIDA 30 TA PARAMETR BO'LISHI SHART ***
+   
+   Agar qiymatni bilmasang — TAXMINIY YOKI STANDART QIYMAT YOZ!
+   Bo'sh qoldirma! Har bir parametr = ball!
 
-9. warranty: Kafolat (masalan "1 год")
+9. warranty: "1 год" yoki "2 года"
 
-JAVOB FAQAT JSON:
+JAVOB FAQAT JSON formatida, boshqa hech narsa yo'q:
 {
   "name_ru": "...",
   "name_uz": "...",
@@ -312,8 +466,8 @@ JAVOB FAQAT JSON:
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.2,
-        max_tokens: 4000,
+        temperature: 0.1, // Lower temperature for more reliable structured output
+        max_tokens: 6000, // More tokens for more parameters
       }),
     });
 
@@ -327,7 +481,7 @@ JAVOB FAQAT JSON:
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const result = JSON.parse(jsonMatch[0]);
-      console.log(`🤖 AI result: name_ru=${result.name_ru?.length}ch, name_uz=${result.name_uz?.length}ch, params=${result.parameterValues?.length}`);
+      console.log(`🤖 AI: name_ru=${result.name_ru?.length}ch, name_uz=${result.name_uz?.length}ch, desc_ru=${result.description_ru?.length}ch, params=${result.parameterValues?.length}`);
       return result;
     }
   } catch (e) {
@@ -346,56 +500,26 @@ function buildYandexOffer(
   category: { id: number; name: string },
   dims: { length: number; width: number; height: number; weight: number },
   mxik: { code: string; name_uz: string },
-  price: number
+  price: number,
+  proxiedImages: string[]
 ): any {
-  // Collect ALL available images - validate each URL
-  const allImages: string[] = [];
-  const blockedDomains = ['avatars.mds.yandex.net', 'yastatic.net']; // Yandex blocks its own CDN images
-  
-  const isValidImageUrl = (url: string): boolean => {
-    if (!url || typeof url !== 'string') return false;
-    if (!url.startsWith('https://') && !url.startsWith('http://')) return false;
-    // Block Yandex's own CDN URLs - they reject reusing other sellers' images
-    if (blockedDomains.some(d => url.includes(d))) {
-      console.warn(`⚠️ Blocked image URL (Yandex CDN): ${url.substring(0, 80)}`);
-      return false;
-    }
-    // Block known unsupported cloud storages
-    if (url.includes('dropbox.com') || url.includes('drive.google.com')) {
-      console.warn(`⚠️ Blocked image URL (unsupported cloud): ${url.substring(0, 80)}`);
-      return false;
-    }
-    // Accept: image extensions, Supabase storage URLs, Samsung CDN, or any direct HTTPS URL
-    // Yandex supports jpg, jpeg, png, webp, heic
-    return true; // Accept all HTTPS URLs - let Yandex validate the actual content
-  };
-
-  if (product.images?.length) {
-    for (const img of product.images) {
-      if (isValidImageUrl(img)) {
-        allImages.push(img);
-      }
-    }
-  }
-  if (product.image && isValidImageUrl(product.image) && !allImages.includes(product.image)) {
-    allImages.unshift(product.image);
-  }
-  const images = allImages.slice(0, 10);
-  
-  console.log(`🖼️ Valid images for Yandex: ${images.length}/${(product.images?.length || 0) + (product.image ? 1 : 0)} total`);
-  if (images.length > 0) {
-    console.log(`🖼️ First image: ${images[0].substring(0, 100)}`);
-  }
-
   const name = stripHtml(ai?.name_ru || product.name);
   const description = stripHtml(ai?.description_ru || product.description || product.name);
 
+  // Ensure name is 60-150 chars
+  let finalName = name;
+  if (finalName.length < 60) {
+    // Pad with category info
+    finalName = `${finalName}, ${category.name}`;
+  }
+  finalName = finalName.substring(0, 150);
+
   const offer: any = {
     offerId: sku,
-    name: name.length >= 50 ? name.substring(0, 150) : name.padEnd(50, ' ').substring(0, 150),
+    name: finalName,
     marketCategoryId: category.id,
     vendor: ai?.vendor || product.brand || "OEM",
-    description: description.length >= 500 ? description.substring(0, 6000) : description.substring(0, 6000),
+    description: description.substring(0, 6000),
     barcodes: [barcode],
     vendorCode: ai?.vendorCode || sku,
     manufacturerCountries: [ai?.manufacturerCountry || "Китай"],
@@ -409,22 +533,25 @@ function buildYandexOffer(
       value: price,
       currencyId: "UZS",
     },
-    commodityCodes: [
-      {
-        code: mxik.code,
-        type: "IKPU_CODE",
-      }
-    ],
     type: "DEFAULT",
     adult: ai?.adult || false,
   };
 
-  // Add images - REQUIRED field per Yandex docs
-  if (images.length > 0) {
-    offer.pictures = images;
-    console.log(`✅ Pictures added: ${images.length}`);
+  // Add IKPU — only if code is valid (17 digits)
+  if (mxik.code && mxik.code.length === 17 && /^\d+$/.test(mxik.code)) {
+    offer.commodityCodes = [{ code: mxik.code, type: "IKPU_CODE" }];
+    console.log(`✅ IKPU code: ${mxik.code}`);
   } else {
-    console.warn('⚠️ NO valid images to send to Yandex! This will cost ~35 quality points.');
+    console.warn(`⚠️ Invalid IKPU code skipped: ${mxik.code}`);
+  }
+
+  // Add PROXIED images — these are guaranteed accessible
+  if (proxiedImages.length > 0) {
+    offer.pictures = proxiedImages.slice(0, 10);
+    console.log(`✅ ${offer.pictures.length} proxied images added`);
+    offer.pictures.forEach((u: string, i: number) => console.log(`  🖼️ [${i}] ${u.substring(0, 100)}`));
+  } else {
+    console.warn('⚠️ NO images! This will cost ~35 quality points.');
   }
 
   // parameterValues — fill ALL params from AI
@@ -438,15 +565,15 @@ function buildYandexOffer(
         if (p.unitId) pv.unitId = String(p.unitId);
         return pv;
       });
-    console.log(`📊 Total parameterValues: ${offer.parameterValues.length}`);
+    console.log(`📊 Parameters: ${offer.parameterValues.length}`);
   }
 
   // Warranty
   if (ai?.warranty) {
-    const match = ai.warranty.match(/(\d+)\s*(yil|year|год|месяц|month|oy)/i);
+    const match = ai.warranty.match(/(\d+)\s*(yil|year|год|года|лет|месяц|month|oy)/i);
     if (match) {
       const period = parseInt(match[1]);
-      const isYear = /yil|year|год/i.test(match[2]);
+      const isYear = /yil|year|год|года|лет/i.test(match[2]);
       offer.guaranteePeriod = {
         timePeriod: isYear ? period * 12 : period,
         timeUnit: "MONTH",
@@ -454,12 +581,9 @@ function buildYandexOffer(
     }
   }
 
-  // Clean undefined/null (but keep empty arrays if needed)
+  // Clean undefined/null
   for (const key of Object.keys(offer)) {
-    const v = offer[key];
-    if (v === undefined || v === null) {
-      delete offer[key];
-    }
+    if (offer[key] === undefined || offer[key] === null) delete offer[key];
   }
 
   return offer;
@@ -485,13 +609,8 @@ async function sendUzbekContent(
       `${YANDEX_API}/businesses/${businessId}/offer-mappings/update?language=UZ`,
       {
         method: "POST",
-        headers: {
-          "Api-Key": apiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          offerMappings: [{ offer }]
-        }),
+        headers: { "Api-Key": apiKey, "Content-Type": "application/json" },
+        body: JSON.stringify({ offerMappings: [{ offer }] }),
       }
     );
     
@@ -507,41 +626,6 @@ async function sendUzbekContent(
     console.error("O'zbek content error:", e);
     return false;
   }
-}
-
-// ============ QUALITY SCORE ============
-
-function calculateQuality(offer: any, ai: any): { score: number; breakdown: Record<string, number> } {
-  const nameLen = offer.name?.length || 0;
-  const descLen = offer.description?.length || 0;
-  const picCount = offer.pictures?.length || 0;
-  const paramCount = offer.parameterValues?.length || 0;
-
-  const b: Record<string, number> = {
-    // Nom: 0/10 ball. 50+ belgi = 10 ball
-    name: nameLen >= 50 ? 10 : nameLen >= 30 ? 5 : 0,
-    // Brend: 0/checkmark
-    brand: offer.vendor && offer.vendor !== "OEM" ? 5 : 0,
-    // Tavsif: 0/20 ball. 500+ = 20, 200+ = 10
-    description: descLen >= 500 ? 20 : descLen >= 200 ? 10 : descLen >= 100 ? 5 : 0,
-    // Rasmlar: 0/43 ball (1 rasm = 24, 3+ = 27, 5+ = 35, oltita+ = 43)
-    pictures: picCount >= 6 ? 43 : picCount >= 5 ? 35 : picCount >= 3 ? 27 : picCount >= 1 ? 24 : 0,
-    // Asosiy xususiyatlar: 0/12 ball
-    basicParams: paramCount >= 8 ? 12 : paramCount >= 5 ? 8 : paramCount >= 3 ? 5 : 0,
-    // Filtr uchun qo'shimcha: 0/8 ball
-    filterParams: paramCount >= 12 ? 8 : paramCount >= 8 ? 5 : 0,
-    // Tovar haqida batafsil: 0/5 ball
-    detailParams: paramCount >= 15 ? 5 : paramCount >= 12 ? 3 : 0,
-    // IKPU: checkmark
-    ikpu: offer.commodityCodes?.length ? 2 : 0,
-    // O'lchamlar
-    dimensions: offer.weightDimensions ? 2 : 0,
-    // Shtrix-kod
-    barcode: offer.barcodes?.length ? 2 : 0,
-    // Kafolat
-    warranty: offer.guaranteePeriod ? 2 : 0,
-  };
-  return { score: Object.values(b).reduce((a, v) => a + v, 0), breakdown: b };
 }
 
 // ============ MAIN HANDLER ============
@@ -593,7 +677,7 @@ serve(async (req) => {
       shopId = userShop?.id || null;
     }
 
-    console.log(`🚀 Creating ${productsList.length} Yandex Market card(s) for user ${user.id}`);
+    console.log(`🚀 Creating ${productsList.length} Yandex card(s) for user ${user.id}`);
 
     const results: any[] = [];
 
@@ -617,48 +701,51 @@ serve(async (req) => {
         const sku = generateSKU(product.name);
         const barcode = product.barcode || generateEAN13();
 
-        // 3. MXIK lookup
+        // 3. MXIK lookup (improved with category)
         const mxik = (product.mxikCode && product.mxikName)
           ? { code: product.mxikCode, name_uz: product.mxikName }
-          : await lookupMXIK(supabase, product.name);
+          : await lookupMXIK(supabase, product.name, cat);
 
-        // 4. *** NEW: Fetch Yandex category parameters ***
-        console.log(`📋 Fetching parameters for category ${yandexCat.id} (${yandexCat.name})...`);
+        // 4. *** PROXY ALL IMAGES THROUGH SUPABASE STORAGE ***
+        const rawImages: string[] = [];
+        if (product.images?.length) rawImages.push(...product.images);
+        if (product.image && !rawImages.includes(product.image)) rawImages.unshift(product.image);
+        
+        console.log(`🖼️ Raw images: ${rawImages.length}`);
+        const proxiedImages = await proxyImagesToStorage(supabase, user.id, rawImages, SUPABASE_URL);
+        console.log(`🖼️ Proxied images: ${proxiedImages.length}`);
+
+        // 5. Fetch Yandex category parameters
+        console.log(`📋 Fetching params for ${yandexCat.name} (${yandexCat.id})...`);
         const categoryParams = await fetchCategoryParameters(creds.apiKey, yandexCat.id);
-        console.log(`📋 Got ${categoryParams.length} parameters for category`);
 
-        // 5. AI optimization WITH category parameters
+        // 6. AI optimization with category parameters
         let aiData: any = null;
         if (LOVABLE_API_KEY) {
           aiData = await optimizeWithAI(product, yandexCat.name, categoryParams, LOVABLE_API_KEY);
           if (aiData) {
-            console.log(`✅ AI filled: name=${aiData.name_ru?.length || 0} chars, params=${aiData.parameterValues?.length || 0}`);
+            console.log(`✅ AI: name=${aiData.name_ru?.length}ch, desc=${aiData.description_ru?.length}ch, params=${aiData.parameterValues?.length}`);
           }
         }
 
-        // 6. Estimate dimensions
+        // 7. Estimate dimensions
         const dims = estimateDimensions(cat);
 
-        // 7. Build offer payload
+        // 8. Build offer payload with PROXIED images
         const offer = buildYandexOffer(
           product, aiData, sku, barcode, yandexCat, dims, mxik,
-          pricing.recommendedPrice
+          pricing.recommendedPrice, proxiedImages
         );
 
-        // 8. Send to Yandex Market API
-        console.log(`📤 Sending "${offer.name}" to Yandex (${offer.parameterValues?.length || 0} params)...`);
+        // 9. Send to Yandex Market API
+        console.log(`📤 Sending "${offer.name?.substring(0, 60)}" — ${offer.parameterValues?.length || 0} params, ${offer.pictures?.length || 0} images`);
         
         const yandexResp = await fetch(
           `${YANDEX_API}/businesses/${creds.businessId}/offer-mappings/update`,
           {
             method: "POST",
-            headers: {
-              "Api-Key": creds.apiKey,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              offerMappings: [{ offer }]
-            }),
+            headers: { "Api-Key": creds.apiKey, "Content-Type": "application/json" },
+            body: JSON.stringify({ offerMappings: [{ offer }] }),
           }
         );
 
@@ -666,19 +753,21 @@ serve(async (req) => {
         let yandexResult: any;
         try { yandexResult = JSON.parse(respText); } catch { yandexResult = { raw: respText }; }
 
-        // 9. *** NEW: Send O'zbek language content ***
+        if (!yandexResp.ok) {
+          console.error(`❌ Yandex API error (${yandexResp.status}):`, respText.substring(0, 500));
+        }
+
+        // 10. Send O'zbek language content
         let uzSent = false;
         if (yandexResp.ok && aiData?.name_uz) {
-          await new Promise(r => setTimeout(r, 300)); // small delay
+          await new Promise(r => setTimeout(r, 300));
           uzSent = await sendUzbekContent(
             creds.apiKey, creds.businessId, sku,
             aiData.name_uz, aiData.description_uz
           );
         }
 
-        const { score: quality, breakdown } = calculateQuality(offer, aiData);
-
-        // 10. Save to local DB
+        // 11. Save to local DB
         let savedProduct = null;
         if (shopId) {
           const { data, error: saveErr } = await supabase
@@ -691,7 +780,7 @@ serve(async (req) => {
               original_price: pricing.costPrice,
               source: "ai" as any,
               source_url: product.sourceUrl,
-              images: offer.pictures || [],
+              images: proxiedImages.length > 0 ? proxiedImages : (product.images || []),
               status: "draft" as any,
               mxik_code: mxik.code,
               mxik_name: mxik.name_uz,
@@ -701,7 +790,6 @@ serve(async (req) => {
                 yandex_category_id: yandexCat.id,
                 yandex_category_name: yandexCat.name,
                 yandex_status: yandexResp.ok ? "success" : "error",
-                yandex_card_quality: quality,
                 barcode,
                 vendor: offer.vendor,
                 dimensions: offer.weightDimensions,
@@ -709,6 +797,7 @@ serve(async (req) => {
                 name_ru: aiData?.name_ru,
                 description_uz: aiData?.description_uz,
                 params_count: offer.parameterValues?.length || 0,
+                images_proxied: proxiedImages.length,
                 uz_content_sent: uzSent,
               },
             })
@@ -730,18 +819,19 @@ serve(async (req) => {
           name: offer.name,
           nameUz: aiData?.name_uz,
           cardUrl,
-          cardQuality: quality,
-          qualityBreakdown: breakdown,
-          category: yandexCat.name,
-          mxikCode: mxik.code,
           paramsCount: offer.parameterValues?.length || 0,
+          imagesCount: offer.pictures?.length || 0,
+          imagesProxied: proxiedImages.length,
+          mxikCode: mxik.code,
+          mxikName: mxik.name_uz,
           uzContentSent: uzSent,
+          category: yandexCat.name,
           yandexResponse: yandexResult,
           localProductId: savedProduct?.id,
           error: yandexResp.ok ? null : (yandexResult?.errors?.[0]?.message || yandexResult?.message || `HTTP ${yandexResp.status}`),
         });
 
-        console.log(`${yandexResp.ok ? "✅" : "❌"} ${product.name}: quality=${quality}, params=${offer.parameterValues?.length || 0}, uz=${uzSent}`);
+        console.log(`${yandexResp.ok ? "✅" : "❌"} ${product.name}: params=${offer.parameterValues?.length || 0}, imgs=${offer.pictures?.length || 0}, uz=${uzSent}`);
 
         if (productsList.length > 1) {
           await new Promise(r => setTimeout(r, 500));
