@@ -131,8 +131,8 @@ export function useMarketplaceTariffs(
     staleTime: 1000 * 60 * 60, // 1 hour — tariffs don't change frequently
     gcTime: 1000 * 60 * 60 * 24,
     refetchOnWindowFocus: false,
-    refetchOnMount: false,
-    refetchInterval: 1000 * 60 * 60, // Refresh every 1 hour (not on every data update)
+    refetchOnMount: 'always' as const, // Always fetch on mount to ensure data is available
+    refetchInterval: 1000 * 60 * 60, // Refresh every 1 hour
   });
 }
 

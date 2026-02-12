@@ -40,9 +40,9 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
   const [priceChanges, setPriceChanges] = useState<Record<string, number>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const isLoading = store.isLoadingProducts;
   const { getCostPrice } = useCostPrices();
-  const { data: tariffMap } = useMarketplaceTariffs(connectedMarketplaces, store);
+  const { data: tariffMap, isLoading: tariffsLoading } = useMarketplaceTariffs(connectedMarketplaces, store);
+  const isLoading = store.isLoadingProducts || tariffsLoading;
 
   const products = useMemo(() => {
     const allProducts: ProductPrice[] = [];
