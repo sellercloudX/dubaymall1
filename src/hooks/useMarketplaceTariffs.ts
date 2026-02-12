@@ -103,27 +103,19 @@ export function useMarketplaceTariffs(
             });
           });
 
-          // Map same tariff to products with same category+price
+          // Map same tariff ONLY to products with SAME category+price (strict match)
           for (const p of products) {
             if (tariffMap.has(p.offerId)) continue;
             const catId = p.marketCategoryId || 0;
             const price = p.price || 0;
             
-            // Find a product with same category+price that has tariff data
-            const similar = products.find(
-              sp => (sp.marketCategoryId || 0) === catId && sp.price === price && tariffMap.has(sp.offerId)
-            );
-            if (similar) {
-              const t = tariffMap.get(similar.offerId)!;
-              tariffMap.set(p.offerId, { ...t, offerId: p.offerId });
-            } else if (price > 0) {
-              // Try to find any product with same price range (±20%)
-              const priceMatch = products.find(
-                sp => tariffMap.has(sp.offerId) && 
-                      Math.abs((sp.price || 0) - price) / price < 0.2
+            // Only exact category+price match — never cross-category
+            if (catId > 0 && price > 0) {
+              const similar = products.find(
+                sp => (sp.marketCategoryId || 0) === catId && sp.price === price && tariffMap.has(sp.offerId)
               );
-              if (priceMatch) {
-                const t = tariffMap.get(priceMatch.offerId)!;
+              if (similar) {
+                const t = tariffMap.get(similar.offerId)!;
                 tariffMap.set(p.offerId, { ...t, offerId: p.offerId });
               }
             }
