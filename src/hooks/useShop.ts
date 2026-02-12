@@ -83,7 +83,7 @@ export function useShopBySlug(slug: string) {
     queryKey: ['shop', 'slug', slug],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('shops')
+        .from('shops_public')
         .select('*')
         .eq('slug', slug)
         .eq('is_active', true)
