@@ -52,7 +52,8 @@ type Product = Tables<'products'> & {
 // Format product name - first letter uppercase, rest lowercase
 const formatProductName = (name: string): string => {
   if (!name) return '';
-  return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+  const cleaned = name.replace(/<br\s*\/?>/gi, ' ').replace(/\s+/g, ' ').trim();
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1).toLowerCase();
 };
 
 const calculateDeliveryDate = (preparationDays: number = 1): { date: string; fullDate: string } => {
@@ -627,7 +628,9 @@ export default function ProductPage() {
               <TabsContent value="description" className="pt-4">
                 {product.description ? (
                   <div className="prose dark:prose-invert max-w-none">
-                    <p className="whitespace-pre-line text-muted-foreground">{product.description}</p>
+                    <p className="whitespace-pre-line text-muted-foreground">
+                      {product.description.replace(/<br\s*\/?>/gi, '\n')}
+                    </p>
                   </div>
                 ) : (
                   <p className="text-muted-foreground">Ta'rif mavjud emas</p>
