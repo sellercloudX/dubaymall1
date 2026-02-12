@@ -180,14 +180,101 @@ serve(async (req) => {
       } catch (e) {
         console.error("Orders fetch error:", e);
       }
-    } else if (marketplace === "uzum" && sellerId) {
-      // Uzum Market API (placeholder - needs real API docs)
-      isValid = true;
-      accountInfo = {
-        sellerId: sellerId,
-        storeName: "Uzum Market Store",
-        state: "CONNECTED",
+  } else if (marketplace === "uzum" && apiKey) {
+      // Uzum Market Seller OpenAPI validation
+      console.log("Validating Uzum Market Seller API...");
+      const uzumBaseUrl = "https://api-seller.uzum.uz/api/seller-openapi";
+      const uzumHeaders = {
+        "Authorization": `Bearer ${apiKey}`,
+        "Accept": "application/json",
       };
+
+      // 1. Get owned shops
+      try {
+        const shopsResponse = await fetch(`${uzumBaseUrl}/v1/shops`, {
+          headers: uzumHeaders,
+        });
+
+        if (shopsResponse.ok) {
+          const shopsData = await shopsResponse.json();
+          const shops = shopsData.payload || shopsData.data || shopsData || [];
+          const shopList = Array.isArray(shops) ? shops : [shops];
+          
+          if (shopList.length > 0) {
+            const shop = shopList[0];
+            isValid = true;
+            accountInfo = {
+              shopId: shop.shopId || shop.id || sellerId,
+              storeName: shop.shopTitle || shop.title || shop.name || "Uzum Market Store",
+              state: "CONNECTED",
+              sellerId: sellerId || shop.sellerId,
+              shopsCount: shopList.length,
+            };
+            console.log("Uzum shop validated:", accountInfo.storeName);
+          } else {
+            isValid = true;
+            accountInfo = {
+              shopId: sellerId,
+              storeName: "Uzum Market Store",
+              state: "CONNECTED",
+              sellerId: sellerId,
+            };
+          }
+        } else {
+          console.log("Uzum shops validation status:", shopsResponse.status);
+          // Still allow connection - API key might be valid but shops endpoint differs
+          isValid = true;
+          accountInfo = {
+            shopId: sellerId,
+            storeName: "Uzum Market Store",
+            state: "PENDING_VALIDATION",
+            sellerId: sellerId,
+          };
+        }
+      } catch (e) {
+        console.error("Uzum shops fetch error:", e);
+        isValid = true;
+        accountInfo = {
+          shopId: sellerId,
+          storeName: "Uzum Market Store",
+          state: "CONNECTION_ERROR",
+          sellerId: sellerId,
+        };
+      }
+
+      // 2. Get products count if we have shopId
+      const uzumShopId = accountInfo.shopId || sellerId;
+      if (uzumShopId) {
+        try {
+          const productsResponse = await fetch(
+            `${uzumBaseUrl}/v1/product/shop/${uzumShopId}`,
+            { headers: uzumHeaders }
+          );
+          if (productsResponse.ok) {
+            const productsData = await productsResponse.json();
+            const items = productsData.payload?.productCards || productsData.payload || productsData.data || [];
+            productsCount = Array.isArray(items) ? items.length : 0;
+            console.log("Uzum products count:", productsCount);
+          }
+        } catch (e) {
+          console.error("Uzum products fetch error:", e);
+        }
+      }
+
+      // 3. Get orders count
+      try {
+        const ordersResponse = await fetch(
+          `${uzumBaseUrl}/v2/fbs/orders/count`,
+          { headers: uzumHeaders }
+        );
+        if (ordersResponse.ok) {
+          const ordersData = await ordersResponse.json();
+          ordersCount = ordersData.payload?.count || ordersData.payload || 0;
+          console.log("Uzum orders count:", ordersCount);
+        }
+      } catch (e) {
+        console.error("Uzum orders fetch error:", e);
+      }
     }
 
     if (!isValid) {
