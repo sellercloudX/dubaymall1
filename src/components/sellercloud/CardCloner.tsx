@@ -161,7 +161,7 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
         shop_id: shop.id,
         stock_quantity: 0,
         source: 'manual' as any,
-        status: 'pending' as any,
+        status: 'draft' as any,
       });
       return true;
     } catch (err: any) {
