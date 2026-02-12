@@ -348,19 +348,44 @@ function buildYandexOffer(
   mxik: { code: string; name_uz: string },
   price: number
 ): any {
-  // Collect ALL available images
+  // Collect ALL available images - validate each URL
   const allImages: string[] = [];
+  const blockedDomains = ['avatars.mds.yandex.net', 'yastatic.net']; // Yandex blocks its own CDN images
+  
+  const isValidImageUrl = (url: string): boolean => {
+    if (!url || typeof url !== 'string') return false;
+    if (!url.startsWith('https://') && !url.startsWith('http://')) return false;
+    // Block Yandex's own CDN URLs - they reject reusing other sellers' images
+    if (blockedDomains.some(d => url.includes(d))) {
+      console.warn(`⚠️ Blocked image URL (Yandex CDN): ${url.substring(0, 80)}`);
+      return false;
+    }
+    // Block known unsupported cloud storages
+    if (url.includes('dropbox.com') || url.includes('drive.google.com')) {
+      console.warn(`⚠️ Blocked image URL (unsupported cloud): ${url.substring(0, 80)}`);
+      return false;
+    }
+    // Accept: image extensions, Supabase storage URLs, Samsung CDN, or any direct HTTPS URL
+    // Yandex supports jpg, jpeg, png, webp, heic
+    return true; // Accept all HTTPS URLs - let Yandex validate the actual content
+  };
+
   if (product.images?.length) {
     for (const img of product.images) {
-      if (img && typeof img === 'string' && (img.startsWith('http://') || img.startsWith('https://'))) {
+      if (isValidImageUrl(img)) {
         allImages.push(img);
       }
     }
   }
-  if (product.image && typeof product.image === 'string' && (product.image.startsWith('http://') || product.image.startsWith('https://')) && !allImages.includes(product.image)) {
+  if (product.image && isValidImageUrl(product.image) && !allImages.includes(product.image)) {
     allImages.unshift(product.image);
   }
   const images = allImages.slice(0, 10);
+  
+  console.log(`🖼️ Valid images for Yandex: ${images.length}/${(product.images?.length || 0) + (product.image ? 1 : 0)} total`);
+  if (images.length > 0) {
+    console.log(`🖼️ First image: ${images[0].substring(0, 100)}`);
+  }
 
   const name = stripHtml(ai?.name_ru || product.name);
   const description = stripHtml(ai?.description_ru || product.description || product.name);
@@ -394,9 +419,12 @@ function buildYandexOffer(
     adult: ai?.adult || false,
   };
 
-  // Add images only if we have them
+  // Add images - REQUIRED field per Yandex docs
   if (images.length > 0) {
     offer.pictures = images;
+    console.log(`✅ Pictures added: ${images.length}`);
+  } else {
+    console.warn('⚠️ NO valid images to send to Yandex! This will cost ~35 quality points.');
   }
 
   // parameterValues — fill ALL params from AI
