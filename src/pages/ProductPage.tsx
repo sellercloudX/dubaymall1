@@ -294,22 +294,6 @@ export default function ProductPage() {
         </div>
       </div>
 
-      {/* Sticky Price Bar - appears when price scrolls out of view (mobile only) */}
-      {priceSticky && (
-        <div className="sticky top-[52px] z-30 bg-background border-b px-4 py-2 md:hidden shadow-sm">
-          <div className="flex items-baseline gap-2">
-            <span className="text-lg font-bold text-primary">{formatPrice(product.price)}</span>
-            {discount && (
-              <Badge variant="destructive" className="text-[10px] px-1.5 py-0">-{discount}%</Badge>
-            )}
-            {product.original_price && product.original_price > product.price && (
-              <span className="text-xs text-muted-foreground line-through">
-                {formatPrice(product.original_price)}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
 
       <div className="container mx-auto px-0 md:px-4 py-0 md:py-6 pb-24 max-w-5xl">
         {/* Desktop Breadcrumb */}
