@@ -831,25 +831,51 @@ serve(async (req) => {
       console.log(`Uzum API: dataType=${dataType}, shopId=${uzumShopId}`);
 
       if (dataType === "products") {
-        // GET /v1/product/shop/{shopId}
+        // GET /v1/product/shop/{shopId}?size=100&page=0
         if (!uzumShopId) {
           result = { success: false, error: "Shop ID required for Uzum products" };
         } else {
           try {
-            const response = await fetch(
-              `${uzumBaseUrl}/v1/product/shop/${uzumShopId}`,
-              { headers: uzumHeaders }
-            );
+            let allProducts: any[] = [];
+            let currentPage = 0;
+            let hasMore = true;
+            const pageSize = 100; // Uzum supports up to ~100 per page
 
-            if (response.ok) {
+            while (hasMore) {
+              const params = new URLSearchParams({
+                size: String(pageSize),
+                page: String(currentPage),
+                filter: 'ALL',
+              });
+
+              console.log(`Uzum products page ${currentPage}: ${uzumBaseUrl}/v1/product/shop/${uzumShopId}?${params.toString()}`);
+
+              const response = await fetch(
+                `${uzumBaseUrl}/v1/product/shop/${uzumShopId}?${params.toString()}`,
+                { headers: uzumHeaders }
+              );
+
+              if (!response.ok) {
+                const errText = await response.text();
+                console.error("Uzum products error:", response.status, errText);
+                if (allProducts.length === 0) {
+                  result = { success: false, error: `Uzum products failed: ${response.status}`, details: errText };
+                }
+                break;
+              }
+
               const data = await response.json();
               const productCards = data.payload?.productCards || data.payload || data.data || [];
               const items = Array.isArray(productCards) ? productCards : [];
 
-              console.log(`Uzum: ${items.length} products found`);
+              console.log(`Uzum page ${currentPage}: ${items.length} products found`);
+
+              if (items.length === 0) {
+                hasMore = false;
+                break;
+              }
 
               const products = items.map((card: any) => {
-                // Each card may have multiple SKUs
                 const skus = card.skuList || card.skus || [];
                 const firstSku = skus[0] || {};
                 const price = firstSku.fullPrice || firstSku.purchasePrice || card.price || 0;
@@ -877,16 +903,22 @@ serve(async (req) => {
                 };
               });
 
-              result = {
-                success: true,
-                data: products,
-                total: products.length,
-              };
-            } else {
-              const errText = await response.text();
-              console.error("Uzum products error:", response.status, errText);
-              result = { success: false, error: `Uzum products failed: ${response.status}` };
+              allProducts = [...allProducts, ...products];
+
+              if (items.length < pageSize || !fetchAll) {
+                hasMore = false;
+              } else {
+                currentPage++;
+                await sleep(300);
+              }
             }
+
+            console.log(`Uzum total products: ${allProducts.length}`);
+            result = {
+              success: true,
+              data: allProducts,
+              total: allProducts.length,
+            };
           } catch (e) {
             console.error("Uzum products error:", e);
             result = { success: false, error: "Uzum products fetch error" };
@@ -899,32 +931,57 @@ serve(async (req) => {
           let allOrders: any[] = [];
           let page = 0;
           let hasMore = true;
-          const pageSize = 100;
+          const pageSize = 50; // Uzum max 50 per page
 
-          while (hasMore) {
-            const params = new URLSearchParams({
-              size: String(pageSize),
-              page: String(page),
-            });
-            if (fromDate) params.append("dateFrom", fromDate);
-            if (toDate) params.append("dateTo", toDate);
-            if (status) params.append("status", status);
+          // Fetch all order statuses to get complete picture
+          const orderStatuses = status ? [status] : [
+            'CREATED', 'PACKING', 'PENDING_DELIVERY', 'DELIVERING', 
+            'DELIVERED', 'COMPLETED', 'CANCELED', 'RETURNED'
+          ];
 
-            const response = await fetch(
-              `${uzumBaseUrl}/v2/fbs/orders?${params.toString()}`,
-              { headers: uzumHeaders }
-            );
+          for (const orderStatus of orderStatuses) {
+            page = 0;
+            hasMore = true;
+
+            while (hasMore) {
+              const params = new URLSearchParams({
+                size: String(pageSize),
+                page: String(page),
+                status: orderStatus,
+              });
+              // shopIds is required - pass as array param
+              if (uzumShopId) {
+                params.append("shopIds", String(uzumShopId));
+              }
+              // dateFrom/dateTo are int64 timestamps (milliseconds)
+              if (fromDate) {
+                const ts = new Date(fromDate).getTime();
+                if (!isNaN(ts)) params.append("dateFrom", String(ts));
+              }
+              if (toDate) {
+                const ts = new Date(toDate).getTime();
+                if (!isNaN(ts)) params.append("dateTo", String(ts));
+              }
+
+              console.log(`Uzum orders (${orderStatus}) page ${page}: ${uzumBaseUrl}/v2/fbs/orders?${params.toString()}`);
+
+              const response = await fetch(
+                `${uzumBaseUrl}/v2/fbs/orders?${params.toString()}`,
+                { headers: uzumHeaders }
+              );
 
             if (!response.ok) {
-              console.error("Uzum orders error:", response.status);
-              break;
+              const errText = await response.text();
+              console.error(`Uzum orders error (${orderStatus}):`, response.status, errText);
+              hasMore = false;
+              continue;
             }
 
             const data = await response.json();
-            const orders = data.payload?.fbsOrders || data.payload?.orders || data.payload || [];
-            const orderList = Array.isArray(orders) ? orders : [];
+            const ordersPayload = data.payload?.sellerOrders || data.payload?.fbsOrders || data.payload?.orders || data.payload || [];
+            const orderList = Array.isArray(ordersPayload) ? ordersPayload : [];
             
-            console.log(`Uzum orders page ${page}: ${orderList.length} orders`);
+            console.log(`Uzum orders (${orderStatus}) page ${page}: ${orderList.length} orders`);
 
             const mapped = orderList.map((order: any) => {
               const items = order.items || order.orderItems || [];
@@ -934,7 +991,7 @@ serve(async (req) => {
 
               return {
                 id: order.orderId || order.id,
-                status: order.status || 'UNKNOWN',
+                status: order.status || orderStatus,
                 substatus: order.substatus || '',
                 createdAt: order.createdAt || order.createDate || new Date().toISOString(),
                 total: order.totalPrice || order.totalAmount || itemsTotal,
@@ -965,7 +1022,8 @@ serve(async (req) => {
               page++;
               await sleep(300);
             }
-          }
+            } // end while
+          } // end for statuses
 
           console.log(`Uzum total orders: ${allOrders.length}`);
           result = {
