@@ -714,64 +714,70 @@ serve(async (req) => {
         if (product.image && !rawImgs.includes(product.image)) rawImgs.unshift(product.image);
         let images = await proxyImagesToStorage(supabase, user.id, rawImgs, SUPABASE_URL);
         
-        // Generate additional product images if we have less than 4
-        if (images.length < 4 && LOVABLE_KEY) {
-          console.log(`🖼️ Only ${images.length} images, generating more...`);
+        // Generate additional product images if we have less than 3 (max 3 to avoid timeout)
+        if (images.length < 3 && LOVABLE_KEY) {
+          console.log(`🖼️ Only ${images.length} images, generating up to 3 more...`);
           const sourceImg = images[0] || null;
           const angles = [
             `Front view of "${product.name}" on pure white studio background, professional product photography, high resolution, no text`,
             `45-degree angle view of "${product.name}" on white background, showing product details, professional studio lighting`,
             `Close-up detail shot of "${product.name}" showing texture and quality, white background, macro product photography`,
-            `Back/side view of "${product.name}" on white background, showing packaging or label details, studio photography`,
-            `Lifestyle context photo of "${product.name}" in elegant setting, soft natural lighting, professional composition`,
-            `Top-down flat lay of "${product.name}" with minimal props, clean aesthetic, professional product photography`,
           ];
           
-          const needed = Math.min(6 - images.length, angles.length);
+          const needed = Math.min(3 - images.length, angles.length);
+          
+          // Generate images in PARALLEL for speed
+          const imgPromises = [];
           for (let i = 0; i < needed; i++) {
-            try {
-              const body: any = {
-                model: "google/gemini-2.5-flash-image",
-                modalities: ["image", "text"],
-                messages: [{
-                  role: "user",
-                  content: sourceImg ? [
-                    { type: "text", text: `Based on this EXACT product, create: ${angles[i]}. The product must look IDENTICAL to the reference image. Only change the angle/background. Do NOT change the product itself.` },
-                    { type: "image_url", image_url: { url: sourceImg } }
-                  ] : angles[i]
-                }],
-              };
-              
-              const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-                method: "POST",
-                headers: { Authorization: `Bearer ${LOVABLE_KEY}`, "Content-Type": "application/json" },
-                body: JSON.stringify(body),
-              });
-              
-              if (res.ok) {
-                const data = await res.json();
-                const imgData = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-                if (imgData && imgData.startsWith("data:image")) {
-                  // Upload base64 to storage
-                  const base64 = imgData.split(",")[1];
-                  const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
-                  const fileName = `${user.id}/ym-gen-${Date.now()}-${i}.png`;
-                  const { error } = await supabase.storage.from('product-images').upload(fileName, bytes, {
-                    contentType: 'image/png', cacheControl: '31536000', upsert: false,
-                  });
-                  if (!error) {
-                    const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(fileName);
-                    if (urlData?.publicUrl) {
-                      images.push(urlData.publicUrl);
-                      console.log(`✅ Generated image ${i + 1}`);
+            imgPromises.push((async () => {
+              try {
+                const genBody: any = {
+                  model: "google/gemini-2.5-flash-image",
+                  modalities: ["image", "text"],
+                  messages: [{
+                    role: "user",
+                    content: sourceImg ? [
+                      { type: "text", text: `Based on this EXACT product, create: ${angles[i]}. The product must look IDENTICAL to the reference image. Only change the angle/background.` },
+                      { type: "image_url", image_url: { url: sourceImg } }
+                    ] : angles[i]
+                  }],
+                };
+                
+                const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+                  method: "POST",
+                  headers: { Authorization: `Bearer ${LOVABLE_KEY}`, "Content-Type": "application/json" },
+                  body: JSON.stringify(genBody),
+                });
+                
+                if (res.ok) {
+                  const data = await res.json();
+                  const imgData = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+                  if (imgData && imgData.startsWith("data:image")) {
+                    const base64 = imgData.split(",")[1];
+                    const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+                    const fileName = `${user.id}/ym-gen-${Date.now()}-${i}.png`;
+                    const { error } = await supabase.storage.from('product-images').upload(fileName, bytes, {
+                      contentType: 'image/png', cacheControl: '31536000', upsert: false,
+                    });
+                    if (!error) {
+                      const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(fileName);
+                      if (urlData?.publicUrl) {
+                        console.log(`✅ Generated image ${i + 1}`);
+                        return urlData.publicUrl;
+                      }
                     }
                   }
                 }
+              } catch (e) {
+                console.error(`Image gen ${i} error:`, e);
               }
-              await new Promise(r => setTimeout(r, 800)); // Rate limit
-            } catch (e) {
-              console.error(`Image gen ${i} error:`, e);
-            }
+              return null;
+            })());
+          }
+          
+          const generatedImgs = await Promise.all(imgPromises);
+          for (const url of generatedImgs) {
+            if (url) images.push(url);
           }
         }
         console.log(`🖼️ Total ${images.length} images ready`);
