@@ -57,11 +57,13 @@ function generateEAN13(): string {
 }
 
 function generateSKU(name: string): string {
-  const words = name.split(/\s+/).slice(0, 2);
+  // Only use ASCII letters for SKU — strip Cyrillic and special chars
+  const ascii = name.replace(/[^a-zA-Z0-9\s]/g, '').trim();
+  const words = (ascii || 'PROD').split(/\s+/).slice(0, 2);
   const prefix = words.map(w => w.substring(0, 4).toUpperCase()).join("");
   const ts = Date.now().toString(36).slice(-4).toUpperCase();
   const rnd = Math.random().toString(36).substring(2, 5).toUpperCase();
-  return `${prefix}-${rnd}-${ts}`;
+  return `${prefix || 'PROD'}-${rnd}-${ts}`;
 }
 
 function stripHtml(text: string): string {
@@ -119,6 +121,7 @@ function detectCategory(name: string, desc?: string): string {
   return "default";
 }
 
+// Use LEAF categories only — parent categories cause INVALID_CATEGORY errors
 const YANDEX_CATEGORIES: Record<string, { id: number; name: string }> = {
   phone: { id: 91491, name: "Смартфоны" },
   laptop: { id: 91013, name: "Ноутбуки" },
@@ -132,13 +135,52 @@ const YANDEX_CATEGORIES: Record<string, { id: number; name: string }> = {
   clothing: { id: 7811873, name: "Одежда" },
   shoes: { id: 7811882, name: "Обувь" },
   bag: { id: 7812078, name: "Сумки" },
-  cosmetics: { id: 90509, name: "Декоративная косметика" },
-  perfume: { id: 90510, name: "Парфюмерия" },
+  cosmetics: { id: 0, name: "Декоративная косметика" }, // Will be resolved dynamically
+  perfume: { id: 0, name: "Парфюмерия" }, // Will be resolved dynamically
   toys: { id: 90764, name: "Игрушки" },
   tools: { id: 90719, name: "Инструменты" },
   massage: { id: 966945, name: "Массажеры" },
-  default: { id: 198119, name: "Электроника" },
+  default: { id: 0, name: "Прочее" }, // Will be resolved dynamically
 };
+
+// Sub-category detection for cosmetics/perfume to get LEAF category IDs
+function resolveLeafCategory(cat: string, productName: string): { id: number; name: string } {
+  const name = productName.toLowerCase();
+  
+  if (cat === "cosmetics") {
+    if (name.includes("помад") || name.includes("lipstick") || name.includes("lip") || name.includes("lab")) 
+      return { id: 16302744, name: "Помада для губ" };
+    if (name.includes("тушь") || name.includes("mascara") || name.includes("kiprik"))
+      return { id: 16302772, name: "Тушь для ресниц" };
+    if (name.includes("тональ") || name.includes("foundation") || name.includes("крем") || name.includes("bb") || name.includes("cc"))
+      return { id: 16302686, name: "Тональные средства" };
+    if (name.includes("пудр") || name.includes("powder"))
+      return { id: 16302718, name: "Пудра" };
+    if (name.includes("румян") || name.includes("blush"))
+      return { id: 16302718, name: "Румяна" };
+    if (name.includes("тени") || name.includes("eyeshadow") || name.includes("shadow"))
+      return { id: 16302760, name: "Тени для век" };
+    if (name.includes("подводка") || name.includes("карандаш") || name.includes("eyeliner") || name.includes("pencil"))
+      return { id: 16302754, name: "Подводка для глаз" };
+    // Generic cosmetics fallback — use "Наборы декоративной косметики" which is a leaf
+    return { id: 16302780, name: "Наборы декоративной косметики" };
+  }
+  
+  if (cat === "perfume") {
+    if (name.includes("женск") || name.includes("woman") || name.includes("ayol"))
+      return { id: 90511, name: "Женская парфюмерия" };
+    if (name.includes("мужск") || name.includes("man") || name.includes("erkak"))
+      return { id: 90512, name: "Мужская парфюмерия" };
+    return { id: 90511, name: "Женская парфюмерия" }; // default
+  }
+
+  // For categories with id=0, try to resolve
+  const base = YANDEX_CATEGORIES[cat];
+  if (base && base.id > 0) return base;
+  
+  // Ultimate fallback
+  return { id: 91597, name: "Товары для красоты" };
+}
 
 // ============ IMAGE PROXY: Download external images → Upload to Supabase Storage ============
 
@@ -517,7 +559,8 @@ function buildYandexOffer(
   const offer: any = {
     offerId: sku,
     name: finalName,
-    marketCategoryId: category.id,
+    // Don't set marketCategoryId — let Yandex auto-detect the correct leaf category
+    // Setting a wrong/non-leaf category causes INVALID_CATEGORY or UNKNOWN_CATEGORY errors
     vendor: ai?.vendor || product.brand || "OEM",
     description: description.substring(0, 6000),
     barcodes: [barcode],
@@ -693,9 +736,9 @@ serve(async (req) => {
           netProfit: Math.round(product.price * 0.2),
         };
 
-        // 1. Detect category
+        // 1. Detect category → resolve to LEAF category
         const cat = detectCategory(product.name, product.description);
-        const yandexCat = YANDEX_CATEGORIES[cat] || YANDEX_CATEGORIES.default;
+        const yandexCat = resolveLeafCategory(cat, product.name);
 
         // 2. Generate identifiers
         const sku = generateSKU(product.name);
@@ -715,30 +758,22 @@ serve(async (req) => {
         const proxiedImages = await proxyImagesToStorage(supabase, user.id, rawImages, SUPABASE_URL);
         console.log(`🖼️ Proxied images: ${proxiedImages.length}`);
 
-        // 5. Fetch Yandex category parameters
-        console.log(`📋 Fetching params for ${yandexCat.name} (${yandexCat.id})...`);
-        const categoryParams = await fetchCategoryParameters(creds.apiKey, yandexCat.id);
-
-        // 6. AI optimization with category parameters
+        // 5. STEP 1: Create basic card first (no params, let Yandex auto-detect category)
+        const dims = estimateDimensions(cat);
+        
+        // AI for name/description only (no params yet)
         let aiData: any = null;
         if (LOVABLE_API_KEY) {
-          aiData = await optimizeWithAI(product, yandexCat.name, categoryParams, LOVABLE_API_KEY);
-          if (aiData) {
-            console.log(`✅ AI: name=${aiData.name_ru?.length}ch, desc=${aiData.description_ru?.length}ch, params=${aiData.parameterValues?.length}`);
-          }
+          // First AI call — just name + description, no category params yet
+          aiData = await optimizeWithAI(product, yandexCat.name, [], LOVABLE_API_KEY);
         }
-
-        // 7. Estimate dimensions
-        const dims = estimateDimensions(cat);
-
-        // 8. Build offer payload with PROXIED images
+        
         const offer = buildYandexOffer(
           product, aiData, sku, barcode, yandexCat, dims, mxik,
           pricing.recommendedPrice, proxiedImages
         );
 
-        // 9. Send to Yandex Market API
-        console.log(`📤 Sending "${offer.name?.substring(0, 60)}" — ${offer.parameterValues?.length || 0} params, ${offer.pictures?.length || 0} images`);
+        console.log(`📤 STEP 1: Creating base card "${offer.name?.substring(0, 60)}" — ${offer.pictures?.length || 0} images`);
         
         const yandexResp = await fetch(
           `${YANDEX_API}/businesses/${creds.businessId}/offer-mappings/update`,
@@ -757,7 +792,87 @@ serve(async (req) => {
           console.error(`❌ Yandex API error (${yandexResp.status}):`, respText.substring(0, 500));
         }
 
-        // 10. Send O'zbek language content
+        // 6. STEP 2: Get assigned category → fetch params → AI fills → update card
+        let paramsCount = 0;
+        if (yandexResp.ok) {
+          await new Promise(r => setTimeout(r, 1500)); // Wait for Yandex to process
+
+          // Query the card to get assigned category
+          console.log(`📋 STEP 2: Fetching assigned category for ${sku}...`);
+          let assignedCategoryId = 0;
+          try {
+            const queryResp = await fetch(
+              `${YANDEX_API}/businesses/${creds.businessId}/offer-mappings?offerIds=${encodeURIComponent(sku)}`,
+              {
+                method: "POST",
+                headers: { "Api-Key": creds.apiKey, "Content-Type": "application/json" },
+                body: JSON.stringify({ offerIds: [sku] }),
+              }
+            );
+            if (queryResp.ok) {
+              const queryData = await queryResp.json();
+              const mapping = queryData.result?.offerMappings?.[0];
+              assignedCategoryId = mapping?.mapping?.marketCategoryId 
+                || mapping?.awaitingModerationMapping?.marketCategoryId 
+                || mapping?.offer?.marketCategoryId || 0;
+              console.log(`📋 Assigned category: ${assignedCategoryId}`);
+            }
+          } catch (e) {
+            console.error("Category query failed:", e);
+          }
+
+          // If we got a category, fetch its params and update the card
+          if (assignedCategoryId > 0) {
+            const categoryParams = await fetchCategoryParameters(creds.apiKey, assignedCategoryId);
+            console.log(`📋 Got ${categoryParams.length} params for category ${assignedCategoryId}`);
+
+            if (categoryParams.length > 0 && LOVABLE_API_KEY) {
+              // Second AI call — now WITH real category params
+              const aiWithParams = await optimizeWithAI(product, yandexCat.name, categoryParams, LOVABLE_API_KEY);
+              
+              if (aiWithParams?.parameterValues?.length) {
+                // Update the card with params
+                const updateOffer: any = {
+                  offerId: sku,
+                  marketCategoryId: assignedCategoryId,
+                };
+
+                updateOffer.parameterValues = aiWithParams.parameterValues
+                  .filter((p: any) => p.parameterId && (p.value !== undefined || p.valueId !== undefined))
+                  .map((p: any) => {
+                    const pv: any = { parameterId: Number(p.parameterId) };
+                    if (p.valueId !== undefined) pv.valueId = Number(p.valueId);
+                    else if (p.value !== undefined) pv.value = String(p.value);
+                    if (p.unitId) pv.unitId = String(p.unitId);
+                    return pv;
+                  });
+
+                paramsCount = updateOffer.parameterValues.length;
+                console.log(`📤 STEP 2: Updating with ${paramsCount} params...`);
+
+                const updateResp = await fetch(
+                  `${YANDEX_API}/businesses/${creds.businessId}/offer-mappings/update`,
+                  {
+                    method: "POST",
+                    headers: { "Api-Key": creds.apiKey, "Content-Type": "application/json" },
+                    body: JSON.stringify({ offerMappings: [{ offer: updateOffer }] }),
+                  }
+                );
+                
+                if (updateResp.ok) {
+                  console.log(`✅ STEP 2: Card updated with ${paramsCount} params`);
+                  // Merge AI data
+                  if (aiWithParams.name_uz) aiData = { ...aiData, ...aiWithParams };
+                } else {
+                  const errText = await updateResp.text();
+                  console.error(`❌ Param update failed: ${errText.substring(0, 300)}`);
+                }
+              }
+            }
+          }
+        }
+
+        // 7. Send O'zbek language content
         let uzSent = false;
         if (yandexResp.ok && aiData?.name_uz) {
           await new Promise(r => setTimeout(r, 300));
@@ -796,7 +911,7 @@ serve(async (req) => {
                 name_uz: aiData?.name_uz,
                 name_ru: aiData?.name_ru,
                 description_uz: aiData?.description_uz,
-                params_count: offer.parameterValues?.length || 0,
+                params_count: paramsCount || offer.parameterValues?.length || 0,
                 images_proxied: proxiedImages.length,
                 uz_content_sent: uzSent,
               },
@@ -819,7 +934,7 @@ serve(async (req) => {
           name: offer.name,
           nameUz: aiData?.name_uz,
           cardUrl,
-          paramsCount: offer.parameterValues?.length || 0,
+          paramsCount: paramsCount || offer.parameterValues?.length || 0,
           imagesCount: offer.pictures?.length || 0,
           imagesProxied: proxiedImages.length,
           mxikCode: mxik.code,
@@ -831,7 +946,7 @@ serve(async (req) => {
           error: yandexResp.ok ? null : (yandexResult?.errors?.[0]?.message || yandexResult?.message || `HTTP ${yandexResp.status}`),
         });
 
-        console.log(`${yandexResp.ok ? "✅" : "❌"} ${product.name}: params=${offer.parameterValues?.length || 0}, imgs=${offer.pictures?.length || 0}, uz=${uzSent}`);
+        console.log(`${yandexResp.ok ? "✅" : "❌"} ${product.name}: params=${paramsCount}, imgs=${offer.pictures?.length || 0}, uz=${uzSent}`);
 
         if (productsList.length > 1) {
           await new Promise(r => setTimeout(r, 500));
