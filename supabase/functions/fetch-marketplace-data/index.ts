@@ -674,7 +674,7 @@ serve(async (req) => {
         // Calculate real Yandex Market tariffs per product
         try {
           const offersForCalc = (tariffOffers || []).slice(0, 200).map((o: any) => ({
-            categoryId: o.categoryId || 91491,
+            categoryId: (o.categoryId && o.categoryId > 0) ? o.categoryId : 91491,
             price: o.price || 0,
             length: o.length || 20,
             width: o.width || 15,
