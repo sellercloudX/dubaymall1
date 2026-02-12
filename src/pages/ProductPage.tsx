@@ -293,7 +293,7 @@ export default function ProductPage() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-4 md:py-8 pb-24">
+      <div className="container mx-auto px-4 py-2 md:py-6 pb-24 max-w-5xl">
         {/* Desktop Breadcrumb */}
         <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground mb-6">
           <Link to="/" className="hover:text-primary">{t.marketplace}</Link>
@@ -307,16 +307,16 @@ export default function ProductPage() {
           <span className="text-foreground line-clamp-1">{formatProductName(product.name)}</span>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-6 md:gap-8">
+        <div className="grid md:grid-cols-2 gap-6 md:gap-8 items-start">
           {/* Images */}
-          <div className="space-y-3">
-            <div className="aspect-square bg-muted rounded-lg overflow-hidden relative">
+          <div className="space-y-3 md:sticky md:top-20">
+            <div className="aspect-[3/4] bg-muted rounded-lg overflow-hidden relative">
               {images.length > 0 ? (
                 <>
                   <img
                     src={variantImageOverride || images[currentImage]}
                     alt={formatProductName(product.name)}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain"
                   />
                   {images.length > 1 && (
                     <>
@@ -374,29 +374,26 @@ export default function ProductPage() {
           </div>
 
           {/* Details */}
-          <div className="space-y-4">
-            {/* Price Section - Uzum style */}
-            <div className="space-y-2">
-              {/* Price with discount */}
+          <div className="space-y-3">
+            {/* Price Section - compact */}
+            <div>
               <div className="flex items-baseline gap-3 flex-wrap">
-                <span className="text-3xl md:text-4xl font-bold text-primary whitespace-nowrap">
+                <span className="text-2xl md:text-3xl font-bold text-primary whitespace-nowrap">
                   {formatPrice(product.price)}
                 </span>
                 {discount && (
                   <Badge className="bg-destructive">-{discount}%</Badge>
                 )}
+                {product.original_price && product.original_price > product.price && (
+                  <span className="text-base text-muted-foreground line-through whitespace-nowrap">
+                    {formatPrice(product.original_price)}
+                  </span>
+                )}
               </div>
-              
-              {/* Original price struck through */}
-              {product.original_price && product.original_price > product.price && (
-                <span className="text-lg text-muted-foreground line-through whitespace-nowrap block">
-                  {formatPrice(product.original_price)}
-                </span>
-              )}
             </div>
 
-            {/* Product Name - Below price like Uzum.uz */}
-            <h1 className="text-lg md:text-xl font-medium text-foreground leading-tight">
+            {/* Product Name */}
+            <h1 className="text-base md:text-lg font-medium text-foreground leading-tight">
               {formatProductName(product.name)}
             </h1>
 
@@ -454,26 +451,19 @@ export default function ProductPage() {
               </Card>
             )}
 
-            {/* Installment Calculator */}
-            <Card className="bg-gradient-to-r from-primary/5 to-accent/10 border-primary/20">
-              <CardContent className="p-4 space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                    <span className="text-primary-foreground text-lg">💳</span>
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium text-sm">Muddatli to'lovga xaridlarga</p>
-                    <p className="text-xs text-muted-foreground">Hoziroq olish mumkin</p>
-                  </div>
+            {/* Installment - compact */}
+            <Card className="border-primary/20">
+              <CardContent className="p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">💳</span>
+                  <p className="font-medium text-sm">Muddatli to'lov</p>
                 </div>
-                
-                {/* Month selector tabs */}
-                <div className="flex gap-2 p-1 bg-background/50 rounded-lg">
+                <div className="flex gap-1.5 p-0.5 bg-muted/50 rounded-md">
                   {[24, 12, 6, 3].map(months => (
                     <button
                       key={months}
                       onClick={() => setSelectedInstallment(months)}
-                      className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-all ${
+                      className={`flex-1 py-1.5 rounded text-xs font-medium transition-all ${
                         selectedInstallment === months 
                           ? 'bg-background shadow-sm' 
                           : 'hover:bg-background/50'
@@ -483,16 +473,11 @@ export default function ProductPage() {
                     </button>
                   ))}
                 </div>
-                
-                {/* Monthly payment display */}
                 <div className="flex items-center justify-between">
-                  <div className="bg-accent text-accent-foreground px-3 py-1.5 rounded font-bold whitespace-nowrap">
+                  <span className="bg-accent text-accent-foreground px-2 py-1 rounded text-sm font-bold">
                     {new Intl.NumberFormat('uz-UZ').format(calculateInstallment(product.price, selectedInstallment))} so'm
-                  </div>
-                  <span className="text-sm text-muted-foreground">× {selectedInstallment} oy</span>
-                  <Button variant="outline" size="sm" className="hidden md:flex">
-                    Limit olish
-                  </Button>
+                  </span>
+                  <span className="text-xs text-muted-foreground">× {selectedInstallment} oy</span>
                 </div>
               </CardContent>
             </Card>
