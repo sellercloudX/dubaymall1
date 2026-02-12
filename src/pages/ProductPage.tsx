@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { SEOHead, StructuredData } from '@/components/SEOHead';
@@ -98,27 +98,9 @@ export default function ProductPage() {
   const [chatOpen, setChatOpen] = useState(false);
   const [variantImageOverride, setVariantImageOverride] = useState<string | null>(null);
   const [selectedVariants, setSelectedVariants] = useState<Record<string, ProductVariant | null>>({});
-  const [priceSticky, setPriceSticky] = useState(false);
-  const priceRef = useRef<HTMLDivElement>(null);
   const { data: ratingData } = useProductRating(id || '');
   const { data: reviews } = useProductReviews(id || '');
   const { variantsByType, hasColors, hasSizes, hasModels } = useProductVariants(id);
-
-  // Sticky price observer - when price section reaches top, make it sticky
-  useEffect(() => {
-    const el = priceRef.current;
-    if (!el) return;
-    
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setPriceSticky(!entry.isIntersecting);
-      },
-      { threshold: 0, rootMargin: '-56px 0px 0px 0px' } // 56px = mobile header height
-    );
-    
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [product]);
 
   useEffect(() => {
     if (id) {
@@ -241,7 +223,7 @@ export default function ProductPage() {
   }
 
   const images = product.images || [];
-  const hasReviews = ratingData?.total_reviews && Number(ratingData.total_reviews) > 0;
+  const hasReviews = !!(ratingData?.total_reviews && Number(ratingData.total_reviews) > 0);
   const deliveryInfo = calculateDeliveryDate(product.preparation_days || 1);
 
   const productStructuredData = {
@@ -380,8 +362,8 @@ export default function ProductPage() {
 
           {/* Details - scrolls under sticky price on mobile */}
           <div className="px-4 md:px-0 space-y-3 mt-3 md:mt-0">
-            {/* Price Section - this is the sentinel for sticky */}
-            <div ref={priceRef}>
+            {/* Price Section */}
+            <div>
               <div className="flex items-baseline gap-3 flex-wrap">
                 <span className="text-2xl md:text-3xl font-bold text-primary whitespace-nowrap">
                   {formatPrice(product.price)}
@@ -527,7 +509,7 @@ export default function ProductPage() {
               </Button>
             </div>
 
-            {/* Mobile: Quantity selector */}
+            {/* Mobile: Quantity selector only - cart button is in sticky footer */}
             <div className="flex items-center gap-3 md:hidden">
               <div className="flex items-center border rounded-lg">
                 <Button variant="ghost" size="icon" onClick={() => setQuantity(q => Math.max(1, q - 1))} disabled={quantity <= 1}>
@@ -538,10 +520,7 @@ export default function ProductPage() {
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
-              <Button className="flex-1 gap-2 h-12" onClick={handleAddToCart} disabled={product.stock_quantity === 0}>
-                <ShoppingCart className="h-5 w-5" />
-                Savatga
-              </Button>
+              <span className="text-sm text-muted-foreground">Omborda: {product.stock_quantity} ta</span>
             </div>
           </div>
         </div>
