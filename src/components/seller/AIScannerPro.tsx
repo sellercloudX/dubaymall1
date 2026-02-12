@@ -235,7 +235,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
 
   // Fetch real tariffs from Yandex API
   const fetchRealTariffs = async () => {
-    const categoryId = (analyzedProduct as any)?.marketCategoryId || 0;
+    const categoryId = (analyzedProduct as any)?.marketCategoryId || 91491; // fallback to valid Yandex category
     // Use a realistic selling price estimate for tariff calculation
     const estimatedPrice = costPrice > 0 
       ? Math.ceil((costPrice + logisticsCost) / (1 - (targetMargin + TAX_RATE) / 100) / 100) * 100
@@ -243,10 +243,8 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
     
     setIsCalculating(true);
     try {
-      // Only send categoryId if we have a real one — don't use hardcoded fallback
-      const offers = categoryId > 0 
-        ? [{ categoryId, price: Math.round(estimatedPrice) }]
-        : [{ categoryId: 0, price: Math.round(estimatedPrice) }];
+      // Always send a valid categoryId — Yandex API returns 500 for categoryId: 0
+      const offers = [{ categoryId, price: Math.round(estimatedPrice) }];
 
       const { data, error } = await supabase.functions.invoke('fetch-marketplace-data', {
         body: {
