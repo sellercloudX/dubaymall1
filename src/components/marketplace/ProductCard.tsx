@@ -25,8 +25,8 @@ interface ProductCardProps {
 // Format product name - first letter uppercase, rest lowercase, truncate if needed
 const formatProductName = (name: string): string => {
   if (!name) return '';
-  const formatted = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
-  return formatted;
+  const cleaned = name.replace(/<br\s*\/?>/gi, ' ').replace(/\s+/g, ' ').trim();
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1).toLowerCase();
 };
 
 // Calculate delivery date based on preparation days + standard delivery time
