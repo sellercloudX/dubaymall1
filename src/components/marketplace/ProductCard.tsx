@@ -171,17 +171,18 @@ export const ProductCard = memo(forwardRef<HTMLAnchorElement, ProductCardProps>(
               {!imageLoaded && (
                 <div className="absolute inset-0 bg-muted animate-pulse" />
               )}
-              <img
-                src={product.images[currentImageIndex]}
-                alt={product.name}
-                loading="lazy"
-                decoding="async"
-                onLoad={() => setImageLoaded(true)}
-                className={`w-full h-full object-cover transition-opacity ${
-                  imageLoaded ? 'opacity-100' : 'opacity-0'
-                }`}
-                style={{ aspectRatio: '1080/1440' }}
-              />
+                <img
+                  src={product.images[currentImageIndex]}
+                  alt={product.name}
+                  loading="lazy"
+                  decoding="async"
+                  width={1080}
+                  height={1440}
+                  onLoad={() => setImageLoaded(true)}
+                  className={`w-full h-full object-contain transition-opacity ${
+                    imageLoaded ? 'opacity-100' : 'opacity-0'
+                  }`}
+                />
               
               {/* Navigation arrows - show on hover when multiple images */}
               {imageCount > 1 && (
