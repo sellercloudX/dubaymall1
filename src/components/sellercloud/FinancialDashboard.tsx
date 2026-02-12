@@ -30,7 +30,7 @@ export function FinancialDashboard({
 }: FinancialDashboardProps) {
   const isLoading = store.isLoadingOrders;
   const { getCostPrice } = useCostPrices();
-  const { data: tariffMap, isLoading: tariffsLoading } = useMarketplaceTariffs(connectedMarketplaces, store);
+  const { data: tariffMap, isLoading: tariffsLoading, dataUpdatedAt: tariffUpdatedAt } = useMarketplaceTariffs(connectedMarketplaces, store);
 
   const summary = useMemo(() => {
     if (isLoading) return null;
@@ -97,7 +97,7 @@ export function FinancialDashboard({
     const yandexFeePercent = totalRevenue > 0 ? ((totalYandexFees / totalRevenue) * 100).toFixed(1) : '0';
 
     return { totalRevenue, totalOrders, platformFee, platformCommission, sellerCloudTotal, totalYandexFees, yandexFeePercent, yandexTax, totalExpenses, netProfit, profitMargin, marketplaceBreakdown, totalProductCost, costCoverage, tariffCoverage };
-  }, [connectedMarketplaces, store.dataVersion, isLoading, monthlyFee, commissionPercent, getCostPrice, tariffMap]);
+  }, [connectedMarketplaces, store.dataVersion, isLoading, monthlyFee, commissionPercent, getCostPrice, tariffUpdatedAt]);
 
   const formatPrice = (price: number) => {
     if (Math.abs(price) >= 1000000) return (price / 1000000).toFixed(1) + ' mln';
