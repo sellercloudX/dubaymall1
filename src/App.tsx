@@ -49,6 +49,7 @@ const Partnership = lazy(() => import("./pages/Partnership"));
  const BloggerActivation = lazy(() => import("./pages/BloggerActivation"));
 const Blog = lazy(() => import("./pages/Blog"));
 const BlogPost = lazy(() => import("./pages/BlogPost"));
+const TrackOrder = lazy(() => import("./pages/TrackOrder"));
 
  // Create persister for offline cache
  const persister = createSyncStoragePersister({
@@ -119,6 +120,7 @@ function App() {
                     <Route path="/blogger-activation" element={<BloggerActivation />} />
                     <Route path="/blog" element={<Blog />} />
                     <Route path="/blog/:slug" element={<BlogPost />} />
+                    <Route path="/track" element={<TrackOrder />} />
                     <Route path="*" element={<NotFound />} />
                   </Routes>
                 </Suspense>

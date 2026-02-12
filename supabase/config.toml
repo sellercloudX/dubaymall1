@@ -59,3 +59,9 @@ verify_jwt = false
 
 [functions.batch-marketplace-sync]
 verify_jwt = false
+
+[functions.create-order]
+verify_jwt = false
+
+[functions.track-order]
+verify_jwt = false
