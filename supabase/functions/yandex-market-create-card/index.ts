@@ -57,7 +57,6 @@ function generateEAN13(): string {
 }
 
 function generateSKU(name: string): string {
-  // Only use ASCII letters for SKU — strip Cyrillic and special chars
   const ascii = name.replace(/[^a-zA-Z0-9\s]/g, '').trim();
   const words = (ascii || 'PROD').split(/\s+/).slice(0, 2);
   const prefix = words.map(w => w.substring(0, 4).toUpperCase()).join("");
@@ -70,303 +69,223 @@ function stripHtml(text: string): string {
   return text.replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
 }
 
-function estimateDimensions(category: string) {
-  const dims: Record<string, { length: number; width: number; height: number; weight: number }> = {
-    phone: { length: 18, width: 10, height: 6, weight: 0.3 },
-    laptop: { length: 40, width: 30, height: 5, weight: 2.5 },
-    tablet: { length: 28, width: 22, height: 4, weight: 0.8 },
-    headphones: { length: 22, width: 18, height: 8, weight: 0.4 },
-    speaker: { length: 25, width: 15, height: 15, weight: 1.2 },
-    smartwatch: { length: 12, width: 10, height: 8, weight: 0.2 },
-    watch: { length: 12, width: 10, height: 8, weight: 0.2 },
-    camera: { length: 20, width: 15, height: 12, weight: 0.8 },
-    tv: { length: 120, width: 75, height: 15, weight: 15 },
-    clothing: { length: 35, width: 25, height: 5, weight: 0.4 },
-    shoes: { length: 35, width: 22, height: 14, weight: 1 },
-    bag: { length: 40, width: 30, height: 15, weight: 0.8 },
-    cosmetics: { length: 15, width: 10, height: 8, weight: 0.15 },
-    perfume: { length: 12, width: 8, height: 15, weight: 0.2 },
-    toys: { length: 30, width: 25, height: 15, weight: 0.5 },
-    tools: { length: 35, width: 25, height: 10, weight: 2 },
-    massage: { length: 45, width: 35, height: 15, weight: 1.8 },
-    default: { length: 30, width: 20, height: 15, weight: 1 },
-  };
-  return dims[category] || dims.default;
-}
-
-function detectCategory(name: string, desc?: string): string {
-  const text = `${name} ${desc || ""}`.toLowerCase();
-  const map: [string, string[]][] = [
-    ["massage", ["массаж", "massaj", "massager"]],
-    ["phone", ["телефон", "phone", "смартфон", "iphone", "samsung galaxy", "galaxy"]],
-    ["laptop", ["ноутбук", "laptop", "macbook"]],
-    ["tablet", ["планшет", "tablet", "ipad"]],
-    ["headphones", ["наушник", "headphone", "airpods", "quloqchin"]],
-    ["speaker", ["колонк", "speaker", "karnay"]],
-    ["smartwatch", ["смарт часы", "smart watch", "apple watch"]],
-    ["watch", ["часы", "watch", "soat"]],
-    ["camera", ["камер", "camera", "фотоаппарат"]],
-    ["tv", ["телевизор", "tv", "televizor"]],
-    ["clothing", ["одежд", "kiyim", "футболк", "штан", "платье", "куртк"]],
-    ["shoes", ["обувь", "shoes", "poyabzal", "кроссовк"]],
-    ["bag", ["сумк", "bag", "рюкзак"]],
-    ["cosmetics", ["косметик", "cosmetic", "крем", "помад"]],
-    ["perfume", ["парфюм", "perfume", "духи"]],
-    ["toys", ["игруш", "toy", "o'yinchoq"]],
-    ["tools", ["инструмент", "tool", "дрель", "молоток", "matkap"]],
-  ];
-  for (const [cat, keywords] of map) {
-    if (keywords.some(kw => text.includes(kw))) return cat;
-  }
-  return "default";
-}
-
-// Use LEAF categories only — parent categories cause INVALID_CATEGORY errors
-const YANDEX_CATEGORIES: Record<string, { id: number; name: string }> = {
-  phone: { id: 91491, name: "Смартфоны" },
-  laptop: { id: 91013, name: "Ноутбуки" },
-  tablet: { id: 6427100, name: "Планшеты" },
-  headphones: { id: 90555, name: "Наушники и гарнитуры" },
-  speaker: { id: 90556, name: "Портативная акустика" },
-  smartwatch: { id: 10498025, name: "Умные часы и браслеты" },
-  watch: { id: 7811901, name: "Наручные часы" },
-  camera: { id: 90606, name: "Фотоаппараты" },
-  tv: { id: 90639, name: "Телевизоры" },
-  clothing: { id: 7811873, name: "Одежда" },
-  shoes: { id: 7811882, name: "Обувь" },
-  bag: { id: 7812078, name: "Сумки" },
-  cosmetics: { id: 0, name: "Декоративная косметика" }, // Will be resolved dynamically
-  perfume: { id: 0, name: "Парфюмерия" }, // Will be resolved dynamically
-  toys: { id: 90764, name: "Игрушки" },
-  tools: { id: 90719, name: "Инструменты" },
-  massage: { id: 966945, name: "Массажеры" },
-  default: { id: 0, name: "Прочее" }, // Will be resolved dynamically
-};
-
-// Sub-category detection for cosmetics/perfume to get LEAF category IDs
-function resolveLeafCategory(cat: string, productName: string): { id: number; name: string } {
-  const name = productName.toLowerCase();
-  
-  if (cat === "cosmetics") {
-    if (name.includes("помад") || name.includes("lipstick") || name.includes("lip") || name.includes("lab")) 
-      return { id: 16302744, name: "Помада для губ" };
-    if (name.includes("тушь") || name.includes("mascara") || name.includes("kiprik"))
-      return { id: 16302772, name: "Тушь для ресниц" };
-    if (name.includes("тональ") || name.includes("foundation") || name.includes("крем") || name.includes("bb") || name.includes("cc"))
-      return { id: 16302686, name: "Тональные средства" };
-    if (name.includes("пудр") || name.includes("powder"))
-      return { id: 16302718, name: "Пудра" };
-    if (name.includes("румян") || name.includes("blush"))
-      return { id: 16302718, name: "Румяна" };
-    if (name.includes("тени") || name.includes("eyeshadow") || name.includes("shadow"))
-      return { id: 16302760, name: "Тени для век" };
-    if (name.includes("подводка") || name.includes("карандаш") || name.includes("eyeliner") || name.includes("pencil"))
-      return { id: 16302754, name: "Подводка для глаз" };
-    // Generic cosmetics fallback — use "Наборы декоративной косметики" which is a leaf
-    return { id: 16302780, name: "Наборы декоративной косметики" };
-  }
-  
-  if (cat === "perfume") {
-    if (name.includes("женск") || name.includes("woman") || name.includes("ayol"))
-      return { id: 90511, name: "Женская парфюмерия" };
-    if (name.includes("мужск") || name.includes("man") || name.includes("erkak"))
-      return { id: 90512, name: "Мужская парфюмерия" };
-    return { id: 90511, name: "Женская парфюмерия" }; // default
-  }
-
-  // For categories with id=0, try to resolve
-  const base = YANDEX_CATEGORIES[cat];
-  if (base && base.id > 0) return base;
-  
-  // Ultimate fallback
-  return { id: 91597, name: "Товары для красоты" };
-}
-
-// ============ IMAGE PROXY: Download external images → Upload to Supabase Storage ============
+// ============ IMAGE PROXY ============
 
 async function proxyImagesToStorage(
-  supabase: any,
-  userId: string,
-  imageUrls: string[],
-  supabaseUrl: string
+  supabase: any, userId: string, imageUrls: string[], supabaseUrl: string
 ): Promise<string[]> {
-  const proxiedUrls: string[] = [];
-
+  const proxied: string[] = [];
   for (const url of imageUrls) {
     if (!url || typeof url !== 'string') continue;
+    if (!url.startsWith('http')) continue;
 
-    // If already a Supabase storage URL from this project, keep it
+    // Already our storage URL
     if (url.includes(supabaseUrl) && url.includes('/storage/v1/object/public/')) {
-      console.log(`🖼️ Already Supabase URL, keeping: ${url.substring(0, 80)}`);
-      proxiedUrls.push(url);
+      proxied.push(url);
       continue;
     }
 
-    // Block obviously invalid URLs
-    if (!url.startsWith('http://') && !url.startsWith('https://')) continue;
-    if (url.includes('dropbox.com') || url.includes('drive.google.com')) {
-      console.warn(`⚠️ Skipping unsupported URL: ${url.substring(0, 60)}`);
-      continue;
-    }
+    // Block unsupported
+    if (url.includes('dropbox.com') || url.includes('drive.google.com')) continue;
 
     try {
-      // Download the image
-      console.log(`⬇️ Downloading: ${url.substring(0, 80)}...`);
       const resp = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; YandexMarketBot/1.0)',
-          'Accept': 'image/*',
-        },
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; MarketBot/1.0)', 'Accept': 'image/*' },
+      });
+      if (!resp.ok) { console.warn(`⚠️ Download failed (${resp.status}): ${url.substring(0, 60)}`); continue; }
+
+      const ct = resp.headers.get('content-type') || 'image/jpeg';
+      if (!ct.startsWith('image/')) continue;
+
+      const data = await resp.arrayBuffer();
+      if (data.byteLength < 1000) continue;
+
+      const extMap: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+      const ext = extMap[ct] || 'jpg';
+      const fileName = `${userId}/ym-${Date.now()}-${Math.random().toString(36).substring(2, 6)}.${ext}`;
+
+      const { error } = await supabase.storage.from('product-images').upload(fileName, data, {
+        contentType: ct, cacheControl: '31536000', upsert: false,
       });
 
-      if (!resp.ok) {
-        console.warn(`⚠️ Failed to download (${resp.status}): ${url.substring(0, 60)}`);
-        continue;
-      }
+      if (error) { console.error(`Upload err: ${error.message}`); proxied.push(url); continue; }
 
-      const contentType = resp.headers.get('content-type') || 'image/jpeg';
-      if (!contentType.startsWith('image/')) {
-        console.warn(`⚠️ Not an image (${contentType}): ${url.substring(0, 60)}`);
-        continue;
-      }
-
-      const imageData = await resp.arrayBuffer();
-      if (imageData.byteLength < 1000) {
-        console.warn(`⚠️ Image too small (${imageData.byteLength}b): ${url.substring(0, 60)}`);
-        continue;
-      }
-
-      // Determine extension from content-type
-      const extMap: Record<string, string> = {
-        'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/png': 'png',
-        'image/webp': 'webp', 'image/heic': 'heic', 'image/gif': 'gif',
-      };
-      const ext = extMap[contentType] || 'jpg';
-      const fileName = `${userId}/yandex-${Date.now()}-${Math.random().toString(36).substring(2, 6)}.${ext}`;
-
-      // Upload to Supabase storage
-      const { error: uploadError } = await supabase.storage
-        .from('product-images')
-        .upload(fileName, imageData, {
-          contentType,
-          cacheControl: '31536000', // 1 year cache
-          upsert: false,
-        });
-
-      if (uploadError) {
-        console.error(`❌ Upload failed: ${uploadError.message}`);
-        // Try with the original URL as fallback
-        proxiedUrls.push(url);
-        continue;
-      }
-
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('product-images')
-        .getPublicUrl(fileName);
-
-      const publicUrl = urlData?.publicUrl;
-      if (publicUrl) {
-        console.log(`✅ Proxied: ${url.substring(0, 50)} → ${publicUrl.substring(0, 80)}`);
-        proxiedUrls.push(publicUrl);
-      } else {
-        proxiedUrls.push(url); // fallback
+      const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(fileName);
+      if (urlData?.publicUrl) {
+        console.log(`✅ Proxied: ${url.substring(0, 40)} → storage`);
+        proxied.push(urlData.publicUrl);
       }
     } catch (e) {
-      console.error(`❌ Proxy error for ${url.substring(0, 60)}:`, e);
-      // Don't add broken URLs
+      console.error(`Proxy err: ${e}`);
     }
   }
-
-  return proxiedUrls;
+  return proxied;
 }
 
-// ============ MXIK LOOKUP (IMPROVED) ============
+// ============ MXIK LOOKUP ============
 
-async function lookupMXIK(supabase: any, name: string, category: string): Promise<{ code: string; name_uz: string }> {
-  // Category-based defaults that are VALID in Yandex IKPU catalog
-  const CATEGORY_IKPU: Record<string, { code: string; name_uz: string }> = {
-    phone: { code: "84713012001000000", name_uz: "Uyali telefonlar (smartfonlar)" },
-    laptop: { code: "84713049001000000", name_uz: "Portativ kompyuterlar" },
-    tablet: { code: "84713012002000000", name_uz: "Planshet kompyuterlar" },
-    headphones: { code: "85183000001000000", name_uz: "Quloqchinlar" },
-    speaker: { code: "85182900001000000", name_uz: "Karnaylar" },
-    smartwatch: { code: "91022900001000000", name_uz: "Aqlli soatlar" },
-    watch: { code: "91022900002000000", name_uz: "Qo'l soatlari" },
-    camera: { code: "85258019001000000", name_uz: "Foto va videokameralar" },
-    tv: { code: "85287200001000000", name_uz: "Televizorlar" },
-    clothing: { code: "62034990001000000", name_uz: "Kiyim-kechak" },
-    shoes: { code: "64039900001000000", name_uz: "Poyabzallar" },
-    bag: { code: "42029290001000000", name_uz: "Sumkalar" },
-    cosmetics: { code: "33049900001000000", name_uz: "Kosmetika vositalari" },
-    perfume: { code: "33030000001000000", name_uz: "Parfyumeriya" },
-    toys: { code: "95030000001000000", name_uz: "O'yinchoqlar" },
-    tools: { code: "82055900001000000", name_uz: "Asbob-uskunalar" },
-    massage: { code: "90191010001000000", name_uz: "Massaj apparatlari" },
-    default: { code: "85176200001000000", name_uz: "Boshqa elektron qurilmalar" },
-  };
-
-  // First try to find exact match in our DB
+async function lookupMXIK(supabase: any, name: string): Promise<{ code: string; name_uz: string }> {
   try {
     const keywords = name.toLowerCase().replace(/[^\w\s\u0400-\u04FF]/g, ' ').split(/\s+/).filter(w => w.length > 2).slice(0, 3);
     for (const kw of keywords) {
-      const { data } = await supabase
-        .from('mxik_codes')
-        .select('code, name_uz')
-        .or(`name_uz.ilike.%${kw}%,name_ru.ilike.%${kw}%`)
-        .eq('is_active', true)
-        .limit(1);
-      if (data?.length) {
-        console.log(`✅ MXIK found in DB: ${data[0].code} — ${data[0].name_uz}`);
-        return data[0];
-      }
+      const { data } = await supabase.from('mxik_codes').select('code, name_uz')
+        .or(`name_uz.ilike.%${kw}%,name_ru.ilike.%${kw}%`).eq('is_active', true).limit(1);
+      if (data?.length) return data[0];
     }
-  } catch (e) {
-    console.error('MXIK lookup failed:', e);
-  }
-
-  // Use category-specific valid IKPU code
-  const fallback = CATEGORY_IKPU[category] || CATEGORY_IKPU.default;
-  console.log(`📋 Using category IKPU: ${fallback.code} (${fallback.name_uz})`);
-  return fallback;
+  } catch (e) { console.error('MXIK lookup:', e); }
+  // Fallback — generic electronics
+  return { code: "85176200001000000", name_uz: "Boshqa elektron qurilmalar" };
 }
 
+// ============ YANDEX CREDENTIALS ============
+
 async function getYandexCredentials(supabase: any, userId: string) {
-  const { data: connection } = await supabase
-    .from("marketplace_connections").select("*")
-    .eq("user_id", userId).eq("marketplace", "yandex").eq("is_active", true)
-    .limit(1).single();
-  if (!connection) return null;
+  const { data: conn } = await supabase.from("marketplace_connections").select("*")
+    .eq("user_id", userId).eq("marketplace", "yandex").eq("is_active", true).limit(1).single();
+  if (!conn) return null;
 
   let apiKey = "", campaignId = "", businessId = "";
-  if (connection.encrypted_credentials) {
-    const { data, error } = await supabase.rpc("decrypt_credentials", { p_encrypted: connection.encrypted_credentials });
+  if (conn.encrypted_credentials) {
+    const { data, error } = await supabase.rpc("decrypt_credentials", { p_encrypted: conn.encrypted_credentials });
     if (!error && data) {
       const c = data as any;
       apiKey = c.apiKey || ""; campaignId = c.campaignId || c.sellerId || ""; businessId = c.businessId || "";
     }
   } else {
-    const c = connection.credentials as any;
+    const c = conn.credentials as any;
     apiKey = c?.apiKey || ""; campaignId = c?.campaignId || c?.sellerId || ""; businessId = c?.businessId || "";
   }
 
   if (apiKey && campaignId && !businessId) {
     try {
-      const resp = await fetch(`${YANDEX_API.replace('/v2', '')}/campaigns/${campaignId}`, {
-        headers: { "Api-Key": apiKey, "Content-Type": "application/json" },
+      const r = await fetch(`${YANDEX_API.replace('/v2', '')}/campaigns/${campaignId}`, {
+        headers: { "Api-Key": apiKey },
       });
-      if (resp.ok) {
-        const d = await resp.json();
-        businessId = d.campaign?.business?.id?.toString() || "";
-      }
-    } catch (e) { console.error("Failed to get businessId:", e); }
+      if (r.ok) { const d = await r.json(); businessId = d.campaign?.business?.id?.toString() || ""; }
+    } catch (e) {}
   }
 
   if (!apiKey || !businessId) return null;
-  return { apiKey, campaignId, businessId, shopId: connection.shop_id };
+  return { apiKey, campaignId, businessId, shopId: conn.shop_id };
 }
 
-// ============ FETCH CATEGORY PARAMETERS FROM YANDEX ============
+// ============ STEP 1: GET LEAF CATEGORY FROM YANDEX CATEGORY TREE ============
+
+async function findLeafCategory(
+  apiKey: string, productName: string, productDesc: string, lovableApiKey: string
+): Promise<{ id: number; name: string }> {
+  // 1. Fetch category tree from Yandex
+  console.log("📂 Fetching Yandex category tree...");
+  let tree: any = null;
+  try {
+    const resp = await fetch(`${YANDEX_API}/categories/tree`, {
+      method: "POST",
+      headers: { "Api-Key": apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({ language: "RU" }),
+    });
+    if (resp.ok) {
+      const data = await resp.json();
+      tree = data.result;
+    }
+  } catch (e) {
+    console.error("Category tree fetch error:", e);
+  }
+
+  if (!tree) {
+    console.warn("⚠️ Could not fetch category tree, using fallback");
+    return { id: 91491, name: "Смартфоны" }; // safe fallback
+  }
+
+  // 2. Flatten tree to get all leaf categories (no children)
+  const leaves: { id: number; name: string; path: string }[] = [];
+  function collectLeaves(node: any, path: string) {
+    const currentPath = path ? `${path} > ${node.name}` : node.name;
+    if (!node.children || node.children.length === 0) {
+      leaves.push({ id: node.id, name: node.name, path: currentPath });
+    } else {
+      for (const child of node.children) {
+        if (child) collectLeaves(child, currentPath);
+      }
+    }
+  }
+  collectLeaves(tree, "");
+  console.log(`📂 Found ${leaves.length} leaf categories`);
+
+  // 3. Pre-filter: search for relevant categories by keywords
+  const searchText = `${productName} ${productDesc || ""}`.toLowerCase();
+  const keywords = searchText.split(/\s+/).filter(w => w.length > 2);
+  
+  // Score each leaf category by keyword matches
+  const scored = leaves.map(leaf => {
+    const leafText = `${leaf.name} ${leaf.path}`.toLowerCase();
+    let score = 0;
+    for (const kw of keywords) {
+      if (leafText.includes(kw)) score += 2;
+    }
+    return { ...leaf, score };
+  }).filter(l => l.score > 0).sort((a, b) => b.score - a.score).slice(0, 30);
+
+  if (scored.length === 0) {
+    // If no keyword match, show top categories to AI
+    const sample = leaves.slice(0, 50);
+    scored.push(...sample.map(l => ({ ...l, score: 0 })));
+  }
+
+  console.log(`📂 Top candidates: ${scored.slice(0, 5).map(c => `${c.name}(${c.id})`).join(', ')}`);
+
+  // 4. Ask AI to select the best leaf category
+  if (lovableApiKey && scored.length > 0) {
+    const categoryList = scored.map(c => `ID:${c.id} — ${c.path}`).join("\n");
+    
+    const prompt = `Mahsulot nomi: "${productName}"
+Tavsif: "${productDesc || 'Yo\'q'}"
+
+Quyidagi Yandex Market kategoriyalaridan eng mos LEAF kategoriyani tanla.
+FAQAT bitta ID raqamini yoz, boshqa hech narsa yo'q.
+
+Kategoriyalar:
+${categoryList}
+
+Javob faqat raqam: `;
+
+    try {
+      const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${lovableApiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "google/gemini-3-flash-preview",
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0,
+          max_tokens: 50,
+        }),
+      });
+
+      if (resp.ok) {
+        const data = await resp.json();
+        const content = data.choices?.[0]?.message?.content?.trim() || "";
+        const idMatch = content.match(/\d+/);
+        if (idMatch) {
+          const selectedId = parseInt(idMatch[0]);
+          const found = scored.find(c => c.id === selectedId);
+          if (found) {
+            console.log(`✅ AI selected category: ${found.name} (${found.id}) — ${found.path}`);
+            return { id: found.id, name: found.name };
+          }
+        }
+      }
+    } catch (e) {
+      console.error("AI category selection error:", e);
+    }
+  }
+
+  // Fallback: use first scored result
+  if (scored.length > 0) {
+    return { id: scored[0].id, name: scored[0].name };
+  }
+  return { id: 91491, name: "Смартфоны" };
+}
+
+// ============ STEP 2: FETCH CATEGORY PARAMETERS ============
 
 async function fetchCategoryParameters(apiKey: string, categoryId: number): Promise<any[]> {
   try {
@@ -376,231 +295,162 @@ async function fetchCategoryParameters(apiKey: string, categoryId: number): Prom
       body: JSON.stringify({}),
     });
     if (!resp.ok) {
-      console.error(`Failed to fetch category params: ${resp.status}`);
+      console.error(`Params fetch failed: ${resp.status}`);
       return [];
     }
     const data = await resp.json();
-    const params = data.result?.parameters || [];
-    console.log(`📋 Category ${categoryId}: ${params.length} parameters available`);
-    return params;
+    return data.result?.parameters || [];
   } catch (e) {
-    console.error("Category params fetch error:", e);
+    console.error("Params fetch error:", e);
     return [];
   }
 }
 
-// ============ AI OPTIMIZATION WITH CATEGORY PARAMETERS ============
+// ============ STEP 3: AI FILLS ALL CONTENT + PARAMETERS ============
 
-async function optimizeWithAI(
+async function aiOptimize(
   product: ProductInput,
   categoryName: string,
   categoryParams: any[],
   lovableApiKey: string
 ): Promise<any> {
-  const requiredParams = categoryParams.filter((p: any) => p.required || p.constraintType === "REQUIRED");
-  const recommendedParams = categoryParams.filter((p: any) => !p.required && p.constraintType !== "REQUIRED");
+  // Filter out URL/PICKER type params — they require special URLs that AI can't generate
+  const safeParams = categoryParams.filter((p: any) => {
+    const type = (p.type || "").toUpperCase();
+    // Skip URL, PICKER, and similar types that require external URLs
+    if (type === "URL" || type === "PICKER") return false;
+    // Skip params with "url" in name (like color picker URLs)
+    if (p.name?.toLowerCase().includes("url")) return false;
+    return true;
+  });
+  
+  const required = safeParams.filter((p: any) => p.required || p.constraintType === "REQUIRED");
+  const recommended = safeParams.filter((p: any) => !p.required && p.constraintType !== "REQUIRED");
 
-  // Build COMPLETE parameter list — show ALL to AI
   const formatParam = (p: any) => {
-    let desc = `  - parameterId: ${p.id}, name: "${p.name}", type: ${p.type || "TEXT"}`;
-    if (p.unit) desc += `, unit: "${p.unit}"`;
+    let s = `  - id:${p.id}, "${p.name}", type:${p.type || "TEXT"}`;
+    if (p.unit) s += `, unit:"${p.unit}"`;
     if (p.values?.length) {
-      const vals = p.values.slice(0, 20).map((v: any) => `{valueId:${v.id}, value:"${v.value}"}`).join(", ");
-      desc += `\n    OPTIONS: [${vals}]`;
-      if (p.values.length > 20) desc += ` ... +${p.values.length - 20} more`;
+      const vals = p.values.slice(0, 20).map((v: any) => `{id:${v.id},"${v.value}"}`).join(", ");
+      s += `\n    OPTIONS:[${vals}]`;
+      if (p.values.length > 20) s += ` +${p.values.length - 20}`;
     }
-    return desc;
+    return s;
   };
 
-  const requiredList = requiredParams.map(formatParam).join("\n");
-  // Show MORE recommended params to AI (up to 80)
-  const recommendedList = recommendedParams.slice(0, 80).map(formatParam).join("\n");
-
-  const prompt = `Sen Yandex Market uchun PROFESSIONAL kartochka yaratuvchi AI san. 
-MAQSAD: Kartochka sifatini 95+ ballga olib chiqish. Har bir ball muhim!
+  const prompt = `VAZIFA: Yandex Market kartochkasi — BARCHA maydonlarni to'ldir! Sifat 95+ ball bo'lishi shart!
 
 MAHSULOT:
-- Nomi: ${product.name}
-- Tavsif: ${product.description || "Tavsif yo'q — MAHSULOT NOMIDAN TO'LIQ TAVSIF YOZ!"}
+- Nom: ${product.name}
+- Tavsif: ${product.description || "YO'Q — O'ZING YOZ!"}
 - Kategoriya: ${categoryName}
-- Brend: ${product.brand || "Mahsulot nomidan aniqla"}
-- Rang: ${product.color || "Mahsulot nomidan aniqla yoki 'черный' deb yoz"}
-- Model: ${product.model || "Mahsulot nomidan aniqla"}
+- Brend: ${product.brand || "Nomdan aniqla"}
+- Rang: ${product.color || "Nomdan aniqla"}
+- Model: ${product.model || "Nomdan aniqla"}
 - Narx: ${product.price} UZS
 
-════════════════════════════════════════════════════════
-*** MAJBURIY PARAMETRLAR — HAR BIRINI TO'LDIR! ***
-${requiredList || "Yo'q"}
+═══ MAJBURIY PARAMETRLAR (BARCHASINI TO'LDIR!) ═══
+${required.map(formatParam).join("\n") || "Yo'q"}
 
-*** TAVSIYA ETILGAN — IMKON QADAR BARCHASINI TO'LDIR! ***
-${recommendedList || "Yo'q"}
-════════════════════════════════════════════════════════
-
-BALLAR TIZIMI (YANDEX):
-- Asosiy xususiyatlar: 12 ball → BARCHA requiredlarni to'ldir
-- Filtrlar uchun qo'shimcha: 8 ball → Kamida 15 ta recommended to'ldir
-- Tovar haqida batafsil: 4 ball → Jami 20+ parametr to'ldir
-- Rasmlar: 43 ball → Biz hal qilamiz
-- Nom: 10 ball → 60-150 belgi SEO nom
-- Tavsif: 20 ball → 800+ belgi professional tavsif
+═══ TAVSIYA ETILGAN (IMKON QADAR BARCHASINI!) ═══
+${recommended.slice(0, 80).map(formatParam).join("\n") || "Yo'q"}
 
 QOIDALAR:
-1. name_ru: "[Tovar turi] [Brend] [Model] [Xususiyatlar], [rang]" formatida.
-   MINIMUM 80 belgi. MAKSIMUM 150 belgi. 
-   Misol: "Смартфон Samsung Galaxy A55 5G 128 ГБ, экран Super AMOLED 6.6 дюйм, камера 50 Мп, аккумулятор 5000 мАч, цвет синий"
-
-2. name_uz: O'zbekcha LOTIN alifbosida, xuddi shunday batafsil, 80-150 belgi.
-   
-3. description_ru: *** JUDA MUHIM — 800+ belgi! ***
-   Professional ruscha tavsif. Tarkib:
-   - 1-paragraf: Umumiy tavsif (3-4 gap)
-   - 2-paragraf: Ekran va dizayn
-   - 3-paragraf: Protsessor va xotira
-   - 4-paragraf: Kamera tizimi
-   - 5-paragraf: Batareya va quvvatlash
-   - 6-paragraf: Qo'shimcha imkoniyatlar
-   *** HTML TEGLARISIZ! Faqat oddiy matn! ***
-
-4. description_uz: O'zbekcha (LOTIN) batafsil tavsif, 600-2000 belgi. HTML TEGLARISIZ!
-
+1. name_ru: Ruscha SEO-nom, 80-150 belgi. Format: "[Tur] [Brend] [Model] [Xususiyatlar], [rang]"
+2. name_uz: O'zbekcha LOTIN, 80-150 belgi, xuddi shunday batafsil
+3. description_ru: 800-3000 belgi ruscha professional tavsif. HTML TEGLARISIZ! 6+ paragraf.
+4. description_uz: 600-2000 belgi o'zbekcha LOTIN tavsif. HTML TEGLARISIZ!
 5. vendor: Aniq brend nomi
-6. vendorCode: Aniq model artikuli (masalan "SM-A556E")
-7. manufacturerCountry: Ishlab chiqarilgan mamlakat ruscha
-
-8. parameterValues: *** ENG MUHIM! BALL SHUNGA BOG'LIQ! ***
-   - Agar OPTIONS ro'yxati bo'lsa → valueId ishlatilsin (FAQAT ro'yxatdagi qiymatlardan!)
-   - Agar TEXT/STRING turi bo'lsa → value ishlatilsin
-   - Agar NUMBER turi bo'lsa → value RAQAM sifatida berilsin
-   
-   *** BARCHA MAJBURIY PARAMETRLARNI TO'LDIR — BU 12 BALL! ***
-   *** TAVSIYA ETILGANLARDAN KAMIDA 25 TASINI TO'LDIR — BU 12 BALL! ***
-   *** JAMI KAMIDA 30 TA PARAMETR BO'LISHI SHART ***
-   
-   Agar qiymatni bilmasang — TAXMINIY YOKI STANDART QIYMAT YOZ!
-   Bo'sh qoldirma! Har bir parametr = ball!
-
+6. vendorCode: Model artikuli
+7. manufacturerCountry: Ishlab chiqarilgan mamlakat (ruscha)
+8. parameterValues: 
+   - OPTIONS bo'lsa → valueId ishlatilsin
+   - TEXT bo'lsa → value ishlatilsin  
+   - NUMBER bo'lsa → value raqam sifatida
+   *** BARCHA MAJBURIYLARNI + KAMIDA 25 ta TAVSIYA ETILGANLARNI TO'LDIR ***
+   *** BILMASANG HAM — TAXMINIY/STANDART QIYMAT YOZ! ***
 9. warranty: "1 год" yoki "2 года"
 
-JAVOB FAQAT JSON formatida, boshqa hech narsa yo'q:
-{
-  "name_ru": "...",
-  "name_uz": "...",
-  "description_ru": "...",
-  "description_uz": "...",
-  "vendor": "...",
-  "vendorCode": "...",
-  "manufacturerCountry": "...",
-  "parameterValues": [
-    {"parameterId": 123, "valueId": 456},
-    {"parameterId": 789, "value": "qiymat"}
-  ],
-  "warranty": "1 год",
-  "adult": false
-}`;
+JAVOB FAQAT JSON:
+{"name_ru":"...","name_uz":"...","description_ru":"...","description_uz":"...","vendor":"...","vendorCode":"...","manufacturerCountry":"...","parameterValues":[{"parameterId":123,"valueId":456},{"parameterId":789,"value":"text"}],"warranty":"1 год","adult":false}`;
 
   try {
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${lovableApiKey}`,
-        "Content-Type": "application/json",
-      },
+      headers: { Authorization: `Bearer ${lovableApiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.1, // Lower temperature for more reliable structured output
-        max_tokens: 6000, // More tokens for more parameters
+        temperature: 0.1,
+        max_tokens: 6000,
       }),
     });
 
-    if (!resp.ok) {
-      console.error("AI optimization failed:", resp.status);
-      return null;
-    }
+    if (!resp.ok) { console.error("AI failed:", resp.status); return null; }
 
     const data = await resp.json();
     const content = data.choices?.[0]?.message?.content || "";
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const result = JSON.parse(jsonMatch[0]);
-      console.log(`🤖 AI: name_ru=${result.name_ru?.length}ch, name_uz=${result.name_uz?.length}ch, desc_ru=${result.description_ru?.length}ch, params=${result.parameterValues?.length}`);
+      console.log(`🤖 AI: name_ru=${result.name_ru?.length}ch, desc=${result.description_ru?.length}ch, params=${result.parameterValues?.length}`);
       return result;
     }
-  } catch (e) {
-    console.error("AI optimization error:", e);
-  }
+  } catch (e) { console.error("AI error:", e); }
   return null;
 }
 
-// ============ BUILD YANDEX OFFER ============
+// ============ BUILD OFFER ============
 
-function buildYandexOffer(
-  product: ProductInput,
-  ai: any,
-  sku: string,
-  barcode: string,
+function buildOffer(
+  product: ProductInput, ai: any, sku: string, barcode: string,
   category: { id: number; name: string },
-  dims: { length: number; width: number; height: number; weight: number },
   mxik: { code: string; name_uz: string },
-  price: number,
-  proxiedImages: string[]
+  price: number, images: string[]
 ): any {
   const name = stripHtml(ai?.name_ru || product.name);
-  const description = stripHtml(ai?.description_ru || product.description || product.name);
-
-  // Ensure name is 60-150 chars
-  let finalName = name;
-  if (finalName.length < 60) {
-    // Pad with category info
-    finalName = `${finalName}, ${category.name}`;
-  }
+  let finalName = name.length >= 80 ? name : `${name}, ${category.name}`;
   finalName = finalName.substring(0, 150);
+
+  const desc = stripHtml(ai?.description_ru || product.description || product.name);
 
   const offer: any = {
     offerId: sku,
     name: finalName,
-    // Don't set marketCategoryId — let Yandex auto-detect the correct leaf category
-    // Setting a wrong/non-leaf category causes INVALID_CATEGORY or UNKNOWN_CATEGORY errors
+    marketCategoryId: category.id,
     vendor: ai?.vendor || product.brand || "OEM",
-    description: description.substring(0, 6000),
+    description: desc.substring(0, 6000),
     barcodes: [barcode],
     vendorCode: ai?.vendorCode || sku,
     manufacturerCountries: [ai?.manufacturerCountry || "Китай"],
     weightDimensions: {
-      length: product.dimensions?.length || dims.length,
-      width: product.dimensions?.width || dims.width,
-      height: product.dimensions?.height || dims.height,
-      weight: product.weight || dims.weight,
+      length: product.dimensions?.length || 20,
+      width: product.dimensions?.width || 15,
+      height: product.dimensions?.height || 10,
+      weight: product.weight || 0.3,
     },
-    basicPrice: {
-      value: price,
-      currencyId: "UZS",
-    },
+    basicPrice: { value: price, currencyId: "UZS" },
     type: "DEFAULT",
     adult: ai?.adult || false,
   };
 
-  // Add IKPU — only if code is valid (17 digits)
-  if (mxik.code && mxik.code.length === 17 && /^\d+$/.test(mxik.code)) {
+  // IKPU
+  if (mxik.code?.length === 17 && /^\d+$/.test(mxik.code)) {
     offer.commodityCodes = [{ code: mxik.code, type: "IKPU_CODE" }];
-    console.log(`✅ IKPU code: ${mxik.code}`);
-  } else {
-    console.warn(`⚠️ Invalid IKPU code skipped: ${mxik.code}`);
   }
 
-  // Add PROXIED images — these are guaranteed accessible
-  if (proxiedImages.length > 0) {
-    offer.pictures = proxiedImages.slice(0, 10);
-    console.log(`✅ ${offer.pictures.length} proxied images added`);
-    offer.pictures.forEach((u: string, i: number) => console.log(`  🖼️ [${i}] ${u.substring(0, 100)}`));
-  } else {
-    console.warn('⚠️ NO images! This will cost ~35 quality points.');
+  // Images
+  if (images.length > 0) {
+    offer.pictures = images.slice(0, 10);
+    console.log(`🖼️ ${offer.pictures.length} images added`);
   }
 
-  // parameterValues — fill ALL params from AI
+  // Parameters — filter out picker/URL params that cause INVALID_PICKER_URL
+  const BLOCKED_PARAM_IDS = [40164890]; // Known picker URL params
   if (ai?.parameterValues?.length) {
     offer.parameterValues = ai.parameterValues
       .filter((p: any) => p.parameterId && (p.value !== undefined || p.valueId !== undefined))
+      .filter((p: any) => !BLOCKED_PARAM_IDS.includes(Number(p.parameterId)))
       .map((p: any) => {
         const pv: any = { parameterId: Number(p.parameterId) };
         if (p.valueId !== undefined) pv.valueId = Number(p.valueId);
@@ -608,379 +458,204 @@ function buildYandexOffer(
         if (p.unitId) pv.unitId = String(p.unitId);
         return pv;
       });
-    console.log(`📊 Parameters: ${offer.parameterValues.length}`);
+    console.log(`📊 ${offer.parameterValues.length} params (filtered)`);
   }
 
   // Warranty
   if (ai?.warranty) {
-    const match = ai.warranty.match(/(\d+)\s*(yil|year|год|года|лет|месяц|month|oy)/i);
-    if (match) {
-      const period = parseInt(match[1]);
-      const isYear = /yil|year|год|года|лет/i.test(match[2]);
-      offer.guaranteePeriod = {
-        timePeriod: isYear ? period * 12 : period,
-        timeUnit: "MONTH",
-      };
+    const m = ai.warranty.match(/(\d+)\s*(год|года|лет|year|месяц|month)/i);
+    if (m) {
+      const n = parseInt(m[1]);
+      const isYear = /год|года|лет|year/i.test(m[2]);
+      offer.guaranteePeriod = { timePeriod: isYear ? n * 12 : n, timeUnit: "MONTH" };
     }
-  }
-
-  // Clean undefined/null
-  for (const key of Object.keys(offer)) {
-    if (offer[key] === undefined || offer[key] === null) delete offer[key];
   }
 
   return offer;
 }
 
-// ============ SEND O'ZBEK LANGUAGE CONTENT ============
+// ============ SEND UZBEK CONTENT ============
 
-async function sendUzbekContent(
-  apiKey: string,
-  businessId: string,
-  offerId: string,
-  nameUz: string,
-  descriptionUz: string
-): Promise<boolean> {
-  if (!nameUz && !descriptionUz) return false;
-  
+async function sendUzbekContent(apiKey: string, businessId: string, offerId: string, nameUz: string, descUz: string): Promise<boolean> {
+  if (!nameUz && !descUz) return false;
   try {
     const offer: any = { offerId };
     if (nameUz) offer.name = stripHtml(nameUz).substring(0, 150);
-    if (descriptionUz) offer.description = stripHtml(descriptionUz).substring(0, 6000);
+    if (descUz) offer.description = stripHtml(descUz).substring(0, 6000);
 
-    const resp = await fetch(
-      `${YANDEX_API}/businesses/${businessId}/offer-mappings/update?language=UZ`,
-      {
-        method: "POST",
-        headers: { "Api-Key": apiKey, "Content-Type": "application/json" },
-        body: JSON.stringify({ offerMappings: [{ offer }] }),
-      }
-    );
-    
-    if (resp.ok) {
-      console.log(`✅ O'zbek content sent for ${offerId}`);
-      return true;
-    } else {
-      const text = await resp.text();
-      console.error(`❌ O'zbek content failed: ${resp.status}`, text);
-      return false;
-    }
-  } catch (e) {
-    console.error("O'zbek content error:", e);
-    return false;
-  }
+    const resp = await fetch(`${YANDEX_API}/businesses/${businessId}/offer-mappings/update?language=UZ`, {
+      method: "POST",
+      headers: { "Api-Key": apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({ offerMappings: [{ offer }] }),
+    });
+    if (resp.ok) { console.log(`✅ UZ content sent`); return true; }
+    else { console.error(`❌ UZ failed: ${resp.status}`); return false; }
+  } catch (e) { console.error("UZ error:", e); return false; }
 }
 
 // ============ MAIN HANDLER ============
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+    if (!authHeader?.startsWith("Bearer "))
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY") || "";
+    const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const LOVABLE_KEY = Deno.env.get("LOVABLE_API_KEY") || "";
 
-    const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: authHeader } }
-    });
-    const { data: { user }, error: authError } = await authClient.auth.getUser();
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Invalid authentication" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+    const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { global: { headers: { Authorization: authHeader } } });
+    const { data: { user }, error: authErr } = await authClient.auth.getUser();
+    if (authErr || !user)
+      return new Response(JSON.stringify({ error: "Auth failed" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-
+    const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
     const creds = await getYandexCredentials(supabase, user.id);
-    if (!creds) {
-      return new Response(JSON.stringify({ error: "Yandex Market ulanmagan. Avval marketplace'ni ulang." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+    if (!creds)
+      return new Response(JSON.stringify({ error: "Yandex Market ulanmagan" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     const body: CreateCardRequest = await req.json();
-    const productsList = body.products || [body.product];
-    if (!productsList.length || !productsList[0]) {
-      return new Response(JSON.stringify({ error: "Product data required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+    const products = body.products || [body.product];
+    if (!products.length || !products[0])
+      return new Response(JSON.stringify({ error: "Product required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     let shopId = creds.shopId || body.shopId;
     if (!shopId || shopId === "sellercloud") {
-      const { data: userShop } = await supabase.from("shops").select("id").eq("owner_id", user.id).limit(1).single();
-      shopId = userShop?.id || null;
+      const { data: s } = await supabase.from("shops").select("id").eq("owner_id", user.id).limit(1).single();
+      shopId = s?.id || null;
     }
 
-    console.log(`🚀 Creating ${productsList.length} Yandex card(s) for user ${user.id}`);
-
+    console.log(`🚀 Creating ${products.length} card(s) for ${user.id}`);
     const results: any[] = [];
 
-    for (const product of productsList) {
+    for (const product of products) {
       try {
         const pricing = body.pricing || {
           costPrice: product.costPrice || Math.round(product.price * 0.6),
           recommendedPrice: product.price,
           marketplaceCommission: Math.round(product.price * 0.15),
-          logisticsCost: 3000,
-          taxRate: 4,
+          logisticsCost: 3000, taxRate: 4,
           targetProfit: Math.round(product.price * 0.2),
           netProfit: Math.round(product.price * 0.2),
         };
 
-        // 1. Detect category → resolve to LEAF category
-        const cat = detectCategory(product.name, product.description);
-        const yandexCat = resolveLeafCategory(cat, product.name);
-
-        // 2. Generate identifiers
         const sku = generateSKU(product.name);
         const barcode = product.barcode || generateEAN13();
 
-        // 3. MXIK lookup (improved with category)
+        // ═══ STEP 1: Proxy images ═══
+        const rawImgs: string[] = [];
+        if (product.images?.length) rawImgs.push(...product.images);
+        if (product.image && !rawImgs.includes(product.image)) rawImgs.unshift(product.image);
+        const images = await proxyImagesToStorage(supabase, user.id, rawImgs, SUPABASE_URL);
+        console.log(`🖼️ ${images.length}/${rawImgs.length} images proxied`);
+
+        // ═══ STEP 2: Find LEAF category from Yandex tree ═══
+        const leafCat = await findLeafCategory(creds.apiKey, product.name, product.description || "", LOVABLE_KEY);
+        console.log(`📂 Category: ${leafCat.name} (${leafCat.id})`);
+
+        // ═══ STEP 3: Fetch category parameters ═══
+        const params = await fetchCategoryParameters(creds.apiKey, leafCat.id);
+        console.log(`📋 ${params.length} params for category ${leafCat.id}`);
+
+        // ═══ STEP 4: AI optimization ═══
+        let ai: any = null;
+        if (LOVABLE_KEY) {
+          ai = await aiOptimize(product, leafCat.name, params, LOVABLE_KEY);
+        }
+
+        // ═══ STEP 5: MXIK lookup ═══
         const mxik = (product.mxikCode && product.mxikName)
           ? { code: product.mxikCode, name_uz: product.mxikName }
-          : await lookupMXIK(supabase, product.name, cat);
+          : await lookupMXIK(supabase, product.name);
 
-        // 4. *** PROXY ALL IMAGES THROUGH SUPABASE STORAGE ***
-        const rawImages: string[] = [];
-        if (product.images?.length) rawImages.push(...product.images);
-        if (product.image && !rawImages.includes(product.image)) rawImages.unshift(product.image);
-        
-        console.log(`🖼️ Raw images: ${rawImages.length}`);
-        const proxiedImages = await proxyImagesToStorage(supabase, user.id, rawImages, SUPABASE_URL);
-        console.log(`🖼️ Proxied images: ${proxiedImages.length}`);
+        // ═══ STEP 6: Build & send offer ═══
+        const offer = buildOffer(product, ai, sku, barcode, leafCat, mxik, pricing.recommendedPrice, images);
 
-        // 5. STEP 1: Create basic card first (no params, let Yandex auto-detect category)
-        const dims = estimateDimensions(cat);
-        
-        // AI for name/description only (no params yet)
-        let aiData: any = null;
-        if (LOVABLE_API_KEY) {
-          // First AI call — just name + description, no category params yet
-          aiData = await optimizeWithAI(product, yandexCat.name, [], LOVABLE_API_KEY);
-        }
-        
-        const offer = buildYandexOffer(
-          product, aiData, sku, barcode, yandexCat, dims, mxik,
-          pricing.recommendedPrice, proxiedImages
-        );
+        console.log(`📤 Sending: ${offer.name?.substring(0, 60)} | cat:${leafCat.id} | params:${offer.parameterValues?.length || 0} | imgs:${offer.pictures?.length || 0}`);
 
-        console.log(`📤 STEP 1: Creating base card "${offer.name?.substring(0, 60)}" — ${offer.pictures?.length || 0} images`);
-        
-        const yandexResp = await fetch(
-          `${YANDEX_API}/businesses/${creds.businessId}/offer-mappings/update`,
-          {
-            method: "POST",
-            headers: { "Api-Key": creds.apiKey, "Content-Type": "application/json" },
-            body: JSON.stringify({ offerMappings: [{ offer }] }),
-          }
-        );
+        const yResp = await fetch(`${YANDEX_API}/businesses/${creds.businessId}/offer-mappings/update`, {
+          method: "POST",
+          headers: { "Api-Key": creds.apiKey, "Content-Type": "application/json" },
+          body: JSON.stringify({ offerMappings: [{ offer }] }),
+        });
 
-        const respText = await yandexResp.text();
-        let yandexResult: any;
-        try { yandexResult = JSON.parse(respText); } catch { yandexResult = { raw: respText }; }
+        const respText = await yResp.text();
+        let yResult: any;
+        try { yResult = JSON.parse(respText); } catch { yResult = { raw: respText }; }
 
-        if (!yandexResp.ok) {
-          console.error(`❌ Yandex API error (${yandexResp.status}):`, respText.substring(0, 500));
-        }
+        if (!yResp.ok) console.error(`❌ Yandex error (${yResp.status}):`, respText.substring(0, 300));
 
-        // 6. STEP 2: Get assigned category → fetch params → AI fills → update card
-        let paramsCount = 0;
-        if (yandexResp.ok) {
-          await new Promise(r => setTimeout(r, 1500)); // Wait for Yandex to process
-
-          // Query the card to get assigned category
-          console.log(`📋 STEP 2: Fetching assigned category for ${sku}...`);
-          let assignedCategoryId = 0;
-          try {
-            const queryResp = await fetch(
-              `${YANDEX_API}/businesses/${creds.businessId}/offer-mappings?offerIds=${encodeURIComponent(sku)}`,
-              {
-                method: "POST",
-                headers: { "Api-Key": creds.apiKey, "Content-Type": "application/json" },
-                body: JSON.stringify({ offerIds: [sku] }),
-              }
-            );
-            if (queryResp.ok) {
-              const queryData = await queryResp.json();
-              const mapping = queryData.result?.offerMappings?.[0];
-              assignedCategoryId = mapping?.mapping?.marketCategoryId 
-                || mapping?.awaitingModerationMapping?.marketCategoryId 
-                || mapping?.offer?.marketCategoryId || 0;
-              console.log(`📋 Assigned category: ${assignedCategoryId}`);
-            }
-          } catch (e) {
-            console.error("Category query failed:", e);
-          }
-
-          // If we got a category, fetch its params and update the card
-          if (assignedCategoryId > 0) {
-            const categoryParams = await fetchCategoryParameters(creds.apiKey, assignedCategoryId);
-            console.log(`📋 Got ${categoryParams.length} params for category ${assignedCategoryId}`);
-
-            if (categoryParams.length > 0 && LOVABLE_API_KEY) {
-              // Second AI call — now WITH real category params
-              const aiWithParams = await optimizeWithAI(product, yandexCat.name, categoryParams, LOVABLE_API_KEY);
-              
-              if (aiWithParams?.parameterValues?.length) {
-                // Update the card with params
-                const updateOffer: any = {
-                  offerId: sku,
-                  marketCategoryId: assignedCategoryId,
-                };
-
-                updateOffer.parameterValues = aiWithParams.parameterValues
-                  .filter((p: any) => p.parameterId && (p.value !== undefined || p.valueId !== undefined))
-                  .map((p: any) => {
-                    const pv: any = { parameterId: Number(p.parameterId) };
-                    if (p.valueId !== undefined) pv.valueId = Number(p.valueId);
-                    else if (p.value !== undefined) pv.value = String(p.value);
-                    if (p.unitId) pv.unitId = String(p.unitId);
-                    return pv;
-                  });
-
-                paramsCount = updateOffer.parameterValues.length;
-                console.log(`📤 STEP 2: Updating with ${paramsCount} params...`);
-
-                const updateResp = await fetch(
-                  `${YANDEX_API}/businesses/${creds.businessId}/offer-mappings/update`,
-                  {
-                    method: "POST",
-                    headers: { "Api-Key": creds.apiKey, "Content-Type": "application/json" },
-                    body: JSON.stringify({ offerMappings: [{ offer: updateOffer }] }),
-                  }
-                );
-                
-                if (updateResp.ok) {
-                  console.log(`✅ STEP 2: Card updated with ${paramsCount} params`);
-                  // Merge AI data
-                  if (aiWithParams.name_uz) aiData = { ...aiData, ...aiWithParams };
-                } else {
-                  const errText = await updateResp.text();
-                  console.error(`❌ Param update failed: ${errText.substring(0, 300)}`);
-                }
-              }
-            }
-          }
-        }
-
-        // 7. Send O'zbek language content
+        // ═══ STEP 7: Uzbek content ═══
         let uzSent = false;
-        if (yandexResp.ok && aiData?.name_uz) {
+        if (yResp.ok && ai?.name_uz) {
           await new Promise(r => setTimeout(r, 300));
-          uzSent = await sendUzbekContent(
-            creds.apiKey, creds.businessId, sku,
-            aiData.name_uz, aiData.description_uz
-          );
+          uzSent = await sendUzbekContent(creds.apiKey, creds.businessId, sku, ai.name_uz, ai.description_uz);
         }
 
-        // 11. Save to local DB
-        let savedProduct = null;
+        // ═══ STEP 8: Save locally ═══
+        let saved = null;
         if (shopId) {
-          const { data, error: saveErr } = await supabase
-            .from("products")
-            .insert({
-              shop_id: shopId,
-              name: product.name,
-              description: stripHtml(aiData?.description_uz || aiData?.description_ru || product.description || ""),
-              price: pricing.recommendedPrice,
-              original_price: pricing.costPrice,
-              source: "ai" as any,
-              source_url: product.sourceUrl,
-              images: proxiedImages.length > 0 ? proxiedImages : (product.images || []),
-              status: "draft" as any,
-              mxik_code: mxik.code,
-              mxik_name: mxik.name_uz,
-              specifications: {
-                yandex_offer_id: sku,
-                yandex_business_id: creds.businessId,
-                yandex_category_id: yandexCat.id,
-                yandex_category_name: yandexCat.name,
-                yandex_status: yandexResp.ok ? "success" : "error",
-                barcode,
-                vendor: offer.vendor,
-                dimensions: offer.weightDimensions,
-                name_uz: aiData?.name_uz,
-                name_ru: aiData?.name_ru,
-                description_uz: aiData?.description_uz,
-                params_count: paramsCount || offer.parameterValues?.length || 0,
-                images_proxied: proxiedImages.length,
-                uz_content_sent: uzSent,
-              },
-            })
-            .select()
-            .single();
-
-          if (!saveErr) savedProduct = data;
-          else console.error("Local save error:", saveErr);
+          const { data, error } = await supabase.from("products").insert({
+            shop_id: shopId, name: product.name,
+            description: stripHtml(ai?.description_uz || ai?.description_ru || product.description || ""),
+            price: pricing.recommendedPrice, original_price: pricing.costPrice,
+            source: "ai" as any, source_url: product.sourceUrl,
+            images: images.length > 0 ? images : (product.images || []),
+            status: "draft" as any, mxik_code: mxik.code, mxik_name: mxik.name_uz,
+            specifications: {
+              yandex_offer_id: sku, yandex_business_id: creds.businessId,
+              yandex_category_id: leafCat.id, yandex_category_name: leafCat.name,
+              yandex_status: yResp.ok ? "success" : "error",
+              barcode, vendor: offer.vendor, name_uz: ai?.name_uz, name_ru: ai?.name_ru,
+              params_count: offer.parameterValues?.length || 0,
+              images_count: images.length, uz_content_sent: uzSent,
+            },
+          }).select().single();
+          if (!error) saved = data;
         }
 
-        const cardUrl = yandexResp.ok
-          ? `https://partner.market.yandex.ru/business/${creds.businessId}/assortment/offer/${encodeURIComponent(sku)}`
-          : `https://partner.market.yandex.ru/business/${creds.businessId}/assortment`;
-
         results.push({
-          success: yandexResp.ok,
-          offerId: sku,
-          barcode,
+          success: yResp.ok,
+          offerId: sku, barcode,
           name: offer.name,
-          nameUz: aiData?.name_uz,
-          cardUrl,
-          paramsCount: paramsCount || offer.parameterValues?.length || 0,
+          nameUz: ai?.name_uz,
+          cardUrl: `https://partner.market.yandex.ru/business/${creds.businessId}/assortment/offer/${encodeURIComponent(sku)}`,
+          categoryId: leafCat.id,
+          categoryName: leafCat.name,
+          paramsCount: offer.parameterValues?.length || 0,
           imagesCount: offer.pictures?.length || 0,
-          imagesProxied: proxiedImages.length,
           mxikCode: mxik.code,
-          mxikName: mxik.name_uz,
           uzContentSent: uzSent,
-          category: yandexCat.name,
-          yandexResponse: yandexResult,
-          localProductId: savedProduct?.id,
-          error: yandexResp.ok ? null : (yandexResult?.errors?.[0]?.message || yandexResult?.message || `HTTP ${yandexResp.status}`),
+          yandexResponse: yResult,
+          localProductId: saved?.id,
+          error: yResp.ok ? null : (yResult?.errors?.[0]?.message || `HTTP ${yResp.status}`),
         });
 
-        console.log(`${yandexResp.ok ? "✅" : "❌"} ${product.name}: params=${paramsCount}, imgs=${offer.pictures?.length || 0}, uz=${uzSent}`);
+        console.log(`${yResp.ok ? "✅" : "❌"} Done: params=${offer.parameterValues?.length || 0}, imgs=${images.length}`);
 
-        if (productsList.length > 1) {
-          await new Promise(r => setTimeout(r, 500));
-        }
-
+        if (products.length > 1) await new Promise(r => setTimeout(r, 500));
       } catch (err: any) {
-        console.error(`❌ Error processing "${product.name}":`, err);
-        results.push({
-          success: false,
-          name: product.name,
-          error: err.message || "Unknown error",
-        });
+        console.error(`❌ Error:`, err);
+        results.push({ success: false, name: product.name, error: err.message });
       }
     }
 
-    const successCount = results.filter(r => r.success).length;
-    const failedCount = results.filter(r => !r.success).length;
-
-    return new Response(
-      JSON.stringify({
-        success: failedCount === 0,
-        total: results.length,
-        successCount,
-        failedCount,
-        results,
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({
+      success: results.every(r => r.success),
+      total: results.length,
+      successCount: results.filter(r => r.success).length,
+      failedCount: results.filter(r => !r.success).length,
+      results,
+    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (error) {
-    console.error("❌ Card creation error:", error);
-    return new Response(
-      JSON.stringify({ success: false, error: error instanceof Error ? error.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    console.error("❌ Fatal:", error);
+    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Error" }), {
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
