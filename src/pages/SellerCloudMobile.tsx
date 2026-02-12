@@ -141,7 +141,8 @@ export default function SellerCloudMobile() {
               isLoading={connectionsLoading} 
               connectMarketplace={connectMarketplace} 
               syncMarketplace={syncMarketplace} 
-              onConnect={handleMarketplaceConnect} 
+              onConnect={handleMarketplaceConnect}
+              store={store}
             />
           </div>
         );

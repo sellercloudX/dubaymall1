@@ -133,6 +133,11 @@ export function useMarketplaceDataStore(connectedMarketplaces: string[]) {
   const isLoadingOrders = orderQueries.some(q => q.isLoading);
   const isLoading = isLoadingProducts || isLoadingOrders;
   const isFetching = productQueries.some(q => q.isFetching) || orderQueries.some(q => q.isFetching);
+  const hasError = productQueries.some(q => q.isError) || orderQueries.some(q => q.isError);
+  const errors = [
+    ...productQueries.filter(q => q.error).map(q => ({ marketplace: q.data?.marketplace || 'unknown', error: q.error })),
+    ...orderQueries.filter(q => q.error).map(q => ({ marketplace: q.data?.marketplace || 'unknown', error: q.error })),
+  ];
 
   // Stable data version counter for memo dependencies
   const dataVersion = productQueries.reduce((v, q) => v + (q.dataUpdatedAt || 0), 0)
@@ -201,6 +206,8 @@ export function useMarketplaceDataStore(connectedMarketplaces: string[]) {
     isLoadingProducts,
     isLoadingOrders,
     isFetching,
+    hasError,
+    errors,
 
     // Refresh functions
     refetchProducts,
