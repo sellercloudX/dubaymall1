@@ -418,59 +418,13 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
         }
       }
 
-      // Step 2: SEO content
-      updateTaskProgress(1, 'running');
-      let seoContent = null;
-      try {
-        const { data: seoData, error: seoError } = await supabase.functions.invoke('generate-product-content', {
-          body: {
-            productName: normalizedProductName,
-            productDescription: product.description || analyzed?.description,
-            category: analyzed?.category,
-            brand: analyzed?.brand,
-            specifications: analyzed?.specifications,
-            targetMarketplace: 'yandex',
-            contentType: 'seo',
-            languages: ['uz', 'ru']
-          },
-        });
-        if (!seoError && seoData) {
-          seoContent = seoData;
-          updateTaskProgress(1, 'completed');
-        } else {
-          updateTaskProgress(1, 'failed');
-        }
-      } catch {
-        updateTaskProgress(1, 'failed');
-      }
+      // Step 2-3: Skip redundant SEO/description generation
+      // Card creator (yandex-market-create-card) handles AI optimization with category params context
+      // which produces much better results than separate calls
+      updateTaskProgress(1, 'completed'); // SEO — card creator will handle
+      updateTaskProgress(2, 'completed'); // Description — card creator will handle
 
-      // Step 3: Description generation
-      updateTaskProgress(2, 'running');
-      let descriptions = null;
-      try {
-        const { data: descData, error: descError } = await supabase.functions.invoke('generate-product-content', {
-          body: {
-            productName: normalizedProductName,
-            productDescription: product.description || analyzed?.description,
-            category: analyzed?.category,
-            brand: analyzed?.brand,
-            specifications: analyzed?.specifications,
-            targetMarketplace: 'yandex',
-            contentType: 'description',
-            languages: ['uz', 'ru']
-          },
-        });
-        if (!descError && descData) {
-          descriptions = descData;
-          updateTaskProgress(2, 'completed');
-        } else {
-          updateTaskProgress(2, 'failed');
-        }
-      } catch {
-        updateTaskProgress(2, 'failed');
-      }
-
-      // Step 4: MXIK lookup
+      // Step 4: MXIK lookup (AI-powered, independent of card creator)
       updateTaskProgress(3, 'running');
       let mxikData = null;
       try {
@@ -491,9 +445,8 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
         updateTaskProgress(3, 'failed');
       }
 
-      // Step 5: Infographic generation - web rasmdan foydalanish
+      // Step 5: Infographic generation
       const generatedInfos: string[] = [];
-      // Infografika uchun eng yaxshi sifatli rasmni tanlaymiz
       const bestImageForInfographic = imageUrl || productImage;
       
       if (shouldGenerateInfographics && bestImageForInfographic) {
@@ -514,7 +467,6 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
 
             if (!infoError && infoData?.images?.length > 0) {
               generatedInfos.push(infoData.images[0].url);
-              // Update task with new images as they come in
               setBackgroundTasks(prev => prev.map(task => 
                 task.id === taskId ? { ...task, generatedImages: [...generatedInfos] } : task
               ));
@@ -534,7 +486,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
         updateTaskProgress(4, 'completed');
       }
 
-      // Step 6: Create Yandex card
+      // Step 6: Create Yandex card — pass ALL data, let card creator do full AI optimization
       updateTaskProgress(5, 'running');
       
       const { error } = await supabase.functions.invoke('yandex-market-create-card', {
@@ -542,17 +494,16 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
           shopId,
           product: {
             name: normalizedProductName,
-            nameRu: seoContent?.seoTitle?.ru || normalizedProductName,
-            description: descriptions?.fullDescription?.uz || product.description || analyzed?.description,
-            descriptionRu: descriptions?.fullDescription?.ru || product.description,
+            nameRu: analyzed?.name || normalizedProductName,
+            description: product.description || analyzed?.description,
+            descriptionRu: product.description || analyzed?.description,
             category: analyzed?.category,
+            brand: analyzed?.brand,
             price: pricingData.sellingPrice,
             costPrice: pricingData.costPrice,
             image: imageUrl,
             images: imagesToUpload,
             sourceUrl: product.url,
-            keywords: seoContent?.keywords,
-            bulletPoints: seoContent?.bulletPoints || descriptions?.sellingPoints,
             mxikCode: mxikData?.mxik_code,
             mxikName: mxikData?.mxik_name,
           },
@@ -595,9 +546,9 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
       status: 'processing',
       progress: [
         { name: 'Rasm tahlili', status: 'pending', model: 'GPT-4o Vision', icon: <Camera className="h-4 w-4" /> },
-        { name: 'SEO kontent', status: 'pending', model: 'Claude Haiku', icon: <Search className="h-4 w-4" /> },
-        { name: 'Tavsif yaratish', status: 'pending', model: 'Claude Sonnet', icon: <FileText className="h-4 w-4" /> },
-        { name: 'MXIK aniqlash', status: 'pending', model: 'Gemini Flash', icon: <Hash className="h-4 w-4" /> },
+        { name: 'SEO kontent', status: 'pending', model: 'Yandex AI', icon: <Search className="h-4 w-4" /> },
+        { name: 'Tavsif yaratish', status: 'pending', model: 'Yandex AI', icon: <FileText className="h-4 w-4" /> },
+        { name: 'MXIK aniqlash', status: 'pending', model: 'Gemini + AI', icon: <Hash className="h-4 w-4" /> },
         { name: 'Infografikalar', status: 'pending', model: 'Gemini Image', icon: <ImageLucide className="h-4 w-4" /> },
         { name: 'Kartochka yaratish', status: 'pending', model: 'Yandex API', icon: <Store className="h-4 w-4" /> },
       ],

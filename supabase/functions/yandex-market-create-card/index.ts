@@ -12,7 +12,9 @@ const YANDEX_API = "https://api.partner.market.yandex.ru/v2";
 
 interface ProductInput {
   name: string;
+  nameRu?: string;
   description?: string;
+  descriptionRu?: string;
   category?: string;
   price: number;
   costPrice: number;
@@ -27,6 +29,8 @@ interface ProductInput {
   mxikName?: string;
   weight?: number;
   dimensions?: { length: number; width: number; height: number };
+  keywords?: string[];
+  bulletPoints?: string[];
 }
 
 interface PricingInput {
@@ -122,19 +126,100 @@ async function proxyImagesToStorage(
   return proxied;
 }
 
-// ============ MXIK LOOKUP ============
+// ============ MXIK LOOKUP (AI-powered) ============
 
-async function lookupMXIK(supabase: any, name: string): Promise<{ code: string; name_uz: string }> {
+async function lookupMXIK(
+  supabase: any, name: string, category?: string, lovableApiKey?: string
+): Promise<{ code: string; name_uz: string }> {
   try {
-    const keywords = name.toLowerCase().replace(/[^\w\s\u0400-\u04FF]/g, ' ').split(/\s+/).filter(w => w.length > 2).slice(0, 3);
-    for (const kw of keywords) {
-      const { data } = await supabase.from('mxik_codes').select('code, name_uz')
-        .or(`name_uz.ilike.%${kw}%,name_ru.ilike.%${kw}%`).eq('is_active', true).limit(1);
-      if (data?.length) return data[0];
+    // Step 1: AI keyword extraction for better search
+    let keywords: string[] = [];
+    if (lovableApiKey) {
+      try {
+        const prompt = `Mahsulot: "${name}"${category ? ` (Kategoriya: ${category})` : ''}
+Ushbu mahsulot uchun MXIK kodini topish uchun eng muhim kalit so'zlarni ajrating.
+Faqat mahsulot TURINI aniqlaydigan umumiy so'zlarni bering (brend, model raqami, rang olib tashlang).
+Masalan:
+- "Estée Lauder Double Wear foundation" → ["tonal krem", "kosmetika", "pardoz vositasi", "yuz uchun krem"]
+- "iPhone 15 Pro Max 256GB" → ["telefon", "smartfon", "mobil telefon"]
+Javobni faqat JSON array: ["so'z1", "so'z2", ...]`;
+
+        const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${lovableApiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash-lite",
+            messages: [{ role: "user", content: prompt }],
+            temperature: 0, max_tokens: 150,
+          }),
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          const content = data.choices?.[0]?.message?.content?.trim() || "";
+          const match = content.match(/\[.*\]/s);
+          if (match) keywords = JSON.parse(match[0]).filter((k: string) => typeof k === 'string' && k.length > 1);
+        }
+      } catch (e) { console.error("AI MXIK keywords error:", e); }
     }
-  } catch (e) { console.error('MXIK lookup:', e); }
-  // Fallback — generic electronics
-  return { code: "85176200001000000", name_uz: "Boshqa elektron qurilmalar" };
+
+    // Fallback keywords
+    if (keywords.length === 0) {
+      keywords = name.toLowerCase().replace(/[^\w\s\u0400-\u04FFa-zA-Z'ʼ]/g, ' ').split(/\s+/).filter(w => w.length > 2);
+    }
+    console.log(`[MXIK] Keywords: ${keywords.join(', ')}`);
+
+    // Step 2: Search with multiple keywords
+    let matches: any[] = [];
+    for (const kw of keywords.slice(0, 4)) {
+      const { data } = await supabase.from('mxik_codes').select('code, name_uz, name_ru, group_name')
+        .or(`name_uz.ilike.%${kw}%,name_ru.ilike.%${kw}%,group_name.ilike.%${kw}%`)
+        .eq('is_active', true).limit(10);
+      if (data) matches.push(...data);
+    }
+
+    // Deduplicate
+    const unique = Array.from(new Map(matches.map(m => [m.code, m])).values());
+
+    if (unique.length === 0) {
+      console.warn("[MXIK] No matches found, using generic fallback");
+      return { code: "46901100001000000", name_uz: "Boshqa tovarlar" };
+    }
+
+    // Step 3: AI selects best match
+    if (lovableApiKey && unique.length > 1) {
+      try {
+        const options = unique.slice(0, 10).map((m, i) =>
+          `${i + 1}. ${m.code} — ${m.name_uz}${m.name_ru ? ` (${m.name_ru})` : ''}`
+        ).join('\n');
+        const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${lovableApiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash-lite",
+            messages: [{ role: "user", content: `Mahsulot: "${name}"
+Quyidagilardan eng mos MXIK kodni tanla:
+${options}
+Javob faqat raqam (1-${Math.min(unique.length, 10)}):` }],
+            temperature: 0, max_tokens: 10,
+          }),
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          const content = data.choices?.[0]?.message?.content?.trim() || "";
+          const idx = parseInt(content.match(/\d+/)?.[0] || "1") - 1;
+          if (idx >= 0 && idx < unique.length) {
+            console.log(`[MXIK] AI selected: ${unique[idx].name_uz} (${unique[idx].code})`);
+            return { code: unique[idx].code, name_uz: unique[idx].name_uz };
+          }
+        }
+      } catch (e) { console.error("AI MXIK select error:", e); }
+    }
+
+    return { code: unique[0].code, name_uz: unique[0].name_uz };
+  } catch (e) {
+    console.error('MXIK lookup error:', e);
+    return { code: "46901100001000000", name_uz: "Boshqa tovarlar" };
+  }
 }
 
 // ============ YANDEX CREDENTIALS ============
@@ -705,10 +790,10 @@ serve(async (req) => {
           ai = await aiOptimize(product, leafCat.name, params, LOVABLE_KEY);
         }
 
-        // ═══ STEP 5: MXIK lookup ═══
+        // ═══ STEP 5: MXIK lookup (AI-powered) ═══
         const mxik = (product.mxikCode && product.mxikName)
           ? { code: product.mxikCode, name_uz: product.mxikName }
-          : await lookupMXIK(supabase, product.name);
+          : await lookupMXIK(supabase, product.name, product.category, LOVABLE_KEY);
 
         // ═══ STEP 6: Build & send offer ═══
         const offer = buildOffer(product, ai, sku, barcode, leafCat, mxik, pricing.recommendedPrice, images);
