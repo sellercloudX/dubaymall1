@@ -22,31 +22,59 @@
    const queryClient = useQueryClient();
  
    // Fetch seller profiles
-   const { data: sellerProfiles, isLoading: loadingSellers } = useQuery({
-     queryKey: ['admin-seller-profiles'],
-     queryFn: async () => {
-       const { data, error } = await supabase
-         .from('seller_profiles')
-         .select('*, profiles:user_id(full_name, phone)')
-         .order('created_at', { ascending: false });
-       
-       if (error) throw error;
-       return data;
-     }
-   });
- 
-   // Fetch blogger profiles
-   const { data: bloggerProfiles, isLoading: loadingBloggers } = useQuery({
-     queryKey: ['admin-blogger-profiles'],
-     queryFn: async () => {
-       const { data, error } = await supabase
-         .from('blogger_profiles')
-         .select('*, profiles:user_id(full_name, phone)')
-         .order('created_at', { ascending: false });
-       
-       if (error) throw error;
-       return data;
-     }
+    const { data: sellerProfiles, isLoading: loadingSellers } = useQuery({
+      queryKey: ['admin-seller-profiles'],
+      queryFn: async () => {
+        const { data, error } = await supabase
+          .from('seller_profiles')
+          .select('*')
+          .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        
+        // Fetch profile info separately (no FK relationship)
+        const userIds = data?.map(s => s.user_id) || [];
+        if (userIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('user_id, full_name, phone')
+            .in('user_id', userIds);
+          
+          return data?.map(seller => ({
+            ...seller,
+            profiles: profiles?.find(p => p.user_id === seller.user_id) || null,
+          })) || [];
+        }
+        return data || [];
+      }
+    });
+  
+    // Fetch blogger profiles
+    const { data: bloggerProfiles, isLoading: loadingBloggers } = useQuery({
+      queryKey: ['admin-blogger-profiles'],
+      queryFn: async () => {
+        const { data, error } = await supabase
+          .from('blogger_profiles')
+          .select('*')
+          .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        
+        // Fetch profile info separately
+        const userIds = data?.map(b => b.user_id) || [];
+        if (userIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('user_id, full_name, phone')
+            .in('user_id', userIds);
+          
+          return data?.map(blogger => ({
+            ...blogger,
+            profiles: profiles?.find(p => p.user_id === blogger.user_id) || null,
+          })) || [];
+        }
+        return data || [];
+      }
     });
 
    // Fetch SellerCloudX subscriptions
@@ -200,17 +228,17 @@
      }
    };
  
-   const filteredSellers = sellerProfiles?.filter(s => 
-     s.business_name?.toLowerCase().includes(search.toLowerCase()) ||
-     s.inn?.includes(search) ||
-     (s.profiles as any)?.full_name?.toLowerCase().includes(search.toLowerCase())
-   );
- 
-   const filteredBloggers = bloggerProfiles?.filter(b => 
-     b.social_username?.toLowerCase().includes(search.toLowerCase()) ||
-     b.social_platform?.toLowerCase().includes(search.toLowerCase()) ||
-     (b.profiles as any)?.full_name?.toLowerCase().includes(search.toLowerCase())
-   );
+    const filteredSellers = sellerProfiles?.filter((s: any) => 
+      s.business_name?.toLowerCase().includes(search.toLowerCase()) ||
+      s.inn?.includes(search) ||
+      s.profiles?.full_name?.toLowerCase().includes(search.toLowerCase())
+    );
+  
+    const filteredBloggers = bloggerProfiles?.filter((b: any) => 
+      b.social_username?.toLowerCase().includes(search.toLowerCase()) ||
+      b.social_platform?.toLowerCase().includes(search.toLowerCase()) ||
+      b.profiles?.full_name?.toLowerCase().includes(search.toLowerCase())
+    );
  
     const pendingCloudCount = cloudSubscriptions?.filter(s => !s.is_active && !s.admin_override).length || 0;
 
