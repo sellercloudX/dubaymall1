@@ -6,7 +6,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-interface ProductData {
+// ============ TYPES ============
+
+interface ProductInput {
   name: string;
   description?: string;
   category?: string;
@@ -21,9 +23,11 @@ interface ProductData {
   barcode?: string;
   mxikCode?: string;
   mxikName?: string;
+  weight?: number;
+  dimensions?: { length: number; width: number; height: number };
 }
 
-interface PricingData {
+interface PricingInput {
   costPrice: number;
   marketplaceCommission: number;
   logisticsCost: number;
@@ -33,195 +37,350 @@ interface PricingData {
   netProfit: number;
 }
 
-// Yandex Market kategoriya ID lari (eng ko'p ishlatiladigan)
-const YANDEX_CATEGORY_IDS: Record<string, { id: number; name: string }> = {
-  "phone": { id: 91491, name: "Смартфоны" },
-  "laptop": { id: 91013, name: "Ноутбуки" },
-  "tablet": { id: 6427100, name: "Планшеты" },
-  "headphones": { id: 90555, name: "Наушники и гарнитуры" },
-  "speaker": { id: 90556, name: "Портативная акустика" },
-  "smartwatch": { id: 10498025, name: "Умные часы и браслеты" },
-  "watch": { id: 7811901, name: "Наручные часы" },
-  "camera": { id: 90606, name: "Фотоаппараты" },
-  "tv": { id: 90639, name: "Телевизоры" },
-  "refrigerator": { id: 71639, name: "Холодильники" },
-  "washing_machine": { id: 138608, name: "Стиральные машины" },
-  "air_conditioner": { id: 90403, name: "Кондиционеры" },
-  "vacuum": { id: 90564, name: "Пылесосы" },
-  "iron": { id: 90567, name: "Утюги" },
-  "kettle": { id: 90570, name: "Электрочайники" },
-  "blender": { id: 90573, name: "Блендеры" },
-  "microwave": { id: 90594, name: "Микроволновые печи" },
-  "clothing": { id: 7811873, name: "Одежда" },
-  "shoes": { id: 7811882, name: "Обувь" },
-  "bag": { id: 7812078, name: "Сумки" },
-  "cosmetics": { id: 90509, name: "Декоративная косметика" },
-  "perfume": { id: 90510, name: "Парфюмерия" },
-  "toys": { id: 90764, name: "Игрушки" },
-  "sports": { id: 90660, name: "Спорттовары" },
-  "furniture": { id: 90720, name: "Мебель" },
-  "tools": { id: 90719, name: "Инструменты" },
-  "auto": { id: 90461, name: "Автотовары" },
-  "health": { id: 90690, name: "Товары для здоровья" },
-  "massage": { id: 966945, name: "Массажеры" },
-  "books": { id: 90829, name: "Книги" },
-  "stationery": { id: 18057714, name: "Канцтовары" },
-  "garden": { id: 90810, name: "Товары для сада" },
-  "pet": { id: 90813, name: "Товары для животных" },
-  "food": { id: 90817, name: "Продукты питания" },
-  "electronics": { id: 198119, name: "Электроника" },
-  "default": { id: 198119, name: "Электроника" },
-};
-
-// Dynamic MXIK lookup from database
-async function lookupMxikFromDB(
-  supabase: any,
-  productName: string,
-  category?: string
-): Promise<{ code: string; name_uz: string; name_ru: string }> {
-  const DEFAULT_MXIK = { code: "46901100001000000", name_uz: "Boshqa tovarlar", name_ru: "Прочие товары" };
-
-  try {
-    const keywords = productName
-      .toLowerCase()
-      .replace(/[^\w\s\u0400-\u04FFa-zA-Z]/g, ' ')
-      .split(/\s+/)
-      .filter((w: string) => w.length > 2)
-      .slice(0, 3);
-
-    for (const keyword of keywords) {
-      const { data } = await supabase
-        .from('mxik_codes')
-        .select('code, name_uz, name_ru')
-        .or(`name_uz.ilike.%${keyword}%,name_ru.ilike.%${keyword}%`)
-        .eq('is_active', true)
-        .limit(1);
-
-      if (data && data.length > 0) {
-        return data[0];
-      }
-    }
-  } catch (e) {
-    console.error('MXIK DB lookup failed:', e);
-  }
-
-  return DEFAULT_MXIK;
+interface CreateCardRequest {
+  shopId?: string;
+  product: ProductInput;
+  pricing: PricingInput;
+  // Batch mode: multiple products at once
+  products?: ProductInput[];
 }
 
-// Mahsulot turini aniqlash funksiyasi
-function detectProductCategory(name: string, description?: string): string {
-  const text = `${name} ${description || ""}`.toLowerCase();
-  
-  if (text.includes("массаж") || text.includes("massaj") || text.includes("massager")) return "massage";
-  if (text.includes("телефон") || text.includes("phone") || text.includes("смартфон") || text.includes("iphone") || text.includes("samsung galaxy")) return "phone";
-  if (text.includes("ноутбук") || text.includes("laptop") || text.includes("macbook")) return "laptop";
-  if (text.includes("планшет") || text.includes("tablet") || text.includes("ipad")) return "tablet";
-  if (text.includes("наушник") || text.includes("headphone") || text.includes("airpods") || text.includes("quloqchin")) return "headphones";
-  if (text.includes("колонк") || text.includes("speaker") || text.includes("karnay")) return "speaker";
-  if (text.includes("смарт часы") || text.includes("smart watch") || text.includes("apple watch")) return "smartwatch";
-  if (text.includes("часы") || text.includes("watch") || text.includes("soat")) return "watch";
-  if (text.includes("камер") || text.includes("camera") || text.includes("фотоаппарат")) return "camera";
-  if (text.includes("телевизор") || text.includes("tv") || text.includes("televizor")) return "tv";
-  if (text.includes("холодильник") || text.includes("refrigerator") || text.includes("muzlatgich")) return "refrigerator";
-  if (text.includes("стиральн") || text.includes("washing") || text.includes("kir yuvish")) return "washing_machine";
-  if (text.includes("кондиционер") || text.includes("air conditioner") || text.includes("konditsioner")) return "air_conditioner";
-  if (text.includes("пылесос") || text.includes("vacuum") || text.includes("changyutgich")) return "vacuum";
-  if (text.includes("утюг") || text.includes("iron") || text.includes("dazmol")) return "iron";
-  if (text.includes("чайник") || text.includes("kettle") || text.includes("choynak")) return "kettle";
-  if (text.includes("блендер") || text.includes("blender")) return "blender";
-  if (text.includes("микроволн") || text.includes("microwave")) return "microwave";
-  if (text.includes("одежд") || text.includes("clothing") || text.includes("kiyim") || text.includes("футболк") || text.includes("штан") || text.includes("платье")) return "clothing";
-  if (text.includes("обувь") || text.includes("shoes") || text.includes("poyabzal") || text.includes("кроссовк") || text.includes("туфл")) return "shoes";
-  if (text.includes("сумк") || text.includes("bag") || text.includes("рюкзак")) return "bag";
-  if (text.includes("косметик") || text.includes("cosmetic") || text.includes("крем") || text.includes("помад")) return "cosmetics";
-  if (text.includes("парфюм") || text.includes("perfume") || text.includes("духи") || text.includes("туалетн")) return "perfume";
-  if (text.includes("игруш") || text.includes("toy") || text.includes("o'yinchoq")) return "toys";
-  if (text.includes("спорт") || text.includes("sport") || text.includes("фитнес")) return "sports";
-  if (text.includes("мебель") || text.includes("furniture") || text.includes("стол") || text.includes("стул") || text.includes("шкаф")) return "furniture";
-  if (text.includes("инструмент") || text.includes("tool") || text.includes("дрель") || text.includes("молоток")) return "tools";
-  if (text.includes("авто") || text.includes("auto") || text.includes("машин") || text.includes("запчаст")) return "auto";
-  if (text.includes("здоровь") || text.includes("health") || text.includes("медицин") || text.includes("витамин")) return "health";
-  if (text.includes("книг") || text.includes("book") || text.includes("kitob")) return "books";
-  if (text.includes("канцеляр") || text.includes("stationery") || text.includes("ручк") || text.includes("тетрад")) return "stationery";
-  if (text.includes("сад") || text.includes("garden") || text.includes("растен") || text.includes("bog'")) return "garden";
-  if (text.includes("корм") || text.includes("pet") || text.includes("животн") || text.includes("собак") || text.includes("кошк")) return "pet";
-  if (text.includes("еда") || text.includes("food") || text.includes("продукт")) return "food";
-  if (text.includes("электрон") || text.includes("electronic") || text.includes("гаджет")) return "electronics";
-  
+// ============ HELPERS ============
+
+/** Generate EAN-13 barcode (200-prefix = internal use) */
+function generateEAN13(): string {
+  let code = "200";
+  for (let i = 0; i < 9; i++) code += Math.floor(Math.random() * 10).toString();
+  let sum = 0;
+  for (let i = 0; i < 12; i++) sum += parseInt(code[i]) * (i % 2 === 0 ? 1 : 3);
+  return code + ((10 - (sum % 10)) % 10).toString();
+}
+
+/** Generate short SKU */
+function generateSKU(name: string): string {
+  const words = name.split(/\s+/).slice(0, 2);
+  const prefix = words.map(w => w.substring(0, 4).toUpperCase()).join("");
+  const ts = Date.now().toString(36).slice(-4).toUpperCase();
+  const rnd = Math.random().toString(36).substring(2, 5).toUpperCase();
+  return `${prefix}-${rnd}-${ts}`;
+}
+
+/** Estimate package dimensions by category */
+function estimateDimensions(category: string): { length: number; width: number; height: number; weight: number } {
+  const dims: Record<string, { length: number; width: number; height: number; weight: number }> = {
+    phone: { length: 18, width: 10, height: 6, weight: 0.3 },
+    laptop: { length: 40, width: 30, height: 5, weight: 2.5 },
+    tablet: { length: 28, width: 22, height: 4, weight: 0.8 },
+    headphones: { length: 22, width: 18, height: 8, weight: 0.4 },
+    speaker: { length: 25, width: 15, height: 15, weight: 1.2 },
+    smartwatch: { length: 12, width: 10, height: 8, weight: 0.2 },
+    watch: { length: 12, width: 10, height: 8, weight: 0.2 },
+    camera: { length: 20, width: 15, height: 12, weight: 0.8 },
+    tv: { length: 120, width: 75, height: 15, weight: 15 },
+    clothing: { length: 35, width: 25, height: 5, weight: 0.4 },
+    shoes: { length: 35, width: 22, height: 14, weight: 1 },
+    bag: { length: 40, width: 30, height: 15, weight: 0.8 },
+    cosmetics: { length: 15, width: 10, height: 8, weight: 0.15 },
+    perfume: { length: 12, width: 8, height: 15, weight: 0.2 },
+    toys: { length: 30, width: 25, height: 15, weight: 0.5 },
+    tools: { length: 35, width: 25, height: 10, weight: 2 },
+    massage: { length: 45, width: 35, height: 15, weight: 1.8 },
+    default: { length: 30, width: 20, height: 15, weight: 1 },
+  };
+  return dims[category] || dims.default;
+}
+
+/** Detect product category from name */
+function detectCategory(name: string, desc?: string): string {
+  const text = `${name} ${desc || ""}`.toLowerCase();
+  const map: [string, string[]][] = [
+    ["massage", ["массаж", "massaj", "massager"]],
+    ["phone", ["телефон", "phone", "смартфон", "iphone", "samsung galaxy"]],
+    ["laptop", ["ноутбук", "laptop", "macbook"]],
+    ["tablet", ["планшет", "tablet", "ipad"]],
+    ["headphones", ["наушник", "headphone", "airpods", "quloqchin"]],
+    ["speaker", ["колонк", "speaker", "karnay"]],
+    ["smartwatch", ["смарт часы", "smart watch", "apple watch"]],
+    ["watch", ["часы", "watch", "soat"]],
+    ["camera", ["камер", "camera", "фотоаппарат"]],
+    ["tv", ["телевизор", "tv", "televizor"]],
+    ["clothing", ["одежд", "kiyim", "футболк", "штан", "платье", "куртк"]],
+    ["shoes", ["обувь", "shoes", "poyabzal", "кроссовк"]],
+    ["bag", ["сумк", "bag", "рюкзак"]],
+    ["cosmetics", ["косметик", "cosmetic", "крем", "помад"]],
+    ["perfume", ["парфюм", "perfume", "духи"]],
+    ["toys", ["игруш", "toy", "o'yinchoq"]],
+    ["tools", ["инструмент", "tool", "дрель", "молоток", "matkap"]],
+  ];
+  for (const [cat, keywords] of map) {
+    if (keywords.some(kw => text.includes(kw))) return cat;
+  }
   return "default";
 }
 
-// Qisqa SKU generatsiya qilish
-function generateShortSKU(name: string, color?: string, model?: string): string {
-  const words = name.split(/\s+/).slice(0, 2);
-  const shortName = words.map(w => w.substring(0, 4).toUpperCase()).join("");
-  const suffix = color ? color.substring(0, 3).toUpperCase() : 
-                 model ? model.substring(0, 3).toUpperCase() : 
-                 Math.random().toString(36).substring(2, 5).toUpperCase();
-  const timestamp = Date.now().toString(36).slice(-4).toUpperCase();
-  return `${shortName}-${suffix}-${timestamp}`;
+/** MXIK code lookup from database */
+async function lookupMXIK(supabase: any, name: string): Promise<{ code: string; name_uz: string }> {
+  const DEFAULT = { code: "46901100001000000", name_uz: "Boshqa tovarlar" };
+  try {
+    const keywords = name.toLowerCase().replace(/[^\w\s\u0400-\u04FF]/g, ' ').split(/\s+/).filter(w => w.length > 2).slice(0, 3);
+    for (const kw of keywords) {
+      const { data } = await supabase.from('mxik_codes').select('code, name_uz').or(`name_uz.ilike.%${kw}%,name_ru.ilike.%${kw}%`).eq('is_active', true).limit(1);
+      if (data?.length) return data[0];
+    }
+  } catch (e) { console.error('MXIK lookup failed:', e); }
+  return DEFAULT;
 }
 
-// Realstik o'lchamlarni aniqlash
-function estimatePackageDimensions(category: string): { length: number; width: number; height: number; weight: number } {
-  const dimensions: Record<string, { length: number; width: number; height: number; weight: number }> = {
-    "phone": { length: 18, width: 10, height: 6, weight: 0.3 },
-    "laptop": { length: 40, width: 30, height: 5, weight: 2.5 },
-    "tablet": { length: 28, width: 22, height: 4, weight: 0.8 },
-    "headphones": { length: 22, width: 18, height: 8, weight: 0.4 },
-    "speaker": { length: 25, width: 15, height: 15, weight: 1.2 },
-    "smartwatch": { length: 12, width: 10, height: 8, weight: 0.2 },
-    "watch": { length: 12, width: 10, height: 8, weight: 0.2 },
-    "camera": { length: 20, width: 15, height: 12, weight: 0.8 },
-    "tv": { length: 120, width: 75, height: 15, weight: 15 },
-    "refrigerator": { length: 70, width: 65, height: 180, weight: 65 },
-    "washing_machine": { length: 65, width: 60, height: 90, weight: 55 },
-    "air_conditioner": { length: 90, width: 35, height: 30, weight: 12 },
-    "vacuum": { length: 45, width: 35, height: 30, weight: 5 },
-    "iron": { length: 32, width: 15, height: 15, weight: 1.5 },
-    "kettle": { length: 25, width: 20, height: 25, weight: 1.2 },
-    "blender": { length: 20, width: 18, height: 40, weight: 2 },
-    "microwave": { length: 55, width: 45, height: 35, weight: 15 },
-    "clothing": { length: 35, width: 25, height: 5, weight: 0.4 },
-    "shoes": { length: 35, width: 22, height: 14, weight: 1 },
-    "bag": { length: 40, width: 30, height: 15, weight: 0.8 },
-    "cosmetics": { length: 15, width: 10, height: 8, weight: 0.15 },
-    "perfume": { length: 12, width: 8, height: 15, weight: 0.2 },
-    "toys": { length: 30, width: 25, height: 15, weight: 0.5 },
-    "sports": { length: 50, width: 30, height: 20, weight: 2 },
-    "furniture": { length: 100, width: 60, height: 40, weight: 20 },
-    "tools": { length: 35, width: 25, height: 10, weight: 2 },
-    "auto": { length: 30, width: 25, height: 15, weight: 1.5 },
-    "health": { length: 20, width: 15, height: 10, weight: 0.3 },
-    "massage": { length: 45, width: 35, height: 15, weight: 1.8 },
-    "books": { length: 25, width: 18, height: 3, weight: 0.5 },
-    "stationery": { length: 30, width: 22, height: 5, weight: 0.3 },
-    "garden": { length: 40, width: 30, height: 25, weight: 3 },
-    "pet": { length: 35, width: 25, height: 20, weight: 2 },
-    "food": { length: 25, width: 20, height: 15, weight: 1 },
-    "electronics": { length: 25, width: 20, height: 10, weight: 0.5 },
-    "default": { length: 30, width: 20, height: 15, weight: 1 },
+/** Yandex Market category IDs */
+const YANDEX_CATEGORIES: Record<string, { id: number; name: string }> = {
+  phone: { id: 91491, name: "Смартфоны" },
+  laptop: { id: 91013, name: "Ноутбуки" },
+  tablet: { id: 6427100, name: "Планшеты" },
+  headphones: { id: 90555, name: "Наушники и гарнитуры" },
+  speaker: { id: 90556, name: "Портативная акустика" },
+  smartwatch: { id: 10498025, name: "Умные часы и браслеты" },
+  watch: { id: 7811901, name: "Наручные часы" },
+  camera: { id: 90606, name: "Фотоаппараты" },
+  tv: { id: 90639, name: "Телевизоры" },
+  clothing: { id: 7811873, name: "Одежда" },
+  shoes: { id: 7811882, name: "Обувь" },
+  bag: { id: 7812078, name: "Сумки" },
+  cosmetics: { id: 90509, name: "Декоративная косметика" },
+  perfume: { id: 90510, name: "Парфюмерия" },
+  toys: { id: 90764, name: "Игрушки" },
+  tools: { id: 90719, name: "Инструменты" },
+  massage: { id: 966945, name: "Массажеры" },
+  default: { id: 198119, name: "Электроника" },
+};
+
+/** Get Yandex credentials from user's marketplace_connections */
+async function getYandexCredentials(supabase: any, userId: string): Promise<{
+  apiKey: string; campaignId: string; businessId: string; shopId?: string;
+} | null> {
+  const { data: connection } = await supabase
+    .from("marketplace_connections")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("marketplace", "yandex")
+    .eq("is_active", true)
+    .limit(1)
+    .single();
+
+  if (!connection) return null;
+
+  let apiKey = "", campaignId = "", businessId = "";
+
+  if (connection.encrypted_credentials) {
+    const { data, error } = await supabase.rpc("decrypt_credentials", { p_encrypted: connection.encrypted_credentials });
+    if (!error && data) {
+      const c = data as any;
+      apiKey = c.apiKey || "";
+      campaignId = c.campaignId || c.sellerId || "";
+      businessId = c.businessId || "";
+    }
+  } else {
+    const c = connection.credentials as any;
+    apiKey = c?.apiKey || "";
+    campaignId = c?.campaignId || c?.sellerId || "";
+    businessId = c?.businessId || "";
+  }
+
+  // Fallback: get businessId from campaign API
+  if (apiKey && campaignId && !businessId) {
+    try {
+      const resp = await fetch(`https://api.partner.market.yandex.ru/campaigns/${campaignId}`, {
+        headers: { "Api-Key": apiKey, "Content-Type": "application/json" },
+      });
+      if (resp.ok) {
+        const d = await resp.json();
+        businessId = d.campaign?.business?.id?.toString() || "";
+      }
+    } catch (e) { console.error("Failed to get businessId:", e); }
+  }
+
+  if (!apiKey || !businessId) return null;
+
+  return { apiKey, campaignId, businessId, shopId: connection.shop_id };
+}
+
+/** AI-powered card optimization — fills all Excel template fields */
+async function optimizeWithAI(
+  product: ProductInput,
+  categoryName: string,
+  lovableApiKey: string
+): Promise<any> {
+  const prompt = `Sen Yandex Market uchun professional kartochka yaratuvchisan. 
+Quyidagi mahsulot uchun BARCHA maydonlarni to'ldir. Javobni FAQAT JSON formatda ber.
+
+Mahsulot: ${product.name}
+Tavsif: ${product.description || "Yo'q"}
+Kategoriya: ${categoryName}
+Brend: ${product.brand || "Aniqlanmagan"}
+
+Talablar:
+1. name_ru: Ruscha nom — TIP + BREND + MODEL formatida, 50-60 belgi
+2. name_uz: O'zbekcha nom (lotin) — xuddi shunday format
+3. description_ru: Ruscha tavsif, 400-600 belgi, HTML teglarisiz, foydalanuvchiga foydali
+4. description_uz: O'zbekcha tavsif (lotin), 300-500 belgi, HTML teglarisiz
+5. vendor: Brend nomi (aniq)
+6. vendorCode: Ishlab chiqaruvchi artikuli
+7. manufacturerCountry: Ishlab chiqarilgan mamlakat (ruscha)
+8. tags: 5-10 ta teglar (vergul bilan)
+9. params: Kamida 8 ta xususiyat [{name, value}] formatida
+10. warranty: Kafolat muddati (masalan, "1 yil")
+11. shelfLife: Yaroqlilik muddati (agar tegishli bo'lsa)
+
+MUHIM: HTML teglarini (<br/>, <br>, <p> va h.k.) ISHLATMA. Faqat oddiy matn.
+
+JSON:
+{
+  "name_ru": "...",
+  "name_uz": "...",
+  "description_ru": "...",
+  "description_uz": "...",
+  "vendor": "...",
+  "vendorCode": "...",
+  "manufacturerCountry": "...",
+  "tags": ["tag1", "tag2"],
+  "params": [{"name": "Rang", "value": "..."}, {"name": "Material", "value": "..."}],
+  "warranty": "1 yil",
+  "shelfLife": null,
+  "adult": false
+}`;
+
+  try {
+    const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${lovableApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.3,
+      }),
+    });
+
+    if (!resp.ok) {
+      console.error("AI optimization failed:", resp.status);
+      return null;
+    }
+
+    const data = await resp.json();
+    const content = data.choices?.[0]?.message?.content || "";
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+  } catch (e) {
+    console.error("AI optimization error:", e);
+  }
+  return null;
+}
+
+/** Remove HTML tags from text */
+function stripHtml(text: string): string {
+  return text.replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+}
+
+/** Build Yandex offer-mappings/update payload */
+function buildYandexOffer(
+  product: ProductInput,
+  ai: any,
+  sku: string,
+  barcode: string,
+  category: { id: number; name: string },
+  dims: { length: number; width: number; height: number; weight: number },
+  mxik: { code: string; name_uz: string },
+  price: number
+): any {
+  const images = (product.images || []).filter(img => img?.startsWith('http')).slice(0, 10);
+  if (!images.length && product.image?.startsWith('http')) images.push(product.image);
+
+  const name = stripHtml(ai?.name_ru || product.name);
+  const description = stripHtml(ai?.description_ru || product.description || product.name);
+
+  const offer: any = {
+    offerId: sku,
+    name: name.substring(0, 150),
+    marketCategoryId: category.id,
+    pictures: images,
+    vendor: ai?.vendor || product.brand || "OEM",
+    description: description.substring(0, 6000),
+    barcodes: [barcode],
+    vendorCode: ai?.vendorCode || sku,
+    manufacturerCountries: [ai?.manufacturerCountry || "Китай"],
+    weightDimensions: {
+      length: product.dimensions?.length || dims.length,
+      width: product.dimensions?.width || dims.width,
+      height: product.dimensions?.height || dims.height,
+      weight: product.weight || dims.weight,
+    },
+    basicPrice: {
+      value: price,
+      currencyId: "UZS",
+    },
+    customsCommodityCode: mxik.code,
+    type: "DEFAULT",
+    adult: ai?.adult || false,
   };
-  
-  return dimensions[category] || dimensions["default"];
+
+  // Tags
+  if (ai?.tags?.length) {
+    offer.tags = ai.tags.slice(0, 10);
+  }
+
+  // Parameters (xususiyatlar)
+  if (ai?.params?.length) {
+    offer.params = ai.params
+      .filter((p: any) => p.name && p.value)
+      .map((p: any) => ({ name: p.name, value: String(p.value) }))
+      .slice(0, 30);
+  }
+
+  // Warranty
+  if (ai?.warranty) {
+    const match = ai.warranty.match(/(\d+)\s*(yil|year|месяц|month|oy)/i);
+    if (match) {
+      const period = parseInt(match[1]);
+      const isYear = /yil|year/i.test(match[2]);
+      offer.guaranteePeriod = {
+        timePeriod: isYear ? period * 12 : period,
+        timeUnit: "MONTH",
+      };
+    }
+  }
+
+  // Clean undefined/null/empty values
+  for (const key of Object.keys(offer)) {
+    const v = offer[key];
+    if (v === undefined || v === null || (Array.isArray(v) && v.length === 0)) {
+      delete offer[key];
+    }
+  }
+
+  return offer;
 }
 
-// EAN-13 shtrixkod generatsiyasi
-function generateEAN13(): string {
-  // 200-299 oralig'i ichki foydalanish uchun
-  const prefix = "200";
-  let code = prefix;
-  for (let i = 0; i < 9; i++) {
-    code += Math.floor(Math.random() * 10).toString();
-  }
-  // Check digit hisoblash
-  let sum = 0;
-  for (let i = 0; i < 12; i++) {
-    sum += parseInt(code[i]) * (i % 2 === 0 ? 1 : 3);
-  }
-  const checkDigit = (10 - (sum % 10)) % 10;
-  return code + checkDigit.toString();
+/** Calculate card quality score */
+function calculateQuality(offer: any, ai: any): { score: number; breakdown: Record<string, number> } {
+  const b: Record<string, number> = {
+    name: (offer.name?.length || 0) >= 50 ? 15 : (offer.name?.length || 0) >= 30 ? 10 : 5,
+    description: (offer.description?.length || 0) >= 400 ? 15 : (offer.description?.length || 0) >= 200 ? 10 : 5,
+    pictures: (offer.pictures?.length || 0) >= 5 ? 15 : (offer.pictures?.length || 0) >= 3 ? 10 : (offer.pictures?.length || 0) >= 1 ? 5 : 0,
+    category: offer.marketCategoryId !== 198119 ? 10 : 5,
+    parameters: (offer.params?.length || 0) >= 10 ? 15 : (offer.params?.length || 0) >= 5 ? 10 : 5,
+    dimensions: offer.weightDimensions ? 10 : 0,
+    barcode: offer.barcodes?.length ? 5 : 0,
+    vendor: offer.vendor && offer.vendor !== "OEM" ? 5 : 3,
+    country: offer.manufacturerCountries?.length ? 5 : 0,
+    warranty: offer.guaranteePeriod ? 5 : 0,
+  };
+  return { score: Object.values(b).reduce((a, v) => a + v, 0), breakdown: b };
 }
+
+// ============ MAIN HANDLER ============
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -229,447 +388,216 @@ serve(async (req) => {
   }
 
   try {
-    // Authentication check
+    // Auth
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY") || "";
 
-    // Auth client to get user
     const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: { headers: { Authorization: authHeader } }
     });
     const { data: { user }, error: authError } = await authClient.auth.getUser();
     if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: "Invalid authentication" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Invalid authentication" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const { shopId, product, pricing } = await req.json() as {
-      shopId: string;
-      product: ProductData;
-      pricing: PricingData;
-    };
-
-    if (!product || !pricing) {
-      return new Response(
-        JSON.stringify({ error: "Missing required fields" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Service role client for DB operations
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Get Yandex credentials from user's marketplace_connections
-    const { data: connection } = await supabase
-      .from("marketplace_connections")
-      .select("*")
-      .eq("user_id", user.id)
-      .eq("marketplace", "yandex")
-      .eq("is_active", true)
-      .limit(1)
-      .single();
-
-    let YANDEX_API_KEY: string | undefined;
-    let YANDEX_CAMPAIGN_ID: string | undefined;
-    let YANDEX_BUSINESS_ID: string | undefined;
-
-    if (connection) {
-      // Decrypt credentials if encrypted
-      if (connection.encrypted_credentials) {
-        const { data: decData, error: decError } = await supabase
-          .rpc("decrypt_credentials", { p_encrypted: connection.encrypted_credentials });
-        if (!decError && decData) {
-          const creds = decData as any;
-          YANDEX_API_KEY = creds.apiKey;
-          YANDEX_CAMPAIGN_ID = creds.campaignId || creds.sellerId;
-          YANDEX_BUSINESS_ID = creds.businessId;
-        }
-      } else {
-        const creds = connection.credentials as any;
-        YANDEX_API_KEY = creds?.apiKey;
-        YANDEX_CAMPAIGN_ID = creds?.campaignId || creds?.sellerId;
-        YANDEX_BUSINESS_ID = creds?.businessId;
-      }
+    // Get Yandex credentials
+    const creds = await getYandexCredentials(supabase, user.id);
+    if (!creds) {
+      return new Response(JSON.stringify({ error: "Yandex Market ulanmagan. Avval marketplace'ni ulang." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Fallback to env vars (legacy)
-    if (!YANDEX_API_KEY) YANDEX_API_KEY = Deno.env.get("YANDEX_MARKET_API_KEY");
-    if (!YANDEX_CAMPAIGN_ID) YANDEX_CAMPAIGN_ID = Deno.env.get("YANDEX_MARKET_CAMPAIGN_ID");
+    const body: CreateCardRequest = await req.json();
 
-    if (!YANDEX_API_KEY || !YANDEX_CAMPAIGN_ID) {
-      return new Response(
-        JSON.stringify({ error: "Yandex Market credentials not configured. Connect Yandex Market first." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    // Support both single and batch mode
+    const productsList = body.products || [body.product];
+    if (!productsList.length || !productsList[0]) {
+      return new Response(JSON.stringify({ error: "Product data required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Use actual shop_id from connection or get user's shop
-    let actualShopId = connection?.shop_id || shopId;
-    if (!actualShopId || actualShopId === "sellercloud") {
-      const { data: userShop } = await supabase
-        .from("shops")
-        .select("id")
-        .eq("owner_id", user.id)
-        .limit(1)
-        .single();
-      actualShopId = userShop?.id || null;
+    // Get user's shop
+    let shopId = creds.shopId || body.shopId;
+    if (!shopId || shopId === "sellercloud") {
+      const { data: userShop } = await supabase.from("shops").select("id").eq("owner_id", user.id).limit(1).single();
+      shopId = userShop?.id || null;
     }
 
-    console.log("🚀 Creating Yandex Market card for:", product.name);
+    console.log(`🚀 Creating ${productsList.length} Yandex Market card(s) for user ${user.id}`);
 
-    // Rasmlarni tayyorlash
-    const productImages: string[] = product.images && product.images.length > 0
-      ? product.images.filter((img: string) => img && img.startsWith('http'))
-      : (product.image && product.image.startsWith('http') ? [product.image] : []);
+    const results: any[] = [];
 
-    // Mahsulot kategoriyasini aniqlash
-    const productCategory = detectProductCategory(product.name, product.description);
-    const yandexCategory = YANDEX_CATEGORY_IDS[productCategory] || YANDEX_CATEGORY_IDS["default"];
-    
-    // MXIK: use passed data or lookup from DB
-    const mxikData = (product.mxikCode && product.mxikName)
-      ? { code: product.mxikCode, name_uz: product.mxikName, name_ru: '' }
-      : await lookupMxikFromDB(supabase, product.name, product.category);
-    
-    const packageDimensions = estimatePackageDimensions(productCategory);
-    const shortSKU = generateShortSKU(product.name, product.color, product.model);
-    const barcode = product.barcode || generateEAN13();
-
-    console.log("📦 Category:", productCategory, "MXIK:", mxikData.code, "SKU:", shortSKU);
-
-    // AI orqali 100 ballik kartochka uchun to'liq optimizatsiya
-    const optimizationPrompt = `Sen Yandex Market uchun professional e-commerce mutaxassisisan. 
-Quyidagi mahsulot uchun 100 BALLIK SIFAT INDEKSIGA erishish uchun TO'LIQ kartochka ma'lumotlarini yarat.
-
-Mahsulot:
-- Nomi: ${product.name}
-- Tavsif: ${product.description || 'Yo\'q'}
-- Kategoriya: ${yandexCategory.name}
-- Narx: ${pricing.recommendedPrice} RUB
-- Brend: ${product.brand || 'Aniqlanmagan'}
-
-100 BALLIK SIFAT INDEKSI UCHUN TALABLAR:
-1. Nom: 50-60 belgi, TIP + BREND + MODEL + XUSUSIYAT formatida
-2. Tavsif: 400-600 belgi, HTML teglari bilan, SEO kalit so'zlar
-3. Xususiyatlar: Kamida 10 ta kategoriyaga xos parametr
-4. Foydalanuvchi uchun foydali ma'lumotlar
-
-MUHIM: Faqat JSON formatda javob ber:
-{
-  "name": "Optimallashtirilgan ruscha nom (50-60 belgi, Tip + Brend + Model + Xususiyat)",
-  "description": "HTML formatlangan tavsif (400-600 belgi): <p>Asosiy tavsif</p><h3>Afzalliklar</h3><ul><li>Afzallik 1</li></ul><h3>Xususiyatlar</h3><ul><li>Xususiyat 1</li></ul>",
-  "vendor": "Brend nomi (aniq yozing)",
-  "vendorCode": "Ishlab chiqaruvchi artikuli",
-  "model": "Model nomi/raqami",
-  "manufacturerCountries": ["Ishlab chiqarilgan mamlakat"],
-  "parameterValues": [
-    {"parameterId": 0, "name": "Rang", "value": "Qora"},
-    {"parameterId": 0, "name": "Material", "value": "Plastik"},
-    {"parameterId": 0, "name": "Quvvat", "value": "100", "unitId": "Vt"},
-    {"parameterId": 0, "name": "Kuchlanish", "value": "220", "unitId": "V"},
-    {"parameterId": 0, "name": "Chastota", "value": "50", "unitId": "Gts"},
-    {"parameterId": 0, "name": "Kafolat", "value": "12", "unitId": "oy"},
-    {"parameterId": 0, "name": "Ishlab chiqaruvchi mamlakati", "value": "Xitoy"},
-    {"parameterId": 0, "name": "Brend mamlakati", "value": "Xitoy"},
-    {"parameterId": 0, "name": "Maqsad", "value": "Uy uchun"},
-    {"parameterId": 0, "name": "Komplektatsiya", "value": "Mahsulot, Qo'llanma, Kafolat kartasi"}
-  ],
-  "warranty": {
-    "period": 12,
-    "unit": "MONTH"
-  },
-  "adult": false,
-  "keywords": ["kalit1", "kalit2", "kalit3", "kalit4", "kalit5"]
-}`;
-
-    let optimizedData: any = {
-      name: product.name,
-      description: product.description || "",
-      vendor: product.brand || "OEM",
-      vendorCode: shortSKU,
-      model: product.model || "",
-      manufacturerCountries: ["Китай"],
-      parameterValues: [],
-      warranty: { period: 12, unit: "MONTH" },
-      adult: false,
-      keywords: []
-    };
-    
-    if (LOVABLE_API_KEY) {
+    for (const product of productsList) {
       try {
-        const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "google/gemini-2.5-flash",
-            messages: [{ role: "user", content: optimizationPrompt }],
-            temperature: 0.3,
-          }),
-        });
+        const pricing = body.pricing || {
+          costPrice: product.costPrice || Math.round(product.price * 0.6),
+          recommendedPrice: product.price,
+          marketplaceCommission: Math.round(product.price * 0.15),
+          logisticsCost: 3000,
+          taxRate: 4,
+          targetProfit: Math.round(product.price * 0.2),
+          netProfit: Math.round(product.price * 0.2),
+        };
 
-        if (aiResponse.ok) {
-          const aiData = await aiResponse.json();
-          const content = aiData.choices?.[0]?.message?.content || "";
-          const jsonMatch = content.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            const parsed = JSON.parse(jsonMatch[0]);
-            optimizedData = { ...optimizedData, ...parsed };
-            console.log("✅ AI optimization successful");
-          }
+        // 1. Detect category
+        const cat = detectCategory(product.name, product.description);
+        const yandexCat = YANDEX_CATEGORIES[cat] || YANDEX_CATEGORIES.default;
+
+        // 2. Generate identifiers
+        const sku = generateSKU(product.name);
+        const barcode = product.barcode || generateEAN13();
+
+        // 3. MXIK lookup
+        const mxik = (product.mxikCode && product.mxikName)
+          ? { code: product.mxikCode, name_uz: product.mxikName }
+          : await lookupMXIK(supabase, product.name);
+
+        // 4. AI optimization (fills all Excel template fields)
+        let aiData: any = null;
+        if (LOVABLE_API_KEY) {
+          aiData = await optimizeWithAI(product, yandexCat.name, LOVABLE_API_KEY);
+          if (aiData) console.log("✅ AI filled all fields for:", product.name);
         }
-      } catch (e) {
-        console.error("AI optimization failed, using defaults:", e);
-      }
-    }
 
-    // Business ID ni olish — credentials'dan yoki campaign API'dan
-    console.log("🔍 Getting business ID...");
-    let businessId = YANDEX_BUSINESS_ID || '';
-    
-    if (!businessId) {
-      try {
-        const campaignResponse = await fetch(
-          `https://api.partner.market.yandex.ru/campaigns/${YANDEX_CAMPAIGN_ID}`,
+        // 5. Estimate dimensions
+        const dims = estimateDimensions(cat);
+
+        // 6. Build Yandex API payload
+        const offer = buildYandexOffer(
+          product, aiData, sku, barcode, yandexCat, dims, mxik,
+          pricing.recommendedPrice
+        );
+
+        // 7. Send to Yandex Market API
+        console.log(`📤 Sending "${offer.name}" to Yandex...`);
+        
+        const yandexResp = await fetch(
+          `https://api.partner.market.yandex.ru/v2/businesses/${creds.businessId}/offer-mappings/update`,
           {
-            method: "GET",
+            method: "POST",
             headers: {
-              "Api-Key": YANDEX_API_KEY,
+              "Api-Key": creds.apiKey,
               "Content-Type": "application/json",
             },
+            body: JSON.stringify({
+              offerMappings: [{ offer }]
+            }),
           }
         );
-        
-        if (campaignResponse.ok) {
-          const campaignData = await campaignResponse.json();
-          businessId = campaignData.campaign?.business?.id?.toString() || '';
-          console.log("✅ Business ID from campaign:", businessId);
+
+        const respText = await yandexResp.text();
+        let yandexResult: any;
+        try { yandexResult = JSON.parse(respText); } catch { yandexResult = { raw: respText }; }
+
+        const { score: quality, breakdown } = calculateQuality(offer, aiData);
+
+        // 8. Save to local DB
+        let savedProduct = null;
+        if (shopId) {
+          const { data, error: saveErr } = await supabase
+            .from("products")
+            .insert({
+              shop_id: shopId,
+              name: product.name,
+              description: stripHtml(aiData?.description_uz || aiData?.description_ru || product.description || ""),
+              price: pricing.recommendedPrice,
+              original_price: pricing.costPrice,
+              source: "ai" as any,
+              source_url: product.sourceUrl,
+              images: offer.pictures || [],
+              status: "draft" as any,
+              mxik_code: mxik.code,
+              mxik_name: mxik.name_uz,
+              specifications: {
+                yandex_offer_id: sku,
+                yandex_business_id: creds.businessId,
+                yandex_category_id: yandexCat.id,
+                yandex_category_name: yandexCat.name,
+                yandex_status: yandexResp.ok ? "success" : "error",
+                yandex_card_quality: quality,
+                barcode,
+                vendor: offer.vendor,
+                dimensions: offer.weightDimensions,
+                name_uz: aiData?.name_uz,
+                name_ru: aiData?.name_ru,
+                description_uz: aiData?.description_uz,
+                tags: aiData?.tags,
+                params_count: offer.params?.length || 0,
+              },
+            })
+            .select()
+            .single();
+
+          if (!saveErr) savedProduct = data;
+          else console.error("Local save error:", saveErr);
         }
-      } catch (e) {
-        console.error("Failed to get business ID:", e);
-      }
-    } else {
-      console.log("✅ Business ID from credentials:", businessId);
-    }
 
-    if (!businessId) {
-      return new Response(
-        JSON.stringify({ error: "Could not determine Yandex Business ID. Check marketplace connection settings." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+        const cardUrl = yandexResp.ok
+          ? `https://partner.market.yandex.ru/business/${creds.businessId}/assortment/offer/${encodeURIComponent(sku)}`
+          : `https://partner.market.yandex.ru/business/${creds.businessId}/assortment`;
 
-    // ✅ TO'LIQ YANDEX MARKET API PAYLOAD (100 ballik sifat uchun)
-    const yandexOffer: any = {
-      // 1. MAJBURIY MAYDONLAR
-      offerId: shortSKU,
-      name: optimizedData.name,
-      marketCategoryId: yandexCategory.id, // ✅ MUHIM! Kategoriya ID
-      pictures: productImages.slice(0, 10),
-      vendor: optimizedData.vendor,
-      description: optimizedData.description,
-      
-      // 2. SHTRIXKOD (sifat uchun muhim)
-      barcodes: [barcode],
-      
-      // 3. ISHLAB CHIQARUVCHI MA'LUMOTLARI
-      vendorCode: optimizedData.vendorCode || shortSKU,
-      manufacturerCountries: optimizedData.manufacturerCountries || ["Китай"],
-      
-      // 4. GABARTLAR VA VAZN (sm va kg formatda)
-      weightDimensions: {
-        length: packageDimensions.length,  // sm
-        width: packageDimensions.width,    // sm
-        height: packageDimensions.height,  // sm
-        weight: packageDimensions.weight,  // kg (grammda emas!)
-      },
-      
-      // 5. NARX (Yandex Market UZ = UZS valyutasi)
-      basicPrice: {
-        value: pricing.recommendedPrice,
-        currencyId: "UZS",
-      },
-      
-      // 6. KAFOLAT
-      guaranteePeriod: optimizedData.warranty ? {
-        timePeriod: optimizedData.warranty.period || 12,
-        timeUnit: optimizedData.warranty.unit || "MONTH",
-      } : undefined,
-      
-      // 7. TN VED KOD (MXIK)
-      customsCommodityCode: mxikData.code,
-      
-      // 8. KATEGORIYA XUSUSIYATLARI (params - deprecated, lekin hali ishlaydi)
-      params: optimizedData.parameterValues?.map((p: any) => ({
-        name: p.name,
-        value: p.value?.toString() || "",
-        unit: p.unitId,
-      })).filter((p: any) => p.name && p.value) || [],
-      
-      // 9. KATTALAR UCHUN
-      adult: optimizedData.adult || false,
-      
-      // 10. TOVAR TURI
-      type: "DEFAULT",
-    };
+        results.push({
+          success: yandexResp.ok,
+          offerId: sku,
+          barcode,
+          name: offer.name,
+          nameUz: aiData?.name_uz,
+          cardUrl,
+          cardQuality: quality,
+          qualityBreakdown: breakdown,
+          category: yandexCat.name,
+          mxikCode: mxik.code,
+          yandexResponse: yandexResult,
+          localProductId: savedProduct?.id,
+          error: yandexResp.ok ? null : (yandexResult?.errors?.[0]?.message || yandexResult?.message || `HTTP ${yandexResp.status}`),
+        });
 
-    // Faqat to'ldirilgan maydonlarni yuborish
-    Object.keys(yandexOffer).forEach(key => {
-      if (yandexOffer[key] === undefined || yandexOffer[key] === null || 
-          (Array.isArray(yandexOffer[key]) && yandexOffer[key].length === 0)) {
-        delete yandexOffer[key];
-      }
-    });
+        console.log(`${yandexResp.ok ? "✅" : "❌"} ${product.name}: quality=${quality}, status=${yandexResp.status}`);
 
-    console.log("📤 Sending to Yandex Market API...");
-    console.log("Offer:", JSON.stringify(yandexOffer, null, 2).substring(0, 1000));
+        // Rate limit: 500ms delay between products
+        if (productsList.length > 1) {
+          await new Promise(r => setTimeout(r, 500));
+        }
 
-    // ✅ TO'G'RI API ENDPOINT
-    const yandexResponse = await fetch(
-      `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-mappings/update`,
-      {
-        method: "POST",
-        headers: {
-          "Api-Key": YANDEX_API_KEY,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          offerMappings: [{
-            offer: yandexOffer
-          }]
-        }),
-      }
-    );
-
-    const responseText = await yandexResponse.text();
-    let yandexResult: any;
-    
-    try {
-      yandexResult = JSON.parse(responseText);
-    } catch {
-      yandexResult = { raw: responseText };
-    }
-
-    let cardUrl = `https://partner.market.yandex.ru/business/${businessId}/assortment`;
-    let cardQuality = 0;
-    let qualityBreakdown: any = {};
-
-    if (yandexResponse.ok) {
-      cardUrl = `https://partner.market.yandex.ru/business/${businessId}/assortment/offer/${encodeURIComponent(shortSKU)}`;
-      
-      // ✅ SIFAT INDEKSINI HISOBLASH (Yandex algoritmi asosida)
-      qualityBreakdown = {
-        name: optimizedData.name?.length >= 50 ? 15 : (optimizedData.name?.length >= 30 ? 10 : 5),
-        description: optimizedData.description?.length >= 400 ? 15 : (optimizedData.description?.length >= 200 ? 10 : 5),
-        pictures: productImages.length >= 5 ? 15 : (productImages.length >= 3 ? 10 : (productImages.length >= 1 ? 5 : 0)),
-        category: yandexCategory.id !== 198119 ? 10 : 5, // Aniq kategoriya
-        parameters: (optimizedData.parameterValues?.length || 0) >= 10 ? 15 : 
-                    (optimizedData.parameterValues?.length || 0) >= 5 ? 10 : 5,
-        weightDimensions: 10, // Har doim to'ldirilgan
-        barcode: 5,
-        vendor: optimizedData.vendor && optimizedData.vendor !== "OEM" ? 5 : 3,
-        manufacturerCountry: 5,
-        warranty: optimizedData.warranty ? 5 : 0,
-      };
-      
-      cardQuality = Object.values(qualityBreakdown).reduce((a: number, b: any) => a + (typeof b === 'number' ? b : 0), 0);
-      
-      console.log("✅ Yandex API success! Quality:", cardQuality);
-      console.log("📊 Quality breakdown:", qualityBreakdown);
-    } else {
-      console.error("❌ Yandex API error:", yandexResponse.status, responseText);
-    }
-
-    // Mahalliy bazaga saqlash (faqat shop_id mavjud bo'lsa)
-    let savedProduct = null;
-    if (actualShopId) {
-      const { data, error: saveError } = await supabase
-        .from("products")
-        .insert({
-          shop_id: actualShopId,
+      } catch (err: any) {
+        console.error(`❌ Error processing "${product.name}":`, err);
+        results.push({
+          success: false,
           name: product.name,
-          description: optimizedData.description || product.description,
-          price: pricing.recommendedPrice,
-          original_price: pricing.costPrice,
-          source: "ai",
-          source_url: product.sourceUrl,
-          images: productImages,
-          status: "active",
-          mxik_code: mxikData.code,
-          mxik_name: mxikData.name_uz,
-          specifications: {
-            yandex_offer_id: shortSKU,
-            yandex_business_id: businessId,
-            yandex_category_id: yandexCategory.id,
-            yandex_category_name: yandexCategory.name,
-            yandex_status: yandexResponse.ok ? "success" : "error",
-            yandex_card_quality: cardQuality,
-            yandex_quality_breakdown: qualityBreakdown,
-            barcode: barcode,
-            optimized_name: optimizedData.name,
-            vendor: optimizedData.vendor,
-            model: optimizedData.model,
-            dimensions: packageDimensions,
-            pricing: pricing,
-            parameters_count: optimizedData.parameterValues?.length || 0,
-          }
-        })
-        .select()
-        .single();
-      
-      if (saveError) {
-        console.error("Failed to save product locally:", saveError);
-      } else {
-        savedProduct = data;
+          error: err.message || "Unknown error",
+        });
       }
-    } else {
-      console.log("No valid shop_id, skipping local save");
     }
+
+    const successCount = results.filter(r => r.success).length;
+    const failedCount = results.filter(r => !r.success).length;
 
     return new Response(
       JSON.stringify({
-        success: yandexResponse.ok,
-        offerId: shortSKU,
-        barcode: barcode,
-        cardUrl: cardUrl,
-        cardQuality: cardQuality,
-        qualityBreakdown: qualityBreakdown,
-        yandexCategoryId: yandexCategory.id,
-        yandexCategoryName: yandexCategory.name,
-        mxikCode: mxikData.code,
-        mxikName: mxikData.name_uz,
-        yandexResponse: yandexResult,
-        localProduct: savedProduct,
-        optimizedData: {
-          name: optimizedData.name,
-          description: optimizedData.description?.substring(0, 200) + "...",
-          parameters_count: optimizedData.parameterValues?.length || 0,
-        },
-        dimensions: packageDimensions,
+        success: failedCount === 0,
+        total: results.length,
+        successCount,
+        failedCount,
+        results,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
+
   } catch (error) {
-    console.error("❌ Yandex Market card creation error:", error);
+    console.error("❌ Card creation error:", error);
     return new Response(
-      JSON.stringify({ 
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error" 
-      }),
+      JSON.stringify({ success: false, error: error instanceof Error ? error.message : "Unknown error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
