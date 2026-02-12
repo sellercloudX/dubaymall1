@@ -20,8 +20,15 @@ export function useMarketplaceTariffs(
   connectedMarketplaces: string[],
   store: MarketplaceDataStore
 ) {
+  // Stable key: only changes when the set of product offerIds changes, NOT on every data update
+  const productIds = connectedMarketplaces
+    .flatMap(mp => store.getProducts(mp).map(p => p.offerId))
+    .sort()
+    .join(',');
+  const stableKey = productIds.length > 0 ? productIds.substring(0, 200) : 'empty';
+
   return useQuery({
-    queryKey: ['marketplace-tariffs', connectedMarketplaces.join(','), store.dataVersion],
+    queryKey: ['marketplace-tariffs', connectedMarketplaces.join(','), stableKey],
     queryFn: async () => {
       const tariffMap = new Map<string, TariffInfo>();
 
@@ -32,7 +39,6 @@ export function useMarketplaceTariffs(
         if (products.length === 0) continue;
 
         // Build unique category+price combos with real categoryIds
-        const uniqueOffers: Array<{ categoryId: number; price: number; offerId: string }>[] = [];
         const batch: Array<{ categoryId: number; price: number; offerId: string }> = [];
         const seen = new Set<string>();
 
@@ -130,10 +136,11 @@ export function useMarketplaceTariffs(
       return tariffMap;
     },
     enabled: connectedMarketplaces.length > 0 && !store.isLoadingProducts && store.allProducts.length > 0,
-    staleTime: 1000 * 60 * 30,
+    staleTime: 1000 * 60 * 60, // 1 hour — tariffs don't change frequently
     gcTime: 1000 * 60 * 60 * 24,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
+    refetchInterval: 1000 * 60 * 60, // Refresh every 1 hour (not on every data update)
   });
 }
 
@@ -155,11 +162,25 @@ export function getTariffForProduct(
       isReal: true,
     };
   }
-  // Fallback: estimated 20% commission + 4000 logistics
+  // Fallback: Use average tariff from real data if available
+  if (tariffMap && tariffMap.size > 0) {
+    const values = Array.from(tariffMap.values());
+    const avgPercent = values.reduce((s, t) => s + t.tariffPercent, 0) / values.length;
+    const avgLogistics = values.reduce((s, t) => s + t.fulfillment + t.delivery, 0) / values.length;
+    const estCommission = price * (avgPercent / 100) * 0.6; // commission part ~60% of total tariff
+    const estLogistics = avgLogistics;
+    return {
+      commission: estCommission,
+      logistics: estLogistics,
+      totalFee: estCommission + estLogistics,
+      isReal: false,
+    };
+  }
+  // Last resort fallback: conservative 15% + 3000 logistics
   return {
-    commission: price * 0.20,
-    logistics: 4000,
-    totalFee: price * 0.20 + 4000,
+    commission: price * 0.15,
+    logistics: 3000,
+    totalFee: price * 0.15 + 3000,
     isReal: false,
   };
 }

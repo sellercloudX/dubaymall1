@@ -48,7 +48,7 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
   const isMobile = useIsMobile();
   const isLoading = store.isLoading;
   const { getCostPrice } = useCostPrices();
-  const { data: tariffMap } = useMarketplaceTariffs(connectedMarketplaces, store);
+  const { data: tariffMap, dataUpdatedAt: tariffUpdatedAt } = useMarketplaceTariffs(connectedMarketplaces, store);
 
   const products = useMemo(() => {
     if (isLoading) return [];
@@ -117,7 +117,7 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
     });
 
     return allProducts;
-  }, [connectedMarketplaces, store.dataVersion, isLoading, commissionPercent, tariffMap]);
+  }, [connectedMarketplaces, store.dataVersion, isLoading, commissionPercent, tariffUpdatedAt]);
 
   const formatPrice = (price: number) => {
     if (Math.abs(price) >= 1000000) return (price / 1000000).toFixed(1) + ' mln';

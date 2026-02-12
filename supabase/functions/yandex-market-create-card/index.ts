@@ -283,6 +283,7 @@ serve(async (req) => {
 
     let YANDEX_API_KEY: string | undefined;
     let YANDEX_CAMPAIGN_ID: string | undefined;
+    let YANDEX_BUSINESS_ID: string | undefined;
 
     if (connection) {
       // Decrypt credentials if encrypted
@@ -293,11 +294,13 @@ serve(async (req) => {
           const creds = decData as any;
           YANDEX_API_KEY = creds.apiKey;
           YANDEX_CAMPAIGN_ID = creds.campaignId || creds.sellerId;
+          YANDEX_BUSINESS_ID = creds.businessId;
         }
       } else {
         const creds = connection.credentials as any;
         YANDEX_API_KEY = creds?.apiKey;
         YANDEX_CAMPAIGN_ID = creds?.campaignId || creds?.sellerId;
+        YANDEX_BUSINESS_ID = creds?.businessId;
       }
     }
 
@@ -434,29 +437,40 @@ MUHIM: Faqat JSON formatda javob ber:
       }
     }
 
-    // Business ID ni olish
-    console.log("🔍 Getting business ID from campaign...");
-    let businessId = YANDEX_CAMPAIGN_ID;
+    // Business ID ni olish — credentials'dan yoki campaign API'dan
+    console.log("🔍 Getting business ID...");
+    let businessId = YANDEX_BUSINESS_ID || '';
     
-    try {
-      const campaignResponse = await fetch(
-        `https://api.partner.market.yandex.ru/campaigns/${YANDEX_CAMPAIGN_ID}`,
-        {
-          method: "GET",
-          headers: {
-            "Api-Key": YANDEX_API_KEY,
-            "Content-Type": "application/json",
-          },
+    if (!businessId) {
+      try {
+        const campaignResponse = await fetch(
+          `https://api.partner.market.yandex.ru/campaigns/${YANDEX_CAMPAIGN_ID}`,
+          {
+            method: "GET",
+            headers: {
+              "Api-Key": YANDEX_API_KEY,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+        
+        if (campaignResponse.ok) {
+          const campaignData = await campaignResponse.json();
+          businessId = campaignData.campaign?.business?.id?.toString() || '';
+          console.log("✅ Business ID from campaign:", businessId);
         }
-      );
-      
-      if (campaignResponse.ok) {
-        const campaignData = await campaignResponse.json();
-        businessId = campaignData.campaign?.business?.id?.toString() || YANDEX_CAMPAIGN_ID;
-        console.log("✅ Business ID:", businessId);
+      } catch (e) {
+        console.error("Failed to get business ID:", e);
       }
-    } catch (e) {
-      console.error("Failed to get business ID, using campaign ID:", e);
+    } else {
+      console.log("✅ Business ID from credentials:", businessId);
+    }
+
+    if (!businessId) {
+      return new Response(
+        JSON.stringify({ error: "Could not determine Yandex Business ID. Check marketplace connection settings." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // ✅ TO'LIQ YANDEX MARKET API PAYLOAD (100 ballik sifat uchun)
