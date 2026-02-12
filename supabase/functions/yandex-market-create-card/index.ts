@@ -358,21 +358,35 @@ ${recommended.slice(0, 80).map(formatParam).join("\n") || "Yo'q"}
 QOIDALAR:
 1. name_ru: Ruscha SEO-nom, 80-150 belgi. Format: "[Tur] [Brend] [Model] [Xususiyatlar], [rang]"
 2. name_uz: O'zbekcha LOTIN, 80-150 belgi, xuddi shunday batafsil
-3. description_ru: 800-3000 belgi ruscha professional tavsif. HTML TEGLARISIZ! 6+ paragraf.
+3. description_ru: 800-3000 belgi ruscha professional tavsif. HTML TEGLARISIZ! Faqat oddiy matn. 6+ paragraf.
 4. description_uz: 600-2000 belgi o'zbekcha LOTIN tavsif. HTML TEGLARISIZ!
 5. vendor: Aniq brend nomi
 6. vendorCode: Model artikuli
 7. manufacturerCountry: Ishlab chiqarilgan mamlakat (ruscha)
-8. parameterValues: 
-   - OPTIONS bo'lsa → valueId ishlatilsin
-   - TEXT bo'lsa → value ishlatilsin  
-   - NUMBER bo'lsa → value raqam sifatida
+8. shelfLife: Yaroqlilik muddati (oy hisobida raqam). Kosmetika=36, Oziq-ovqat=12, Elektronika=0 (bermang). Bu MAJBURIY!
+9. lifeTime: Foydalanish muddati (oy hisobida raqam). Kosmetika=36, Kiyim=24, Elektronika=60
+10. parameterValues:
+   - OPTIONS bo'lsa → valueId ishlatilsin (raqam)
+   - TEXT bo'lsa → FAQAT qiymatni yoz! NOTO'G'RI: "название: значение". TO'G'RI: "значение"
+   - NUMBER bo'lsa → value raqam sifatida, MINIMUM qiymatlarni hurmat qil!
+     * SPF-faktor: KAMIDA 1 (odatda 15, 30, 50)
+     * Hajm (ml): KAMIDA 1 
+     * Og'irlik (g): KAMIDA 1
+     * Miqdor: KAMIDA 1
    *** BARCHA MAJBURIYLARNI + KAMIDA 25 ta TAVSIYA ETILGANLARNI TO'LDIR ***
    *** BILMASANG HAM — TAXMINIY/STANDART QIYMAT YOZ! ***
-9. warranty: "1 год" yoki "2 года"
+   *** Har bir parametr uchun FAQAT value YOKI valueId ber, ikkalasini emas! ***
+11. warranty: "1 год" yoki "2 года"
+
+MUHIM XATOLARDAN SAQLANING:
+- TEXT tipidagi parametrda "название характеристики: значение" formatini ISHLATMANG! Faqat qiymatni yozing!
+  XATO: "Цвет: красный" → TO'G'RI: "красный"
+  XATO: "Объем: 50 мл" → TO'G'RI: "50"
+- NUMBER parametrlarda juda kichik qiymat bermang (minimum chegaralarni tekshiring)
+- Yaroqlilik muddati (shelfLife) — kosmetika va parfyumeriya uchun MAJBURIY
 
 JAVOB FAQAT JSON:
-{"name_ru":"...","name_uz":"...","description_ru":"...","description_uz":"...","vendor":"...","vendorCode":"...","manufacturerCountry":"...","parameterValues":[{"parameterId":123,"valueId":456},{"parameterId":789,"value":"text"}],"warranty":"1 год","adult":false}`;
+{"name_ru":"...","name_uz":"...","description_ru":"...","description_uz":"...","vendor":"...","vendorCode":"...","manufacturerCountry":"...","shelfLife":36,"lifeTime":36,"parameterValues":[{"parameterId":123,"valueId":456},{"parameterId":789,"value":"qiymat"}],"warranty":"1 год","adult":false}`;
 
   try {
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -445,7 +459,7 @@ function buildOffer(
     console.log(`🖼️ ${offer.pictures.length} images added`);
   }
 
-  // Parameters — filter out picker/URL params that cause INVALID_PICKER_URL
+  // Parameters — filter out picker/URL params and sanitize values
   const BLOCKED_PARAM_IDS = [40164890]; // Known picker URL params
   if (ai?.parameterValues?.length) {
     offer.parameterValues = ai.parameterValues
@@ -453,12 +467,33 @@ function buildOffer(
       .filter((p: any) => !BLOCKED_PARAM_IDS.includes(Number(p.parameterId)))
       .map((p: any) => {
         const pv: any = { parameterId: Number(p.parameterId) };
-        if (p.valueId !== undefined) pv.valueId = Number(p.valueId);
-        else if (p.value !== undefined) pv.value = String(p.value);
+        if (p.valueId !== undefined && p.valueId !== null) {
+          pv.valueId = Number(p.valueId);
+        } else if (p.value !== undefined) {
+          // Strip "название: значение" format → keep only value part
+          let val = String(p.value);
+          // Remove patterns like "Название характеристики: " or "Цвет: "
+          val = val.replace(/^[А-Яа-яA-Za-z\s\-()]+:\s*/u, '');
+          // For numeric-looking values, ensure they're reasonable
+          const numVal = parseFloat(val);
+          if (!isNaN(numVal) && numVal < 1 && numVal >= 0) {
+            val = "1"; // Minimum value fix for SPF, volume, etc.
+          }
+          pv.value = val;
+        }
         if (p.unitId) pv.unitId = String(p.unitId);
         return pv;
       });
-    console.log(`📊 ${offer.parameterValues.length} params (filtered)`);
+    console.log(`📊 ${offer.parameterValues.length} params (filtered & sanitized)`);
+  }
+
+  // Shelf life (Yaroqlilik muddati) — required for cosmetics, food, etc.
+  if (ai?.shelfLife && ai.shelfLife > 0) {
+    offer.shelfLife = { timePeriod: ai.shelfLife, timeUnit: "MONTH" };
+  }
+  // Life time (Foydalanish muddati)
+  if (ai?.lifeTime && ai.lifeTime > 0) {
+    offer.lifeTime = { timePeriod: ai.lifeTime, timeUnit: "MONTH" };
   }
 
   // Warranty
@@ -546,12 +581,73 @@ serve(async (req) => {
         const sku = generateSKU(product.name);
         const barcode = product.barcode || generateEAN13();
 
-        // ═══ STEP 1: Proxy images ═══
+        // ═══ STEP 1: Proxy images + generate if not enough ═══
         const rawImgs: string[] = [];
         if (product.images?.length) rawImgs.push(...product.images);
         if (product.image && !rawImgs.includes(product.image)) rawImgs.unshift(product.image);
-        const images = await proxyImagesToStorage(supabase, user.id, rawImgs, SUPABASE_URL);
-        console.log(`🖼️ ${images.length}/${rawImgs.length} images proxied`);
+        let images = await proxyImagesToStorage(supabase, user.id, rawImgs, SUPABASE_URL);
+        
+        // Generate additional product images if we have less than 4
+        if (images.length < 4 && LOVABLE_KEY) {
+          console.log(`🖼️ Only ${images.length} images, generating more...`);
+          const sourceImg = images[0] || null;
+          const angles = [
+            `Front view of "${product.name}" on pure white studio background, professional product photography, high resolution, no text`,
+            `45-degree angle view of "${product.name}" on white background, showing product details, professional studio lighting`,
+            `Close-up detail shot of "${product.name}" showing texture and quality, white background, macro product photography`,
+            `Back/side view of "${product.name}" on white background, showing packaging or label details, studio photography`,
+            `Lifestyle context photo of "${product.name}" in elegant setting, soft natural lighting, professional composition`,
+            `Top-down flat lay of "${product.name}" with minimal props, clean aesthetic, professional product photography`,
+          ];
+          
+          const needed = Math.min(6 - images.length, angles.length);
+          for (let i = 0; i < needed; i++) {
+            try {
+              const body: any = {
+                model: "google/gemini-2.5-flash-image",
+                modalities: ["image", "text"],
+                messages: [{
+                  role: "user",
+                  content: sourceImg ? [
+                    { type: "text", text: `Based on this EXACT product, create: ${angles[i]}. The product must look IDENTICAL to the reference image. Only change the angle/background. Do NOT change the product itself.` },
+                    { type: "image_url", image_url: { url: sourceImg } }
+                  ] : angles[i]
+                }],
+              };
+              
+              const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+                method: "POST",
+                headers: { Authorization: `Bearer ${LOVABLE_KEY}`, "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+              });
+              
+              if (res.ok) {
+                const data = await res.json();
+                const imgData = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+                if (imgData && imgData.startsWith("data:image")) {
+                  // Upload base64 to storage
+                  const base64 = imgData.split(",")[1];
+                  const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+                  const fileName = `${user.id}/ym-gen-${Date.now()}-${i}.png`;
+                  const { error } = await supabase.storage.from('product-images').upload(fileName, bytes, {
+                    contentType: 'image/png', cacheControl: '31536000', upsert: false,
+                  });
+                  if (!error) {
+                    const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(fileName);
+                    if (urlData?.publicUrl) {
+                      images.push(urlData.publicUrl);
+                      console.log(`✅ Generated image ${i + 1}`);
+                    }
+                  }
+                }
+              }
+              await new Promise(r => setTimeout(r, 800)); // Rate limit
+            } catch (e) {
+              console.error(`Image gen ${i} error:`, e);
+            }
+          }
+        }
+        console.log(`🖼️ Total ${images.length} images ready`);
 
         // ═══ STEP 2: Find LEAF category from Yandex tree ═══
         const leafCat = await findLeafCategory(creds.apiKey, product.name, product.description || "", LOVABLE_KEY);
