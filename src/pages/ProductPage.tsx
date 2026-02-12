@@ -277,7 +277,7 @@ export default function ProductPage() {
       </div>
 
 
-      <div className="w-full md:container md:mx-auto px-3 md:px-4 py-0 md:py-6 pb-24 md:max-w-5xl">
+      <div className="w-full md:container md:mx-auto md:px-4 py-0 md:py-6 pb-24 md:max-w-5xl overflow-x-hidden">
         {/* Desktop Breadcrumb */}
         <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground mb-6 px-4 md:px-0">
           <Link to="/" className="hover:text-primary">{t.marketplace}</Link>
