@@ -201,7 +201,9 @@ async function fetchCategoryParameters(apiKey: string, categoryId: number): Prom
       return [];
     }
     const data = await resp.json();
-    return data.result?.parameters || [];
+    const params = data.result?.parameters || [];
+    console.log(`📋 Raw params count: ${params.length}`);
+    return params;
   } catch (e) {
     console.error("Category params fetch error:", e);
     return [];
@@ -216,74 +218,85 @@ async function optimizeWithAI(
   categoryParams: any[],
   lovableApiKey: string
 ): Promise<any> {
-  // Build parameter descriptions for AI
-  const requiredParams = categoryParams
-    .filter((p: any) => p.required || p.constraintType === "REQUIRED")
-    .slice(0, 30);
-  
-  const allParams = categoryParams.slice(0, 50);
+  // Separate params into groups for clarity
+  const requiredParams = categoryParams.filter((p: any) => p.required || p.constraintType === "REQUIRED");
+  const recommendedParams = categoryParams.filter((p: any) => !p.required && p.constraintType !== "REQUIRED");
 
-  const paramDescriptions = allParams.map((p: any) => {
-    let desc = `- ID: ${p.id}, Name: "${p.name}"`;
-    if (p.type) desc += `, Type: ${p.type}`;
+  // Build DETAILED parameter list for AI - ALL parameters, not just 50
+  const formatParam = (p: any) => {
+    let desc = `  - parameterId: ${p.id}, name: "${p.name}", type: ${p.type || "TEXT"}`;
+    if (p.unit) desc += `, unit: "${p.unit}"`;
     if (p.values?.length) {
-      const vals = p.values.slice(0, 10).map((v: any) => `${v.id}:"${v.value}"`).join(", ");
-      desc += `, Values: [${vals}]`;
+      const vals = p.values.slice(0, 15).map((v: any) => `{valueId:${v.id}, value:"${v.value}"}`).join(", ");
+      desc += `\n    OPTIONS: [${vals}]`;
+      if (p.values.length > 15) desc += ` ... +${p.values.length - 15} more`;
     }
-    if (p.required) desc += ` [REQUIRED]`;
     return desc;
-  }).join("\n");
+  };
 
-  const prompt = `Sen Yandex Market uchun PROFESSIONAL kartochka yaratuvchisan.
-Mahsulot: ${product.name}
-Tavsif: ${product.description || "Yo'q"}
-Kategoriya: ${categoryName}
-Brend: ${product.brand || "Aniqlanmagan"}
-Rang: ${product.color || ""}
-Model: ${product.model || ""}
+  const requiredList = requiredParams.map(formatParam).join("\n");
+  const recommendedList = recommendedParams.slice(0, 60).map(formatParam).join("\n");
 
-YANDEX KATEGORIYA PARAMETRLARI (ALBATTA TO'LDIR!):
-${paramDescriptions}
+  const prompt = `Sen Yandex Market uchun PROFESSIONAL kartochka yaratuvchi AI san. Sening vazifang — mahsulot kartochkasini 95+ ball sifatida yaratish.
 
-TALABLAR:
-1. name_ru: Ruscha nom — JUDA BATAFSIL, TIP + BREND + MODEL + ASOSIY XUSUSIYATLAR formatida.
-   MINIMUM 50 belgi, MAKSIMUM 150 belgi. SEO uchun optimallashtirilgan.
-   Misol: "Смартфон Samsung Galaxy A55 5G 128 ГБ, 8 ГБ ОЗУ, Super AMOLED, камера 50 Мп, синий"
+MAHSULOT MA'LUMOTLARI:
+- Nomi: ${product.name}
+- Tavsif: ${product.description || "Tavsif yo'q — o'zing yoz!"}
+- Kategoriya: ${categoryName}
+- Brend: ${product.brand || "Mahsulot nomidan aniqla"}
+- Rang: ${product.color || "Mahsulot nomidan aniqla"}
+- Model: ${product.model || "Mahsulot nomidan aniqla"}
+- Narx: ${product.price} UZS
+
+════════════════════════════════════════
+MAJBURIY PARAMETRLAR (BARCHASINI TO'LDIR!):
+${requiredList || "Yo'q"}
+
+TAVSIYA ETILGAN PARAMETRLAR (IMKON QADAR BARCHASINI TO'LDIR!):
+${recommendedList || "Yo'q"}
+════════════════════════════════════════
+
+QOIDALAR:
+1. name_ru: Ruscha SEO-nom. ANIQ FORMAT: "[Tovar turi] [Brend] [Model] [Asosiy xususiyatlar]"
+   MINIMUM 60 belgi, MAKSIMUM 150 belgi.
+   Misol: "Смартфон Samsung Galaxy A55 5G 8/128 ГБ, экран Super AMOLED 6.6\", камера 50 Мп, аккумулятор 5000 мАч, синий"
+
+2. name_uz: O'zbekcha nom LOTIN alifbosida, xuddi shunday batafsil, 60-150 belgi.
+   Misol: "Samsung Galaxy A55 5G smartfoni, 8/128 GB, Super AMOLED 6.6\" ekran, 50 MP kamera, 5000 mAh batareya, ko'k"
+
+3. description_ru: Batafsil ruscha tavsif, 800-3000 belgi. HTML TEGLARISIZ!
+   Tarkibi: Umumiy, Texnik xususiyatlar, Kamera, Batareya, Ekran, Qo'shimcha ma'lumot.
+
+4. description_uz: O'zbekcha (LOTIN) batafsil tavsif, 600-2000 belgi. HTML TEGLARISIZ!
+
+5. vendor: Brend nomi (Samsung, Apple, Xiaomi va h.k.)
+6. vendorCode: Model artikuli (masalan "SM-A556E")
+7. manufacturerCountry: Ishlab chiqarilgan mamlakat ruscha
+
+8. parameterValues: *** ENG MUHIM QISM! ***
+   Har bir parametr uchun:
+   - Agar OPTIONS ro'yxati bo'lsa → valueId ishlatilsin (faqat ro'yxatdagi qiymatlardan!)
+   - Agar TEXT turi bo'lsa → value ishlatilsin
+   - Agar raqamli bo'lsa → value raqam sifatida berilsin
    
-2. name_uz: O'zbekcha nom (LOTIN alifbosi), xuddi shunday batafsil format, 50-150 belgi.
-   Misol: "Samsung Galaxy A55 5G smartfoni, 128 GB xotira, 8 GB RAM, Super AMOLED ekran, 50 MP kamera, ko'k rang"
+   *** BARCHA MAJBURIY PARAMETRLARNI TO'LDIR ***
+   *** TAVSIYA ETILGANLARDAN HAM KAMIDA 20 TASINI TO'LDIR ***
+   *** JAMI KAMIDA 25 TA PARAMETR BO'LISHI SHART ***
 
-3. description_ru: Ruscha batafsil tavsif, 500-2000 belgi, HTML teglarisiz.
-   Mahsulotning BARCHA asosiy afzalliklari, texnik xususiyatlari va foydalanish holatlari.
+9. warranty: Kafolat (masalan "1 год")
 
-4. description_uz: O'zbekcha (LOTIN) batafsil tavsif, 400-1500 belgi, HTML teglarisiz.
-
-5. vendor: Brend nomi (aniq)
-6. vendorCode: Ishlab chiqaruvchi artikuli (model raqami)
-7. manufacturerCountry: Ishlab chiqarilgan mamlakat (ruscha)
-
-8. parameterValues: BARCHA yuqoridagi parametrlarni to'ldir!
-   Agar parametrda values ro'yxati bo'lsa, valueId ishlatilsin.
-   Agar erkin matn bo'lsa, value ishlatilsin.
-   Format: [{"parameterId": ID, "value": "qiymat"} yoki {"parameterId": ID, "valueId": ID}]
-   KAMIDA 15 ta parametr to'ldirish SHART!
-
-9. warranty: Kafolat muddati (masalan "1 год" yoki "2 года")
-
-MUHIM: HTML teglarini ISHLATMA. Faqat oddiy matn.
-
-JAVOBNI FAQAT JSON FORMATDA BER:
+JAVOB FAQAT JSON:
 {
-  "name_ru": "...(50-150 belgi, SEO optimallashtirilgan)...",
-  "name_uz": "...(50-150 belgi, lotin alifbosida)...",
-  "description_ru": "...(500-2000 belgi)...",
-  "description_uz": "...(400-1500 belgi)...",
+  "name_ru": "...",
+  "name_uz": "...",
+  "description_ru": "...",
+  "description_uz": "...",
   "vendor": "...",
   "vendorCode": "...",
   "manufacturerCountry": "...",
   "parameterValues": [
-    {"parameterId": 123, "value": "qiymat"},
-    {"parameterId": 456, "valueId": 789}
+    {"parameterId": 123, "valueId": 456},
+    {"parameterId": 789, "value": "qiymat"}
   ],
   "warranty": "1 год",
   "adult": false
@@ -299,7 +312,8 @@ JAVOBNI FAQAT JSON FORMATDA BER:
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.3,
+        temperature: 0.2,
+        max_tokens: 4000,
       }),
     });
 
@@ -312,7 +326,9 @@ JAVOBNI FAQAT JSON FORMATDA BER:
     const content = data.choices?.[0]?.message?.content || "";
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
+      const result = JSON.parse(jsonMatch[0]);
+      console.log(`🤖 AI result: name_ru=${result.name_ru?.length}ch, name_uz=${result.name_uz?.length}ch, params=${result.parameterValues?.length}`);
+      return result;
     }
   } catch (e) {
     console.error("AI optimization error:", e);
@@ -332,19 +348,29 @@ function buildYandexOffer(
   mxik: { code: string; name_uz: string },
   price: number
 ): any {
-  const images = (product.images || []).filter(img => img?.startsWith('http')).slice(0, 10);
-  if (!images.length && product.image?.startsWith('http')) images.push(product.image);
+  // Collect ALL available images
+  const allImages: string[] = [];
+  if (product.images?.length) {
+    for (const img of product.images) {
+      if (img && typeof img === 'string' && (img.startsWith('http://') || img.startsWith('https://'))) {
+        allImages.push(img);
+      }
+    }
+  }
+  if (product.image && typeof product.image === 'string' && (product.image.startsWith('http://') || product.image.startsWith('https://')) && !allImages.includes(product.image)) {
+    allImages.unshift(product.image);
+  }
+  const images = allImages.slice(0, 10);
 
   const name = stripHtml(ai?.name_ru || product.name);
   const description = stripHtml(ai?.description_ru || product.description || product.name);
 
   const offer: any = {
     offerId: sku,
-    name: name.substring(0, 150),
+    name: name.length >= 50 ? name.substring(0, 150) : name.padEnd(50, ' ').substring(0, 150),
     marketCategoryId: category.id,
-    pictures: images,
     vendor: ai?.vendor || product.brand || "OEM",
-    description: description.substring(0, 6000),
+    description: description.length >= 500 ? description.substring(0, 6000) : description.substring(0, 6000),
     barcodes: [barcode],
     vendorCode: ai?.vendorCode || sku,
     manufacturerCountries: [ai?.manufacturerCountry || "Китай"],
@@ -358,7 +384,6 @@ function buildYandexOffer(
       value: price,
       currencyId: "UZS",
     },
-    // IKPU code in proper format
     commodityCodes: [
       {
         code: mxik.code,
@@ -369,18 +394,23 @@ function buildYandexOffer(
     adult: ai?.adult || false,
   };
 
-  // parameterValues — the KEY missing piece for characteristics (25+ points)
+  // Add images only if we have them
+  if (images.length > 0) {
+    offer.pictures = images;
+  }
+
+  // parameterValues — fill ALL params from AI
   if (ai?.parameterValues?.length) {
     offer.parameterValues = ai.parameterValues
-      .filter((p: any) => p.parameterId && (p.value || p.valueId))
+      .filter((p: any) => p.parameterId && (p.value !== undefined || p.valueId !== undefined))
       .map((p: any) => {
-        const pv: any = { parameterId: p.parameterId };
-        if (p.valueId) pv.valueId = p.valueId;
-        else if (p.value) pv.value = String(p.value);
-        if (p.unitId) pv.unitId = p.unitId;
+        const pv: any = { parameterId: Number(p.parameterId) };
+        if (p.valueId !== undefined) pv.valueId = Number(p.valueId);
+        else if (p.value !== undefined) pv.value = String(p.value);
+        if (p.unitId) pv.unitId = String(p.unitId);
         return pv;
-      })
-      .slice(0, 50);
+      });
+    console.log(`📊 Total parameterValues: ${offer.parameterValues.length}`);
   }
 
   // Warranty
@@ -396,10 +426,10 @@ function buildYandexOffer(
     }
   }
 
-  // Clean undefined/null/empty
+  // Clean undefined/null (but keep empty arrays if needed)
   for (const key of Object.keys(offer)) {
     const v = offer[key];
-    if (v === undefined || v === null || (Array.isArray(v) && v.length === 0)) {
+    if (v === undefined || v === null) {
       delete offer[key];
     }
   }
