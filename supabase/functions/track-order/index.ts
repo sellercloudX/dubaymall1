@@ -12,6 +12,25 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // API key YOKI Supabase auth tekshirish (web tracking sahifasi uchun)
+    const apiKey = req.headers.get("x-api-key");
+    const authHeader = req.headers.get("authorization");
+    const validKey = Deno.env.get("DUBAYMALL_API_KEY");
+    
+    if (!apiKey && !authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized: x-api-key yoki authorization header kerak" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    if (apiKey && apiKey !== validKey) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized: noto'g'ri API key" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
