@@ -132,23 +132,39 @@ export function useMarketplaceConnections(): UseMarketplaceConnectionsReturn {
     if (!connection) return;
 
     try {
-      // Fetch products count
-      const productsResult = await fetchMarketplaceData(marketplace, 'products', { limit: 1 });
-      const ordersResult = await fetchMarketplaceData(marketplace, 'orders');
+      // Fetch actual products and orders counts
+      const [productsResult, ordersResult] = await Promise.all([
+        fetchMarketplaceData(marketplace, 'products', { limit: 200, fetchAll: true }),
+        fetchMarketplaceData(marketplace, 'orders', { fetchAll: true }),
+      ]);
 
-      // Update local state with new data
+      const productsCount = productsResult.data?.length || 0;
+      const ordersCount = ordersResult.data?.length || 0;
+
+      // Update connection stats in database
+      await supabase
+        .from('marketplace_connections')
+        .update({
+          products_count: productsCount,
+          orders_count: ordersCount,
+          last_sync_at: new Date().toISOString(),
+        })
+        .eq('id', connection.id);
+
+      // Update local state
       setConnections(prev => prev.map(c => 
         c.marketplace === marketplace 
           ? {
               ...c,
-               products_count: productsResult.data?.length || c.products_count,
-              orders_count: ordersResult.total || ordersResult.data?.length || c.orders_count,
+              products_count: productsCount,
+              orders_count: ordersCount,
               last_sync_at: new Date().toISOString(),
             }
           : c
       ));
     } catch (err) {
       console.error('Sync error:', err);
+      throw err;
     }
   };
 

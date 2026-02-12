@@ -17,31 +17,7 @@ import {
   Link2, Check, ExternalLink, Loader2, 
   Settings, RefreshCw, AlertCircle, Package, ShoppingCart, TrendingUp
 } from 'lucide-react';
-import { useMarketplaceProducts, useMarketplaceOrders } from '@/hooks/useMarketplaceData';
-
-// Component to show actual product count from fetched data
-function ProductCountDisplay({ marketplace }: { marketplace: string }) {
-  const { data: productsData, isLoading } = useMarketplaceProducts(marketplace);
-  const count = productsData?.data?.length || 0;
-  
-  return (
-    <div className="text-lg font-bold">
-      {isLoading ? '...' : new Intl.NumberFormat('uz-UZ').format(count)}
-    </div>
-  );
-}
-
-// Component to show actual order count from fetched data
-function OrderCountDisplay({ marketplace }: { marketplace: string }) {
-  const { data: ordersData, isLoading } = useMarketplaceOrders(marketplace);
-  const count = ordersData?.data?.length || 0;
-  
-  return (
-    <div className="text-lg font-bold">
-      {isLoading ? '...' : new Intl.NumberFormat('uz-UZ').format(count)}
-    </div>
-  );
-}
+import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 
 interface MarketplaceConnection {
   id: string;
@@ -128,6 +104,7 @@ interface MarketplaceOAuthProps {
   connectMarketplace: (marketplace: string, credentials: Record<string, string>) => Promise<{ success: boolean; error?: string; data?: any }>;
   syncMarketplace: (marketplace: string) => Promise<void>;
   onConnect?: (marketplace: string) => void;
+  store?: MarketplaceDataStore;
 }
 
 export function MarketplaceOAuth({ 
@@ -135,7 +112,8 @@ export function MarketplaceOAuth({
   isLoading, 
   connectMarketplace, 
   syncMarketplace,
-  onConnect 
+  onConnect,
+  store,
 }: MarketplaceOAuthProps) {
   
   const [connectingId, setConnectingId] = useState<string | null>(null);
@@ -310,12 +288,16 @@ export function MarketplaceOAuth({
                           <div className="grid grid-cols-3 gap-2 text-center">
                             <div className="p-2 rounded-lg bg-muted/50">
                               <Package className="h-4 w-4 mx-auto text-muted-foreground mb-1" />
-                              <ProductCountDisplay marketplace={mp.id} />
+                              <div className="text-lg font-bold">
+                                {store?.isLoadingProducts ? '...' : formatNumber(store?.getProducts(mp.id)?.length || connection.products_count)}
+                              </div>
                               <div className="text-xs text-muted-foreground">Mahsulotlar</div>
                             </div>
                             <div className="p-2 rounded-lg bg-muted/50">
                               <ShoppingCart className="h-4 w-4 mx-auto text-muted-foreground mb-1" />
-                              <OrderCountDisplay marketplace={mp.id} />
+                              <div className="text-lg font-bold">
+                                {store?.isLoadingOrders ? '...' : formatNumber(store?.getOrders(mp.id)?.length || connection.orders_count)}
+                              </div>
                               <div className="text-xs text-muted-foreground">Buyurtmalar</div>
                             </div>
                             <div className="p-2 rounded-lg bg-muted/50">

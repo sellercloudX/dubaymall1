@@ -36,7 +36,7 @@ import {
   Loader2, Globe, Package, ShoppingCart, BarChart3, 
   Scan, Crown, Check, ArrowRight, ArrowDownUp, DollarSign,
   Upload, Bell, FileSpreadsheet, CreditCard, Calculator, AlertTriangle,
-  Shield, Copy, AlertOctagon, Wrench
+  Shield, Copy, AlertOctagon, Wrench, RefreshCw
 } from 'lucide-react';
 
 export default function SellerCloudX() {
@@ -194,6 +194,19 @@ export default function SellerCloudX() {
           </CardContent></Card>
         )}
 
+        {store.hasError && (
+          <Card className="border-destructive/50 bg-destructive/5 mb-6"><CardContent className="pt-6">
+            <div className="flex items-start gap-4"><AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+              <div className="flex-1"><h4 className="font-semibold text-destructive text-sm">Ma'lumot yuklashda xatolik</h4>
+                <p className="text-xs text-muted-foreground mt-1">Ba'zi marketplace ma'lumotlari yuklanmadi. Qayta urinib ko'ring.</p>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => store.refetchAll()} disabled={store.isFetching}>
+                <RefreshCw className={`h-4 w-4 ${store.isFetching ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
+          </CardContent></Card>
+        )}
+
         {!hasAccess ? (
           // When access is restricted, only show subscription tab
           <Tabs defaultValue="subscription" className="space-y-6">
@@ -218,7 +231,7 @@ export default function SellerCloudX() {
             </TabsList>
 
             <TabsContent value="marketplaces">
-              <MarketplaceOAuth connections={connections} isLoading={connectionsLoading} connectMarketplace={connectMarketplace} syncMarketplace={syncMarketplace} onConnect={handleMarketplaceConnect} />
+              <MarketplaceOAuth connections={connections} isLoading={connectionsLoading} connectMarketplace={connectMarketplace} syncMarketplace={syncMarketplace} onConnect={handleMarketplaceConnect} store={store} />
             </TabsContent>
             <TabsContent value="scanner">
               {connectedMarketplaces.length > 0 ? <AIScannerPro shopId="sellercloud" /> : (
