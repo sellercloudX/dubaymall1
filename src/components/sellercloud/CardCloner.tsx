@@ -12,6 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useShop } from '@/hooks/useShop';
 import { useProducts } from '@/hooks/useProducts';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCategories } from '@/hooks/useCategories';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 
 interface CardClonerProps {
@@ -39,10 +40,33 @@ const MARKETPLACE_INFO: Record<string, { name: string; logo: string; color: stri
   ozon: { name: 'Ozon', logo: '🔵', color: 'from-blue-500 to-cyan-500' },
 };
 
+// Auto-categorize based on product name keywords
+const CATEGORY_KEYWORDS: Record<string, string[]> = {
+  'electronics': ['камера', 'camera', 'фен', 'trimmer', 'триммер', 'пистолет', 'зарядка', 'наушники', 'колонка', 'bluetooth', 'usb', 'led', 'лампа', 'фонарь', 'часы', 'watch', 'power bank', 'кабель', 'адаптер', 'электро', 'мини-камера', 'wi-fi', 'wifi', 'ip-камера', 'термо'],
+  'beauty': ['крем', 'гель', 'маска', 'сыворотка', 'шампунь', 'мыло', 'скраб', 'парфюм', 'духи', 'косметик', 'ресниц', 'бровей', 'пилинг', 'увлажн', 'отбелив', 'тампон', 'интимн', 'волос', 'кожи', 'лица', 'serum', 'cream', 'soap', 'perfume', 'lash', 'hair', 'skin'],
+  'clothing': ['платье', 'рубашк', 'футболк', 'штан', 'джинс', 'куртк', 'пальто', 'костюм', 'юбка', 'носки', 'белье', 'кроссовк', 'обувь', 'сумк', 'кошелек', 'ремень', 'шарф', 'перчатк', 'шапк'],
+  'home-garden': ['подушк', 'одеял', 'полотенц', 'ковер', 'штор', 'посуд', 'кастрюл', 'сковород', 'кухн', 'ванн', 'хранен', 'органайзер', 'уборк', 'мебел'],
+  'kids': ['детск', 'ребенк', 'игрушк', 'коляск', 'подгузник', 'baby', 'малыш'],
+  'sports': ['спорт', 'тренажер', 'гантел', 'фитнес', 'йога', 'велосипед', 'мяч'],
+  'food': ['чай', 'кофе', 'мед', 'шоколад', 'витамин', 'бад', 'орех'],
+  'auto': ['авто', 'машин', 'руль', 'шин', 'масло', 'двигател'],
+};
+
+function detectCategorySlug(productName: string): string | null {
+  const lower = productName.toLowerCase();
+  for (const [slug, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
+    if (keywords.some(kw => lower.includes(kw))) {
+      return slug;
+    }
+  }
+  return null;
+}
+
 export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
   const { user } = useAuth();
   const { shop } = useShop();
   const { products: dubayMallProducts, createProduct } = useProducts(shop?.id || null);
+  const { categories } = useCategories();
 
   // All available sources: DubayMall + connected marketplaces
   const allSources = useMemo(() => ['dubaymall', ...connectedMarketplaces], [connectedMarketplaces]);
@@ -153,6 +177,11 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
     try {
       // Filter valid image URLs
       const validImages = (product.pictures || []).filter(img => img && img.startsWith('http'));
+      
+      // Auto-detect category
+      const detectedSlug = detectCategorySlug(product.name);
+      const matchedCategory = detectedSlug ? categories.find(c => c.slug === detectedSlug) : null;
+      
       await createProduct({
         name: product.name,
         price: product.price,
@@ -162,6 +191,8 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
         stock_quantity: 0,
         source: 'manual' as any,
         status: 'draft' as any,
+        category_id: matchedCategory?.id || null,
+        free_shipping: true,
       });
       return true;
     } catch (err: any) {

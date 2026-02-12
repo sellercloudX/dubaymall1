@@ -492,7 +492,7 @@ export default function CheckoutPage() {
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm line-clamp-1">{item.product?.name}</p>
+                        <p className="text-sm line-clamp-1">{item.product?.name?.replace(/<br\s*\/?>/gi, ' ').replace(/\s+/g, ' ').trim()}</p>
                         <p className="text-xs text-muted-foreground">{item.quantity} x {formatPrice(item.product?.price || 0)}</p>
                       </div>
                       <p className="text-sm font-medium">
