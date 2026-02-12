@@ -6,6 +6,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const YANDEX_API = "https://api.partner.market.yandex.ru/v2";
+
 // ============ TYPES ============
 
 interface ProductInput {
@@ -41,13 +43,11 @@ interface CreateCardRequest {
   shopId?: string;
   product: ProductInput;
   pricing: PricingInput;
-  // Batch mode: multiple products at once
   products?: ProductInput[];
 }
 
 // ============ HELPERS ============
 
-/** Generate EAN-13 barcode (200-prefix = internal use) */
 function generateEAN13(): string {
   let code = "200";
   for (let i = 0; i < 9; i++) code += Math.floor(Math.random() * 10).toString();
@@ -56,7 +56,6 @@ function generateEAN13(): string {
   return code + ((10 - (sum % 10)) % 10).toString();
 }
 
-/** Generate short SKU */
 function generateSKU(name: string): string {
   const words = name.split(/\s+/).slice(0, 2);
   const prefix = words.map(w => w.substring(0, 4).toUpperCase()).join("");
@@ -65,8 +64,11 @@ function generateSKU(name: string): string {
   return `${prefix}-${rnd}-${ts}`;
 }
 
-/** Estimate package dimensions by category */
-function estimateDimensions(category: string): { length: number; width: number; height: number; weight: number } {
+function stripHtml(text: string): string {
+  return text.replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function estimateDimensions(category: string) {
   const dims: Record<string, { length: number; width: number; height: number; weight: number }> = {
     phone: { length: 18, width: 10, height: 6, weight: 0.3 },
     laptop: { length: 40, width: 30, height: 5, weight: 2.5 },
@@ -90,7 +92,6 @@ function estimateDimensions(category: string): { length: number; width: number; 
   return dims[category] || dims.default;
 }
 
-/** Detect product category from name */
 function detectCategory(name: string, desc?: string): string {
   const text = `${name} ${desc || ""}`.toLowerCase();
   const map: [string, string[]][] = [
@@ -118,20 +119,6 @@ function detectCategory(name: string, desc?: string): string {
   return "default";
 }
 
-/** MXIK code lookup from database */
-async function lookupMXIK(supabase: any, name: string): Promise<{ code: string; name_uz: string }> {
-  const DEFAULT = { code: "46901100001000000", name_uz: "Boshqa tovarlar" };
-  try {
-    const keywords = name.toLowerCase().replace(/[^\w\s\u0400-\u04FF]/g, ' ').split(/\s+/).filter(w => w.length > 2).slice(0, 3);
-    for (const kw of keywords) {
-      const { data } = await supabase.from('mxik_codes').select('code, name_uz').or(`name_uz.ilike.%${kw}%,name_ru.ilike.%${kw}%`).eq('is_active', true).limit(1);
-      if (data?.length) return data[0];
-    }
-  } catch (e) { console.error('MXIK lookup failed:', e); }
-  return DEFAULT;
-}
-
-/** Yandex Market category IDs */
 const YANDEX_CATEGORIES: Record<string, { id: number; name: string }> = {
   phone: { id: 91491, name: "Смартфоны" },
   laptop: { id: 91013, name: "Ноутбуки" },
@@ -153,42 +140,40 @@ const YANDEX_CATEGORIES: Record<string, { id: number; name: string }> = {
   default: { id: 198119, name: "Электроника" },
 };
 
-/** Get Yandex credentials from user's marketplace_connections */
-async function getYandexCredentials(supabase: any, userId: string): Promise<{
-  apiKey: string; campaignId: string; businessId: string; shopId?: string;
-} | null> {
-  const { data: connection } = await supabase
-    .from("marketplace_connections")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("marketplace", "yandex")
-    .eq("is_active", true)
-    .limit(1)
-    .single();
+async function lookupMXIK(supabase: any, name: string): Promise<{ code: string; name_uz: string }> {
+  const DEFAULT = { code: "46901100001000000", name_uz: "Boshqa tovarlar" };
+  try {
+    const keywords = name.toLowerCase().replace(/[^\w\s\u0400-\u04FF]/g, ' ').split(/\s+/).filter(w => w.length > 2).slice(0, 3);
+    for (const kw of keywords) {
+      const { data } = await supabase.from('mxik_codes').select('code, name_uz').or(`name_uz.ilike.%${kw}%,name_ru.ilike.%${kw}%`).eq('is_active', true).limit(1);
+      if (data?.length) return data[0];
+    }
+  } catch (e) { console.error('MXIK lookup failed:', e); }
+  return DEFAULT;
+}
 
+async function getYandexCredentials(supabase: any, userId: string) {
+  const { data: connection } = await supabase
+    .from("marketplace_connections").select("*")
+    .eq("user_id", userId).eq("marketplace", "yandex").eq("is_active", true)
+    .limit(1).single();
   if (!connection) return null;
 
   let apiKey = "", campaignId = "", businessId = "";
-
   if (connection.encrypted_credentials) {
     const { data, error } = await supabase.rpc("decrypt_credentials", { p_encrypted: connection.encrypted_credentials });
     if (!error && data) {
       const c = data as any;
-      apiKey = c.apiKey || "";
-      campaignId = c.campaignId || c.sellerId || "";
-      businessId = c.businessId || "";
+      apiKey = c.apiKey || ""; campaignId = c.campaignId || c.sellerId || ""; businessId = c.businessId || "";
     }
   } else {
     const c = connection.credentials as any;
-    apiKey = c?.apiKey || "";
-    campaignId = c?.campaignId || c?.sellerId || "";
-    businessId = c?.businessId || "";
+    apiKey = c?.apiKey || ""; campaignId = c?.campaignId || c?.sellerId || ""; businessId = c?.businessId || "";
   }
 
-  // Fallback: get businessId from campaign API
   if (apiKey && campaignId && !businessId) {
     try {
-      const resp = await fetch(`https://api.partner.market.yandex.ru/campaigns/${campaignId}`, {
+      const resp = await fetch(`${YANDEX_API.replace('/v2', '')}/campaigns/${campaignId}`, {
         headers: { "Api-Key": apiKey, "Content-Type": "application/json" },
       });
       if (resp.ok) {
@@ -199,52 +184,108 @@ async function getYandexCredentials(supabase: any, userId: string): Promise<{
   }
 
   if (!apiKey || !businessId) return null;
-
   return { apiKey, campaignId, businessId, shopId: connection.shop_id };
 }
 
-/** AI-powered card optimization — fills all Excel template fields */
+// ============ FETCH CATEGORY PARAMETERS FROM YANDEX ============
+
+async function fetchCategoryParameters(apiKey: string, categoryId: number): Promise<any[]> {
+  try {
+    const resp = await fetch(`${YANDEX_API}/category/${categoryId}/parameters`, {
+      method: "POST",
+      headers: { "Api-Key": apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    if (!resp.ok) {
+      console.error(`Failed to fetch category params: ${resp.status}`);
+      return [];
+    }
+    const data = await resp.json();
+    return data.result?.parameters || [];
+  } catch (e) {
+    console.error("Category params fetch error:", e);
+    return [];
+  }
+}
+
+// ============ AI OPTIMIZATION WITH CATEGORY PARAMETERS ============
+
 async function optimizeWithAI(
   product: ProductInput,
   categoryName: string,
+  categoryParams: any[],
   lovableApiKey: string
 ): Promise<any> {
-  const prompt = `Sen Yandex Market uchun professional kartochka yaratuvchisan. 
-Quyidagi mahsulot uchun BARCHA maydonlarni to'ldir. Javobni FAQAT JSON formatda ber.
+  // Build parameter descriptions for AI
+  const requiredParams = categoryParams
+    .filter((p: any) => p.required || p.constraintType === "REQUIRED")
+    .slice(0, 30);
+  
+  const allParams = categoryParams.slice(0, 50);
 
+  const paramDescriptions = allParams.map((p: any) => {
+    let desc = `- ID: ${p.id}, Name: "${p.name}"`;
+    if (p.type) desc += `, Type: ${p.type}`;
+    if (p.values?.length) {
+      const vals = p.values.slice(0, 10).map((v: any) => `${v.id}:"${v.value}"`).join(", ");
+      desc += `, Values: [${vals}]`;
+    }
+    if (p.required) desc += ` [REQUIRED]`;
+    return desc;
+  }).join("\n");
+
+  const prompt = `Sen Yandex Market uchun PROFESSIONAL kartochka yaratuvchisan.
 Mahsulot: ${product.name}
 Tavsif: ${product.description || "Yo'q"}
 Kategoriya: ${categoryName}
 Brend: ${product.brand || "Aniqlanmagan"}
+Rang: ${product.color || ""}
+Model: ${product.model || ""}
 
-Talablar:
-1. name_ru: Ruscha nom — TIP + BREND + MODEL formatida, 50-60 belgi
-2. name_uz: O'zbekcha nom (lotin) — xuddi shunday format
-3. description_ru: Ruscha tavsif, 400-600 belgi, HTML teglarisiz, foydalanuvchiga foydali
-4. description_uz: O'zbekcha tavsif (lotin), 300-500 belgi, HTML teglarisiz
+YANDEX KATEGORIYA PARAMETRLARI (ALBATTA TO'LDIR!):
+${paramDescriptions}
+
+TALABLAR:
+1. name_ru: Ruscha nom — JUDA BATAFSIL, TIP + BREND + MODEL + ASOSIY XUSUSIYATLAR formatida.
+   MINIMUM 50 belgi, MAKSIMUM 150 belgi. SEO uchun optimallashtirilgan.
+   Misol: "Смартфон Samsung Galaxy A55 5G 128 ГБ, 8 ГБ ОЗУ, Super AMOLED, камера 50 Мп, синий"
+   
+2. name_uz: O'zbekcha nom (LOTIN alifbosi), xuddi shunday batafsil format, 50-150 belgi.
+   Misol: "Samsung Galaxy A55 5G smartfoni, 128 GB xotira, 8 GB RAM, Super AMOLED ekran, 50 MP kamera, ko'k rang"
+
+3. description_ru: Ruscha batafsil tavsif, 500-2000 belgi, HTML teglarisiz.
+   Mahsulotning BARCHA asosiy afzalliklari, texnik xususiyatlari va foydalanish holatlari.
+
+4. description_uz: O'zbekcha (LOTIN) batafsil tavsif, 400-1500 belgi, HTML teglarisiz.
+
 5. vendor: Brend nomi (aniq)
-6. vendorCode: Ishlab chiqaruvchi artikuli
+6. vendorCode: Ishlab chiqaruvchi artikuli (model raqami)
 7. manufacturerCountry: Ishlab chiqarilgan mamlakat (ruscha)
-8. tags: 5-10 ta teglar (vergul bilan)
-9. params: Kamida 8 ta xususiyat [{name, value}] formatida
-10. warranty: Kafolat muddati (masalan, "1 yil")
-11. shelfLife: Yaroqlilik muddati (agar tegishli bo'lsa)
 
-MUHIM: HTML teglarini (<br/>, <br>, <p> va h.k.) ISHLATMA. Faqat oddiy matn.
+8. parameterValues: BARCHA yuqoridagi parametrlarni to'ldir!
+   Agar parametrda values ro'yxati bo'lsa, valueId ishlatilsin.
+   Agar erkin matn bo'lsa, value ishlatilsin.
+   Format: [{"parameterId": ID, "value": "qiymat"} yoki {"parameterId": ID, "valueId": ID}]
+   KAMIDA 15 ta parametr to'ldirish SHART!
 
-JSON:
+9. warranty: Kafolat muddati (masalan "1 год" yoki "2 года")
+
+MUHIM: HTML teglarini ISHLATMA. Faqat oddiy matn.
+
+JAVOBNI FAQAT JSON FORMATDA BER:
 {
-  "name_ru": "...",
-  "name_uz": "...",
-  "description_ru": "...",
-  "description_uz": "...",
+  "name_ru": "...(50-150 belgi, SEO optimallashtirilgan)...",
+  "name_uz": "...(50-150 belgi, lotin alifbosida)...",
+  "description_ru": "...(500-2000 belgi)...",
+  "description_uz": "...(400-1500 belgi)...",
   "vendor": "...",
   "vendorCode": "...",
   "manufacturerCountry": "...",
-  "tags": ["tag1", "tag2"],
-  "params": [{"name": "Rang", "value": "..."}, {"name": "Material", "value": "..."}],
-  "warranty": "1 yil",
-  "shelfLife": null,
+  "parameterValues": [
+    {"parameterId": 123, "value": "qiymat"},
+    {"parameterId": 456, "valueId": 789}
+  ],
+  "warranty": "1 год",
   "adult": false
 }`;
 
@@ -279,12 +320,8 @@ JSON:
   return null;
 }
 
-/** Remove HTML tags from text */
-function stripHtml(text: string): string {
-  return text.replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
-}
+// ============ BUILD YANDEX OFFER ============
 
-/** Build Yandex offer-mappings/update payload */
 function buildYandexOffer(
   product: ProductInput,
   ai: any,
@@ -321,30 +358,37 @@ function buildYandexOffer(
       value: price,
       currencyId: "UZS",
     },
-    customsCommodityCode: mxik.code,
+    // IKPU code in proper format
+    commodityCodes: [
+      {
+        code: mxik.code,
+        type: "IKPU_CODE",
+      }
+    ],
     type: "DEFAULT",
     adult: ai?.adult || false,
   };
 
-  // Tags
-  if (ai?.tags?.length) {
-    offer.tags = ai.tags.slice(0, 10);
-  }
-
-  // Parameters (xususiyatlar)
-  if (ai?.params?.length) {
-    offer.params = ai.params
-      .filter((p: any) => p.name && p.value)
-      .map((p: any) => ({ name: p.name, value: String(p.value) }))
-      .slice(0, 30);
+  // parameterValues — the KEY missing piece for characteristics (25+ points)
+  if (ai?.parameterValues?.length) {
+    offer.parameterValues = ai.parameterValues
+      .filter((p: any) => p.parameterId && (p.value || p.valueId))
+      .map((p: any) => {
+        const pv: any = { parameterId: p.parameterId };
+        if (p.valueId) pv.valueId = p.valueId;
+        else if (p.value) pv.value = String(p.value);
+        if (p.unitId) pv.unitId = p.unitId;
+        return pv;
+      })
+      .slice(0, 50);
   }
 
   // Warranty
   if (ai?.warranty) {
-    const match = ai.warranty.match(/(\d+)\s*(yil|year|месяц|month|oy)/i);
+    const match = ai.warranty.match(/(\d+)\s*(yil|year|год|месяц|month|oy)/i);
     if (match) {
       const period = parseInt(match[1]);
-      const isYear = /yil|year/i.test(match[2]);
+      const isYear = /yil|year|год/i.test(match[2]);
       offer.guaranteePeriod = {
         timePeriod: isYear ? period * 12 : period,
         timeUnit: "MONTH",
@@ -352,7 +396,7 @@ function buildYandexOffer(
     }
   }
 
-  // Clean undefined/null/empty values
+  // Clean undefined/null/empty
   for (const key of Object.keys(offer)) {
     const v = offer[key];
     if (v === undefined || v === null || (Array.isArray(v) && v.length === 0)) {
@@ -363,19 +407,81 @@ function buildYandexOffer(
   return offer;
 }
 
-/** Calculate card quality score */
+// ============ SEND O'ZBEK LANGUAGE CONTENT ============
+
+async function sendUzbekContent(
+  apiKey: string,
+  businessId: string,
+  offerId: string,
+  nameUz: string,
+  descriptionUz: string
+): Promise<boolean> {
+  if (!nameUz && !descriptionUz) return false;
+  
+  try {
+    const offer: any = { offerId };
+    if (nameUz) offer.name = stripHtml(nameUz).substring(0, 150);
+    if (descriptionUz) offer.description = stripHtml(descriptionUz).substring(0, 6000);
+
+    const resp = await fetch(
+      `${YANDEX_API}/businesses/${businessId}/offer-mappings/update?language=UZ`,
+      {
+        method: "POST",
+        headers: {
+          "Api-Key": apiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          offerMappings: [{ offer }]
+        }),
+      }
+    );
+    
+    if (resp.ok) {
+      console.log(`✅ O'zbek content sent for ${offerId}`);
+      return true;
+    } else {
+      const text = await resp.text();
+      console.error(`❌ O'zbek content failed: ${resp.status}`, text);
+      return false;
+    }
+  } catch (e) {
+    console.error("O'zbek content error:", e);
+    return false;
+  }
+}
+
+// ============ QUALITY SCORE ============
+
 function calculateQuality(offer: any, ai: any): { score: number; breakdown: Record<string, number> } {
+  const nameLen = offer.name?.length || 0;
+  const descLen = offer.description?.length || 0;
+  const picCount = offer.pictures?.length || 0;
+  const paramCount = offer.parameterValues?.length || 0;
+
   const b: Record<string, number> = {
-    name: (offer.name?.length || 0) >= 50 ? 15 : (offer.name?.length || 0) >= 30 ? 10 : 5,
-    description: (offer.description?.length || 0) >= 400 ? 15 : (offer.description?.length || 0) >= 200 ? 10 : 5,
-    pictures: (offer.pictures?.length || 0) >= 5 ? 15 : (offer.pictures?.length || 0) >= 3 ? 10 : (offer.pictures?.length || 0) >= 1 ? 5 : 0,
-    category: offer.marketCategoryId !== 198119 ? 10 : 5,
-    parameters: (offer.params?.length || 0) >= 10 ? 15 : (offer.params?.length || 0) >= 5 ? 10 : 5,
-    dimensions: offer.weightDimensions ? 10 : 0,
-    barcode: offer.barcodes?.length ? 5 : 0,
-    vendor: offer.vendor && offer.vendor !== "OEM" ? 5 : 3,
-    country: offer.manufacturerCountries?.length ? 5 : 0,
-    warranty: offer.guaranteePeriod ? 5 : 0,
+    // Nom: 0/10 ball. 50+ belgi = 10 ball
+    name: nameLen >= 50 ? 10 : nameLen >= 30 ? 5 : 0,
+    // Brend: 0/checkmark
+    brand: offer.vendor && offer.vendor !== "OEM" ? 5 : 0,
+    // Tavsif: 0/20 ball. 500+ = 20, 200+ = 10
+    description: descLen >= 500 ? 20 : descLen >= 200 ? 10 : descLen >= 100 ? 5 : 0,
+    // Rasmlar: 0/43 ball (1 rasm = 24, 3+ = 27, 5+ = 35, oltita+ = 43)
+    pictures: picCount >= 6 ? 43 : picCount >= 5 ? 35 : picCount >= 3 ? 27 : picCount >= 1 ? 24 : 0,
+    // Asosiy xususiyatlar: 0/12 ball
+    basicParams: paramCount >= 8 ? 12 : paramCount >= 5 ? 8 : paramCount >= 3 ? 5 : 0,
+    // Filtr uchun qo'shimcha: 0/8 ball
+    filterParams: paramCount >= 12 ? 8 : paramCount >= 8 ? 5 : 0,
+    // Tovar haqida batafsil: 0/5 ball
+    detailParams: paramCount >= 15 ? 5 : paramCount >= 12 ? 3 : 0,
+    // IKPU: checkmark
+    ikpu: offer.commodityCodes?.length ? 2 : 0,
+    // O'lchamlar
+    dimensions: offer.weightDimensions ? 2 : 0,
+    // Shtrix-kod
+    barcode: offer.barcodes?.length ? 2 : 0,
+    // Kafolat
+    warranty: offer.guaranteePeriod ? 2 : 0,
   };
   return { score: Object.values(b).reduce((a, v) => a + v, 0), breakdown: b };
 }
@@ -388,7 +494,6 @@ serve(async (req) => {
   }
 
   try {
-    // Auth
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }),
@@ -411,7 +516,6 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Get Yandex credentials
     const creds = await getYandexCredentials(supabase, user.id);
     if (!creds) {
       return new Response(JSON.stringify({ error: "Yandex Market ulanmagan. Avval marketplace'ni ulang." }),
@@ -419,15 +523,12 @@ serve(async (req) => {
     }
 
     const body: CreateCardRequest = await req.json();
-
-    // Support both single and batch mode
     const productsList = body.products || [body.product];
     if (!productsList.length || !productsList[0]) {
       return new Response(JSON.stringify({ error: "Product data required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Get user's shop
     let shopId = creds.shopId || body.shopId;
     if (!shopId || shopId === "sellercloud") {
       const { data: userShop } = await supabase.from("shops").select("id").eq("owner_id", user.id).limit(1).single();
@@ -463,27 +564,34 @@ serve(async (req) => {
           ? { code: product.mxikCode, name_uz: product.mxikName }
           : await lookupMXIK(supabase, product.name);
 
-        // 4. AI optimization (fills all Excel template fields)
+        // 4. *** NEW: Fetch Yandex category parameters ***
+        console.log(`📋 Fetching parameters for category ${yandexCat.id} (${yandexCat.name})...`);
+        const categoryParams = await fetchCategoryParameters(creds.apiKey, yandexCat.id);
+        console.log(`📋 Got ${categoryParams.length} parameters for category`);
+
+        // 5. AI optimization WITH category parameters
         let aiData: any = null;
         if (LOVABLE_API_KEY) {
-          aiData = await optimizeWithAI(product, yandexCat.name, LOVABLE_API_KEY);
-          if (aiData) console.log("✅ AI filled all fields for:", product.name);
+          aiData = await optimizeWithAI(product, yandexCat.name, categoryParams, LOVABLE_API_KEY);
+          if (aiData) {
+            console.log(`✅ AI filled: name=${aiData.name_ru?.length || 0} chars, params=${aiData.parameterValues?.length || 0}`);
+          }
         }
 
-        // 5. Estimate dimensions
+        // 6. Estimate dimensions
         const dims = estimateDimensions(cat);
 
-        // 6. Build Yandex API payload
+        // 7. Build offer payload
         const offer = buildYandexOffer(
           product, aiData, sku, barcode, yandexCat, dims, mxik,
           pricing.recommendedPrice
         );
 
-        // 7. Send to Yandex Market API
-        console.log(`📤 Sending "${offer.name}" to Yandex...`);
+        // 8. Send to Yandex Market API
+        console.log(`📤 Sending "${offer.name}" to Yandex (${offer.parameterValues?.length || 0} params)...`);
         
         const yandexResp = await fetch(
-          `https://api.partner.market.yandex.ru/v2/businesses/${creds.businessId}/offer-mappings/update`,
+          `${YANDEX_API}/businesses/${creds.businessId}/offer-mappings/update`,
           {
             method: "POST",
             headers: {
@@ -500,9 +608,19 @@ serve(async (req) => {
         let yandexResult: any;
         try { yandexResult = JSON.parse(respText); } catch { yandexResult = { raw: respText }; }
 
+        // 9. *** NEW: Send O'zbek language content ***
+        let uzSent = false;
+        if (yandexResp.ok && aiData?.name_uz) {
+          await new Promise(r => setTimeout(r, 300)); // small delay
+          uzSent = await sendUzbekContent(
+            creds.apiKey, creds.businessId, sku,
+            aiData.name_uz, aiData.description_uz
+          );
+        }
+
         const { score: quality, breakdown } = calculateQuality(offer, aiData);
 
-        // 8. Save to local DB
+        // 10. Save to local DB
         let savedProduct = null;
         if (shopId) {
           const { data, error: saveErr } = await supabase
@@ -532,8 +650,8 @@ serve(async (req) => {
                 name_uz: aiData?.name_uz,
                 name_ru: aiData?.name_ru,
                 description_uz: aiData?.description_uz,
-                tags: aiData?.tags,
-                params_count: offer.params?.length || 0,
+                params_count: offer.parameterValues?.length || 0,
+                uz_content_sent: uzSent,
               },
             })
             .select()
@@ -558,14 +676,15 @@ serve(async (req) => {
           qualityBreakdown: breakdown,
           category: yandexCat.name,
           mxikCode: mxik.code,
+          paramsCount: offer.parameterValues?.length || 0,
+          uzContentSent: uzSent,
           yandexResponse: yandexResult,
           localProductId: savedProduct?.id,
           error: yandexResp.ok ? null : (yandexResult?.errors?.[0]?.message || yandexResult?.message || `HTTP ${yandexResp.status}`),
         });
 
-        console.log(`${yandexResp.ok ? "✅" : "❌"} ${product.name}: quality=${quality}, status=${yandexResp.status}`);
+        console.log(`${yandexResp.ok ? "✅" : "❌"} ${product.name}: quality=${quality}, params=${offer.parameterValues?.length || 0}, uz=${uzSent}`);
 
-        // Rate limit: 500ms delay between products
         if (productsList.length > 1) {
           await new Promise(r => setTimeout(r, 500));
         }
