@@ -361,91 +361,34 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
       // Mahsulot nomini normallashtirish (lotin harflarga)
       const normalizedProductName = normalizeProductName(product.title);
 
-      // MUHIM: Kamera rasmini AI orqali professional rasmga aylantirish
-      // sourceImage sifatida kamera rasmini uzatamiz — AI aynan shu mahsulotni
-      // professional fonlarda yaratadi (generic rasm EMAS)
+      // Rasmni storage'ga yuklash (card creator o'zi professional rasmlar yaratadi)
       let imageUrl: string | undefined;
       const imagesToUpload: string[] = [];
 
-      // Kamera yoki web rasmni AI bilan yaxshilash
-      const sourceImageForAI = productImage || product.image || null;
+      // Kamera yoki web rasmni yuklash
+      const sourceImage = productImage || product.image || null;
       
-      if (sourceImageForAI) {
-        try {
-          console.log('🎨 AI bilan professional rasm yaratilmoqda (aynan shu mahsulot)...');
-          const { data: enhancedData, error: enhanceError } = await supabase.functions.invoke('generate-product-image', {
-            body: {
-              productName: normalizedProductName,
-              category: analyzed?.category || '',
-              style: 'marketplace',
-              sourceImage: sourceImageForAI, // MUHIM: kamera rasmini uzatish
-            },
-          });
-
-          if (!enhanceError && enhancedData?.imageUrl) {
-            // AI yaratgan rasmni storage'ga yuklash
-            const enhancedUrl = await uploadImageToStorage(
-              enhancedData.imageUrl.startsWith('data:') ? enhancedData.imageUrl : enhancedData.imageUrl
-            );
-            if (enhancedUrl) {
-              imageUrl = enhancedUrl;
-              imagesToUpload.push(enhancedUrl);
-              console.log('✅ AI professional rasm tayyor:', enhancedData.aiModel);
-            }
-          }
-        } catch (enhanceErr) {
-          console.error('AI image enhancement failed:', enhanceErr);
-        }
-      }
-
-      // Fallback: web rasmni ishlatish
-      if (!imageUrl && product.image && product.image.startsWith('http')) {
-        imageUrl = product.image;
-        imagesToUpload.push(product.image);
-      }
-      
-      // Fallback: kamera rasmni yuklash
-      if (!imageUrl && productImage) {
-        if (productImage.startsWith('data:')) {
-          const uploadedUrl = await uploadImageToStorage(productImage);
+      if (sourceImage) {
+        if (sourceImage.startsWith('data:')) {
+          const uploadedUrl = await uploadImageToStorage(sourceImage);
           if (uploadedUrl) {
             imageUrl = uploadedUrl;
             imagesToUpload.push(uploadedUrl);
           }
-        } else if (productImage.startsWith('http')) {
-          imageUrl = productImage;
-          imagesToUpload.push(productImage);
+        } else if (sourceImage.startsWith('http')) {
+          imageUrl = sourceImage;
+          imagesToUpload.push(sourceImage);
         }
       }
 
-      // Step 2-3: Skip redundant SEO/description generation
-      // Card creator (yandex-market-create-card) handles AI optimization with category params context
-      // which produces much better results than separate calls
-      updateTaskProgress(1, 'completed'); // SEO — card creator will handle
-      updateTaskProgress(2, 'completed'); // Description — card creator will handle
+      // Step 2-3: Card creator handles SEO + description with category context
+      updateTaskProgress(1, 'completed');
+      updateTaskProgress(2, 'completed');
 
-      // Step 4: MXIK lookup (AI-powered, independent of card creator)
-      updateTaskProgress(3, 'running');
-      let mxikData = null;
-      try {
-        const { data: mxikResult, error: mxikError } = await supabase.functions.invoke('lookup-mxik-code', {
-          body: {
-            productName: normalizedProductName,
-            category: analyzed?.category,
-            description: product.description || analyzed?.description,
-          },
-        });
-        if (!mxikError && mxikResult) {
-          mxikData = mxikResult;
-          updateTaskProgress(3, 'completed');
-        } else {
-          updateTaskProgress(3, 'failed');
-        }
-      } catch {
-        updateTaskProgress(3, 'failed');
-      }
+      // Step 4: Card creator handles MXIK with better context (category + params)
+      updateTaskProgress(3, 'completed');
 
-      // Step 5: Infographic generation
+      // Step 5: Infographic generation (parallel, client-side — no timeout issue)
       const generatedInfos: string[] = [];
       const bestImageForInfographic = imageUrl || productImage;
       
@@ -453,26 +396,36 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
         updateTaskProgress(4, 'running');
         const styles = ['professional', 'minimalist', 'vibrant', 'luxury', 'tech', 'professional'];
 
-        for (let i = 0; i < Math.min(infoCount, 6); i++) {
-          try {
-            const { data: infoData, error: infoError } = await supabase.functions.invoke('generate-infographic', {
-              body: {
-                productImage: bestImageForInfographic,
-                productName: normalizedProductName,
-                category: analyzed?.category,
-                style: styles[i % styles.length],
-                count: 1
-              },
-            });
-
-            if (!infoError && infoData?.images?.length > 0) {
-              generatedInfos.push(infoData.images[0].url);
+        // Parallel infographic generation (3 at a time)
+        const batchSize = 3;
+        for (let batch = 0; batch < Math.ceil(Math.min(infoCount, 6) / batchSize); batch++) {
+          const promises = [];
+          for (let i = batch * batchSize; i < Math.min((batch + 1) * batchSize, infoCount, 6); i++) {
+            promises.push(
+              supabase.functions.invoke('generate-infographic', {
+                body: {
+                  productImage: bestImageForInfographic,
+                  productName: normalizedProductName,
+                  category: analyzed?.category,
+                  style: styles[i % styles.length],
+                  count: 1
+                },
+              }).then(({ data: infoData, error: infoError }) => {
+                if (!infoError && infoData?.images?.length > 0) {
+                  return infoData.images[0].url;
+                }
+                return null;
+              }).catch(() => null)
+            );
+          }
+          const results = await Promise.all(promises);
+          for (const url of results) {
+            if (url) {
+              generatedInfos.push(url);
               setBackgroundTasks(prev => prev.map(task => 
                 task.id === taskId ? { ...task, generatedImages: [...generatedInfos] } : task
               ));
             }
-          } catch (e) {
-            console.error(`Infographic ${i + 1} failed:`, e);
           }
         }
 
@@ -489,7 +442,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
       // Step 6: Create Yandex card — pass ALL data, let card creator do full AI optimization
       updateTaskProgress(5, 'running');
       
-      const { error } = await supabase.functions.invoke('yandex-market-create-card', {
+      const { data: cardResult, error } = await supabase.functions.invoke('yandex-market-create-card', {
         body: {
           shopId,
           product: {
@@ -504,15 +457,21 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
             image: imageUrl,
             images: imagesToUpload,
             sourceUrl: product.url,
-            mxikCode: mxikData?.mxik_code,
-            mxikName: mxikData?.mxik_name,
+            specifications: analyzed?.specifications,
           },
           pricing: {
-            ...pricingData,
+            costPrice: pricingData.costPrice,
             recommendedPrice: pricingData.sellingPrice,
+            marketplaceCommission: pricingData.marketplaceCommission,
+            logisticsCost: pricingData.logisticsCost,
+            taxRate: pricingData.taxPercent,
+            targetProfit: pricingData.netProfit,
+            netProfit: pricingData.netProfit,
           },
         },
       });
+
+      console.log('Card creation result:', cardResult);
 
       if (error) throw error;
 
