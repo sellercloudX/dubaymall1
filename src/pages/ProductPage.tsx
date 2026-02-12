@@ -479,7 +479,7 @@ export default function ProductPage() {
                   <div className="flex-1">
                     <p className="font-semibold">{deliveryInfo.fullDate} yetkazib beramiz</p>
                     <p className="text-sm text-muted-foreground">
-                      {product.free_shipping ? 'Bepul yetkazib berish' : `Yetkazish: ${formatPrice(product.shipping_price || 15000)}`}
+                      {product.free_shipping || !product.shipping_price ? 'Bepul yetkazib berish' : `Yetkazish: ${formatPrice(product.shipping_price)}`}
                     </p>
                   </div>
                 </div>
