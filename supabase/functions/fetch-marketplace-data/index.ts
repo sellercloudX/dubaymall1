@@ -815,6 +815,319 @@ serve(async (req) => {
           products_count: result.total || connection.products_count,
         })
         .eq("id", connection.id);
+    } else if (marketplace === "uzum") {
+      // ========== UZUM MARKET SELLER OPENAPI ==========
+      const uzumBaseUrl = "https://api-seller.uzum.uz/api/seller-openapi";
+      const uzumHeaders = {
+        "Authorization": `Bearer ${apiKey}`,
+        "Accept": "application/json",
+      };
+      
+      // Get shopId from credentials or account_info
+      const uzumShopId = credentials.sellerId || 
+                         (connection.account_info as any)?.shopId || 
+                         (connection.account_info as any)?.sellerId;
+
+      console.log(`Uzum API: dataType=${dataType}, shopId=${uzumShopId}`);
+
+      if (dataType === "products") {
+        // GET /v1/product/shop/{shopId}
+        if (!uzumShopId) {
+          result = { success: false, error: "Shop ID required for Uzum products" };
+        } else {
+          try {
+            const response = await fetch(
+              `${uzumBaseUrl}/v1/product/shop/${uzumShopId}`,
+              { headers: uzumHeaders }
+            );
+
+            if (response.ok) {
+              const data = await response.json();
+              const productCards = data.payload?.productCards || data.payload || data.data || [];
+              const items = Array.isArray(productCards) ? productCards : [];
+
+              console.log(`Uzum: ${items.length} products found`);
+
+              const products = items.map((card: any) => {
+                // Each card may have multiple SKUs
+                const skus = card.skuList || card.skus || [];
+                const firstSku = skus[0] || {};
+                const price = firstSku.fullPrice || firstSku.purchasePrice || card.price || 0;
+                const stockCount = skus.reduce((sum: number, sku: any) => {
+                  const amounts = sku.skuAmountList || sku.amounts || [];
+                  return sum + amounts.reduce((s: number, a: any) => s + (a.amount || 0), 0);
+                }, 0);
+                
+                const photos = card.photos || card.images || [];
+                const pictures = photos.map((p: any) => p.photo?.url || p.url || p).filter(Boolean);
+
+                return {
+                  offerId: String(card.productId || card.id || firstSku.skuId || ''),
+                  name: card.title || card.name || '',
+                  price,
+                  shopSku: String(firstSku.skuId || firstSku.barCode || card.productId || ''),
+                  category: card.category?.title || card.categoryTitle || '',
+                  marketCategoryId: card.category?.id || card.categoryId || 0,
+                  pictures,
+                  description: card.description || '',
+                  availability: card.status?.title || card.moderationStatus || 'ACTIVE',
+                  stockFBO: 0,
+                  stockFBS: stockCount,
+                  stockCount,
+                };
+              });
+
+              result = {
+                success: true,
+                data: products,
+                total: products.length,
+              };
+            } else {
+              const errText = await response.text();
+              console.error("Uzum products error:", response.status, errText);
+              result = { success: false, error: `Uzum products failed: ${response.status}` };
+            }
+          } catch (e) {
+            console.error("Uzum products error:", e);
+            result = { success: false, error: "Uzum products fetch error" };
+          }
+        }
+
+      } else if (dataType === "orders") {
+        // GET /v2/fbs/orders
+        try {
+          let allOrders: any[] = [];
+          let page = 0;
+          let hasMore = true;
+          const pageSize = 100;
+
+          while (hasMore) {
+            const params = new URLSearchParams({
+              size: String(pageSize),
+              page: String(page),
+            });
+            if (fromDate) params.append("dateFrom", fromDate);
+            if (toDate) params.append("dateTo", toDate);
+            if (status) params.append("status", status);
+
+            const response = await fetch(
+              `${uzumBaseUrl}/v2/fbs/orders?${params.toString()}`,
+              { headers: uzumHeaders }
+            );
+
+            if (!response.ok) {
+              console.error("Uzum orders error:", response.status);
+              break;
+            }
+
+            const data = await response.json();
+            const orders = data.payload?.fbsOrders || data.payload?.orders || data.payload || [];
+            const orderList = Array.isArray(orders) ? orders : [];
+            
+            console.log(`Uzum orders page ${page}: ${orderList.length} orders`);
+
+            const mapped = orderList.map((order: any) => {
+              const items = order.items || order.orderItems || [];
+              const itemsTotal = items.reduce((sum: number, item: any) => {
+                return sum + ((item.price || item.amount || 0) * (item.quantity || item.count || 1));
+              }, 0);
+
+              return {
+                id: order.orderId || order.id,
+                status: order.status || 'UNKNOWN',
+                substatus: order.substatus || '',
+                createdAt: order.createdAt || order.createDate || new Date().toISOString(),
+                total: order.totalPrice || order.totalAmount || itemsTotal,
+                totalUZS: order.totalPrice || order.totalAmount || itemsTotal,
+                itemsTotal,
+                itemsTotalUZS: itemsTotal,
+                deliveryTotal: order.deliveryPrice || 0,
+                deliveryTotalUZS: order.deliveryPrice || 0,
+                buyer: {
+                  firstName: order.customerName || order.buyer?.firstName || '',
+                  lastName: order.buyer?.lastName || '',
+                },
+                items: items.map((item: any) => ({
+                  offerId: String(item.productId || item.skuId || ''),
+                  offerName: item.title || item.productTitle || item.name || '',
+                  count: item.quantity || item.count || 1,
+                  price: item.price || item.amount || 0,
+                  priceUZS: item.price || item.amount || 0,
+                })),
+              };
+            });
+
+            allOrders = [...allOrders, ...mapped];
+
+            if (orderList.length < pageSize || !fetchAll) {
+              hasMore = false;
+            } else {
+              page++;
+              await sleep(300);
+            }
+          }
+
+          console.log(`Uzum total orders: ${allOrders.length}`);
+          result = {
+            success: true,
+            data: allOrders,
+            total: allOrders.length,
+          };
+        } catch (e) {
+          console.error("Uzum orders error:", e);
+          result = { success: false, error: "Uzum orders fetch error" };
+        }
+
+      } else if (dataType === "stocks") {
+        // GET /v2/fbs/sku/stocks
+        try {
+          const response = await fetch(
+            `${uzumBaseUrl}/v2/fbs/sku/stocks`,
+            { headers: uzumHeaders }
+          );
+
+          if (response.ok) {
+            const data = await response.json();
+            const stocks = data.payload || data.data || [];
+            const stockList = Array.isArray(stocks) ? stocks : [];
+            
+            result = {
+              success: true,
+              data: stockList.map((s: any) => ({
+                offerId: String(s.skuId || s.productId || ''),
+                fbo: 0,
+                fbs: s.amount || s.available || 0,
+                total: s.amount || s.available || 0,
+              })),
+              total: stockList.length,
+            };
+          } else {
+            result = { success: false, error: "Failed to fetch Uzum stocks" };
+          }
+        } catch (e) {
+          console.error("Uzum stocks error:", e);
+          result = { success: false, error: "Uzum stocks fetch error" };
+        }
+
+      } else if (dataType === "finance") {
+        // GET /v1/finance/orders + /v1/finance/expenses
+        try {
+          const [ordersRes, expensesRes] = await Promise.all([
+            fetch(`${uzumBaseUrl}/v1/finance/orders`, { headers: uzumHeaders }),
+            fetch(`${uzumBaseUrl}/v1/finance/expenses`, { headers: uzumHeaders }),
+          ]);
+
+          let financeOrders: any[] = [];
+          let financeExpenses: any[] = [];
+
+          if (ordersRes.ok) {
+            const ordData = await ordersRes.json();
+            financeOrders = ordData.payload || ordData.data || [];
+          }
+          if (expensesRes.ok) {
+            const expData = await expensesRes.json();
+            financeExpenses = expData.payload || expData.data || [];
+          }
+
+          result = {
+            success: true,
+            data: {
+              orders: Array.isArray(financeOrders) ? financeOrders : [],
+              expenses: Array.isArray(financeExpenses) ? financeExpenses : [],
+            },
+          };
+        } catch (e) {
+          console.error("Uzum finance error:", e);
+          result = { success: false, error: "Uzum finance fetch error" };
+        }
+
+      } else if (dataType === "update-prices") {
+        // POST /v1/product/{shopId}/sendPriceData
+        try {
+          const { offers: priceOffers } = requestBody;
+          
+          if (!priceOffers || priceOffers.length === 0) {
+            result = { success: false, error: "No offers provided" };
+          } else if (!uzumShopId) {
+            result = { success: false, error: "Shop ID required for price updates" };
+          } else {
+            const priceData = priceOffers.map((o: any) => ({
+              skuId: o.offerId || o.skuId,
+              price: o.price,
+            }));
+
+            const response = await fetch(
+              `${uzumBaseUrl}/v1/product/${uzumShopId}/sendPriceData`,
+              {
+                method: 'POST',
+                headers: {
+                  ...uzumHeaders,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ skuPriceList: priceData }),
+              }
+            );
+
+            if (response.ok) {
+              const data = await response.json();
+              result = { success: true, data, updated: priceOffers.length };
+            } else {
+              const errText = await response.text();
+              result = { success: false, error: `Price update failed: ${response.status}`, details: errText };
+            }
+          }
+        } catch (e) {
+          console.error("Uzum price update error:", e);
+          result = { success: false, error: "Price update error" };
+        }
+
+      } else if (dataType === "update-stocks") {
+        // POST /v2/fbs/sku/stocks
+        try {
+          const { stockUpdates } = requestBody;
+          
+          if (!stockUpdates || stockUpdates.length === 0) {
+            result = { success: false, error: "No stock updates provided" };
+          } else {
+            const response = await fetch(
+              `${uzumBaseUrl}/v2/fbs/sku/stocks`,
+              {
+                method: 'POST',
+                headers: {
+                  ...uzumHeaders,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  skuAmountList: stockUpdates.map((s: any) => ({
+                    skuId: s.skuId || s.offerId,
+                    amount: s.amount || s.stock || 0,
+                  })),
+                }),
+              }
+            );
+
+            if (response.ok) {
+              const data = await response.json();
+              result = { success: true, data, updated: stockUpdates.length };
+            } else {
+              const errText = await response.text();
+              result = { success: false, error: `Stock update failed: ${response.status}`, details: errText };
+            }
+          }
+        } catch (e) {
+          console.error("Uzum stock update error:", e);
+          result = { success: false, error: "Stock update error" };
+        }
+      }
+
+      // Update connection with latest sync time
+      await supabase
+        .from("marketplace_connections")
+        .update({ 
+          last_sync_at: new Date().toISOString(),
+          products_count: result.total || connection.products_count,
+        })
+        .eq("id", connection.id);
     }
 
     return new Response(

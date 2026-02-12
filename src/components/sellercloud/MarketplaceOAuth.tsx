@@ -92,8 +92,8 @@ const MARKETPLACES: Marketplace[] = [
     color: 'from-purple-500 to-violet-500',
     requiresManualKey: true,
     fields: [
-      { key: 'apiKey', label: 'API Kalit', placeholder: 'uzum_api_...' },
-      { key: 'sellerId', label: 'Seller ID', placeholder: 'S12345' },
+      { key: 'apiKey', label: 'API Kalit', placeholder: 'seller_api_key...' },
+      { key: 'sellerId', label: 'Do\'kon ID (Shop ID)', placeholder: '12345' },
     ],
     status: 'available',
   },
@@ -404,7 +404,11 @@ export function MarketplaceOAuth({
                         API kalitni {mp.name} kabinetidan olishingiz mumkin.
                       </p>
                       <a 
-                        href={mp.id === 'yandex' ? 'https://partner.market.yandex.ru/settings/api-keys' : '#'}
+                        href={
+                          mp.id === 'yandex' ? 'https://partner.market.yandex.ru/settings/api-keys' :
+                          mp.id === 'uzum' ? 'https://seller.uzum.uz/seller/api-keys' :
+                          '#'
+                        }
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-primary hover:underline inline-flex items-center gap-1"
