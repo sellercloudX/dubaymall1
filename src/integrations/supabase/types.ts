@@ -2322,19 +2322,16 @@ export type Database = {
         Row: {
           id: string | null
           is_active: boolean | null
-          link_code: string | null
           product_id: string | null
         }
         Insert: {
           id?: string | null
           is_active?: boolean | null
-          link_code?: string | null
           product_id?: string | null
         }
         Update: {
           id?: string | null
           is_active?: boolean | null
-          link_code?: string | null
           product_id?: string | null
         }
         Relationships: [
