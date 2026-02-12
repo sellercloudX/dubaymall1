@@ -114,7 +114,7 @@ export function FinancialDashboard({
     return (<Card><CardContent className="py-12 text-center"><Calculator className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" /><h3 className="text-lg font-semibold mb-2">Moliyaviy hisobotlar</h3><p className="text-muted-foreground">Avval marketplace ulang</p></CardContent></Card>);
   }
 
-  if (isLoading || !summary) {
+  if (isLoading || tariffsLoading || !summary) {
     return (<div className="space-y-4"><div className="grid grid-cols-2 gap-3">{[1,2,3,4].map(i => <Skeleton key={i} className="h-24" />)}</div><Skeleton className="h-64" /></div>);
   }
 

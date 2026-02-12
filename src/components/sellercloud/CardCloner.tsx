@@ -168,25 +168,37 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
     }
   };
 
-  // Clone product to external marketplace (call edge function)
+  // Clone product to external marketplace (call yandex-market-create-card)
   const cloneToMarketplace = async (product: CloneableProduct, targetMp: string): Promise<boolean> => {
     try {
-      const { data, error } = await supabase.functions.invoke('create-marketplace-card', {
+      const { data, error } = await supabase.functions.invoke('yandex-market-create-card', {
         body: {
-          marketplace: targetMp,
+          shopId: shop?.id || 'sellercloud',
           product: {
             name: product.name,
+            description: product.description || product.name,
             price: product.price,
-            description: product.description,
-            pictures: product.pictures,
-            category: product.category,
-            shopSku: product.shopSku,
-            offerId: product.offerId,
+            costPrice: Math.round(product.price * 0.6),
+            images: product.pictures?.filter(p => p.startsWith('http')) || [],
+            category: product.category || '',
+          },
+          pricing: {
+            costPrice: Math.round(product.price * 0.6),
+            marketplaceCommission: Math.round(product.price * 0.15),
+            logisticsCost: 3000,
+            taxRate: 4,
+            targetProfit: Math.round(product.price * 0.2),
+            recommendedPrice: product.price,
+            netProfit: Math.round(product.price * 0.2),
           },
         },
       });
       if (error) throw error;
-      return data?.success !== false;
+      if (data?.error) {
+        console.error(`Clone to ${targetMp} error:`, data.error);
+        return false;
+      }
+      return true;
     } catch (err) {
       console.error(`Clone to ${targetMp} failed:`, err);
       return false;
