@@ -12,6 +12,16 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // API key tekshirish
+    const apiKey = req.headers.get("x-api-key");
+    const validKey = Deno.env.get("DUBAYMALL_API_KEY");
+    if (!apiKey || apiKey !== validKey) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized: noto'g'ri yoki yo'q API key" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
