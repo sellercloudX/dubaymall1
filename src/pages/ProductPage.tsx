@@ -277,7 +277,7 @@ export default function ProductPage() {
       </div>
 
 
-      <div className="container mx-auto px-0 md:px-4 py-0 md:py-6 pb-24 max-w-5xl">
+      <div className="container mx-auto px-4 py-0 md:py-6 pb-24 max-w-5xl">
         {/* Desktop Breadcrumb */}
         <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground mb-6 px-4 md:px-0">
           <Link to="/" className="hover:text-primary">{t.marketplace}</Link>
@@ -339,7 +339,7 @@ export default function ProductPage() {
             
             {/* Thumbnail strip */}
             {images.length > 1 && (
-              <div className="px-4 md:px-0 mt-3">
+              <div className="md:px-0 mt-3">
                 <ScrollArea className="w-full">
                   <div className="flex gap-2 pb-2">
                     {images.map((img, idx) => (
