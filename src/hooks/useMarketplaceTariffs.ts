@@ -140,12 +140,37 @@ export function useMarketplaceTariffs(
  * Get tariff for a specific product.
  * Falls back to estimated 20% + 4000 logistics if no real data.
  */
+/**
+ * Safely get from tariffMap — handles both Map and plain object (from cache deserialization)
+ */
+function safeMapGet(map: any, key: string): TariffInfo | undefined {
+  if (!map) return undefined;
+  if (map instanceof Map) return map.get(key);
+  // Deserialized plain object fallback
+  if (typeof map === 'object' && key in map) return map[key];
+  return undefined;
+}
+
+function safeMapSize(map: any): number {
+  if (!map) return 0;
+  if (map instanceof Map) return map.size;
+  if (typeof map === 'object') return Object.keys(map).length;
+  return 0;
+}
+
+function safeMapValues(map: any): TariffInfo[] {
+  if (!map) return [];
+  if (map instanceof Map) return Array.from(map.values());
+  if (typeof map === 'object') return Object.values(map);
+  return [];
+}
+
 export function getTariffForProduct(
   tariffMap: Map<string, TariffInfo> | undefined,
   offerId: string,
   price: number
 ): { commission: number; logistics: number; totalFee: number; isReal: boolean } {
-  const tariff = tariffMap?.get(offerId);
+  const tariff = safeMapGet(tariffMap, offerId);
   if (tariff && tariff.totalTariff > 0) {
     return {
       commission: tariff.agencyCommission,
@@ -155,8 +180,8 @@ export function getTariffForProduct(
     };
   }
   // Fallback: Use average tariff from real data if available
-  if (tariffMap && tariffMap.size > 0) {
-    const values = Array.from(tariffMap.values());
+  if (safeMapSize(tariffMap) > 0) {
+    const values = safeMapValues(tariffMap);
     const avgPercent = values.reduce((s, t) => s + t.tariffPercent, 0) / values.length;
     const avgLogistics = values.reduce((s, t) => s + t.fulfillment + t.delivery, 0) / values.length;
     const estCommission = price * (avgPercent / 100) * 0.6; // commission part ~60% of total tariff
