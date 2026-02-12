@@ -10,6 +10,7 @@ export interface MarketplaceProduct {
   category?: string;
   marketCategoryId?: number;
   pictures?: string[];
+  description?: string;
   availability?: string;
   stockFBO?: number;
   stockFBS?: number;
