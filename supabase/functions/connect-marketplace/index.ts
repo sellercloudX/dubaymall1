@@ -246,15 +246,23 @@ serve(async (req) => {
       const uzumShopId = accountInfo.shopId || sellerId;
       if (uzumShopId) {
         try {
+          const params = new URLSearchParams({
+            size: '10',
+            page: '0',
+            filter: 'ALL',
+          });
           const productsResponse = await fetch(
-            `${uzumBaseUrl}/v1/product/shop/${uzumShopId}`,
+            `${uzumBaseUrl}/v1/product/shop/${uzumShopId}?${params.toString()}`,
             { headers: uzumHeaders }
           );
           if (productsResponse.ok) {
             const productsData = await productsResponse.json();
+            const totalCount = productsData.payload?.totalElements || productsData.payload?.total;
             const items = productsData.payload?.productCards || productsData.payload || productsData.data || [];
-            productsCount = Array.isArray(items) ? items.length : 0;
+            productsCount = totalCount || (Array.isArray(items) ? items.length : 0);
             console.log("Uzum products count:", productsCount);
+          } else {
+            console.log("Uzum products status:", productsResponse.status);
           }
         } catch (e) {
           console.error("Uzum products fetch error:", e);
@@ -263,14 +271,19 @@ serve(async (req) => {
 
       // 3. Get orders count
       try {
+        const params = new URLSearchParams({ status: 'CREATED' });
+        if (uzumShopId) params.append("shopIds", String(uzumShopId));
+        
         const ordersResponse = await fetch(
-          `${uzumBaseUrl}/v2/fbs/orders/count`,
+          `${uzumBaseUrl}/v2/fbs/orders/count?${params.toString()}`,
           { headers: uzumHeaders }
         );
         if (ordersResponse.ok) {
           const ordersData = await ordersResponse.json();
           ordersCount = ordersData.payload?.count || ordersData.payload || 0;
           console.log("Uzum orders count:", ordersCount);
+        } else {
+          console.log("Uzum orders count status:", ordersResponse.status);
         }
       } catch (e) {
         console.error("Uzum orders fetch error:", e);
