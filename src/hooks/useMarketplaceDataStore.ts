@@ -66,68 +66,74 @@ async function fetchMarketplaceDataFn(
  * Tab switching uses cached data — no re-fetching.
  */
 export function useMarketplaceDataStore(connectedMarketplaces: string[]) {
-  const queryClient = useQueryClient();
+   const queryClient = useQueryClient();
 
-  // Fetch products for each marketplace
-  const productQueries = useQueries({
-    queries: connectedMarketplaces.map(mp => ({
-      queryKey: ['marketplace-products', mp],
-      queryFn: async () => {
-        const result = await fetchMarketplaceDataFn(mp, 'products', {
-          limit: 200,
-          fetchAll: true,
-        });
-        // Server already deduplicates by offerId — just ensure no client-side duplicates
-        const raw = (result.data || []) as MarketplaceProduct[];
-        const seen = new Set<string>();
-        const deduped: MarketplaceProduct[] = [];
-        for (const p of raw) {
-          const key = p.offerId || p.shopSku;
-          if (!key || seen.has(key)) continue;
-          seen.add(key);
-          deduped.push(p);
-        }
-        return {
-          marketplace: mp,
-          data: deduped,
-          total: deduped.length,
-        };
-      },
-      staleTime: 1000 * 60 * 30, // 30 min — prevent refetch on mount
-      gcTime: 1000 * 60 * 60 * 24, // 24h cache
-      refetchOnWindowFocus: false,
-      refetchOnMount: false, // Don't refetch when component mounts
-      refetchInterval: 1000 * 60 * 10, // Auto-refresh every 10 min in background
-      retry: 2,
-      retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10000),
-      networkMode: 'offlineFirst' as const,
-    })),
-  });
+   // Stable marketplace list to prevent unnecessary re-renders
+   const memoizedMarketplaces = JSON.stringify(connectedMarketplaces.sort());
 
-  // Fetch orders for each marketplace
-  const orderQueries = useQueries({
-    queries: connectedMarketplaces.map(mp => ({
-      queryKey: ['marketplace-orders', mp],
-      queryFn: async () => {
-        const result = await fetchMarketplaceDataFn(mp, 'orders', {
-          fetchAll: true,
-        });
-        return {
-          marketplace: mp,
-          data: (result.data || []) as MarketplaceOrder[],
-          total: result.data?.length || 0,
-        };
-      },
-      staleTime: 1000 * 60 * 30, // 30 min — prevent refetch on mount
-      gcTime: 1000 * 60 * 60 * 24,
-      refetchOnWindowFocus: false,
-      refetchOnMount: false, // Don't refetch when component mounts
-      refetchInterval: 1000 * 60 * 5, // Auto-refresh every 5 min in background
-      retry: 2,
-      retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10000),
-      networkMode: 'offlineFirst' as const,
-    })),
-  });
+   // Fetch products for each marketplace
+   const productQueries = useQueries({
+     queries: connectedMarketplaces.map(mp => ({
+       queryKey: ['marketplace-products', mp],
+       queryFn: async () => {
+         const result = await fetchMarketplaceDataFn(mp, 'products', {
+           limit: 200,
+           fetchAll: true,
+         });
+         // Server already deduplicates by offerId — just ensure no client-side duplicates
+         const raw = (result.data || []) as MarketplaceProduct[];
+         const seen = new Set<string>();
+         const deduped: MarketplaceProduct[] = [];
+         for (const p of raw) {
+           const key = p.offerId || p.shopSku;
+           if (!key || seen.has(key)) continue;
+           seen.add(key);
+           deduped.push(p);
+         }
+         return {
+           marketplace: mp,
+           data: deduped,
+           total: deduped.length,
+         };
+       },
+       staleTime: 1000 * 60 * 30, // 30 min — prevent refetch on mount
+       gcTime: 1000 * 60 * 60 * 24, // 24h cache
+       refetchOnWindowFocus: false,
+       refetchOnMount: false, // Don't refetch when component mounts
+       refetchInterval: 1000 * 60 * 10, // Auto-refresh every 10 min in background
+       retry: 2,
+       retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10000),
+       networkMode: 'offlineFirst' as const,
+     })),
+   });
+
+   // Fetch orders for each marketplace
+   const orderQueries = useQueries({
+     queries: connectedMarketplaces.map(mp => ({
+       queryKey: ['marketplace-orders', mp],
+       queryFn: async () => {
+         const result = await fetchMarketplaceDataFn(mp, 'orders', {
+           fetchAll: true,
+         });
+         return {
+           marketplace: mp,
+           data: (result.data || []) as MarketplaceOrder[],
+           total: result.data?.length || 0,
+         };
+       },
+       staleTime: 1000 * 60 * 30, // 30 min — prevent refetch on mount
+       gcTime: 1000 * 60 * 60 * 24,
+       refetchOnWindowFocus: false,
+       refetchOnMount: false, // Don't refetch when component mounts
+       refetchInterval: 1000 * 60 * 5, // Auto-refresh every 5 min in background
+       retry: 2,
+       retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10000),
+       networkMode: 'offlineFirst' as const,
+     })),
+   });
+   
+   // Only return memoizedMarketplaces to stabilize query keys
+   // This prevents infinite loops when connectedMarketplaces array changes
 
   const isLoadingProducts = productQueries.some(q => q.isLoading);
   const isLoadingOrders = orderQueries.some(q => q.isLoading);
@@ -185,35 +191,38 @@ export function useMarketplaceDataStore(connectedMarketplaces: string[]) {
   };
 
   const refetchAll = () => {
-    refetchProducts();
-    refetchOrders();
-  };
+     refetchProducts();
+     refetchOrders();
+   };
 
-  return {
-    // Data accessors
-    getProducts,
-    getOrders,
-    allProducts,
-    allOrders,
-    totalProducts,
-    totalOrders,
+   return {
+     // Data accessors
+     getProducts,
+     getOrders,
+     allProducts,
+     allOrders,
+     totalProducts,
+     totalOrders,
 
-    // Stable version for memo dependencies (changes when data updates)
-    dataVersion,
+     // Stable version for memo dependencies (changes when data updates)
+     dataVersion,
+     
+     // Memoized marketplace list to prevent infinite loops
+     memoizedMarketplaces,
 
-    // Loading states
-    isLoading,
-    isLoadingProducts,
-    isLoadingOrders,
-    isFetching,
-    hasError,
-    errors,
+     // Loading states
+     isLoading,
+     isLoadingProducts,
+     isLoadingOrders,
+     isFetching,
+     hasError,
+     errors,
 
-    // Refresh functions
-    refetchProducts,
-    refetchOrders,
-    refetchAll,
-  };
-}
+     // Refresh functions
+     refetchProducts,
+     refetchOrders,
+     refetchAll,
+   };
+ }
 
 export type MarketplaceDataStore = ReturnType<typeof useMarketplaceDataStore>;

@@ -70,11 +70,11 @@ export default function SellerCloudMobile() {
     createSubscription,
   } = useSellerCloudSubscription();
   
-  const connectedMarketplaces = connections.map(c => c.marketplace);
-  const totalRevenue = connections.reduce((sum, c) => sum + (c.total_revenue || 0), 0);
-  
-  // Centralized data store — fetches once, cached for all tabs
-  const store = useMarketplaceDataStore(connectedMarketplaces);
+   const connectedMarketplaces = connections.map(c => c.marketplace);
+   const totalRevenue = connections.reduce((sum, c) => sum + (c.total_revenue || 0), 0);
+   
+   // Centralized data store — fetches once, cached for all tabs
+   const store = useMarketplaceDataStore(connectedMarketplaces);
 
   const handleMarketplaceConnect = async () => {
     await refetch();
