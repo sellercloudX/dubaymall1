@@ -147,23 +147,26 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
   // Clone product to DubayMall (insert into products table)
   const cloneToDubayMall = async (product: CloneableProduct): Promise<boolean> => {
     if (!shop) {
-      toast.error('DubayMall do\'koni topilmadi');
+      toast.error('Avval DubayMall do\'konini yarating (Sotuvchi sahifasida)');
       return false;
     }
     try {
+      // Filter valid image URLs
+      const validImages = (product.pictures || []).filter(img => img && img.startsWith('http'));
       await createProduct({
         name: product.name,
         price: product.price,
         description: product.description || `${product.marketplace} dan import qilingan`,
-        images: product.pictures,
+        images: validImages.length > 0 ? validImages : [],
         shop_id: shop.id,
         stock_quantity: 0,
         source: 'manual' as any,
         status: 'pending' as any,
       });
       return true;
-    } catch (err) {
-      console.error('Clone to DubayMall failed:', err);
+    } catch (err: any) {
+      console.error('Clone to DubayMall failed:', err?.message || err);
+      toast.error(`Klonlash xatosi: ${err?.message || 'Noma\'lum xato'}`);
       return false;
     }
   };
@@ -171,6 +174,11 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
   // Clone product to external marketplace (call yandex-market-create-card)
   const cloneToMarketplace = async (product: CloneableProduct, targetMp: string): Promise<boolean> => {
     try {
+      const validImages = (product.pictures || []).filter(p => p && p.startsWith('http'));
+      const costPrice = Math.round(product.price * 0.6);
+      
+      console.log(`Cloning "${product.name}" to ${targetMp}, images: ${validImages.length}`);
+      
       const { data, error } = await supabase.functions.invoke('yandex-market-create-card', {
         body: {
           shopId: shop?.id || 'sellercloud',
@@ -178,12 +186,12 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
             name: product.name,
             description: product.description || product.name,
             price: product.price,
-            costPrice: Math.round(product.price * 0.6),
-            images: product.pictures?.filter(p => p.startsWith('http')) || [],
+            costPrice,
+            images: validImages,
             category: product.category || '',
           },
           pricing: {
-            costPrice: Math.round(product.price * 0.6),
+            costPrice,
             marketplaceCommission: Math.round(product.price * 0.15),
             logisticsCost: 3000,
             taxRate: 4,
@@ -193,14 +201,24 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
           },
         },
       });
-      if (error) throw error;
-      if (data?.error) {
-        console.error(`Clone to ${targetMp} error:`, data.error);
+      
+      if (error) {
+        console.error(`Clone to ${targetMp} invoke error:`, error.message || error);
+        toast.error(`${product.name}: ${error.message || 'Edge function xatosi'}`);
         return false;
       }
+      
+      if (!data?.success) {
+        const errMsg = data?.error || 'Yandex API xatosi';
+        console.error(`Clone to ${targetMp} API error:`, errMsg, data?.yandexResponse);
+        toast.error(`${product.name.slice(0, 30)}: ${errMsg}`);
+        return false;
+      }
+      
+      console.log(`✅ Cloned "${product.name}" to ${targetMp}, quality: ${data?.cardQuality}`);
       return true;
-    } catch (err) {
-      console.error(`Clone to ${targetMp} failed:`, err);
+    } catch (err: any) {
+      console.error(`Clone to ${targetMp} failed:`, err?.message || err);
       return false;
     }
   };

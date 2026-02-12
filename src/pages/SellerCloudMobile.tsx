@@ -66,6 +66,7 @@ export default function SellerCloudMobile() {
   const {
     subscription,
     accessStatus,
+    isLoading: subscriptionLoading,
     createSubscription,
   } = useSellerCloudSubscription();
   
@@ -86,7 +87,7 @@ export default function SellerCloudMobile() {
     }
   }, [user, authLoading, navigate]);
 
-  if (authLoading) {
+  if (authLoading || subscriptionLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
