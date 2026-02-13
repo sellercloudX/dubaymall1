@@ -11,6 +11,8 @@ interface InfographicRequest {
   category?: string;
   style?: string;
   count?: number;
+  pinterestDesignPrompts?: { prompt: string; referenceImage?: string; style: string }[];
+  usePinterestDesigns?: boolean;
 }
 
 // ==================== INFOGRAPHIC STYLE PROMPTS ====================
@@ -219,6 +221,54 @@ async function generateWithGoogle(
   }
 }
 
+// ==================== PINTEREST REFERENCE — MULTI-IMAGE EDIT ====================
+async function generateWithPinterestReference(
+  productImage: string,
+  referenceImage: string,
+  prompt: string
+): Promise<string | null> {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) return null;
+
+  try {
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash-image",
+        messages: [{
+          role: "user",
+          content: [
+            { type: "text", text: `Use the FIRST image as the design style/layout REFERENCE from Pinterest marketplace cards. Apply that card design style to the SECOND image (the actual product). ${prompt}. CRITICAL: Keep the product in the second image EXACTLY identical — only change background, lighting, layout and composition to match the Pinterest reference style.` },
+            { type: "image_url", image_url: { url: referenceImage } },
+            { type: "image_url", image_url: { url: productImage } }
+          ]
+        }],
+        modalities: ["image", "text"]
+      }),
+    });
+
+    if (!res.ok) {
+      console.error(`Pinterest ref generation failed: ${res.status}`);
+      return null;
+    }
+
+    const data = await res.json();
+    const img = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    if (img) {
+      console.log("✅ Pinterest-enhanced infographic generated");
+      return img;
+    }
+    return null;
+  } catch (err) {
+    console.error("Pinterest reference generation error:", err);
+    return null;
+  }
+}
+
 // ==================== MAIN HANDLER ====================
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -227,7 +277,7 @@ serve(async (req) => {
 
   try {
     const request: InfographicRequest = await req.json();
-    const { productImage, productName, category = "", count = 1 } = request;
+    const { productImage, productName, category = "", count = 1, pinterestDesignPrompts, usePinterestDesigns } = request;
 
     if (!productImage) {
       return new Response(
@@ -236,19 +286,43 @@ serve(async (req) => {
       );
     }
 
+    const hasPinterest = usePinterestDesigns && pinterestDesignPrompts && pinterestDesignPrompts.length > 0;
     console.log(`🎨 Generating ${count} infographic(s) for: "${productName}" [${category}]`);
     console.log(`🤖 AI Priority: Lovable AI (Gemini Image Edit) → Google AI Studio`);
+    if (hasPinterest) {
+      console.log(`📌 Pinterest design reference: ${pinterestDesignPrompts.length} prompts available`);
+    }
 
-    const prompts = getInfographicPrompts(productName, category);
+    // Use Pinterest-enhanced prompts if available, otherwise fallback to built-in
+    const prompts = hasPinterest
+      ? pinterestDesignPrompts.map(p => p.prompt)
+      : getInfographicPrompts(productName, category);
+    
+    // Pinterest reference images for multi-image edit
+    const referenceImages = hasPinterest
+      ? pinterestDesignPrompts.map(p => p.referenceImage).filter(Boolean)
+      : [];
+
     const results: any[] = [];
     let usedModel = "lovable-ai";
 
     for (let i = 0; i < Math.min(count, 6); i++) {
       const prompt = prompts[i % prompts.length];
-      console.log(`📸 Infographic ${i + 1}/${count}...`);
+      const refImage = referenceImages[i % (referenceImages.length || 1)] as string | undefined;
+      console.log(`📸 Infographic ${i + 1}/${count}${refImage ? ' (with Pinterest ref)' : ''}...`);
 
-      // PRIMARY: Lovable AI
-      let imageUrl = await generateWithLovableAI(productImage, prompt);
+      // PRIMARY: Lovable AI — with optional Pinterest reference image
+      let imageUrl: string | null = null;
+      
+      if (refImage) {
+        // Use Pinterest reference + product image together
+        imageUrl = await generateWithPinterestReference(productImage, refImage, prompt);
+      }
+      
+      if (!imageUrl) {
+        imageUrl = await generateWithLovableAI(productImage, prompt);
+      }
+      
       if (imageUrl) {
         usedModel = "lovable-gemini-edit";
       }
@@ -260,11 +334,16 @@ serve(async (req) => {
       }
 
       if (imageUrl) {
+        const styleLabel = hasPinterest 
+          ? (pinterestDesignPrompts[i % pinterestDesignPrompts.length]?.style || "pinterest")
+          : ["hero", "lifestyle", "detail", "premium", "catalog", "dramatic"][i % 6];
+        
         results.push({
           url: imageUrl,
           id: `infographic-${Date.now()}-${i}`,
-          style: ["hero", "lifestyle", "detail", "premium", "catalog", "dramatic"][i % 6],
+          style: styleLabel,
           variation: `Variation ${i + 1}`,
+          source: hasPinterest ? "pinterest-enhanced" : "standard",
         });
         console.log(`✅ Infographic ${i + 1} ready (${usedModel})`);
       } else {
@@ -285,7 +364,8 @@ serve(async (req) => {
         aiModel: usedModel,
         count: results.length,
         dimensions: "1080x1440",
-        format: "marketplace-optimized"
+        format: "marketplace-optimized",
+        pinterestEnhanced: hasPinterest,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

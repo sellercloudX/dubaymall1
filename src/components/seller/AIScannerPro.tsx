@@ -388,15 +388,36 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
       // Step 4: Card creator handles MXIK with better context (category + params)
       updateTaskProgress(3, 'completed');
 
-      // Step 5: Infographic generation (parallel, client-side — no timeout issue)
+      // Step 5: Pinterest design search + Infographic generation
       const generatedInfos: string[] = [];
       const bestImageForInfographic = imageUrl || productImage;
       
       if (shouldGenerateInfographics && bestImageForInfographic) {
         updateTaskProgress(4, 'running');
+        
+        // First: fetch Pinterest design inspiration for this category
+        let pinterestDesignPrompts: any[] = [];
+        try {
+          console.log('📌 Fetching Pinterest design inspiration...');
+          const { data: pinterestData } = await supabase.functions.invoke('pinterest-design-search', {
+            body: {
+              category: analyzed?.category || '',
+              productName: normalizedProductName,
+              count: infoCount,
+            },
+          });
+          
+          if (pinterestData?.success && pinterestData?.enhancedPrompts?.length > 0) {
+            pinterestDesignPrompts = pinterestData.enhancedPrompts;
+            console.log(`✅ Pinterest: ${pinterestDesignPrompts.length} design prompts received`);
+          }
+        } catch (e) {
+          console.warn('Pinterest search failed, using standard prompts:', e);
+        }
+
         const styles = ['professional', 'minimalist', 'vibrant', 'luxury', 'tech', 'professional'];
 
-        // Parallel infographic generation (3 at a time)
+        // Parallel infographic generation (3 at a time) with Pinterest-enhanced prompts
         const batchSize = 3;
         for (let batch = 0; batch < Math.ceil(Math.min(infoCount, 6) / batchSize); batch++) {
           const promises = [];
@@ -408,7 +429,11 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
                   productName: normalizedProductName,
                   category: analyzed?.category,
                   style: styles[i % styles.length],
-                  count: 1
+                  count: 1,
+                  usePinterestDesigns: pinterestDesignPrompts.length > 0,
+                  pinterestDesignPrompts: pinterestDesignPrompts.length > 0 
+                    ? pinterestDesignPrompts.slice(i, i + 1) 
+                    : undefined,
                 },
               }).then(({ data: infoData, error: infoError }) => {
                 if (!infoError && infoData?.images?.length > 0) {
@@ -508,7 +533,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
         { name: 'SEO kontent', status: 'pending', model: 'Yandex AI', icon: <Search className="h-4 w-4" /> },
         { name: 'Tavsif yaratish', status: 'pending', model: 'Yandex AI', icon: <FileText className="h-4 w-4" /> },
         { name: 'MXIK aniqlash', status: 'pending', model: 'Gemini + AI', icon: <Hash className="h-4 w-4" /> },
-        { name: 'Infografikalar', status: 'pending', model: 'Gemini Image', icon: <ImageLucide className="h-4 w-4" /> },
+        { name: 'Pinterest + Infografika', status: 'pending', model: 'Firecrawl + Gemini', icon: <ImageLucide className="h-4 w-4" /> },
         { name: 'Kartochka yaratish', status: 'pending', model: 'Yandex API', icon: <Store className="h-4 w-4" /> },
       ],
       generatedImages: [],
