@@ -480,7 +480,7 @@ export default function Index() {
       </nav>
 
       {/* ━━━ HERO ━━━ */}
-      <section className="relative min-h-[100vh] flex items-center pt-24 sm:pt-28 md:pt-32 pb-12 overflow-hidden">
+      <section className="relative min-h-[100vh] flex items-center pt-28 sm:pt-32 md:pt-36 pb-16 overflow-hidden">
         <div className="absolute inset-0 bg-mesh" />
         <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-primary/8 rounded-full blur-[120px]" />
         <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-accent/6 rounded-full blur-[100px]" />
@@ -488,14 +488,14 @@ export default function Index() {
 
         <div className="container mx-auto px-4 relative z-10">
           <div className="grid lg:grid-cols-2 gap-8 md:gap-12 lg:gap-16 items-center">
-            <div className="max-w-2xl w-full text-center lg:text-left">
+            <div className="max-w-2xl w-full mx-auto lg:mx-0 text-center lg:text-left">
               <div className="animate-fade-up">
-                <Badge className="mb-6 px-4 py-2 text-sm font-medium bg-primary/10 text-primary border-primary/20">
+                <Badge className="mb-6 sm:mb-8 px-4 py-2 text-sm font-medium bg-primary/10 text-primary border-primary/20">
                   {txt.badge}
                 </Badge>
               </div>
 
-              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6 font-display leading-tight animate-fade-up" style={{ animationDelay: '0.1s' }}>
+              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6 sm:mb-8 font-display leading-tight animate-fade-up" style={{ animationDelay: '0.1s' }}>
                 <span className="text-foreground">{txt.heroTitle1}</span>
                 <br />
                 <span className="text-gradient">{txt.heroTitle2}</span>
@@ -503,7 +503,7 @@ export default function Index() {
                 <span className="text-foreground">{txt.heroTitle3}</span>
               </h1>
               
-              <p className="text-base sm:text-lg text-muted-foreground mb-8 leading-relaxed animate-fade-up max-w-xl" style={{ animationDelay: '0.2s' }}>
+              <p className="text-base sm:text-lg text-muted-foreground mb-8 sm:mb-10 leading-relaxed animate-fade-up max-w-xl mx-auto lg:mx-0" style={{ animationDelay: '0.2s' }}>
                 {txt.heroDesc}
               </p>
 
