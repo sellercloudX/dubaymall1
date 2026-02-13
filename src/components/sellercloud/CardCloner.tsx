@@ -202,14 +202,15 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
     }
   };
 
-  // Clone product to external marketplace (call yandex-market-create-card)
+  // Clone product to external marketplace (call yandex-market-create-card with cost optimization)
   const cloneToMarketplace = async (product: CloneableProduct, targetMp: string): Promise<boolean> => {
     try {
       const validImages = (product.pictures || []).filter(p => p && p.startsWith('http'));
       const costPrice = Math.round(product.price * 0.6);
       
-      console.log(`Cloning "${product.name}" to ${targetMp}, images: ${validImages.length}`);
+      console.log(`Cloning "${product.name}" to ${targetMp}, cost-optimized mode, images: ${validImages.length}`);
       
+      // COST OPTIMIZATION: Skip image generation and reuse existing images
       const { data, error } = await supabase.functions.invoke('yandex-market-create-card', {
         body: {
           shopId: shop?.id || 'sellercloud',
@@ -230,6 +231,7 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
             recommendedPrice: product.price,
             netProfit: Math.round(product.price * 0.2),
           },
+          skipImageGeneration: true, // 💰 Reuse existing images from master card
         },
       });
       
@@ -240,13 +242,13 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
       }
       
       if (!data?.success) {
-        const errMsg = data?.error || 'Yandex API xatosi';
+        const errMsg = data?.error || 'Marketplace API xatosi';
         console.error(`Clone to ${targetMp} API error:`, errMsg, data?.yandexResponse);
         toast.error(`${product.name.slice(0, 30)}: ${errMsg}`);
         return false;
       }
       
-      console.log(`✅ Cloned "${product.name}" to ${targetMp}, quality: ${data?.cardQuality}`);
+      console.log(`✅ Cloned "${product.name}" to ${targetMp} (cost-optimized)`);
       return true;
     } catch (err: any) {
       console.error(`Clone to ${targetMp} failed:`, err?.message || err);

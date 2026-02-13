@@ -48,6 +48,7 @@ interface CreateCardRequest {
   product: ProductInput;
   pricing: PricingInput;
   products?: ProductInput[];
+  skipImageGeneration?: boolean; // Cost optimization: reuse existing images for clones
 }
 
 // ============ HELPERS ============
@@ -722,7 +723,8 @@ serve(async (req) => {
         // Always generate fresh professional images using AI
         let images: string[] = [];
         
-        if (LOVABLE_KEY) {
+        // Cost optimization: skip image generation if cloning (reuse existing images)
+        if (LOVABLE_KEY && !body.skipImageGeneration) {
           console.log(`🖼️ Generating 4 creative professional images (source ref: ${sourceImg ? 'yes' : 'no'})...`);
           const creativeAngles = [
             `Professional e-commerce HERO shot of "${product.name}" centered on pristine white background. Perfect studio lighting, soft diffused shadows. The product must fill 70% of frame. Ultra-sharp 4K quality, no text overlays.`,
@@ -778,6 +780,9 @@ serve(async (req) => {
           
           const generatedImgs = await Promise.all(imgPromises);
           images = generatedImgs.filter(Boolean) as string[];
+        } else if (body.skipImageGeneration) {
+          console.log(`💰 Cost optimization: reusing ${sourceImages.length} images for clone`);
+          images = sourceImages;
         }
         
         // If no images generated, fall back to source (better than nothing)
