@@ -460,9 +460,10 @@ serve(async (req) => {
           limit,
         };
       } else if (dataType === "orders") {
-        // Fetch ALL orders from Yandex Market
+        // Fetch ALL orders from Yandex Market — fetch 365 days by default
+        // so client-side date filters (7d, 30d, 90d, year) work correctly
         const today = new Date();
-        const defaultFromDate = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+        const defaultFromDate = new Date(today.getTime() - 365 * 24 * 60 * 60 * 1000);
         const from = fromDate || defaultFromDate.toISOString().split('T')[0];
         const to = toDate || today.toISOString().split('T')[0];
 
