@@ -6,12 +6,16 @@ import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   RefreshCw, Package, AlertTriangle, Check, 
   ArrowDownUp, Settings, Search, TrendingDown,
-  AlertOctagon, FileWarning, BarChart3
+  AlertOctagon, FileWarning, BarChart3, Filter
 } from 'lucide-react';
 import type { MarketplaceDataStore, MarketplaceProduct } from '@/hooks/useMarketplaceDataStore';
+
+type StockFilter = 'all' | 'in_stock' | 'low_stock' | 'out_of_stock';
+type LossFilter = 'all' | 'with_loss' | 'no_loss';
 
 interface InventorySyncProps {
   connectedMarketplaces: string[];
@@ -52,6 +56,8 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
   const [syncInterval] = useState(30);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMarketplace, setSelectedMarketplace] = useState<string>('all');
+  const [stockFilter, setStockFilter] = useState<StockFilter>('all');
+  const [lossFilter, setLossFilter] = useState<LossFilter>('all');
   const isLoading = store.isLoadingProducts;
 
   // Stock data
@@ -145,15 +151,24 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
   }, [connectedMarketplaces, store.dataVersion, selectedMarketplace]);
 
   // Filter
-  const filteredProducts = products.filter(p =>
-    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.sku.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredProducts = products.filter(p => {
+    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.sku.toLowerCase().includes(searchQuery.toLowerCase());
+    if (!matchesSearch) return false;
+    if (stockFilter === 'in_stock') return p.totalStock >= LOW_STOCK_THRESHOLD;
+    if (stockFilter === 'low_stock') return p.totalStock > 0 && p.totalStock < LOW_STOCK_THRESHOLD;
+    if (stockFilter === 'out_of_stock') return p.totalStock === 0;
+    return true;
+  });
 
-  const filteredReconciliation = reconciliation.filter(r =>
-    r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    r.sku.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredReconciliation = reconciliation.filter(r => {
+    const matchesSearch = r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      r.sku.toLowerCase().includes(searchQuery.toLowerCase());
+    if (!matchesSearch) return false;
+    if (lossFilter === 'with_loss') return r.lost > 0;
+    if (lossFilter === 'no_loss') return r.lost === 0;
+    return true;
+  });
 
   // Stats
   const lowStockCount = products.filter(p => p.lowStockAlert).length;
@@ -217,6 +232,25 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
 
         {/* Tab 1: Zaxira holati */}
         <TabsContent value="stock">
+          {/* Stock Filter */}
+          <div className="flex items-center gap-2 mb-4 flex-wrap">
+            <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+            <Select value={stockFilter} onValueChange={(v) => setStockFilter(v as StockFilter)}>
+              <SelectTrigger className="h-8 w-[140px] text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Barchasi</SelectItem>
+                <SelectItem value="in_stock">Mavjud</SelectItem>
+                <SelectItem value="low_stock">Kam qoldiq</SelectItem>
+                <SelectItem value="out_of_stock">Tugagan</SelectItem>
+              </SelectContent>
+            </Select>
+            {stockFilter !== 'all' && (
+              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setStockFilter('all')}>Tozalash</Button>
+            )}
+          </div>
+
           {/* Stats */}
           <div className="grid grid-cols-3 gap-4 mb-4">
             <Card>
@@ -311,6 +345,24 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
 
         {/* Tab 2: Yo'qotishlar tahlili (Reconciliation) */}
         <TabsContent value="reconciliation">
+          {/* Loss Filter */}
+          <div className="flex items-center gap-2 mb-4 flex-wrap">
+            <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+            <Select value={lossFilter} onValueChange={(v) => setLossFilter(v as LossFilter)}>
+              <SelectTrigger className="h-8 w-[160px] text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Barchasi</SelectItem>
+                <SelectItem value="with_loss">Yo'qolganlari</SelectItem>
+                <SelectItem value="no_loss">Yo'qotishsiz</SelectItem>
+              </SelectContent>
+            </Select>
+            {lossFilter !== 'all' && (
+              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setLossFilter('all')}>Tozalash</Button>
+            )}
+          </div>
+
           {/* Summary */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
             <Card>
