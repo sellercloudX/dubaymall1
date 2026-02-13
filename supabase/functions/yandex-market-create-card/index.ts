@@ -449,31 +449,29 @@ async function aiOptimize(
   // Filter out URL/PICKER type params — they require special URLs that AI can't generate
   const safeParams = categoryParams.filter((p: any) => {
     const type = (p.type || "").toUpperCase();
-    // Skip URL, PICKER, and similar types that require external URLs
     if (type === "URL" || type === "PICKER") return false;
-    // Skip params with "url" in name (like color picker URLs)
     if (p.name?.toLowerCase().includes("url")) return false;
     return true;
   });
   
-  const required = safeParams.filter((p: any) => p.required || p.constraintType === "REQUIRED");
-  const recommended = safeParams.filter((p: any) => !p.required && p.constraintType !== "REQUIRED");
-  const allParams = [...required, ...recommended];
+  // ALL params — required, recommended, AND hidden ("Maydonlarni ko'rsatish" params)
+  const allParams = safeParams; // Don't filter — fill EVERYTHING
 
   const formatParam = (p: any) => {
-    let s = `  - id:${p.id}, "${p.name}", type:${p.type || "TEXT"}`;
+    let s = `  - id:${p.id}, "${p.name}", type:${p.type || "TEXT"}, required:${p.required || p.constraintType === "REQUIRED" ? "YES" : "no"}`;
     if (p.unit) s += `, unit:"${p.unit}"`;
     if (p.values?.length) {
-      const vals = p.values.slice(0, 20).map((v: any) => `{id:${v.id},"${v.value}"}`).join(", ");
+      const vals = p.values.slice(0, 25).map((v: any) => `{id:${v.id},"${v.value}"}`).join(", ");
       s += `\n    OPTIONS:[${vals}]`;
-      if (p.values.length > 20) s += ` +${p.values.length - 20}`;
+      if (p.values.length > 25) s += ` +${p.values.length - 25}`;
     }
     return s;
   };
 
-  console.log(`🤖 AI optimizing: ${required.length} required + ${recommended.length} recommended = ${allParams.length} total params`);
+  console.log(`🤖 AI optimizing: ${allParams.length} TOTAL params (filling ALL including hidden)`);
 
-  const prompt = `VAZIFA: Yandex Market kartochkasi — BARCHA ${allParams.length} ta maydonni to'ldir! Sifat 95+ ball uchun HAMMA parametrlar to'ldirilishi SHART!
+  const prompt = `VAZIFA: Yandex Market kartochkasi uchun BARCHA ${allParams.length} ta parametrni to'ldir!
+MAQSAD: MAKSIMAL ball olish. "Maydonlarni ko'rsatish" (Показать поля) ortidagi YASHIRIN parametrlar ham ALBATTA to'ldirilishi SHART!
 
 MAHSULOT:
 - Nom: ${product.name}
@@ -484,13 +482,13 @@ MAHSULOT:
 - Model: ${product.model || "Nomdan aniqla"}
 - Narx: ${product.price} UZS
 
-═══ BARCHA PARAMETRLAR — HAR BIRINI TO'LDIR! (${allParams.length} ta) ═══
+═══ BARCHA PARAMETRLAR — HAR BIRINI TO'LDIR! ═══
 ${allParams.map(formatParam).join("\n")}
 
 QOIDALAR:
 1. name_ru: Ruscha SEO-nom, 80-150 belgi. Format: "[Tur] [Brend] [Model] [Xususiyatlar], [rang]"
-2. name_uz: O'zbekcha LOTIN, 80-150 belgi, xuddi shunday batafsil
-3. description_ru: 800-3000 belgi ruscha professional tavsif. HTML TEGLARISIZ! Faqat oddiy matn. 6+ paragraf.
+2. name_uz: O'zbekcha LOTIN, 80-150 belgi
+3. description_ru: 800-3000 belgi ruscha tavsif. HTML TEGLARISIZ! Oddiy matn. 6+ paragraf.
 4. description_uz: 600-2000 belgi o'zbekcha LOTIN tavsif. HTML TEGLARISIZ!
 5. vendor: Aniq brend nomi
 6. vendorCode: Model artikuli
@@ -500,26 +498,32 @@ QOIDALAR:
 10. parameterValues — MUHIM QOIDALAR:
    - OPTIONS bor parametr → valueId (raqam) tanla, eng mos variant
    - TEXT parametr → FAQAT qiymatni yoz! "Цвет: красный" XATO → "красный" TO'G'RI
-   - NUMBER parametr → value raqam, MINIMUM 1 dan past bo'lmasin
+   - NUMBER parametr → value raqam
+   - BOOLEAN parametr → "true" yoki "false"
    
-   *** JUDA MUHIM: HAMMA ${allParams.length} ta parametrni to'ldir! ***
-   *** "Maydonlarni ko'rsatish" (Показать поля) ortidagi yashirin parametrlar ham to'ldirilishi kerak! ***
-   *** Bilmasang — TAXMINIY/STANDART qiymat yoz, BO'SH QOLDIRMA! ***
+   *** JUDA MUHIM: HAR BIR ${allParams.length} ta parametrni to'ldir! ***
+   *** BO'SH QOLDIRMA! Bilmasang — mahsulotga mos taxminiy qiymat yoz! ***
    *** Har bir parametr uchun FAQAT value YOKI valueId ber, ikkalasini emas! ***
 11. warranty: "1 год" yoki "2 года"
+12. weightDimensions — REAL o'lchamlar:
+   - Kosmetika/parfyum: weight=0.05-0.3kg, 5x5x10 ~ 10x10x15 sm
+   - Telefon: weight=0.15-0.25kg, 8x1x16 sm
+   - Krossovka: weight=0.4-0.8kg, 35x25x12 sm  
+   - Maishiy texnika (kichik): weight=0.5-3kg, 20x15x15 ~ 40x30x30 sm
+   - KATTA qo'yma! Logistika narxi oshadi!
 
 JAVOB FAQAT JSON:
-{"name_ru":"...","name_uz":"...","description_ru":"...","description_uz":"...","vendor":"...","vendorCode":"...","manufacturerCountry":"...","shelfLife":36,"lifeTime":36,"parameterValues":[{"parameterId":123,"valueId":456},{"parameterId":789,"value":"qiymat"}],"warranty":"1 год","adult":false}`;
+{"name_ru":"...","name_uz":"...","description_ru":"...","description_uz":"...","vendor":"...","vendorCode":"...","manufacturerCountry":"...","shelfLife":null,"lifeTime":null,"parameterValues":[{"parameterId":123,"valueId":456},{"parameterId":789,"value":"qiymat"}],"warranty":"1 год","adult":false,"weightKg":0.15,"lengthCm":10,"widthCm":8,"heightCm":5}`;
 
   try {
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${lovableApiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-2.5-pro",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.1,
-        max_tokens: 8000,
+        max_tokens: 12000,
       }),
     });
 
@@ -530,7 +534,7 @@ JAVOB FAQAT JSON:
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const result = JSON.parse(jsonMatch[0]);
-      console.log(`🤖 AI: name_ru=${result.name_ru?.length}ch, desc=${result.description_ru?.length}ch, params=${result.parameterValues?.length}`);
+      console.log(`🤖 AI: name_ru=${result.name_ru?.length}ch, desc=${result.description_ru?.length}ch, params=${result.parameterValues?.length}, weight=${result.weightKg}kg`);
       return result;
     }
   } catch (e) { console.error("AI error:", e); }
@@ -551,6 +555,12 @@ function buildOffer(
 
   const desc = stripHtml(ai?.description_ru || product.description || product.name);
 
+  // Use AI-provided realistic dimensions, fallback to small defaults (not inflated!)
+  const weight = ai?.weightKg || product.weight || 0.15;
+  const length = ai?.lengthCm || product.dimensions?.length || 10;
+  const width = ai?.widthCm || product.dimensions?.width || 8;
+  const height = ai?.heightCm || product.dimensions?.height || 5;
+
   const offer: any = {
     offerId: sku,
     name: finalName,
@@ -560,12 +570,7 @@ function buildOffer(
     barcodes: [barcode],
     vendorCode: ai?.vendorCode || sku,
     manufacturerCountries: [ai?.manufacturerCountry || "Китай"],
-    weightDimensions: {
-      length: product.dimensions?.length || 20,
-      width: product.dimensions?.width || 15,
-      height: product.dimensions?.height || 10,
-      weight: product.weight || 0.3,
-    },
+    weightDimensions: { length, width, height, weight },
     basicPrice: { value: price, currencyId: "UZS" },
     type: "DEFAULT",
     adult: ai?.adult || false,
@@ -704,79 +709,83 @@ serve(async (req) => {
         const sku = generateSKU(product.name);
         const barcode = product.barcode || generateEAN13();
 
-        // ═══ STEP 1: Proxy images + generate if not enough ═══
+        // ═══ STEP 1: Get source image for AI reference (NOT for card!) ═══
         const rawImgs: string[] = [];
         if (product.images?.length) rawImgs.push(...product.images);
         if (product.image && !rawImgs.includes(product.image)) rawImgs.unshift(product.image);
-        let images = await proxyImagesToStorage(supabase, user.id, rawImgs, SUPABASE_URL);
         
-        // Generate professional product images — creative & diverse angles
-        if (images.length < 4 && LOVABLE_KEY) {
-          console.log(`🖼️ Only ${images.length} images, generating up to ${3 - images.length + 1} creative studio images...`);
-          const sourceImg = images[0] || null;
+        // Proxy source images to storage (for AI reference only)
+        const sourceImages = await proxyImagesToStorage(supabase, user.id, rawImgs, SUPABASE_URL);
+        const sourceImg = sourceImages[0] || null; // First image = AI reference
+        
+        // CRITICAL: Don't use raw camera/gallery images on card!
+        // Always generate fresh professional images using AI
+        let images: string[] = [];
+        
+        if (LOVABLE_KEY) {
+          console.log(`🖼️ Generating 4 creative professional images (source ref: ${sourceImg ? 'yes' : 'no'})...`);
           const creativeAngles = [
-            `Professional e-commerce hero shot of "${product.name}" on clean white background. Studio lighting with soft shadows. Ultra sharp product photography.`,
-            `Lifestyle shot of "${product.name}" in natural usage environment. Professional photography, warm lighting.`,
-            `45-degree angle studio shot of "${product.name}" highlighting key features. White gradient background.`,
+            `Professional e-commerce HERO shot of "${product.name}" centered on pristine white background. Perfect studio lighting, soft diffused shadows. The product must fill 70% of frame. Ultra-sharp 4K quality, no text overlays.`,
+            `Elegant LIFESTYLE photo of "${product.name}" in a beautiful, aspirational usage setting. Natural warm lighting, shallow depth of field, bokeh background. Show the product in context — on a vanity table, in a kitchen, on a desk, etc. depending on category.`,
+            `Premium 45-DEGREE ANGLE studio shot of "${product.name}" on subtle gradient background (white to light gray). Dramatic rim lighting highlighting texture and build quality. Professional catalog photography.`,
+            `DETAIL MACRO close-up of "${product.name}" showing premium texture, material quality, branding, key buttons or functional elements. Shallow depth of field, studio lighting on clean background.`,
           ];
           
-          const needed = Math.min(3 - images.length + 1, creativeAngles.length);
-          
-          // Generate images in PARALLEL with fast model
-          const imgPromises = [];
-          for (let i = 0; i < needed; i++) {
-            imgPromises.push((async () => {
-              try {
-                const genBody: any = {
-                  model: "google/gemini-2.5-flash-image",
-                  modalities: ["image", "text"],
-                  messages: [{
-                    role: "user",
-                    content: sourceImg ? [
-                      { type: "text", text: `You are a professional product photographer. Using this EXACT product as reference (it must look 100% IDENTICAL — same shape, color, brand, details), create: ${creativeAngles[i]}. CRITICAL: The product must be the SAME item, not a generic version. Only change the angle, background and lighting.` },
-                      { type: "image_url", image_url: { url: sourceImg } }
-                    ] : creativeAngles[i]
-                  }],
-                };
-                
-                const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-                  method: "POST",
-                  headers: { Authorization: `Bearer ${LOVABLE_KEY}`, "Content-Type": "application/json" },
-                  body: JSON.stringify(genBody),
-                });
-                
-                if (res.ok) {
-                  const data = await res.json();
-                  const imgData = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-                  if (imgData && imgData.startsWith("data:image")) {
-                    const base64 = imgData.split(",")[1];
-                    const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
-                    const fileName = `${user.id}/ym-gen-${Date.now()}-${i}.png`;
-                    const { error } = await supabase.storage.from('product-images').upload(fileName, bytes, {
-                      contentType: 'image/png', cacheControl: '31536000', upsert: false,
-                    });
-                    if (!error) {
-                      const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(fileName);
-                      if (urlData?.publicUrl) {
-                        console.log(`✅ Generated image ${i + 1}`);
-                        return urlData.publicUrl;
-                      }
+          const imgPromises = creativeAngles.map((angle, i) => (async () => {
+            try {
+              const genBody: any = {
+                model: "google/gemini-2.5-flash-image",
+                modalities: ["image", "text"],
+                messages: [{
+                  role: "user",
+                  content: sourceImg ? [
+                    { type: "text", text: `You are an elite product photographer for a premium marketplace. Using this product as EXACT visual reference (same shape, color, brand, every detail must be IDENTICAL), create: ${angle}\n\nCRITICAL: The product must look 100% identical to the reference — same brand logo, same color, same shape. ONLY change the angle, background, and lighting. Do NOT add any text, watermarks, or labels to the image.` },
+                    { type: "image_url", image_url: { url: sourceImg } }
+                  ] : angle
+                }],
+              };
+              
+              const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+                method: "POST",
+                headers: { Authorization: `Bearer ${LOVABLE_KEY}`, "Content-Type": "application/json" },
+                body: JSON.stringify(genBody),
+              });
+              
+              if (res.ok) {
+                const data = await res.json();
+                const imgData = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+                if (imgData && imgData.startsWith("data:image")) {
+                  const base64 = imgData.split(",")[1];
+                  const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+                  const fileName = `${user.id}/ym-gen-${Date.now()}-${i}.png`;
+                  const { error } = await supabase.storage.from('product-images').upload(fileName, bytes, {
+                    contentType: 'image/png', cacheControl: '31536000', upsert: false,
+                  });
+                  if (!error) {
+                    const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(fileName);
+                    if (urlData?.publicUrl) {
+                      console.log(`✅ Generated creative image ${i + 1}: ${creativeAngles[i].substring(0, 30)}`);
+                      return urlData.publicUrl;
                     }
                   }
                 }
-              } catch (e) {
-                console.error(`Image gen ${i} error:`, e);
               }
-              return null;
-            })());
-          }
+            } catch (e) {
+              console.error(`Image gen ${i} error:`, e);
+            }
+            return null;
+          })());
           
           const generatedImgs = await Promise.all(imgPromises);
-          for (const url of generatedImgs) {
-            if (url) images.push(url);
-          }
+          images = generatedImgs.filter(Boolean) as string[];
         }
-        console.log(`🖼️ Total ${images.length} images ready`);
+        
+        // If no images generated, fall back to source (better than nothing)
+        if (images.length === 0 && sourceImages.length > 0) {
+          console.warn("⚠️ No images generated, falling back to source images");
+          images = sourceImages;
+        }
+        console.log(`🖼️ Total ${images.length} professional images ready`);
 
         // ═══ STEP 2: Find LEAF category from Yandex tree ═══
         const leafCat = await findLeafCategory(creds.apiKey, product.name, product.description || "", LOVABLE_KEY);
