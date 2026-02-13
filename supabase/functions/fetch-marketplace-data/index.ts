@@ -460,100 +460,116 @@ serve(async (req) => {
           limit,
         };
       } else if (dataType === "orders") {
-        // Fetch ALL orders from Yandex Market — fetch 365 days by default
-        // so client-side date filters (7d, 30d, 90d, year) work correctly
+        // Fetch orders from Yandex Market
+        // Yandex API allows max 30-day intervals, so we split into 30-day chunks
+        // to fetch up to 365 days of data for client-side date filtering
         const today = new Date();
-        const defaultFromDate = new Date(today.getTime() - 365 * 24 * 60 * 60 * 1000);
-        const from = fromDate || defaultFromDate.toISOString().split('T')[0];
-        const to = toDate || today.toISOString().split('T')[0];
+        const requestedDays = 365;
+        const chunkDays = 30;
+        const startDate = fromDate ? new Date(fromDate) : new Date(today.getTime() - requestedDays * 24 * 60 * 60 * 1000);
+        const endDate = toDate ? new Date(toDate) : today;
 
         let allOrders: YandexOrder[] = [];
-        let orderPage = 1;
-        let hasMoreOrders = true;
+        const orderIdsSeen = new Set<number>();
 
-        while (hasMoreOrders) {
-          let url = `https://api.partner.market.yandex.ru/campaigns/${campaignId}/orders?fromDate=${from}&toDate=${to}&page=${orderPage}&pageSize=50`;
-          if (status) {
-            url += `&status=${status}`;
-          }
-
-          console.log(`Calling orders API page ${orderPage}: ${url}`);
-
-          const response = await fetchWithRetry(url, { headers });
-
-          if (!response.ok) {
-            const errorText = await response.text();
-            console.error("Yandex orders error:", response.status, errorText);
-            break;
-          }
-
-          const data = await response.json();
-          const orders = data.orders || [];
-          console.log(`Found ${orders.length} orders on page ${orderPage}`);
+        // Split into 30-day chunks
+        let chunkEnd = new Date(endDate);
+        while (chunkEnd > startDate) {
+          let chunkStart = new Date(chunkEnd.getTime() - chunkDays * 24 * 60 * 60 * 1000);
+          if (chunkStart < startDate) chunkStart = new Date(startDate);
           
-          // Log first order to see available fields
-          if (orders.length > 0 && orderPage === 1) {
-            console.log('Sample order fields:', JSON.stringify(Object.keys(orders[0])));
-            console.log('Sample order dates:', JSON.stringify({
-              createdAt: orders[0].createdAt,
-              creationDate: orders[0].creationDate,
-              updateDate: orders[0].updateDate,
-            }));
-          }
+          const from = chunkStart.toISOString().split('T')[0];
+          const to = chunkEnd.toISOString().split('T')[0];
+          
+          let orderPage = 1;
+          let hasMoreOrders = true;
 
-          // Yandex Market UZ returns prices in UZS directly - no conversion needed
-          // IMPORTANT: Yandex uses buyerTotal/buyerItemsTotal, NOT 'total'
-          const pageOrders: YandexOrder[] = orders.map((order: any) => {
-            const itemsTotal = order.buyerItemsTotal || order.itemsTotal || 0;
-            const deliveryTotal = order.deliveryTotal || 0;
-            const total = order.buyerTotal || order.buyerItemsTotalBeforeDiscount || (itemsTotal + deliveryTotal) || 0;
+          while (hasMoreOrders) {
+            let url = `https://api.partner.market.yandex.ru/campaigns/${campaignId}/orders?fromDate=${from}&toDate=${to}&page=${orderPage}&pageSize=50`;
+            if (status) {
+              url += `&status=${status}`;
+            }
+
+            console.log(`Calling orders API page ${orderPage} (${from} to ${to}): ${url}`);
+
+            const response = await fetchWithRetry(url, { headers });
+
+            if (!response.ok) {
+              const errorText = await response.text();
+              console.error("Yandex orders error:", response.status, errorText);
+              hasMoreOrders = false;
+              break;
+            }
+
+            const data = await response.json();
+            const orders = data.orders || [];
+            console.log(`Found ${orders.length} orders on page ${orderPage} (${from} to ${to})`);
             
-            return {
-              id: order.id,
-              status: order.status,
-              substatus: order.substatus,
-              createdAt: order.creationDate || order.createdAt || new Date().toISOString(),
-              total: total,
-              totalUZS: total,
-              itemsTotal: itemsTotal,
-              itemsTotalUZS: itemsTotal,
-              deliveryTotal: deliveryTotal,
-              deliveryTotalUZS: deliveryTotal,
-              paymentType: order.paymentType,
-              paymentMethod: order.paymentMethod,
-              buyer: {
-                firstName: order.buyer?.firstName || '',
-                lastName: order.buyer?.lastName || '',
-                type: order.buyer?.type,
-              },
-              deliveryAddress: order.delivery?.address,
-              deliveryRegion: order.delivery?.region?.name,
-              items: order.items?.map((item: any) => {
-                const itemPrice = item.buyerPrice || item.price || 0;
-                return {
-                  offerId: item.offerId,
-                  offerName: item.offerName,
-                  count: item.count,
-                  price: itemPrice,
-                  priceUZS: itemPrice,
-                  categoryId: item.marketCategoryId,
-                };
-              }),
-            };
-          });
+            if (orders.length > 0 && orderPage === 1 && allOrders.length === 0) {
+              console.log('Sample order fields:', JSON.stringify(Object.keys(orders[0])));
+            }
 
-          allOrders = [...allOrders, ...pageOrders];
+            const pageOrders: YandexOrder[] = orders.map((order: any) => {
+              const itemsTotal = order.buyerItemsTotal || order.itemsTotal || 0;
+              const deliveryTotal = order.deliveryTotal || 0;
+              const total = order.buyerTotal || order.buyerItemsTotalBeforeDiscount || (itemsTotal + deliveryTotal) || 0;
+              
+              return {
+                id: order.id,
+                status: order.status,
+                substatus: order.substatus,
+                createdAt: order.creationDate || order.createdAt || new Date().toISOString(),
+                total: total,
+                totalUZS: total,
+                itemsTotal: itemsTotal,
+                itemsTotalUZS: itemsTotal,
+                deliveryTotal: deliveryTotal,
+                deliveryTotalUZS: deliveryTotal,
+                paymentType: order.paymentType,
+                paymentMethod: order.paymentMethod,
+                buyer: {
+                  firstName: order.buyer?.firstName || '',
+                  lastName: order.buyer?.lastName || '',
+                  type: order.buyer?.type,
+                },
+                deliveryAddress: order.delivery?.address,
+                deliveryRegion: order.delivery?.region?.name,
+                items: order.items?.map((item: any) => {
+                  const itemPrice = item.buyerPrice || item.price || 0;
+                  return {
+                    offerId: item.offerId,
+                    offerName: item.offerName,
+                    count: item.count,
+                    price: itemPrice,
+                    priceUZS: itemPrice,
+                    categoryId: item.marketCategoryId,
+                  };
+                }),
+              };
+            });
 
-          // Check if there are more pages
-          const paging = data.pager || data.paging || {};
-          const totalPages = paging.pagesCount || Math.ceil((paging.total || 0) / 50);
-          
-          if (orderPage >= totalPages || orders.length < 50 || !fetchAll) {
-            hasMoreOrders = false;
-          } else {
-            orderPage++;
-            await sleep(500); // Delay between pages to avoid rate limiting
+            // Deduplicate orders across chunks
+            for (const order of pageOrders) {
+              if (!orderIdsSeen.has(order.id)) {
+                orderIdsSeen.add(order.id);
+                allOrders.push(order);
+              }
+            }
+
+            const paging = data.pager || data.paging || {};
+            const totalPages = paging.pagesCount || Math.ceil((paging.total || 0) / 50);
+            
+            if (orderPage >= totalPages || orders.length < 50 || !fetchAll) {
+              hasMoreOrders = false;
+            } else {
+              orderPage++;
+              await sleep(500);
+            }
           }
+
+          // Move to previous chunk
+          chunkEnd = new Date(chunkStart.getTime() - 1);
+          await sleep(300); // Small delay between chunks
         }
 
         console.log(`Total orders fetched: ${allOrders.length}`);
@@ -1085,7 +1101,10 @@ serve(async (req) => {
             'DELIVERED', 'COMPLETED', 'CANCELED', 'RETURNED'
           ];
 
-          for (const orderStatus of orderStatuses) {
+          for (let si = 0; si < orderStatuses.length; si++) {
+            const orderStatus = orderStatuses[si];
+            // Add delay between status queries to avoid 429 rate limits
+            if (si > 0) await sleep(500);
             page = 0;
             hasMore = true;
 
