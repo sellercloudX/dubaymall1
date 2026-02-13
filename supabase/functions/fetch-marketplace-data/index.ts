@@ -514,11 +514,33 @@ serve(async (req) => {
               const deliveryTotal = order.deliveryTotal || 0;
               const total = order.buyerTotal || order.buyerItemsTotalBeforeDiscount || (itemsTotal + deliveryTotal) || 0;
               
+              // Parse Yandex date format "DD-MM-YYYY HH:MM:SS" to ISO
+              let parsedDate = new Date().toISOString();
+              const rawDate = order.creationDate || order.createdAt || '';
+              if (rawDate) {
+                const ddmmMatch = rawDate.match(/^(\d{2})-(\d{2})-(\d{4})\s+(\d{2}):(\d{2}):(\d{2})$/);
+                if (ddmmMatch) {
+                  // DD-MM-YYYY HH:MM:SS → ISO
+                  parsedDate = `${ddmmMatch[3]}-${ddmmMatch[2]}-${ddmmMatch[1]}T${ddmmMatch[4]}:${ddmmMatch[5]}:${ddmmMatch[6]}Z`;
+                } else if (rawDate.includes('T') || rawDate.match(/^\d{4}-/)) {
+                  // Already ISO-like
+                  parsedDate = rawDate;
+                } else {
+                  // Try DD-MM-YYYY without time
+                  const dateOnlyMatch = rawDate.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+                  if (dateOnlyMatch) {
+                    parsedDate = `${dateOnlyMatch[3]}-${dateOnlyMatch[2]}-${dateOnlyMatch[1]}T00:00:00Z`;
+                  } else {
+                    parsedDate = new Date().toISOString();
+                  }
+                }
+              }
+
               return {
                 id: order.id,
                 status: order.status,
                 substatus: order.substatus,
-                createdAt: order.creationDate || order.createdAt || new Date().toISOString(),
+                createdAt: parsedDate,
                 total: total,
                 totalUZS: total,
                 itemsTotal: itemsTotal,

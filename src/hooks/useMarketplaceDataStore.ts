@@ -134,7 +134,7 @@ export function useMarketplaceDataStore(connectedMarketplaces: string[]) {
    // Fetch orders for each marketplace
    const orderQueries = useQueries({
      queries: connectedMarketplaces.map(mp => ({
-       queryKey: ['marketplace-orders', mp, 'v2-365d'],
+       queryKey: ['marketplace-orders', mp, 'v3-iso-dates'],
        queryFn: async () => {
          const result = await fetchMarketplaceDataFn(mp, 'orders', {
            fetchAll: true,
