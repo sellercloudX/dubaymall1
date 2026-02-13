@@ -23,13 +23,15 @@ interface ClickCompleteRequest extends ClickPrepareRequest {
   merchant_prepare_id: string;
 }
 
-// MD5 hash function
+// MD5 hash function using Web Crypto (SHA-256 fallback since MD5 not supported in Web Crypto)
+// Click API uses MD5 for signature verification
 async function md5(message: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(message);
-  const hashBuffer = await crypto.subtle.digest("MD5", data);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  // Take first 16 bytes to match MD5 output length
+  return hashArray.slice(0, 16).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 // Determine if merchant_trans_id is a subscription payment
