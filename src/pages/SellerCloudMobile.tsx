@@ -26,7 +26,8 @@ import { ReportsExport } from '@/components/sellercloud/ReportsExport';
 import { NotificationCenter } from '@/components/sellercloud/NotificationCenter';
 import { SubscriptionBilling } from '@/components/sellercloud/SubscriptionBilling';
 import { CostPriceManager } from '@/components/sellercloud/CostPriceManager';
-import { Loader2, Lock, TrendingUp, Calculator, DollarSign, BarChart3, Shield, Copy, AlertOctagon, ArrowDownUp, Tag, Upload, FileSpreadsheet, Bell, CreditCard, Coins } from 'lucide-react';
+import { UzumCardHelper } from '@/components/sellercloud/UzumCardHelper';
+import { Loader2, Lock, TrendingUp, Calculator, DollarSign, BarChart3, Shield, Copy, AlertOctagon, ArrowDownUp, Tag, Upload, FileSpreadsheet, Bell, CreditCard, Coins, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -39,6 +40,7 @@ const moreSubTabs = [
   { id: 'cost-prices' as const, icon: Coins, label: 'Tannarx' },
   { id: 'min-price' as const, icon: Shield, label: 'Min narx' },
   { id: 'card-clone' as const, icon: Copy, label: 'Klonlash' },
+  { id: 'uzum-card' as const, icon: Sparkles, label: 'Uzum Card' },
   { id: 'problems' as const, icon: AlertOctagon, label: 'Muammolar' },
   { id: 'inventory' as const, icon: ArrowDownUp, label: 'Zaxira' },
   { id: 'pricing' as const, icon: Tag, label: 'Narxlar' },
@@ -164,6 +166,8 @@ export default function SellerCloudMobile() {
         return <div className="p-4"><MinPriceProtection connectedMarketplaces={connectedMarketplaces} store={store} commissionPercent={subscription?.commission_percent || 4} /></div>;
       case 'card-clone':
         return <div className="p-4"><CardCloner connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
+      case 'uzum-card':
+        return <div className="p-4"><UzumCardHelper connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'problems':
         return <div className="p-4"><ProblematicProducts connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'financials':

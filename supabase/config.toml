@@ -65,3 +65,6 @@ verify_jwt = false
 
 [functions.track-order]
 verify_jwt = false
+
+[functions.prepare-uzum-card]
+verify_jwt = false
