@@ -224,10 +224,10 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
       </div>
 
       <Tabs defaultValue="stock" className="space-y-4">
-        <TabsList className="h-auto gap-1 p-1">
-          <TabsTrigger value="stock" className="text-xs gap-1"><Package className="h-3.5 w-3.5" />Zaxira holati</TabsTrigger>
-          <TabsTrigger value="reconciliation" className="text-xs gap-1"><FileWarning className="h-3.5 w-3.5" />Yo'qotishlar tahlili</TabsTrigger>
-          <TabsTrigger value="movement" className="text-xs gap-1"><BarChart3 className="h-3.5 w-3.5" />Inventar harakati</TabsTrigger>
+        <TabsList className="h-auto gap-1 p-1 w-full flex-wrap">
+          <TabsTrigger value="stock" className="text-xs gap-1 flex-1 min-w-0"><Package className="h-3.5 w-3.5 shrink-0" /><span className="truncate">Zaxira</span></TabsTrigger>
+          <TabsTrigger value="reconciliation" className="text-xs gap-1 flex-1 min-w-0"><FileWarning className="h-3.5 w-3.5 shrink-0" /><span className="truncate">Yo'qotishlar</span></TabsTrigger>
+          <TabsTrigger value="movement" className="text-xs gap-1 flex-1 min-w-0"><BarChart3 className="h-3.5 w-3.5 shrink-0" /><span className="truncate">Harakat</span></TabsTrigger>
         </TabsList>
 
         {/* Tab 1: Zaxira holati */}
@@ -252,29 +252,29 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-3 gap-4 mb-4">
+          <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-4">
             <Card>
               <CardContent className="pt-4">
-                <div className="flex items-center gap-2 text-primary mb-2">
-                  <Check className="h-4 w-4" /><span className="text-sm">Mavjud</span>
-                </div>
-                {isLoading ? <Skeleton className="h-8 w-12" /> : <div className="text-2xl font-bold">{inStockCount}</div>}
+                 <div className="flex items-center gap-1.5 text-primary mb-1">
+                   <Check className="h-3.5 w-3.5 shrink-0" /><span className="text-xs sm:text-sm truncate">Mavjud</span>
+                 </div>
+                 {isLoading ? <Skeleton className="h-7 w-10" /> : <div className="text-xl sm:text-2xl font-bold">{inStockCount}</div>}
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-4">
-                <div className="flex items-center gap-2 text-amber-600 mb-2">
-                  <AlertTriangle className="h-4 w-4" /><span className="text-sm">Kam (&lt;{LOW_STOCK_THRESHOLD})</span>
-                </div>
-                {isLoading ? <Skeleton className="h-8 w-12" /> : <div className="text-2xl font-bold text-amber-600">{lowStockCount}</div>}
+                 <div className="flex items-center gap-1.5 text-amber-600 mb-1">
+                   <AlertTriangle className="h-3.5 w-3.5 shrink-0" /><span className="text-xs sm:text-sm truncate">Kam</span>
+                 </div>
+                 {isLoading ? <Skeleton className="h-7 w-10" /> : <div className="text-xl sm:text-2xl font-bold text-amber-600">{lowStockCount}</div>}
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-4">
-                <div className="flex items-center gap-2 text-destructive mb-2">
-                  <Package className="h-4 w-4" /><span className="text-sm">Tugagan</span>
-                </div>
-                {isLoading ? <Skeleton className="h-8 w-12" /> : <div className="text-2xl font-bold text-destructive">{outOfStockCount}</div>}
+                 <div className="flex items-center gap-1.5 text-destructive mb-1">
+                   <Package className="h-3.5 w-3.5 shrink-0" /><span className="text-xs sm:text-sm truncate">Tugagan</span>
+                 </div>
+                 {isLoading ? <Skeleton className="h-7 w-10" /> : <div className="text-xl sm:text-2xl font-bold text-destructive">{outOfStockCount}</div>}
               </CardContent>
             </Card>
           </div>
@@ -364,7 +364,7 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
           </div>
 
           {/* Summary */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 mb-4">
             <Card>
               <CardContent className="pt-4">
                 <div className="text-xs text-muted-foreground mb-1">Jami mahsulotlar</div>
@@ -428,16 +428,17 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
                   <Package className="h-12 w-12 mx-auto mb-3 opacity-50" /><p>Ma'lumot topilmadi</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
+                <>
+                <div className="hidden sm:block overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b text-left">
                         <th className="px-4 py-2 font-medium text-xs text-muted-foreground">Mahsulot</th>
                         <th className="px-3 py-2 font-medium text-xs text-muted-foreground text-center">MP</th>
-                        <th className="px-3 py-2 font-medium text-xs text-muted-foreground text-right">Yuklangan</th>
+                        <th className="px-3 py-2 font-medium text-xs text-muted-foreground text-right">Yukl.</th>
                         <th className="px-3 py-2 font-medium text-xs text-muted-foreground text-right">Sotilgan</th>
                         <th className="px-3 py-2 font-medium text-xs text-muted-foreground text-right">Qoldiq</th>
-                        <th className="px-3 py-2 font-medium text-xs text-muted-foreground text-right">Qaytarilgan</th>
+                        <th className="px-3 py-2 font-medium text-xs text-muted-foreground text-right">Qayt.</th>
                         <th className="px-3 py-2 font-medium text-xs text-muted-foreground text-right">Yo'qolgan</th>
                       </tr>
                     </thead>
@@ -451,7 +452,7 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
                               <code className="text-[10px] text-muted-foreground">{item.sku}</code>
                             </td>
                             <td className="px-3 py-2.5 text-center">
-                              <Badge variant="outline" className="text-xs">{MARKETPLACE_NAMES[item.marketplace]}</Badge>
+                              <Badge variant="outline" className="text-[10px]">{MARKETPLACE_NAMES[item.marketplace]}</Badge>
                             </td>
                             <td className="px-3 py-2.5 text-right font-medium">{item.invoiced}</td>
                             <td className="px-3 py-2.5 text-right font-medium text-primary">{item.sold}</td>
@@ -469,6 +470,48 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
                     </tbody>
                   </table>
                 </div>
+                {/* Mobile card layout */}
+                <div className="sm:hidden space-y-2 px-4">
+                  {filteredReconciliation
+                    .sort((a, b) => b.lost - a.lost)
+                    .map(item => (
+                      <div key={`${item.sku}-${item.marketplace}`} className="p-3 rounded-lg border space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium text-sm break-words">{item.name}</div>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <Badge variant="outline" className="text-[10px]">{MARKETPLACE_NAMES[item.marketplace]}</Badge>
+                              <code className="text-[10px] text-muted-foreground truncate">{item.sku}</code>
+                            </div>
+                          </div>
+                          {item.lost > 0 ? (
+                            <Badge variant="destructive" className="text-xs shrink-0">{item.lost} yo'q.</Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-xs text-primary shrink-0">✓</Badge>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-4 gap-1 text-center">
+                          <div>
+                            <div className="text-[10px] text-muted-foreground">Yukl.</div>
+                            <div className="font-medium text-xs">{item.invoiced}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-muted-foreground">Sotilgan</div>
+                            <div className="font-medium text-xs text-primary">{item.sold}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-muted-foreground">Qoldiq</div>
+                            <div className="font-medium text-xs">{item.currentStock}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-muted-foreground">Qayt.</div>
+                            <div className="font-medium text-xs text-amber-600">{item.returned}</div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+                </>
               )}
             </CardContent>
           </Card>
@@ -567,27 +610,27 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
                         <span className="font-medium text-sm">{MARKETPLACE_NAMES[mp] || mp}</span>
                         <Badge variant="outline">{mpProducts.length} SKU</Badge>
                       </div>
-                      <div className="grid grid-cols-5 gap-2 text-center">
-                        <div>
-                          <div className="text-xs text-muted-foreground">Umumiy qoldiq</div>
-                          <div className="font-bold text-sm">{mpTotalStock}</div>
-                        </div>
-                        <div>
-                          <div className="text-xs text-muted-foreground">Sotilgan</div>
-                          <div className="font-bold text-sm text-primary">{mpSold}</div>
-                        </div>
-                        <div>
-                          <div className="text-xs text-muted-foreground">Qaytarilgan</div>
-                          <div className="font-bold text-sm text-amber-600">{mpReturned}</div>
-                        </div>
-                        <div>
-                          <div className="text-xs text-muted-foreground">Kam qoldiq</div>
-                          <div className="font-bold text-sm text-amber-600">{mpLowStock}</div>
-                        </div>
-                        <div>
-                          <div className="text-xs text-muted-foreground">Tugagan</div>
-                          <div className="font-bold text-sm text-destructive">{mpOutOfStock}</div>
-                        </div>
+                      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 text-center">
+                         <div>
+                           <div className="text-[10px] sm:text-xs text-muted-foreground">Qoldiq</div>
+                           <div className="font-bold text-xs sm:text-sm">{mpTotalStock}</div>
+                         </div>
+                         <div>
+                           <div className="text-[10px] sm:text-xs text-muted-foreground">Sotilgan</div>
+                           <div className="font-bold text-xs sm:text-sm text-primary">{mpSold}</div>
+                         </div>
+                         <div>
+                           <div className="text-[10px] sm:text-xs text-muted-foreground">Qayt.</div>
+                           <div className="font-bold text-xs sm:text-sm text-amber-600">{mpReturned}</div>
+                         </div>
+                         <div className="hidden sm:block">
+                           <div className="text-xs text-muted-foreground">Kam</div>
+                           <div className="font-bold text-sm text-amber-600">{mpLowStock}</div>
+                         </div>
+                         <div className="hidden sm:block">
+                           <div className="text-xs text-muted-foreground">Tugagan</div>
+                           <div className="font-bold text-sm text-destructive">{mpOutOfStock}</div>
+                         </div>
                       </div>
                     </div>
                   );
