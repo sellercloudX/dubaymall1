@@ -13,7 +13,7 @@ import {
   Play, Sparkles, Shield, Rocket, Send, MessageCircle,
   ChevronDown, Lock, FileCheck
 } from 'lucide-react';
-import { useState, useEffect, useRef, ReactNode } from 'react';
+import React, { useState, useEffect, useRef, ReactNode } from 'react';
 import heroDashboard from '@/assets/hero-dashboard.png';
 import abstractShapes from '@/assets/abstract-shapes.png';
 
@@ -47,22 +47,25 @@ function useInView(threshold = 0.15) {
   return { ref, inView };
 }
 
-function FadeInSection({ children, className = '', delay = 0 }: { children: ReactNode; className?: string; delay?: number }) {
-  const { ref, inView } = useInView(0.1);
-  return (
-    <div 
-      ref={ref} 
-      className={`transition-all duration-700 ${inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'} ${className}`}
-      style={{ transitionDelay: `${delay}ms` }}
-    >
-      {children}
-    </div>
-  );
-}
+const FadeInSection = React.forwardRef<HTMLDivElement, { children: ReactNode; className?: string; delay?: number }>(
+  ({ children, className = '', delay = 0 }, _ref) => {
+    const { ref, inView } = useInView(0.1);
+    return (
+      <div 
+        ref={ref} 
+        className={`transition-all duration-700 ${inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'} ${className}`}
+        style={{ transitionDelay: `${delay}ms` }}
+      >
+        {children}
+      </div>
+    );
+  }
+);
+FadeInSection.displayName = 'FadeInSection';
 
-function FloatingParticles() {
+const FloatingParticles = React.memo(React.forwardRef<HTMLDivElement>((_props, ref) => {
   return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+    <div ref={ref} className="absolute inset-0 overflow-hidden pointer-events-none">
       {Array.from({ length: 20 }).map((_, i) => (
         <div 
           key={i}
@@ -77,7 +80,8 @@ function FloatingParticles() {
       ))}
     </div>
   );
-}
+}));
+FloatingParticles.displayName = 'FloatingParticles';
 
 // ─── FAQ Component ───
 function FAQItem({ question, answer }: { question: string; answer: string }) {
