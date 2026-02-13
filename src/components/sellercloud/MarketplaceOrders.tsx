@@ -225,21 +225,31 @@ export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceO
                         {order.items && order.items.length > 0 ? (
                           <div className="space-y-2">
                             <h4 className="font-medium text-sm mb-3">Mahsulotlar:</h4>
-                            {order.items.map((item, idx) => (
-                              <div key={idx} className="flex items-center justify-between p-2 bg-background rounded">
-                                <div className="flex items-center gap-2">
-                                  <Package className="h-4 w-4 text-muted-foreground" />
-                                  <div>
-                                    <div className="text-sm font-medium">{item.offerName}</div>
-                                    <div className="text-xs text-muted-foreground">ID: {item.offerId}</div>
+                            {order.items.map((item, idx) => {
+                              const matchedProduct = store.getProducts(selectedMarketplace).find(p => p.offerId === item.offerId || p.shopSku === item.offerId);
+                              const itemImg = matchedProduct?.pictures?.[0];
+                              return (
+                              <div key={idx} className="flex items-center justify-between p-2 bg-background rounded gap-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <div className="w-10 h-10 rounded bg-muted flex items-center justify-center overflow-hidden shrink-0">
+                                    {itemImg ? (
+                                      <img src={itemImg} alt="" className="w-full h-full object-cover" />
+                                    ) : (
+                                      <Package className="h-4 w-4 text-muted-foreground" />
+                                    )}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="text-sm font-medium line-clamp-1">{item.offerName}</div>
+                                    <code className="text-[10px] text-muted-foreground">{item.offerId}</code>
                                   </div>
                                 </div>
-                                <div className="text-right">
+                                <div className="text-right shrink-0">
                                   <div className="font-medium">{formatPrice(item.priceUZS || item.price)}</div>
                                   <div className="text-xs text-muted-foreground">× {item.count}</div>
                                 </div>
                               </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         ) : (
                           <p className="text-sm text-muted-foreground">Mahsulotlar ma'lumoti mavjud emas</p>

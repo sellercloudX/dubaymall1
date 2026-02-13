@@ -40,17 +40,20 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
   const [priceChanges, setPriceChanges] = useState<Record<string, number>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedMp, setSelectedMp] = useState(connectedMarketplaces[0] || '');
   const { getCostPrice } = useCostPrices();
   const { data: tariffMap, isLoading: tariffsLoading } = useMarketplaceTariffs(connectedMarketplaces, store);
   const isLoading = store.isLoadingProducts || tariffsLoading;
 
+  const activeMarketplaces = selectedMp ? [selectedMp] : connectedMarketplaces;
+
   const products = useMemo(() => {
     const allProducts: ProductPrice[] = [];
-    for (const marketplace of connectedMarketplaces) {
+    for (const marketplace of activeMarketplaces) {
       store.getProducts(marketplace).forEach(product => {
         const price = product.price || 0;
         const costPrice = getCostPrice(marketplace, product.offerId);
-        const tariff = getTariffForProduct(tariffMap, product.offerId, price);
+        const tariff = getTariffForProduct(tariffMap, product.offerId, price, marketplace);
         
         // Min price calculation: use COST PRICE as base for tariff estimation
         // to avoid circular dependency (price -> tariff -> minPrice -> price)
@@ -84,7 +87,7 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
       });
     }
     return allProducts;
-  }, [connectedMarketplaces, store.dataVersion, getCostPrice, tariffMap, minProfit, priceChanges]);
+  }, [activeMarketplaces, store.dataVersion, getCostPrice, tariffMap, minProfit, priceChanges]);
 
   const filteredProducts = searchQuery 
     ? products.filter(p => 
@@ -184,6 +187,18 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
 
   return (
     <div className="space-y-4 overflow-hidden">
+      {/* Marketplace Filter */}
+      {connectedMarketplaces.length > 1 && (
+        <div className="flex gap-2 overflow-x-auto no-scrollbar">
+          {connectedMarketplaces.map(mp => (
+            <Button key={mp} variant={selectedMp === mp ? 'default' : 'outline'} size="sm"
+              onClick={() => setSelectedMp(mp)} className="shrink-0 text-xs">
+              {mp === 'yandex' ? '🟡' : mp === 'uzum' ? '🟣' : '📦'} {MARKETPLACE_NAMES[mp]}
+            </Button>
+          ))}
+        </div>
+      )}
+
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3">
         <Card className="overflow-hidden">
@@ -246,7 +261,7 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
       {changedProducts.length > 0 && (
         <Button onClick={handleSavePrices} disabled={isSaving} className="w-full">
           <Save className="h-4 w-4 mr-2" />
-          {isSaving ? 'Saqlanmoqda...' : `${changedProducts.length} ta narxni Yandex'ga saqlash`}
+          {isSaving ? 'Saqlanmoqda...' : `${changedProducts.length} ta narxni ${MARKETPLACE_NAMES[selectedMp] || 'marketplace'}ga saqlash`}
         </Button>
       )}
 
