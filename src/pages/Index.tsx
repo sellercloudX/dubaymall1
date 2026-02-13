@@ -640,8 +640,8 @@ export default function Index() {
       {/* ━━━ Features ━━━ */}
       <section id="features" className="py-24 md:py-32 relative overflow-hidden">
         <div className="absolute inset-0 bg-dot-pattern opacity-[0.03]" />
-        <div className="absolute top-0 right-0 w-[400px] h-[400px]">
-          <img src={abstractShapes} alt="" className="w-full h-full object-contain opacity-20 dark:opacity-10" loading="lazy" />
+        <div className="absolute -top-20 -right-20 w-[600px] h-[600px] opacity-10 dark:opacity-5 pointer-events-none">
+          <img src={abstractShapes} alt="" className="w-full h-full object-contain" loading="lazy" />
         </div>
         
         <div className="container mx-auto px-4 relative">

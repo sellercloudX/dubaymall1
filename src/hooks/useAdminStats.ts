@@ -10,7 +10,18 @@ export function useAdminStats() {
         .from('profiles')
         .select('*', { count: 'exact', head: true });
 
-      // Get total shops count
+      // Get subscriptions count
+      const { count: subscriptionsCount } = await supabase
+        .from('sellercloud_subscriptions')
+        .select('*', { count: 'exact', head: true });
+
+      // Get marketplace connections count
+      const { count: connectionsCount } = await supabase
+        .from('marketplace_connections')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_active', true);
+
+      // Get total shops count (legacy)
       const { count: shopsCount } = await supabase
         .from('shops')
         .select('*', { count: 'exact', head: true });
@@ -39,6 +50,8 @@ export function useAdminStats() {
       return {
         usersCount: usersCount || 0,
         shopsCount: shopsCount || 0,
+        subscriptionsCount: subscriptionsCount || 0,
+        connectionsCount: connectionsCount || 0,
         productsCount: productsCount || 0,
         totalOrders,
         totalRevenue,

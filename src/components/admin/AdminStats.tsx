@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAdminStats } from '@/hooks/useAdminStats';
-import { Users, Store, Package, ShoppingCart, DollarSign, Clock } from 'lucide-react';
+import { Users, Globe, Crown, ShoppingCart, DollarSign, Clock } from 'lucide-react';
 
 export function AdminStats() {
   const { data: stats, isLoading } = useAdminStats();
@@ -19,8 +19,8 @@ export function AdminStats() {
 
   const statItems = [
     { label: 'Foydalanuvchilar', value: stats?.usersCount || 0, icon: Users, color: 'text-blue-500' },
-    { label: "Do'konlar", value: stats?.shopsCount || 0, icon: Store, color: 'text-green-500' },
-    { label: 'Mahsulotlar', value: stats?.productsCount || 0, icon: Package, color: 'text-purple-500' },
+    { label: 'Obunalar', value: stats?.subscriptionsCount || stats?.shopsCount || 0, icon: Crown, color: 'text-amber-500' },
+    { label: 'Marketplace', value: stats?.connectionsCount || 0, icon: Globe, color: 'text-purple-500' },
     { label: 'Buyurtmalar', value: stats?.totalOrders || 0, icon: ShoppingCart, color: 'text-orange-500' },
     { label: 'Umumiy daromad', value: `${(stats?.totalRevenue || 0).toLocaleString()} so'm`, icon: DollarSign, color: 'text-emerald-500' },
     { label: 'Kutilmoqda', value: stats?.pendingOrders || 0, icon: Clock, color: 'text-yellow-500' },
