@@ -464,13 +464,15 @@ export default function Index() {
             </a>
           </div>
 
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <LanguageSwitcher />
-            <Button variant="ghost" size="sm" className="font-medium" asChild>
+          <div className="flex items-center gap-1 sm:gap-2">
+            <div className="hidden sm:flex items-center gap-1">
+              <ThemeToggle />
+              <LanguageSwitcher />
+            </div>
+            <Button variant="ghost" size="sm" className="font-medium text-xs sm:text-sm px-2 sm:px-3" asChild>
               <Link to="/auth">{txt.loginCta}</Link>
             </Button>
-            <Button size="sm" asChild className="shadow-lg shadow-primary/20">
+            <Button size="sm" asChild className="shadow-lg shadow-primary/20 text-xs sm:text-sm px-2 sm:px-4">
               <Link to="/auth?mode=register">
                 {language === 'uz' ? "Ro'yxatdan o'tish" : language === 'ru' ? 'Регистрация' : 'Sign Up'}
               </Link>

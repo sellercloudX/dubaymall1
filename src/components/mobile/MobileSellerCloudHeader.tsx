@@ -1,7 +1,8 @@
-import { Globe, RefreshCw, Settings, Crown } from 'lucide-react';
+import { RefreshCw, Crown, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface MobileSellerCloudHeaderProps {
   connectedCount: number;
@@ -11,6 +12,12 @@ interface MobileSellerCloudHeaderProps {
 
 export function MobileSellerCloudHeader({ connectedCount, onRefresh, isLoading }: MobileSellerCloudHeaderProps) {
   const navigate = useNavigate();
+  const { signOut } = useAuth();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/');
+  };
   
   return (
     <header className="fixed top-0 left-0 right-0 z-40 bg-background/95 backdrop-blur border-b safe-area-top">
@@ -42,10 +49,10 @@ export function MobileSellerCloudHeader({ connectedCount, onRefresh, isLoading }
           <Button 
             variant="ghost" 
             size="icon"
-            onClick={() => navigate('/seller-cloud')}
-            className="h-9 w-9"
+            onClick={handleSignOut}
+            className="h-9 w-9 text-destructive"
           >
-            <Settings className="h-4 w-4" />
+            <LogOut className="h-4 w-4" />
           </Button>
         </div>
       </div>
