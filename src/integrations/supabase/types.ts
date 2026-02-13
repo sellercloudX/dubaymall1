@@ -112,6 +112,42 @@ export type Database = {
           },
         ]
       }
+      ai_usage_log: {
+        Row: {
+          action_type: string
+          created_at: string
+          estimated_cost_usd: number | null
+          id: string
+          metadata: Json | null
+          model_used: string | null
+          tokens_input: number | null
+          tokens_output: number | null
+          user_id: string
+        }
+        Insert: {
+          action_type: string
+          created_at?: string
+          estimated_cost_usd?: number | null
+          id?: string
+          metadata?: Json | null
+          model_used?: string | null
+          tokens_input?: number | null
+          tokens_output?: number | null
+          user_id: string
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          estimated_cost_usd?: number | null
+          id?: string
+          metadata?: Json | null
+          model_used?: string | null
+          tokens_input?: number | null
+          tokens_output?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       banners: {
         Row: {
           clicks_count: number | null
@@ -1400,6 +1436,45 @@ export type Database = {
           total_amount?: number
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      platform_expenses: {
+        Row: {
+          amount: number
+          category: string | null
+          connection_id: string | null
+          created_at: string
+          currency: string
+          description: string | null
+          expense_type: string
+          id: string
+          metadata: Json | null
+          user_id: string | null
+        }
+        Insert: {
+          amount?: number
+          category?: string | null
+          connection_id?: string | null
+          created_at?: string
+          currency?: string
+          description?: string | null
+          expense_type: string
+          id?: string
+          metadata?: Json | null
+          user_id?: string | null
+        }
+        Update: {
+          amount?: number
+          category?: string | null
+          connection_id?: string | null
+          created_at?: string
+          currency?: string
+          description?: string | null
+          expense_type?: string
+          id?: string
+          metadata?: Json | null
+          user_id?: string | null
         }
         Relationships: []
       }
