@@ -24,7 +24,14 @@ const ORDER_STATUSES = [
   { value: 'DELIVERY', label: 'Yetkazilmoqda' },
   { value: 'PICKUP', label: 'Olib ketish' },
   { value: 'DELIVERED', label: 'Yetkazildi' },
+  { value: 'COMPLETED', label: 'Yakunlandi' },
   { value: 'CANCELLED', label: 'Bekor qilindi' },
+  { value: 'CANCELED', label: 'Bekor qilindi' },
+  { value: 'PACKING', label: 'Yig\'ilmoqda' },
+  { value: 'CREATED', label: 'Yangi' },
+  { value: 'PENDING_DELIVERY', label: 'Yetkazishga tayyor' },
+  { value: 'DELIVERING', label: 'Yetkazilmoqda' },
+  { value: 'RETURNED', label: 'Qaytarildi' },
 ];
 
 export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceOrdersProps) {
@@ -58,8 +65,19 @@ export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceO
       DELIVERY: { variant: 'default', label: 'Yetkazilmoqda' },
       PICKUP: { variant: 'outline', label: 'Olib ketish' },
       DELIVERED: { variant: 'default', label: 'Yetkazildi' },
+      COMPLETED: { variant: 'default', label: 'Yakunlandi' },
       CANCELLED: { variant: 'destructive', label: 'Bekor qilindi' },
+      CANCELED: { variant: 'destructive', label: 'Bekor qilindi' },
       UNPAID: { variant: 'outline', label: 'To\'lanmagan' },
+      // Uzum-specific statuses
+      CREATED: { variant: 'outline', label: 'Yangi' },
+      PACKING: { variant: 'secondary', label: 'Yig\'ilmoqda' },
+      PENDING_DELIVERY: { variant: 'secondary', label: 'Yetkazishga tayyor' },
+      DELIVERING: { variant: 'default', label: 'Yetkazilmoqda' },
+      ACCEPTED_AT_DP: { variant: 'default', label: 'Qabul qilindi' },
+      DELIVERED_TO_CUSTOMER_DELIVERY_POINT: { variant: 'default', label: 'Olib ketish punktida' },
+      PENDING_CANCELLATION: { variant: 'destructive', label: 'Bekor qilinmoqda' },
+      RETURNED: { variant: 'destructive', label: 'Qaytarildi' },
     };
     const config = variants[status] || { variant: 'outline' as const, label: status };
     return (

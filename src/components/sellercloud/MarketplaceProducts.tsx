@@ -49,6 +49,23 @@ export function MarketplaceProducts({ connectedMarketplaces, store }: Marketplac
 
   const getAvailabilityBadge = (availability?: string) => {
     const status = availability?.toUpperCase();
+    const statusLower = availability?.toLowerCase() || '';
+    
+    // Uzum statuses (Uzbek and English)
+    if (statusLower === 'sotuvda' || status === 'IN_STOCK') 
+      return <Badge variant="default" className="whitespace-nowrap bg-green-600">Sotuvda</Badge>;
+    if (statusLower === 'tugadi' || status === 'OUT_OF_STOCK' || status === 'RUN_OUT') 
+      return <Badge variant="destructive" className="whitespace-nowrap">Tugadi</Badge>;
+    if (statusLower === 'arxiv' || statusLower === 'arxivlangan' || status === 'ARCHIVED') 
+      return <Badge variant="secondary" className="whitespace-nowrap">Arxiv</Badge>;
+    if (statusLower === 'yetkazishga tayyor' || status === 'READY_TO_SHIP' || status === 'READY_TO_SEND') 
+      return <Badge variant="default" className="whitespace-nowrap">Yetkazishga tayyor</Badge>;
+    if (statusLower === 'moderatsiyada' || status === 'ON_PREMODERATION' || status === 'ON_MODERATION') 
+      return <Badge variant="outline" className="bg-accent text-accent-foreground whitespace-nowrap">Moderatsiya</Badge>;
+    if (statusLower === 'bloklangan' || status === 'BLOCKED') 
+      return <Badge variant="destructive" className="whitespace-nowrap">Bloklangan</Badge>;
+    
+    // Yandex statuses
     switch (status) {
       case 'ACTIVE':
       case 'PUBLISHED':
@@ -69,8 +86,6 @@ export function MarketplaceProducts({ connectedMarketplaces, store }: Marketplac
       case 'CREATING_CARD':
       case 'NO_CARD':
         return <Badge variant="outline" className="bg-accent text-accent-foreground whitespace-nowrap">Moderatsiya</Badge>;
-      case 'ARCHIVED':
-        return <Badge variant="secondary" className="whitespace-nowrap">Arxiv</Badge>;
       default:
         return <Badge variant="outline" className="whitespace-nowrap">{availability || 'Noma\'lum'}</Badge>;
     }

@@ -1194,8 +1194,23 @@ serve(async (req) => {
                     fbsStock = Math.max(fbsStock, fbsStockMap[skuId]);
                   }
                   
-                  const photos = card.photos || card.images || [];
-                  const pictures = photos.map((p: any) => p.photo?.url || p.url || p).filter(Boolean);
+                  // Extract photos from multiple sources: card.photos, sku.photo, sku.previewImage
+                  const cardPhotos = card.photos || card.images || [];
+                  let pictures = cardPhotos
+                    .map((p: any) => p.photo?.url || p.url || (typeof p === 'string' ? p : null))
+                    .filter(Boolean);
+                  
+                  // If no card-level photos, try SKU-level photos
+                  if (pictures.length === 0) {
+                    skus.forEach((sku: any) => {
+                      if (sku.previewImage && typeof sku.previewImage === 'string') {
+                        pictures.push(sku.previewImage);
+                      } else if (sku.photo) {
+                        const photoUrl = sku.photo?.url || sku.photo?.photo?.url || (typeof sku.photo === 'string' ? sku.photo : null);
+                        if (photoUrl) pictures.push(photoUrl);
+                      }
+                    });
+                  }
 
                   return {
                     offerId: String(card.productId || card.id || firstSku.skuId || ''),
@@ -1206,7 +1221,7 @@ serve(async (req) => {
                     marketCategoryId: typeof card.category === 'object' ? (card.category?.id || 0) : (card.categoryId || 0),
                     pictures,
                     description: card.description || '',
-                    availability: card.status?.title || card.moderationStatus || 'ACTIVE',
+                    availability: card.status?.value || card.status?.title || card.moderationStatus || 'ACTIVE',
                     stockFBO: fboStock,
                     stockFBS: fbsStock,
                     stockCount: fboStock + fbsStock,
