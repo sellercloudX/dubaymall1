@@ -478,7 +478,7 @@ export default function Index() {
       </nav>
 
       {/* ━━━ HERO ━━━ */}
-      <section className="relative min-h-[100vh] flex items-center pt-16 overflow-hidden">
+      <section className="relative min-h-[100vh] flex items-center pt-24 sm:pt-28 md:pt-32 pb-12 overflow-hidden">
         <div className="absolute inset-0 bg-mesh" />
         <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-primary/8 rounded-full blur-[120px]" />
         <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-accent/6 rounded-full blur-[100px]" />

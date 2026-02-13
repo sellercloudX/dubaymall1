@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
-import { ShoppingBag, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Crown, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
 
@@ -200,8 +200,10 @@ export default function Auth() {
       
       {/* Logo */}
       <Link to="/" className="flex items-center gap-2 mb-8">
-        <ShoppingBag className="h-10 w-10 text-primary" />
-        <span className="text-2xl font-bold">{t.appName}</span>
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/20">
+          <Crown className="h-5 w-5 text-white" />
+        </div>
+        <span className="text-2xl font-bold font-display">SellerCloudX</span>
       </Link>
       
       {/* Auth Card */}
