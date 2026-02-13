@@ -11,15 +11,35 @@ export interface TariffInfo {
   tariffPercent: number;
 }
 
-// Uzum default tariff rates by approximate category
-const UZUM_DEFAULT_COMMISSION_PERCENT = 0.12; // 12% o'rtacha
-const UZUM_DEFAULT_LOGISTICS = 5000; // ~5000 so'm logistika
+// Uzum tariff rates — based on official Uzum Market docs
+// Commission varies by category (up to 35%), using category-aware defaults
+// Logistics: 20,000 (large), 8,000 (medium), 2,000-6,000 (small) UZS
+const UZUM_COMMISSION_BY_PRICE: Array<{ maxPrice: number; percent: number }> = [
+  { maxPrice: 50000, percent: 0.20 },    // cheap items → higher %
+  { maxPrice: 200000, percent: 0.15 },   // medium
+  { maxPrice: 1000000, percent: 0.12 },  // standard
+  { maxPrice: Infinity, percent: 0.10 }, // expensive items → lower %
+];
 const UZUM_SERVICE_FEE_PERCENT = 0.02; // 2% xizmat haqi
+
+function getUzumCommissionPercent(price: number): number {
+  for (const tier of UZUM_COMMISSION_BY_PRICE) {
+    if (price <= tier.maxPrice) return tier.percent;
+  }
+  return 0.12;
+}
+
+function getUzumLogistics(price: number): number {
+  // Approximate by price: expensive = likely larger
+  if (price > 500000) return 20000;
+  if (price > 100000) return 8000;
+  return 4000;
+}
 
 /**
  * Fetches real Yandex Market tariffs for connected products.
- * For Uzum — uses known fee structure (commission + logistics + service fee).
- * Uses POST /v2/tariffs/calculate API via edge function for Yandex.
+ * For Uzum — uses known fee structure (commission varies by price tier + logistics + service fee).
+ * Also fetches Uzum finance API for real expense data when available.
  */
 export function useMarketplaceTariffs(
   connectedMarketplaces: string[],
@@ -41,22 +61,69 @@ export function useMarketplaceTariffs(
         if (products.length === 0) continue;
 
         if (mp === 'uzum') {
-          // Uzum: use known fee structure
+          // Try to fetch real finance data from Uzum API
+          let realExpenses: Map<string, { commission: number; logistics: number }> | null = null;
+          try {
+            const { data, error } = await supabase.functions.invoke('fetch-marketplace-data', {
+              body: { marketplace: 'uzum', dataType: 'finance' },
+            });
+            if (!error && data?.success && data?.data?.expenses) {
+              realExpenses = new Map();
+              const expenses = Array.isArray(data.data.expenses) ? data.data.expenses : [];
+              expenses.forEach((exp: any) => {
+                const offerId = String(exp.productId || exp.skuId || '');
+                if (!offerId) return;
+                const existing = realExpenses!.get(offerId) || { commission: 0, logistics: 0 };
+                const amount = Math.abs(exp.amount || exp.value || 0);
+                const type = (exp.type || exp.expenseType || '').toLowerCase();
+                if (type.includes('commission') || type.includes('komissiya')) {
+                  existing.commission += amount;
+                } else if (type.includes('logist') || type.includes('deliver')) {
+                  existing.logistics += amount;
+                } else {
+                  existing.commission += amount; // default to commission
+                }
+                realExpenses!.set(offerId, existing);
+              });
+              console.log(`Uzum finance: got real expenses for ${realExpenses.size} products`);
+            }
+          } catch (e) {
+            console.warn('Uzum finance fetch failed, using estimated tariffs:', e);
+          }
+
+          // Apply tariffs per product
           for (const p of products) {
             const price = p.price || 0;
             if (price <= 0) continue;
-            const commission = price * UZUM_DEFAULT_COMMISSION_PERCENT;
-            const serviceFee = price * UZUM_SERVICE_FEE_PERCENT;
-            const logistics = UZUM_DEFAULT_LOGISTICS;
-            const totalTariff = commission + serviceFee + logistics;
-            tariffMap.set(p.offerId, {
-              offerId: p.offerId,
-              agencyCommission: commission + serviceFee,
-              fulfillment: logistics,
-              delivery: 0,
-              totalTariff,
-              tariffPercent: price > 0 ? (totalTariff / price) * 100 : 0,
-            });
+            
+            const realExp = realExpenses?.get(p.offerId);
+            if (realExp && (realExp.commission > 0 || realExp.logistics > 0)) {
+              // Use real finance data
+              const totalTariff = realExp.commission + realExp.logistics;
+              tariffMap.set(p.offerId, {
+                offerId: p.offerId,
+                agencyCommission: realExp.commission,
+                fulfillment: realExp.logistics,
+                delivery: 0,
+                totalTariff,
+                tariffPercent: price > 0 ? (totalTariff / price) * 100 : 0,
+              });
+            } else {
+              // Use estimated tariffs based on price tier
+              const commissionPercent = getUzumCommissionPercent(price);
+              const commission = price * commissionPercent;
+              const serviceFee = price * UZUM_SERVICE_FEE_PERCENT;
+              const logistics = getUzumLogistics(price);
+              const totalTariff = commission + serviceFee + logistics;
+              tariffMap.set(p.offerId, {
+                offerId: p.offerId,
+                agencyCommission: commission + serviceFee,
+                fulfillment: logistics,
+                delivery: 0,
+                totalTariff,
+                tariffPercent: price > 0 ? (totalTariff / price) * 100 : 0,
+              });
+            }
           }
           continue;
         }
@@ -194,9 +261,10 @@ export function getTariffForProduct(
 
   // Marketplace-specific fallbacks
   if (marketplace === 'uzum') {
-    const commission = price * UZUM_DEFAULT_COMMISSION_PERCENT;
+    const commissionPercent = getUzumCommissionPercent(price);
+    const commission = price * commissionPercent;
     const serviceFee = price * UZUM_SERVICE_FEE_PERCENT;
-    const logistics = UZUM_DEFAULT_LOGISTICS;
+    const logistics = getUzumLogistics(price);
     return {
       commission: commission + serviceFee,
       logistics,

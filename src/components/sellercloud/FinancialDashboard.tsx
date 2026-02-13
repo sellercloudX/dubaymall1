@@ -27,10 +27,15 @@ const MARKETPLACE_NAMES: Record<string, string> = {
 };
 
 const MARKETPLACE_FEE_LABELS: Record<string, string> = {
-  yandex: 'Yandex xizmat haqi',
-  uzum: 'Uzum xizmat haqi',
+  yandex: 'Yandex komissiya + logistika',
+  uzum: 'Uzum komissiya + logistika',
   wildberries: 'WB xizmat haqi',
   ozon: 'Ozon xizmat haqi',
+};
+
+const MARKETPLACE_FEE_DETAILS: Record<string, string> = {
+  yandex: 'API orqali real tarif',
+  uzum: 'Komissiya (10-20%) + logistika (4-20k)',
 };
 
 const MARKETPLACE_TAX: Record<string, number> = {
@@ -266,14 +271,12 @@ export function FinancialDashboard({
                       <div className="min-w-0">
                         <div className="font-medium text-sm truncate flex items-center gap-1.5">
                           {MARKETPLACE_FEE_LABELS[mp] || `${mp} xizmat haqi`}
-                          {summary.tariffCoverage > 0 && (
-                            <Badge variant="outline" className="text-[10px] border-primary/30 text-primary px-1.5 py-0">
+                          <Badge variant="outline" className="text-[10px] border-primary/30 text-primary px-1.5 py-0">
                               <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />{mp === 'uzum' ? 'Taxminiy' : 'Real'}
                             </Badge>
-                          )}
                         </div>
                         <div className="text-xs text-muted-foreground truncate">
-                          ~{mpData.feePercent}% (komissiya + logistika)
+                          {MARKETPLACE_FEE_DETAILS[mp] || `~${mpData.feePercent}%`}
                         </div>
                       </div>
                     </div>
@@ -295,7 +298,7 @@ export function FinancialDashboard({
                       </Badge>
                     </div>
                     <div className="text-xs text-muted-foreground truncate">
-                      ~{summary.feePercent}% (komissiya + logistika)
+                      {MARKETPLACE_FEE_DETAILS[selectedMp] || `~${summary.feePercent}%`}
                     </div>
                   </div>
                 </div>
