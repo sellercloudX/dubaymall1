@@ -63,7 +63,20 @@ serve(async (req) => {
 
   try {
     const url = new URL(req.url);
-    const action = url.searchParams.get("action");
+    let action = url.searchParams.get("action");
+
+    // For POST requests from frontend (supabase.functions.invoke doesn't pass query params)
+    // Default to "create" if no action specified and method is POST
+    if (!action && req.method === "POST") {
+      // Clone request to peek at body for action field
+      const clonedReq = req.clone();
+      try {
+        const bodyPeek = await clonedReq.json();
+        action = bodyPeek.action || "create";
+      } catch {
+        action = "create";
+      }
+    }
 
     // ===== Frontend: Create payment URL =====
     if (req.method === "POST" && action === "create") {
