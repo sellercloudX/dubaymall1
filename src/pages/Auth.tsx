@@ -42,12 +42,11 @@ export default function Auth() {
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-       // Buyers go to marketplace
        const redirect = searchParams.get('redirect');
        if (redirect) {
          navigate(redirect);
        } else {
-         navigate('/');
+         navigate('/seller-cloud');
        }
     }
    }, [user, navigate, searchParams]);

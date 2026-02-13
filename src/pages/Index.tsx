@@ -470,8 +470,10 @@ export default function Index() {
             <Button variant="ghost" size="sm" className="font-medium" asChild>
               <Link to="/auth">{txt.loginCta}</Link>
             </Button>
-            <Button size="sm" asChild className="hidden sm:inline-flex shadow-lg shadow-primary/20">
-              <Link to="/auth?mode=register">{txt.cta}</Link>
+            <Button size="sm" asChild className="shadow-lg shadow-primary/20">
+              <Link to="/auth?mode=register">
+                {language === 'uz' ? "Ro'yxatdan o'tish" : language === 'ru' ? 'Регистрация' : 'Sign Up'}
+              </Link>
             </Button>
           </div>
         </div>
@@ -486,7 +488,7 @@ export default function Index() {
 
         <div className="container mx-auto px-4 relative z-10">
           <div className="grid lg:grid-cols-2 gap-8 md:gap-12 lg:gap-16 items-center">
-            <div className="max-w-2xl w-full">
+            <div className="max-w-2xl w-full text-center lg:text-left">
               <div className="animate-fade-up">
                 <Badge className="mb-6 px-4 py-2 text-sm font-medium bg-primary/10 text-primary border-primary/20">
                   {txt.badge}
@@ -505,7 +507,7 @@ export default function Index() {
                 {txt.heroDesc}
               </p>
 
-              <div className="flex flex-col sm:flex-row gap-4 animate-fade-up" style={{ animationDelay: '0.3s' }}>
+              <div className="flex flex-col sm:flex-row gap-4 animate-fade-up justify-center lg:justify-start" style={{ animationDelay: '0.3s' }}>
                 <Button size="lg" className="text-base px-8 py-6 shadow-xl shadow-primary/25 hover:shadow-2xl hover:shadow-primary/30 transition-all group" asChild>
                   <Link to="/auth?mode=register">
                     <Rocket className="mr-2 h-5 w-5" />
@@ -522,7 +524,7 @@ export default function Index() {
               </div>
 
               {/* Trust badges */}
-              <div className="mt-10 flex flex-wrap items-center gap-4 animate-fade-up" style={{ animationDelay: '0.45s' }}>
+              <div className="mt-10 flex flex-wrap items-center gap-4 animate-fade-up justify-center lg:justify-start" style={{ animationDelay: '0.45s' }}>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Shield className="h-4 w-4 text-primary" />
                   <span>{txt.guarantee}</span>
@@ -538,9 +540,9 @@ export default function Index() {
               </div>
 
               {/* Marketplace logos */}
-              <div className="mt-8 animate-fade-up" style={{ animationDelay: '0.5s' }}>
+              <div className="mt-8 animate-fade-up text-center lg:text-left" style={{ animationDelay: '0.5s' }}>
                 <p className="text-xs text-muted-foreground mb-3 uppercase tracking-widest font-medium">{txt.trusted}</p>
-                <div className="flex items-center gap-6 md:gap-8">
+                <div className="flex items-center gap-6 md:gap-8 justify-center lg:justify-start">
                   {[
                     { name: 'Uzum', color: 'text-purple-500' },
                     { name: 'Yandex', color: 'text-yellow-500' },
