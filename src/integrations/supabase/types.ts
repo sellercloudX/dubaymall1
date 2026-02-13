@@ -2405,6 +2405,7 @@ export type Database = {
           created_at: string
           currency: string
           id: string
+          merchant_trans_id: string | null
           months_covered: number
           notes: string | null
           paid_at: string | null
@@ -2422,6 +2423,7 @@ export type Database = {
           created_at?: string
           currency?: string
           id?: string
+          merchant_trans_id?: string | null
           months_covered?: number
           notes?: string | null
           paid_at?: string | null
@@ -2439,6 +2441,7 @@ export type Database = {
           created_at?: string
           currency?: string
           id?: string
+          merchant_trans_id?: string | null
           months_covered?: number
           notes?: string | null
           paid_at?: string | null

@@ -36,7 +36,7 @@ async function md5(message: string): Promise<string> {
 
 // Determine if merchant_trans_id is a subscription payment
 function isSubscriptionPayment(merchantTransId: string): boolean {
-  return merchantTransId.startsWith('SP-');
+  return merchantTransId.startsWith('SCX-') || merchantTransId.startsWith('SP-');
 }
 
 serve(async (req) => {
@@ -131,8 +131,17 @@ serve(async (req) => {
           );
         }
 
-        // Use SP- prefix for subscription payments
-        const merchantTransId = `SP-${payment.id}`;
+        // Generate clean payment number: SCX-YYMMDD-XXXXXX
+        const now = new Date();
+        const dateStr = now.toISOString().slice(2, 10).replace(/-/g, '');
+        const shortId = payment.id.replace(/-/g, '').slice(0, 6).toUpperCase();
+        const merchantTransId = `SCX-${dateStr}-${shortId}`;
+
+        // Save merchant_trans_id to DB for callback lookup
+        await supabase
+          .from('subscription_payments')
+          .update({ merchant_trans_id: merchantTransId })
+          .eq('id', payment.id);
 
         console.log("Creating Click payment URL for subscription:", merchantTransId, "amount:", amount);
 
@@ -203,16 +212,14 @@ serve(async (req) => {
 
       // --- Subscription payment ---
       if (isSubscriptionPayment(body.merchant_trans_id)) {
-        const paymentId = body.merchant_trans_id.replace('SP-', '');
-        
         const { data: payment, error: payError } = await supabase
           .from('subscription_payments')
           .select('*')
-          .eq('id', paymentId)
-          .single();
+          .eq('merchant_trans_id', body.merchant_trans_id)
+          .maybeSingle();
 
         if (payError || !payment) {
-          console.error("Subscription payment not found:", paymentId);
+          console.error("Subscription payment not found:", body.merchant_trans_id);
           return new Response(
             JSON.stringify({ error: -5, error_note: "Payment not found" }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -244,9 +251,9 @@ serve(async (req) => {
             payment_status: 'processing',
             updated_at: new Date().toISOString(),
           })
-          .eq('id', paymentId);
+          .eq('id', payment.id);
 
-        console.log("Prepare successful for subscription payment:", paymentId);
+        console.log("Prepare successful for subscription payment:", payment.id);
 
         return new Response(
           JSON.stringify({
@@ -331,11 +338,10 @@ serve(async (req) => {
       // Check if cancelled
       if (body.error === "-5017") {
         if (isSubscriptionPayment(body.merchant_trans_id)) {
-          const paymentId = body.merchant_trans_id.replace('SP-', '');
           await supabase
             .from('subscription_payments')
             .update({ payment_status: 'cancelled', updated_at: new Date().toISOString() })
-            .eq('id', paymentId);
+            .eq('merchant_trans_id', body.merchant_trans_id);
         } else {
           await supabase
             .from("orders")
@@ -351,13 +357,11 @@ serve(async (req) => {
 
       // --- Subscription payment complete ---
       if (isSubscriptionPayment(body.merchant_trans_id)) {
-        const paymentId = body.merchant_trans_id.replace('SP-', '');
-        
         const { data: payment, error: payError } = await supabase
           .from('subscription_payments')
           .select('*')
-          .eq('id', paymentId)
-          .single();
+          .eq('merchant_trans_id', body.merchant_trans_id)
+          .maybeSingle();
 
         if (payError || !payment) {
           return new Response(
@@ -374,7 +378,7 @@ serve(async (req) => {
             paid_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
-          .eq('id', paymentId);
+          .eq('id', payment.id);
 
         // Auto-activate subscription for the paid duration
         try {
