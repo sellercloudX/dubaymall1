@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useCostPrices } from '@/hooks/useCostPrices';
 import { useMarketplaceTariffs, getTariffForProduct } from '@/hooks/useMarketplaceTariffs';
+import { DateRangeFilter, getPresetDates, type DatePreset } from './DateRangeFilter';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 
 interface FinancialDashboardProps {
@@ -28,6 +29,10 @@ const MARKETPLACE_NAMES: Record<string, string> = {
 export function FinancialDashboard({ 
   connectedMarketplaces, store, monthlyFee = 499, commissionPercent = 4
 }: FinancialDashboardProps) {
+  const [datePreset, setDatePreset] = useState<DatePreset>('30d');
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(getPresetDates('30d').from);
+  const [dateTo, setDateTo] = useState<Date | undefined>(getPresetDates('30d').to);
+
   const isLoading = store.isLoadingOrders;
   const { getCostPrice } = useCostPrices();
   const { data: tariffMap, isLoading: tariffsLoading, dataUpdatedAt: tariffUpdatedAt } = useMarketplaceTariffs(connectedMarketplaces, store);
@@ -45,7 +50,16 @@ export function FinancialDashboard({
 
     const marketplaceBreakdown = connectedMarketplaces.map(marketplace => {
       const orders = store.getOrders(marketplace);
-      const activeOrders = orders.filter(o => !['CANCELLED', 'RETURNED'].includes(o.status));
+      // Filter by date range and status
+      const activeOrders = orders.filter(o => {
+        if (['CANCELLED', 'RETURNED'].includes(o.status)) return false;
+        if (dateFrom || dateTo) {
+          const orderDate = new Date(o.createdAt);
+          if (dateFrom && orderDate < dateFrom) return false;
+          if (dateTo && orderDate > dateTo) return false;
+        }
+        return true;
+      });
       
       // Revenue from item-level data (not order.totalUZS which includes delivery)
       let mpRevenue = 0;
@@ -97,7 +111,7 @@ export function FinancialDashboard({
     const yandexFeePercent = totalRevenue > 0 ? ((totalYandexFees / totalRevenue) * 100).toFixed(1) : '0';
 
     return { totalRevenue, totalOrders, platformFee, platformCommission, sellerCloudTotal, totalYandexFees, yandexFeePercent, yandexTax, totalExpenses, netProfit, profitMargin, marketplaceBreakdown, totalProductCost, costCoverage, tariffCoverage };
-  }, [connectedMarketplaces, store.dataVersion, isLoading, monthlyFee, commissionPercent, getCostPrice, tariffUpdatedAt]);
+  }, [connectedMarketplaces, store.dataVersion, isLoading, monthlyFee, commissionPercent, getCostPrice, tariffUpdatedAt, dateFrom, dateTo]);
 
   const formatPrice = (price: number) => {
     if (Math.abs(price) >= 1000000) return (price / 1000000).toFixed(1) + ' mln';
@@ -122,6 +136,14 @@ export function FinancialDashboard({
 
   return (
     <div className="space-y-4 md:space-y-6 overflow-hidden">
+      {/* Date Range Filter */}
+      <DateRangeFilter
+        from={dateFrom}
+        to={dateTo}
+        activePreset={datePreset}
+        onRangeChange={(f, t, p) => { setDateFrom(f); setDateTo(t); setDatePreset(p); }}
+      />
+
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20 overflow-hidden">
