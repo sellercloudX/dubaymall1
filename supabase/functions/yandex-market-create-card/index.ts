@@ -359,29 +359,34 @@ Javob FAQAT JSON array: ["so'z1", "so'z2", ...]` }],
 
   console.log(`📂 Top candidates: ${scored.slice(0, 5).map(c => `${c.name}(${c.id})`).join(', ')}`);
 
-  // 5. Ask AI to select the best leaf category
+  // 5. Ask AI to select the best leaf category — use strong model for accuracy
   if (lovableApiKey && scored.length > 0) {
-    const categoryList = scored.slice(0, 40).map(c => `ID:${c.id} — ${c.path}`).join("\n");
+    const categoryList = scored.slice(0, 50).map(c => `ID:${c.id} — ${c.path}`).join("\n");
     
-    const prompt = `Mahsulot: "${productName}"
-Tavsif: "${productDesc || 'Yo\'q'}"
+    const prompt = `VAZIFA: Mahsulotga ENG TO'G'RI Yandex Market kategoriyasini tanla.
 
-Quyidagi Yandex Market kategoriyalaridan MAHSULOTGA ENG MOS LEAF kategoriyani tanla.
-Diqqat: kategoriya mahsulot TURIGA mos bo'lishi kerak!
-Masalan: tonal krem → "Тональные средства", lipstick → "Губная помада"
+MAHSULOT NOMI: "${productName}"
+TAVSIF: "${productDesc || 'Yo\'q'}"
 
-FAQAT bitta ID raqamini yoz:
+MUHIM QOIDALAR:
+- Kategoriya mahsulot TURIGA aniq mos bo'lishi SHART
+- "Par dazmol" va "Vakuum paketlash mashinasi" — BU BOSHQA NARSALAR!
+- Mahsulot nomidagi kalit so'zlarni sinchiklab tahlil qil
+- Masalan: "vakuumlovchi" → "Вакуумные упаковщики", "par dazmol" → "Парогенераторы"
+- "foundation/tonal krem" → "Тональные средства", "lipstick" → "Губная помада"
+- Agar mahsulot nomi ANIQ bir kategoriyaga to'g'ri kelsa, uni tanla
 
+KATEGORIYALAR RO'YXATI:
 ${categoryList}
 
-Javob (faqat raqam):`;
+JAVOB: Faqat bitta ID raqam yoz, hech narsa qo'shma:`;
 
     try {
       const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${lovableApiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
+          model: "google/gemini-2.5-flash",
           messages: [{ role: "user", content: prompt }],
           temperature: 0,
           max_tokens: 50,
@@ -453,6 +458,7 @@ async function aiOptimize(
   
   const required = safeParams.filter((p: any) => p.required || p.constraintType === "REQUIRED");
   const recommended = safeParams.filter((p: any) => !p.required && p.constraintType !== "REQUIRED");
+  const allParams = [...required, ...recommended];
 
   const formatParam = (p: any) => {
     let s = `  - id:${p.id}, "${p.name}", type:${p.type || "TEXT"}`;
@@ -465,7 +471,9 @@ async function aiOptimize(
     return s;
   };
 
-  const prompt = `VAZIFA: Yandex Market kartochkasi — BARCHA maydonlarni to'ldir! Sifat 95+ ball bo'lishi shart!
+  console.log(`🤖 AI optimizing: ${required.length} required + ${recommended.length} recommended = ${allParams.length} total params`);
+
+  const prompt = `VAZIFA: Yandex Market kartochkasi — BARCHA ${allParams.length} ta maydonni to'ldir! Sifat 95+ ball uchun HAMMA parametrlar to'ldirilishi SHART!
 
 MAHSULOT:
 - Nom: ${product.name}
@@ -476,11 +484,8 @@ MAHSULOT:
 - Model: ${product.model || "Nomdan aniqla"}
 - Narx: ${product.price} UZS
 
-═══ MAJBURIY PARAMETRLAR (BARCHASINI TO'LDIR!) ═══
-${required.map(formatParam).join("\n") || "Yo'q"}
-
-═══ TAVSIYA ETILGAN (IMKON QADAR BARCHASINI!) ═══
-${recommended.slice(0, 80).map(formatParam).join("\n") || "Yo'q"}
+═══ BARCHA PARAMETRLAR — HAR BIRINI TO'LDIR! (${allParams.length} ta) ═══
+${allParams.map(formatParam).join("\n")}
 
 QOIDALAR:
 1. name_ru: Ruscha SEO-nom, 80-150 belgi. Format: "[Tur] [Brend] [Model] [Xususiyatlar], [rang]"
@@ -490,27 +495,18 @@ QOIDALAR:
 5. vendor: Aniq brend nomi
 6. vendorCode: Model artikuli
 7. manufacturerCountry: Ishlab chiqarilgan mamlakat (ruscha)
-8. shelfLife: Yaroqlilik muddati (oy hisobida raqam). Kosmetika=36, Oziq-ovqat=12, Elektronika=0 (bermang). Bu MAJBURIY!
-9. lifeTime: Foydalanish muddati (oy hisobida raqam). Kosmetika=36, Kiyim=24, Elektronika=60
-10. parameterValues:
-   - OPTIONS bo'lsa → valueId ishlatilsin (raqam)
-   - TEXT bo'lsa → FAQAT qiymatni yoz! NOTO'G'RI: "название: значение". TO'G'RI: "значение"
-   - NUMBER bo'lsa → value raqam sifatida, MINIMUM qiymatlarni hurmat qil!
-     * SPF-faktor: KAMIDA 1 (odatda 15, 30, 50)
-     * Hajm (ml): KAMIDA 1 
-     * Og'irlik (g): KAMIDA 1
-     * Miqdor: KAMIDA 1
-   *** BARCHA MAJBURIYLARNI + KAMIDA 25 ta TAVSIYA ETILGANLARNI TO'LDIR ***
-   *** BILMASANG HAM — TAXMINIY/STANDART QIYMAT YOZ! ***
+8. shelfLife: Yaroqlilik muddati (oy). Kosmetika=36, Oziq-ovqat=12, Elektronika bermang
+9. lifeTime: Foydalanish muddati (oy). Kosmetika=36, Kiyim=24, Elektronika=60
+10. parameterValues — MUHIM QOIDALAR:
+   - OPTIONS bor parametr → valueId (raqam) tanla, eng mos variant
+   - TEXT parametr → FAQAT qiymatni yoz! "Цвет: красный" XATO → "красный" TO'G'RI
+   - NUMBER parametr → value raqam, MINIMUM 1 dan past bo'lmasin
+   
+   *** JUDA MUHIM: HAMMA ${allParams.length} ta parametrni to'ldir! ***
+   *** "Maydonlarni ko'rsatish" (Показать поля) ortidagi yashirin parametrlar ham to'ldirilishi kerak! ***
+   *** Bilmasang — TAXMINIY/STANDART qiymat yoz, BO'SH QOLDIRMA! ***
    *** Har bir parametr uchun FAQAT value YOKI valueId ber, ikkalasini emas! ***
 11. warranty: "1 год" yoki "2 года"
-
-MUHIM XATOLARDAN SAQLANING:
-- TEXT tipidagi parametrda "название характеристики: значение" formatini ISHLATMANG! Faqat qiymatni yozing!
-  XATO: "Цвет: красный" → TO'G'RI: "красный"
-  XATO: "Объем: 50 мл" → TO'G'RI: "50"
-- NUMBER parametrlarda juda kichik qiymat bermang (minimum chegaralarni tekshiring)
-- Yaroqlilik muddati (shelfLife) — kosmetika va parfyumeriya uchun MAJBURIY
 
 JAVOB FAQAT JSON:
 {"name_ru":"...","name_uz":"...","description_ru":"...","description_uz":"...","vendor":"...","vendorCode":"...","manufacturerCountry":"...","shelfLife":36,"lifeTime":36,"parameterValues":[{"parameterId":123,"valueId":456},{"parameterId":789,"value":"qiymat"}],"warranty":"1 год","adult":false}`;
@@ -520,10 +516,10 @@ JAVOB FAQAT JSON:
       method: "POST",
       headers: { Authorization: `Bearer ${lovableApiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-2.5-pro",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.1,
-        max_tokens: 6000,
+        max_tokens: 12000,
       }),
     });
 
@@ -714,32 +710,33 @@ serve(async (req) => {
         if (product.image && !rawImgs.includes(product.image)) rawImgs.unshift(product.image);
         let images = await proxyImagesToStorage(supabase, user.id, rawImgs, SUPABASE_URL);
         
-        // Generate additional product images if we have less than 3 (max 3 to avoid timeout)
-        if (images.length < 3 && LOVABLE_KEY) {
-          console.log(`🖼️ Only ${images.length} images, generating up to 3 more...`);
+        // Generate professional product images — creative & diverse angles
+        if (images.length < 4 && LOVABLE_KEY) {
+          console.log(`🖼️ Only ${images.length} images, generating up to ${4 - images.length} creative studio images...`);
           const sourceImg = images[0] || null;
-          const angles = [
-            `Front view of "${product.name}" on pure white studio background, professional product photography, high resolution, no text`,
-            `45-degree angle view of "${product.name}" on white background, showing product details, professional studio lighting`,
-            `Close-up detail shot of "${product.name}" showing texture and quality, white background, macro product photography`,
+          const creativeAngles = [
+            `Professional e-commerce hero shot of "${product.name}" on clean white background. Studio lighting with soft shadows. Ultra sharp, 4K product photography. Show the full product clearly from the front.`,
+            `Lifestyle context shot of "${product.name}" in a natural usage environment. Show the product being used or in its typical setting. Professional photography, warm natural lighting, shallow depth of field.`,
+            `Premium 45-degree angle studio shot of "${product.name}" highlighting build quality and key features. Dramatic studio lighting with reflections. White gradient background. Professional catalog photography.`,
+            `Close-up detail macro shot of "${product.name}" showing texture, material quality, buttons, labels or key functional elements. Professional macro photography on white background with perfect focus.`,
           ];
           
-          const needed = Math.min(3 - images.length, angles.length);
+          const needed = Math.min(4 - images.length, creativeAngles.length);
           
-          // Generate images in PARALLEL for speed
+          // Generate images in PARALLEL with best model
           const imgPromises = [];
           for (let i = 0; i < needed; i++) {
             imgPromises.push((async () => {
               try {
                 const genBody: any = {
-                  model: "google/gemini-2.5-flash-image",
+                  model: "google/gemini-3-pro-image-preview",
                   modalities: ["image", "text"],
                   messages: [{
                     role: "user",
                     content: sourceImg ? [
-                      { type: "text", text: `Based on this EXACT product, create: ${angles[i]}. The product must look IDENTICAL to the reference image. Only change the angle/background.` },
+                      { type: "text", text: `You are a professional product photographer. Using this EXACT product as reference (it must look 100% IDENTICAL — same shape, color, brand, details), create: ${creativeAngles[i]}. CRITICAL: The product must be the SAME item, not a generic version. Only change the angle, background and lighting.` },
                       { type: "image_url", image_url: { url: sourceImg } }
-                    ] : angles[i]
+                    ] : creativeAngles[i]
                   }],
                 };
                 
