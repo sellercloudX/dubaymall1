@@ -1,4 +1,4 @@
-import React, { useState, Suspense, lazy, useEffect } from "react";
+import React, { useState, useCallback, Suspense, lazy, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -25,6 +25,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { CartProvider } from "@/contexts/CartContext";
 import { PageLoader } from "@/components/PageLoader";
 import { InstallPWA } from "@/components/InstallPWA";
+import { SplashScreen } from "@/components/SplashScreen";
 
 // Lazy load pages for code splitting
 const Index = lazy(() => import("./pages/Index"));
@@ -42,6 +43,16 @@ const NotFound = lazy(() => import("./pages/NotFound"));
  });
  
 function App() {
+  const [showSplash, setShowSplash] = useState(() => {
+    const shown = sessionStorage.getItem('splash-shown');
+    return !shown;
+  });
+  
+  const handleSplashComplete = useCallback(() => {
+    setShowSplash(false);
+    sessionStorage.setItem('splash-shown', 'true');
+  }, []);
+
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {
@@ -64,7 +75,9 @@ function App() {
    }, [queryClient]);
  
   return (
-    <PersistQueryClientProvider 
+    <>
+      {showSplash && <SplashScreen onComplete={handleSplashComplete} />}
+    <PersistQueryClientProvider
       client={queryClient} 
       persistOptions={{ 
         persister,
@@ -102,6 +115,7 @@ function App() {
         </AuthProvider>
       </LanguageProvider>
     </PersistQueryClientProvider>
+    </>
   );
 }
 
