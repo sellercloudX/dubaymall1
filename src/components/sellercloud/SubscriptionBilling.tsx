@@ -71,12 +71,20 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
      setIsCreating(false);
    };
  
+   // Discount rates
+   const getDiscount = (months: number) => {
+     if (months >= 6) return 0.15;
+     if (months >= 3) return 0.10;
+     return 0;
+   };
+
    // Real Click payment handler for subscription
    const handleSubscriptionPayment = async (months: number = 1) => {
      if (!subscription) return;
      
      const monthlyFeeUZS = subscription.monthly_fee * USD_TO_UZS;
-     const totalAmount = monthlyFeeUZS * months;
+     const discount = getDiscount(months);
+     const totalAmount = Math.round(monthlyFeeUZS * months * (1 - discount));
      
      setIsCreating(true);
      try {
@@ -396,33 +404,54 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
             {/* Click Payment Options */}
             <div className="mt-6 pt-4 border-t space-y-3">
               <p className="text-sm font-medium">Click orqali to'lash:</p>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-2">
+                {/* 1 month */}
                 <Button 
                   variant="outline" 
                   onClick={() => handleSubscriptionPayment(1)}
                   disabled={isCreating}
-                  className="flex-col h-auto py-3 px-2 text-center min-w-0"
+                  className="w-full justify-between h-auto py-3 px-4"
                 >
-                  <span className="text-xs text-muted-foreground">1 oy</span>
-                  <span className="font-bold text-xs sm:text-sm truncate w-full">{formatPrice(monthlyFeeUZS)}</span>
+                  <span className="text-sm font-medium">1 oy</span>
+                  <span className="font-bold text-sm">{formatPrice(monthlyFeeUZS)}</span>
                 </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => handleSubscriptionPayment(3)}
-                  disabled={isCreating}
-                  className="flex-col h-auto py-3 px-2 text-center min-w-0"
-                >
-                  <span className="text-xs text-muted-foreground">3 oy</span>
-                  <span className="font-bold text-xs sm:text-sm truncate w-full">{formatPrice(monthlyFeeUZS * 3)}</span>
-                </Button>
-                <Button 
-                  onClick={() => handleSubscriptionPayment(6)}
-                  disabled={isCreating}
-                  className="flex-col h-auto py-3 px-2 text-center min-w-0"
-                >
-                  <span className="text-xs text-muted-foreground">6 oy</span>
-                  <span className="font-bold text-xs sm:text-sm truncate w-full">{formatPrice(monthlyFeeUZS * 6)}</span>
-                </Button>
+
+                {/* 3 months - 10% discount */}
+                <div className="relative">
+                  <div className="absolute -top-2 right-3 z-10">
+                    <Badge className="bg-primary text-primary-foreground text-[10px] px-1.5 py-0">-10%</Badge>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => handleSubscriptionPayment(3)}
+                    disabled={isCreating}
+                    className="w-full justify-between h-auto py-3 px-4 border-primary/30"
+                  >
+                    <span className="text-sm font-medium">3 oy</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground line-through">{formatPrice(monthlyFeeUZS * 3)}</span>
+                      <span className="font-bold text-sm text-primary">{formatPrice(Math.round(monthlyFeeUZS * 3 * 0.9))}</span>
+                    </div>
+                  </Button>
+                </div>
+
+                {/* 6 months - 15% discount */}
+                <div className="relative">
+                  <div className="absolute -top-2 right-3 z-10">
+                    <Badge className="bg-accent text-accent-foreground text-[10px] px-1.5 py-0">-15%</Badge>
+                  </div>
+                  <Button 
+                    onClick={() => handleSubscriptionPayment(6)}
+                    disabled={isCreating}
+                    className="w-full justify-between h-auto py-3 px-4"
+                  >
+                    <span className="text-sm font-medium">6 oy</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground line-through">{formatPrice(monthlyFeeUZS * 6)}</span>
+                      <span className="font-bold text-sm">{formatPrice(Math.round(monthlyFeeUZS * 6 * 0.85))}</span>
+                    </div>
+                  </Button>
+                </div>
               </div>
             </div>
          </CardContent>
