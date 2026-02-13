@@ -67,7 +67,14 @@ export default function SellerCloudX() {
    // Centralized data store — fetches once, cached for all tabs
    const store = useMarketplaceDataStore(connectedMarketplaces);
   
-  const totalRevenue = connections.reduce((sum, c) => sum + (c.total_revenue || 0), 0);
+  // Calculate revenue from actual order data, excluding cancelled/returned
+  const totalRevenue = (() => {
+    const orders = store.allOrders;
+    if (orders.length === 0) return connections.reduce((sum, c) => sum + (c.total_revenue || 0), 0);
+    return orders
+      .filter((o: any) => !['CANCELLED', 'CANCELED', 'RETURNED'].includes(String(o.status).toUpperCase()))
+      .reduce((sum: number, o: any) => sum + (o.itemsTotal || o.total || 0), 0);
+  })();
 
   const handleMarketplaceConnect = async (marketplace: string) => {
     await refetch();
