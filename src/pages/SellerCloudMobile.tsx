@@ -122,11 +122,21 @@ export default function SellerCloudMobile() {
   if (accessStatus && !accessStatus.is_active) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
-        <Card className="border-destructive max-w-sm"><CardContent className="pt-6 text-center">
-          <Lock className="h-12 w-12 text-destructive mx-auto mb-4" />
-          <h2 className="text-lg font-semibold mb-2">Akkount cheklangan</h2>
-          <p className="text-sm text-muted-foreground mb-4">{accessStatus.message}</p>
-          <Button variant="destructive" onClick={() => navigate('/seller-cloud')}>To'lovga o'tish</Button>
+        <Card className="border-destructive max-w-sm w-full"><CardContent className="pt-6 text-center space-y-4">
+          <Lock className="h-12 w-12 text-destructive mx-auto" />
+          <h2 className="text-lg font-semibold">Akkount cheklangan</h2>
+          <p className="text-sm text-muted-foreground">{accessStatus.message}</p>
+          <div className="bg-muted p-3 rounded-lg text-sm">
+            <p className="font-medium mb-1">Nima qilish kerak?</p>
+            <ul className="text-xs text-muted-foreground space-y-1 text-left">
+              <li>1. To'lov qiling — avtomatik aktivlashadi</li>
+              <li>2. Yoki admin bilan bog'laning</li>
+            </ul>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="destructive" className="flex-1" onClick={() => setActiveTab('subscription' as any)}>To'lov qilish</Button>
+            <Button variant="outline" className="flex-1" onClick={() => navigate('/')}>Bosh sahifa</Button>
+          </div>
         </CardContent></Card>
       </div>
     );

@@ -200,9 +200,13 @@ export default function SellerCloudX() {
         {accessStatus && !accessStatus.is_active && (
           <Card className="border-destructive bg-destructive/5 mb-6"><CardContent className="pt-6">
             <div className="flex items-start gap-4"><AlertTriangle className="h-6 w-6 text-destructive flex-shrink-0" />
-              <div className="flex-1"><h4 className="font-semibold text-destructive">Akkount cheklangan</h4><p className="text-sm text-muted-foreground mt-1">{accessStatus.message}</p>
+              <div className="flex-1">
+                <h4 className="font-semibold text-destructive">Akkount cheklangan</h4>
+                <p className="text-sm text-muted-foreground mt-1">{accessStatus.message}</p>
                 {totalDebt > 0 && <p className="font-medium mt-2">Qarzdorlik: {new Intl.NumberFormat('uz-UZ').format(totalDebt)} so'm</p>}
-              </div><Button variant="destructive" size="sm">To'lash</Button>
+                <p className="text-xs text-muted-foreground mt-2">To'lov qiling — avtomatik aktivlashadi. Yoki admin bilan bog'laning.</p>
+              </div>
+              <Button variant="destructive" size="sm">To'lash</Button>
             </div>
           </CardContent></Card>
         )}

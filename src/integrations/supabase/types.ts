@@ -2273,11 +2273,15 @@ export type Database = {
       }
       sellercloud_subscriptions: {
         Row: {
+          activated_by: string | null
+          activated_until: string | null
           admin_notes: string | null
           admin_override: boolean
           commission_percent: number
+          contract_duration_months: number | null
           created_at: string
           expires_at: string | null
+          free_access: boolean | null
           id: string
           initial_payment_at: string | null
           initial_payment_completed: boolean | null
@@ -2295,11 +2299,15 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          activated_by?: string | null
+          activated_until?: string | null
           admin_notes?: string | null
           admin_override?: boolean
           commission_percent?: number
+          contract_duration_months?: number | null
           created_at?: string
           expires_at?: string | null
+          free_access?: boolean | null
           id?: string
           initial_payment_at?: string | null
           initial_payment_completed?: boolean | null
@@ -2317,11 +2325,15 @@ export type Database = {
           user_id: string
         }
         Update: {
+          activated_by?: string | null
+          activated_until?: string | null
           admin_notes?: string | null
           admin_override?: boolean
           commission_percent?: number
+          contract_duration_months?: number | null
           created_at?: string
           expires_at?: string | null
+          free_access?: boolean | null
           id?: string
           initial_payment_at?: string | null
           initial_payment_completed?: boolean | null
@@ -2824,6 +2836,10 @@ export type Database = {
       }
     }
     Functions: {
+      activate_subscription_by_payment: {
+        Args: { p_months: number; p_subscription_id: string }
+        Returns: undefined
+      }
       calculate_order_financials: {
         Args: { p_order_id: string; p_platform_commission_percent?: number }
         Returns: Json
