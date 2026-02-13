@@ -393,38 +393,38 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
             </div>
            </div>
 
-           {/* Click Payment Options */}
-           <div className="mt-6 pt-4 border-t space-y-3">
-             <p className="text-sm font-medium">Click orqali to'lash:</p>
-             <div className="grid grid-cols-3 gap-3">
-               <Button 
-                 variant="outline" 
-                 onClick={() => handleSubscriptionPayment(1)}
-                 disabled={isCreating}
-                 className="flex-col h-auto py-3"
-               >
-                 <span className="text-xs text-muted-foreground">1 oy</span>
-                 <span className="font-bold">{formatPrice(monthlyFeeUZS)}</span>
-               </Button>
-               <Button 
-                 variant="outline" 
-                 onClick={() => handleSubscriptionPayment(3)}
-                 disabled={isCreating}
-                 className="flex-col h-auto py-3"
-               >
-                 <span className="text-xs text-muted-foreground">3 oy</span>
-                 <span className="font-bold">{formatPrice(monthlyFeeUZS * 3)}</span>
-               </Button>
-               <Button 
-                 onClick={() => handleSubscriptionPayment(6)}
-                 disabled={isCreating}
-                 className="flex-col h-auto py-3"
-               >
-                 <span className="text-xs text-muted-foreground">6 oy</span>
-                 <span className="font-bold">{formatPrice(monthlyFeeUZS * 6)}</span>
-               </Button>
-             </div>
-           </div>
+            {/* Click Payment Options */}
+            <div className="mt-6 pt-4 border-t space-y-3">
+              <p className="text-sm font-medium">Click orqali to'lash:</p>
+              <div className="grid grid-cols-3 gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => handleSubscriptionPayment(1)}
+                  disabled={isCreating}
+                  className="flex-col h-auto py-3 px-2 text-center min-w-0"
+                >
+                  <span className="text-xs text-muted-foreground">1 oy</span>
+                  <span className="font-bold text-xs sm:text-sm truncate w-full">{formatPrice(monthlyFeeUZS)}</span>
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => handleSubscriptionPayment(3)}
+                  disabled={isCreating}
+                  className="flex-col h-auto py-3 px-2 text-center min-w-0"
+                >
+                  <span className="text-xs text-muted-foreground">3 oy</span>
+                  <span className="font-bold text-xs sm:text-sm truncate w-full">{formatPrice(monthlyFeeUZS * 3)}</span>
+                </Button>
+                <Button 
+                  onClick={() => handleSubscriptionPayment(6)}
+                  disabled={isCreating}
+                  className="flex-col h-auto py-3 px-2 text-center min-w-0"
+                >
+                  <span className="text-xs text-muted-foreground">6 oy</span>
+                  <span className="font-bold text-xs sm:text-sm truncate w-full">{formatPrice(monthlyFeeUZS * 6)}</span>
+                </Button>
+              </div>
+            </div>
          </CardContent>
        </Card>
 
