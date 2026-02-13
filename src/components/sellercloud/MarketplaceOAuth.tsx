@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,10 +12,21 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { 
   Link2, Check, ExternalLink, Loader2, 
-  Settings, RefreshCw, AlertCircle, Package, ShoppingCart, TrendingUp
+  Settings, RefreshCw, AlertCircle, Package, ShoppingCart, TrendingUp,
+  Unplug, KeyRound
 } from 'lucide-react';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 
@@ -102,6 +113,7 @@ interface MarketplaceOAuthProps {
   connections: MarketplaceConnection[];
   isLoading: boolean;
   connectMarketplace: (marketplace: string, credentials: Record<string, string>) => Promise<{ success: boolean; error?: string; data?: any }>;
+  disconnectMarketplace: (marketplace: string) => Promise<{ success: boolean; error?: string }>;
   syncMarketplace: (marketplace: string) => Promise<void>;
   onConnect?: (marketplace: string) => void;
   store?: MarketplaceDataStore;
@@ -111,15 +123,20 @@ export function MarketplaceOAuth({
   connections, 
   isLoading, 
   connectMarketplace, 
+  disconnectMarketplace,
   syncMarketplace,
   onConnect,
   store,
 }: MarketplaceOAuthProps) {
   
   const [connectingId, setConnectingId] = useState<string | null>(null);
+  const [settingsId, setSettingsId] = useState<string | null>(null);
+  const [disconnectId, setDisconnectId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [credentials, setCredentials] = useState<Record<string, string>>({});
+  const [settingsMode, setSettingsMode] = useState<'menu' | 'update-key'>('menu');
 
   const handleConnect = async (marketplace: Marketplace) => {
     if (marketplace.status === 'coming_soon') {
@@ -132,7 +149,6 @@ export function MarketplaceOAuth({
   };
 
   const submitConnection = async (marketplace: Marketplace) => {
-    // Validate required fields
     const missingFields = marketplace.fields.filter(f => !credentials[f.key]);
     if (missingFields.length > 0) {
       toast.error(`${missingFields[0].label} ni kiriting`);
@@ -152,24 +168,38 @@ export function MarketplaceOAuth({
       
       if (result.data) {
         const info = [];
-        if (result.data.productsCount > 0) {
-          info.push(`${result.data.productsCount} ta mahsulot`);
-        }
-        if (result.data.ordersCount > 0) {
-          info.push(`${result.data.ordersCount} ta buyurtma`);
-        }
-        if (info.length > 0) {
-          toast.info(`Topildi: ${info.join(', ')}`);
-        }
+        if (result.data.productsCount > 0) info.push(`${result.data.productsCount} ta mahsulot`);
+        if (result.data.ordersCount > 0) info.push(`${result.data.ordersCount} ta buyurtma`);
+        if (info.length > 0) toast.info(`Topildi: ${info.join(', ')}`);
       }
 
       onConnect?.(marketplace.id);
       setConnectingId(null);
+      setSettingsId(null);
+      setSettingsMode('menu');
       setCredentials({});
     } catch (error: any) {
       toast.error('Ulanish xatosi: ' + (error.message || 'Noma\'lum xato'));
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDisconnect = async (marketplaceId: string) => {
+    setIsDisconnecting(true);
+    try {
+      const result = await disconnectMarketplace(marketplaceId);
+      if (result.success) {
+        toast.success('Marketplace uzildi');
+        setDisconnectId(null);
+        setSettingsId(null);
+      } else {
+        toast.error('Xatolik: ' + (result.error || 'Noma\'lum xato'));
+      }
+    } catch (error: any) {
+      toast.error('Xatolik: ' + error.message);
+    } finally {
+      setIsDisconnecting(false);
     }
   };
 
@@ -185,23 +215,13 @@ export function MarketplaceOAuth({
     }
   };
 
-  const getConnection = (marketplaceId: string) => {
-    return connections.find(c => c.marketplace === marketplaceId);
-  };
-
+  const getConnection = (marketplaceId: string) => connections.find(c => c.marketplace === marketplaceId);
   const isConnected = (id: string) => !!getConnection(id);
 
-  const formatNumber = (num: number) => {
-    return new Intl.NumberFormat('uz-UZ').format(num);
-  };
-
+  const formatNumber = (num: number) => new Intl.NumberFormat('uz-UZ').format(num);
   const formatRevenue = (num: number) => {
-    if (num >= 1000000) {
-      return `${(num / 1000000).toFixed(1)}M`;
-    }
-    if (num >= 1000) {
-      return `${(num / 1000).toFixed(0)}K`;
-    }
+    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
+    if (num >= 1000) return `${(num / 1000).toFixed(0)}K`;
     return formatNumber(num);
   };
 
@@ -246,7 +266,6 @@ export function MarketplaceOAuth({
                       connected ? 'border-green-500/50 bg-green-50/50 dark:bg-green-950/20' : ''
                     } ${mp.status === 'coming_soon' ? 'opacity-60' : ''}`}
                   >
-                    {/* Status indicator */}
                     <div className={`absolute top-0 right-0 w-2 h-full ${
                       connected ? 'bg-green-500' : 
                       mp.status === 'coming_soon' ? 'bg-gray-300' : 'bg-gray-400'
@@ -277,14 +296,12 @@ export function MarketplaceOAuth({
                     <CardContent>
                       {connected && connection ? (
                         <div className="space-y-3">
-                          {/* Store name */}
-                          {connection.account_info?.campaignName && (
+                          {(connection.account_info?.campaignName || connection.account_info?.storeName) && (
                             <p className="text-sm font-medium text-muted-foreground">
-                              {connection.account_info.campaignName}
+                              {connection.account_info.campaignName || connection.account_info.storeName}
                             </p>
                           )}
                           
-                          {/* Stats */}
                           <div className="grid grid-cols-3 gap-2 text-center">
                             <div className="p-2 rounded-lg bg-muted/50">
                               <Package className="h-4 w-4 mx-auto text-muted-foreground mb-1" />
@@ -307,14 +324,12 @@ export function MarketplaceOAuth({
                             </div>
                           </div>
 
-                          {/* Last sync */}
                           {connection.last_sync_at && (
                             <p className="text-xs text-muted-foreground text-center">
                               Oxirgi sinxronizatsiya: {new Date(connection.last_sync_at).toLocaleString('uz-UZ')}
                             </p>
                           )}
                           
-                          {/* Actions */}
                           <div className="flex gap-2">
                             <Button 
                               variant="outline" 
@@ -330,7 +345,15 @@ export function MarketplaceOAuth({
                               )}
                               Sinxronlash
                             </Button>
-                            <Button variant="outline" size="sm">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => {
+                                setSettingsId(mp.id);
+                                setSettingsMode('menu');
+                                setCredentials({});
+                              }}
+                            >
                               <Settings className="h-4 w-4" />
                             </Button>
                           </div>
@@ -341,13 +364,8 @@ export function MarketplaceOAuth({
                           onClick={() => handleConnect(mp)}
                           disabled={mp.status === 'coming_soon'}
                         >
-                          {mp.status === 'coming_soon' ? (
-                            'Tez kunda'
-                          ) : (
-                            <>
-                              <Link2 className="h-4 w-4 mr-2" />
-                              Ulash
-                            </>
+                          {mp.status === 'coming_soon' ? 'Tez kunda' : (
+                            <><Link2 className="h-4 w-4 mr-2" /> Ulash</>
                           )}
                         </Button>
                       )}
@@ -378,7 +396,6 @@ export function MarketplaceOAuth({
                 </DialogHeader>
 
                 <div className="space-y-4 py-4">
-                  {/* Help link */}
                   <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/50 text-sm">
                     <AlertCircle className="h-4 w-4 mt-0.5 text-muted-foreground" />
                     <div>
@@ -388,20 +405,17 @@ export function MarketplaceOAuth({
                       <a 
                         href={
                           mp.id === 'yandex' ? 'https://partner.market.yandex.ru/settings/api-keys' :
-                          mp.id === 'uzum' ? 'https://seller.uzum.uz/seller/api-keys' :
-                          '#'
+                          mp.id === 'uzum' ? 'https://seller.uzum.uz/seller/api-keys' : '#'
                         }
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-primary hover:underline inline-flex items-center gap-1"
                       >
-                        Yo'riqnomani ko'rish
-                        <ExternalLink className="h-3 w-3" />
+                        Yo'riqnomani ko'rish <ExternalLink className="h-3 w-3" />
                       </a>
                     </div>
                   </div>
 
-                  {/* Form fields */}
                   {mp.fields.map((field) => (
                     <div key={field.key} className="space-y-2">
                       <Label htmlFor={field.key}>{field.label}</Label>
@@ -410,10 +424,7 @@ export function MarketplaceOAuth({
                         type={field.key.includes('Key') || field.key.includes('Token') ? 'password' : 'text'}
                         placeholder={field.placeholder}
                         value={credentials[field.key] || ''}
-                        onChange={(e) => setCredentials(prev => ({
-                          ...prev,
-                          [field.key]: e.target.value,
-                        }))}
+                        onChange={(e) => setCredentials(prev => ({ ...prev, [field.key]: e.target.value }))}
                       />
                     </div>
                   ))}
@@ -424,15 +435,9 @@ export function MarketplaceOAuth({
                     disabled={isSubmitting}
                   >
                     {isSubmitting ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Ulanmoqda...
-                      </>
+                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Ulanmoqda...</>
                     ) : (
-                      <>
-                        <Link2 className="h-4 w-4 mr-2" />
-                        Ulash
-                      </>
+                      <><Link2 className="h-4 w-4 mr-2" /> Ulash</>
                     )}
                   </Button>
                 </div>
@@ -441,6 +446,160 @@ export function MarketplaceOAuth({
           })()}
         </DialogContent>
       </Dialog>
+
+      {/* Settings Dialog */}
+      <Dialog open={!!settingsId} onOpenChange={() => { setSettingsId(null); setSettingsMode('menu'); }}>
+        <DialogContent className="sm:max-w-md">
+          {settingsId && (() => {
+            const mp = MARKETPLACES.find(m => m.id === settingsId)!;
+            const connection = getConnection(settingsId);
+
+            if (settingsMode === 'update-key') {
+              return (
+                <>
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                      <KeyRound className="h-5 w-5" />
+                      {mp.name} — API kalitni yangilash
+                    </DialogTitle>
+                    <DialogDescription>
+                      Yangi API kalitlarni kiriting. Eski kalit almashtiriladi.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    {mp.fields.map((field) => (
+                      <div key={field.key} className="space-y-2">
+                        <Label htmlFor={`settings-${field.key}`}>{field.label}</Label>
+                        <Input
+                          id={`settings-${field.key}`}
+                          type={field.key.includes('Key') || field.key.includes('Token') ? 'password' : 'text'}
+                          placeholder={field.placeholder}
+                          value={credentials[field.key] || ''}
+                          onChange={(e) => setCredentials(prev => ({ ...prev, [field.key]: e.target.value }))}
+                        />
+                      </div>
+                    ))}
+                    <div className="flex gap-2">
+                      <Button variant="outline" className="flex-1" onClick={() => { setSettingsMode('menu'); setCredentials({}); }}>
+                        Orqaga
+                      </Button>
+                      <Button 
+                        className={`flex-1 bg-gradient-to-r ${mp.color}`}
+                        onClick={() => submitConnection(mp)}
+                        disabled={isSubmitting}
+                      >
+                        {isSubmitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <KeyRound className="h-4 w-4 mr-2" />}
+                        Yangilash
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              );
+            }
+
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Settings className="h-5 w-5" />
+                    {mp.name} sozlamalari
+                  </DialogTitle>
+                  <DialogDescription>
+                    Marketplace ulanishini boshqaring
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-3 py-4">
+                  {/* Connection info */}
+                  {connection && (
+                    <div className="p-3 rounded-lg bg-muted/50 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Holat</span>
+                        <Badge variant="default"><Check className="h-3 w-3 mr-1" /> Ulangan</Badge>
+                      </div>
+                      {(connection.account_info?.campaignName || connection.account_info?.storeName) && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Do'kon</span>
+                          <span className="text-sm font-medium">{connection.account_info.campaignName || connection.account_info.storeName}</span>
+                        </div>
+                      )}
+                      {connection.account_info?.campaignId && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Campaign ID</span>
+                          <span className="text-sm font-mono">{connection.account_info.campaignId}</span>
+                        </div>
+                      )}
+                      {connection.account_info?.sellerId && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Do'kon ID</span>
+                          <span className="text-sm font-mono">{connection.account_info.sellerId}</span>
+                        </div>
+                      )}
+                      {connection.last_sync_at && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Oxirgi sinxronizatsiya</span>
+                          <span className="text-sm">{new Date(connection.last_sync_at).toLocaleString('uz-UZ')}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start" 
+                    onClick={() => { setSettingsMode('update-key'); setCredentials({}); }}
+                  >
+                    <KeyRound className="h-4 w-4 mr-3" />
+                    API kalitni yangilash
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start"
+                    onClick={() => { handleSync(settingsId); setSettingsId(null); }}
+                  >
+                    <RefreshCw className="h-4 w-4 mr-3" />
+                    Ma'lumotlarni sinxronlash
+                  </Button>
+                  
+                  <Button 
+                    variant="destructive" 
+                    className="w-full justify-start"
+                    onClick={() => setDisconnectId(settingsId)}
+                  >
+                    <Unplug className="h-4 w-4 mr-3" />
+                    Ulanishni uzish
+                  </Button>
+                </div>
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* Disconnect Confirmation */}
+      <AlertDialog open={!!disconnectId} onOpenChange={() => setDisconnectId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Ulanishni uzishni tasdiqlang</AlertDialogTitle>
+            <AlertDialogDescription>
+              Bu marketplace bilan ulanish uziladi. Mahsulotlar va buyurtmalar sinxronizatsiyasi to'xtaydi. 
+              Qayta ulash istalgan vaqtda mumkin.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Bekor qilish</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => disconnectId && handleDisconnect(disconnectId)}
+              disabled={isDisconnecting}
+            >
+              {isDisconnecting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Unplug className="h-4 w-4 mr-2" />}
+              Ha, uzish
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -59,6 +59,7 @@ export default function SellerCloudMobile() {
     connections, 
     isLoading: connectionsLoading,
     connectMarketplace,
+    disconnectMarketplace,
     syncMarketplace,
     refetch
   } = useMarketplaceConnections();
@@ -140,6 +141,7 @@ export default function SellerCloudMobile() {
               connections={connections} 
               isLoading={connectionsLoading} 
               connectMarketplace={connectMarketplace} 
+              disconnectMarketplace={disconnectMarketplace}
               syncMarketplace={syncMarketplace} 
               onConnect={handleMarketplaceConnect}
               store={store}
