@@ -1018,7 +1018,8 @@ serve(async (req) => {
         const shopsResp = await fetch(`${uzumBaseUrl}/v1/shops`, { headers: uzumHeaders });
         if (shopsResp.ok) {
           const shopsData = await shopsResp.json();
-          const shops = shopsData.payload || shopsData.data || shopsData || [];
+          // API returns array directly per Swagger spec, NOT wrapped in payload
+          const shops = Array.isArray(shopsData) ? shopsData : (shopsData.payload || shopsData.data || shopsData || []);
           const shopList = Array.isArray(shops) ? shops : [shops];
           if (shopList.length > 0) {
             const realShopId = shopList[0].shopId || shopList[0].id;
@@ -1156,7 +1157,8 @@ serve(async (req) => {
           // Fetch all order statuses to get complete picture
           const orderStatuses = status ? [status] : [
             'CREATED', 'PACKING', 'PENDING_DELIVERY', 'DELIVERING', 
-            'DELIVERED', 'COMPLETED', 'CANCELED', 'RETURNED'
+            'DELIVERED', 'ACCEPTED_AT_DP', 'DELIVERED_TO_CUSTOMER_DELIVERY_POINT',
+            'COMPLETED', 'CANCELED', 'PENDING_CANCELLATION', 'RETURNED'
           ];
 
           for (let si = 0; si < orderStatuses.length; si++) {
@@ -1292,10 +1294,14 @@ serve(async (req) => {
 
       } else if (dataType === "finance") {
         // GET /v1/finance/orders + /v1/finance/expenses
+        // Both require shopIds as mandatory param per Swagger spec
         try {
+          const financeParams = new URLSearchParams();
+          if (uzumShopId) financeParams.append("shopIds", String(uzumShopId));
+          
           const [ordersRes, expensesRes] = await Promise.all([
-            fetch(`${uzumBaseUrl}/v1/finance/orders`, { headers: uzumHeaders }),
-            fetch(`${uzumBaseUrl}/v1/finance/expenses`, { headers: uzumHeaders }),
+            fetch(`${uzumBaseUrl}/v1/finance/orders?${financeParams.toString()}`, { headers: uzumHeaders }),
+            fetch(`${uzumBaseUrl}/v1/finance/expenses?${financeParams.toString()}`, { headers: uzumHeaders }),
           ]);
 
           let financeOrders: any[] = [];
@@ -1401,56 +1407,85 @@ serve(async (req) => {
         }
 
       } else if (dataType === "invoices") {
-        // GET /v1/shop/{shopId}/invoice/products - fetch all delivered goods
+        // First fetch invoice list from /v1/shop/{shopId}/invoice, then get products per invoice
         try {
           if (!uzumShopId) {
             result = { success: false, error: "Shop ID required for Uzum invoices" };
           } else {
+            // Step 1: Get all invoices list
             let allInvoiceItems: any[] = [];
-            let page = 0;
-            let hasMore = true;
-            const pageSize = 100;
+            let invoicePage = 0;
+            let invoiceHasMore = true;
 
-            while (hasMore) {
-              const params = new URLSearchParams({
-                size: String(pageSize),
-                page: String(page),
+            while (invoiceHasMore) {
+              const invoiceListParams = new URLSearchParams({
+                size: '50',
+                page: String(invoicePage),
               });
 
-              console.log(`Uzum invoices page ${page}`);
+              console.log(`Uzum invoice list page ${invoicePage}`);
 
-              const response = await fetch(
-                `${uzumBaseUrl}/v1/shop/${uzumShopId}/invoice/products?${params.toString()}`,
+              const invoiceListResp = await fetch(
+                `${uzumBaseUrl}/v1/shop/${uzumShopId}/invoice?${invoiceListParams.toString()}`,
                 { headers: uzumHeaders }
               );
 
-              if (!response.ok) {
-                const errText = await response.text();
-                console.error("Uzum invoices error:", response.status, errText);
+              if (!invoiceListResp.ok) {
+                const errText = await invoiceListResp.text();
+                console.error("Uzum invoice list error:", invoiceListResp.status, errText);
                 break;
               }
 
-              const data = await response.json();
-              const items = data.payload?.items || data.payload || [];
-              const itemList = Array.isArray(items) ? items : [];
+              const invoiceListData = await invoiceListResp.json();
+              // Returns array of InvoiceInList directly
+              const invoices = Array.isArray(invoiceListData) ? invoiceListData : (invoiceListData.payload || []);
+              
+              console.log(`Uzum invoice list page ${invoicePage}: ${invoices.length} invoices`);
 
-              console.log(`Uzum invoices page ${page}: ${itemList.length} items`);
+              if (invoices.length === 0) {
+                invoiceHasMore = false;
+                break;
+              }
 
-              const mapped = itemList.map((item: any) => ({
-                offerId: String(item.skuId || item.productId || ''),
-                skuId: String(item.skuId || ''),
-                invoiceId: item.invoiceId || '',
-                quantity: item.quantity || item.amount || 0,
-                receivedQuantity: item.receivedQuantity || item.receivedAmount || 0,
-                invoicedAt: item.invoicedAt || item.createdAt || new Date().toISOString(),
-              }));
+              // Step 2: For each invoice, get products via /v1/shop/{shopId}/invoice/products?invoiceId=X
+              for (const inv of invoices) {
+                const invoiceId = inv.invoiceId || inv.id;
+                if (!invoiceId) continue;
 
-              allInvoiceItems = [...allInvoiceItems, ...mapped];
+                await sleep(300);
+                
+                const prodParams = new URLSearchParams({
+                  invoiceId: String(invoiceId),
+                });
 
-              if (itemList.length < pageSize || !fetchAll) {
-                hasMore = false;
+                const prodResp = await fetch(
+                  `${uzumBaseUrl}/v1/shop/${uzumShopId}/invoice/products?${prodParams.toString()}`,
+                  { headers: uzumHeaders }
+                );
+
+                if (prodResp.ok) {
+                  const prodData = await prodResp.json();
+                  // Returns array of ProductForInvoiceDto directly
+                  const items = Array.isArray(prodData) ? prodData : (prodData.payload || []);
+                  
+                  const mapped = items.map((item: any) => ({
+                    offerId: String(item.skuId || item.productId || ''),
+                    skuId: String(item.skuId || ''),
+                    invoiceId: String(invoiceId),
+                    quantity: item.quantity || item.amount || 0,
+                    receivedQuantity: item.receivedQuantity || item.receivedAmount || 0,
+                    invoicedAt: inv.createdAt || inv.invoicedAt || new Date().toISOString(),
+                  }));
+                  allInvoiceItems = [...allInvoiceItems, ...mapped];
+                } else {
+                  console.error(`Uzum invoice products error for invoice ${invoiceId}:`, prodResp.status);
+                }
+              }
+
+              if (invoices.length < 50) {
+                invoiceHasMore = false;
               } else {
-                page++;
+                invoicePage++;
                 await sleep(300);
               }
             }
@@ -1492,7 +1527,7 @@ serve(async (req) => {
             let allReturns: any[] = [];
             let page = 0;
             let hasMore = true;
-            const pageSize = 100;
+            const pageSize = 50; // Swagger spec max is 50
 
             while (hasMore) {
               const params = new URLSearchParams({
@@ -1502,8 +1537,9 @@ serve(async (req) => {
 
               console.log(`Uzum returns page ${page}`);
 
+              // Swagger: /v1/shop/{shopId}/return (NOT /returns)
               const response = await fetch(
-                `${uzumBaseUrl}/v1/shop/${uzumShopId}/returns?${params.toString()}`,
+                `${uzumBaseUrl}/v1/shop/${uzumShopId}/return?${params.toString()}`,
                 { headers: uzumHeaders }
               );
 
@@ -1514,7 +1550,8 @@ serve(async (req) => {
               }
 
               const data = await response.json();
-              const items = data.payload?.items || data.payload || [];
+              // Returns array of SellerReturnLite directly per Swagger
+              const items = Array.isArray(data) ? data : (data.payload?.items || data.payload || []);
               const itemList = Array.isArray(items) ? items : [];
 
               console.log(`Uzum returns page ${page}: ${itemList.length} returns`);
@@ -1571,14 +1608,26 @@ serve(async (req) => {
           if (!uzumShopId) {
             result = { success: false, error: "Shop ID required for reconciliation" };
           } else {
-            // Fetch all required data in parallel
-            const [invoicesRes, ordersRes, stocksRes, returnsRes] = await Promise.all([
+            // For inventory reconciliation, we need: invoices, orders, stocks, returns
+            // /v1/shop/{shopId}/invoice/products requires invoiceId — so first get invoice list
+            // /v2/fbs/orders requires shopIds
+            // /v1/shop/{shopId}/return (NOT /returns)
+            
+            // Step 1: Fetch invoice list + stocks + returns in parallel
+            const ordersParams = new URLSearchParams({
+              shopIds: String(uzumShopId),
+              status: 'COMPLETED',
+              size: '50',
+              page: '0',
+            });
+            
+            const [invoiceListRes, ordersRes, stocksRes, returnsRes] = await Promise.all([
               fetch(
-                `${uzumBaseUrl}/v1/shop/${uzumShopId}/invoice/products`,
+                `${uzumBaseUrl}/v1/shop/${uzumShopId}/invoice?size=50&page=0`,
                 { headers: uzumHeaders }
               ),
               fetch(
-                `${uzumBaseUrl}/v2/fbs/orders`,
+                `${uzumBaseUrl}/v2/fbs/orders?${ordersParams.toString()}`,
                 { headers: uzumHeaders }
               ),
               fetch(
@@ -1586,36 +1635,50 @@ serve(async (req) => {
                 { headers: uzumHeaders }
               ),
               fetch(
-                `${uzumBaseUrl}/v1/shop/${uzumShopId}/returns`,
+                `${uzumBaseUrl}/v1/shop/${uzumShopId}/return?size=50&page=0`,
                 { headers: uzumHeaders }
               ),
             ]);
 
-            // Parse invoices
+            // Parse invoices - first get invoice IDs, then fetch products per invoice
             let invoiceMap = new Map<string, number>();
-            if (invoicesRes.ok) {
-              const invoicesData = await invoicesRes.json();
-              const items = invoicesData.payload?.items || [];
-              items.forEach((item: any) => {
-                const key = String(item.skuId || item.productId || '');
-                invoiceMap.set(key, (invoiceMap.get(key) || 0) + (item.quantity || 0));
-              });
+            if (invoiceListRes.ok) {
+              const invoiceListData = await invoiceListRes.json();
+              const invoices = Array.isArray(invoiceListData) ? invoiceListData : (invoiceListData.payload || []);
+              
+              // Fetch products for each invoice
+              for (const inv of invoices) {
+                const invoiceId = inv.invoiceId || inv.id;
+                if (!invoiceId) continue;
+                await sleep(300);
+                
+                const prodResp = await fetch(
+                  `${uzumBaseUrl}/v1/shop/${uzumShopId}/invoice/products?invoiceId=${invoiceId}`,
+                  { headers: uzumHeaders }
+                );
+                if (prodResp.ok) {
+                  const prodData = await prodResp.json();
+                  const items = Array.isArray(prodData) ? prodData : (prodData.payload || []);
+                  items.forEach((item: any) => {
+                    const key = String(item.skuId || item.productId || '');
+                    invoiceMap.set(key, (invoiceMap.get(key) || 0) + (item.quantity || 0));
+                  });
+                }
+              }
             }
 
             // Parse sold orders
             let soldMap = new Map<string, number>();
             if (ordersRes.ok) {
               const ordersData = await ordersRes.json();
-              const orders = ordersData.payload?.sellerOrders || ordersData.payload?.fbsOrders || [];
-              orders.forEach((order: any) => {
-                const items = order.items || [];
+              const orders = ordersData.payload?.sellerOrders || ordersData.payload?.fbsOrders || ordersData.payload?.orders || [];
+              const orderList = Array.isArray(orders) ? orders : [];
+              orderList.forEach((order: any) => {
+                const items = order.items || order.orderItems || [];
                 items.forEach((item: any) => {
                   const key = String(item.skuId || item.productId || '');
                   const qty = item.quantity || item.count || 1;
-                  // Only count delivered/completed orders
-                  if (['DELIVERED', 'COMPLETED'].includes(order.status)) {
-                    soldMap.set(key, (soldMap.get(key) || 0) + qty);
-                  }
+                  soldMap.set(key, (soldMap.get(key) || 0) + qty);
                 });
               });
             }
@@ -1625,24 +1688,23 @@ serve(async (req) => {
             if (stocksRes.ok) {
               const stocksData = await stocksRes.json();
               const stocks = stocksData.payload || [];
-              stocks.forEach((s: any) => {
+              const stockList = Array.isArray(stocks) ? stocks : [];
+              stockList.forEach((s: any) => {
                 const key = String(s.skuId || s.productId || '');
                 stockMap.set(key, s.amount || s.available || 0);
               });
             }
 
-            // Parse returns
+            // Parse returns — API returns array of SellerReturnLite directly
             let returnMap = new Map<string, number>();
             if (returnsRes.ok) {
               const returnsData = await returnsRes.json();
-              const returns = returnsData.payload?.items || [];
-              returns.forEach((ret: any) => {
+              const returns = Array.isArray(returnsData) ? returnsData : (returnsData.payload?.items || returnsData.payload || []);
+              const returnList = Array.isArray(returns) ? returns : [];
+              returnList.forEach((ret: any) => {
                 const key = String(ret.skuId || ret.productId || '');
                 const qty = ret.quantity || 1;
-                // Only count accepted returns
-                if (['ACCEPTED', 'COMPLETED'].includes(ret.status)) {
-                  returnMap.set(key, (returnMap.get(key) || 0) + qty);
-                }
+                returnMap.set(key, (returnMap.get(key) || 0) + qty);
               });
             }
 
