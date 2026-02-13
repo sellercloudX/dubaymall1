@@ -111,8 +111,14 @@ export default function Auth() {
             title: 'Muvaffaqiyat',
             description: t.loginSuccess,
           });
-               const redirect = searchParams.get('redirect');
-               navigate(redirect || '/');
+          const redirect = searchParams.get('redirect');
+          if (redirect) {
+            navigate(redirect);
+          } else {
+            // Detect mobile and redirect accordingly
+            const isMobile = window.innerWidth < 768;
+            navigate(isMobile ? '/seller-cloud-mobile' : '/seller-cloud');
+          }
         }
       } else {
         const { error } = await signUp(formData.email, formData.password, formData.fullName);
