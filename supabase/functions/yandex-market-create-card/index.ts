@@ -516,10 +516,10 @@ JAVOB FAQAT JSON:
       method: "POST",
       headers: { Authorization: `Bearer ${lovableApiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
+        model: "google/gemini-2.5-flash",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.1,
-        max_tokens: 12000,
+        max_tokens: 8000,
       }),
     });
 
@@ -712,24 +712,23 @@ serve(async (req) => {
         
         // Generate professional product images — creative & diverse angles
         if (images.length < 4 && LOVABLE_KEY) {
-          console.log(`🖼️ Only ${images.length} images, generating up to ${4 - images.length} creative studio images...`);
+          console.log(`🖼️ Only ${images.length} images, generating up to ${3 - images.length + 1} creative studio images...`);
           const sourceImg = images[0] || null;
           const creativeAngles = [
-            `Professional e-commerce hero shot of "${product.name}" on clean white background. Studio lighting with soft shadows. Ultra sharp, 4K product photography. Show the full product clearly from the front.`,
-            `Lifestyle context shot of "${product.name}" in a natural usage environment. Show the product being used or in its typical setting. Professional photography, warm natural lighting, shallow depth of field.`,
-            `Premium 45-degree angle studio shot of "${product.name}" highlighting build quality and key features. Dramatic studio lighting with reflections. White gradient background. Professional catalog photography.`,
-            `Close-up detail macro shot of "${product.name}" showing texture, material quality, buttons, labels or key functional elements. Professional macro photography on white background with perfect focus.`,
+            `Professional e-commerce hero shot of "${product.name}" on clean white background. Studio lighting with soft shadows. Ultra sharp product photography.`,
+            `Lifestyle shot of "${product.name}" in natural usage environment. Professional photography, warm lighting.`,
+            `45-degree angle studio shot of "${product.name}" highlighting key features. White gradient background.`,
           ];
           
-          const needed = Math.min(4 - images.length, creativeAngles.length);
+          const needed = Math.min(3 - images.length + 1, creativeAngles.length);
           
-          // Generate images in PARALLEL with best model
+          // Generate images in PARALLEL with fast model
           const imgPromises = [];
           for (let i = 0; i < needed; i++) {
             imgPromises.push((async () => {
               try {
                 const genBody: any = {
-                  model: "google/gemini-3-pro-image-preview",
+                  model: "google/gemini-2.5-flash-image",
                   modalities: ["image", "text"],
                   messages: [{
                     role: "user",
