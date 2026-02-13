@@ -299,10 +299,30 @@ serve(async (req) => {
 
     // Encrypt credentials before storing
     const ENCRYPTION_KEY = Deno.env.get("CREDENTIALS_ENCRYPTION_KEY");
+    
+    // For Yandex: derive businessId from campaign info if available
+    let businessId = "";
+    if (marketplace === "yandex" && campaignId && !businessId) {
+      try {
+        const bizResp = await fetch(
+          `https://api.partner.market.yandex.ru/campaigns/${campaignId}`,
+          { headers: { "Api-Key": apiKey, "Content-Type": "application/json" } }
+        );
+        if (bizResp.ok) {
+          const bizData = await bizResp.json();
+          businessId = bizData.campaign?.business?.id?.toString() || "";
+          console.log(`Derived businessId: ${businessId} from campaign ${campaignId}`);
+        }
+      } catch (e) {
+        console.error("Failed to derive businessId:", e);
+      }
+    }
+    
     const credentialsPayload = {
       apiKey: apiKey,
       campaignId: campaignId || null,
       sellerId: sellerId || null,
+      businessId: businessId || null,
     };
 
     let encryptedCredentials: string | null = null;

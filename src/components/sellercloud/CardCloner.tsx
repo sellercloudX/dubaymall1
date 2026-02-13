@@ -202,7 +202,7 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
     }
   };
 
-  // Clone product to external marketplace (call yandex-market-create-card with cost optimization)
+  // Clone product to external marketplace
   const cloneToMarketplace = async (product: CloneableProduct, targetMp: string): Promise<boolean> => {
     try {
       const validImages = (product.pictures || []).filter(p => p && p.startsWith('http'));
@@ -210,46 +210,55 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
       
       console.log(`Cloning "${product.name}" to ${targetMp}, cost-optimized mode, images: ${validImages.length}`);
       
-      // COST OPTIMIZATION: Skip image generation and reuse existing images
-      const { data, error } = await supabase.functions.invoke('yandex-market-create-card', {
-        body: {
-          shopId: shop?.id || 'sellercloud',
-          product: {
-            name: product.name,
-            description: product.description || product.name,
-            price: product.price,
-            costPrice,
-            images: validImages,
-            category: product.category || '',
+      // Only Yandex Market has create-card endpoint
+      if (targetMp === 'yandex') {
+        const { data, error } = await supabase.functions.invoke('yandex-market-create-card', {
+          body: {
+            shopId: shop?.id || 'sellercloud',
+            product: {
+              name: product.name,
+              description: product.description || product.name,
+              price: product.price,
+              costPrice,
+              images: validImages,
+              category: product.category || '',
+            },
+            pricing: {
+              costPrice,
+              marketplaceCommission: Math.round(product.price * 0.15),
+              logisticsCost: 3000,
+              taxRate: 4,
+              targetProfit: Math.round(product.price * 0.2),
+              recommendedPrice: product.price,
+              netProfit: Math.round(product.price * 0.2),
+            },
+            skipImageGeneration: true, // 💰 Reuse existing images from master card
+            cloneMode: true, // 💰 Use cheaper AI models
           },
-          pricing: {
-            costPrice,
-            marketplaceCommission: Math.round(product.price * 0.15),
-            logisticsCost: 3000,
-            taxRate: 4,
-            targetProfit: Math.round(product.price * 0.2),
-            recommendedPrice: product.price,
-            netProfit: Math.round(product.price * 0.2),
-          },
-          skipImageGeneration: true, // 💰 Reuse existing images from master card
-        },
-      });
-      
-      if (error) {
-        console.error(`Clone to ${targetMp} invoke error:`, error.message || error);
-        toast.error(`${product.name}: ${error.message || 'Edge function xatosi'}`);
-        return false;
+        });
+        
+        if (error) {
+          console.error(`Clone to ${targetMp} invoke error:`, error.message || error);
+          toast.error(`${product.name}: ${error.message || 'Edge function xatosi'}`);
+          return false;
+        }
+        
+        if (!data?.success) {
+          const errMsg = data?.error || 'Marketplace API xatosi';
+          console.error(`Clone to ${targetMp} API error:`, errMsg, data?.yandexResponse);
+          toast.error(`${product.name.slice(0, 30)}: ${errMsg}`);
+          return false;
+        }
+        
+        console.log(`✅ Cloned "${product.name}" to ${targetMp} (cost-optimized)`);
+        return true;
       }
       
-      if (!data?.success) {
-        const errMsg = data?.error || 'Marketplace API xatosi';
-        console.error(`Clone to ${targetMp} API error:`, errMsg, data?.yandexResponse);
-        toast.error(`${product.name.slice(0, 30)}: ${errMsg}`);
-        return false;
-      }
-      
-      console.log(`✅ Cloned "${product.name}" to ${targetMp} (cost-optimized)`);
-      return true;
+      // For Uzum and other marketplaces: not yet supported for card creation
+      // TODO: Implement uzum-market-create-card when ready
+      console.warn(`⚠️ Card creation for ${targetMp} not yet supported, skipping`);
+      toast.warning(`${MARKETPLACE_INFO[targetMp]?.name || targetMp}: kartochka yaratish hali mavjud emas`);
+      return false;
     } catch (err: any) {
       console.error(`Clone to ${targetMp} failed:`, err?.message || err);
       return false;

@@ -49,6 +49,7 @@ interface CreateCardRequest {
   pricing: PricingInput;
   products?: ProductInput[];
   skipImageGeneration?: boolean; // Cost optimization: reuse existing images for clones
+  cloneMode?: boolean; // Use cheaper AI models for cloning
 }
 
 // ============ HELPERS ============
@@ -445,7 +446,8 @@ async function aiOptimize(
   product: ProductInput,
   categoryName: string,
   categoryParams: any[],
-  lovableApiKey: string
+  lovableApiKey: string,
+  cloneMode: boolean = false
 ): Promise<any> {
   // Filter out URL/PICKER type params — they require special URLs that AI can't generate
   const safeParams = categoryParams.filter((p: any) => {
@@ -516,15 +518,18 @@ QOIDALAR:
 JAVOB FAQAT JSON:
 {"name_ru":"...","name_uz":"...","description_ru":"...","description_uz":"...","vendor":"...","vendorCode":"...","manufacturerCountry":"...","shelfLife":null,"lifeTime":null,"parameterValues":[{"parameterId":123,"valueId":456},{"parameterId":789,"value":"qiymat"}],"warranty":"1 год","adult":false,"weightKg":0.15,"lengthCm":10,"widthCm":8,"heightCm":5}`;
 
+  // Use cheaper model for clone mode to save ~80% on AI costs
+  const aiModel = cloneMode ? "google/gemini-2.5-flash" : "google/gemini-2.5-pro";
+  
   try {
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${lovableApiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
+        model: aiModel,
         messages: [{ role: "user", content: prompt }],
         temperature: 0.1,
-        max_tokens: 12000,
+        max_tokens: cloneMode ? 8000 : 12000,
       }),
     });
 
@@ -793,6 +798,7 @@ serve(async (req) => {
         console.log(`🖼️ Total ${images.length} professional images ready`);
 
         // ═══ STEP 2: Find LEAF category from Yandex tree ═══
+        // COST OPTIMIZATION: For clones, use cheaper Flash Lite for category detection
         const leafCat = await findLeafCategory(creds.apiKey, product.name, product.description || "", LOVABLE_KEY);
         console.log(`📂 Category: ${leafCat.name} (${leafCat.id})`);
 
@@ -803,7 +809,11 @@ serve(async (req) => {
         // ═══ STEP 4: AI optimization ═══
         let ai: any = null;
         if (LOVABLE_KEY) {
-          ai = await aiOptimize(product, leafCat.name, params, LOVABLE_KEY);
+          const isClone = !!body.skipImageGeneration;
+          if (isClone) {
+            console.log(`💰 Clone mode: using Flash instead of Pro for AI optimization`);
+          }
+          ai = await aiOptimize(product, leafCat.name, params, LOVABLE_KEY, isClone);
         }
 
         // ═══ STEP 5: MXIK lookup (AI-powered) ═══
