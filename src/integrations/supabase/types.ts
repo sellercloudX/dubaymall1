@@ -2397,6 +2397,68 @@ export type Database = {
         }
         Relationships: []
       }
+      subscription_payments: {
+        Row: {
+          amount: number
+          click_paydoc_id: string | null
+          click_trans_id: string | null
+          created_at: string
+          currency: string
+          id: string
+          months_covered: number
+          notes: string | null
+          paid_at: string | null
+          payment_method: string
+          payment_status: string
+          payment_type: string
+          subscription_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          click_paydoc_id?: string | null
+          click_trans_id?: string | null
+          created_at?: string
+          currency?: string
+          id?: string
+          months_covered?: number
+          notes?: string | null
+          paid_at?: string | null
+          payment_method?: string
+          payment_status?: string
+          payment_type?: string
+          subscription_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          click_paydoc_id?: string | null
+          click_trans_id?: string | null
+          created_at?: string
+          currency?: string
+          id?: string
+          months_covered?: number
+          notes?: string | null
+          paid_at?: string | null
+          payment_method?: string
+          payment_status?: string
+          payment_type?: string
+          subscription_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_payments_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "sellercloud_subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_addresses: {
         Row: {
           address: string

@@ -32,6 +32,11 @@ async function md5(message: string): Promise<string> {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+// Determine if merchant_trans_id is a subscription payment
+function isSubscriptionPayment(merchantTransId: string): boolean {
+  return merchantTransId.startsWith('SP-');
+}
+
 serve(async (req) => {
   // Handle CORS
   if (req.method === "OPTIONS") {
@@ -58,7 +63,7 @@ serve(async (req) => {
     const url = new URL(req.url);
     const action = url.searchParams.get("action");
 
-    // Handle frontend request to create payment URL
+    // ===== Frontend: Create payment URL =====
     if (req.method === "POST" && action === "create") {
       const authHeader = req.headers.get("Authorization");
       if (!authHeader) {
@@ -78,18 +83,73 @@ serve(async (req) => {
         );
       }
 
-      const { orderId, amount, returnUrl } = await req.json();
+      const { orderId, amount, returnUrl, paymentType, subscriptionId, months } = await req.json();
 
-      if (!orderId || !amount) {
+      if (!amount) {
         return new Response(
-          JSON.stringify({ error: "Missing orderId or amount" }),
+          JSON.stringify({ error: "Missing amount" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // For subscription payments, create a subscription_payments record
+      if (paymentType === 'subscription' && subscriptionId) {
+        const { data: payment, error: payError } = await supabase
+          .from('subscription_payments')
+          .insert({
+            user_id: user.id,
+            subscription_id: subscriptionId,
+            amount: amount,
+            months_covered: months || 1,
+            payment_type: 'subscription',
+            payment_method: 'click',
+            payment_status: 'pending',
+          })
+          .select('id')
+          .single();
+
+        if (payError) {
+          console.error("Error creating subscription payment:", payError);
+          return new Response(
+            JSON.stringify({ error: payError.message }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Use SP- prefix for subscription payments
+        const merchantTransId = `SP-${payment.id}`;
+
+        console.log("Creating Click payment URL for subscription:", merchantTransId, "amount:", amount);
+
+        const clickUrl = new URL("https://my.click.uz/services/pay");
+        clickUrl.searchParams.set("service_id", CLICK_SERVICE_ID);
+        clickUrl.searchParams.set("merchant_id", CLICK_MERCHANT_ID);
+        clickUrl.searchParams.set("amount", amount.toString());
+        clickUrl.searchParams.set("transaction_param", merchantTransId);
+        if (returnUrl) {
+          clickUrl.searchParams.set("return_url", returnUrl);
+        }
+
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            paymentUrl: clickUrl.toString(),
+            paymentId: payment.id,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // For order payments (legacy)
+      if (!orderId) {
+        return new Response(
+          JSON.stringify({ error: "Missing orderId" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
       console.log("Creating Click payment URL for order:", orderId, "amount:", amount);
 
-      // Generate Click payment URL
       const clickUrl = new URL("https://my.click.uz/services/pay");
       clickUrl.searchParams.set("service_id", CLICK_SERVICE_ID);
       clickUrl.searchParams.set("merchant_id", CLICK_MERCHANT_ID);
@@ -109,7 +169,7 @@ serve(async (req) => {
       );
     }
 
-    // Handle Click callback (Prepare)
+    // ===== Click Callback: Prepare (action=0) =====
     if (action === "0") {
       const body: ClickPrepareRequest = await req.json();
       console.log("Click Prepare request:", body);
@@ -121,15 +181,71 @@ serve(async (req) => {
       if (body.sign_string !== expectedSign) {
         console.error("Invalid signature");
         return new Response(
+          JSON.stringify({ error: -1, error_note: "Invalid signature" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // --- Subscription payment ---
+      if (isSubscriptionPayment(body.merchant_trans_id)) {
+        const paymentId = body.merchant_trans_id.replace('SP-', '');
+        
+        const { data: payment, error: payError } = await supabase
+          .from('subscription_payments')
+          .select('*')
+          .eq('id', paymentId)
+          .single();
+
+        if (payError || !payment) {
+          console.error("Subscription payment not found:", paymentId);
+          return new Response(
+            JSON.stringify({ error: -5, error_note: "Payment not found" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        if (payment.payment_status === 'paid') {
+          return new Response(
+            JSON.stringify({ error: -4, error_note: "Already paid" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Check amount
+        if (Math.abs(Number(payment.amount) - parseFloat(body.amount)) > 0.01) {
+          console.error("Amount mismatch:", payment.amount, body.amount);
+          return new Response(
+            JSON.stringify({ error: -2, error_note: "Incorrect amount" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Update with Click info
+        await supabase
+          .from('subscription_payments')
+          .update({
+            click_trans_id: body.click_trans_id,
+            click_paydoc_id: body.click_paydoc_id,
+            payment_status: 'processing',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', paymentId);
+
+        console.log("Prepare successful for subscription payment:", paymentId);
+
+        return new Response(
           JSON.stringify({
-            error: -1,
-            error_note: "Invalid signature"
+            click_trans_id: body.click_trans_id,
+            merchant_trans_id: body.merchant_trans_id,
+            merchant_prepare_id: paymentId,
+            error: 0,
+            error_note: "Success"
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      // Check if order exists
+      // --- Order payment (legacy) ---
       const { data: order, error: orderError } = await supabase
         .from("orders")
         .select("*")
@@ -139,38 +255,25 @@ serve(async (req) => {
       if (orderError || !order) {
         console.error("Order not found:", body.merchant_trans_id);
         return new Response(
-          JSON.stringify({
-            error: -5,
-            error_note: "Order not found"
-          }),
+          JSON.stringify({ error: -5, error_note: "Order not found" }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      // Check amount
       if (Math.abs(order.total_amount - parseFloat(body.amount)) > 0.01) {
-        console.error("Amount mismatch:", order.total_amount, body.amount);
         return new Response(
-          JSON.stringify({
-            error: -2,
-            error_note: "Incorrect amount"
-          }),
+          JSON.stringify({ error: -2, error_note: "Incorrect amount" }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      // Check if already paid
       if (order.payment_status === "paid") {
         return new Response(
-          JSON.stringify({
-            error: -4,
-            error_note: "Already paid"
-          }),
+          JSON.stringify({ error: -4, error_note: "Already paid" }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      // Update order with prepare info
       await supabase
         .from("orders")
         .update({
@@ -181,8 +284,6 @@ serve(async (req) => {
           })
         })
         .eq("id", body.merchant_trans_id);
-
-      console.log("Prepare successful for order:", body.merchant_trans_id);
 
       return new Response(
         JSON.stringify({
@@ -196,7 +297,7 @@ serve(async (req) => {
       );
     }
 
-    // Handle Click callback (Complete)
+    // ===== Click Callback: Complete (action=1) =====
     if (action === "1") {
       const body: ClickCompleteRequest = await req.json();
       console.log("Click Complete request:", body);
@@ -206,33 +307,96 @@ serve(async (req) => {
       const expectedSign = await md5(signString);
 
       if (body.sign_string !== expectedSign) {
-        console.error("Invalid signature");
         return new Response(
-          JSON.stringify({
-            error: -1,
-            error_note: "Invalid signature"
-          }),
+          JSON.stringify({ error: -1, error_note: "Invalid signature" }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      // Check if transaction was cancelled
+      // Check if cancelled
       if (body.error === "-5017") {
+        if (isSubscriptionPayment(body.merchant_trans_id)) {
+          const paymentId = body.merchant_trans_id.replace('SP-', '');
+          await supabase
+            .from('subscription_payments')
+            .update({ payment_status: 'cancelled', updated_at: new Date().toISOString() })
+            .eq('id', paymentId);
+        } else {
+          await supabase
+            .from("orders")
+            .update({ payment_status: "cancelled" })
+            .eq("id", body.merchant_trans_id);
+        }
+
+        return new Response(
+          JSON.stringify({ error: -9, error_note: "Transaction cancelled" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // --- Subscription payment complete ---
+      if (isSubscriptionPayment(body.merchant_trans_id)) {
+        const paymentId = body.merchant_trans_id.replace('SP-', '');
+        
+        const { data: payment, error: payError } = await supabase
+          .from('subscription_payments')
+          .select('*')
+          .eq('id', paymentId)
+          .single();
+
+        if (payError || !payment) {
+          return new Response(
+            JSON.stringify({ error: -5, error_note: "Payment not found" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Mark as paid
         await supabase
-          .from("orders")
-          .update({ payment_status: "cancelled" })
-          .eq("id", body.merchant_trans_id);
+          .from('subscription_payments')
+          .update({
+            payment_status: 'paid',
+            paid_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', paymentId);
+
+        // Auto-activate subscription for the paid duration
+        try {
+          await supabase.rpc('activate_subscription_by_payment', {
+            p_subscription_id: payment.subscription_id,
+            p_months: payment.months_covered,
+          });
+          console.log(`Subscription ${payment.subscription_id} activated for ${payment.months_covered} months`);
+        } catch (activateErr) {
+          console.error("Error activating subscription:", activateErr);
+        }
+
+        // Record platform revenue
+        await supabase
+          .from('platform_revenue')
+          .insert({
+            amount: Number(payment.amount),
+            source_type: 'sellercloud_subscription',
+            source_id: payment.subscription_id,
+            description: `SellerCloudX obuna to'lovi - ${payment.months_covered} oy`,
+          });
+
+        console.log("Subscription payment completed:", paymentId);
 
         return new Response(
           JSON.stringify({
-            error: -9,
-            error_note: "Transaction cancelled"
+            click_trans_id: body.click_trans_id,
+            merchant_trans_id: body.merchant_trans_id,
+            merchant_confirm_id: paymentId,
+            error: 0,
+            error_note: "Success"
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      // Get order
+      // --- Order payment complete (legacy) ---
       const { data: order, error: orderError } = await supabase
         .from("orders")
         .select("*")
@@ -241,15 +405,11 @@ serve(async (req) => {
 
       if (orderError || !order) {
         return new Response(
-          JSON.stringify({
-            error: -5,
-            error_note: "Order not found"
-          }),
+          JSON.stringify({ error: -5, error_note: "Order not found" }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      // Mark as paid
       await supabase
         .from("orders")
         .update({
