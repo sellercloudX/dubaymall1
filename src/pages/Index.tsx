@@ -465,10 +465,8 @@ export default function Index() {
           </div>
 
           <div className="flex items-center gap-1 sm:gap-2">
-            <div className="hidden sm:flex items-center gap-1">
-              <ThemeToggle />
-              <LanguageSwitcher />
-            </div>
+            <ThemeToggle />
+            <LanguageSwitcher />
             <Button variant="ghost" size="sm" className="font-medium text-xs sm:text-sm px-2 sm:px-3" asChild>
               <Link to="/auth">{txt.loginCta}</Link>
             </Button>
