@@ -189,7 +189,7 @@ serve(async (req) => {
         "Accept": "application/json",
       };
 
-      // 1. Get owned shops
+      // 1. Get owned shops (returns array directly per Swagger spec)
       try {
         const shopsResponse = await fetch(`${uzumBaseUrl}/v1/shops`, {
           headers: uzumHeaders,
@@ -197,7 +197,8 @@ serve(async (req) => {
 
         if (shopsResponse.ok) {
           const shopsData = await shopsResponse.json();
-          const shops = shopsData.payload || shopsData.data || shopsData || [];
+          // API returns array directly, NOT wrapped in payload
+          const shops = Array.isArray(shopsData) ? shopsData : (shopsData.payload || shopsData.data || shopsData || []);
           const shopList = Array.isArray(shops) ? shops : [shops];
           
           if (shopList.length > 0) {
@@ -271,7 +272,8 @@ serve(async (req) => {
 
       // 3. Get orders count
       try {
-        const params = new URLSearchParams({ status: 'CREATED' });
+        const params = new URLSearchParams();
+        params.append("status", "CREATED");
         if (uzumShopId) params.append("shopIds", String(uzumShopId));
         
         const ordersResponse = await fetch(
@@ -280,7 +282,8 @@ serve(async (req) => {
         );
         if (ordersResponse.ok) {
           const ordersData = await ordersResponse.json();
-          ordersCount = ordersData.payload?.count || ordersData.payload || 0;
+          // GenericResponseLong: { payload: number }
+          ordersCount = typeof ordersData.payload === 'number' ? ordersData.payload : (ordersData.payload?.count || 0);
           console.log("Uzum orders count:", ordersCount);
         } else {
           console.log("Uzum orders count status:", ordersResponse.status);
