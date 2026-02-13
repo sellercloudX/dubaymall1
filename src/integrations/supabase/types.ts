@@ -2367,6 +2367,234 @@ export type Database = {
         }
         Relationships: []
       }
+      wildberries_connections: {
+        Row: {
+          account_info: Json | null
+          api_key: string
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          last_sync_at: string | null
+          orders_count: number | null
+          products_count: number | null
+          supplier_id: number
+          total_revenue: number | null
+          updated_at: string | null
+          user_id: string
+          warehouse_id: number | null
+        }
+        Insert: {
+          account_info?: Json | null
+          api_key: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_sync_at?: string | null
+          orders_count?: number | null
+          products_count?: number | null
+          supplier_id: number
+          total_revenue?: number | null
+          updated_at?: string | null
+          user_id: string
+          warehouse_id?: number | null
+        }
+        Update: {
+          account_info?: Json | null
+          api_key?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_sync_at?: string | null
+          orders_count?: number | null
+          products_count?: number | null
+          supplier_id?: number
+          total_revenue?: number | null
+          updated_at?: string | null
+          user_id?: string
+          warehouse_id?: number | null
+        }
+        Relationships: []
+      }
+      wildberries_financials: {
+        Row: {
+          commission: number | null
+          connection_id: string
+          created_at: string | null
+          date: string | null
+          id: string
+          logistics: number | null
+          net_income: number | null
+          order_id: number
+          penalty: number | null
+          return_amount: number | null
+          revenue: number | null
+          user_id: string
+        }
+        Insert: {
+          commission?: number | null
+          connection_id: string
+          created_at?: string | null
+          date?: string | null
+          id?: string
+          logistics?: number | null
+          net_income?: number | null
+          order_id: number
+          penalty?: number | null
+          return_amount?: number | null
+          revenue?: number | null
+          user_id: string
+        }
+        Update: {
+          commission?: number | null
+          connection_id?: string
+          created_at?: string | null
+          date?: string | null
+          id?: string
+          logistics?: number | null
+          net_income?: number | null
+          order_id?: number
+          penalty?: number | null
+          return_amount?: number | null
+          revenue?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wildberries_financials_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "wildberries_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wildberries_orders: {
+        Row: {
+          buyer_name: string | null
+          commission_amount: number | null
+          commission_percent: number | null
+          connection_id: string
+          created_at: string | null
+          delivery_address: string | null
+          id: string
+          items: Json | null
+          order_date: string | null
+          order_id: number
+          payment_method: string | null
+          status: string | null
+          total_amount: number | null
+          total_price: number | null
+          updated_at: string | null
+          user_id: string
+          warehouse_id: number | null
+        }
+        Insert: {
+          buyer_name?: string | null
+          commission_amount?: number | null
+          commission_percent?: number | null
+          connection_id: string
+          created_at?: string | null
+          delivery_address?: string | null
+          id?: string
+          items?: Json | null
+          order_date?: string | null
+          order_id: number
+          payment_method?: string | null
+          status?: string | null
+          total_amount?: number | null
+          total_price?: number | null
+          updated_at?: string | null
+          user_id: string
+          warehouse_id?: number | null
+        }
+        Update: {
+          buyer_name?: string | null
+          commission_amount?: number | null
+          commission_percent?: number | null
+          connection_id?: string
+          created_at?: string | null
+          delivery_address?: string | null
+          id?: string
+          items?: Json | null
+          order_date?: string | null
+          order_id?: number
+          payment_method?: string | null
+          status?: string | null
+          total_amount?: number | null
+          total_price?: number | null
+          updated_at?: string | null
+          user_id?: string
+          warehouse_id?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wildberries_orders_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "wildberries_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wildberries_products: {
+        Row: {
+          category_id: number | null
+          connection_id: string
+          created_at: string | null
+          discount_percent: number | null
+          id: string
+          images: string[] | null
+          nm_id: number
+          price: number | null
+          rating: number | null
+          review_count: number | null
+          stock: Json | null
+          title: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          category_id?: number | null
+          connection_id: string
+          created_at?: string | null
+          discount_percent?: number | null
+          id?: string
+          images?: string[] | null
+          nm_id: number
+          price?: number | null
+          rating?: number | null
+          review_count?: number | null
+          stock?: Json | null
+          title: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          category_id?: number | null
+          connection_id?: string
+          created_at?: string | null
+          discount_percent?: number | null
+          id?: string
+          images?: string[] | null
+          nm_id?: number
+          price?: number | null
+          rating?: number | null
+          review_count?: number | null
+          stock?: Json | null
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wildberries_products_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "wildberries_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       withdrawal_requests: {
         Row: {
           amount: number

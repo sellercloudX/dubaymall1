@@ -84,17 +84,18 @@ const MARKETPLACES: Marketplace[] = [
     ],
     status: 'available',
   },
-  {
-    id: 'wildberries',
-    name: 'Wildberries',
-    logo: '🟣',
-    color: 'from-fuchsia-500 to-pink-500',
-    requiresManualKey: true,
-    fields: [
-      { key: 'apiKey', label: 'API Token', placeholder: 'eyJhbGciOi...' },
-    ],
-    status: 'coming_soon',
-  },
+   {
+     id: 'wildberries',
+     name: 'Wildberries',
+     logo: '🟣',
+     color: 'from-fuchsia-500 to-pink-500',
+     requiresManualKey: true,
+     fields: [
+       { key: 'apiKey', label: 'API Token', placeholder: 'eyJhbGciOi...' },
+       { key: 'supplierId', label: 'Supplier ID', placeholder: '123456' },
+     ],
+     status: 'available',
+   },
   {
     id: 'ozon',
     name: 'Ozon',
