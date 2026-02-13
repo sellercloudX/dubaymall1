@@ -15,6 +15,7 @@ import {
   Calculator, Store, Wand2, FileText, Image as ImageLucide, Zap, Hash,
   Clock, CheckCircle, AlertCircle
 } from 'lucide-react';
+import { InlineCamera } from './InlineCamera';
 
 // Safe image component with fallback - no innerHTML
 function ProductImageWithFallback({ src, alt }: { src?: string; alt: string }) {
@@ -102,6 +103,7 @@ interface AIScannerProProps {
 export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [currentStep, setCurrentStep] = useState<Step>('capture');
+  const [showInlineCamera, setShowInlineCamera] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [analyzedProduct, setAnalyzedProduct] = useState<AnalyzedProduct | null>(null);
   const [webProducts, setWebProducts] = useState<WebProduct[]>([]);
@@ -534,6 +536,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
 
   const resetScanner = () => {
     setCapturedImage(null);
+    setShowInlineCamera(false);
     setAnalyzedProduct(null);
     setWebProducts([]);
     setSelectedProduct(null);
@@ -700,34 +703,41 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Side by side buttons */}
-            <div className="grid grid-cols-2 gap-3">
-              <Button
-                size="lg"
-                className="h-24 flex flex-col items-center justify-center gap-2"
-                onClick={() => {
-                  const input = document.createElement('input');
-                  input.type = 'file';
-                  input.accept = 'image/*';
-                  input.capture = 'environment';
-                  input.onchange = (e: any) => handleImageCapture(e);
-                  input.click();
+            {/* Inline Camera */}
+            {showInlineCamera && (
+              <InlineCamera
+                onCapture={(base64) => {
+                  setShowInlineCamera(false);
+                  setCapturedImage(base64);
+                  analyzeImage(base64);
                 }}
-              >
-                <Camera className="h-8 w-8" />
-                <span className="text-sm">Kameradan</span>
-              </Button>
+                onClose={() => setShowInlineCamera(false)}
+              />
+            )}
 
-              <Button
-                variant="outline"
-                size="lg"
-                className="h-24 flex flex-col items-center justify-center gap-2"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <ImageIcon className="h-8 w-8" />
-                <span className="text-sm">Galereyadan</span>
-              </Button>
-            </div>
+            {/* Side by side buttons */}
+            {!showInlineCamera && (
+              <div className="grid grid-cols-2 gap-3">
+                <Button
+                  size="lg"
+                  className="h-24 flex flex-col items-center justify-center gap-2"
+                  onClick={() => setShowInlineCamera(true)}
+                >
+                  <Camera className="h-8 w-8" />
+                  <span className="text-sm">Kameradan</span>
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="h-24 flex flex-col items-center justify-center gap-2"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <ImageIcon className="h-8 w-8" />
+                  <span className="text-sm">Galereyadan</span>
+                </Button>
+              </div>
+            )}
 
             <input
               ref={fileInputRef}
@@ -738,13 +748,15 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
             />
 
             {/* Tips for mobile users */}
-            <div className="bg-muted/50 rounded-lg p-3">
-              <p className="font-medium text-sm text-foreground mb-1">💡 Maslahat:</p>
-              <ul className="space-y-0.5 text-xs text-muted-foreground">
-                <li>• Yaxshi yoritilgan joyda rasmga oling</li>
-                <li>• Rasm tiniq bo'lishi kerak</li>
-              </ul>
-            </div>
+            {!showInlineCamera && (
+              <div className="bg-muted/50 rounded-lg p-3">
+                <p className="font-medium text-sm text-foreground mb-1">💡 Maslahat:</p>
+                <ul className="space-y-0.5 text-xs text-muted-foreground">
+                  <li>• Yaxshi yoritilgan joyda rasmga oling</li>
+                  <li>• Rasm tiniq bo'lishi kerak</li>
+                </ul>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

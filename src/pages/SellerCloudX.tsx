@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -10,34 +10,39 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { MarketplaceOAuth } from '@/components/sellercloud/MarketplaceOAuth';
-import { MarketplaceProducts } from '@/components/sellercloud/MarketplaceProducts';
-import { MarketplaceOrders } from '@/components/sellercloud/MarketplaceOrders';
-import { MarketplaceAnalytics } from '@/components/sellercloud/MarketplaceAnalytics';
-import { InventorySync } from '@/components/sellercloud/InventorySync';
-import { PriceManager } from '@/components/sellercloud/PriceManager';
-import { MultiPublish } from '@/components/sellercloud/MultiPublish';
-import { NotificationCenter } from '@/components/sellercloud/NotificationCenter';
-import { ReportsExport } from '@/components/sellercloud/ReportsExport';
-import { SubscriptionBilling } from '@/components/sellercloud/SubscriptionBilling';
-import { FinancialDashboard } from '@/components/sellercloud/FinancialDashboard';
-import { ABCAnalysis } from '@/components/sellercloud/ABCAnalysis';
-import { MinPriceProtection } from '@/components/sellercloud/MinPriceProtection';
-import { CardCloner } from '@/components/sellercloud/CardCloner';
-import { ProblematicProducts } from '@/components/sellercloud/ProblematicProducts';
-import { ProfitCalculator } from '@/components/sellercloud/ProfitCalculator';
-import { CostPriceManager } from '@/components/sellercloud/CostPriceManager';
-import { AIScannerPro } from '@/components/seller/AIScannerPro';
 import { useMarketplaceConnections } from '@/hooks/useMarketplaceConnections';
 import { useSellerCloudSubscription } from '@/hooks/useSellerCloudSubscription';
 import { useMarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 import { toast } from 'sonner';
+import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Loader2, Globe, Package, ShoppingCart, BarChart3, 
   Scan, Crown, Check, ArrowRight, ArrowDownUp, DollarSign,
   Upload, Bell, FileSpreadsheet, CreditCard, Calculator, AlertTriangle,
   Shield, Copy, AlertOctagon, Wrench, RefreshCw
 } from 'lucide-react';
+
+// Lazy load heavy tab components
+const MarketplaceOAuth = lazy(() => import('@/components/sellercloud/MarketplaceOAuth').then(m => ({ default: m.MarketplaceOAuth })));
+const MarketplaceProducts = lazy(() => import('@/components/sellercloud/MarketplaceProducts').then(m => ({ default: m.MarketplaceProducts })));
+const MarketplaceOrders = lazy(() => import('@/components/sellercloud/MarketplaceOrders').then(m => ({ default: m.MarketplaceOrders })));
+const MarketplaceAnalytics = lazy(() => import('@/components/sellercloud/MarketplaceAnalytics').then(m => ({ default: m.MarketplaceAnalytics })));
+const InventorySync = lazy(() => import('@/components/sellercloud/InventorySync').then(m => ({ default: m.InventorySync })));
+const PriceManager = lazy(() => import('@/components/sellercloud/PriceManager').then(m => ({ default: m.PriceManager })));
+const MultiPublish = lazy(() => import('@/components/sellercloud/MultiPublish').then(m => ({ default: m.MultiPublish })));
+const NotificationCenter = lazy(() => import('@/components/sellercloud/NotificationCenter').then(m => ({ default: m.NotificationCenter })));
+const ReportsExport = lazy(() => import('@/components/sellercloud/ReportsExport').then(m => ({ default: m.ReportsExport })));
+const SubscriptionBilling = lazy(() => import('@/components/sellercloud/SubscriptionBilling').then(m => ({ default: m.SubscriptionBilling })));
+const FinancialDashboard = lazy(() => import('@/components/sellercloud/FinancialDashboard').then(m => ({ default: m.FinancialDashboard })));
+const ABCAnalysis = lazy(() => import('@/components/sellercloud/ABCAnalysis').then(m => ({ default: m.ABCAnalysis })));
+const MinPriceProtection = lazy(() => import('@/components/sellercloud/MinPriceProtection').then(m => ({ default: m.MinPriceProtection })));
+const CardCloner = lazy(() => import('@/components/sellercloud/CardCloner').then(m => ({ default: m.CardCloner })));
+const ProblematicProducts = lazy(() => import('@/components/sellercloud/ProblematicProducts').then(m => ({ default: m.ProblematicProducts })));
+const ProfitCalculator = lazy(() => import('@/components/sellercloud/ProfitCalculator').then(m => ({ default: m.ProfitCalculator })));
+const CostPriceManager = lazy(() => import('@/components/sellercloud/CostPriceManager').then(m => ({ default: m.CostPriceManager })));
+const AIScannerPro = lazy(() => import('@/components/seller/AIScannerPro').then(m => ({ default: m.AIScannerPro })));
+
+const TabLoader = () => <div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
 
 export default function SellerCloudX() {
   const { user, loading: authLoading } = useAuth();
@@ -222,8 +227,8 @@ export default function SellerCloudX() {
               <TabsTrigger value="subscription" className="gap-2"><CreditCard className="h-4 w-4" /><span className="hidden sm:inline">Obuna</span></TabsTrigger>
               <TabsTrigger value="notifications" className="gap-2"><Bell className="h-4 w-4" /><span className="hidden sm:inline">Bildirishnoma</span></TabsTrigger>
             </TabsList>
-            <TabsContent value="subscription"><SubscriptionBilling totalSalesVolume={totalRevenue} /></TabsContent>
-            <TabsContent value="notifications"><NotificationCenter /></TabsContent>
+            <TabsContent value="subscription"><Suspense fallback={<TabLoader />}><SubscriptionBilling totalSalesVolume={totalRevenue} /></Suspense></TabsContent>
+            <TabsContent value="notifications"><Suspense fallback={<TabLoader />}><NotificationCenter /></Suspense></TabsContent>
           </Tabs>
         ) : (
           <Tabs defaultValue="marketplaces" className="space-y-6">
@@ -239,29 +244,39 @@ export default function SellerCloudX() {
             </TabsList>
 
             <TabsContent value="marketplaces">
-              <MarketplaceOAuth connections={connections} isLoading={connectionsLoading} connectMarketplace={connectMarketplace} disconnectMarketplace={disconnectMarketplace} syncMarketplace={syncMarketplace} onConnect={handleMarketplaceConnect} store={store} />
+              <Suspense fallback={<TabLoader />}>
+                <MarketplaceOAuth connections={connections} isLoading={connectionsLoading} connectMarketplace={connectMarketplace} disconnectMarketplace={disconnectMarketplace} syncMarketplace={syncMarketplace} onConnect={handleMarketplaceConnect} store={store} />
+              </Suspense>
             </TabsContent>
             <TabsContent value="scanner">
-              {connectedMarketplaces.length > 0 ? <AIScannerPro shopId="sellercloud" /> : (
-                <Card><CardContent className="py-12 text-center"><Scan className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" /><h3 className="text-lg font-semibold mb-2">AI Scanner Pro</h3><p className="text-muted-foreground mb-4">Avval kamida bitta marketplace ulang</p></CardContent></Card>
-              )}
+              <Suspense fallback={<TabLoader />}>
+                {connectedMarketplaces.length > 0 ? <AIScannerPro shopId="sellercloud" /> : (
+                  <Card><CardContent className="py-12 text-center"><Scan className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" /><h3 className="text-lg font-semibold mb-2">AI Scanner Pro</h3><p className="text-muted-foreground mb-4">Avval kamida bitta marketplace ulang</p></CardContent></Card>
+                )}
+              </Suspense>
             </TabsContent>
-            <TabsContent value="products"><MarketplaceProducts connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
-            <TabsContent value="orders"><MarketplaceOrders connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
+            <TabsContent value="products"><Suspense fallback={<TabLoader />}><MarketplaceProducts connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
+            <TabsContent value="orders"><Suspense fallback={<TabLoader />}><MarketplaceOrders connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
             
             {/* Analytics - sub-tabs */}
             <TabsContent value="analytics">
-              <AnalyticsSubTabs connectedMarketplaces={connectedMarketplaces} store={store} subscription={subscription} totalRevenue={totalRevenue} />
+              <Suspense fallback={<TabLoader />}>
+                <AnalyticsSubTabs connectedMarketplaces={connectedMarketplaces} store={store} subscription={subscription} totalRevenue={totalRevenue} />
+              </Suspense>
             </TabsContent>
 
             {/* Tools - sub-tabs */}
             <TabsContent value="tools">
-              <ToolsSubTabs connectedMarketplaces={connectedMarketplaces} store={store} subscription={subscription} />
+              <Suspense fallback={<TabLoader />}>
+                <ToolsSubTabs connectedMarketplaces={connectedMarketplaces} store={store} subscription={subscription} />
+              </Suspense>
             </TabsContent>
 
             {/* Settings - sub-tabs */}
             <TabsContent value="settings">
-              <SettingsSubTabs totalRevenue={totalRevenue} connectedMarketplaces={connectedMarketplaces} store={store} />
+              <Suspense fallback={<TabLoader />}>
+                <SettingsSubTabs totalRevenue={totalRevenue} connectedMarketplaces={connectedMarketplaces} store={store} />
+              </Suspense>
             </TabsContent>
           </Tabs>
         )}
@@ -284,11 +299,11 @@ function AnalyticsSubTabs({ connectedMarketplaces, store, subscription, totalRev
         <TabsTrigger value="cost-prices" className="text-xs gap-1"><DollarSign className="h-3.5 w-3.5" />Tannarx</TabsTrigger>
         <TabsTrigger value="calculator" className="text-xs gap-1"><Calculator className="h-3.5 w-3.5" />Kalkulyator</TabsTrigger>
       </TabsList>
-      <TabsContent value="overview"><MarketplaceAnalytics connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
-      <TabsContent value="financials"><FinancialDashboard connectedMarketplaces={connectedMarketplaces} store={store} monthlyFee={subscription?.monthly_fee || 499} commissionPercent={subscription?.commission_percent || 4} /></TabsContent>
-      <TabsContent value="abc"><ABCAnalysis connectedMarketplaces={connectedMarketplaces} store={store} commissionPercent={subscription?.commission_percent || 4} /></TabsContent>
-      <TabsContent value="cost-prices"><CostPriceManager connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
-      <TabsContent value="calculator"><ProfitCalculator commissionPercent={subscription?.commission_percent || 4} /></TabsContent>
+      <TabsContent value="overview"><Suspense fallback={<TabLoader />}><MarketplaceAnalytics connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
+      <TabsContent value="financials"><Suspense fallback={<TabLoader />}><FinancialDashboard connectedMarketplaces={connectedMarketplaces} store={store} monthlyFee={subscription?.monthly_fee || 499} commissionPercent={subscription?.commission_percent || 4} /></Suspense></TabsContent>
+      <TabsContent value="abc"><Suspense fallback={<TabLoader />}><ABCAnalysis connectedMarketplaces={connectedMarketplaces} store={store} commissionPercent={subscription?.commission_percent || 4} /></Suspense></TabsContent>
+      <TabsContent value="cost-prices"><Suspense fallback={<TabLoader />}><CostPriceManager connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
+      <TabsContent value="calculator"><Suspense fallback={<TabLoader />}><ProfitCalculator commissionPercent={subscription?.commission_percent || 4} /></Suspense></TabsContent>
     </Tabs>
   );
 }
@@ -306,12 +321,12 @@ function ToolsSubTabs({ connectedMarketplaces, store, subscription }: {
         <TabsTrigger value="clone" className="text-xs gap-1"><Copy className="h-3.5 w-3.5" />Klonlash</TabsTrigger>
         <TabsTrigger value="problems" className="text-xs gap-1"><AlertOctagon className="h-3.5 w-3.5" />Muammolar</TabsTrigger>
       </TabsList>
-      <TabsContent value="inventory"><InventorySync connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
-      <TabsContent value="pricing"><PriceManager connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
-      <TabsContent value="publish"><MultiPublish connectedMarketplaces={connectedMarketplaces} /></TabsContent>
-      <TabsContent value="min-price"><MinPriceProtection connectedMarketplaces={connectedMarketplaces} store={store} commissionPercent={subscription?.commission_percent || 4} /></TabsContent>
-      <TabsContent value="clone"><CardCloner connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
-      <TabsContent value="problems"><ProblematicProducts connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
+      <TabsContent value="inventory"><Suspense fallback={<TabLoader />}><InventorySync connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
+      <TabsContent value="pricing"><Suspense fallback={<TabLoader />}><PriceManager connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
+      <TabsContent value="publish"><Suspense fallback={<TabLoader />}><MultiPublish connectedMarketplaces={connectedMarketplaces} /></Suspense></TabsContent>
+      <TabsContent value="min-price"><Suspense fallback={<TabLoader />}><MinPriceProtection connectedMarketplaces={connectedMarketplaces} store={store} commissionPercent={subscription?.commission_percent || 4} /></Suspense></TabsContent>
+      <TabsContent value="clone"><Suspense fallback={<TabLoader />}><CardCloner connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
+      <TabsContent value="problems"><Suspense fallback={<TabLoader />}><ProblematicProducts connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
     </Tabs>
   );
 }
@@ -326,9 +341,9 @@ function SettingsSubTabs({ totalRevenue, connectedMarketplaces, store }: {
         <TabsTrigger value="reports" className="text-xs gap-1"><FileSpreadsheet className="h-3.5 w-3.5" />Hisobotlar</TabsTrigger>
         <TabsTrigger value="notifications" className="text-xs gap-1"><Bell className="h-3.5 w-3.5" />Bildirishnoma</TabsTrigger>
       </TabsList>
-      <TabsContent value="subscription"><SubscriptionBilling totalSalesVolume={totalRevenue} /></TabsContent>
-      <TabsContent value="reports"><ReportsExport connectedMarketplaces={connectedMarketplaces} store={store} /></TabsContent>
-      <TabsContent value="notifications"><NotificationCenter /></TabsContent>
+      <TabsContent value="subscription"><Suspense fallback={<TabLoader />}><SubscriptionBilling totalSalesVolume={totalRevenue} /></Suspense></TabsContent>
+      <TabsContent value="reports"><Suspense fallback={<TabLoader />}><ReportsExport connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
+      <TabsContent value="notifications"><Suspense fallback={<TabLoader />}><NotificationCenter /></Suspense></TabsContent>
     </Tabs>
   );
 }
