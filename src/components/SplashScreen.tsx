@@ -1,28 +1,40 @@
 import { useState, useEffect } from 'react';
-import { Rocket } from 'lucide-react';
+import sellerCloudXLogo from '@/assets/logos/sellercloudx-logo.png';
+import uzumLogo from '@/assets/logos/uzum-market.png';
+import magnitLogo from '@/assets/logos/magnit.png';
+import wbLogo from '@/assets/logos/wildberries.jpg';
+import ozonLogo from '@/assets/logos/ozon.png';
 
 interface SplashScreenProps {
   onComplete: () => void;
   duration?: number;
 }
 
-export function SplashScreen({ onComplete, duration = 2500 }: SplashScreenProps) {
-  const [phase, setPhase] = useState<'logo' | 'bars' | 'exit'>('logo');
-  const [progress, setProgress] = useState(0);
+const marketplaces = [
+  { src: uzumLogo, name: 'Uzum Market' },
+  { src: magnitLogo, name: 'Magnit' },
+  { src: wbLogo, name: 'Wildberries' },
+  { src: ozonLogo, name: 'Ozon' },
+];
+
+export function SplashScreen({ onComplete, duration = 3000 }: SplashScreenProps) {
+  const [phase, setPhase] = useState<'logo' | 'marketplaces' | 'exit'>('logo');
+  const [visibleLogos, setVisibleLogos] = useState(0);
 
   useEffect(() => {
-    // Phase 1: Logo appears (0-800ms)
-    const t1 = setTimeout(() => setPhase('bars'), 800);
-    
-    // Phase 2: Progress bars animate (800-2000ms)
-    const interval = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 100) { clearInterval(interval); return 100; }
-        return prev + 3;
-      });
-    }, 30);
+    // Phase 1: Main logo appears (0-600ms)
+    const t1 = setTimeout(() => {
+      setPhase('marketplaces');
+      // Show marketplace logos one by one
+      let count = 0;
+      const logoInterval = setInterval(() => {
+        count++;
+        setVisibleLogos(count);
+        if (count >= 4) clearInterval(logoInterval);
+      }, 350);
+    }, 600);
 
-    // Phase 3: Exit animation
+    // Phase 2: Exit
     const t2 = setTimeout(() => setPhase('exit'), duration - 400);
     const t3 = setTimeout(onComplete, duration);
 
@@ -30,75 +42,59 @@ export function SplashScreen({ onComplete, duration = 2500 }: SplashScreenProps)
       clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
-      clearInterval(interval);
     };
   }, [duration, onComplete]);
 
   return (
-    <div className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-background transition-all duration-400 ${
+    <div className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-background transition-all duration-500 ${
       phase === 'exit' ? 'opacity-0 scale-105' : 'opacity-100 scale-100'
     }`}>
       {/* Background glow */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-primary/5 blur-3xl animate-pulse" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-primary/5 blur-3xl animate-pulse" />
       </div>
 
-      {/* Logo */}
-      <div className={`relative flex flex-col items-center gap-4 transition-all duration-700 ${
-        phase === 'logo' ? 'animate-scale-in' : ''
+      {/* SellerCloudX Logo */}
+      <div className={`relative flex flex-col items-center gap-3 transition-all duration-700 ${
+        phase === 'logo' ? 'animate-scale-up' : ''
       }`}>
-        <div className="relative">
-          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-lg shadow-primary/20">
-            <Rocket className="h-10 w-10 text-primary-foreground" />
-          </div>
-          {/* Ring pulse */}
-          <div className="absolute inset-0 rounded-2xl border-2 border-primary/30 animate-ping" style={{ animationDuration: '1.5s' }} />
-        </div>
-        
-        <h1 className="text-2xl font-bold tracking-tight">
+        <img
+          src={sellerCloudXLogo}
+          alt="SellerCloudX"
+          className="w-24 h-24 rounded-2xl shadow-lg shadow-primary/20 object-cover"
+        />
+        <h1 className="text-2xl font-bold tracking-tight font-display">
           <span className="text-primary">Seller</span>
           <span className="text-foreground">CloudX</span>
         </h1>
       </div>
 
-      {/* Loading bars */}
-      <div className={`mt-10 w-64 space-y-3 transition-all duration-500 ${
-        phase === 'bars' || phase === 'exit' ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+      {/* Marketplace Logos */}
+      <div className="mt-10 flex items-center gap-4">
+        {marketplaces.map((mp, i) => (
+          <div
+            key={mp.name}
+            className={`transition-all duration-500 ${
+              i < visibleLogos
+                ? 'opacity-100 scale-100 translate-y-0'
+                : 'opacity-0 scale-75 translate-y-4'
+            }`}
+          >
+            <img
+              src={mp.src}
+              alt={mp.name}
+              className="w-14 h-14 rounded-xl object-cover shadow-md"
+            />
+          </div>
+        ))}
+      </div>
+
+      {/* Text */}
+      <p className={`mt-6 text-sm text-muted-foreground transition-all duration-500 ${
+        visibleLogos >= 4 ? 'opacity-100' : 'opacity-0'
       }`}>
-        <LoadingBar label="Ma'lumotlar" progress={Math.min(progress * 1.3, 100)} delay={0} />
-        <LoadingBar label="Marketplace" progress={Math.min(progress * 1.1, 100)} delay={100} />
-        <LoadingBar label="Analitika" progress={Math.min(progress * 0.9, 100)} delay={200} />
-        
-        <p className="text-xs text-muted-foreground text-center mt-4 animate-pulse">
-          Tizim yuklanmoqda...
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function LoadingBar({ label, progress, delay }: { label: string; progress: number; delay: number }) {
-  const [show, setShow] = useState(false);
-  
-  useEffect(() => {
-    const t = setTimeout(() => setShow(true), delay);
-    return () => clearTimeout(t);
-  }, [delay]);
-
-  if (!show) return <div className="h-6" />;
-
-  return (
-    <div className="space-y-1 animate-fade-in">
-      <div className="flex justify-between text-xs">
-        <span className="text-muted-foreground font-medium">{label}</span>
-        <span className="text-primary font-mono">{Math.round(progress)}%</span>
-      </div>
-      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-        <div 
-          className="h-full rounded-full bg-gradient-to-r from-primary to-primary/60 transition-all duration-300 ease-out"
-          style={{ width: `${progress}%` }}
-        />
-      </div>
+        Barcha marketplace — bir joyda
+      </p>
     </div>
   );
 }
