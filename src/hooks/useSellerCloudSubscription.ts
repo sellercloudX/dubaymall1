@@ -15,6 +15,10 @@ interface SellerCloudSubscription {
   expires_at: string | null;
   admin_override: boolean;
   admin_notes: string | null;
+  activated_until: string | null;
+  activated_by: string | null;
+  contract_duration_months: number | null;
+  free_access: boolean;
   created_at: string;
   updated_at: string;
 }

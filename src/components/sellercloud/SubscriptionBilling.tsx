@@ -74,20 +74,31 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
    };
  
    const handlePaymentSuccess = async () => {
-     // Update subscription as payment completed
-     if (subscription) {
-       await supabase
-         .from('sellercloud_subscriptions')
-         .update({
-           initial_payment_completed: true,
-           initial_payment_at: new Date().toISOString(),
-           terms_accepted: true,
-           terms_accepted_at: new Date().toISOString(),
-         })
-         .eq('id', subscription.id);
-     }
+     if (!subscription) return;
      
-     toast.success('To\'lov muvaffaqiyatli! Akkountingiz aktivlashtirildi.');
+     // Calculate how many months this payment covers
+     const monthlyFeeUZS = subscription.monthly_fee * USD_TO_UZS;
+     const paymentAmount = selectedPlan === 'pro' ? 499 * USD_TO_UZS : 999 * USD_TO_UZS;
+     const months = Math.max(1, Math.floor(paymentAmount / monthlyFeeUZS));
+     
+     // Auto-activate for the paid duration
+     await supabase.rpc('activate_subscription_by_payment', {
+       p_subscription_id: subscription.id,
+       p_months: months,
+     });
+
+     // Also mark payment details
+     await supabase
+       .from('sellercloud_subscriptions')
+       .update({
+         initial_payment_completed: true,
+         initial_payment_at: new Date().toISOString(),
+         terms_accepted: true,
+         terms_accepted_at: new Date().toISOString(),
+       })
+       .eq('id', subscription.id);
+     
+     toast.success(`To'lov muvaffaqiyatli! ${months} oyga aktivlashtirildi.`);
      refetch();
   };
 
@@ -323,13 +334,22 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
             <div className="p-4 rounded-lg bg-muted/50">
               <div className="text-sm text-muted-foreground flex items-center gap-2">
                 <Calendar className="h-4 w-4" />
-                Boshlanish
+                {(subscription as any).activated_until ? 'Faol muddat' : 'Boshlanish'}
               </div>
-              <div className="text-xl font-bold mt-1">{format(new Date(subscription.started_at), 'dd.MM.yy')}</div>
+              <div className="text-xl font-bold mt-1">
+                {(subscription as any).activated_until 
+                  ? format(new Date((subscription as any).activated_until), 'dd.MM.yy')
+                  : format(new Date(subscription.started_at), 'dd.MM.yy')
+                }
+              </div>
               <div className="text-xs text-muted-foreground">
-                {subscription.is_trial && subscription.trial_ends_at && (
+                {(subscription as any).activated_until ? (
+                  new Date((subscription as any).activated_until) > new Date() 
+                    ? `${Math.ceil((new Date((subscription as any).activated_until).getTime() - Date.now()) / (1000 * 60 * 60 * 24))} kun qoldi`
+                    : 'Muddati tugagan'
+                ) : subscription.is_trial && subscription.trial_ends_at ? (
                   <>Sinov: {format(new Date(subscription.trial_ends_at), 'dd.MM.yy')}</>
-                )}
+                ) : null}
               </div>
             </div>
             <div className="p-4 rounded-lg bg-accent/50 border border-accent">
