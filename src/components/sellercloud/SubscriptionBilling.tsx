@@ -429,7 +429,7 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
                   >
                     <span className="text-sm font-medium">3 oy</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground line-through">{formatPrice(monthlyFeeUZS * 3)}</span>
+                      <span className="text-xs text-foreground/60 line-through">{formatPrice(monthlyFeeUZS * 3)}</span>
                       <span className="font-bold text-sm text-primary">{formatPrice(Math.round(monthlyFeeUZS * 3 * 0.9))}</span>
                     </div>
                   </Button>
@@ -447,7 +447,7 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
                   >
                     <span className="text-sm font-medium">6 oy</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground line-through">{formatPrice(monthlyFeeUZS * 6)}</span>
+                      <span className="text-xs text-foreground/60 line-through">{formatPrice(monthlyFeeUZS * 6)}</span>
                       <span className="font-bold text-sm">{formatPrice(Math.round(monthlyFeeUZS * 6 * 0.85))}</span>
                     </div>
                   </Button>
