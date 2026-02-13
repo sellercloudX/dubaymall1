@@ -1154,17 +1154,28 @@ serve(async (req) => {
                   break;
                 }
 
-                // Log first product's SKU structure for debugging stock
+                // Log first product's full structure for debugging photos and stock
                 if (currentPage === 0 && allProducts.length === 0 && items.length > 0) {
                   const s = items[0];
+                  console.log(`Uzum product[0] top-level keys: ${Object.keys(s).join(', ')}`);
+                  console.log(`Uzum product[0] title: ${s.title || s.name}`);
+                  // Log photo-related fields
+                  if (s.photos) console.log(`Uzum product[0].photos: ${JSON.stringify(s.photos).substring(0, 500)}`);
+                  if (s.images) console.log(`Uzum product[0].images: ${JSON.stringify(s.images).substring(0, 500)}`);
+                  if (s.photo) console.log(`Uzum product[0].photo: ${JSON.stringify(s.photo).substring(0, 300)}`);
+                  if (s.photoUrl) console.log(`Uzum product[0].photoUrl: ${s.photoUrl}`);
+                  if (s.mainPhoto) console.log(`Uzum product[0].mainPhoto: ${JSON.stringify(s.mainPhoto).substring(0, 300)}`);
+                  if (s.previewImage) console.log(`Uzum product[0].previewImage: ${s.previewImage}`);
                   const skuSample = (s.skuList || s.skus || [])[0];
                   if (skuSample) {
                     console.log(`Uzum SKU keys: ${Object.keys(skuSample).join(', ')}`);
-                    const amts = skuSample.skuAmountList || skuSample.amounts || [];
-                    console.log(`Uzum SKU amounts: ${JSON.stringify(amts).substring(0, 300)}`);
+                    if (skuSample.photo) console.log(`Uzum SKU photo: ${JSON.stringify(skuSample.photo).substring(0, 300)}`);
+                    if (skuSample.previewImage) console.log(`Uzum SKU previewImage: ${skuSample.previewImage}`);
+                    if (skuSample.photoUrl) console.log(`Uzum SKU photoUrl: ${skuSample.photoUrl}`);
+                    if (skuSample.image) console.log(`Uzum SKU image: ${JSON.stringify(skuSample.image).substring(0, 300)}`);
                   }
                 }
-                
+
                 const products = items.map((card: any) => {
                   const skus = card.skuList || card.skus || [];
                   const firstSku = skus[0] || {};
@@ -1174,11 +1185,8 @@ serve(async (req) => {
                   let fboStock = 0;
                   let fbsStock = 0;
                   skus.forEach((sku: any) => {
-                    // Direct quantity fields from Uzum API
                     fboStock += (sku.quantityActive || 0);
                     fbsStock += (sku.quantityFbs || 0);
-                    
-                    // Also check skuAmountList as fallback
                     const amounts = sku.skuAmountList || sku.amounts || [];
                     if (amounts.length > 0) {
                       amounts.forEach((a: any) => {
@@ -1188,29 +1196,44 @@ serve(async (req) => {
                     }
                   });
                   
-                  // Also check FBS stock map from dedicated endpoint
                   const skuId = String(firstSku.skuId || '');
                   if (fbsStockMap[skuId]) {
                     fbsStock = Math.max(fbsStock, fbsStockMap[skuId]);
                   }
                   
-                  // Extract photos from multiple sources: card.photos, sku.photo, sku.previewImage
-                  const cardPhotos = card.photos || card.images || [];
-                  let pictures = cardPhotos
-                    .map((p: any) => p.photo?.url || p.url || (typeof p === 'string' ? p : null))
-                    .filter(Boolean);
+                  // Extract photos from ALL possible sources
+                  const UZUM_CDN_BASE = 'https://images.uzum.uz';
+                  let pictures: string[] = [];
                   
-                  // If no card-level photos, try SKU-level photos
-                  if (pictures.length === 0) {
-                    skus.forEach((sku: any) => {
-                      if (sku.previewImage && typeof sku.previewImage === 'string') {
-                        pictures.push(sku.previewImage);
-                      } else if (sku.photo) {
-                        const photoUrl = sku.photo?.url || sku.photo?.photo?.url || (typeof sku.photo === 'string' ? sku.photo : null);
-                        if (photoUrl) pictures.push(photoUrl);
-                      }
+                  // 1. Card-level photos
+                  const cardPhotos = card.photos || card.images || [];
+                  if (Array.isArray(cardPhotos)) {
+                    cardPhotos.forEach((p: any) => {
+                      const url = p.photo?.url || p.url || p.photoUrl || (typeof p === 'string' ? p : null);
+                      if (url) pictures.push(url);
                     });
                   }
+                  
+                  // 2. Card-level single photo fields
+                  if (pictures.length === 0) {
+                    const directPhoto = card.photoUrl || card.previewImage || card.mainPhoto?.url || card.photo?.url || (typeof card.photo === 'string' ? card.photo : null);
+                    if (directPhoto) pictures.push(directPhoto);
+                  }
+                  
+                  // 3. SKU-level photos
+                  if (pictures.length === 0) {
+                    skus.forEach((sku: any) => {
+                      const skuPhoto = sku.previewImage || sku.photoUrl || sku.photo?.url || sku.photo?.photo?.url || sku.image?.url || (typeof sku.photo === 'string' ? sku.photo : null) || (typeof sku.image === 'string' ? sku.image : null);
+                      if (skuPhoto && !pictures.includes(skuPhoto)) pictures.push(skuPhoto);
+                    });
+                  }
+                  
+                  // 4. Ensure full URLs — Uzum may return relative paths
+                  pictures = pictures.map(url => {
+                    if (url.startsWith('http')) return url;
+                    if (url.startsWith('/')) return `${UZUM_CDN_BASE}${url}`;
+                    return `${UZUM_CDN_BASE}/${url}`;
+                  });
 
                   return {
                     offerId: String(card.productId || card.id || firstSku.skuId || ''),

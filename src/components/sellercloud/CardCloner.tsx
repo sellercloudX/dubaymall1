@@ -254,10 +254,10 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
         return true;
       }
       
-      // For Uzum and other marketplaces: not yet supported for card creation
-      // TODO: Implement uzum-market-create-card when ready
-      console.warn(`⚠️ Card creation for ${targetMp} not yet supported, skipping`);
-      toast.warning(`${MARKETPLACE_INFO[targetMp]?.name || targetMp}: kartochka yaratish hali mavjud emas`);
+      // Uzum Market API does NOT have product creation endpoints
+      // Only read products, update prices/stocks, and manage orders are available
+      console.warn(`⚠️ ${targetMp} API does not support card creation`);
+      toast.error(`${MARKETPLACE_INFO[targetMp]?.name || targetMp}: API kartochka yaratishni qo'llab-quvvatlamaydi. Faqat narx va qoldiq yangilash mumkin.`);
       return false;
     } catch (err: any) {
       console.error(`Clone to ${targetMp} failed:`, err?.message || err);
