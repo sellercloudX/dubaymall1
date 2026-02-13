@@ -1002,8 +1002,13 @@ serve(async (req) => {
     } else if (marketplace === "uzum") {
       // ========== UZUM MARKET SELLER OPENAPI ==========
       const uzumBaseUrl = "https://api-seller.uzum.uz/api/seller-openapi";
-      const uzumHeaders = {
-        "Authorization": `Bearer ${apiKey}`,
+      
+      // Debug: log key info for troubleshooting
+      console.log(`Uzum: apiKey length=${apiKey?.length}, first8=${apiKey?.substring(0, 8)}, last4=${apiKey?.substring(apiKey.length - 4)}`);
+      
+      // Uzum OpenAPI uses raw API key without prefix (not Bearer, not Token)
+      const uzumHeaders: Record<string, string> = {
+        "Authorization": apiKey,
         "Accept": "application/json",
       };
       
@@ -1016,34 +1021,50 @@ serve(async (req) => {
       try {
         console.log(`Uzum: discovering shopId from /v1/shops...`);
         const shopsResp = await fetch(`${uzumBaseUrl}/v1/shops`, { headers: uzumHeaders });
+        
         if (shopsResp.ok) {
           const shopsData = await shopsResp.json();
-          // API returns array directly per Swagger spec, NOT wrapped in payload
           const shops = Array.isArray(shopsData) ? shopsData : (shopsData.payload || shopsData.data || shopsData || []);
           const shopList = Array.isArray(shops) ? shops : [shops];
+          console.log(`Uzum: /v1/shops returned ${shopList.length} shops`);
+          
+          // Log all available shops for debugging
+          shopList.forEach((s: any, i: number) => {
+            console.log(`Uzum shop[${i}]: id=${s.shopId || s.id}, title=${s.shopTitle || s.title || s.name}`);
+          });
+          
           if (shopList.length > 0) {
-            const realShopId = shopList[0].shopId || shopList[0].id;
-            if (realShopId && String(realShopId) !== String(uzumShopId)) {
-              console.log(`Uzum: discovered real shopId=${realShopId} (was ${uzumShopId})`);
+            // Use sellerId to find matching shop, or fall back to first shop
+            let matchedShop = shopList[0];
+            if (uzumShopId) {
+              const found = shopList.find((s: any) => 
+                String(s.shopId || s.id) === String(uzumShopId) || 
+                String(s.sellerId) === String(uzumShopId)
+              );
+              if (found) matchedShop = found;
+            }
+            
+            const realShopId = matchedShop.shopId || matchedShop.id;
+            if (realShopId) {
+              console.log(`Uzum: using shopId=${realShopId}`);
               uzumShopId = String(realShopId);
-              // Update account_info in DB with correct shopId
               await supabase
                 .from("marketplace_connections")
                 .update({ 
                   account_info: { 
                     ...(connection.account_info as any),
                     shopId: uzumShopId,
-                    storeName: shopList[0].shopTitle || shopList[0].title || shopList[0].name || "Uzum Market Store",
+                    storeName: matchedShop.shopTitle || matchedShop.title || matchedShop.name || "Uzum Market Store",
                     state: "CONNECTED",
+                    allShops: shopList.map((s: any) => ({ id: s.shopId || s.id, title: s.shopTitle || s.title || s.name })),
                   }
                 })
                 .eq("id", connection.id);
-            } else {
-              console.log(`Uzum: shopId confirmed: ${uzumShopId}`);
             }
           }
         } else {
-          console.log(`Uzum /v1/shops returned ${shopsResp.status}: ${await shopsResp.text()}`);
+          const errText = await shopsResp.text();
+          console.error(`Uzum /v1/shops failed (${shopsResp.status}): ${errText}`);
         }
       } catch (e) {
         console.error("Uzum shops discovery error:", e);

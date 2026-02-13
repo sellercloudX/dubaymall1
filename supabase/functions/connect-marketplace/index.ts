@@ -185,7 +185,7 @@ serve(async (req) => {
       console.log("Validating Uzum Market Seller API...");
       const uzumBaseUrl = "https://api-seller.uzum.uz/api/seller-openapi";
       const uzumHeaders = {
-        "Authorization": `Bearer ${apiKey}`,
+        "Authorization": apiKey,
         "Accept": "application/json",
       };
 
