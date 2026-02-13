@@ -16,6 +16,7 @@ import {
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useCostPrices } from '@/hooks/useCostPrices';
 import { useMarketplaceTariffs, getTariffForProduct } from '@/hooks/useMarketplaceTariffs';
+import { DateRangeFilter, getPresetDates, type DatePreset } from './DateRangeFilter';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 
 interface ABCAnalysisProps {
@@ -45,6 +46,9 @@ const ABC_COLORS = {
 
 export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 4 }: ABCAnalysisProps) {
   const [selectedGroup, setSelectedGroup] = useState<'all' | 'A' | 'B' | 'C'>('all');
+  const [datePreset, setDatePreset] = useState<DatePreset>('30d');
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(getPresetDates('30d').from);
+  const [dateTo, setDateTo] = useState<Date | undefined>(getPresetDates('30d').to);
   const isMobile = useIsMobile();
   const isLoading = store.isLoading;
   const { getCostPrice } = useCostPrices();
@@ -58,9 +62,17 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
       const productsList = store.getProducts(marketplace);
       const orders = store.getOrders(marketplace);
 
-      // Build sales map from real order items only
+      // Build sales map from real order items only — filtered by date
       const salesMap = new Map<string, { qty: number; revenue: number }>();
-      const activeOrders = orders.filter(o => !['CANCELLED', 'RETURNED'].includes(o.status));
+      const activeOrders = orders.filter(o => {
+        if (['CANCELLED', 'RETURNED'].includes(o.status)) return false;
+        if (dateFrom || dateTo) {
+          const orderDate = new Date(o.createdAt);
+          if (dateFrom && orderDate < dateFrom) return false;
+          if (dateTo && orderDate > dateTo) return false;
+        }
+        return true;
+      });
       activeOrders.forEach(order => {
         (order.items || []).forEach(item => {
           const key = item.offerId;
@@ -117,7 +129,7 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
     });
 
     return allProducts;
-  }, [connectedMarketplaces, store.dataVersion, isLoading, commissionPercent, tariffUpdatedAt]);
+  }, [connectedMarketplaces, store.dataVersion, isLoading, commissionPercent, tariffUpdatedAt, dateFrom, dateTo]);
 
   const formatPrice = (price: number) => {
     if (Math.abs(price) >= 1000000) return (price / 1000000).toFixed(1) + ' mln';
@@ -150,6 +162,14 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
 
   return (
     <div className="space-y-4 overflow-hidden">
+      {/* Date Range Filter */}
+      <DateRangeFilter
+        from={dateFrom}
+        to={dateTo}
+        activePreset={datePreset}
+        onRangeChange={(f, t, p) => { setDateFrom(f); setDateTo(t); setDatePreset(p); }}
+      />
+
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20 overflow-hidden">
