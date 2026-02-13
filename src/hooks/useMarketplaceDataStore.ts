@@ -41,6 +41,30 @@ export interface MarketplaceOrder {
   }>;
 }
 
+export interface InventoryReconciliation {
+  skuId: string;
+  invoiced: number;
+  sold: number;
+  currentStock: number;
+  returned: number;
+  lost: number;
+  reconciled: boolean;
+}
+
+// Helper function to fetch inventory reconciliation for Uzum
+export async function fetchUzumInventoryReconciliation(marketplace: string) {
+  return marketplaceQueue.add(
+    async () => {
+      const { data, error } = await supabase.functions.invoke('fetch-marketplace-data', {
+        body: { marketplace, dataType: 'inventory-reconciliation' },
+      });
+      if (error) throw error;
+      return data;
+    },
+    { id: `${marketplace}-reconciliation`, priority: 3 }
+  );
+}
+
 // Shared fetch function
 async function fetchMarketplaceDataFn(
   marketplace: string,

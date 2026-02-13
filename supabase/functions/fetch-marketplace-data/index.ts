@@ -1176,6 +1176,297 @@ serve(async (req) => {
           console.error("Uzum stock update error:", e);
           result = { success: false, error: "Stock update error" };
         }
+
+      } else if (dataType === "invoices") {
+        // GET /v1/shop/{shopId}/invoice/products - fetch all delivered goods
+        try {
+          if (!uzumShopId) {
+            result = { success: false, error: "Shop ID required for Uzum invoices" };
+          } else {
+            let allInvoiceItems: any[] = [];
+            let page = 0;
+            let hasMore = true;
+            const pageSize = 100;
+
+            while (hasMore) {
+              const params = new URLSearchParams({
+                size: String(pageSize),
+                page: String(page),
+              });
+
+              console.log(`Uzum invoices page ${page}`);
+
+              const response = await fetch(
+                `${uzumBaseUrl}/v1/shop/${uzumShopId}/invoice/products?${params.toString()}`,
+                { headers: uzumHeaders }
+              );
+
+              if (!response.ok) {
+                const errText = await response.text();
+                console.error("Uzum invoices error:", response.status, errText);
+                break;
+              }
+
+              const data = await response.json();
+              const items = data.payload?.items || data.payload || [];
+              const itemList = Array.isArray(items) ? items : [];
+
+              console.log(`Uzum invoices page ${page}: ${itemList.length} items`);
+
+              const mapped = itemList.map((item: any) => ({
+                offerId: String(item.skuId || item.productId || ''),
+                skuId: String(item.skuId || ''),
+                invoiceId: item.invoiceId || '',
+                quantity: item.quantity || item.amount || 0,
+                receivedQuantity: item.receivedQuantity || item.receivedAmount || 0,
+                invoicedAt: item.invoicedAt || item.createdAt || new Date().toISOString(),
+              }));
+
+              allInvoiceItems = [...allInvoiceItems, ...mapped];
+
+              if (itemList.length < pageSize || !fetchAll) {
+                hasMore = false;
+              } else {
+                page++;
+                await sleep(300);
+              }
+            }
+
+            // Group by SKU and sum quantities
+            const invoiceMap = new Map<string, any>();
+            allInvoiceItems.forEach(item => {
+              const key = item.skuId || item.offerId;
+              const existing = invoiceMap.get(key) || { 
+                offerId: item.offerId,
+                skuId: item.skuId,
+                totalInvoiced: 0,
+                totalReceived: 0,
+                invoices: []
+              };
+              existing.totalInvoiced += item.quantity || 0;
+              existing.totalReceived += item.receivedQuantity || 0;
+              existing.invoices.push(item);
+              invoiceMap.set(key, existing);
+            });
+
+            result = {
+              success: true,
+              data: Array.from(invoiceMap.values()),
+              total: invoiceMap.size,
+            };
+          }
+        } catch (e) {
+          console.error("Uzum invoices error:", e);
+          result = { success: false, error: "Uzum invoices fetch error" };
+        }
+
+      } else if (dataType === "returns") {
+        // GET /v1/shop/{shopId}/return/{returnId} - fetch all returns
+        try {
+          if (!uzumShopId) {
+            result = { success: false, error: "Shop ID required for Uzum returns" };
+          } else {
+            let allReturns: any[] = [];
+            let page = 0;
+            let hasMore = true;
+            const pageSize = 100;
+
+            while (hasMore) {
+              const params = new URLSearchParams({
+                size: String(pageSize),
+                page: String(page),
+              });
+
+              console.log(`Uzum returns page ${page}`);
+
+              const response = await fetch(
+                `${uzumBaseUrl}/v1/shop/${uzumShopId}/returns?${params.toString()}`,
+                { headers: uzumHeaders }
+              );
+
+              if (!response.ok) {
+                const errText = await response.text();
+                console.error("Uzum returns error:", response.status, errText);
+                break;
+              }
+
+              const data = await response.json();
+              const items = data.payload?.items || data.payload || [];
+              const itemList = Array.isArray(items) ? items : [];
+
+              console.log(`Uzum returns page ${page}: ${itemList.length} returns`);
+
+              const mapped = itemList.map((item: any) => ({
+                returnId: item.returnId || item.id || '',
+                offerId: String(item.skuId || item.productId || ''),
+                skuId: String(item.skuId || ''),
+                quantity: item.quantity || item.amount || 1,
+                status: item.status || 'PENDING',
+                reason: item.reason || '',
+                returnedAt: item.returnedAt || item.createdAt || new Date().toISOString(),
+              }));
+
+              allReturns = [...allReturns, ...mapped];
+
+              if (itemList.length < pageSize || !fetchAll) {
+                hasMore = false;
+              } else {
+                page++;
+                await sleep(300);
+              }
+            }
+
+            // Group by SKU
+            const returnMap = new Map<string, any>();
+            allReturns.forEach(ret => {
+              const key = ret.skuId || ret.offerId;
+              const existing = returnMap.get(key) || {
+                offerId: ret.offerId,
+                skuId: ret.skuId,
+                totalReturned: 0,
+                returns: []
+              };
+              existing.totalReturned += ret.quantity || 0;
+              existing.returns.push(ret);
+              returnMap.set(key, existing);
+            });
+
+            result = {
+              success: true,
+              data: Array.from(returnMap.values()),
+              total: returnMap.size,
+            };
+          }
+        } catch (e) {
+          console.error("Uzum returns error:", e);
+          result = { success: false, error: "Uzum returns fetch error" };
+        }
+
+      } else if (dataType === "inventory-reconciliation") {
+        // Calculate LOST = INVOICED - SOLD - STOCK - RETURNED
+        try {
+          if (!uzumShopId) {
+            result = { success: false, error: "Shop ID required for reconciliation" };
+          } else {
+            // Fetch all required data in parallel
+            const [invoicesRes, ordersRes, stocksRes, returnsRes] = await Promise.all([
+              fetch(
+                `${uzumBaseUrl}/v1/shop/${uzumShopId}/invoice/products`,
+                { headers: uzumHeaders }
+              ),
+              fetch(
+                `${uzumBaseUrl}/v2/fbs/orders`,
+                { headers: uzumHeaders }
+              ),
+              fetch(
+                `${uzumBaseUrl}/v2/fbs/sku/stocks`,
+                { headers: uzumHeaders }
+              ),
+              fetch(
+                `${uzumBaseUrl}/v1/shop/${uzumShopId}/returns`,
+                { headers: uzumHeaders }
+              ),
+            ]);
+
+            // Parse invoices
+            let invoiceMap = new Map<string, number>();
+            if (invoicesRes.ok) {
+              const invoicesData = await invoicesRes.json();
+              const items = invoicesData.payload?.items || [];
+              items.forEach((item: any) => {
+                const key = String(item.skuId || item.productId || '');
+                invoiceMap.set(key, (invoiceMap.get(key) || 0) + (item.quantity || 0));
+              });
+            }
+
+            // Parse sold orders
+            let soldMap = new Map<string, number>();
+            if (ordersRes.ok) {
+              const ordersData = await ordersRes.json();
+              const orders = ordersData.payload?.sellerOrders || ordersData.payload?.fbsOrders || [];
+              orders.forEach((order: any) => {
+                const items = order.items || [];
+                items.forEach((item: any) => {
+                  const key = String(item.skuId || item.productId || '');
+                  const qty = item.quantity || item.count || 1;
+                  // Only count delivered/completed orders
+                  if (['DELIVERED', 'COMPLETED'].includes(order.status)) {
+                    soldMap.set(key, (soldMap.get(key) || 0) + qty);
+                  }
+                });
+              });
+            }
+
+            // Parse current stock
+            let stockMap = new Map<string, number>();
+            if (stocksRes.ok) {
+              const stocksData = await stocksRes.json();
+              const stocks = stocksData.payload || [];
+              stocks.forEach((s: any) => {
+                const key = String(s.skuId || s.productId || '');
+                stockMap.set(key, s.amount || s.available || 0);
+              });
+            }
+
+            // Parse returns
+            let returnMap = new Map<string, number>();
+            if (returnsRes.ok) {
+              const returnsData = await returnsRes.json();
+              const returns = returnsData.payload?.items || [];
+              returns.forEach((ret: any) => {
+                const key = String(ret.skuId || ret.productId || '');
+                const qty = ret.quantity || 1;
+                // Only count accepted returns
+                if (['ACCEPTED', 'COMPLETED'].includes(ret.status)) {
+                  returnMap.set(key, (returnMap.get(key) || 0) + qty);
+                }
+              });
+            }
+
+            // Calculate loss for each SKU: LOST = INVOICED - SOLD - STOCK - RETURNED
+            const allSkus = new Set([
+              ...invoiceMap.keys(),
+              ...soldMap.keys(),
+              ...stockMap.keys(),
+              ...returnMap.keys(),
+            ]);
+
+            const reconciliation = Array.from(allSkus).map(skuId => {
+              const invoiced = invoiceMap.get(skuId) || 0;
+              const sold = soldMap.get(skuId) || 0;
+              const stock = stockMap.get(skuId) || 0;
+              const returned = returnMap.get(skuId) || 0;
+              const lost = Math.max(0, invoiced - sold - stock - returned);
+
+              return {
+                skuId,
+                invoiced,
+                sold,
+                currentStock: stock,
+                returned,
+                lost,
+                reconciled: invoiced === (sold + stock + returned + lost),
+              };
+            }).filter(item => item.invoiced > 0 || item.lost > 0) // Show only items with activity
+            .sort((a, b) => b.lost - a.lost); // Sort by loss descending
+
+            result = {
+              success: true,
+              data: reconciliation,
+              summary: {
+                totalInvoiced: Array.from(invoiceMap.values()).reduce((a, b) => a + b, 0),
+                totalSold: Array.from(soldMap.values()).reduce((a, b) => a + b, 0),
+                totalStock: Array.from(stockMap.values()).reduce((a, b) => a + b, 0),
+                totalReturned: Array.from(returnMap.values()).reduce((a, b) => a + b, 0),
+                totalLost: reconciliation.reduce((sum, item) => sum + item.lost, 0),
+              },
+              total: reconciliation.length,
+            };
+          }
+        } catch (e) {
+          console.error("Inventory reconciliation error:", e);
+          result = { success: false, error: "Inventory reconciliation error" };
+        }
       }
 
       // Update connection with latest sync time
