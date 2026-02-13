@@ -48,6 +48,7 @@ export default function SellerCloudX() {
     connections, 
     isLoading: connectionsLoading, 
     connectMarketplace,
+    disconnectMarketplace,
     syncMarketplace,
     fetchMarketplaceData,
     refetch
@@ -231,7 +232,7 @@ export default function SellerCloudX() {
             </TabsList>
 
             <TabsContent value="marketplaces">
-              <MarketplaceOAuth connections={connections} isLoading={connectionsLoading} connectMarketplace={connectMarketplace} syncMarketplace={syncMarketplace} onConnect={handleMarketplaceConnect} store={store} />
+              <MarketplaceOAuth connections={connections} isLoading={connectionsLoading} connectMarketplace={connectMarketplace} disconnectMarketplace={disconnectMarketplace} syncMarketplace={syncMarketplace} onConnect={handleMarketplaceConnect} store={store} />
             </TabsContent>
             <TabsContent value="scanner">
               {connectedMarketplaces.length > 0 ? <AIScannerPro shopId="sellercloud" /> : (

@@ -25,6 +25,7 @@ interface UseMarketplaceConnectionsReturn {
   error: string | null;
   refetch: () => Promise<void>;
   connectMarketplace: (marketplace: string, credentials: Record<string, string>) => Promise<{ success: boolean; error?: string; data?: any }>;
+  disconnectMarketplace: (marketplace: string) => Promise<{ success: boolean; error?: string }>;
   fetchMarketplaceData: (marketplace: string, dataType: string, options?: Record<string, any>) => Promise<any>;
   syncMarketplace: (marketplace: string) => Promise<void>;
 }
@@ -168,12 +169,32 @@ export function useMarketplaceConnections(): UseMarketplaceConnectionsReturn {
     }
   };
 
+  const disconnectMarketplace = async (marketplace: string): Promise<{ success: boolean; error?: string }> => {
+    const connection = connections.find(c => c.marketplace === marketplace);
+    if (!connection) return { success: false, error: 'Connection not found' };
+
+    try {
+      const { error: updateError } = await supabase
+        .from('marketplace_connections')
+        .update({ is_active: false })
+        .eq('id', connection.id);
+
+      if (updateError) throw updateError;
+
+      setConnections(prev => prev.filter(c => c.marketplace !== marketplace));
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  };
+
   return {
     connections,
     isLoading,
     error,
     refetch: fetchConnections,
     connectMarketplace,
+    disconnectMarketplace,
     fetchMarketplaceData,
     syncMarketplace,
   };
