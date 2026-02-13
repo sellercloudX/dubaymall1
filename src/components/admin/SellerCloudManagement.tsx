@@ -183,10 +183,35 @@ export function SellerCloudManagement() {
     totalPaid: billings.filter((b: any) => b.status === 'paid').reduce((sum: number, b: any) => sum + b.total_paid, 0),
   };
 
-  const filteredSubscriptions = subscriptions.filter((s: any) => 
-    s.user_id?.toLowerCase().includes(search.toLowerCase()) ||
-    s.plan_type?.toLowerCase().includes(search.toLowerCase())
-  );
+  // Fetch profiles for display names
+  const [profilesMap, setProfilesMap] = useState<any>({});
+  
+  const fetchProfiles = async () => {
+    const userIds = subscriptions.map(s => s.user_id).filter(Boolean);
+    if (userIds.length === 0) return;
+    
+    const { data } = await supabase
+      .from('profiles')
+      .select('user_id, full_name')
+      .in('user_id', userIds);
+    
+    const map: any = {};
+    data?.forEach(p => {
+      map[p.user_id] = p.full_name;
+    });
+    setProfilesMap(map);
+  };
+
+  // Fetch profiles when subscriptions change
+  if (Object.keys(profilesMap).length === 0 && subscriptions.length > 0) {
+    fetchProfiles();
+  }
+
+  const filteredSubscriptions = subscriptions.filter((s: any) => {
+    const userName = profilesMap[s.user_id] || s.user_id;
+    return userName?.toLowerCase().includes(search.toLowerCase()) ||
+           s.plan_type?.toLowerCase().includes(search.toLowerCase());
+  });
 
   const isExpired = (sub: any) => sub.activated_until && new Date(sub.activated_until) < new Date();
   const daysLeft = (sub: any) => {
@@ -271,7 +296,7 @@ export function SellerCloudManagement() {
                     const expired = isExpired(sub);
                     return (
                       <TableRow key={sub.id}>
-                        <TableCell className="font-mono text-xs">{sub.user_id.slice(0, 8)}...</TableCell>
+                         <TableCell className="font-medium">{profilesMap[sub.user_id] || sub.user_id.slice(0, 8)}</TableCell>
                         <TableCell>
                           <Badge variant={sub.plan_type === 'pro' ? 'default' : 'secondary'}>
                             {sub.plan_type === 'pro' ? 'Pro' : 'Individual'}
