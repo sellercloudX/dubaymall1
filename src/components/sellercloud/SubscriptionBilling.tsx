@@ -2,15 +2,13 @@ import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
- import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
- import { Checkbox } from '@/components/ui/checkbox';
- import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { useSellerCloudSubscription } from '@/hooks/useSellerCloudSubscription';
- import { PaymentModal } from '@/components/payment/PaymentModal';
- import { supabase } from '@/integrations/supabase/client';
- import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import { 
   CreditCard, AlertTriangle, CheckCircle2, Clock, Crown, 
    Calendar, Receipt, DollarSign, TrendingUp, XCircle, FileText, ArrowRight
@@ -73,34 +71,45 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
      setIsCreating(false);
    };
  
-   const handlePaymentSuccess = async () => {
+   // Real Click payment handler for subscription
+   const handleSubscriptionPayment = async (months: number = 1) => {
      if (!subscription) return;
      
-     // Calculate how many months this payment covers
      const monthlyFeeUZS = subscription.monthly_fee * USD_TO_UZS;
-     const paymentAmount = selectedPlan === 'pro' ? 499 * USD_TO_UZS : 999 * USD_TO_UZS;
-     const months = Math.max(1, Math.floor(paymentAmount / monthlyFeeUZS));
+     const totalAmount = monthlyFeeUZS * months;
      
-     // Auto-activate for the paid duration
-     await supabase.rpc('activate_subscription_by_payment', {
-       p_subscription_id: subscription.id,
-       p_months: months,
-     });
+     setIsCreating(true);
+     try {
+       const { data, error } = await supabase.functions.invoke('click-payment', {
+         body: {
+           paymentType: 'subscription',
+           subscriptionId: subscription.id,
+           amount: totalAmount,
+           months: months,
+           returnUrl: window.location.origin + '/seller-cloud-mobile?tab=billing'
+         }
+       });
 
-     // Also mark payment details
-     await supabase
-       .from('sellercloud_subscriptions')
-       .update({
-         initial_payment_completed: true,
-         initial_payment_at: new Date().toISOString(),
-         terms_accepted: true,
-         terms_accepted_at: new Date().toISOString(),
-       })
-       .eq('id', subscription.id);
-     
-     toast.success(`To'lov muvaffaqiyatli! ${months} oyga aktivlashtirildi.`);
-     refetch();
-  };
+       if (error) throw error;
+
+       if (data?.paymentUrl) {
+         window.open(data.paymentUrl, '_blank');
+         toast.success('Click to\'lov sahifasi ochildi. To\'lov yakunlangach aktivatsiya avtomatik bo\'ladi.');
+       }
+     } catch (error: any) {
+       console.error('Payment error:', error);
+       toast.error('To\'lov xatosi: ' + (error.message || 'Noma\'lum xato'));
+     } finally {
+       setIsCreating(false);
+     }
+   };
+
+   // Initial subscription payment after terms accepted
+   const handleInitialPayment = async () => {
+     if (!subscription) return;
+     // Default to 1 month
+     await handleSubscriptionPayment(1);
+   };
 
   if (isLoading) {
     return (
@@ -240,31 +249,21 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
              </div>
            </DialogContent>
          </Dialog>
- 
-         {/* Payment Modal */}
-         <PaymentModal
-           open={showPaymentModal}
-           onClose={() => setShowPaymentModal(false)}
-           onSuccess={handlePaymentSuccess}
-           paymentMethod="click"
-           amount={selectedPlan === 'pro' ? 499 * USD_TO_UZS : 999 * USD_TO_UZS}
-           orderNumber={`SCX-${Date.now()}`}
-           orderId={subscription?.id}
-         />
-       </>
-    );
-  }
 
-  // Calculate current billing
-  const monthlyFeeUZS = subscription.monthly_fee * USD_TO_UZS;
-  const commissionAmount = totalSalesVolume * (subscription.commission_percent / 100);
-  const currentBillingTotal = monthlyFeeUZS + commissionAmount;
+        </>
+     );
+   }
 
-  // Status badges
-  const getStatusBadge = () => {
-    if (!accessStatus) return null;
-    
-    switch (accessStatus.reason) {
+   // Calculate current billing
+   const monthlyFeeUZS = subscription.monthly_fee * USD_TO_UZS;
+   const commissionAmount = totalSalesVolume * (subscription.commission_percent / 100);
+   const currentBillingTotal = monthlyFeeUZS + commissionAmount;
+
+   // Status badges
+   const getStatusBadge = () => {
+     if (!accessStatus) return null;
+     
+     switch (accessStatus.reason) {
       case 'active':
         return <Badge className="bg-primary text-primary-foreground"><CheckCircle2 className="h-3 w-3 mr-1" /> Faol</Badge>;
       case 'admin_override':
@@ -291,7 +290,9 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
                   <p className="font-medium mt-2">Qarzdorlik: {formatPrice(accessStatus.total_debt)}</p>
                 )}
               </div>
-              <Button variant="destructive" size="sm">To'lash</Button>
+               <Button variant="destructive" size="sm" onClick={() => handleSubscriptionPayment(1)} disabled={isCreating}>
+                  {isCreating ? 'Yuklanmoqda...' : 'Click orqali to\'lash'}
+                </Button>
             </div>
           </CardContent>
         </Card>
@@ -390,9 +391,42 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
               <span>Jami to'lanishi kerak</span>
               <span className="text-primary">{formatPrice(currentBillingTotal)}</span>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+           </div>
+
+           {/* Click Payment Options */}
+           <div className="mt-6 pt-4 border-t space-y-3">
+             <p className="text-sm font-medium">Click orqali to'lash:</p>
+             <div className="grid grid-cols-3 gap-3">
+               <Button 
+                 variant="outline" 
+                 onClick={() => handleSubscriptionPayment(1)}
+                 disabled={isCreating}
+                 className="flex-col h-auto py-3"
+               >
+                 <span className="text-xs text-muted-foreground">1 oy</span>
+                 <span className="font-bold">{formatPrice(monthlyFeeUZS)}</span>
+               </Button>
+               <Button 
+                 variant="outline" 
+                 onClick={() => handleSubscriptionPayment(3)}
+                 disabled={isCreating}
+                 className="flex-col h-auto py-3"
+               >
+                 <span className="text-xs text-muted-foreground">3 oy</span>
+                 <span className="font-bold">{formatPrice(monthlyFeeUZS * 3)}</span>
+               </Button>
+               <Button 
+                 onClick={() => handleSubscriptionPayment(6)}
+                 disabled={isCreating}
+                 className="flex-col h-auto py-3"
+               >
+                 <span className="text-xs text-muted-foreground">6 oy</span>
+                 <span className="font-bold">{formatPrice(monthlyFeeUZS * 6)}</span>
+               </Button>
+             </div>
+           </div>
+         </CardContent>
+       </Card>
 
       {/* Billing History */}
       {billing.length > 0 && (
@@ -447,7 +481,9 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
               </div>
               <div className="text-right">
                 <div className="text-2xl font-bold text-destructive">{formatPrice(totalDebt)}</div>
-                <Button variant="destructive" size="sm" className="mt-2">Hozir to'lash</Button>
+                <Button variant="destructive" size="sm" className="mt-2" onClick={() => handleSubscriptionPayment(1)} disabled={isCreating}>
+                  {isCreating ? 'Yuklanmoqda...' : 'Hozir to\'lash'}
+                </Button>
               </div>
             </div>
           </CardContent>
