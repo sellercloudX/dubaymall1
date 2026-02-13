@@ -191,11 +191,20 @@ export function CostPriceManager({ connectedMarketplaces, store }: CostPriceMana
                       const hasCost = existingCost !== null;
                       return (
                         <div key={product.offerId} className="p-3 rounded-lg border space-y-2">
-                          <div className="min-w-0">
-                            <div className="text-sm font-medium line-clamp-1">{product.name || 'Nomsiz'}</div>
-                            <div className="flex items-center gap-2 mt-1">
-                              <code className="text-[10px] text-muted-foreground">{product.offerId}</code>
-                              {hasCost && <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">✓</Badge>}
+                          <div className="flex items-start gap-2">
+                            <div className="w-10 h-10 rounded-lg border bg-muted/50 overflow-hidden shrink-0 flex items-center justify-center">
+                              {product.pictures?.[0] ? (
+                                <img src={product.pictures[0]} alt="" className="w-full h-full object-cover" loading="lazy" />
+                              ) : (
+                                <Package className="h-4 w-4 text-muted-foreground/40" />
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-sm font-medium line-clamp-1">{product.name || 'Nomsiz'}</div>
+                              <div className="flex items-center gap-2 mt-1">
+                                <code className="text-[10px] text-muted-foreground">{product.offerId}</code>
+                                {hasCost && <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">✓</Badge>}
+                              </div>
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
@@ -258,6 +267,13 @@ export function CostPriceManager({ connectedMarketplaces, store }: CostPriceMana
                       <TableRow key={product.offerId}>
                         <TableCell>
                           <div className="flex items-center gap-2">
+                            <div className="w-9 h-9 rounded-lg border bg-muted/50 overflow-hidden shrink-0 flex items-center justify-center">
+                              {product.pictures?.[0] ? (
+                                <img src={product.pictures[0]} alt="" className="w-full h-full object-cover" loading="lazy" />
+                              ) : (
+                                <Package className="h-3.5 w-3.5 text-muted-foreground/40" />
+                              )}
+                            </div>
                             {hasCost ? <CheckCircle2 className="h-4 w-4 text-primary shrink-0" /> : <AlertCircle className="h-4 w-4 text-muted-foreground/40 shrink-0" />}
                             <div className="min-w-0">
                               <div className="font-medium text-sm line-clamp-1">{product.name || 'Nomsiz'}</div>

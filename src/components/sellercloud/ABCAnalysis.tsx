@@ -32,10 +32,16 @@ interface ProductPnL {
   netProfit: number; profitMargin: number;
   abcGroup: 'A' | 'B' | 'C'; revenueShare: number;
   isRealTariff: boolean;
+  imageUrl?: string;
 }
 
 const MARKETPLACE_NAMES: Record<string, string> = {
   yandex: 'Yandex', uzum: 'Uzum', wildberries: 'WB', ozon: 'Ozon',
+};
+
+const MARKETPLACE_TAX: Record<string, number> = {
+  yandex: 0.04,
+  uzum: 0.04,
 };
 
 const ABC_COLORS = {
@@ -46,6 +52,7 @@ const ABC_COLORS = {
 
 export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 4 }: ABCAnalysisProps) {
   const [selectedGroup, setSelectedGroup] = useState<'all' | 'A' | 'B' | 'C'>('all');
+  const [selectedMp, setSelectedMp] = useState<string>('all');
   const [datePreset, setDatePreset] = useState<DatePreset>('30d');
   const [dateFrom, setDateFrom] = useState<Date | undefined>(getPresetDates('30d').from);
   const [dateTo, setDateTo] = useState<Date | undefined>(getPresetDates('30d').to);
@@ -54,15 +61,17 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
   const { getCostPrice } = useCostPrices();
   const { data: tariffMap, dataUpdatedAt: tariffUpdatedAt, isLoading: tariffsLoading } = useMarketplaceTariffs(connectedMarketplaces, store);
 
+  const activeMarketplaces = selectedMp === 'all' ? connectedMarketplaces : [selectedMp];
+
   const products = useMemo(() => {
     if (isLoading) return [];
     const allProducts: ProductPnL[] = [];
 
-    for (const marketplace of connectedMarketplaces) {
+    for (const marketplace of activeMarketplaces) {
       const productsList = store.getProducts(marketplace);
       const orders = store.getOrders(marketplace);
+      const taxRate = MARKETPLACE_TAX[marketplace] ?? 0.04;
 
-      // Build sales map from real order items only — filtered by date
       const salesMap = new Map<string, { qty: number; revenue: number }>();
       const activeOrders = orders.filter(o => {
         if (['CANCELLED', 'RETURNED'].includes(o.status)) return false;
@@ -89,18 +98,15 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
         const price = product.price || 0;
         const totalRevenue = sales.revenue || sales.qty * price;
         
-        // Real tannarx from DB
         const realCostPrice = getCostPrice(marketplace, product.offerId);
         const productCost = realCostPrice !== null ? realCostPrice * sales.qty : 0;
         
-        // Real tariff from Yandex API — use actual sold price (avg), not listing price
         const avgSoldPrice = sales.qty > 0 ? sales.revenue / sales.qty : price;
-        const tariff = getTariffForProduct(tariffMap, product.offerId, avgSoldPrice);
-        const yandexFees = tariff.totalFee * sales.qty;
+        const tariff = getTariffForProduct(tariffMap, product.offerId, avgSoldPrice, marketplace);
+        const marketplaceFees = tariff.totalFee * sales.qty;
         
-        const taxAmount = totalRevenue * 0.04;
-        // SellerCloudX commission excluded from per-product PnL (shown separately in FinancialDashboard)
-        const totalCosts = productCost + yandexFees + taxAmount;
+        const taxAmount = totalRevenue * taxRate;
+        const totalCosts = productCost + marketplaceFees + taxAmount;
         const netProfit = totalRevenue - totalCosts;
         const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
 
@@ -113,6 +119,7 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
           netProfit, profitMargin,
           abcGroup: 'C', revenueShare: 0,
           isRealTariff: tariff.isReal,
+          imageUrl: product.pictures?.[0],
         });
       });
     }
@@ -129,7 +136,7 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
     });
 
     return allProducts;
-  }, [connectedMarketplaces, store.dataVersion, isLoading, commissionPercent, tariffUpdatedAt, dateFrom, dateTo]);
+  }, [activeMarketplaces, store.dataVersion, isLoading, commissionPercent, tariffUpdatedAt, dateFrom, dateTo, selectedMp]);
 
   const formatPrice = (price: number) => {
     if (Math.abs(price) >= 1000000) return (price / 1000000).toFixed(1) + ' mln';
@@ -148,27 +155,49 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
   const totalProfit = products.reduce((s, p) => s + p.netProfit, 0);
   const profitableCount = products.filter(p => p.netProfit > 0).length;
   const unprofitableCount = products.filter(p => p.netProfit <= 0).length;
-  const realTariffCount = products.filter(p => p.isRealTariff).length;
 
   if (connectedMarketplaces.length === 0) {
     return (<Card><CardContent className="py-12 text-center"><BarChart3 className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" /><h3 className="text-lg font-semibold mb-2">ABC-analiz & PnL</h3><p className="text-muted-foreground">Avval marketplace ulang</p></CardContent></Card>);
   }
 
-  // Show loading if data or tariffs are still loading, OR if tariffs haven't been fetched yet
   const tariffsPending = tariffsLoading || (!tariffMap && store.allProducts.length > 0);
   if (isLoading || tariffsPending) {
     return (<div className="space-y-4"><div className="grid grid-cols-2 gap-4">{[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24" />)}</div><Skeleton className="h-96" /></div>);
   }
 
+  const ProductImage = ({ src, name }: { src?: string; name: string }) => (
+    <div className="w-10 h-10 rounded-lg border bg-muted/50 overflow-hidden shrink-0 flex items-center justify-center">
+      {src ? (
+        <img src={src} alt={name} className="w-full h-full object-cover" loading="lazy" />
+      ) : (
+        <Package className="h-4 w-4 text-muted-foreground/40" />
+      )}
+    </div>
+  );
+
   return (
     <div className="space-y-4 overflow-hidden">
-      {/* Date Range Filter */}
-      <DateRangeFilter
-        from={dateFrom}
-        to={dateTo}
-        activePreset={datePreset}
-        onRangeChange={(f, t, p) => { setDateFrom(f); setDateTo(t); setDatePreset(p); }}
-      />
+      {/* Marketplace Filter + Date */}
+      <div className="flex flex-col gap-3">
+        {connectedMarketplaces.length > 1 && (
+          <div className="flex gap-2 overflow-x-auto no-scrollbar">
+            <Button variant={selectedMp === 'all' ? 'default' : 'outline'} size="sm"
+              onClick={() => setSelectedMp('all')} className="shrink-0 text-xs">
+              📊 Umumiy
+            </Button>
+            {connectedMarketplaces.map(mp => (
+              <Button key={mp} variant={selectedMp === mp ? 'default' : 'outline'} size="sm"
+                onClick={() => setSelectedMp(mp)} className="shrink-0 text-xs">
+                {mp === 'yandex' ? '🟡' : mp === 'uzum' ? '🟣' : '📦'} {MARKETPLACE_NAMES[mp]}
+              </Button>
+            ))}
+          </div>
+        )}
+        <DateRangeFilter
+          from={dateFrom} to={dateTo} activePreset={datePreset}
+          onRangeChange={(f, t, p) => { setDateFrom(f); setDateTo(t); setDatePreset(p); }}
+        />
+      </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
@@ -199,16 +228,6 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
           </CardContent>
         </Card>
       </div>
-
-      {/* Tariff info badge */}
-      {realTariffCount > 0 && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/5 border border-primary/20">
-          <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
-          <span className="text-xs text-primary">
-            {realTariffCount} ta mahsulotda real Yandex tarif qo'llanildi
-          </span>
-        </div>
-      )}
 
       {/* ABC Groups */}
       <ScrollArea className="w-full">
@@ -264,7 +283,8 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
                 const colors = ABC_COLORS[product.abcGroup];
                 return (
                   <div key={`${product.id}-${product.marketplace}`} className="p-3 rounded-lg border space-y-2">
-                    <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-2">
+                      <ProductImage src={product.imageUrl} name={product.name} />
                       <div className="min-w-0 flex-1">
                         <div className="text-sm font-medium line-clamp-1">{product.name}</div>
                         <code className="text-[10px] text-muted-foreground block truncate">{product.sku}</code>
@@ -302,7 +322,7 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
             <ScrollArea className="w-full">
               <Table>
                 <TableHeader><TableRow>
-                  <TableHead className="w-10">ABC</TableHead><TableHead className="min-w-[180px]">Mahsulot</TableHead>
+                  <TableHead className="w-10">ABC</TableHead><TableHead className="min-w-[250px]">Mahsulot</TableHead>
                   <TableHead className="w-16 text-center">MP</TableHead><TableHead className="w-20 text-right">Narxi</TableHead>
                   <TableHead className="w-16 text-center">Sotildi</TableHead><TableHead className="w-24 text-right">Daromad</TableHead>
                   <TableHead className="w-24 text-right">Xarajatlar</TableHead><TableHead className="w-20 text-right">Komissiya</TableHead>
@@ -315,10 +335,15 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
                       <TableRow key={`${product.id}-${product.marketplace}`}>
                         <TableCell><Badge className={`${colors.badge} text-white`}>{product.abcGroup}</Badge></TableCell>
                         <TableCell>
-                          <div className="font-medium text-sm line-clamp-1">{product.name}</div>
-                          <div className="flex items-center gap-1">
-                            <code className="text-xs text-muted-foreground">{product.sku}</code>
-                            {product.isRealTariff && <CheckCircle2 className="h-3 w-3 text-primary shrink-0" />}
+                          <div className="flex items-center gap-2">
+                            <ProductImage src={product.imageUrl} name={product.name} />
+                            <div className="min-w-0">
+                              <div className="font-medium text-sm line-clamp-1">{product.name}</div>
+                              <div className="flex items-center gap-1">
+                                <code className="text-xs text-muted-foreground">{product.sku}</code>
+                                {product.isRealTariff && <CheckCircle2 className="h-3 w-3 text-primary shrink-0" />}
+                              </div>
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell className="text-center"><Badge variant="outline" className="text-xs">{MARKETPLACE_NAMES[product.marketplace]}</Badge></TableCell>

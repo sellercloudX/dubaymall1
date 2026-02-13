@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
-import { DollarSign, Calculator, RefreshCw, Save, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { DollarSign, Calculator, RefreshCw, Save, AlertTriangle, CheckCircle2, Package } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useCostPrices } from '@/hooks/useCostPrices';
@@ -284,16 +284,29 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
                 return (
                   <div key={key} className={`p-3 rounded-lg border space-y-2 ${isBelowMin ? 'border-destructive/30 bg-destructive/5' : ''}`}>
                     <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <div className="text-sm font-medium line-clamp-1">{product.name}</div>
-                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                          <Badge variant="outline" className="text-[10px]">{MARKETPLACE_NAMES[product.marketplace]}</Badge>
-                          <code className="text-[10px] text-muted-foreground">{product.sku}</code>
-                          {product.isRealTariff && (
-                            <Badge variant="outline" className="text-[10px] border-primary/30 text-primary px-1">
-                              <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />Tarif
-                            </Badge>
-                          )}
+                      <div className="flex items-start gap-2 min-w-0 flex-1">
+                        <div className="w-10 h-10 rounded-lg border bg-muted/50 overflow-hidden shrink-0 flex items-center justify-center">
+                          {(() => {
+                            const storeProduct = store.getProducts(product.marketplace).find(p => p.offerId === product.id);
+                            const imgUrl = storeProduct?.pictures?.[0];
+                            return imgUrl ? (
+                              <img src={imgUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
+                            ) : (
+                              <Package className="h-4 w-4 text-muted-foreground/40" />
+                            );
+                          })()}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-medium line-clamp-1">{product.name}</div>
+                          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                            <Badge variant="outline" className="text-[10px]">{MARKETPLACE_NAMES[product.marketplace]}</Badge>
+                            <code className="text-[10px] text-muted-foreground">{product.sku}</code>
+                            {product.isRealTariff && (
+                              <Badge variant="outline" className="text-[10px] border-primary/30 text-primary px-1">
+                                <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />Tarif
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
