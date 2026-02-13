@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
-  DollarSign, TrendingUp, Users, Store, 
+  DollarSign, TrendingUp, Crown, 
   Clock, CheckCircle, XCircle, RefreshCw 
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -41,6 +41,23 @@ export function AdminFinancials() {
     },
   });
 
+  // Subscription revenue
+  const { data: subscriptionStats } = useQuery({
+    queryKey: ['admin-subscription-stats'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('sellercloud_subscriptions')
+        .select('id, is_active, monthly_fee, commission_percent, created_at');
+      if (error) throw error;
+      
+      const activeCount = data?.filter(s => s.is_active).length || 0;
+      const monthlyRevenue = data?.filter(s => s.is_active)
+        .reduce((sum, s) => sum + (s.monthly_fee || 0), 0) || 0;
+      
+      return { activeCount, monthlyRevenue, total: data?.length || 0 };
+    },
+  });
+
   // Order financials
   const { data: orderFinancials, isLoading: financialsLoading, refetch: refetchFinancials } = useQuery({
     queryKey: ['admin-order-financials'],
@@ -54,35 +71,6 @@ export function AdminFinancials() {
         `)
         .order('created_at', { ascending: false })
         .limit(100);
-      if (error) throw error;
-      return data || [];
-    },
-  });
-
-  // Seller withdrawal requests
-  const { data: sellerWithdrawals, refetch: refetchSellerWithdrawals } = useQuery({
-    queryKey: ['admin-seller-withdrawals'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('seller_withdrawal_requests')
-        .select(`
-          *,
-          shops (name)
-        `)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return data || [];
-    },
-  });
-
-  // Blogger withdrawal requests
-  const { data: bloggerWithdrawals, refetch: refetchBloggerWithdrawals } = useQuery({
-    queryKey: ['admin-blogger-withdrawals'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('withdrawal_requests')
-        .select('*')
-        .order('created_at', { ascending: false });
       if (error) throw error;
       return data || [];
     },
@@ -102,34 +90,6 @@ export function AdminFinancials() {
     }
   };
 
-  const handleUpdateWithdrawalStatus = async (
-    type: 'seller' | 'blogger',
-    id: string,
-    status: 'approved' | 'rejected'
-  ) => {
-    try {
-      const table = type === 'seller' ? 'seller_withdrawal_requests' : 'withdrawal_requests';
-      const { error } = await supabase
-        .from(table)
-        .update({ 
-          status, 
-          processed_at: new Date().toISOString() 
-        })
-        .eq('id', id);
-
-      if (error) throw error;
-      toast.success(status === 'approved' ? 'Tasdiqlandi' : 'Rad etildi');
-      
-      if (type === 'seller') {
-        refetchSellerWithdrawals();
-      } else {
-        refetchBloggerWithdrawals();
-      }
-    } catch (error: any) {
-      toast.error(error.message || 'Xatolik');
-    }
-  };
-
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
@@ -137,7 +97,6 @@ export function AdminFinancials() {
       case 'ready':
         return <Badge className="bg-blue-600"><RefreshCw className="h-3 w-3 mr-1" /> Tayyor</Badge>;
       case 'approved':
-        return <Badge className="bg-emerald-600"><CheckCircle className="h-3 w-3 mr-1" /> Tasdiqlangan</Badge>;
       case 'completed':
         return <Badge className="bg-emerald-600"><CheckCircle className="h-3 w-3 mr-1" /> Bajarildi</Badge>;
       case 'rejected':
@@ -182,13 +141,13 @@ export function AdminFinancials() {
         <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-purple-100 flex items-center gap-2">
-              <Store className="h-4 w-4" />
-              Sotuvchi so'rovlari
+              <Crown className="h-4 w-4" />
+              Faol obunalar
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold">
-              {sellerWithdrawals?.filter(w => w.status === 'pending').length || 0}
+              {subscriptionStats?.activeCount || 0}
             </p>
           </CardContent>
         </Card>
@@ -196,13 +155,13 @@ export function AdminFinancials() {
         <Card className="bg-gradient-to-br from-amber-500 to-amber-600 text-white">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-amber-100 flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Blogger so'rovlari
+              <DollarSign className="h-4 w-4" />
+              Oylik obuna daromadi
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold">
-              {bloggerWithdrawals?.filter(w => w.status === 'pending').length || 0}
+              {(subscriptionStats?.monthlyRevenue || 0).toLocaleString()} so'm
             </p>
           </CardContent>
         </Card>
@@ -224,8 +183,6 @@ export function AdminFinancials() {
       <Tabs defaultValue="financials" className="space-y-4">
         <TabsList>
           <TabsTrigger value="financials">Buyurtma moliyasi</TabsTrigger>
-          <TabsTrigger value="seller-withdrawals">Sotuvchi so'rovlari</TabsTrigger>
-          <TabsTrigger value="blogger-withdrawals">Blogger so'rovlari</TabsTrigger>
           <TabsTrigger value="revenue">Platform daromadi</TabsTrigger>
         </TabsList>
 
@@ -237,7 +194,7 @@ export function AdminFinancials() {
             <CardContent>
               {financialsLoading ? (
                 <p className="text-center py-4 text-muted-foreground">Yuklanmoqda...</p>
-              ) : (
+              ) : orderFinancials && orderFinancials.length > 0 ? (
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
@@ -246,7 +203,6 @@ export function AdminFinancials() {
                         <TableHead>Do'kon</TableHead>
                         <TableHead className="text-right">Summa</TableHead>
                         <TableHead className="text-right">Platform</TableHead>
-                        <TableHead className="text-right">Blogger</TableHead>
                         <TableHead className="text-right">Sotuvchi</TableHead>
                         <TableHead>Payout</TableHead>
                       </TableRow>
@@ -264,9 +220,6 @@ export function AdminFinancials() {
                           <TableCell className="text-right text-emerald-600">
                             {f.platform_commission_amount.toLocaleString()}
                           </TableCell>
-                          <TableCell className="text-right text-blue-600">
-                            {(f.blogger_commission_amount || 0).toLocaleString()}
-                          </TableCell>
                           <TableCell className="text-right font-medium">
                             {f.seller_net_amount.toLocaleString()}
                           </TableCell>
@@ -276,121 +229,11 @@ export function AdminFinancials() {
                     </TableBody>
                   </Table>
                 </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  Hali buyurtma moliyasi yo'q
+                </div>
               )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="seller-withdrawals">
-          <Card>
-            <CardHeader>
-              <CardTitle>Sotuvchi pul yechish so'rovlari</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Sana</TableHead>
-                      <TableHead>Do'kon</TableHead>
-                      <TableHead className="text-right">Summa</TableHead>
-                      <TableHead>To'lov usuli</TableHead>
-                      <TableHead>Holat</TableHead>
-                      <TableHead>Amallar</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sellerWithdrawals?.map((w: any) => (
-                      <TableRow key={w.id}>
-                        <TableCell className="text-muted-foreground">
-                          {format(new Date(w.created_at), 'dd.MM.yyyy HH:mm')}
-                        </TableCell>
-                        <TableCell>{w.shops?.name || '-'}</TableCell>
-                        <TableCell className="text-right font-semibold">
-                          {w.amount.toLocaleString()} so'm
-                        </TableCell>
-                        <TableCell className="capitalize">{w.payment_method}</TableCell>
-                        <TableCell>{getStatusBadge(w.status)}</TableCell>
-                        <TableCell>
-                          {w.status === 'pending' && (
-                            <div className="flex gap-2">
-                              <Button 
-                                size="sm" 
-                                onClick={() => handleUpdateWithdrawalStatus('seller', w.id, 'approved')}
-                              >
-                                <CheckCircle className="h-3 w-3 mr-1" /> Tasdiqlash
-                              </Button>
-                              <Button 
-                                size="sm" 
-                                variant="destructive"
-                                onClick={() => handleUpdateWithdrawalStatus('seller', w.id, 'rejected')}
-                              >
-                                <XCircle className="h-3 w-3 mr-1" /> Rad etish
-                              </Button>
-                            </div>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="blogger-withdrawals">
-          <Card>
-            <CardHeader>
-              <CardTitle>Blogger pul yechish so'rovlari</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Sana</TableHead>
-                      <TableHead className="text-right">Summa</TableHead>
-                      <TableHead>To'lov usuli</TableHead>
-                      <TableHead>Holat</TableHead>
-                      <TableHead>Amallar</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {bloggerWithdrawals?.map((w: any) => (
-                      <TableRow key={w.id}>
-                        <TableCell className="text-muted-foreground">
-                          {format(new Date(w.created_at), 'dd.MM.yyyy HH:mm')}
-                        </TableCell>
-                        <TableCell className="text-right font-semibold">
-                          {w.amount.toLocaleString()} so'm
-                        </TableCell>
-                        <TableCell className="capitalize">{w.payment_method}</TableCell>
-                        <TableCell>{getStatusBadge(w.status)}</TableCell>
-                        <TableCell>
-                          {w.status === 'pending' && (
-                            <div className="flex gap-2">
-                              <Button 
-                                size="sm" 
-                                onClick={() => handleUpdateWithdrawalStatus('blogger', w.id, 'approved')}
-                              >
-                                <CheckCircle className="h-3 w-3 mr-1" /> Tasdiqlash
-                              </Button>
-                              <Button 
-                                size="sm" 
-                                variant="destructive"
-                                onClick={() => handleUpdateWithdrawalStatus('blogger', w.id, 'rejected')}
-                              >
-                                <XCircle className="h-3 w-3 mr-1" /> Rad etish
-                              </Button>
-                            </div>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -401,34 +244,40 @@ export function AdminFinancials() {
               <CardTitle>Platform daromad tarixi</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Sana</TableHead>
-                      <TableHead>Manba</TableHead>
-                      <TableHead>Tavsif</TableHead>
-                      <TableHead className="text-right">Summa</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {revenueStats?.records.slice(0, 50).map((r: any, i: number) => (
-                      <TableRow key={i}>
-                        <TableCell className="text-muted-foreground">
-                          {format(new Date(r.created_at), 'dd.MM.yyyy HH:mm')}
-                        </TableCell>
-                        <TableCell className="capitalize">{r.source_type}</TableCell>
-                        <TableCell className="text-muted-foreground max-w-[200px] truncate">
-                          {r.description || '-'}
-                        </TableCell>
-                        <TableCell className="text-right font-semibold text-emerald-600">
-                          +{r.amount.toLocaleString()} so'm
-                        </TableCell>
+              {revenueStats?.records && revenueStats.records.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Sana</TableHead>
+                        <TableHead>Manba</TableHead>
+                        <TableHead>Tavsif</TableHead>
+                        <TableHead className="text-right">Summa</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                    </TableHeader>
+                    <TableBody>
+                      {revenueStats?.records.slice(0, 50).map((r: any, i: number) => (
+                        <TableRow key={i}>
+                          <TableCell className="text-muted-foreground">
+                            {format(new Date(r.created_at), 'dd.MM.yyyy HH:mm')}
+                          </TableCell>
+                          <TableCell className="capitalize">{r.source_type}</TableCell>
+                          <TableCell className="text-muted-foreground max-w-[200px] truncate">
+                            {r.description || '-'}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold text-emerald-600">
+                            +{r.amount.toLocaleString()} so'm
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  Hali daromad tarixi yo'q
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
