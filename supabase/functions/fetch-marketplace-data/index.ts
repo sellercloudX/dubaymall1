@@ -1003,8 +1003,6 @@ serve(async (req) => {
       // ========== UZUM MARKET SELLER OPENAPI ==========
       const uzumBaseUrl = "https://api-seller.uzum.uz/api/seller-openapi";
       
-      // Debug: log key info for troubleshooting
-      console.log(`Uzum: apiKey length=${apiKey?.length}, first8=${apiKey?.substring(0, 8)}, last4=${apiKey?.substring(apiKey.length - 4)}`);
       
       // Uzum OpenAPI uses raw API key without prefix (not Bearer, not Token)
       const uzumHeaders: Record<string, string> = {
@@ -1016,6 +1014,7 @@ serve(async (req) => {
       let uzumShopId = credentials.sellerId || 
                        (connection.account_info as any)?.shopId || 
                        (connection.account_info as any)?.sellerId;
+      let allShopIds: string[] = uzumShopId ? [String(uzumShopId)] : [];
 
       // Always try to discover the real shopId from /v1/shops
       try {
@@ -1034,6 +1033,9 @@ serve(async (req) => {
           });
           
           if (shopList.length > 0) {
+            // Store ALL shop IDs for multi-shop product fetching
+            allShopIds = shopList.map((s: any) => String(s.shopId || s.id));
+            
             // Use sellerId to find matching shop, or fall back to first shop
             let matchedShop = shopList[0];
             if (uzumShopId) {
@@ -1046,7 +1048,7 @@ serve(async (req) => {
             
             const realShopId = matchedShop.shopId || matchedShop.id;
             if (realShopId) {
-              console.log(`Uzum: using shopId=${realShopId}`);
+              console.log(`Uzum: primary shopId=${realShopId}, total shops=${allShopIds.length}`);
               uzumShopId = String(realShopId);
               await supabase
                 .from("marketplace_connections")
@@ -1070,92 +1072,160 @@ serve(async (req) => {
         console.error("Uzum shops discovery error:", e);
       }
 
-      console.log(`Uzum API: dataType=${dataType}, shopId=${uzumShopId}`);
+      console.log(`Uzum API: dataType=${dataType}, shopId=${uzumShopId}, allShops=${allShopIds.length}`);
 
       if (dataType === "products") {
-        // GET /v1/product/shop/{shopId}?size=100&page=0
-        if (!uzumShopId) {
-          result = { success: false, error: "Shop ID required for Uzum products" };
+        // Fetch products from ALL shops, not just one
+        if (allShopIds.length === 0) {
+          result = { success: false, error: "No shops found for Uzum" };
         } else {
           try {
             let allProducts: any[] = [];
-            let currentPage = 0;
-            let hasMore = true;
-            const pageSize = 100; // Uzum supports up to ~100 per page
-
-            while (hasMore) {
-              const params = new URLSearchParams({
-                size: String(pageSize),
-                page: String(currentPage),
-                filter: 'ALL',
-              });
-
-              console.log(`Uzum products page ${currentPage}: ${uzumBaseUrl}/v1/product/shop/${uzumShopId}?${params.toString()}`);
-
-              const response = await fetch(
-                `${uzumBaseUrl}/v1/product/shop/${uzumShopId}?${params.toString()}`,
-                { headers: uzumHeaders }
-              );
-
-              if (!response.ok) {
-                const errText = await response.text();
-                console.error("Uzum products error:", response.status, errText);
-                if (allProducts.length === 0) {
-                  result = { success: false, error: `Uzum products failed: ${response.status}`, details: errText };
-                }
-                break;
-              }
-
-              const data = await response.json();
-              const productCards = data.payload?.productCards || data.payload || data.data || [];
-              const items = Array.isArray(productCards) ? productCards : [];
-
-              console.log(`Uzum page ${currentPage}: ${items.length} products found`);
-
-              if (items.length === 0) {
-                hasMore = false;
-                break;
-              }
-
-              const products = items.map((card: any) => {
-                const skus = card.skuList || card.skus || [];
-                const firstSku = skus[0] || {};
-                const price = firstSku.fullPrice || firstSku.purchasePrice || card.price || 0;
-                const stockCount = skus.reduce((sum: number, sku: any) => {
-                  const amounts = sku.skuAmountList || sku.amounts || [];
-                  return sum + amounts.reduce((s: number, a: any) => s + (a.amount || 0), 0);
-                }, 0);
-                
-                const photos = card.photos || card.images || [];
-                const pictures = photos.map((p: any) => p.photo?.url || p.url || p).filter(Boolean);
-
-                return {
-                  offerId: String(card.productId || card.id || firstSku.skuId || ''),
-                  name: card.title || card.name || '',
-                  price,
-                  shopSku: String(firstSku.skuId || firstSku.barCode || card.productId || ''),
-                  category: card.category?.title || card.categoryTitle || '',
-                  marketCategoryId: card.category?.id || card.categoryId || 0,
-                  pictures,
-                  description: card.description || '',
-                  availability: card.status?.title || card.moderationStatus || 'ACTIVE',
-                  stockFBO: 0,
-                  stockFBS: stockCount,
-                  stockCount,
-                };
-              });
-
-              allProducts = [...allProducts, ...products];
-
-              if (items.length < pageSize || !fetchAll) {
-                hasMore = false;
+            
+            // Also fetch FBS stock data via /v2/fbs/sku/stocks
+            let fbsStockMap: Record<string, number> = {};
+            try {
+              console.log(`Uzum: fetching FBS stocks from /v2/fbs/sku/stocks...`);
+              const fbsResp = await fetch(`${uzumBaseUrl}/v2/fbs/sku/stocks`, { headers: uzumHeaders });
+              if (fbsResp.ok) {
+                const fbsData = await fbsResp.json();
+                const fbsItems = fbsData.payload || fbsData.data || fbsData || [];
+                const fbsList = Array.isArray(fbsItems) ? fbsItems : [];
+                console.log(`Uzum FBS stocks: ${fbsList.length} SKUs`);
+                fbsList.forEach((item: any) => {
+                  const skuId = String(item.skuId || item.sku || '');
+                  if (skuId) {
+                    fbsStockMap[skuId] = item.amount || item.stock || item.available || 0;
+                  }
+                });
               } else {
-                currentPage++;
-                await sleep(300);
+                console.log(`Uzum FBS stocks failed: ${fbsResp.status}`);
+              }
+            } catch (e) {
+              console.error("Uzum FBS stocks error:", e);
+            }
+            
+            await sleep(300); // Delay after FBS stocks before fetching products
+            
+            // Iterate through ALL shops
+            for (let shopIdx = 0; shopIdx < allShopIds.length; shopIdx++) {
+              const currentShopId = allShopIds[shopIdx];
+              if (shopIdx > 0) await sleep(500); // Delay between shops to avoid 429
+              
+              let currentPage = 0;
+              let hasMore = true;
+              const pageSize = 100;
+
+              while (hasMore) {
+                const params = new URLSearchParams({
+                  size: String(pageSize),
+                  page: String(currentPage),
+                  filter: 'ALL',
+                });
+
+                console.log(`Uzum products shop=${currentShopId} page ${currentPage}`);
+
+                const response = await fetch(
+                  `${uzumBaseUrl}/v1/product/shop/${currentShopId}?${params.toString()}`,
+                  { headers: uzumHeaders }
+                );
+
+                if (!response.ok) {
+                  const errText = await response.text();
+                  // 403 = no access to this shop, 429 = rate limit - skip silently
+                  if (response.status === 403) {
+                    console.log(`Uzum: no access to shop=${currentShopId}, skipping`);
+                  } else {
+                    console.error(`Uzum products error shop=${currentShopId}:`, response.status, errText);
+                  }
+                  break;
+                }
+
+                const data = await response.json();
+                
+                // Uzum uses "productList" key
+                const productCards = data.productList || data.productCards || data.payload?.productCards || data.payload?.productList || data.payload || data.data || [];
+                const items = Array.isArray(productCards) ? productCards : [];
+
+                console.log(`Uzum shop=${currentShopId} page ${currentPage}: ${items.length} products`);
+
+                if (items.length === 0) {
+                  hasMore = false;
+                  break;
+                }
+
+                // Log first product's SKU structure for debugging stock
+                if (currentPage === 0 && allProducts.length === 0 && items.length > 0) {
+                  const s = items[0];
+                  const skuSample = (s.skuList || s.skus || [])[0];
+                  if (skuSample) {
+                    console.log(`Uzum SKU keys: ${Object.keys(skuSample).join(', ')}`);
+                    const amts = skuSample.skuAmountList || skuSample.amounts || [];
+                    console.log(`Uzum SKU amounts: ${JSON.stringify(amts).substring(0, 300)}`);
+                  }
+                }
+                
+                const products = items.map((card: any) => {
+                  const skus = card.skuList || card.skus || [];
+                  const firstSku = skus[0] || {};
+                  const price = firstSku.fullPrice || firstSku.purchasePrice || card.price || 0;
+                  
+                  // Uzum SKU has direct quantity fields: quantityActive, quantityFbs, etc.
+                  let fboStock = 0;
+                  let fbsStock = 0;
+                  skus.forEach((sku: any) => {
+                    // Direct quantity fields from Uzum API
+                    fboStock += (sku.quantityActive || 0);
+                    fbsStock += (sku.quantityFbs || 0);
+                    
+                    // Also check skuAmountList as fallback
+                    const amounts = sku.skuAmountList || sku.amounts || [];
+                    if (amounts.length > 0) {
+                      amounts.forEach((a: any) => {
+                        const amt = a.amount || a.available || 0;
+                        fboStock += amt;
+                      });
+                    }
+                  });
+                  
+                  // Also check FBS stock map from dedicated endpoint
+                  const skuId = String(firstSku.skuId || '');
+                  if (fbsStockMap[skuId]) {
+                    fbsStock = Math.max(fbsStock, fbsStockMap[skuId]);
+                  }
+                  
+                  const photos = card.photos || card.images || [];
+                  const pictures = photos.map((p: any) => p.photo?.url || p.url || p).filter(Boolean);
+
+                  return {
+                    offerId: String(card.productId || card.id || firstSku.skuId || ''),
+                    name: card.title || card.name || '',
+                    price,
+                    shopSku: String(firstSku.skuId || firstSku.barCode || card.productId || ''),
+                    category: typeof card.category === 'string' ? card.category : (card.category?.title || card.categoryTitle || ''),
+                    marketCategoryId: typeof card.category === 'object' ? (card.category?.id || 0) : (card.categoryId || 0),
+                    pictures,
+                    description: card.description || '',
+                    availability: card.status?.title || card.moderationStatus || 'ACTIVE',
+                    stockFBO: fboStock,
+                    stockFBS: fbsStock,
+                    stockCount: fboStock + fbsStock,
+                    shopId: currentShopId,
+                  };
+                });
+
+                allProducts = [...allProducts, ...products];
+
+                if (items.length < pageSize || !fetchAll) {
+                  hasMore = false;
+                } else {
+                  currentPage++;
+                  await sleep(300);
+                }
               }
             }
 
-            console.log(`Uzum total products: ${allProducts.length}`);
+            console.log(`Uzum total products from ${allShopIds.length} shops: ${allProducts.length}`);
             result = {
               success: true,
               data: allProducts,
