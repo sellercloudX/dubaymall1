@@ -10,7 +10,8 @@ import {
   Globe, ArrowRight, CheckCircle, BarChart3, Zap, 
   Bot, DollarSign, LineChart, Clock, Users, Star, 
   ChevronRight, Crown, TrendingUp, AlertTriangle,
-  Play, Sparkles, Shield, Rocket, Send
+  Play, Sparkles, Shield, Rocket, Send, MessageCircle,
+  ChevronDown, Lock, FileCheck
 } from 'lucide-react';
 import { useState, useEffect, useRef, ReactNode } from 'react';
 import heroDashboard from '@/assets/hero-dashboard.png';
@@ -59,7 +60,6 @@ function FadeInSection({ children, className = '', delay = 0 }: { children: Reac
   );
 }
 
-// ─── Floating particle component ───
 function FloatingParticles() {
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -79,29 +79,48 @@ function FloatingParticles() {
   );
 }
 
+// ─── FAQ Component ───
+function FAQItem({ question, answer }: { question: string; answer: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="border-b last:border-b-0">
+      <button 
+        onClick={() => setOpen(!open)} 
+        className="w-full flex items-center justify-between py-5 text-left group"
+      >
+        <span className="font-semibold text-sm md:text-base pr-4">{question}</span>
+        <ChevronDown className={`h-5 w-5 text-muted-foreground shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+      </button>
+      <div className={`overflow-hidden transition-all duration-300 ${open ? 'max-h-40 pb-5' : 'max-h-0'}`}>
+        <p className="text-sm text-muted-foreground leading-relaxed">{answer}</p>
+      </div>
+    </div>
+  );
+}
+
 // ─── Translations ───
 const T = {
   uz: {
     badge: '🚀 O\'zbekistonning #1 marketplace platformasi',
-    heroTitle1: 'Sotuvlaringizni',
-    heroTitle2: 'avtomatlashtiramiz',
-    heroTitle3: 'siz foyda olasiz.',
-    heroDesc: 'Uzum, Yandex Market, Wildberries, Ozon — barchasini yagona AI-quvvatli dashboard orqali boshqaring. Kartochka yaratishdan tortib, sof foydani real-vaqtda kuzatishgacha.',
-    cta: 'Bepul sinab ko\'rish',
-    ctaSecondary: 'Demo ko\'rish',
+    heroTitle1: '4-5 ta hodim ishini',
+    heroTitle2: 'bitta platforma',
+    heroTitle3: 'bajaradi.',
+    heroDesc: 'Uzum, Yandex Market, Wildberries, Ozon — barchasini yagona AI-quvvatli dashboard orqali boshqaring. Kuniga 1-2 soat ishlash yetarli — qolganini SellerCloudX avtomatlashtiradi.',
+    cta: 'Hoziroq boshlash',
+    ctaSecondary: 'Imkoniyatlarni ko\'rish',
     loginCta: 'Kirish',
-    trusted: 'Ishonchli hamkorlar',
+    trusted: 'Qo\'llab-quvvatlanadigan marketplacelar',
     statsMarketplaces: 'Marketplace',
     statsProducts: 'Sinxron mahsulot',
     statsOrders: 'Avtomatik buyurtma',
-    statsTime: 'Vaqt tejash',
+    statsReplace: 'Hodim o\'rniga',
     featuresTitle: 'Sotuvchi uchun barcha vositalar',
     featuresSubtitle: 'bitta platformada',
     featuresDesc: 'Bozordagi eng kuchli avtomatizatsiya vositalarini birlashtirdik',
     feat1: 'Multi-marketplace',
     feat1d: 'Uzum, Yandex, WB, Ozon — bitta OAuth bilan ulang va barchani markazdan boshqaring',
     feat2: 'AI kartochka yaratish',
-    feat2d: 'Rasm yuklang — AI nom, tavsif, kategoriya va SEO matnlarni avtomatik yaratadi',
+    feat2d: 'Rasm yuklang — AI nom, tavsif, kategoriya va SEO matnlarni 3 tilda avtomatik yaratadi',
     feat3: 'Real-vaqt moliya',
     feat3d: 'Har bir SKU bo\'yicha sof foyda, marja, komissiya va logistika xarajatlarini kuzating',
     feat4: 'ABC-analiz',
@@ -110,30 +129,39 @@ const T = {
     feat5d: 'Real tariflarga asoslangan avtomatik narx hisoblash va minimal narx himoyasi',
     feat6: 'Inventarizatsiya auditi',
     feat6d: 'Omborlardagi yo\'qolgan tovarlarni aniqlang va kompensatsiya talab qiling',
+    feat7: 'Trend Hunter AI',
+    feat7d: 'Eng ko\'p sotiladigan mahsulotlarni toping va AI tavsiyalari bilan to\'g\'ri vaqtda qo\'shing',
+    feat8: '24/7 Monitoring',
+    feat8d: 'Stok tugashi, narx o\'zgarishi, yangi buyurtmalar — Telegram orqali real-time xabarnomalar',
+    feat9: 'Bulk operatsiyalar',
+    feat9d: 'Yuzlab mahsulotni bir vaqtda yangilang. Excel import/export. Narx, stok hammasini tez o\'zgartiring',
     howTitle: 'Qanday ishlaydi?',
     howDesc: 'Uch qadam bilan sotuvlarni avtomatlashtirishni boshlang',
     step1: 'Ro\'yxatdan o\'ting',
-    step1d: '7 kunlik bepul sinov davri — bank kartasi talab qilinmaydi',
+    step1d: 'Akkount yarating va tizimga kiring — 5 daqiqada sozlash',
     step2: 'Marketplacelarni ulang',
     step2d: 'API kalitingizni kiriting — tizim avtomatik sinxronlashadi',
     step3: 'Foydani kuzating',
-    step3d: 'Analitika, buyurtmalar va narxlarni yagona paneldan kuzating',
+    step3d: 'Analitika, buyurtmalar va narxlarni yagona paneldan boshqaring',
     pricingTitle: 'Oddiy va shaffof narxlar',
-    pricingDesc: 'Yashirin to\'lovlar yo\'q. Har qanday paytda bekor qilish mumkin.',
-    proPlan: 'Pro',
+    pricingDesc: 'Yashirin to\'lovlar yo\'q. 60 kunlik savdo o\'sishi kafolati.',
+    proPlan: 'Premium',
     proPrice: '$499',
-    proFeatures: ['4 ta marketplace', 'AI kartochka yaratish', 'ABC-analiz va PnL', 'Narx optimallashtirish', 'Inventarizatsiya auditi', 'Telegram bildirishnomalar', '24/7 texnik yordam'],
-    entPlan: 'Enterprise',
+    proPriceUzs: '6 300 000 so\'m',
+    proFeatures: ['4 ta marketplace', 'Cheksiz AI kartochka yaratish', 'ABC-analiz va PnL hisoboti', 'Narx optimallashtirish', 'Trend Hunter FULL', 'Inventarizatsiya auditi', 'Sof foyda analitikasi', 'Telegram bildirishnomalar', '24/7 texnik yordam'],
+    entPlan: 'Individual',
     entPrice: 'Kelishuv',
-    entFeatures: ['Barcha Pro imkoniyatlar', 'Individual komissiya', 'API integratsiya', 'Shaxsiy menejer', 'WMS integratsiya', 'Maxsus hisobotlar'],
+    entFeatures: ['Barcha Premium imkoniyatlar', 'Past komissiya (2% dan)', 'Shaxsiy menejer', 'Custom integratsiyalar', 'WMS integratsiya', 'SLA kafolati', 'White-label branding', 'API priority'],
+    entFor: 'Kimlar uchun:',
+    entForList: ['Oylik savdo $50,000+ bo\'lgan sotuvchilar', 'Ko\'p brendli bizneslar', 'Maxsus talablar bo\'lgan kompaniyalar'],
     perMonth: '/oyiga',
-    commission: '+ 4% komissiya',
-    commissionEnt: '+ 2% komissiya',
-    freeTrial: '7 kunlik bepul sinov',
-    startPro: 'Pro ni boshlash',
-    contactSales: 'Bog\'lanish',
+    commission: '+ savdodan 4%',
+    commissionEnt: '+ savdodan 2% dan',
+    guarantee: '60 kunlik kafolat',
+    startPro: 'Boshlash',
+    contactSales: 'Taklif olish',
     testimonialsTitle: 'Sotuvchilar nima deydi?',
-    t1: '"SellerCloudX bilan Uzum va Yandex\'ni bitta joydan boshqaraman. Oyiga 15+ soat tejayman."',
+    t1: '"SellerCloudX bilan Uzum va Yandex\'ni bitta joydan boshqaraman. Kuniga 1-2 soat yetarli."',
     t1n: 'Sardor M.', t1r: 'Elektronika sotuvchisi',
     t2: '"ABC-analiz orqali 30% zarar keltiruvchi mahsulotlarni aniqladim va assortimentni optimallashtirdim."',
     t2n: 'Nilufar R.', t2r: 'Kiyim-kechak do\'koni',
@@ -141,41 +169,54 @@ const T = {
     t3n: 'Jasur T.', t3r: 'Gadget sotuvchisi',
     ctaTitle: 'Raqobatchilaringiz allaqachon avtomatlashtirilgan.',
     ctaSubtitle: 'Siz-chi?',
-    ctaDesc: 'Minglab professional sotuvchilar SellerCloudX bilan sotuv samaradorligini oshirmoqda',
+    ctaDesc: '60 kunlik savdo o\'sishi kafolati. Natija bo\'lmasa — to\'lov yo\'q.',
     ctaButton: 'Hoziroq boshlang',
     footer: 'SellerCloudX',
-    footerDesc: 'Marketplace avtomatizatsiya platformasi',
+    footerDesc: 'AI-Powered Marketplace Automation',
     rights: 'Barcha huquqlar himoyalangan',
     privacy: 'Maxfiylik siyosati',
     terms: 'Foydalanish shartlari',
     support: 'Yordam',
     resultTitle: 'Aniq natijalar',
-    resultDesc: 'Foydalanuvchilarimiz erishgan ko\'rsatkichlar',
-    r1: 'Vaqt tejash', r1v: '15+ soat/oy',
-    r2: 'Foyda o\'sishi', r2v: '+23%',
-    r3: 'Xarajat kamaytirish', r3v: '-34%',
+    resultDesc: 'SellerCloudX foydalanuvchilari erishgan ko\'rsatkichlar',
+    r1: 'Hodim o\'rniga', r1v: '4-5 ta',
+    r2: 'Kuniga ishlash', r2v: '1-2 soat',
+    r3: 'Savdo o\'sishi', r3v: '+23%',
+    faqTitle: 'Tez-tez so\'raladigan savollar',
+    faq1q: 'Platformani qanday boshlash mumkin?',
+    faq1a: 'Ro\'yxatdan o\'ting, API kalitingizni kiriting va 5 daqiqada barcha marketplacelaringizni ulang. Maxsus bilim talab qilinmaydi.',
+    faq2q: 'Qaysi marketplace\'lar qo\'llab-quvvatlanadi?',
+    faq2a: 'Hozirda Uzum Market, Yandex Market, Wildberries va Ozon qo\'llab-quvvatlanadi. Yangi platformalar muntazam qo\'shilmoqda.',
+    faq3q: 'AI kartochka yaratish qanday ishlaydi?',
+    faq3a: 'Mahsulot rasmini yuklang — AI avtomatik nom, tavsif, kategoriya va SEO matnlarni 3 tilda (UZ, RU, EN) yaratadi.',
+    faq4q: 'To\'lovni qanday amalga oshiraman?',
+    faq4a: 'Click, Payme yoki bank o\'tkazmasi orqali to\'lashingiz mumkin. Oylik to\'lov + savdodan foiz.',
+    faq5q: '60 kunlik kafolat nima?',
+    faq5a: 'Agar 60 kun ichida savdolaringiz o\'smasa, to\'langan summani qaytarib olamiz. Bu bizning sifatga ishonchimiz.',
+    faq6q: 'Ma\'lumotlarim xavfsizmi?',
+    faq6a: 'Ha. API kalitlaringiz shifrlangan holda saqlanadi. SSL himoyasi va GDPR standartlariga muvofiq ishlaymiz.',
   },
   ru: {
     badge: '🚀 Платформа #1 для маркетплейсов Узбекистана',
-    heroTitle1: 'Автоматизируем',
-    heroTitle2: 'ваши продажи,',
-    heroTitle3: 'вы получаете прибыль.',
-    heroDesc: 'Uzum, Yandex Market, Wildberries, Ozon — управляйте всем через единый AI-дашборд. От создания карточек до отслеживания чистой прибыли в реальном времени.',
-    cta: 'Попробовать бесплатно',
-    ctaSecondary: 'Смотреть демо',
+    heroTitle1: 'Работу 4-5 сотрудников',
+    heroTitle2: 'выполняет одна',
+    heroTitle3: 'платформа.',
+    heroDesc: 'Uzum, Yandex Market, Wildberries, Ozon — управляйте всем через единый AI-дашборд. Достаточно 1-2 часа в день — остальное SellerCloudX автоматизирует.',
+    cta: 'Начать сейчас',
+    ctaSecondary: 'Узнать возможности',
     loginCta: 'Войти',
-    trusted: 'Доверенные партнёры',
+    trusted: 'Поддерживаемые маркетплейсы',
     statsMarketplaces: 'Маркетплейсов',
     statsProducts: 'Синхр. товаров',
     statsOrders: 'Авто-заказов',
-    statsTime: 'Экономия времени',
+    statsReplace: 'Вместо сотрудников',
     featuresTitle: 'Все инструменты для продавца',
     featuresSubtitle: 'в одной платформе',
     featuresDesc: 'Мы объединили самые мощные инструменты автоматизации на рынке',
     feat1: 'Мульти-маркетплейс',
     feat1d: 'Uzum, Yandex, WB, Ozon — подключите одним OAuth и управляйте централизованно',
     feat2: 'AI-генерация карточек',
-    feat2d: 'Загрузите фото — AI создаст название, описание, категорию и SEO-тексты',
+    feat2d: 'Загрузите фото — AI создаст название, описание, категорию и SEO-тексты на 3 языках',
     feat3: 'Финансы реального времени',
     feat3d: 'Отслеживайте чистую прибыль, маржу, комиссии и логистику по каждому SKU',
     feat4: 'ABC-анализ',
@@ -184,30 +225,39 @@ const T = {
     feat5d: 'Автоматический расчёт цен на основе реальных тарифов и защита минимальной цены',
     feat6: 'Аудит инвентаризации',
     feat6d: 'Выявляйте потерянные товары на складах и требуйте компенсацию',
+    feat7: 'Trend Hunter AI',
+    feat7d: 'Находите самые продаваемые товары и добавляйте их в нужный момент по AI-рекомендациям',
+    feat8: '24/7 Мониторинг',
+    feat8d: 'Остатки, цены, новые заказы — real-time уведомления через Telegram',
+    feat9: 'Массовые операции',
+    feat9d: 'Обновляйте сотни товаров одновременно. Excel import/export. Быстро меняйте цены и остатки',
     howTitle: 'Как это работает?',
     howDesc: 'Три шага для начала автоматизации продаж',
     step1: 'Зарегистрируйтесь',
-    step1d: '7 дней бесплатно — банковская карта не требуется',
+    step1d: 'Создайте аккаунт и войдите в систему — настройка за 5 минут',
     step2: 'Подключите маркетплейсы',
     step2d: 'Введите API-ключ — система синхронизируется автоматически',
-    step3: 'Отслеживайте прибыль',
+    step3: 'Управляйте прибылью',
     step3d: 'Аналитика, заказы и цены в едином интерфейсе',
     pricingTitle: 'Простые и прозрачные цены',
-    pricingDesc: 'Никаких скрытых платежей. Отмена в любое время.',
-    proPlan: 'Pro',
+    pricingDesc: 'Никаких скрытых платежей. 60-дневная гарантия роста продаж.',
+    proPlan: 'Premium',
     proPrice: '$499',
-    proFeatures: ['4 маркетплейса', 'AI-генерация карточек', 'ABC-анализ и PnL', 'Оптимизация цен', 'Аудит инвентаризации', 'Telegram-уведомления', 'Поддержка 24/7'],
-    entPlan: 'Enterprise',
+    proPriceUzs: '6 300 000 сум',
+    proFeatures: ['4 маркетплейса', 'Безлимитная AI-генерация карточек', 'ABC-анализ и PnL-отчёты', 'Оптимизация цен', 'Trend Hunter FULL', 'Аудит инвентаризации', 'Аналитика чистой прибыли', 'Telegram-уведомления', 'Поддержка 24/7'],
+    entPlan: 'Individual',
     entPrice: 'По запросу',
-    entFeatures: ['Все возможности Pro', 'Индивидуальная комиссия', 'API-интеграция', 'Персональный менеджер', 'WMS-интеграция', 'Кастомные отчёты'],
+    entFeatures: ['Все возможности Premium', 'Низкая комиссия (от 2%)', 'Персональный менеджер', 'Custom интеграции', 'WMS-интеграция', 'SLA-гарантия', 'White-label branding', 'API priority'],
+    entFor: 'Для кого:',
+    entForList: ['Продавцы с оборотом $50,000+/мес', 'Мультибрендовые бизнесы', 'Компании с особыми требованиями'],
     perMonth: '/мес',
-    commission: '+ 4% комиссия',
-    commissionEnt: '+ 2% комиссия',
-    freeTrial: '7 дней бесплатно',
-    startPro: 'Начать Pro',
-    contactSales: 'Связаться',
+    commission: '+ 4% с продаж',
+    commissionEnt: '+ от 2% с продаж',
+    guarantee: '60-дневная гарантия',
+    startPro: 'Начать',
+    contactSales: 'Получить предложение',
     testimonialsTitle: 'Что говорят продавцы?',
-    t1: '"С SellerCloudX управляю Uzum и Yandex из одного места. Экономлю 15+ часов в месяц."',
+    t1: '"С SellerCloudX управляю Uzum и Yandex из одного места. Достаточно 1-2 часа в день."',
     t1n: 'Сардор М.', t1r: 'Продавец электроники',
     t2: '"Через ABC-анализ выявил 30% убыточных товаров и оптимизировал ассортимент."',
     t2n: 'Нилуфар Р.', t2r: 'Магазин одежды',
@@ -215,41 +265,54 @@ const T = {
     t3n: 'Жасур Т.', t3r: 'Продавец гаджетов',
     ctaTitle: 'Ваши конкуренты уже автоматизированы.',
     ctaSubtitle: 'А вы?',
-    ctaDesc: 'Тысячи профессиональных продавцов повышают эффективность с SellerCloudX',
+    ctaDesc: '60-дневная гарантия роста продаж. Нет результата — нет оплаты.',
     ctaButton: 'Начать сейчас',
     footer: 'SellerCloudX',
-    footerDesc: 'Платформа автоматизации маркетплейсов',
+    footerDesc: 'AI-Powered Marketplace Automation',
     rights: 'Все права защищены',
     privacy: 'Политика конфиденциальности',
     terms: 'Условия использования',
     support: 'Поддержка',
     resultTitle: 'Реальные результаты',
-    resultDesc: 'Показатели, которых достигают наши пользователи',
-    r1: 'Экономия времени', r1v: '15+ ч/мес',
-    r2: 'Рост прибыли', r2v: '+23%',
-    r3: 'Снижение расходов', r3v: '-34%',
+    resultDesc: 'Показатели пользователей SellerCloudX',
+    r1: 'Вместо сотрудников', r1v: '4-5',
+    r2: 'Работа в день', r2v: '1-2 ч',
+    r3: 'Рост продаж', r3v: '+23%',
+    faqTitle: 'Часто задаваемые вопросы',
+    faq1q: 'Как начать работу с платформой?',
+    faq1a: 'Зарегистрируйтесь, введите API-ключ и подключите все маркетплейсы за 5 минут. Специальных знаний не требуется.',
+    faq2q: 'Какие маркетплейсы поддерживаются?',
+    faq2a: 'Сейчас поддерживаются Uzum Market, Yandex Market, Wildberries и Ozon. Новые платформы добавляются регулярно.',
+    faq3q: 'Как работает AI-генерация карточек?',
+    faq3a: 'Загрузите фото товара — AI автоматически создаст название, описание, категорию и SEO-тексты на 3 языках (UZ, RU, EN).',
+    faq4q: 'Как оплатить подписку?',
+    faq4a: 'Оплата через Click, Payme или банковский перевод. Ежемесячная оплата + процент с продаж.',
+    faq5q: 'Что такое 60-дневная гарантия?',
+    faq5a: 'Если за 60 дней ваши продажи не вырастут, мы вернём оплаченную сумму. Это наша уверенность в качестве.',
+    faq6q: 'Мои данные в безопасности?',
+    faq6a: 'Да. API-ключи хранятся в зашифрованном виде. SSL-защита и соответствие стандартам GDPR.',
   },
   en: {
-    badge: '🚀 #1 Marketplace Automation Platform',
-    heroTitle1: 'We automate',
-    heroTitle2: 'your sales,',
-    heroTitle3: 'you earn profit.',
-    heroDesc: 'Uzum, Yandex Market, Wildberries, Ozon — manage everything through a single AI-powered dashboard. From product card creation to real-time profit tracking.',
-    cta: 'Start Free Trial',
-    ctaSecondary: 'Watch Demo',
+    badge: '🚀 #1 Marketplace Automation Platform in Uzbekistan',
+    heroTitle1: 'Replace 4-5 employees',
+    heroTitle2: 'with one',
+    heroTitle3: 'platform.',
+    heroDesc: 'Uzum, Yandex Market, Wildberries, Ozon — manage everything through a single AI-powered dashboard. Just 1-2 hours a day — SellerCloudX automates the rest.',
+    cta: 'Get Started',
+    ctaSecondary: 'Explore Features',
     loginCta: 'Sign In',
-    trusted: 'Trusted Partners',
+    trusted: 'Supported Marketplaces',
     statsMarketplaces: 'Marketplaces',
     statsProducts: 'Synced Products',
     statsOrders: 'Auto Orders',
-    statsTime: 'Time Saved',
+    statsReplace: 'Replaces employees',
     featuresTitle: 'All seller tools',
     featuresSubtitle: 'in one platform',
-    featuresDesc: 'We\'ve combined the most powerful automation tools on the market',
+    featuresDesc: 'We\'ve combined the most powerful marketplace automation tools',
     feat1: 'Multi-Marketplace',
     feat1d: 'Uzum, Yandex, WB, Ozon — connect via OAuth and manage centrally',
     feat2: 'AI Card Generation',
-    feat2d: 'Upload a photo — AI generates title, description, category, and SEO texts',
+    feat2d: 'Upload a photo — AI generates title, description, category, and SEO texts in 3 languages',
     feat3: 'Real-time Finance',
     feat3d: 'Track net profit, margin, commissions, and logistics per SKU',
     feat4: 'ABC Analysis',
@@ -258,30 +321,39 @@ const T = {
     feat5d: 'Auto-calculate prices based on real tariffs with minimum price protection',
     feat6: 'Inventory Audit',
     feat6d: 'Detect lost items in warehouses and claim compensation',
+    feat7: 'Trend Hunter AI',
+    feat7d: 'Find best-selling products and add them at the right time with AI recommendations',
+    feat8: '24/7 Monitoring',
+    feat8d: 'Stock, prices, new orders — real-time Telegram notifications',
+    feat9: 'Bulk Operations',
+    feat9d: 'Update hundreds of products at once. Excel import/export. Change prices and stock instantly',
     howTitle: 'How It Works',
     howDesc: 'Three steps to start automating your sales',
     step1: 'Sign Up',
-    step1d: '7-day free trial — no credit card required',
+    step1d: 'Create your account and sign in — setup in 5 minutes',
     step2: 'Connect Marketplaces',
     step2d: 'Enter your API key — system syncs automatically',
-    step3: 'Track Profits',
+    step3: 'Manage Profits',
     step3d: 'Analytics, orders, and pricing in one unified panel',
     pricingTitle: 'Simple, Transparent Pricing',
-    pricingDesc: 'No hidden fees. Cancel anytime.',
-    proPlan: 'Pro',
+    pricingDesc: 'No hidden fees. 60-day sales growth guarantee.',
+    proPlan: 'Premium',
     proPrice: '$499',
-    proFeatures: ['4 marketplaces', 'AI card generation', 'ABC Analysis & PnL', 'Price optimization', 'Inventory audit', 'Telegram notifications', '24/7 support'],
-    entPlan: 'Enterprise',
+    proPriceUzs: '6,300,000 UZS',
+    proFeatures: ['4 marketplaces', 'Unlimited AI card generation', 'ABC Analysis & PnL reports', 'Price optimization', 'Trend Hunter FULL', 'Inventory audit', 'Net profit analytics', 'Telegram notifications', '24/7 support'],
+    entPlan: 'Individual',
     entPrice: 'Custom',
-    entFeatures: ['All Pro features', 'Custom commission', 'API integration', 'Dedicated manager', 'WMS integration', 'Custom reports'],
+    entFeatures: ['All Premium features', 'Low commission (from 2%)', 'Dedicated manager', 'Custom integrations', 'WMS integration', 'SLA guarantee', 'White-label branding', 'API priority'],
+    entFor: 'Who it\'s for:',
+    entForList: ['Sellers with $50,000+/mo revenue', 'Multi-brand businesses', 'Companies with special requirements'],
     perMonth: '/mo',
-    commission: '+ 4% commission',
-    commissionEnt: '+ 2% commission',
-    freeTrial: '7-day free trial',
-    startPro: 'Start Pro',
-    contactSales: 'Contact Sales',
+    commission: '+ 4% of sales',
+    commissionEnt: '+ from 2% of sales',
+    guarantee: '60-day guarantee',
+    startPro: 'Get Started',
+    contactSales: 'Get a Quote',
     testimonialsTitle: 'What Sellers Say',
-    t1: '"With SellerCloudX I manage Uzum and Yandex from one place. Saving 15+ hours monthly."',
+    t1: '"With SellerCloudX I manage Uzum and Yandex from one place. Just 1-2 hours a day is enough."',
     t1n: 'Sardor M.', t1r: 'Electronics Seller',
     t2: '"ABC analysis revealed 30% of unprofitable products. I optimized my assortment."',
     t2n: 'Nilufar R.', t2r: 'Clothing Store',
@@ -289,19 +361,32 @@ const T = {
     t3n: 'Jasur T.', t3r: 'Gadget Seller',
     ctaTitle: 'Your competitors are already automated.',
     ctaSubtitle: 'Are you?',
-    ctaDesc: 'Thousands of professional sellers boost efficiency with SellerCloudX',
+    ctaDesc: '60-day sales growth guarantee. No results — no payment.',
     ctaButton: 'Get Started Now',
     footer: 'SellerCloudX',
-    footerDesc: 'Marketplace automation platform',
+    footerDesc: 'AI-Powered Marketplace Automation',
     rights: 'All rights reserved',
     privacy: 'Privacy Policy',
     terms: 'Terms of Service',
     support: 'Support',
     resultTitle: 'Real Results',
-    resultDesc: 'Metrics our users achieve',
-    r1: 'Time Saved', r1v: '15+ hrs/mo',
-    r2: 'Profit Growth', r2v: '+23%',
-    r3: 'Cost Reduction', r3v: '-34%',
+    resultDesc: 'Metrics achieved by SellerCloudX users',
+    r1: 'Replaces employees', r1v: '4-5',
+    r2: 'Daily work needed', r2v: '1-2 hrs',
+    r3: 'Sales Growth', r3v: '+23%',
+    faqTitle: 'Frequently Asked Questions',
+    faq1q: 'How do I get started?',
+    faq1a: 'Sign up, enter your API key and connect all your marketplaces in 5 minutes. No special knowledge required.',
+    faq2q: 'Which marketplaces are supported?',
+    faq2a: 'Currently Uzum Market, Yandex Market, Wildberries and Ozon are supported. New platforms are added regularly.',
+    faq3q: 'How does AI card generation work?',
+    faq3a: 'Upload a product photo — AI automatically generates name, description, category and SEO texts in 3 languages (UZ, RU, EN).',
+    faq4q: 'How do I pay for the subscription?',
+    faq4a: 'Pay via Click, Payme or bank transfer. Monthly payment + percentage of sales.',
+    faq5q: 'What is the 60-day guarantee?',
+    faq5a: 'If your sales don\'t grow within 60 days, we refund the paid amount. That\'s our confidence in quality.',
+    faq6q: 'Is my data secure?',
+    faq6a: 'Yes. API keys are stored encrypted. SSL protection and GDPR compliance.',
   },
 };
 
@@ -321,6 +406,9 @@ export default function Index() {
     { icon: BarChart3, title: txt.feat4, desc: txt.feat4d, color: 'text-amber-500 dark:text-amber-400', bg: 'bg-amber-500/10' },
     { icon: TrendingUp, title: txt.feat5, desc: txt.feat5d, color: 'text-rose-500 dark:text-rose-400', bg: 'bg-rose-500/10' },
     { icon: AlertTriangle, title: txt.feat6, desc: txt.feat6d, color: 'text-cyan-500 dark:text-cyan-400', bg: 'bg-cyan-500/10' },
+    { icon: Sparkles, title: txt.feat7, desc: txt.feat7d, color: 'text-orange-500 dark:text-orange-400', bg: 'bg-orange-500/10' },
+    { icon: Zap, title: txt.feat8, desc: txt.feat8d, color: 'text-yellow-500 dark:text-yellow-400', bg: 'bg-yellow-500/10' },
+    { icon: LineChart, title: txt.feat9, desc: txt.feat9d, color: 'text-indigo-500 dark:text-indigo-400', bg: 'bg-indigo-500/10' },
   ];
 
   const steps = [
@@ -335,11 +423,20 @@ export default function Index() {
     { text: txt.t3, name: txt.t3n, role: txt.t3r },
   ];
 
+  const faqs = [
+    { q: txt.faq1q, a: txt.faq1a },
+    { q: txt.faq2q, a: txt.faq2a },
+    { q: txt.faq3q, a: txt.faq3a },
+    { q: txt.faq4q, a: txt.faq4a },
+    { q: txt.faq5q, a: txt.faq5a },
+    { q: txt.faq6q, a: txt.faq6a },
+  ];
+
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       <SEOHead 
-        title="SellerCloudX — Marketplace Automation Platform"
-        description="Manage Uzum, Yandex Market, Wildberries, Ozon from one dashboard. AI card generation, PnL analytics, price optimization."
+        title="SellerCloudX — AI Marketplace Automation Platform"
+        description="Manage Uzum, Yandex Market, Wildberries, Ozon from one dashboard. AI card generation, PnL analytics, price optimization. Replace 4-5 employees."
       />
 
       {/* ━━━ Navigation ━━━ */}
@@ -362,6 +459,9 @@ export default function Index() {
             <a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">
               {language === 'uz' ? 'Narxlar' : language === 'ru' ? 'Цены' : 'Pricing'}
             </a>
+            <a href="#faq" className="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">
+              FAQ
+            </a>
           </div>
 
           <div className="flex items-center gap-2">
@@ -379,7 +479,6 @@ export default function Index() {
 
       {/* ━━━ HERO ━━━ */}
       <section className="relative min-h-[100vh] flex items-center pt-16 overflow-hidden">
-        {/* Background effects */}
         <div className="absolute inset-0 bg-mesh" />
         <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-primary/8 rounded-full blur-[120px]" />
         <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-accent/6 rounded-full blur-[100px]" />
@@ -387,7 +486,6 @@ export default function Index() {
 
         <div className="container mx-auto px-4 relative z-10">
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-            {/* Left - Text */}
             <div className="max-w-2xl">
               <div className="animate-fade-up">
                 <Badge className="mb-6 px-4 py-2 text-sm font-medium bg-primary/10 text-primary border-primary/20">
@@ -417,14 +515,30 @@ export default function Index() {
                 </Button>
                 <Button size="lg" variant="outline" className="text-base px-8 py-6 glass" asChild>
                   <a href="#features">
-                    <Play className="mr-2 h-4 w-4" />
+                    <Sparkles className="mr-2 h-4 w-4" />
                     {txt.ctaSecondary}
                   </a>
                 </Button>
               </div>
 
+              {/* Trust badges */}
+              <div className="mt-10 flex flex-wrap items-center gap-4 animate-fade-up" style={{ animationDelay: '0.45s' }}>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Shield className="h-4 w-4 text-primary" />
+                  <span>{txt.guarantee}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Lock className="h-4 w-4 text-primary" />
+                  <span>SSL Secured</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <FileCheck className="h-4 w-4 text-primary" />
+                  <span>GDPR</span>
+                </div>
+              </div>
+
               {/* Marketplace logos */}
-              <div className="mt-12 animate-fade-up" style={{ animationDelay: '0.5s' }}>
+              <div className="mt-8 animate-fade-up" style={{ animationDelay: '0.5s' }}>
                 <p className="text-xs text-muted-foreground mb-3 uppercase tracking-widest font-medium">{txt.trusted}</p>
                 <div className="flex items-center gap-6 md:gap-8">
                   {[
@@ -445,7 +559,6 @@ export default function Index() {
             {/* Right - Dashboard Image */}
             <div className="relative animate-fade-up hidden lg:block" style={{ animationDelay: '0.4s' }}>
               <div className="relative">
-                {/* Glow behind image */}
                 <div className="absolute -inset-4 bg-gradient-to-br from-primary/20 to-accent/20 rounded-3xl blur-2xl" />
                 <img 
                   src={heroDashboard} 
@@ -453,17 +566,15 @@ export default function Index() {
                   className="relative rounded-2xl shadow-2xl border border-border/30 w-full"
                   loading="eager"
                 />
-                {/* Floating badge */}
                 <div className="absolute -bottom-4 -left-4 bg-card border shadow-xl rounded-xl px-4 py-3 flex items-center gap-3 animate-bounce-subtle">
-                  <div className="w-10 h-10 rounded-lg bg-success/10 flex items-center justify-center">
-                    <TrendingUp className="h-5 w-5 text-success" />
+                  <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                    <Users className="h-5 w-5 text-emerald-500" />
                   </div>
                   <div>
-                    <div className="text-sm font-bold">+23%</div>
-                    <div className="text-xs text-muted-foreground">{txt.r2}</div>
+                    <div className="text-sm font-bold">4-5 → 1</div>
+                    <div className="text-xs text-muted-foreground">{txt.statsReplace}</div>
                   </div>
                 </div>
-                {/* Floating badge 2 */}
                 <div className="absolute -top-3 -right-3 bg-card border shadow-xl rounded-xl px-4 py-3 flex items-center gap-3">
                   <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
                     <Sparkles className="h-5 w-5 text-primary" />
@@ -491,7 +602,6 @@ export default function Index() {
           </div>
         </div>
 
-        {/* Scroll indicator */}
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce-subtle hidden md:block">
           <div className="w-6 h-10 rounded-full border-2 border-muted-foreground/20 flex items-start justify-center p-1.5">
             <div className="w-1.5 h-2.5 rounded-full bg-primary/50 animate-pulse" />
@@ -506,8 +616,8 @@ export default function Index() {
             {[
               { value: `${c1}+`, label: txt.statsMarketplaces, icon: Globe, color: 'text-primary' },
               { value: c2 >= 1000 ? `${(c2/1000).toFixed(0)}K+` : `${c2}+`, label: txt.statsProducts, icon: BarChart3, color: 'text-accent' },
-              { value: c3 >= 1000 ? `${(c3/1000).toFixed(0)}K+` : `${c3}+`, label: txt.statsOrders, icon: TrendingUp, color: 'text-success' },
-              { value: '15h+', label: txt.statsTime, icon: Clock, color: 'text-warning' },
+              { value: c3 >= 1000 ? `${(c3/1000).toFixed(0)}K+` : `${c3}+`, label: txt.statsOrders, icon: TrendingUp, color: 'text-emerald-500' },
+              { value: '4-5', label: txt.statsReplace, icon: Users, color: 'text-amber-500' },
             ].map((stat, i) => (
               <div key={i} className="text-center group cursor-default">
                 <div className={`w-14 h-14 rounded-2xl bg-card border shadow-sm mx-auto mb-4 flex items-center justify-center group-hover:shadow-lg group-hover:scale-105 transition-all`}>
@@ -542,7 +652,7 @@ export default function Index() {
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 max-w-6xl mx-auto">
             {features.map((feat, i) => (
-              <FadeInSection key={i} delay={i * 100}>
+              <FadeInSection key={i} delay={i * 80}>
                 <Card className="group border shadow-sm hover:shadow-xl transition-all duration-500 overflow-hidden hover:-translate-y-2 h-full">
                   <CardContent className="p-6 md:p-8">
                     <div className={`w-14 h-14 rounded-2xl ${feat.bg} flex items-center justify-center mb-5 group-hover:scale-110 transition-transform duration-300`}>
@@ -568,9 +678,9 @@ export default function Index() {
           </FadeInSection>
           <div className="grid grid-cols-3 gap-6 max-w-3xl mx-auto">
             {[
-              { label: txt.r1, value: txt.r1v, icon: Clock, color: 'text-primary' },
-              { label: txt.r2, value: txt.r2v, icon: TrendingUp, color: 'text-success' },
-              { label: txt.r3, value: txt.r3v, icon: Shield, color: 'text-accent' },
+              { label: txt.r1, value: txt.r1v, icon: Users, color: 'text-primary' },
+              { label: txt.r2, value: txt.r2v, icon: Clock, color: 'text-emerald-500' },
+              { label: txt.r3, value: txt.r3v, icon: TrendingUp, color: 'text-accent' },
             ].map((r, i) => (
               <FadeInSection key={i} delay={i * 150} className="text-center">
                 <r.icon className={`h-8 w-8 mx-auto mb-3 ${r.color}`} />
@@ -592,7 +702,6 @@ export default function Index() {
           </FadeInSection>
           
           <div className="grid md:grid-cols-3 gap-8 md:gap-12 max-w-5xl mx-auto relative">
-            {/* Connecting line */}
             <div className="hidden md:block absolute top-16 left-[20%] right-[20%] h-px bg-gradient-to-r from-primary/20 via-primary/40 to-primary/20" />
             
             {steps.map((step, i) => (
@@ -619,20 +728,21 @@ export default function Index() {
           </FadeInSection>
 
           <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            {/* Pro */}
+            {/* Premium */}
             <FadeInSection>
               <Card className="relative border-2 border-primary/30 shadow-xl overflow-hidden h-full hover:shadow-2xl transition-shadow">
                 <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-primary to-accent" />
                 <CardContent className="p-8 md:p-10">
                   <Badge className="mb-5 bg-primary/10 text-primary border-primary/20">
                     <Star className="h-3 w-3 mr-1" />
-                    {txt.freeTrial}
+                    {language === 'uz' ? 'TAVSIYA' : language === 'ru' ? 'РЕКОМЕНДУЕМ' : 'RECOMMENDED'}
                   </Badge>
                   <h3 className="text-2xl font-bold mb-1 font-display">{txt.proPlan}</h3>
-                  <div className="flex items-baseline gap-1 mb-2">
+                  <div className="flex items-baseline gap-1 mb-1">
                     <span className="text-5xl md:text-6xl font-bold text-primary font-display">{txt.proPrice}</span>
                     <span className="text-muted-foreground text-lg">{txt.perMonth}</span>
                   </div>
+                  <p className="text-sm text-muted-foreground mb-1">{txt.proPriceUzs}{txt.perMonth}</p>
                   <p className="text-sm text-muted-foreground mb-8">{txt.commission}</p>
                   <ul className="space-y-4 mb-10">
                     {txt.proFeatures.map((f, i) => (
@@ -650,20 +760,34 @@ export default function Index() {
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
                   </Button>
+                  <p className="text-xs text-center text-muted-foreground mt-3">{txt.guarantee}</p>
                 </CardContent>
               </Card>
             </FadeInSection>
 
-            {/* Enterprise */}
+            {/* Individual */}
             <FadeInSection delay={150}>
               <Card className="border shadow-sm h-full hover:shadow-lg transition-shadow">
                 <CardContent className="p-8 md:p-10">
-                  <Badge variant="outline" className="mb-5">Enterprise</Badge>
+                  <Badge variant="outline" className="mb-5">VIP</Badge>
                   <h3 className="text-2xl font-bold mb-1 font-display">{txt.entPlan}</h3>
                   <div className="flex items-baseline gap-1 mb-2">
                     <span className="text-5xl md:text-6xl font-bold font-display">{txt.entPrice}</span>
                   </div>
-                  <p className="text-sm text-muted-foreground mb-8">{txt.commissionEnt}</p>
+                  <p className="text-sm text-muted-foreground mb-6">{txt.commissionEnt}</p>
+                  
+                  <div className="mb-6">
+                    <p className="text-sm font-semibold mb-2">{txt.entFor}</p>
+                    <ul className="space-y-1.5">
+                      {txt.entForList.map((item, i) => (
+                        <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
+                          <span className="text-primary mt-0.5">•</span>
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
                   <ul className="space-y-4 mb-10">
                     {txt.entFeatures.map((f, i) => (
                       <li key={i} className="flex items-center gap-3 text-sm">
@@ -675,9 +799,9 @@ export default function Index() {
                     ))}
                   </ul>
                   <Button variant="outline" className="w-full" size="lg" asChild>
-                    <a href="https://t.me/sellercloudx">
+                    <a href="https://t.me/sellercloudx" target="_blank" rel="noopener noreferrer">
+                      <MessageCircle className="mr-2 h-4 w-4" />
                       {txt.contactSales}
-                      <ChevronRight className="ml-2 h-4 w-4" />
                     </a>
                   </Button>
                 </CardContent>
@@ -723,6 +847,26 @@ export default function Index() {
         </div>
       </section>
 
+      {/* ━━━ FAQ ━━━ */}
+      <section id="faq" className="py-24 md:py-32 bg-muted/30">
+        <div className="container mx-auto px-4">
+          <FadeInSection className="text-center mb-16">
+            <Badge variant="outline" className="mb-4 px-4 py-1.5">FAQ</Badge>
+            <h2 className="text-3xl md:text-5xl font-bold font-display">{txt.faqTitle}</h2>
+          </FadeInSection>
+
+          <FadeInSection>
+            <Card className="max-w-3xl mx-auto">
+              <CardContent className="p-6 md:p-8">
+                {faqs.map((faq, i) => (
+                  <FAQItem key={i} question={faq.q} answer={faq.a} />
+                ))}
+              </CardContent>
+            </Card>
+          </FadeInSection>
+        </div>
+      </section>
+
       {/* ━━━ Final CTA ━━━ */}
       <section className="py-24 md:py-32 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary to-accent" />
@@ -764,14 +908,25 @@ export default function Index() {
                 <p className="text-xs text-muted-foreground">{txt.footerDesc}</p>
               </div>
             </div>
-            <div className="flex items-center gap-6 text-sm text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-6 text-sm text-muted-foreground">
               <a href="https://t.me/sellercloudx" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors flex items-center gap-1.5">
                 <Send className="h-3.5 w-3.5" /> Telegram
+              </a>
+              <a href="https://sellercloudx.com" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                sellercloudx.com
               </a>
               <span className="hover:text-foreground transition-colors cursor-pointer">{txt.privacy}</span>
               <span className="hover:text-foreground transition-colors cursor-pointer">{txt.terms}</span>
               <span className="hover:text-foreground transition-colors cursor-pointer">{txt.support}</span>
             </div>
+            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+              <Lock className="h-3.5 w-3.5" />
+              <span>SSL Secured</span>
+              <span>•</span>
+              <span>GDPR</span>
+            </div>
+          </div>
+          <div className="text-center mt-8 pt-6 border-t">
             <p className="text-sm text-muted-foreground">
               © {new Date().getFullYear()} SellerCloudX. {txt.rights}
             </p>
