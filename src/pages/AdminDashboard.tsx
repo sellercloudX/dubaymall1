@@ -12,9 +12,12 @@ import { SellerCloudManagement } from '@/components/admin/SellerCloudManagement'
 import { SiteAnalytics } from '@/components/admin/SiteAnalytics';
 import { ActivationsManagement } from '@/components/admin/ActivationsManagement';
 import { AdminsManagement } from '@/components/admin/AdminsManagement';
+import { StartupMetrics } from '@/components/admin/StartupMetrics';
+import { PlatformExpenses } from '@/components/admin/PlatformExpenses';
+import { PartnerAnalytics } from '@/components/admin/PartnerAnalytics';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
-import { Shield, Users, ShoppingCart, BarChart3, DollarSign, Wallet, Crown, Globe, UserCheck, Settings } from 'lucide-react';
+import { Shield, Users, ShoppingCart, BarChart3, DollarSign, Wallet, Crown, Globe, UserCheck, Settings, Zap, TrendingUp, UsersRound } from 'lucide-react';
 
 export default function AdminDashboard() {
   const { user, loading } = useAuth();
@@ -69,11 +72,21 @@ export default function AdminDashboard() {
         )}
 
         {/* Management Tabs */}
-        <Tabs defaultValue="analytics" className="space-y-6">
+        <Tabs defaultValue="metrics" className="space-y-6">
           <TabsList className="h-auto flex-wrap gap-1 p-1">
+            {hasPermission('can_manage_finances') && (
+              <TabsTrigger value="metrics" className="gap-1.5 text-xs">
+                <TrendingUp className="h-3.5 w-3.5" />Metrikalar
+              </TabsTrigger>
+            )}
             {hasPermission('can_manage_finances') && (
               <TabsTrigger value="analytics" className="gap-1.5 text-xs">
                 <BarChart3 className="h-3.5 w-3.5" />Analitika
+              </TabsTrigger>
+            )}
+            {hasPermission('can_manage_finances') && (
+              <TabsTrigger value="partners" className="gap-1.5 text-xs">
+                <UsersRound className="h-3.5 w-3.5" />Hamkorlar
               </TabsTrigger>
             )}
             {hasPermission('can_manage_users') && (
@@ -96,6 +109,11 @@ export default function AdminDashboard() {
                 <Wallet className="h-3.5 w-3.5" />Moliya
               </TabsTrigger>
             )}
+            {hasPermission('can_manage_finances') && (
+              <TabsTrigger value="expenses" className="gap-1.5 text-xs">
+                <Zap className="h-3.5 w-3.5" />Xarajatlar
+              </TabsTrigger>
+            )}
             {hasPermission('can_manage_content') && (
               <TabsTrigger value="site-stats" className="gap-1.5 text-xs">
                 <Globe className="h-3.5 w-3.5" />Sayt
@@ -108,8 +126,16 @@ export default function AdminDashboard() {
             )}
           </TabsList>
 
+          <TabsContent value="metrics">
+            <StartupMetrics />
+          </TabsContent>
+
           <TabsContent value="analytics">
             <AdminAnalytics />
+          </TabsContent>
+
+          <TabsContent value="partners">
+            <PartnerAnalytics />
           </TabsContent>
 
           <TabsContent value="users">
@@ -135,6 +161,10 @@ export default function AdminDashboard() {
               <TabsContent value="monetization"><MonetizationSettings /></TabsContent>
               <TabsContent value="sellercloud"><SellerCloudManagement /></TabsContent>
             </Tabs>
+          </TabsContent>
+
+          <TabsContent value="expenses">
+            <PlatformExpenses />
           </TabsContent>
 
           <TabsContent value="site-stats">
