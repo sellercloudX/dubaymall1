@@ -440,7 +440,7 @@ async function fetchCategoryParameters(apiKey: string, categoryId: number): Prom
   }
 }
 
-// ============ STEP 3: AI FILLS ALL CONTENT + PARAMETERS ============
+// ============ STEP 3: AI FILLS ALL CONTENT + PARAMETERS (2-PASS) ============
 
 async function aiOptimize(
   product: ProductInput,
@@ -457,8 +457,7 @@ async function aiOptimize(
     return true;
   });
   
-  // ALL params — required, recommended, AND hidden ("Maydonlarni ko'rsatish" params)
-  const allParams = safeParams; // Don't filter — fill EVERYTHING
+  const allParams = safeParams;
 
   const formatParam = (p: any) => {
     let s = `  - id:${p.id}, "${p.name}", type:${p.type || "TEXT"}, required:${p.required || p.constraintType === "REQUIRED" ? "YES" : "no"}`;
@@ -471,7 +470,7 @@ async function aiOptimize(
     return s;
   };
 
-  console.log(`🤖 AI optimizing: ${allParams.length} TOTAL params (filling ALL including hidden)`);
+  console.log(`🤖 AI optimizing (2-pass): ${allParams.length} TOTAL params`);
 
   const prompt = `VAZIFA: Yandex Market kartochkasi uchun BARCHA ${allParams.length} ta parametrni to'ldir!
 MAQSAD: MAKSIMAL ball olish. "Maydonlarni ko'rsatish" (Показать поля) ortidagi YASHIRIN parametrlar ham ALBATTA to'ldirilishi SHART!
@@ -518,9 +517,12 @@ QOIDALAR:
 JAVOB FAQAT JSON:
 {"name_ru":"...","name_uz":"...","description_ru":"...","description_uz":"...","vendor":"...","vendorCode":"...","manufacturerCountry":"...","shelfLife":null,"lifeTime":null,"parameterValues":[{"parameterId":123,"valueId":456},{"parameterId":789,"value":"qiymat"}],"warranty":"1 год","adult":false,"weightKg":0.15,"lengthCm":10,"widthCm":8,"heightCm":5}`;
 
-  // Use cheaper model for clone mode to save ~80% on AI costs
+  // Use better model for first pass
   const aiModel = cloneMode ? "google/gemini-2.5-flash" : "google/gemini-2.5-pro";
   
+  let result: any = null;
+  
+  // ═══ PASS 1: Initial AI fill ═══
   try {
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -529,22 +531,85 @@ JAVOB FAQAT JSON:
         model: aiModel,
         messages: [{ role: "user", content: prompt }],
         temperature: 0.1,
-        max_tokens: cloneMode ? 8000 : 12000,
+        max_tokens: cloneMode ? 8000 : 16000,
       }),
     });
 
-    if (!resp.ok) { console.error("AI failed:", resp.status); return null; }
+    if (!resp.ok) { console.error("AI Pass 1 failed:", resp.status); return null; }
 
     const data = await resp.json();
     const content = data.choices?.[0]?.message?.content || "";
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      const result = JSON.parse(jsonMatch[0]);
-      console.log(`🤖 AI: name_ru=${result.name_ru?.length}ch, desc=${result.description_ru?.length}ch, params=${result.parameterValues?.length}, weight=${result.weightKg}kg`);
-      return result;
+      result = JSON.parse(jsonMatch[0]);
+      console.log(`🤖 Pass 1: name_ru=${result.name_ru?.length}ch, desc=${result.description_ru?.length}ch, params=${result.parameterValues?.length}, weight=${result.weightKg}kg`);
     }
-  } catch (e) { console.error("AI error:", e); }
-  return null;
+  } catch (e) { console.error("AI Pass 1 error:", e); }
+  
+  if (!result) return null;
+
+  // ═══ PASS 2: Find missing params and fill them ═══
+  const filledParamIds = new Set(
+    (result.parameterValues || []).map((p: any) => Number(p.parameterId))
+  );
+  const missingParams = allParams.filter((p: any) => !filledParamIds.has(Number(p.id)));
+  
+  if (missingParams.length > 0 && missingParams.length <= 80) {
+    console.log(`🔄 Pass 2: ${missingParams.length} params bo'sh qoldi, to'ldirish...`);
+    
+    const pass2Prompt = `VAZIFA: Quyidagi ${missingParams.length} ta BO'SH parametrni to'ldir!
+Bular birinchi bosqichda to'ldirilmagan parametrlar. HAR BIRINI ALBATTA to'ldir!
+
+MAHSULOT: "${product.name}" — ${categoryName}
+Brend: ${result.vendor || product.brand || "OEM"}
+
+BO'SH PARAMETRLAR:
+${missingParams.map(formatParam).join("\n")}
+
+QOIDALAR:
+- OPTIONS bor → valueId (raqam) tanla
+- TEXT → FAQAT qiymat ("красный", "100 мл")
+- NUMBER → raqam
+- BOOLEAN → "true"/"false"
+- Bilmasang ham — mahsulotga mos TAXMINIY qiymat yoz!
+
+JAVOB FAQAT JSON array:
+[{"parameterId":123,"valueId":456},{"parameterId":789,"value":"qiymat"}]`;
+
+    try {
+      const resp2 = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${lovableApiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages: [{ role: "user", content: pass2Prompt }],
+          temperature: 0.1,
+          max_tokens: 6000,
+        }),
+      });
+
+      if (resp2.ok) {
+        const data2 = await resp2.json();
+        const content2 = data2.choices?.[0]?.message?.content || "";
+        const arrMatch = content2.match(/\[[\s\S]*\]/);
+        if (arrMatch) {
+          const extraParams = JSON.parse(arrMatch[0]);
+          if (Array.isArray(extraParams) && extraParams.length > 0) {
+            result.parameterValues = [...(result.parameterValues || []), ...extraParams];
+            console.log(`✅ Pass 2: +${extraParams.length} params to'ldirildi. Jami: ${result.parameterValues.length}`);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("AI Pass 2 error:", e);
+    }
+  } else if (missingParams.length === 0) {
+    console.log(`✅ Pass 1 da barcha ${allParams.length} param to'ldirildi!`);
+  } else {
+    console.log(`⚠️ ${missingParams.length} param bo'sh qoldi (juda ko'p, pass 2 o'tkazildi)`);
+  }
+
+  return result;
 }
 
 // ============ BUILD OFFER ============
@@ -730,12 +795,44 @@ serve(async (req) => {
         
         // Cost optimization: skip image generation if cloning (reuse existing images)
         if (LOVABLE_KEY && !body.skipImageGeneration) {
-          console.log(`🖼️ Generating 4 creative professional images (source ref: ${sourceImg ? 'yes' : 'no'})...`);
+          // Determine category-specific marketplace card design style
+          const catLower = (product.category || product.name || "").toLowerCase();
+          let cardBg = "clean white-to-light-gray gradient";
+          let cardAccent = "soft blue accent glow";
+          let cardMood = "premium marketplace listing";
+          
+          if (catLower.includes("kosmetik") || catLower.includes("beauty") || catLower.includes("go'zallik") || catLower.includes("parfum") || catLower.includes("cream")) {
+            cardBg = "soft rose-gold to cream gradient with subtle golden sparkle particles";
+            cardAccent = "rose-gold shimmer and soft floral bokeh";
+            cardMood = "luxury beauty brand advertisement, Sephora/Charlotte Tilbury level";
+          } else if (catLower.includes("elektron") || catLower.includes("phone") || catLower.includes("smartfon") || catLower.includes("kompyuter") || catLower.includes("audio") || catLower.includes("tech")) {
+            cardBg = "sleek dark charcoal-to-black gradient (#0a0a0a to #1a1a2e) with subtle electric blue ambient glow";
+            cardAccent = "electric blue neon rim lighting and holographic shimmer";
+            cardMood = "Apple/Samsung flagship device launch, futuristic premium tech";
+          } else if (catLower.includes("kiyim") || catLower.includes("fashion") || catLower.includes("poyabzal") || catLower.includes("shoes")) {
+            cardBg = "warm off-white to beige gradient with subtle fabric texture overlay";
+            cardAccent = "warm gold accent lines and editorial composition";
+            cardMood = "ZARA/H&M catalog photography, clean fashion editorial";
+          } else if (catLower.includes("sport") || catLower.includes("fitness")) {
+            cardBg = "dynamic dark gradient with energetic orange-red accent streaks";
+            cardAccent = "fiery orange rim lighting and motion blur energy lines";
+            cardMood = "Nike/Adidas campaign photography, dynamic and powerful";
+          } else if (catLower.includes("bolalar") || catLower.includes("kids") || catLower.includes("baby") || catLower.includes("toy")) {
+            cardBg = "soft cheerful pastel rainbow gradient (light blue, mint, soft yellow)";
+            cardAccent = "bright playful shapes and confetti dots";
+            cardMood = "safe, bright, parent-friendly, Mothercare quality";
+          } else if (catLower.includes("oziq") || catLower.includes("food") || catLower.includes("ovqat") || catLower.includes("drink")) {
+            cardBg = "warm appetizing gradient with subtle wooden surface texture";
+            cardAccent = "warm amber lighting and freshness glow";
+            cardMood = "premium food photography, appetizing and inviting";
+          }
+
+          console.log(`🖼️ Generating 4 Pinterest-style marketplace card images (${cardMood})...`);
           const creativeAngles = [
-            `Professional e-commerce HERO shot of "${product.name}" centered on pristine white background. Perfect studio lighting, soft diffused shadows. The product must fill 70% of frame. Ultra-sharp 4K quality, no text overlays.`,
-            `Elegant LIFESTYLE photo of "${product.name}" in a beautiful, aspirational usage setting. Natural warm lighting, shallow depth of field, bokeh background. Show the product in context — on a vanity table, in a kitchen, on a desk, etc. depending on category.`,
-            `Premium 45-DEGREE ANGLE studio shot of "${product.name}" on subtle gradient background (white to light gray). Dramatic rim lighting highlighting texture and build quality. Professional catalog photography.`,
-            `DETAIL MACRO close-up of "${product.name}" showing premium texture, material quality, branding, key buttons or functional elements. Shallow depth of field, studio lighting on clean background.`,
+            `Create a PREMIUM MARKETPLACE CARD image: ${cardBg} background. Product "${product.name}" centered, fills 75% of frame. ${cardAccent} around the product edges. Professional three-point studio lighting with dramatic rim light. Subtle reflection beneath. Style: ${cardMood}. NO text, NO watermarks, NO labels overlaid on the image. Ultra-sharp 4K quality, 3:4 marketplace card ratio.`,
+            `Create a LIFESTYLE MARKETPLACE CARD: ${cardBg} with subtle lifestyle elements (soft bokeh, ambient glow, aspirational setting). Product "${product.name}" slightly angled at 15 degrees for dynamic feel. Warm inviting lighting creating emotional connection and desire to purchase. ${cardAccent}. Style: ${cardMood}. NO text overlays. Premium marketplace listing quality.`,
+            `Create a PREMIUM ANGLE MARKETPLACE CARD: ${cardBg}. Three-quarter angle perspective of "${product.name}" showing 3D depth. Dramatic rim lighting creating stunning silhouette edge highlight. Sophisticated composition with artistic negative space. ${cardAccent}. Style: ${cardMood}. NO text overlays. Luxury catalog quality.`,
+            `Create a DETAIL SHOWCASE MARKETPLACE CARD: ${cardBg}. Close-up of "${product.name}" showing premium texture, material quality, branding details. Product fills 85% of frame. Bright even lighting emphasizing craftsmanship and quality. ${cardAccent}. Style: ${cardMood}. NO text overlays. Professional macro-style marketplace photography.`,
           ];
           
           const imgPromises = creativeAngles.map((angle, i) => (async () => {
