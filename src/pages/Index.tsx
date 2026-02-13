@@ -105,7 +105,7 @@ const T = {
     heroTitle1: '4-5 ta hodim ishini',
     heroTitle2: 'bitta platforma',
     heroTitle3: 'bajaradi.',
-    heroDesc: 'Uzum, Yandex Market, Wildberries, Ozon — barchasini yagona AI-quvvatli dashboard orqali boshqaring. Kuniga 1-2 soat ishlash yetarli — qolganini SellerCloudX avtomatlashtiradi.',
+    heroDesc: 'Uzum, Yandex Market, Wildberries, Ozon — barchasini yagona AI-quvvatli dashboard orqali boshqaring. Kuniga 1-2 soat ishlash yetarli — qolganini platforma avtomatlashtiradi.',
     cta: 'Hoziroq boshlash',
     ctaSecondary: 'Imkoniyatlarni ko\'rish',
     loginCta: 'Kirish',
@@ -201,7 +201,7 @@ const T = {
     heroTitle1: 'Работу 4-5 сотрудников',
     heroTitle2: 'выполняет одна',
     heroTitle3: 'платформа.',
-    heroDesc: 'Uzum, Yandex Market, Wildberries, Ozon — управляйте всем через единый AI-дашборд. Достаточно 1-2 часа в день — остальное SellerCloudX автоматизирует.',
+    heroDesc: 'Uzum, Yandex Market, Wildberries, Ozon — управляйте всем через единый AI-дашборд. Достаточно 1-2 часа в день — остальное платформа автоматизирует.',
     cta: 'Начать сейчас',
     ctaSecondary: 'Узнать возможности',
     loginCta: 'Войти',
@@ -297,7 +297,7 @@ const T = {
     heroTitle1: 'Replace 4-5 employees',
     heroTitle2: 'with one',
     heroTitle3: 'platform.',
-    heroDesc: 'Uzum, Yandex Market, Wildberries, Ozon — manage everything through a single AI-powered dashboard. Just 1-2 hours a day — SellerCloudX automates the rest.',
+    heroDesc: 'Uzum, Yandex Market, Wildberries, Ozon — manage everything through a single AI-powered dashboard. Just 1-2 hours a day — the platform automates the rest.',
     cta: 'Get Started',
     ctaSecondary: 'Explore Features',
     loginCta: 'Sign In',
@@ -446,7 +446,7 @@ export default function Index() {
             <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/20">
               <Crown className="h-3.5 w-3.5 sm:h-4.5 sm:w-4.5 text-white" />
             </div>
-            <span className="text-base sm:text-xl font-bold font-display tracking-tight">SellerCloudX</span>
+            <span className="hidden sm:inline text-xl font-bold font-display tracking-tight">SellerCloudX</span>
           </Link>
           
           <div className="hidden md:flex items-center gap-8">
@@ -495,7 +495,7 @@ export default function Index() {
                 </Badge>
               </div>
 
-              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6 sm:mb-8 font-display leading-tight animate-fade-up" style={{ animationDelay: '0.1s' }}>
+              <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6 sm:mb-8 font-display leading-tight animate-fade-up" style={{ animationDelay: '0.1s' }}>
                 <span className="text-foreground">{txt.heroTitle1}</span>
                 <br />
                 <span className="text-gradient">{txt.heroTitle2}</span>
