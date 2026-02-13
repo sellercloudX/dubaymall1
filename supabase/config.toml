@@ -71,3 +71,6 @@ verify_jwt = false
 
 [functions.prepare-uzum-card]
 verify_jwt = false
+
+[functions.pinterest-design-search]
+verify_jwt = false
