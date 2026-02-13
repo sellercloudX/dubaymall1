@@ -15,8 +15,8 @@ interface SEOHeadProps {
 }
 
 export function SEOHead({
-  title = "Dubay Mall - O'zbekiston onlayn bozori",
-  description = "O'zbekistonning eng yirik onlayn savdo platformasi. Minglab mahsulotlar, ishonchli sotuvchilar va tez yetkazib berish.",
+  title = "SellerCloudX — Marketplace Automation Platform",
+  description = "Manage Uzum, Yandex Market, Wildberries, Ozon from one dashboard. AI card generation, PnL analytics, price optimization.",
   image = "/og-image.png",
   url,
   type = 'website',
@@ -49,7 +49,7 @@ export function SEOHead({
     setMetaTag('og:image', image);
     setMetaTag('og:type', type);
     if (url) setMetaTag('og:url', url);
-    setMetaTag('og:site_name', 'Dubay Mall');
+    setMetaTag('og:site_name', 'SellerCloudX');
     setMetaTag('og:locale', 'uz_UZ');
 
     // Twitter Card tags
@@ -75,7 +75,7 @@ export function SEOHead({
     // Cleanup function
     return () => {
       // Reset to default title when component unmounts
-      document.title = "Dubay Mall - O'zbekiston onlayn bozori";
+      document.title = "SellerCloudX — Marketplace Automation Platform";
     };
   }, [title, description, image, url, type, product]);
 

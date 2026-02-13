@@ -1,134 +1,64 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { useCart } from '@/contexts/CartContext';
-import { useUserRoles } from '@/hooks/useUserRoles';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { NotificationsDropdown } from '@/components/notifications/NotificationsDropdown';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
- import { ShoppingBag, ShoppingCart, User, LogOut, Menu, X, Shield, Heart, Handshake, Store, Users, BookOpen, Crown } from 'lucide-react';
+import { useUserRoles } from '@/hooks/useUserRoles';
+import { Crown, User, LogOut, Menu, X, Shield } from 'lucide-react';
 import { useState } from 'react';
 
 export function Navbar() {
   const { t } = useLanguage();
   const { user, signOut } = useAuth();
-  const { totalItems } = useCart();
-  const { isAdmin, isSeller, isBlogger, loading: rolesLoading } = useUserRoles();
+  const { isAdmin, loading: rolesLoading } = useUserRoles();
   const navigate = useNavigate();
+  const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Don't show this navbar on landing page (it has its own nav)
+  if (location.pathname === '/') return null;
 
   const handleSignOut = async () => {
     await signOut();
     navigate('/');
   };
 
-  // Only show role-specific links if user has that role
-  const showSellerLink = user && isSeller;
-  const showBloggerLink = user && isBlogger;
-  const showAdminLink = user && isAdmin;
-
   return (
     <nav className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 safe-area-top">
       <div className="container mx-auto px-4">
         <div className="flex h-14 md:h-16 items-center justify-between">
-          {/* Logo */}
           <Link to="/" className="flex items-center gap-2">
-            <ShoppingBag className="h-7 w-7 md:h-8 md:w-8 text-primary" />
-             <span className="text-lg md:text-xl font-bold text-foreground hidden sm:inline">{t.appName}</span>
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+              <Crown className="h-4 w-4 text-white" />
+            </div>
+            <span className="text-lg md:text-xl font-bold text-foreground font-display">SellerCloudX</span>
           </Link>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-6">
-            <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors">
-               {t.marketplace}
+            <Link to="/seller-cloud" className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5">
+              <Crown className="h-4 w-4" />
+              Dashboard
             </Link>
-            
-            {/* Partnership link - visible to everyone */}
-            <Link to="/partnership" className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5">
-              <Handshake className="h-4 w-4" />
-               Hamkorlik
-            </Link>
-            
-            {/* Blog link - visible to everyone */}
-            <Link to="/blog" className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5">
-              <BookOpen className="h-4 w-4" />
-              Blog
-            </Link>
-
-            {/* Role-specific links - only visible to users with that role */}
-            {!rolesLoading && (
-              <>
-                {showSellerLink && (
-                  <>
-                    <Link to="/seller" className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5">
-                      <Store className="h-4 w-4" />
-                      {t.myShop}
-                    </Link>
-                    <Link to="/seller-cloud" className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5">
-                      <Crown className="h-4 w-4" />
-                      SellerCloudX
-                    </Link>
-                  </>
-                )}
-                {showBloggerLink && (
-                  <Link to="/blogger" className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5">
-                    <Users className="h-4 w-4" />
-                    Blogger
-                  </Link>
-                )}
-                {showAdminLink && (
-                  <Link to="/admin" className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
-                    <Shield className="h-4 w-4" />
-                    Admin
-                  </Link>
-                )}
-              </>
+            {!rolesLoading && isAdmin && user && (
+              <Link to="/admin" className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+                <Shield className="h-4 w-4" />
+                Admin
+              </Link>
             )}
           </div>
 
-          {/* Right Side - Desktop */}
-          <div className="hidden md:flex items-center gap-4">
+          {/* Right Side */}
+          <div className="hidden md:flex items-center gap-3">
             <ThemeToggle />
             <LanguageSwitcher />
-            
-            {user && (
-              <>
-                <NotificationsDropdown />
-                <Link to="/favorites">
-                  <Button variant="ghost" size="icon" aria-label="Sevimlilar">
-                    <Heart className="h-5 w-5" />
-                  </Button>
-                </Link>
-              </>
-            )}
-            
-            <Link to="/cart" className="relative">
-              <Button variant="ghost" size="icon" aria-label="Savatcha">
-                <ShoppingCart className="h-5 w-5" />
-                {totalItems > 0 && (
-                  <Badge 
-                    className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
-                  >
-                    {totalItems > 99 ? '99+' : totalItems}
-                  </Badge>
-                )}
-              </Button>
-            </Link>
-            
+            {user && <NotificationsDropdown />}
             {user ? (
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" asChild>
-                  <Link to="/dashboard" className="gap-2">
-                    <User className="h-4 w-4" />
-                     <span className="hidden lg:inline">{t.dashboard}</span>
-                  </Link>
-                </Button>
-                <Button variant="ghost" size="sm" onClick={handleSignOut} aria-label="Chiqish">
-                  <LogOut className="h-4 w-4" />
-                </Button>
-              </div>
+              <Button variant="ghost" size="sm" onClick={handleSignOut} aria-label="Chiqish">
+                <LogOut className="h-4 w-4" />
+              </Button>
             ) : (
               <div className="flex items-center gap-2">
                 <Button variant="ghost" size="sm" asChild>
@@ -141,150 +71,42 @@ export function Navbar() {
             )}
           </div>
 
-          {/* Mobile - Right side */}
+          {/* Mobile */}
           <div className="flex md:hidden items-center gap-2">
-             <Link to="/cart" className="relative p-2">
-               <ShoppingCart className="h-5 w-5" />
-               {totalItems > 0 && (
-                 <Badge 
-                   className="absolute -top-0 -right-0 h-4 w-4 flex items-center justify-center p-0 text-[10px]"
-                 >
-                   {totalItems > 9 ? '9+' : totalItems}
-                 </Badge>
-               )}
-             </Link>
-            <button
-              className="p-2"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              aria-label={mobileMenuOpen ? "Menyuni yopish" : "Menyuni ochish"}
-            >
-              {mobileMenuOpen ? (
-                <X className="h-5 w-5" />
-              ) : (
-                <Menu className="h-5 w-5" />
-              )}
+            <button className="p-2" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
           </div>
         </div>
 
-        {/* Mobile Menu */}
         {mobileMenuOpen && (
           <div className="md:hidden py-4 border-t animate-fade-in">
             <div className="flex flex-col gap-3">
-               {/* Quick actions */}
-               <div className="flex items-center justify-between pb-3 border-b">
-                 <div className="flex items-center gap-2">
-                   <ThemeToggle />
-                   <LanguageSwitcher />
-                 </div>
-                 {user && (
-                   <div className="flex items-center gap-2">
-                     <Link to="/favorites" onClick={() => setMobileMenuOpen(false)}>
-                       <Button variant="ghost" size="icon">
-                         <Heart className="h-5 w-5" />
-                       </Button>
-                     </Link>
-                     <NotificationsDropdown />
-                   </div>
-                 )}
-               </div>
- 
-              {/* Partnership - visible to all */}
-              <Link
-                to="/partnership"
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2 py-2"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                <Handshake className="h-4 w-4" />
-                 Hamkorlik
+              <div className="flex items-center gap-2 pb-3 border-b">
+                <ThemeToggle />
+                <LanguageSwitcher />
+                {user && <NotificationsDropdown />}
+              </div>
+              <Link to="/seller-cloud" className="text-sm py-2 flex items-center gap-2" onClick={() => setMobileMenuOpen(false)}>
+                <Crown className="h-4 w-4" /> Dashboard
               </Link>
-              
-              {/* Blog - visible to all */}
-              <Link
-                to="/blog"
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2 py-2"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                <BookOpen className="h-4 w-4" />
-                Blog
-              </Link>
-
-              {/* Role-specific links */}
-              {user && !rolesLoading && (
-                <>
-                  {showSellerLink && (
-                    <>
-                      <Link
-                        to="/seller"
-                        className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2 py-2"
-                        onClick={() => setMobileMenuOpen(false)}
-                      >
-                        <Store className="h-4 w-4" />
-                        {t.myShop}
-                      </Link>
-                      <Link
-                        to="/seller-cloud"
-                        className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2 py-2"
-                        onClick={() => setMobileMenuOpen(false)}
-                      >
-                        <Crown className="h-4 w-4" />
-                        SellerCloudX
-                      </Link>
-                    </>
-                  )}
-                  {showBloggerLink && (
-                    <Link
-                      to="/blogger"
-                      className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2 py-2"
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      <Users className="h-4 w-4" />
-                       Blogger kabineti
-                    </Link>
-                  )}
-                  {showAdminLink && (
-                    <Link
-                      to="/admin"
-                      className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2 py-2"
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      <Shield className="h-4 w-4" />
-                       Admin kabineti
-                    </Link>
-                  )}
-                </>
+              {!rolesLoading && isAdmin && user && (
+                <Link to="/admin" className="text-sm py-2 flex items-center gap-2" onClick={() => setMobileMenuOpen(false)}>
+                  <Shield className="h-4 w-4" /> Admin
+                </Link>
               )}
-              
               <div className="border-t pt-3 mt-2">
                 {user ? (
-                   <div className="flex flex-col gap-2">
-                     <Button variant="outline" size="sm" asChild>
-                       <Link to="/dashboard" onClick={() => setMobileMenuOpen(false)}>
-                         <User className="h-4 w-4 mr-2" />
-                         {t.dashboard}
-                       </Link>
-                     </Button>
-                     <Button 
-                       variant="ghost" 
-                       size="sm" 
-                       onClick={() => { handleSignOut(); setMobileMenuOpen(false); }}
-                       className="justify-start gap-2 text-destructive"
-                     >
-                       <LogOut className="h-4 w-4" />
-                       {t.logout}
-                     </Button>
-                   </div>
+                  <Button variant="ghost" size="sm" onClick={() => { handleSignOut(); setMobileMenuOpen(false); }} className="justify-start gap-2 text-destructive">
+                    <LogOut className="h-4 w-4" /> {t.logout}
+                  </Button>
                 ) : (
                   <div className="flex flex-col gap-2">
                     <Button variant="outline" size="sm" asChild>
-                      <Link to="/auth" onClick={() => setMobileMenuOpen(false)}>
-                        {t.login}
-                      </Link>
+                      <Link to="/auth" onClick={() => setMobileMenuOpen(false)}>{t.login}</Link>
                     </Button>
                     <Button size="sm" asChild>
-                      <Link to="/auth?mode=register" onClick={() => setMobileMenuOpen(false)}>
-                        {t.register}
-                      </Link>
+                      <Link to="/auth?mode=register" onClick={() => setMobileMenuOpen(false)}>{t.register}</Link>
                     </Button>
                   </div>
                 )}

@@ -64,7 +64,7 @@ export function InstallPWA() {
             <Download className="h-5 w-5 text-primary" />
           </div>
           <div className="flex-1 min-w-0">
-            <h4 className="font-semibold text-sm">Dubay Mall'ni o'rnating</h4>
+            <h4 className="font-semibold text-sm">SellerCloudX ni o'rnating</h4>
             <p className="text-xs text-muted-foreground mt-1">
               Tezroq kirish va offline rejim uchun ilovani o'rnating
             </p>

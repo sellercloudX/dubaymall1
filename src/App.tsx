@@ -11,7 +11,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
    const cached = localStorage.getItem('sellercloud-cache');
    if (cached) {
      const parsed = JSON.parse(cached);
-     // Check if cache structure is valid
      if (!parsed || typeof parsed !== 'object' || !parsed.clientState) {
        localStorage.removeItem('sellercloud-cache');
      }
@@ -20,7 +19,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
    localStorage.removeItem('sellercloud-cache');
  }
 
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { CartProvider } from "@/contexts/CartContext";
@@ -30,26 +29,10 @@ import { InstallPWA } from "@/components/InstallPWA";
 // Lazy load pages for code splitting
 const Index = lazy(() => import("./pages/Index"));
 const Auth = lazy(() => import("./pages/Auth"));
- const PartnerAuth = lazy(() => import("./pages/PartnerAuth"));
-const Dashboard = lazy(() => import("./pages/Dashboard"));
-const Marketplace = lazy(() => import("./pages/Marketplace"));
-const SellerDashboard = lazy(() => import("./pages/SellerDashboard"));
 const SellerCloudX = lazy(() => import("./pages/SellerCloudX"));
 const SellerCloudMobile = lazy(() => import("./pages/SellerCloudMobile"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
-const ShopPage = lazy(() => import("./pages/ShopPage"));
-const ProductPage = lazy(() => import("./pages/ProductPage"));
-const CartPage = lazy(() => import("./pages/CartPage"));
-const CheckoutPage = lazy(() => import("./pages/CheckoutPage"));
-const BloggerDashboard = lazy(() => import("./pages/BloggerDashboard"));
-const FavoritesPage = lazy(() => import("./pages/FavoritesPage"));
-const Partnership = lazy(() => import("./pages/Partnership"));
- const NotFound = lazy(() => import("./pages/NotFound"));
- const SellerActivation = lazy(() => import("./pages/SellerActivation"));
- const BloggerActivation = lazy(() => import("./pages/BloggerActivation"));
-const Blog = lazy(() => import("./pages/Blog"));
-const BlogPost = lazy(() => import("./pages/BlogPost"));
-const TrackOrder = lazy(() => import("./pages/TrackOrder"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 
  // Create persister for offline cache
  const persister = createSyncStoragePersister({
@@ -62,22 +45,20 @@ function App() {
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {
-        staleTime: 1000 * 60 * 2, // 2 minutes - fresher data
-        gcTime: 1000 * 60 * 60 * 24, // 24 hours for offline
+        staleTime: 1000 * 60 * 2,
+        gcTime: 1000 * 60 * 60 * 24,
         refetchOnWindowFocus: false,
-        refetchOnReconnect: true, // Refetch when back online
+        refetchOnReconnect: true,
         retry: 1,
         networkMode: 'offlineFirst',
       },
     },
   }));
 
-   // Listen for online/offline status
    useEffect(() => {
      const handleOnline = () => {
        queryClient.invalidateQueries();
      };
-     
      window.addEventListener('online', handleOnline);
      return () => window.removeEventListener('online', handleOnline);
    }, [queryClient]);
@@ -87,7 +68,7 @@ function App() {
       client={queryClient} 
       persistOptions={{ 
         persister,
-        maxAge: 1000 * 60 * 60 * 24, // 24 hours
+        maxAge: 1000 * 60 * 60 * 24,
         buster: 'v1',
       }}
     >
@@ -101,26 +82,17 @@ function App() {
               <BrowserRouter>
                 <Suspense fallback={<PageLoader />}>
                   <Routes>
-                    <Route path="/" element={<Marketplace />} />
+                    <Route path="/" element={<Index />} />
                     <Route path="/auth" element={<Auth />} />
-                    <Route path="/partner-auth" element={<PartnerAuth />} />
-                    <Route path="/dashboard" element={<Dashboard />} />
-                    <Route path="/seller" element={<SellerDashboard />} />
                     <Route path="/seller-cloud" element={<SellerCloudX />} />
                     <Route path="/seller-cloud-mobile" element={<SellerCloudMobile />} />
                     <Route path="/admin" element={<AdminDashboard />} />
-                    <Route path="/shop/:slug" element={<ShopPage />} />
-                    <Route path="/product/:id" element={<ProductPage />} />
-                    <Route path="/cart" element={<CartPage />} />
-                    <Route path="/checkout" element={<CheckoutPage />} />
-                    <Route path="/blogger" element={<BloggerDashboard />} />
-                    <Route path="/favorites" element={<FavoritesPage />} />
-                    <Route path="/partnership" element={<Partnership />} />
-                    <Route path="/seller-activation" element={<SellerActivation />} />
-                    <Route path="/blogger-activation" element={<BloggerActivation />} />
-                    <Route path="/blog" element={<Blog />} />
-                    <Route path="/blog/:slug" element={<BlogPost />} />
-                    <Route path="/track" element={<TrackOrder />} />
+                    {/* Redirect old routes to landing */}
+                    <Route path="/partnership" element={<Navigate to="/" replace />} />
+                    <Route path="/seller" element={<Navigate to="/seller-cloud" replace />} />
+                    <Route path="/blogger" element={<Navigate to="/" replace />} />
+                    <Route path="/dashboard" element={<Navigate to="/seller-cloud" replace />} />
+                    <Route path="/marketplace" element={<Navigate to="/" replace />} />
                     <Route path="*" element={<NotFound />} />
                   </Routes>
                 </Suspense>

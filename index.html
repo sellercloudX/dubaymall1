@@ -1,27 +1,19 @@
 <!doctype html>
-<html lang="uz">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>Dubay Mall - O'zbekiston onlayn bozori</title>
-    <meta name="description" content="O&#39;zbekistonning eng yirik onlayn savdo platformasi. Minglab mahsulotlar, ishonchli sotuvchilar va tez yetkazib berish. Payme, Click, Uzcard orqali to&#39;lang.">
-    <meta name="author" content="Dubay Mall" />
+    <title>SellerCloudX — Marketplace Automation Platform</title>
+    <meta name="description" content="Manage Uzum, Yandex Market, Wildberries, Ozon from one dashboard. AI card generation, PnL analytics, price optimization.">
+    <meta name="author" content="SellerCloudX" />
     <meta name="robots" content="index, follow" />
-    <meta name="keywords" content="online shopping, e-commerce, uzbekistan, onlayn savdo, internet do&#39;kon, mahsulotlar, sotuvchi, xaridor">
+    <meta name="keywords" content="marketplace automation, seller tools, uzum, yandex market, wildberries, ozon, ecommerce, analytics, AI">
 
-    <!-- Preconnect to Google Fonts for faster font loading -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    
-    <!-- Preconnect to Supabase storage for faster LCP image loading -->
     <link rel="preconnect" href="https://idcshubgqrzdvkttnslz.supabase.co" crossorigin />
     <link rel="dns-prefetch" href="https://idcshubgqrzdvkttnslz.supabase.co" />
-    
-    <!-- Preconnect to Unsplash for fallback images -->
-    <link rel="preconnect" href="https://images.unsplash.com" crossorigin />
-    <link rel="dns-prefetch" href="https://images.unsplash.com" />
 
-    <!-- Load fonts with display=swap and as stylesheet (non-blocking) -->
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" />
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" media="print" onload="this.media='all'" />
@@ -31,30 +23,29 @@
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" />
     </noscript>
      
-     <!-- Preload critical font files directly -->
-     <link rel="preload" as="font" type="font/woff2" href="https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2" crossorigin />
+    <link rel="preload" as="font" type="font/woff2" href="https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2" crossorigin />
 
     <!-- PWA -->
     <link rel="manifest" href="/manifest.json" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="Dubay Mall" />
+    <meta name="apple-mobile-web-app-title" content="SellerCloudX" />
     
-    <!-- Canonical URL -->
-    <link rel="canonical" href="https://dubaymall.uz" />
+    <link rel="canonical" href="https://sellercloudx.com" />
 
     <!-- Open Graph -->
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://dubaymall.uz" />
+    <meta property="og:url" content="https://sellercloudx.com" />
+    <meta property="og:title" content="SellerCloudX — Marketplace Automation Platform" />
+    <meta property="og:description" content="Manage Uzum, Yandex Market, Wildberries, Ozon from one dashboard. AI card generation, PnL analytics, price optimization." />
     <meta property="og:image" content="/og-image.png" />
-    <meta property="og:site_name" content="Dubay Mall" />
-    <meta property="og:locale" content="uz_UZ" />
-    <meta property="og:locale:alternate" content="ru_RU" />
-    <meta property="og:locale:alternate" content="en_US" />
+    <meta property="og:site_name" content="SellerCloudX" />
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="SellerCloudX — Marketplace Automation Platform" />
+    <meta name="twitter:description" content="Manage Uzum, Yandex Market, Wildberries, Ozon from one dashboard." />
     <meta name="twitter:image" content="/og-image.png" />
 
     <!-- Theme Color -->
@@ -64,17 +55,12 @@
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/favicon.png" />
-    <meta property="og:title" content="Dubay Mall - O'zbekiston onlayn bozori">
-    <meta name="twitter:title" content="Dubay Mall - O'zbekiston onlayn bozori">
-    <meta property="og:description" content="O&#39;zbekistonning eng yirik onlayn savdo platformasi. Minglab mahsulotlar, ishonchli sotuvchilar va tez yetkazib berish. Payme, Click, Uzcard orqali to&#39;lang.">
-    <meta name="twitter:description" content="O&#39;zbekistonning eng yirik onlayn savdo platformasi. Minglab mahsulotlar, ishonchli sotuvchilar va tez yetkazib berish. Payme, Click, Uzcard orqali to&#39;lang.">
   </head>
 
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
-      // Register Service Worker (deferred to not block render)
       if ('serviceWorker' in navigator) {
         setTimeout(() => {
           navigator.serviceWorker.register('/sw.js')

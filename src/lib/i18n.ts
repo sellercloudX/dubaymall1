@@ -3,7 +3,7 @@ export type Language = 'uz' | 'ru' | 'en';
 export const translations = {
   uz: {
     // Common
-    appName: 'Dubay Mall',
+    appName: 'SellerCloudX',
     tagline: 'O\'zbekiston va Markaziy Osiyo uchun e-commerce platforma',
     save: 'Saqlash',
     cancel: 'Bekor qilish',
@@ -180,7 +180,7 @@ export const translations = {
   },
   ru: {
     // Common
-    appName: 'Dubay Mall',
+    appName: 'SellerCloudX',
     tagline: 'E-commerce платформа для Узбекистана и Центральной Азии',
     save: 'Сохранить',
     cancel: 'Отмена',
@@ -357,7 +357,7 @@ export const translations = {
   },
   en: {
     // Common
-    appName: 'Dubay Mall',
+    appName: 'SellerCloudX',
     tagline: 'E-commerce platform for Uzbekistan and Central Asia',
     save: 'Save',
     cancel: 'Cancel',

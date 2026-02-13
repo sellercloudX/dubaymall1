@@ -154,7 +154,7 @@ export default function SellerCloudX() {
               </CardContent>
             </Card>
             <div className="text-center mt-8">
-              <Button variant="ghost" asChild><Link to="/seller">← Dubay Mall do'koniga qaytish</Link></Button>
+              <Button variant="ghost" asChild><Link to="/">← Bosh sahifaga qaytish</Link></Button>
             </div>
           </div>
         </div>
@@ -177,7 +177,7 @@ export default function SellerCloudX() {
               <p className="text-sm text-muted-foreground">Marketplace avtomatizatsiya markazi</p>
             </div>
           </div>
-          <Button variant="outline" asChild><Link to="/seller">Dubay Mall do'koni →</Link></Button>
+          <Button variant="outline" asChild><Link to="/">Bosh sahifa →</Link></Button>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">

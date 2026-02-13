@@ -1,39 +1,21 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Home, Handshake, ShoppingCart, Heart, User } from 'lucide-react';
-import { useCart } from '@/contexts/CartContext';
+import { Home, Crown, User } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-
-interface NavItem {
-  icon: React.ElementType;
-  label: string;
-  path: string;
-  badge?: number;
-  requiresAuth?: boolean;
-}
 
 export function BottomNavigation() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { totalItems } = useCart();
   const { user } = useAuth();
 
-  const navItems: NavItem[] = [
-    { icon: Home, label: 'Marketplace', path: '/' },
-    { icon: Heart, label: 'Sevimli', path: '/favorites', requiresAuth: true },
-    { icon: ShoppingCart, label: 'Savat', path: '/cart', badge: totalItems },
-    { icon: Handshake, label: 'Hamkorlik', path: '/partnership' },
-    { icon: User, label: 'Profil', path: user ? '/dashboard' : '/auth' },
-  ];
+  // Hide on landing page
+  if (location.pathname === '/') return null;
 
-  const handleNavigation = (item: NavItem) => {
-    if (item.requiresAuth && !user) {
-      navigate('/auth');
-    } else {
-      navigate(item.path);
-    }
-  };
+  const navItems = [
+    { icon: Home, label: 'Home', path: '/' },
+    { icon: Crown, label: 'Dashboard', path: '/seller-cloud' },
+    { icon: User, label: 'Profil', path: user ? '/seller-cloud' : '/auth' },
+  ];
 
   const isActive = (path: string) => {
     if (path === '/') return location.pathname === '/';
@@ -46,34 +28,18 @@ export function BottomNavigation() {
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.path);
-          
           return (
             <button
-              key={item.path}
-              onClick={() => handleNavigation(item)}
+              key={item.label}
+              onClick={() => navigate(item.path)}
               aria-label={item.label}
               className={cn(
                 "flex flex-col items-center justify-center w-full h-full gap-1 transition-colors min-h-[44px]",
                 active ? "text-primary" : "text-muted-foreground"
               )}
             >
-              <div className="relative">
-                <Icon className={cn("h-5 w-5", active && "stroke-[2.5]")} />
-                {item.badge && item.badge > 0 && (
-                  <Badge 
-                    variant="destructive" 
-                    className="absolute -top-2 -right-2 h-4 w-4 p-0 flex items-center justify-center text-[9px]"
-                  >
-                    {item.badge > 9 ? '9+' : item.badge}
-                  </Badge>
-                )}
-              </div>
-              <span className={cn(
-                "text-[10px] leading-tight",
-                active && "font-semibold"
-              )}>
-                {item.label}
-              </span>
+              <Icon className={cn("h-5 w-5", active && "stroke-[2.5]")} />
+              <span className={cn("text-[10px] leading-tight", active && "font-semibold")}>{item.label}</span>
             </button>
           );
         })}
