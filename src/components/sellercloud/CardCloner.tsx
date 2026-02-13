@@ -9,10 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Copy, ArrowRight, Globe, Package, Search, Check, X, Loader2, Image, RefreshCw, Zap, Store, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { useShop } from '@/hooks/useShop';
-import { useProducts } from '@/hooks/useProducts';
 import { useAuth } from '@/contexts/AuthContext';
-import { useCategories } from '@/hooks/useCategories';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 
 interface CardClonerProps {
@@ -33,45 +30,16 @@ interface CloneableProduct {
 }
 
 const MARKETPLACE_INFO: Record<string, { name: string; logo: string; color: string }> = {
-  dubaymall: { name: 'Dubay Mall', logo: '🏬', color: 'from-emerald-500 to-teal-500' },
   yandex: { name: 'Yandex Market', logo: '🟡', color: 'from-yellow-500 to-amber-500' },
   uzum: { name: 'Uzum Market', logo: '🟣', color: 'from-purple-500 to-violet-500' },
   wildberries: { name: 'Wildberries', logo: '🟣', color: 'from-fuchsia-500 to-pink-500' },
   ozon: { name: 'Ozon', logo: '🔵', color: 'from-blue-500 to-cyan-500' },
 };
 
-// Auto-categorize based on product name keywords
-const CATEGORY_KEYWORDS: Record<string, string[]> = {
-  'electronics': ['камера', 'camera', 'фен', 'trimmer', 'триммер', 'пистолет', 'зарядка', 'наушники', 'колонка', 'bluetooth', 'usb', 'led', 'лампа', 'фонарь', 'часы', 'watch', 'power bank', 'кабель', 'адаптер', 'электро', 'мини-камера', 'wi-fi', 'wifi', 'ip-камера', 'термо'],
-  'beauty': ['крем', 'гель', 'маска', 'сыворотка', 'шампунь', 'мыло', 'скраб', 'парфюм', 'духи', 'косметик', 'ресниц', 'бровей', 'пилинг', 'увлажн', 'отбелив', 'тампон', 'интимн', 'волос', 'кожи', 'лица', 'serum', 'cream', 'soap', 'perfume', 'lash', 'hair', 'skin'],
-  'clothing': ['платье', 'рубашк', 'футболк', 'штан', 'джинс', 'куртк', 'пальто', 'костюм', 'юбка', 'носки', 'белье', 'кроссовк', 'обувь', 'сумк', 'кошелек', 'ремень', 'шарф', 'перчатк', 'шапк'],
-  'home-garden': ['подушк', 'одеял', 'полотенц', 'ковер', 'штор', 'посуд', 'кастрюл', 'сковород', 'кухн', 'ванн', 'хранен', 'органайзер', 'уборк', 'мебел'],
-  'kids': ['детск', 'ребенк', 'игрушк', 'коляск', 'подгузник', 'baby', 'малыш'],
-  'sports': ['спорт', 'тренажер', 'гантел', 'фитнес', 'йога', 'велосипед', 'мяч'],
-  'food': ['чай', 'кофе', 'мед', 'шоколад', 'витамин', 'бад', 'орех'],
-  'auto': ['авто', 'машин', 'руль', 'шин', 'масло', 'двигател'],
-};
-
-function detectCategorySlug(productName: string): string | null {
-  const lower = productName.toLowerCase();
-  for (const [slug, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
-    if (keywords.some(kw => lower.includes(kw))) {
-      return slug;
-    }
-  }
-  return null;
-}
-
 export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
   const { user } = useAuth();
-  const { shop } = useShop();
-  const { products: dubayMallProducts, createProduct } = useProducts(shop?.id || null);
-  const { categories } = useCategories();
 
-  // All available sources: DubayMall + connected marketplaces
-  const allSources = useMemo(() => ['dubaymall', ...connectedMarketplaces], [connectedMarketplaces]);
-
-  const [sourceMarketplace, setSourceMarketplace] = useState('dubaymall');
+  const [sourceMarketplace, setSourceMarketplace] = useState(connectedMarketplaces[0] || '');
   const [targetMarketplaces, setTargetMarketplaces] = useState<string[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isCloning, setIsCloning] = useState(false);
@@ -79,28 +47,23 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
   const [cloneResults, setCloneResults] = useState<{ success: number; failed: number; skipped: number } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const isLoading = sourceMarketplace === 'dubaymall' ? false : store.isLoadingProducts;
+  const isLoading = store.isLoadingProducts;
 
   useEffect(() => {
     setSelectedIds(new Set());
     setTargetMarketplaces([]);
   }, [sourceMarketplace]);
 
+  // Set default source when marketplaces change
+  useEffect(() => {
+    if (connectedMarketplaces.length > 0 && !connectedMarketplaces.includes(sourceMarketplace)) {
+      setSourceMarketplace(connectedMarketplaces[0]);
+    }
+  }, [connectedMarketplaces]);
+
   // Get products for selected source
   const products = useMemo((): CloneableProduct[] => {
-    if (sourceMarketplace === 'dubaymall') {
-      return dubayMallProducts.map(p => ({
-        offerId: p.id,
-        name: p.name || 'Nomsiz',
-        price: p.price || 0,
-        shopSku: p.id.slice(0, 8),
-        pictures: p.images || [],
-        category: '',
-        description: p.description || '',
-        marketplace: 'dubaymall',
-        selected: selectedIds.has(p.id),
-      }));
-    }
+    if (!sourceMarketplace) return [];
     return store.getProducts(sourceMarketplace).map(p => ({
       offerId: p.offerId,
       name: p.name || 'Nomsiz',
@@ -112,14 +75,13 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
       marketplace: sourceMarketplace,
       selected: selectedIds.has(p.offerId),
     }));
-  }, [sourceMarketplace, store.dataVersion, selectedIds, dubayMallProducts]);
+  }, [sourceMarketplace, store.dataVersion, selectedIds]);
 
   const getProductCount = useCallback((mp: string) => {
-    if (mp === 'dubaymall') return dubayMallProducts.length;
     return store.getProducts(mp).length;
-  }, [dubayMallProducts.length, store.dataVersion]);
+  }, [store.dataVersion]);
 
-  const availableTargets = allSources.filter(mp => mp !== sourceMarketplace);
+  const availableTargets = connectedMarketplaces.filter(mp => mp !== sourceMarketplace);
 
   const toggleTarget = (mp: string) => {
     setTargetMarketplaces(prev => prev.includes(mp) ? prev.filter(m => m !== mp) : [...prev, mp]);
@@ -153,54 +115,13 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
 
   // Check if product already exists in target marketplace
   const isAlreadyCloned = useCallback((product: CloneableProduct, targetMp: string): boolean => {
-    if (targetMp === 'dubaymall') {
-      // Check if product name already exists in DubayMall
-      return dubayMallProducts.some(p =>
-        p.name.toLowerCase().trim() === product.name.toLowerCase().trim()
-      );
-    }
-    // Check if offerId/SKU already exists in target marketplace
     const targetProducts = store.getProducts(targetMp);
     return targetProducts.some(p =>
       p.offerId === product.offerId ||
       p.shopSku === product.shopSku ||
       (p.name && p.name.toLowerCase().trim() === product.name.toLowerCase().trim())
     );
-  }, [dubayMallProducts, store.dataVersion]);
-
-  // Clone product to DubayMall (insert into products table)
-  const cloneToDubayMall = async (product: CloneableProduct): Promise<boolean> => {
-    if (!shop) {
-      toast.error('Avval DubayMall do\'konini yarating (Sotuvchi sahifasida)');
-      return false;
-    }
-    try {
-      // Filter valid image URLs
-      const validImages = (product.pictures || []).filter(img => img && img.startsWith('http'));
-      
-      // Auto-detect category
-      const detectedSlug = detectCategorySlug(product.name);
-      const matchedCategory = detectedSlug ? categories.find(c => c.slug === detectedSlug) : null;
-      
-      await createProduct({
-        name: product.name,
-        price: product.price,
-        description: product.description || `${product.marketplace} dan import qilingan`,
-        images: validImages.length > 0 ? validImages : [],
-        shop_id: shop.id,
-        stock_quantity: 0,
-        source: 'manual' as any,
-        status: 'draft' as any,
-        category_id: matchedCategory?.id || null,
-        free_shipping: true,
-      });
-      return true;
-    } catch (err: any) {
-      console.error('Clone to DubayMall failed:', err?.message || err);
-      toast.error(`Klonlash xatosi: ${err?.message || 'Noma\'lum xato'}`);
-      return false;
-    }
-  };
+  }, [store.dataVersion]);
 
   // Clone product to external marketplace
   const cloneToMarketplace = async (product: CloneableProduct, targetMp: string): Promise<boolean> => {
@@ -210,11 +131,10 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
       
       console.log(`Cloning "${product.name}" to ${targetMp}, cost-optimized mode, images: ${validImages.length}`);
       
-      // Yandex and Wildberries have create-card endpoints
       if (targetMp === 'yandex') {
         const { data, error } = await supabase.functions.invoke('yandex-market-create-card', {
           body: {
-            shopId: shop?.id || 'sellercloud',
+            shopId: 'sellercloud',
             product: {
               name: product.name,
               description: product.description || product.name,
@@ -232,32 +152,26 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
               recommendedPrice: product.price,
               netProfit: Math.round(product.price * 0.2),
             },
-            skipImageGeneration: true, // 💰 Reuse existing images from master card
-            cloneMode: true, // 💰 Use cheaper AI models
+            skipImageGeneration: true,
+            cloneMode: true,
           },
         });
         
         if (error) {
-          console.error(`Clone to ${targetMp} invoke error:`, error.message || error);
           toast.error(`${product.name}: ${error.message || 'Edge function xatosi'}`);
           return false;
         }
-        
         if (!data?.success) {
-          const errMsg = data?.error || 'Marketplace API xatosi';
-          console.error(`Clone to ${targetMp} API error:`, errMsg, data?.yandexResponse);
-          toast.error(`${product.name.slice(0, 30)}: ${errMsg}`);
+          toast.error(`${product.name.slice(0, 30)}: ${data?.error || 'API xatosi'}`);
           return false;
         }
-        
-        console.log(`✅ Cloned "${product.name}" to ${targetMp} (cost-optimized)`);
         return true;
       }
 
       if (targetMp === 'wildberries') {
         const { data, error } = await supabase.functions.invoke('wildberries-create-card', {
           body: {
-            shopId: shop?.id || 'sellercloud',
+            shopId: 'sellercloud',
             product: {
               name: product.name,
               description: product.description || product.name,
@@ -266,32 +180,24 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
               images: validImages,
               category: product.category || '',
             },
-            skipImageGeneration: true, // 💰 Reuse existing images from master card
-            cloneMode: true, // 💰 Use cheaper AI models
+            skipImageGeneration: true,
+            cloneMode: true,
           },
         });
         
         if (error) {
-          console.error(`Clone to ${targetMp} invoke error:`, error.message || error);
           toast.error(`${product.name}: ${error.message || 'Edge function xatosi'}`);
           return false;
         }
-        
         if (!data?.success) {
-          const errMsg = data?.error || 'Marketplace API xatosi';
-          console.error(`Clone to ${targetMp} API error:`, errMsg);
-          toast.error(`${product.name.slice(0, 30)}: ${errMsg}`);
+          toast.error(`${product.name.slice(0, 30)}: ${data?.error || 'API xatosi'}`);
           return false;
         }
-        
-        console.log(`✅ Cloned "${product.name}" to ${targetMp} (cost-optimized)`);
         return true;
       }
       
-      // Uzum Market API does NOT have product creation endpoints
-      // Only read products, update prices/stocks, and manage orders are available
       console.warn(`⚠️ ${targetMp} API does not support card creation`);
-      toast.error(`${MARKETPLACE_INFO[targetMp]?.name || targetMp}: API kartochka yaratishni qo'llab-quvvatlamaydi. Faqat narx va qoldiq yangilash mumkin.`);
+      toast.error(`${MARKETPLACE_INFO[targetMp]?.name || targetMp}: Kartochka yaratish qo'llab-quvvatlanmaydi`);
       return false;
     } catch (err: any) {
       console.error(`Clone to ${targetMp} failed:`, err?.message || err);
@@ -313,7 +219,6 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
 
     for (const product of selectedProducts) {
       for (const target of targetMarketplaces) {
-        // Deduplication check
         if (isAlreadyCloned(product, target)) {
           skipped++;
           processed++;
@@ -321,20 +226,12 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
           continue;
         }
 
-        let ok = false;
-        if (target === 'dubaymall') {
-          ok = await cloneToDubayMall(product);
-        } else {
-          ok = await cloneToMarketplace(product, target);
-        }
-
+        const ok = await cloneToMarketplace(product, target);
         if (ok) success++;
         else failed++;
 
         processed++;
         setCloneProgress(Math.round((processed / total) * 100));
-
-        // Small delay to avoid API rate limits
         await new Promise(resolve => setTimeout(resolve, 300));
       }
     }
@@ -349,7 +246,6 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
 
   const formatPrice = (price: number) => new Intl.NumberFormat('uz-UZ').format(price) + ' so\'m';
 
-  // Count how many would be skipped
   const skippedCount = useMemo(() => {
     if (targetMarketplaces.length === 0) return 0;
     let count = 0;
@@ -363,12 +259,12 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
 
   const actualCloneCount = (selectedProducts.length * targetMarketplaces.length) - skippedCount;
 
-  if (connectedMarketplaces.length === 0 && !shop) {
+  if (connectedMarketplaces.length < 2) {
     return (
       <Card><CardContent className="py-12 text-center">
         <Copy className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
         <h3 className="text-lg font-semibold mb-2">Kartochka klonlash</h3>
-        <p className="text-muted-foreground mb-4">Klonlash uchun marketplace ulang yoki DubayMall do'konini yarating</p>
+        <p className="text-muted-foreground mb-4">Klonlash uchun kamida 2 ta marketplace ulang</p>
       </CardContent></Card>
     );
   }
@@ -384,7 +280,7 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
           </CardHeader>
           <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0">
             <div className="space-y-2">
-              {allSources.map(mp => {
+              {connectedMarketplaces.map(mp => {
                 const info = MARKETPLACE_INFO[mp] || { name: mp, logo: '📦', color: 'from-gray-500 to-gray-600' };
                 const count = getProductCount(mp);
                 return (
@@ -411,7 +307,7 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
           <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0">
             <div className="space-y-2">
               {availableTargets.length === 0
-                ? <p className="text-xs text-muted-foreground">Boshqa marketplace yoki do'kon yo'q</p>
+                ? <p className="text-xs text-muted-foreground">Boshqa marketplace yo'q</p>
                 : availableTargets.map(mp => {
                   const info = MARKETPLACE_INFO[mp] || { name: mp, logo: '📦', color: 'from-gray-500 to-gray-600' };
                   const isSelected = targetMarketplaces.includes(mp);
@@ -503,36 +399,41 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
           <CardContent className="py-6">
             <div className="text-center mb-3">
               <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-primary" />
-              <div className="font-medium text-sm">Klonlanmoqda...</div>
+              <p className="text-sm">Klonlanmoqda... {cloneProgress}%</p>
             </div>
             <Progress value={cloneProgress} className="h-2" />
-            <div className="text-xs text-center mt-1.5 text-muted-foreground">{cloneProgress}%</div>
           </CardContent>
         </Card>
       ) : cloneResults ? (
-        <Card className="border-green-500/30 overflow-hidden">
-          <CardContent className="py-6 text-center">
-            <Check className="h-10 w-10 text-green-500 mx-auto mb-2" />
-            <div className="text-base font-bold mb-1">{cloneResults.success} ta klonlandi</div>
-            {cloneResults.skipped > 0 && <div className="text-xs text-warning">{cloneResults.skipped} ta o'tkazib yuborildi (allaqachon mavjud)</div>}
-            {cloneResults.failed > 0 && <div className="text-xs text-red-500">{cloneResults.failed} ta xato</div>}
-            <Button className="mt-3" size="sm" onClick={() => setCloneResults(null)}>Yangi klonlash</Button>
+        <Card className="overflow-hidden">
+          <CardContent className="py-6">
+            <div className="text-center space-y-3">
+              <Check className="h-8 w-8 mx-auto text-primary" />
+              <h3 className="font-semibold">Klonlash yakunlandi</h3>
+              <div className="flex justify-center gap-4 text-sm">
+                {cloneResults.success > 0 && <Badge variant="default">{cloneResults.success} muvaffaqiyatli</Badge>}
+                {cloneResults.skipped > 0 && <Badge variant="outline">{cloneResults.skipped} o'tkazildi</Badge>}
+                {cloneResults.failed > 0 && <Badge variant="destructive">{cloneResults.failed} xato</Badge>}
+              </div>
+              <Button variant="outline" size="sm" onClick={() => setCloneResults(null)}>Yangi klonlash</Button>
+            </div>
           </CardContent>
         </Card>
       ) : (
-        <Card className="overflow-hidden">
-          <CardContent className="p-3 sm:py-6">
-            <Button className="w-full" size="default" disabled={selectedIds.size === 0 || targetMarketplaces.length === 0 || actualCloneCount === 0} onClick={handleClone}>
-              <Zap className="h-4 w-4 mr-1.5 shrink-0" />
-              <span className="truncate">
-                {actualCloneCount > 0
-                  ? `${actualCloneCount} ta → ${targetMarketplaces.map(mp => MARKETPLACE_INFO[mp]?.name || mp).join(', ')}`
-                  : 'Barchasi allaqachon mavjud'}
-              </span>
-              <ArrowRight className="h-4 w-4 ml-1.5 shrink-0" />
-            </Button>
-          </CardContent>
-        </Card>
+        <Button
+          className="w-full"
+          size="lg"
+          disabled={selectedProducts.length === 0 || targetMarketplaces.length === 0 || actualCloneCount === 0}
+          onClick={handleClone}
+        >
+          <Copy className="h-4 w-4 mr-2" />
+          {actualCloneCount > 0
+            ? `${actualCloneCount} ta mahsulotni klonlash`
+            : 'Mahsulot va maqsad tanlang'}
+          {targetMarketplaces.length > 0 && (
+            <span className="ml-2 text-xs opacity-75">→ {targetMarketplaces.map(mp => MARKETPLACE_INFO[mp]?.name || mp).join(', ')}</span>
+          )}
+        </Button>
       )}
     </div>
   );
