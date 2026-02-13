@@ -441,12 +441,12 @@ export default function Index() {
 
       {/* ━━━ Navigation ━━━ */}
       <nav className="fixed top-0 left-0 right-0 z-50 border-b bg-background/80 backdrop-blur-xl">
-        <div className="container mx-auto px-4 flex h-16 items-center justify-between">
-          <Link to="/" className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/20">
-              <Crown className="h-4.5 w-4.5 text-white" />
+        <div className="container mx-auto px-3 sm:px-4 flex h-16 items-center justify-between">
+          <Link to="/" className="flex items-center gap-2">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/20">
+              <Crown className="h-4 w-4 sm:h-4.5 sm:w-4.5 text-white" />
             </div>
-            <span className="text-xl font-bold font-display tracking-tight">SellerCloudX</span>
+            <span className="text-lg sm:text-xl font-bold font-display tracking-tight">SellerCloudX</span>
           </Link>
           
           <div className="hidden md:flex items-center gap-8">
@@ -485,15 +485,15 @@ export default function Index() {
         <FloatingParticles />
 
         <div className="container mx-auto px-4 relative z-10">
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-            <div className="max-w-2xl">
+          <div className="grid lg:grid-cols-2 gap-8 md:gap-12 lg:gap-16 items-center">
+            <div className="max-w-2xl w-full">
               <div className="animate-fade-up">
                 <Badge className="mb-6 px-4 py-2 text-sm font-medium bg-primary/10 text-primary border-primary/20">
                   {txt.badge}
                 </Badge>
               </div>
 
-              <h1 className="text-4xl sm:text-5xl md:text-6xl xl:text-7xl font-bold tracking-tight mb-6 font-display leading-[1.1] animate-fade-up" style={{ animationDelay: '0.1s' }}>
+              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6 font-display leading-tight animate-fade-up" style={{ animationDelay: '0.1s' }}>
                 <span className="text-foreground">{txt.heroTitle1}</span>
                 <br />
                 <span className="text-gradient">{txt.heroTitle2}</span>
@@ -501,7 +501,7 @@ export default function Index() {
                 <span className="text-foreground">{txt.heroTitle3}</span>
               </h1>
               
-              <p className="text-lg md:text-xl text-muted-foreground mb-10 leading-relaxed animate-fade-up max-w-xl" style={{ animationDelay: '0.2s' }}>
+              <p className="text-base sm:text-lg text-muted-foreground mb-8 leading-relaxed animate-fade-up max-w-xl" style={{ animationDelay: '0.2s' }}>
                 {txt.heroDesc}
               </p>
 
@@ -612,21 +612,21 @@ export default function Index() {
       {/* ━━━ Stats Bar ━━━ */}
       <section ref={stats.ref} className="py-16 bg-muted/30 border-y relative">
         <div className="container mx-auto px-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-5xl mx-auto">
-            {[
-              { value: `${c1}+`, label: txt.statsMarketplaces, icon: Globe, color: 'text-primary' },
-              { value: c2 >= 1000 ? `${(c2/1000).toFixed(0)}K+` : `${c2}+`, label: txt.statsProducts, icon: BarChart3, color: 'text-accent' },
-              { value: c3 >= 1000 ? `${(c3/1000).toFixed(0)}K+` : `${c3}+`, label: txt.statsOrders, icon: TrendingUp, color: 'text-emerald-500' },
-              { value: '4-5', label: txt.statsReplace, icon: Users, color: 'text-amber-500' },
-            ].map((stat, i) => (
-              <div key={i} className="text-center group cursor-default">
-                <div className={`w-14 h-14 rounded-2xl bg-card border shadow-sm mx-auto mb-4 flex items-center justify-center group-hover:shadow-lg group-hover:scale-105 transition-all`}>
-                  <stat.icon className={`h-6 w-6 ${stat.color}`} />
-                </div>
-                <div className="text-3xl md:text-4xl font-bold text-foreground font-display">{stat.value}</div>
-                <div className="text-sm text-muted-foreground mt-1 font-medium">{stat.label}</div>
-              </div>
-            ))}
+           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 md:gap-8 max-w-5xl mx-auto">
+             {[
+               { value: `${c1}+`, label: txt.statsMarketplaces, icon: Globe, color: 'text-primary' },
+               { value: c2 >= 1000 ? `${(c2/1000).toFixed(0)}K+` : `${c2}+`, label: txt.statsProducts, icon: BarChart3, color: 'text-accent' },
+               { value: c3 >= 1000 ? `${(c3/1000).toFixed(0)}K+` : `${c3}+`, label: txt.statsOrders, icon: TrendingUp, color: 'text-emerald-500' },
+               { value: '4-5', label: txt.statsReplace, icon: Users, color: 'text-amber-500' },
+             ].map((stat, i) => (
+               <div key={i} className="text-center group cursor-default">
+                 <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-card border shadow-sm mx-auto mb-2 sm:mb-4 flex items-center justify-center group-hover:shadow-lg group-hover:scale-105 transition-all`}>
+                   <stat.icon className={`h-5 w-5 sm:h-6 sm:w-6 ${stat.color}`} />
+                 </div>
+                 <div className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground font-display">{stat.value}</div>
+                 <div className="text-xs sm:text-sm text-muted-foreground mt-1 font-medium">{stat.label}</div>
+               </div>
+             ))}
           </div>
         </div>
       </section>
@@ -650,20 +650,20 @@ export default function Index() {
             <p className="text-muted-foreground max-w-2xl mx-auto text-lg">{txt.featuresDesc}</p>
           </FadeInSection>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 max-w-6xl mx-auto">
-            {features.map((feat, i) => (
-              <FadeInSection key={i} delay={i * 80}>
-                <Card className="group border shadow-sm hover:shadow-xl transition-all duration-500 overflow-hidden hover:-translate-y-2 h-full">
-                  <CardContent className="p-6 md:p-8">
-                    <div className={`w-14 h-14 rounded-2xl ${feat.bg} flex items-center justify-center mb-5 group-hover:scale-110 transition-transform duration-300`}>
-                      <feat.icon className={`h-7 w-7 ${feat.color}`} />
-                    </div>
-                    <h3 className="text-lg font-bold mb-2 font-display">{feat.title}</h3>
-                    <p className="text-muted-foreground text-sm leading-relaxed">{feat.desc}</p>
-                  </CardContent>
-                </Card>
-              </FadeInSection>
-            ))}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8 max-w-6xl mx-auto">
+             {features.map((feat, i) => (
+               <FadeInSection key={i} delay={i * 80}>
+                 <Card className="group border shadow-sm hover:shadow-xl transition-all duration-500 overflow-hidden hover:-translate-y-2 h-full">
+                   <CardContent className="p-5 sm:p-6 md:p-8">
+                     <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl ${feat.bg} flex items-center justify-center mb-4 sm:mb-5 group-hover:scale-110 transition-transform duration-300`}>
+                       <feat.icon className={`h-6 w-6 sm:h-7 sm:w-7 ${feat.color}`} />
+                     </div>
+                     <h3 className="text-base sm:text-lg font-bold mb-2 font-display">{feat.title}</h3>
+                     <p className="text-muted-foreground text-xs sm:text-sm leading-relaxed">{feat.desc}</p>
+                   </CardContent>
+                 </Card>
+               </FadeInSection>
+             ))}
           </div>
         </div>
       </section>
@@ -673,21 +673,21 @@ export default function Index() {
         <div className="absolute inset-0 bg-grid-pattern opacity-[0.03]" />
         <div className="container mx-auto px-4 relative">
           <FadeInSection className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold font-display mb-2">{txt.resultTitle}</h2>
-            <p className="text-muted-foreground">{txt.resultDesc}</p>
-          </FadeInSection>
-          <div className="grid grid-cols-3 gap-6 max-w-3xl mx-auto">
-            {[
-              { label: txt.r1, value: txt.r1v, icon: Users, color: 'text-primary' },
-              { label: txt.r2, value: txt.r2v, icon: Clock, color: 'text-emerald-500' },
-              { label: txt.r3, value: txt.r3v, icon: TrendingUp, color: 'text-accent' },
-            ].map((r, i) => (
-              <FadeInSection key={i} delay={i * 150} className="text-center">
-                <r.icon className={`h-8 w-8 mx-auto mb-3 ${r.color}`} />
-                <div className="text-3xl md:text-5xl font-bold font-display mb-1">{r.value}</div>
-                <div className="text-sm text-muted-foreground font-medium">{r.label}</div>
-              </FadeInSection>
-            ))}
+             <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold font-display mb-3">{txt.resultTitle}</h2>
+             <p className="text-sm sm:text-base text-muted-foreground">{txt.resultDesc}</p>
+           </FadeInSection>
+           <div className="grid grid-cols-3 gap-4 sm:gap-6 md:gap-8 max-w-3xl mx-auto">
+             {[
+               { label: txt.r1, value: txt.r1v, icon: Users, color: 'text-primary' },
+               { label: txt.r2, value: txt.r2v, icon: Clock, color: 'text-emerald-500' },
+               { label: txt.r3, value: txt.r3v, icon: TrendingUp, color: 'text-accent' },
+             ].map((r, i) => (
+               <FadeInSection key={i} delay={i * 150} className="text-center">
+                 <r.icon className={`h-6 w-6 sm:h-8 sm:w-8 mx-auto mb-2 sm:mb-3 ${r.color}`} />
+                 <div className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold font-display mb-1">{r.value}</div>
+                 <div className="text-xs sm:text-sm text-muted-foreground font-medium">{r.label}</div>
+               </FadeInSection>
+             ))}
           </div>
         </div>
       </section>
@@ -701,19 +701,19 @@ export default function Index() {
             <p className="text-muted-foreground max-w-2xl mx-auto text-lg">{txt.howDesc}</p>
           </FadeInSection>
           
-          <div className="grid md:grid-cols-3 gap-8 md:gap-12 max-w-5xl mx-auto relative">
-            <div className="hidden md:block absolute top-16 left-[20%] right-[20%] h-px bg-gradient-to-r from-primary/20 via-primary/40 to-primary/20" />
-            
-            {steps.map((step, i) => (
-              <FadeInSection key={i} delay={i * 200} className="relative text-center group">
-                <div className="relative z-10 w-24 h-24 md:w-28 md:h-28 rounded-3xl bg-card border-2 border-primary/10 flex flex-col items-center justify-center mx-auto mb-8 group-hover:border-primary/40 group-hover:shadow-xl group-hover:shadow-primary/10 transition-all duration-300">
-                  <span className="text-xs font-bold text-primary/60 mb-1 tracking-wider">{step.num}</span>
-                  <step.icon className="h-8 w-8 md:h-10 md:w-10 text-primary" />
-                </div>
-                <h3 className="text-xl font-bold mb-2 font-display">{step.title}</h3>
-                <p className="text-sm text-muted-foreground max-w-xs mx-auto">{step.desc}</p>
-              </FadeInSection>
-            ))}
+           <div className="grid md:grid-cols-3 gap-6 md:gap-12 max-w-5xl mx-auto relative">
+             <div className="hidden md:block absolute top-14 left-[20%] right-[20%] h-px bg-gradient-to-r from-primary/20 via-primary/40 to-primary/20" />
+             
+             {steps.map((step, i) => (
+               <FadeInSection key={i} delay={i * 200} className="relative text-center group">
+                 <div className="relative z-10 w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-2xl sm:rounded-3xl bg-card border-2 border-primary/10 flex flex-col items-center justify-center mx-auto mb-6 sm:mb-8 group-hover:border-primary/40 group-hover:shadow-xl group-hover:shadow-primary/10 transition-all duration-300">
+                   <span className="text-xs font-bold text-primary/60 mb-0.5 tracking-wider">{step.num}</span>
+                   <step.icon className="h-6 w-6 sm:h-8 sm:w-8 md:h-10 md:w-10 text-primary" />
+                 </div>
+                 <h3 className="text-base sm:text-lg md:text-xl font-bold mb-2 font-display">{step.title}</h3>
+                 <p className="text-xs sm:text-sm text-muted-foreground max-w-xs mx-auto">{step.desc}</p>
+               </FadeInSection>
+             ))}
           </div>
         </div>
       </section>
@@ -722,10 +722,10 @@ export default function Index() {
       <section id="pricing" className="py-24 md:py-32 bg-muted/30">
         <div className="container mx-auto px-4">
           <FadeInSection className="text-center mb-16">
-            <Badge variant="outline" className="mb-4 px-4 py-1.5">Pricing</Badge>
-            <h2 className="text-3xl md:text-5xl font-bold mb-4 font-display">{txt.pricingTitle}</h2>
-            <p className="text-muted-foreground text-lg">{txt.pricingDesc}</p>
-          </FadeInSection>
+             <Badge variant="outline" className="mb-4 px-4 py-1.5">Pricing</Badge>
+             <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-4 font-display">{txt.pricingTitle}</h2>
+             <p className="text-muted-foreground text-base sm:text-lg">{txt.pricingDesc}</p>
+           </FadeInSection>
 
           <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
             {/* Premium */}
@@ -737,23 +737,23 @@ export default function Index() {
                     <Star className="h-3 w-3 mr-1" />
                     {language === 'uz' ? 'TAVSIYA' : language === 'ru' ? 'РЕКОМЕНДУЕМ' : 'RECOMMENDED'}
                   </Badge>
-                  <h3 className="text-2xl font-bold mb-1 font-display">{txt.proPlan}</h3>
-                  <div className="flex items-baseline gap-1 mb-1">
-                    <span className="text-5xl md:text-6xl font-bold text-primary font-display">{txt.proPrice}</span>
-                    <span className="text-muted-foreground text-lg">{txt.perMonth}</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground mb-1">{txt.proPriceUzs}{txt.perMonth}</p>
-                  <p className="text-sm text-muted-foreground mb-8">{txt.commission}</p>
-                  <ul className="space-y-4 mb-10">
-                    {txt.proFeatures.map((f, i) => (
-                      <li key={i} className="flex items-center gap-3 text-sm">
-                        <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                          <CheckCircle className="h-3.5 w-3.5 text-primary" />
-                        </div>
-                        <span className="font-medium">{f}</span>
-                      </li>
-                    ))}
-                  </ul>
+                   <h3 className="text-lg sm:text-xl md:text-2xl font-bold mb-2 sm:mb-1 font-display">{txt.proPlan}</h3>
+                   <div className="flex items-baseline gap-1 mb-2 sm:mb-1">
+                     <span className="text-4xl sm:text-5xl md:text-6xl font-bold text-primary font-display">{txt.proPrice}</span>
+                     <span className="text-muted-foreground text-sm sm:text-base md:text-lg">{txt.perMonth}</span>
+                   </div>
+                   <p className="text-xs sm:text-sm text-muted-foreground mb-1">{txt.proPriceUzs}{txt.perMonth}</p>
+                   <p className="text-xs sm:text-sm text-muted-foreground mb-6 sm:mb-8">{txt.commission}</p>
+                   <ul className="space-y-3 sm:space-y-4 mb-8 sm:mb-10">
+                     {txt.proFeatures.map((f, i) => (
+                       <li key={i} className="flex items-start gap-2 sm:gap-3 text-xs sm:text-sm">
+                         <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5 sm:mt-0">
+                           <CheckCircle className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-primary" />
+                         </div>
+                         <span className="font-medium leading-snug">{f}</span>
+                       </li>
+                     ))}
+                   </ul>
                   <Button className="w-full shadow-lg shadow-primary/20" size="lg" asChild>
                     <Link to="/auth?mode=register">
                       {txt.startPro}
@@ -770,34 +770,34 @@ export default function Index() {
               <Card className="border shadow-sm h-full hover:shadow-lg transition-shadow">
                 <CardContent className="p-8 md:p-10">
                   <Badge variant="outline" className="mb-5">VIP</Badge>
-                  <h3 className="text-2xl font-bold mb-1 font-display">{txt.entPlan}</h3>
-                  <div className="flex items-baseline gap-1 mb-2">
-                    <span className="text-5xl md:text-6xl font-bold font-display">{txt.entPrice}</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground mb-6">{txt.commissionEnt}</p>
+                   <h3 className="text-lg sm:text-xl md:text-2xl font-bold mb-2 sm:mb-1 font-display">{txt.entPlan}</h3>
+                   <div className="flex items-baseline gap-1 mb-3 sm:mb-2">
+                     <span className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold font-display">{txt.entPrice}</span>
+                   </div>
+                   <p className="text-xs sm:text-sm text-muted-foreground mb-5 sm:mb-6">{txt.commissionEnt}</p>
                   
-                  <div className="mb-6">
-                    <p className="text-sm font-semibold mb-2">{txt.entFor}</p>
-                    <ul className="space-y-1.5">
-                      {txt.entForList.map((item, i) => (
-                        <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
-                          <span className="text-primary mt-0.5">•</span>
-                          {item}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
+                   <div className="mb-5 sm:mb-6">
+                     <p className="text-xs sm:text-sm font-semibold mb-2">{txt.entFor}</p>
+                     <ul className="space-y-1 sm:space-y-1.5">
+                       {txt.entForList.map((item, i) => (
+                         <li key={i} className="text-xs sm:text-sm text-muted-foreground flex items-start gap-2">
+                           <span className="text-primary mt-0.5">•</span>
+                           <span>{item}</span>
+                         </li>
+                       ))}
+                     </ul>
+                   </div>
 
-                  <ul className="space-y-4 mb-10">
-                    {txt.entFeatures.map((f, i) => (
-                      <li key={i} className="flex items-center gap-3 text-sm">
-                        <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                          <CheckCircle className="h-3.5 w-3.5 text-muted-foreground" />
-                        </div>
-                        <span>{f}</span>
-                      </li>
-                    ))}
-                  </ul>
+                   <ul className="space-y-3 sm:space-y-4 mb-8 sm:mb-10">
+                     {txt.entFeatures.map((f, i) => (
+                       <li key={i} className="flex items-start gap-2 sm:gap-3 text-xs sm:text-sm">
+                         <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-muted flex items-center justify-center flex-shrink-0 mt-0.5 sm:mt-0">
+                           <CheckCircle className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-muted-foreground" />
+                         </div>
+                         <span>{f}</span>
+                       </li>
+                     ))}
+                   </ul>
                   <Button variant="outline" className="w-full" size="lg" asChild>
                     <a href="https://t.me/sellercloudx" target="_blank" rel="noopener noreferrer">
                       <MessageCircle className="mr-2 h-4 w-4" />
@@ -819,30 +819,30 @@ export default function Index() {
             <h2 className="text-3xl md:text-5xl font-bold font-display">{txt.testimonialsTitle}</h2>
           </FadeInSection>
 
-          <div className="grid md:grid-cols-3 gap-6 md:gap-8 max-w-5xl mx-auto">
-            {testimonials.map((t, i) => (
-              <FadeInSection key={i} delay={i * 150}>
-                <Card className="border shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 h-full">
-                  <CardContent className="p-6 md:p-8 flex flex-col h-full">
-                    <div className="flex gap-1 mb-5">
-                      {Array.from({ length: 5 }).map((_, j) => (
-                        <Star key={j} className="h-4 w-4 fill-amber-400 text-amber-400" />
-                      ))}
-                    </div>
-                    <p className="text-foreground mb-6 text-sm leading-relaxed flex-1">{t.text}</p>
-                    <div className="flex items-center gap-3 pt-4 border-t">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
-                        <span className="text-primary font-bold text-sm">{t.name[0]}</span>
-                      </div>
-                      <div>
-                        <div className="font-bold text-sm">{t.name}</div>
-                        <div className="text-xs text-muted-foreground">{t.role}</div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </FadeInSection>
-            ))}
+          <div className="grid md:grid-cols-3 gap-4 sm:gap-6 md:gap-8 max-w-5xl mx-auto">
+             {testimonials.map((t, i) => (
+               <FadeInSection key={i} delay={i * 150}>
+                 <Card className="border shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 h-full">
+                   <CardContent className="p-4 sm:p-6 md:p-8 flex flex-col h-full">
+                     <div className="flex gap-1 mb-4 sm:mb-5">
+                       {Array.from({ length: 5 }).map((_, j) => (
+                         <Star key={j} className="h-3 w-3 sm:h-4 sm:w-4 fill-amber-400 text-amber-400" />
+                       ))}
+                     </div>
+                     <p className="text-foreground mb-4 sm:mb-6 text-xs sm:text-sm leading-relaxed flex-1">{t.text}</p>
+                     <div className="flex items-center gap-3 pt-3 sm:pt-4 border-t">
+                       <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center flex-shrink-0">
+                         <span className="text-primary font-bold text-xs sm:text-sm">{t.name[0]}</span>
+                       </div>
+                       <div>
+                         <div className="font-bold text-xs sm:text-sm">{t.name}</div>
+                         <div className="text-xs text-muted-foreground">{t.role}</div>
+                       </div>
+                     </div>
+                   </CardContent>
+                 </Card>
+               </FadeInSection>
+             ))}
           </div>
         </div>
       </section>
@@ -851,13 +851,13 @@ export default function Index() {
       <section id="faq" className="py-24 md:py-32 bg-muted/30">
         <div className="container mx-auto px-4">
           <FadeInSection className="text-center mb-16">
-            <Badge variant="outline" className="mb-4 px-4 py-1.5">FAQ</Badge>
-            <h2 className="text-3xl md:text-5xl font-bold font-display">{txt.faqTitle}</h2>
-          </FadeInSection>
+             <Badge variant="outline" className="mb-4 px-4 py-1.5">FAQ</Badge>
+             <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold font-display">{txt.faqTitle}</h2>
+           </FadeInSection>
 
-          <FadeInSection>
-            <Card className="max-w-3xl mx-auto">
-              <CardContent className="p-6 md:p-8">
+           <FadeInSection>
+             <Card className="max-w-3xl mx-auto border">
+               <CardContent className="p-4 sm:p-6 md:p-8">
                 {faqs.map((faq, i) => (
                   <FAQItem key={i} question={faq.q} answer={faq.a} />
                 ))}
@@ -867,23 +867,23 @@ export default function Index() {
         </div>
       </section>
 
-      {/* ━━━ Final CTA ━━━ */}
-      <section className="py-24 md:py-32 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary to-accent" />
-        <div className="absolute inset-0 bg-dot-pattern opacity-10" />
-        <FloatingParticles />
-        
-        <div className="container mx-auto px-4 relative z-10 text-center">
-          <FadeInSection>
-            <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold text-primary-foreground mb-3 font-display">
-              {txt.ctaTitle}
-            </h2>
-            <p className="text-4xl md:text-6xl font-bold text-primary-foreground/90 mb-8 font-display">
-              {txt.ctaSubtitle}
-            </p>
-            <p className="text-primary-foreground/70 mb-12 max-w-2xl mx-auto text-lg">
-              {txt.ctaDesc}
-            </p>
+       {/* ━━━ Final CTA ━━━ */}
+       <section className="py-20 md:py-32 relative overflow-hidden">
+         <div className="absolute inset-0 bg-gradient-to-br from-primary to-accent" />
+         <div className="absolute inset-0 bg-dot-pattern opacity-10" />
+         <FloatingParticles />
+         
+         <div className="container mx-auto px-4 relative z-10 text-center">
+           <FadeInSection>
+             <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-primary-foreground mb-3 font-display leading-tight">
+               {txt.ctaTitle}
+             </h2>
+             <p className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-primary-foreground/90 mb-6 sm:mb-8 font-display leading-tight">
+               {txt.ctaSubtitle}
+             </p>
+             <p className="text-primary-foreground/70 mb-8 sm:mb-12 max-w-2xl mx-auto text-sm sm:text-base md:text-lg">
+               {txt.ctaDesc}
+             </p>
             <Button size="lg" variant="secondary" className="text-lg px-10 py-7 shadow-2xl font-bold group" asChild>
               <Link to="/auth?mode=register">
                 <Rocket className="mr-2 h-5 w-5" />
@@ -895,44 +895,44 @@ export default function Index() {
         </div>
       </section>
 
-      {/* ━━━ Footer ━━━ */}
-      <footer className="border-t bg-card py-12 md:py-16">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-8">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                <Crown className="h-4 w-4 text-white" />
-              </div>
-              <div>
-                <span className="font-bold font-display text-lg">{txt.footer}</span>
-                <p className="text-xs text-muted-foreground">{txt.footerDesc}</p>
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-6 text-sm text-muted-foreground">
-              <a href="https://t.me/sellercloudx" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors flex items-center gap-1.5">
-                <Send className="h-3.5 w-3.5" /> Telegram
-              </a>
-              <a href="https://sellercloudx.com" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
-                sellercloudx.com
-              </a>
-              <span className="hover:text-foreground transition-colors cursor-pointer">{txt.privacy}</span>
-              <span className="hover:text-foreground transition-colors cursor-pointer">{txt.terms}</span>
-              <span className="hover:text-foreground transition-colors cursor-pointer">{txt.support}</span>
-            </div>
-            <div className="flex items-center gap-3 text-sm text-muted-foreground">
-              <Lock className="h-3.5 w-3.5" />
-              <span>SSL Secured</span>
-              <span>•</span>
-              <span>GDPR</span>
-            </div>
-          </div>
-          <div className="text-center mt-8 pt-6 border-t">
-            <p className="text-sm text-muted-foreground">
-              © {new Date().getFullYear()} SellerCloudX. {txt.rights}
-            </p>
-          </div>
-        </div>
-      </footer>
+       {/* ━━━ Footer ━━━ */}
+       <footer className="border-t bg-card py-10 md:py-14">
+         <div className="container mx-auto px-4">
+           <div className="flex flex-col md:flex-row items-center justify-between gap-6 md:gap-8">
+             <div className="flex items-center gap-2">
+               <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+                 <Crown className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
+               </div>
+               <div>
+                 <span className="font-bold font-display text-base sm:text-lg">{txt.footer}</span>
+                 <p className="text-xs text-muted-foreground">{txt.footerDesc}</p>
+               </div>
+             </div>
+             <div className="flex flex-wrap items-center justify-center md:justify-end gap-3 sm:gap-4 md:gap-6 text-xs sm:text-sm text-muted-foreground">
+               <a href="https://t.me/sellercloudx" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors flex items-center gap-1 sm:gap-1.5">
+                 <Send className="h-3 w-3 sm:h-3.5 sm:w-3.5" /> Telegram
+               </a>
+               <a href="https://sellercloudx.com" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors whitespace-nowrap">
+                 sellercloudx.com
+               </a>
+               <span className="hover:text-foreground transition-colors cursor-pointer hidden sm:block">{txt.privacy}</span>
+               <span className="hover:text-foreground transition-colors cursor-pointer hidden sm:block">{txt.terms}</span>
+               <span className="hover:text-foreground transition-colors cursor-pointer hidden sm:block">{txt.support}</span>
+             </div>
+             <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm text-muted-foreground">
+               <Lock className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+               <span className="whitespace-nowrap">SSL Secured</span>
+               <span className="hidden sm:block">•</span>
+               <span className="whitespace-nowrap">GDPR</span>
+             </div>
+           </div>
+           <div className="text-center mt-6 sm:mt-8 pt-4 sm:pt-6 border-t">
+             <p className="text-xs sm:text-sm text-muted-foreground">
+               © {new Date().getFullYear()} SellerCloudX. {txt.rights}
+             </p>
+           </div>
+         </div>
+       </footer>
     </div>
   );
 }
