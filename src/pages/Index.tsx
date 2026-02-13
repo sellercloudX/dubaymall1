@@ -1,20 +1,22 @@
 import { Link } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { SEOHead, StructuredData } from '@/components/SEOHead';
+import { SEOHead } from '@/components/SEOHead';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { 
-  Globe, ArrowRight, CheckCircle, BarChart3, Shield, Zap, 
-  Package, ShoppingCart, TrendingUp, Layers, Bot, DollarSign,
-  LineChart, Clock, Users, Star, ChevronRight, Crown, Lock,
-  Repeat, AlertTriangle, Calculator, FileSpreadsheet
+  Globe, ArrowRight, CheckCircle, BarChart3, Zap, 
+  Bot, DollarSign, LineChart, Clock, Users, Star, 
+  ChevronRight, Crown, TrendingUp, AlertTriangle,
+  Play, Sparkles, Shield, Rocket, Send
 } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, ReactNode } from 'react';
+import heroDashboard from '@/assets/hero-dashboard.png';
+import abstractShapes from '@/assets/abstract-shapes.png';
 
-// Animated counter hook
+// ─── Animation hooks ───
 function useCountUp(end: number, duration = 2000, trigger = false) {
   const [count, setCount] = useState(0);
   useEffect(() => {
@@ -23,20 +25,15 @@ function useCountUp(end: number, duration = 2000, trigger = false) {
     const increment = end / (duration / 16);
     const timer = setInterval(() => {
       start += increment;
-      if (start >= end) {
-        setCount(end);
-        clearInterval(timer);
-      } else {
-        setCount(Math.floor(start));
-      }
+      if (start >= end) { setCount(end); clearInterval(timer); } 
+      else setCount(Math.floor(start));
     }, 16);
     return () => clearInterval(timer);
   }, [end, duration, trigger]);
   return count;
 }
 
-// Intersection observer hook
-function useInView(threshold = 0.2) {
+function useInView(threshold = 0.15) {
   const ref = useRef<HTMLDivElement>(null);
   const [inView, setInView] = useState(false);
   useEffect(() => {
@@ -49,30 +46,67 @@ function useInView(threshold = 0.2) {
   return { ref, inView };
 }
 
-const LANDING_TEXT = {
+function FadeInSection({ children, className = '', delay = 0 }: { children: ReactNode; className?: string; delay?: number }) {
+  const { ref, inView } = useInView(0.1);
+  return (
+    <div 
+      ref={ref} 
+      className={`transition-all duration-700 ${inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'} ${className}`}
+      style={{ transitionDelay: `${delay}ms` }}
+    >
+      {children}
+    </div>
+  );
+}
+
+// ─── Floating particle component ───
+function FloatingParticles() {
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      {Array.from({ length: 20 }).map((_, i) => (
+        <div 
+          key={i}
+          className="absolute w-1 h-1 rounded-full bg-primary/30 animate-pulse"
+          style={{
+            left: `${Math.random() * 100}%`,
+            top: `${Math.random() * 100}%`,
+            animationDelay: `${Math.random() * 3}s`,
+            animationDuration: `${2 + Math.random() * 3}s`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ─── Translations ───
+const T = {
   uz: {
-    badge: 'Marketplace avtomatizatsiya platformasi',
-    heroTitle1: 'Barcha marketplacelarni',
-    heroTitle2: 'bitta joydan boshqaring',
-    heroDesc: 'Uzum, Yandex Market, Wildberries, Ozon — barchasini yagona dashboard orqali avtomatlashtiring. AI bilan kartochka yarating, narxlarni optimallashtiring va sof foydani real-vaqtda kuzating.',
-    cta: 'Bepul boshlash',
-    ctaSecondary: 'Batafsil',
+    badge: '🚀 O\'zbekistonning #1 marketplace platformasi',
+    heroTitle1: 'Sotuvlaringizni',
+    heroTitle2: 'avtomatlashtiramiz',
+    heroTitle3: 'siz foyda olasiz.',
+    heroDesc: 'Uzum, Yandex Market, Wildberries, Ozon — barchasini yagona AI-quvvatli dashboard orqali boshqaring. Kartochka yaratishdan tortib, sof foydani real-vaqtda kuzatishgacha.',
+    cta: 'Bepul sinab ko\'rish',
+    ctaSecondary: 'Demo ko\'rish',
     loginCta: 'Kirish',
+    trusted: 'Ishonchli hamkorlar',
     statsMarketplaces: 'Marketplace',
     statsProducts: 'Sinxron mahsulot',
     statsOrders: 'Avtomatik buyurtma',
     statsTime: 'Vaqt tejash',
-    featuresTitle: 'Nima uchun SellerCloudX?',
-    featuresDesc: 'Professional sotuvchilar uchun yaratilgan kuchli vositalar to\'plami',
-    feat1: 'Multi-marketplace ulanish',
+    featuresTitle: 'Sotuvchi uchun barcha vositalar',
+    featuresSubtitle: 'bitta platformada',
+    featuresDesc: 'Bozordagi eng kuchli avtomatizatsiya vositalarini birlashtirdik',
+    feat1: 'Multi-marketplace',
     feat1d: 'Uzum, Yandex, WB, Ozon — bitta OAuth bilan ulang va barchani markazdan boshqaring',
     feat2: 'AI kartochka yaratish',
     feat2d: 'Rasm yuklang — AI nom, tavsif, kategoriya va SEO matnlarni avtomatik yaratadi',
-    feat3: 'Moliya va PnL',
+    feat3: 'Real-vaqt moliya',
     feat3d: 'Har bir SKU bo\'yicha sof foyda, marja, komissiya va logistika xarajatlarini kuzating',
     feat4: 'ABC-analiz',
-    feat4d: 'Mahsulotlaringizni A/B/C toifalariga ajratib, qaysi biri daromad keltirmasligini bilib oling',
-    feat5: 'Narxlarni optimallashtirish',
+    feat4d: 'Mahsulotlaringizni A/B/C toifalariga ajratib, zarar keltiruvchilarni aniqlang',
+    feat5: 'Smart narxlash',
     feat5d: 'Real tariflarga asoslangan avtomatik narx hisoblash va minimal narx himoyasi',
     feat6: 'Inventarizatsiya auditi',
     feat6d: 'Omborlardagi yo\'qolgan tovarlarni aniqlang va kompensatsiya talab qiling',
@@ -82,7 +116,7 @@ const LANDING_TEXT = {
     step1d: '7 kunlik bepul sinov davri — bank kartasi talab qilinmaydi',
     step2: 'Marketplacelarni ulang',
     step2d: 'API kalitingizni kiriting — tizim avtomatik sinxronlashadi',
-    step3: 'Boshqarishni boshlang',
+    step3: 'Foydani kuzating',
     step3d: 'Analitika, buyurtmalar va narxlarni yagona paneldan kuzating',
     pricingTitle: 'Oddiy va shaffof narxlar',
     pricingDesc: 'Yashirin to\'lovlar yo\'q. Har qanday paytda bekor qilish mumkin.',
@@ -100,16 +134,14 @@ const LANDING_TEXT = {
     contactSales: 'Bog\'lanish',
     testimonialsTitle: 'Sotuvchilar nima deydi?',
     t1: '"SellerCloudX bilan Uzum va Yandex\'ni bitta joydan boshqaraman. Oyiga 15+ soat tejayman."',
-    t1n: 'Sardor M.',
-    t1r: 'Elektronika sotuvchisi',
+    t1n: 'Sardor M.', t1r: 'Elektronika sotuvchisi',
     t2: '"ABC-analiz orqali 30% zarar keltiruvchi mahsulotlarni aniqladim va assortimentni optimallashtirdim."',
-    t2n: 'Nilufar R.',
-    t2r: 'Kiyim-kechak do\'koni',
+    t2n: 'Nilufar R.', t2r: 'Kiyim-kechak do\'koni',
     t3: '"Inventarizatsiya auditi yordamida yo\'qolgan 47 dona mahsulot uchun kompensatsiya oldim."',
-    t3n: 'Jasur T.',
-    t3r: 'Gadget sotuvchisi',
-    ctaTitle: 'Sotuvlaringizni avtomatlashtirishga tayyormisiz?',
-    ctaDesc: 'Minglab professional sotuvchilar allaqachon SellerCloudX dan foydalanmoqda',
+    t3n: 'Jasur T.', t3r: 'Gadget sotuvchisi',
+    ctaTitle: 'Raqobatchilaringiz allaqachon avtomatlashtirilgan.',
+    ctaSubtitle: 'Siz-chi?',
+    ctaDesc: 'Minglab professional sotuvchilar SellerCloudX bilan sotuv samaradorligini oshirmoqda',
     ctaButton: 'Hoziroq boshlang',
     footer: 'SellerCloudX',
     footerDesc: 'Marketplace avtomatizatsiya platformasi',
@@ -117,30 +149,38 @@ const LANDING_TEXT = {
     privacy: 'Maxfiylik siyosati',
     terms: 'Foydalanish shartlari',
     support: 'Yordam',
+    resultTitle: 'Aniq natijalar',
+    resultDesc: 'Foydalanuvchilarimiz erishgan ko\'rsatkichlar',
+    r1: 'Vaqt tejash', r1v: '15+ soat/oy',
+    r2: 'Foyda o\'sishi', r2v: '+23%',
+    r3: 'Xarajat kamaytirish', r3v: '-34%',
   },
   ru: {
-    badge: 'Платформа автоматизации маркетплейсов',
-    heroTitle1: 'Управляйте всеми маркетплейсами',
-    heroTitle2: 'из одного места',
-    heroDesc: 'Uzum, Yandex Market, Wildberries, Ozon — автоматизируйте всё через единый дашборд. Создавайте карточки с AI, оптимизируйте цены и отслеживайте чистую прибыль в реальном времени.',
-    cta: 'Начать бесплатно',
-    ctaSecondary: 'Подробнее',
+    badge: '🚀 Платформа #1 для маркетплейсов Узбекистана',
+    heroTitle1: 'Автоматизируем',
+    heroTitle2: 'ваши продажи,',
+    heroTitle3: 'вы получаете прибыль.',
+    heroDesc: 'Uzum, Yandex Market, Wildberries, Ozon — управляйте всем через единый AI-дашборд. От создания карточек до отслеживания чистой прибыли в реальном времени.',
+    cta: 'Попробовать бесплатно',
+    ctaSecondary: 'Смотреть демо',
     loginCta: 'Войти',
+    trusted: 'Доверенные партнёры',
     statsMarketplaces: 'Маркетплейсов',
     statsProducts: 'Синхр. товаров',
     statsOrders: 'Авто-заказов',
     statsTime: 'Экономия времени',
-    featuresTitle: 'Почему SellerCloudX?',
-    featuresDesc: 'Мощный набор инструментов для профессиональных продавцов',
+    featuresTitle: 'Все инструменты для продавца',
+    featuresSubtitle: 'в одной платформе',
+    featuresDesc: 'Мы объединили самые мощные инструменты автоматизации на рынке',
     feat1: 'Мульти-маркетплейс',
     feat1d: 'Uzum, Yandex, WB, Ozon — подключите одним OAuth и управляйте централизованно',
     feat2: 'AI-генерация карточек',
     feat2d: 'Загрузите фото — AI создаст название, описание, категорию и SEO-тексты',
-    feat3: 'Финансы и PnL',
+    feat3: 'Финансы реального времени',
     feat3d: 'Отслеживайте чистую прибыль, маржу, комиссии и логистику по каждому SKU',
     feat4: 'ABC-анализ',
     feat4d: 'Разделите товары на A/B/C категории и выявите убыточные позиции',
-    feat5: 'Оптимизация цен',
+    feat5: 'Smart-ценообразование',
     feat5d: 'Автоматический расчёт цен на основе реальных тарифов и защита минимальной цены',
     feat6: 'Аудит инвентаризации',
     feat6d: 'Выявляйте потерянные товары на складах и требуйте компенсацию',
@@ -150,7 +190,7 @@ const LANDING_TEXT = {
     step1d: '7 дней бесплатно — банковская карта не требуется',
     step2: 'Подключите маркетплейсы',
     step2d: 'Введите API-ключ — система синхронизируется автоматически',
-    step3: 'Начните управлять',
+    step3: 'Отслеживайте прибыль',
     step3d: 'Аналитика, заказы и цены в едином интерфейсе',
     pricingTitle: 'Простые и прозрачные цены',
     pricingDesc: 'Никаких скрытых платежей. Отмена в любое время.',
@@ -168,16 +208,14 @@ const LANDING_TEXT = {
     contactSales: 'Связаться',
     testimonialsTitle: 'Что говорят продавцы?',
     t1: '"С SellerCloudX управляю Uzum и Yandex из одного места. Экономлю 15+ часов в месяц."',
-    t1n: 'Сардор М.',
-    t1r: 'Продавец электроники',
+    t1n: 'Сардор М.', t1r: 'Продавец электроники',
     t2: '"Через ABC-анализ выявил 30% убыточных товаров и оптимизировал ассортимент."',
-    t2n: 'Нилуфар Р.',
-    t2r: 'Магазин одежды',
+    t2n: 'Нилуфар Р.', t2r: 'Магазин одежды',
     t3: '"Аудит инвентаризации помог получить компенсацию за 47 потерянных единиц товара."',
-    t3n: 'Жасур Т.',
-    t3r: 'Продавец гаджетов',
-    ctaTitle: 'Готовы автоматизировать продажи?',
-    ctaDesc: 'Тысячи профессиональных продавцов уже используют SellerCloudX',
+    t3n: 'Жасур Т.', t3r: 'Продавец гаджетов',
+    ctaTitle: 'Ваши конкуренты уже автоматизированы.',
+    ctaSubtitle: 'А вы?',
+    ctaDesc: 'Тысячи профессиональных продавцов повышают эффективность с SellerCloudX',
     ctaButton: 'Начать сейчас',
     footer: 'SellerCloudX',
     footerDesc: 'Платформа автоматизации маркетплейсов',
@@ -185,30 +223,38 @@ const LANDING_TEXT = {
     privacy: 'Политика конфиденциальности',
     terms: 'Условия использования',
     support: 'Поддержка',
+    resultTitle: 'Реальные результаты',
+    resultDesc: 'Показатели, которых достигают наши пользователи',
+    r1: 'Экономия времени', r1v: '15+ ч/мес',
+    r2: 'Рост прибыли', r2v: '+23%',
+    r3: 'Снижение расходов', r3v: '-34%',
   },
   en: {
-    badge: 'Marketplace Automation Platform',
-    heroTitle1: 'Manage all marketplaces',
-    heroTitle2: 'from one place',
-    heroDesc: 'Uzum, Yandex Market, Wildberries, Ozon — automate everything through a unified dashboard. Create product cards with AI, optimize prices, and track net profit in real-time.',
-    cta: 'Start Free',
-    ctaSecondary: 'Learn More',
+    badge: '🚀 #1 Marketplace Automation Platform',
+    heroTitle1: 'We automate',
+    heroTitle2: 'your sales,',
+    heroTitle3: 'you earn profit.',
+    heroDesc: 'Uzum, Yandex Market, Wildberries, Ozon — manage everything through a single AI-powered dashboard. From product card creation to real-time profit tracking.',
+    cta: 'Start Free Trial',
+    ctaSecondary: 'Watch Demo',
     loginCta: 'Sign In',
+    trusted: 'Trusted Partners',
     statsMarketplaces: 'Marketplaces',
     statsProducts: 'Synced Products',
     statsOrders: 'Auto Orders',
     statsTime: 'Time Saved',
-    featuresTitle: 'Why SellerCloudX?',
-    featuresDesc: 'Powerful toolkit built for professional sellers',
+    featuresTitle: 'All seller tools',
+    featuresSubtitle: 'in one platform',
+    featuresDesc: 'We\'ve combined the most powerful automation tools on the market',
     feat1: 'Multi-Marketplace',
     feat1d: 'Uzum, Yandex, WB, Ozon — connect via OAuth and manage centrally',
     feat2: 'AI Card Generation',
     feat2d: 'Upload a photo — AI generates title, description, category, and SEO texts',
-    feat3: 'Finance & PnL',
+    feat3: 'Real-time Finance',
     feat3d: 'Track net profit, margin, commissions, and logistics per SKU',
     feat4: 'ABC Analysis',
     feat4d: 'Categorize products into A/B/C tiers and identify underperformers',
-    feat5: 'Price Optimization',
+    feat5: 'Smart Pricing',
     feat5d: 'Auto-calculate prices based on real tariffs with minimum price protection',
     feat6: 'Inventory Audit',
     feat6d: 'Detect lost items in warehouses and claim compensation',
@@ -218,7 +264,7 @@ const LANDING_TEXT = {
     step1d: '7-day free trial — no credit card required',
     step2: 'Connect Marketplaces',
     step2d: 'Enter your API key — system syncs automatically',
-    step3: 'Start Managing',
+    step3: 'Track Profits',
     step3d: 'Analytics, orders, and pricing in one unified panel',
     pricingTitle: 'Simple, Transparent Pricing',
     pricingDesc: 'No hidden fees. Cancel anytime.',
@@ -236,16 +282,14 @@ const LANDING_TEXT = {
     contactSales: 'Contact Sales',
     testimonialsTitle: 'What Sellers Say',
     t1: '"With SellerCloudX I manage Uzum and Yandex from one place. Saving 15+ hours monthly."',
-    t1n: 'Sardor M.',
-    t1r: 'Electronics Seller',
+    t1n: 'Sardor M.', t1r: 'Electronics Seller',
     t2: '"ABC analysis revealed 30% of unprofitable products. I optimized my assortment."',
-    t2n: 'Nilufar R.',
-    t2r: 'Clothing Store',
+    t2n: 'Nilufar R.', t2r: 'Clothing Store',
     t3: '"Inventory audit helped me claim compensation for 47 lost units."',
-    t3n: 'Jasur T.',
-    t3r: 'Gadget Seller',
-    ctaTitle: 'Ready to automate your sales?',
-    ctaDesc: 'Thousands of professional sellers already use SellerCloudX',
+    t3n: 'Jasur T.', t3r: 'Gadget Seller',
+    ctaTitle: 'Your competitors are already automated.',
+    ctaSubtitle: 'Are you?',
+    ctaDesc: 'Thousands of professional sellers boost efficiency with SellerCloudX',
     ctaButton: 'Get Started Now',
     footer: 'SellerCloudX',
     footerDesc: 'Marketplace automation platform',
@@ -253,12 +297,17 @@ const LANDING_TEXT = {
     privacy: 'Privacy Policy',
     terms: 'Terms of Service',
     support: 'Support',
+    resultTitle: 'Real Results',
+    resultDesc: 'Metrics our users achieve',
+    r1: 'Time Saved', r1v: '15+ hrs/mo',
+    r2: 'Profit Growth', r2v: '+23%',
+    r3: 'Cost Reduction', r3v: '-34%',
   },
 };
 
 export default function Index() {
   const { language } = useLanguage();
-  const txt = LANDING_TEXT[language] || LANDING_TEXT.en;
+  const txt = T[language] || T.en;
   
   const stats = useInView();
   const c1 = useCountUp(4, 1500, stats.inView);
@@ -266,12 +315,12 @@ export default function Index() {
   const c3 = useCountUp(10000, 2000, stats.inView);
 
   const features = [
-    { icon: Globe, title: txt.feat1, desc: txt.feat1d, gradient: 'from-blue-500 to-indigo-600' },
-    { icon: Bot, title: txt.feat2, desc: txt.feat2d, gradient: 'from-violet-500 to-purple-600' },
-    { icon: DollarSign, title: txt.feat3, desc: txt.feat3d, gradient: 'from-emerald-500 to-teal-600' },
-    { icon: BarChart3, title: txt.feat4, desc: txt.feat4d, gradient: 'from-amber-500 to-orange-600' },
-    { icon: TrendingUp, title: txt.feat5, desc: txt.feat5d, gradient: 'from-rose-500 to-pink-600' },
-    { icon: AlertTriangle, title: txt.feat6, desc: txt.feat6d, gradient: 'from-cyan-500 to-blue-600' },
+    { icon: Globe, title: txt.feat1, desc: txt.feat1d, color: 'text-blue-500 dark:text-blue-400', bg: 'bg-blue-500/10' },
+    { icon: Bot, title: txt.feat2, desc: txt.feat2d, color: 'text-violet-500 dark:text-violet-400', bg: 'bg-violet-500/10' },
+    { icon: DollarSign, title: txt.feat3, desc: txt.feat3d, color: 'text-emerald-500 dark:text-emerald-400', bg: 'bg-emerald-500/10' },
+    { icon: BarChart3, title: txt.feat4, desc: txt.feat4d, color: 'text-amber-500 dark:text-amber-400', bg: 'bg-amber-500/10' },
+    { icon: TrendingUp, title: txt.feat5, desc: txt.feat5d, color: 'text-rose-500 dark:text-rose-400', bg: 'bg-rose-500/10' },
+    { icon: AlertTriangle, title: txt.feat6, desc: txt.feat6d, color: 'text-cyan-500 dark:text-cyan-400', bg: 'bg-cyan-500/10' },
   ];
 
   const steps = [
@@ -287,316 +336,441 @@ export default function Index() {
   ];
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       <SEOHead 
         title="SellerCloudX — Marketplace Automation Platform"
         description="Manage Uzum, Yandex Market, Wildberries, Ozon from one dashboard. AI card generation, PnL analytics, price optimization."
       />
 
-      {/* Navigation */}
-      <nav className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      {/* ━━━ Navigation ━━━ */}
+      <nav className="fixed top-0 left-0 right-0 z-50 border-b bg-background/80 backdrop-blur-xl">
         <div className="container mx-auto px-4 flex h-16 items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-              <Crown className="h-4 w-4 text-white" />
+          <Link to="/" className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/20">
+              <Crown className="h-4.5 w-4.5 text-white" />
             </div>
-            <span className="text-xl font-bold font-display">SellerCloudX</span>
+            <span className="text-xl font-bold font-display tracking-tight">SellerCloudX</span>
           </Link>
           
-          <div className="hidden md:flex items-center gap-6">
-            <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              {txt.featuresTitle?.split('?')[0] || 'Features'}
+          <div className="hidden md:flex items-center gap-8">
+            <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">
+              {language === 'uz' ? 'Imkoniyatlar' : language === 'ru' ? 'Возможности' : 'Features'}
             </a>
-            <a href="#how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+            <a href="#how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">
               {txt.howTitle}
             </a>
-            <a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              {txt.pricingTitle?.split(',')[0] || 'Pricing'}
+            <a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">
+              {language === 'uz' ? 'Narxlar' : language === 'ru' ? 'Цены' : 'Pricing'}
             </a>
           </div>
 
           <div className="flex items-center gap-2">
             <ThemeToggle />
             <LanguageSwitcher />
-            <Button variant="ghost" size="sm" asChild>
+            <Button variant="ghost" size="sm" className="font-medium" asChild>
               <Link to="/auth">{txt.loginCta}</Link>
             </Button>
-            <Button size="sm" asChild className="hidden sm:inline-flex">
+            <Button size="sm" asChild className="hidden sm:inline-flex shadow-lg shadow-primary/20">
               <Link to="/auth?mode=register">{txt.cta}</Link>
             </Button>
           </div>
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section className="relative overflow-hidden">
+      {/* ━━━ HERO ━━━ */}
+      <section className="relative min-h-[100vh] flex items-center pt-16 overflow-hidden">
+        {/* Background effects */}
         <div className="absolute inset-0 bg-mesh" />
-        <div className="absolute top-20 left-[10%] w-72 h-72 bg-primary/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-20 right-[10%] w-96 h-96 bg-accent/8 rounded-full blur-3xl" />
-        
-        <div className="container mx-auto px-4 relative z-10 pt-20 pb-24 md:pt-32 md:pb-36">
-          <div className="max-w-4xl mx-auto text-center">
-            <div className="inline-flex animate-fade-up">
-              <Badge className="mb-8 px-5 py-2.5 text-sm font-medium bg-primary/10 text-primary border-primary/20 backdrop-blur-sm">
-                <Zap className="h-4 w-4 mr-2" />
-                {txt.badge}
-              </Badge>
+        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-primary/8 rounded-full blur-[120px]" />
+        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-accent/6 rounded-full blur-[100px]" />
+        <FloatingParticles />
+
+        <div className="container mx-auto px-4 relative z-10">
+          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+            {/* Left - Text */}
+            <div className="max-w-2xl">
+              <div className="animate-fade-up">
+                <Badge className="mb-6 px-4 py-2 text-sm font-medium bg-primary/10 text-primary border-primary/20">
+                  {txt.badge}
+                </Badge>
+              </div>
+
+              <h1 className="text-4xl sm:text-5xl md:text-6xl xl:text-7xl font-bold tracking-tight mb-6 font-display leading-[1.1] animate-fade-up" style={{ animationDelay: '0.1s' }}>
+                <span className="text-foreground">{txt.heroTitle1}</span>
+                <br />
+                <span className="text-gradient">{txt.heroTitle2}</span>
+                <br />
+                <span className="text-foreground">{txt.heroTitle3}</span>
+              </h1>
+              
+              <p className="text-lg md:text-xl text-muted-foreground mb-10 leading-relaxed animate-fade-up max-w-xl" style={{ animationDelay: '0.2s' }}>
+                {txt.heroDesc}
+              </p>
+
+              <div className="flex flex-col sm:flex-row gap-4 animate-fade-up" style={{ animationDelay: '0.3s' }}>
+                <Button size="lg" className="text-base px-8 py-6 shadow-xl shadow-primary/25 hover:shadow-2xl hover:shadow-primary/30 transition-all group" asChild>
+                  <Link to="/auth?mode=register">
+                    <Rocket className="mr-2 h-5 w-5" />
+                    {txt.cta}
+                    <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                  </Link>
+                </Button>
+                <Button size="lg" variant="outline" className="text-base px-8 py-6 glass" asChild>
+                  <a href="#features">
+                    <Play className="mr-2 h-4 w-4" />
+                    {txt.ctaSecondary}
+                  </a>
+                </Button>
+              </div>
+
+              {/* Marketplace logos */}
+              <div className="mt-12 animate-fade-up" style={{ animationDelay: '0.5s' }}>
+                <p className="text-xs text-muted-foreground mb-3 uppercase tracking-widest font-medium">{txt.trusted}</p>
+                <div className="flex items-center gap-6 md:gap-8">
+                  {[
+                    { name: 'Uzum', color: 'text-purple-500' },
+                    { name: 'Yandex', color: 'text-yellow-500' },
+                    { name: 'Wildberries', color: 'text-pink-500' },
+                    { name: 'Ozon', color: 'text-blue-500' },
+                  ].map((mp) => (
+                    <div key={mp.name} className="flex items-center gap-1.5 opacity-70 hover:opacity-100 transition-opacity">
+                      <div className={`w-2 h-2 rounded-full ${mp.color} bg-current`} />
+                      <span className="text-sm font-medium text-muted-foreground">{mp.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
 
-            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-8 animate-fade-up font-display" style={{ animationDelay: '0.1s' }}>
-              <span className="text-foreground">{txt.heroTitle1}</span>
-              <br />
-              <span className="text-gradient">{txt.heroTitle2}</span>
-            </h1>
-            
-            <p className="text-lg md:text-xl text-muted-foreground mb-12 max-w-2xl mx-auto animate-fade-up leading-relaxed" style={{ animationDelay: '0.2s' }}>
-              {txt.heroDesc}
-            </p>
-
-            <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-up" style={{ animationDelay: '0.3s' }}>
-              <Button size="lg" className="text-lg px-8 py-6 shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all btn-glow group" asChild>
-                <Link to="/auth?mode=register">
-                  {txt.cta}
-                  <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                </Link>
-              </Button>
-              <Button size="lg" variant="outline" className="text-lg px-8 py-6 glass hover:bg-primary/5 transition-all" asChild>
-                <a href="#features">{txt.ctaSecondary}</a>
-              </Button>
+            {/* Right - Dashboard Image */}
+            <div className="relative animate-fade-up hidden lg:block" style={{ animationDelay: '0.4s' }}>
+              <div className="relative">
+                {/* Glow behind image */}
+                <div className="absolute -inset-4 bg-gradient-to-br from-primary/20 to-accent/20 rounded-3xl blur-2xl" />
+                <img 
+                  src={heroDashboard} 
+                  alt="SellerCloudX Dashboard" 
+                  className="relative rounded-2xl shadow-2xl border border-border/30 w-full"
+                  loading="eager"
+                />
+                {/* Floating badge */}
+                <div className="absolute -bottom-4 -left-4 bg-card border shadow-xl rounded-xl px-4 py-3 flex items-center gap-3 animate-bounce-subtle">
+                  <div className="w-10 h-10 rounded-lg bg-success/10 flex items-center justify-center">
+                    <TrendingUp className="h-5 w-5 text-success" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold">+23%</div>
+                    <div className="text-xs text-muted-foreground">{txt.r2}</div>
+                  </div>
+                </div>
+                {/* Floating badge 2 */}
+                <div className="absolute -top-3 -right-3 bg-card border shadow-xl rounded-xl px-4 py-3 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Sparkles className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold">AI</div>
+                    <div className="text-xs text-muted-foreground">Powered</div>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            {/* Marketplace logos */}
-            <div className="mt-16 flex items-center justify-center gap-6 md:gap-10 opacity-60 animate-fade-up" style={{ animationDelay: '0.5s' }}>
-              {['🟣 Uzum', '🟡 Yandex', '🔵 Wildberries', '🟢 Ozon'].map((mp, i) => (
-                <span key={i} className="text-sm md:text-base font-medium text-muted-foreground">{mp}</span>
-              ))}
+            {/* Mobile hero image */}
+            <div className="relative lg:hidden animate-fade-up" style={{ animationDelay: '0.4s' }}>
+              <div className="relative">
+                <div className="absolute -inset-2 bg-gradient-to-br from-primary/15 to-accent/15 rounded-2xl blur-xl" />
+                <img 
+                  src={heroDashboard} 
+                  alt="SellerCloudX Dashboard" 
+                  className="relative rounded-xl shadow-xl border border-border/30 w-full"
+                  loading="eager"
+                />
+              </div>
             </div>
           </div>
         </div>
 
         {/* Scroll indicator */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce-subtle">
-          <div className="w-6 h-10 rounded-full border-2 border-muted-foreground/30 flex items-start justify-center p-1.5">
-            <div className="w-1.5 h-2.5 rounded-full bg-muted-foreground/50 animate-pulse" />
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce-subtle hidden md:block">
+          <div className="w-6 h-10 rounded-full border-2 border-muted-foreground/20 flex items-start justify-center p-1.5">
+            <div className="w-1.5 h-2.5 rounded-full bg-primary/50 animate-pulse" />
           </div>
         </div>
       </section>
 
-      {/* Stats */}
-      <section ref={stats.ref} className="py-16 bg-muted/30 border-y">
+      {/* ━━━ Stats Bar ━━━ */}
+      <section ref={stats.ref} className="py-16 bg-muted/30 border-y relative">
         <div className="container mx-auto px-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 max-w-4xl mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-5xl mx-auto">
             {[
-              { value: `${c1}+`, label: txt.statsMarketplaces, icon: Globe },
-              { value: c2 >= 1000 ? `${(c2/1000).toFixed(0)}K+` : `${c2}+`, label: txt.statsProducts, icon: Package },
-              { value: c3 >= 1000 ? `${(c3/1000).toFixed(0)}K+` : `${c3}+`, label: txt.statsOrders, icon: ShoppingCart },
-              { value: '15h+', label: txt.statsTime, icon: Clock },
+              { value: `${c1}+`, label: txt.statsMarketplaces, icon: Globe, color: 'text-primary' },
+              { value: c2 >= 1000 ? `${(c2/1000).toFixed(0)}K+` : `${c2}+`, label: txt.statsProducts, icon: BarChart3, color: 'text-accent' },
+              { value: c3 >= 1000 ? `${(c3/1000).toFixed(0)}K+` : `${c3}+`, label: txt.statsOrders, icon: TrendingUp, color: 'text-success' },
+              { value: '15h+', label: txt.statsTime, icon: Clock, color: 'text-warning' },
             ].map((stat, i) => (
-              <div key={i} className="text-center group">
-                <stat.icon className="h-6 w-6 mx-auto mb-3 text-primary group-hover:scale-110 transition-transform" />
-                <div className="text-3xl md:text-4xl font-bold text-foreground font-display">{stat.value}</div>
-                <div className="text-sm text-muted-foreground mt-1">{stat.label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Features */}
-      <section id="features" className="py-24 relative overflow-hidden">
-        <div className="absolute inset-0 bg-grid-pattern opacity-[0.02]" />
-        <div className="container mx-auto px-4 relative">
-          <div className="text-center mb-16">
-            <Badge variant="outline" className="mb-4">Features</Badge>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4 font-display">{txt.featuresTitle}</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">{txt.featuresDesc}</p>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
-            {features.map((feat, i) => (
-              <Card key={i} className="group border shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden hover:-translate-y-1">
-                <CardContent className="p-6">
-                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${feat.gradient} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg`}>
-                    <feat.icon className="h-6 w-6 text-white" />
-                  </div>
-                  <h3 className="text-lg font-semibold mb-2">{feat.title}</h3>
-                  <p className="text-muted-foreground text-sm leading-relaxed">{feat.desc}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* How It Works */}
-      <section id="how-it-works" className="py-24 bg-muted/30">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <Badge variant="outline" className="mb-4">Process</Badge>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4 font-display">{txt.howTitle}</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">{txt.howDesc}</p>
-          </div>
-          
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {steps.map((step, i) => (
-              <div key={i} className="relative text-center group">
-                {i < steps.length - 1 && (
-                  <div className="hidden md:block absolute top-12 left-[60%] w-[80%] border-t-2 border-dashed border-border" />
-                )}
-                <div className="relative z-10 w-24 h-24 rounded-2xl bg-card border-2 border-primary/20 flex flex-col items-center justify-center mx-auto mb-6 group-hover:border-primary/50 group-hover:shadow-lg transition-all">
-                  <span className="text-xs font-bold text-primary mb-1">{step.num}</span>
-                  <step.icon className="h-8 w-8 text-primary" />
+              <div key={i} className="text-center group cursor-default">
+                <div className={`w-14 h-14 rounded-2xl bg-card border shadow-sm mx-auto mb-4 flex items-center justify-center group-hover:shadow-lg group-hover:scale-105 transition-all`}>
+                  <stat.icon className={`h-6 w-6 ${stat.color}`} />
                 </div>
-                <h3 className="text-lg font-semibold mb-2">{step.title}</h3>
-                <p className="text-sm text-muted-foreground">{step.desc}</p>
+                <div className="text-3xl md:text-4xl font-bold text-foreground font-display">{stat.value}</div>
+                <div className="text-sm text-muted-foreground mt-1 font-medium">{stat.label}</div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Pricing */}
-      <section id="pricing" className="py-24">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <Badge variant="outline" className="mb-4">Pricing</Badge>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4 font-display">{txt.pricingTitle}</h2>
-            <p className="text-muted-foreground">{txt.pricingDesc}</p>
+      {/* ━━━ Features ━━━ */}
+      <section id="features" className="py-24 md:py-32 relative overflow-hidden">
+        <div className="absolute inset-0 bg-dot-pattern opacity-[0.03]" />
+        <div className="absolute top-0 right-0 w-[400px] h-[400px]">
+          <img src={abstractShapes} alt="" className="w-full h-full object-contain opacity-20 dark:opacity-10" loading="lazy" />
+        </div>
+        
+        <div className="container mx-auto px-4 relative">
+          <FadeInSection className="text-center mb-16 md:mb-20">
+            <Badge variant="outline" className="mb-4 px-4 py-1.5">
+              <Sparkles className="h-3 w-3 mr-1.5" />
+              Features
+            </Badge>
+            <h2 className="text-3xl md:text-5xl font-bold mb-3 font-display">
+              {txt.featuresTitle} <span className="text-gradient">{txt.featuresSubtitle}</span>
+            </h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto text-lg">{txt.featuresDesc}</p>
+          </FadeInSection>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 max-w-6xl mx-auto">
+            {features.map((feat, i) => (
+              <FadeInSection key={i} delay={i * 100}>
+                <Card className="group border shadow-sm hover:shadow-xl transition-all duration-500 overflow-hidden hover:-translate-y-2 h-full">
+                  <CardContent className="p-6 md:p-8">
+                    <div className={`w-14 h-14 rounded-2xl ${feat.bg} flex items-center justify-center mb-5 group-hover:scale-110 transition-transform duration-300`}>
+                      <feat.icon className={`h-7 w-7 ${feat.color}`} />
+                    </div>
+                    <h3 className="text-lg font-bold mb-2 font-display">{feat.title}</h3>
+                    <p className="text-muted-foreground text-sm leading-relaxed">{feat.desc}</p>
+                  </CardContent>
+                </Card>
+              </FadeInSection>
+            ))}
           </div>
+        </div>
+      </section>
+
+      {/* ━━━ Results Banner ━━━ */}
+      <section className="py-20 bg-muted/30 border-y relative overflow-hidden">
+        <div className="absolute inset-0 bg-grid-pattern opacity-[0.03]" />
+        <div className="container mx-auto px-4 relative">
+          <FadeInSection className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold font-display mb-2">{txt.resultTitle}</h2>
+            <p className="text-muted-foreground">{txt.resultDesc}</p>
+          </FadeInSection>
+          <div className="grid grid-cols-3 gap-6 max-w-3xl mx-auto">
+            {[
+              { label: txt.r1, value: txt.r1v, icon: Clock, color: 'text-primary' },
+              { label: txt.r2, value: txt.r2v, icon: TrendingUp, color: 'text-success' },
+              { label: txt.r3, value: txt.r3v, icon: Shield, color: 'text-accent' },
+            ].map((r, i) => (
+              <FadeInSection key={i} delay={i * 150} className="text-center">
+                <r.icon className={`h-8 w-8 mx-auto mb-3 ${r.color}`} />
+                <div className="text-3xl md:text-5xl font-bold font-display mb-1">{r.value}</div>
+                <div className="text-sm text-muted-foreground font-medium">{r.label}</div>
+              </FadeInSection>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ━━━ How It Works ━━━ */}
+      <section id="how-it-works" className="py-24 md:py-32">
+        <div className="container mx-auto px-4">
+          <FadeInSection className="text-center mb-16 md:mb-20">
+            <Badge variant="outline" className="mb-4 px-4 py-1.5">Process</Badge>
+            <h2 className="text-3xl md:text-5xl font-bold mb-4 font-display">{txt.howTitle}</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto text-lg">{txt.howDesc}</p>
+          </FadeInSection>
+          
+          <div className="grid md:grid-cols-3 gap-8 md:gap-12 max-w-5xl mx-auto relative">
+            {/* Connecting line */}
+            <div className="hidden md:block absolute top-16 left-[20%] right-[20%] h-px bg-gradient-to-r from-primary/20 via-primary/40 to-primary/20" />
+            
+            {steps.map((step, i) => (
+              <FadeInSection key={i} delay={i * 200} className="relative text-center group">
+                <div className="relative z-10 w-24 h-24 md:w-28 md:h-28 rounded-3xl bg-card border-2 border-primary/10 flex flex-col items-center justify-center mx-auto mb-8 group-hover:border-primary/40 group-hover:shadow-xl group-hover:shadow-primary/10 transition-all duration-300">
+                  <span className="text-xs font-bold text-primary/60 mb-1 tracking-wider">{step.num}</span>
+                  <step.icon className="h-8 w-8 md:h-10 md:w-10 text-primary" />
+                </div>
+                <h3 className="text-xl font-bold mb-2 font-display">{step.title}</h3>
+                <p className="text-sm text-muted-foreground max-w-xs mx-auto">{step.desc}</p>
+              </FadeInSection>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ━━━ Pricing ━━━ */}
+      <section id="pricing" className="py-24 md:py-32 bg-muted/30">
+        <div className="container mx-auto px-4">
+          <FadeInSection className="text-center mb-16">
+            <Badge variant="outline" className="mb-4 px-4 py-1.5">Pricing</Badge>
+            <h2 className="text-3xl md:text-5xl font-bold mb-4 font-display">{txt.pricingTitle}</h2>
+            <p className="text-muted-foreground text-lg">{txt.pricingDesc}</p>
+          </FadeInSection>
 
           <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
             {/* Pro */}
-            <Card className="relative border-2 border-primary/30 shadow-xl overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary to-accent" />
-              <CardContent className="p-8">
-                <Badge className="mb-4 bg-primary/10 text-primary border-primary/20">
-                  <Star className="h-3 w-3 mr-1" />
-                  {txt.freeTrial}
-                </Badge>
-                <h3 className="text-2xl font-bold mb-1">{txt.proPlan}</h3>
-                <div className="flex items-baseline gap-1 mb-2">
-                  <span className="text-5xl font-bold text-primary font-display">{txt.proPrice}</span>
-                  <span className="text-muted-foreground">{txt.perMonth}</span>
-                </div>
-                <p className="text-sm text-muted-foreground mb-6">{txt.commission}</p>
-                <ul className="space-y-3 mb-8">
-                  {txt.proFeatures.map((f, i) => (
-                    <li key={i} className="flex items-center gap-3 text-sm">
-                      <CheckCircle className="h-4 w-4 text-primary flex-shrink-0" />
-                      <span>{f}</span>
-                    </li>
-                  ))}
-                </ul>
-                <Button className="w-full" size="lg" asChild>
-                  <Link to="/auth?mode=register">
-                    {txt.startPro}
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
+            <FadeInSection>
+              <Card className="relative border-2 border-primary/30 shadow-xl overflow-hidden h-full hover:shadow-2xl transition-shadow">
+                <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-primary to-accent" />
+                <CardContent className="p-8 md:p-10">
+                  <Badge className="mb-5 bg-primary/10 text-primary border-primary/20">
+                    <Star className="h-3 w-3 mr-1" />
+                    {txt.freeTrial}
+                  </Badge>
+                  <h3 className="text-2xl font-bold mb-1 font-display">{txt.proPlan}</h3>
+                  <div className="flex items-baseline gap-1 mb-2">
+                    <span className="text-5xl md:text-6xl font-bold text-primary font-display">{txt.proPrice}</span>
+                    <span className="text-muted-foreground text-lg">{txt.perMonth}</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-8">{txt.commission}</p>
+                  <ul className="space-y-4 mb-10">
+                    {txt.proFeatures.map((f, i) => (
+                      <li key={i} className="flex items-center gap-3 text-sm">
+                        <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <CheckCircle className="h-3.5 w-3.5 text-primary" />
+                        </div>
+                        <span className="font-medium">{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button className="w-full shadow-lg shadow-primary/20" size="lg" asChild>
+                    <Link to="/auth?mode=register">
+                      {txt.startPro}
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            </FadeInSection>
 
             {/* Enterprise */}
-            <Card className="border shadow-sm">
-              <CardContent className="p-8">
-                <Badge variant="outline" className="mb-4">Enterprise</Badge>
-                <h3 className="text-2xl font-bold mb-1">{txt.entPlan}</h3>
-                <div className="flex items-baseline gap-1 mb-2">
-                  <span className="text-5xl font-bold font-display">{txt.entPrice}</span>
-                </div>
-                <p className="text-sm text-muted-foreground mb-6">{txt.commissionEnt}</p>
-                <ul className="space-y-3 mb-8">
-                  {txt.entFeatures.map((f, i) => (
-                    <li key={i} className="flex items-center gap-3 text-sm">
-                      <CheckCircle className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      <span>{f}</span>
-                    </li>
-                  ))}
-                </ul>
-                <Button variant="outline" className="w-full" size="lg" asChild>
-                  <a href="https://t.me/sellercloudx">
-                    {txt.contactSales}
-                    <ChevronRight className="ml-2 h-4 w-4" />
-                  </a>
-                </Button>
-              </CardContent>
-            </Card>
+            <FadeInSection delay={150}>
+              <Card className="border shadow-sm h-full hover:shadow-lg transition-shadow">
+                <CardContent className="p-8 md:p-10">
+                  <Badge variant="outline" className="mb-5">Enterprise</Badge>
+                  <h3 className="text-2xl font-bold mb-1 font-display">{txt.entPlan}</h3>
+                  <div className="flex items-baseline gap-1 mb-2">
+                    <span className="text-5xl md:text-6xl font-bold font-display">{txt.entPrice}</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-8">{txt.commissionEnt}</p>
+                  <ul className="space-y-4 mb-10">
+                    {txt.entFeatures.map((f, i) => (
+                      <li key={i} className="flex items-center gap-3 text-sm">
+                        <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                          <CheckCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                        </div>
+                        <span>{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button variant="outline" className="w-full" size="lg" asChild>
+                    <a href="https://t.me/sellercloudx">
+                      {txt.contactSales}
+                      <ChevronRight className="ml-2 h-4 w-4" />
+                    </a>
+                  </Button>
+                </CardContent>
+              </Card>
+            </FadeInSection>
           </div>
         </div>
       </section>
 
-      {/* Testimonials */}
-      <section className="py-24 bg-muted/30">
+      {/* ━━━ Testimonials ━━━ */}
+      <section className="py-24 md:py-32">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <Badge variant="outline" className="mb-4">Testimonials</Badge>
-            <h2 className="text-3xl md:text-4xl font-bold font-display">{txt.testimonialsTitle}</h2>
-          </div>
+          <FadeInSection className="text-center mb-16">
+            <Badge variant="outline" className="mb-4 px-4 py-1.5">Testimonials</Badge>
+            <h2 className="text-3xl md:text-5xl font-bold font-display">{txt.testimonialsTitle}</h2>
+          </FadeInSection>
 
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+          <div className="grid md:grid-cols-3 gap-6 md:gap-8 max-w-5xl mx-auto">
             {testimonials.map((t, i) => (
-              <Card key={i} className="border shadow-sm hover:shadow-lg transition-shadow">
-                <CardContent className="p-6">
-                  <div className="flex gap-1 mb-4">
-                    {Array.from({ length: 5 }).map((_, j) => (
-                      <Star key={j} className="h-4 w-4 fill-amber-400 text-amber-400" />
-                    ))}
-                  </div>
-                  <p className="text-foreground mb-6 italic text-sm leading-relaxed">{t.text}</p>
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <span className="text-primary font-semibold text-sm">{t.name[0]}</span>
+              <FadeInSection key={i} delay={i * 150}>
+                <Card className="border shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 h-full">
+                  <CardContent className="p-6 md:p-8 flex flex-col h-full">
+                    <div className="flex gap-1 mb-5">
+                      {Array.from({ length: 5 }).map((_, j) => (
+                        <Star key={j} className="h-4 w-4 fill-amber-400 text-amber-400" />
+                      ))}
                     </div>
-                    <div>
-                      <div className="font-semibold text-sm">{t.name}</div>
-                      <div className="text-xs text-muted-foreground">{t.role}</div>
+                    <p className="text-foreground mb-6 text-sm leading-relaxed flex-1">{t.text}</p>
+                    <div className="flex items-center gap-3 pt-4 border-t">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
+                        <span className="text-primary font-bold text-sm">{t.name[0]}</span>
+                      </div>
+                      <div>
+                        <div className="font-bold text-sm">{t.name}</div>
+                        <div className="text-xs text-muted-foreground">{t.role}</div>
+                      </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </FadeInSection>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Final CTA */}
-      <section className="py-24 relative overflow-hidden">
+      {/* ━━━ Final CTA ━━━ */}
+      <section className="py-24 md:py-32 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary to-accent" />
         <div className="absolute inset-0 bg-dot-pattern opacity-10" />
+        <FloatingParticles />
         
         <div className="container mx-auto px-4 relative z-10 text-center">
-          <h2 className="text-3xl md:text-5xl font-bold text-primary-foreground mb-6 font-display">
-            {txt.ctaTitle}
-          </h2>
-          <p className="text-primary-foreground/80 mb-10 max-w-2xl mx-auto text-lg">
-            {txt.ctaDesc}
-          </p>
-          <Button size="lg" variant="secondary" className="text-lg px-8 py-6 shadow-xl" asChild>
-            <Link to="/auth?mode=register">
-              {txt.ctaButton}
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </Link>
-          </Button>
+          <FadeInSection>
+            <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold text-primary-foreground mb-3 font-display">
+              {txt.ctaTitle}
+            </h2>
+            <p className="text-4xl md:text-6xl font-bold text-primary-foreground/90 mb-8 font-display">
+              {txt.ctaSubtitle}
+            </p>
+            <p className="text-primary-foreground/70 mb-12 max-w-2xl mx-auto text-lg">
+              {txt.ctaDesc}
+            </p>
+            <Button size="lg" variant="secondary" className="text-lg px-10 py-7 shadow-2xl font-bold group" asChild>
+              <Link to="/auth?mode=register">
+                <Rocket className="mr-2 h-5 w-5" />
+                {txt.ctaButton}
+                <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+              </Link>
+            </Button>
+          </FadeInSection>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t bg-card py-12">
+      {/* ━━━ Footer ━━━ */}
+      <footer className="border-t bg-card py-12 md:py-16">
         <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-8">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
                 <Crown className="h-4 w-4 text-white" />
               </div>
               <div>
-                <span className="font-bold font-display">{txt.footer}</span>
+                <span className="font-bold font-display text-lg">{txt.footer}</span>
                 <p className="text-xs text-muted-foreground">{txt.footerDesc}</p>
               </div>
             </div>
             <div className="flex items-center gap-6 text-sm text-muted-foreground">
-              <span>{txt.privacy}</span>
-              <span>{txt.terms}</span>
-              <span>{txt.support}</span>
+              <a href="https://t.me/sellercloudx" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors flex items-center gap-1.5">
+                <Send className="h-3.5 w-3.5" /> Telegram
+              </a>
+              <span className="hover:text-foreground transition-colors cursor-pointer">{txt.privacy}</span>
+              <span className="hover:text-foreground transition-colors cursor-pointer">{txt.terms}</span>
+              <span className="hover:text-foreground transition-colors cursor-pointer">{txt.support}</span>
             </div>
             <p className="text-sm text-muted-foreground">
               © {new Date().getFullYear()} SellerCloudX. {txt.rights}
