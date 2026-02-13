@@ -1,13 +1,15 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Copy, Check, Sparkles, ExternalLink, Package, Search, ChevronDown, ChevronUp } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Progress } from '@/components/ui/progress';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { FileSpreadsheet, Search, Sparkles, Download, Package, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import * as XLSX from 'xlsx';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 
 interface UzumCardHelperProps {
@@ -15,67 +17,65 @@ interface UzumCardHelperProps {
   store: MarketplaceDataStore;
 }
 
-interface UzumCardData {
-  name_uz: string;
+interface SourceProduct {
+  id: string;
+  name: string;
+  price: number;
+  description: string;
+  category: string;
+  marketplace: string;
+  images?: string[];
+}
+
+interface GeneratedRow {
   name_ru: string;
-  short_description_uz: string;
+  name_uz: string;
   short_description_ru: string;
-  full_description_uz: string;
+  short_description_uz: string;
   full_description_ru: string;
+  full_description_uz: string;
   brand?: string;
-  properties: Array<{
-    name_uz: string;
-    name_ru: string;
-    value_uz: string;
-    value_ru: string;
-  }>;
-  seo_keywords?: string[];
+  properties?: Array<{ name_uz: string; name_ru: string; value_uz: string; value_ru: string }>;
 }
 
-function CopyField({ label, value, multiline = false }: { label: string; value: string; multiline?: boolean }) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(value);
-    setCopied(true);
-    toast.success(`${label} nusxalandi`);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  return (
-    <div className="space-y-1">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-muted-foreground">{label}</span>
-        <Button variant="ghost" size="sm" onClick={handleCopy} className="h-6 px-2 text-xs">
-          {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
-          {copied ? 'Nusxalandi' : 'Nusxalash'}
-        </Button>
-      </div>
-      {multiline ? (
-        <div className="bg-muted/50 rounded-md p-2.5 text-sm whitespace-pre-wrap border">{value}</div>
-      ) : (
-        <div className="bg-muted/50 rounded-md px-2.5 py-1.5 text-sm border truncate">{value}</div>
-      )}
-    </div>
-  );
+// Common fields for all products in batch
+interface CommonFields {
+  categoryName: string;
+  categoryId: string;
+  brand: string;
+  country: string;
+  ikpu: string;
+  weight: string;
+  height: string;
+  width: string;
+  length: string;
 }
+
+const EMPTY_COMMON: CommonFields = {
+  categoryName: '',
+  categoryId: '',
+  brand: '',
+  country: "O'zbekiston",
+  ikpu: '',
+  weight: '',
+  height: '',
+  width: '',
+  length: '',
+};
 
 export function UzumCardHelper({ connectedMarketplaces, store }: UzumCardHelperProps) {
-  const [mode, setMode] = useState<'select' | 'manual'>('select');
-  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
-  const [manualName, setManualName] = useState('');
-  const [manualDescription, setManualDescription] = useState('');
-  const [manualCategory, setManualCategory] = useState('');
-  const [manualBrand, setManualBrand] = useState('');
-  const [manualPrice, setManualPrice] = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [cardData, setCardData] = useState<UzumCardData | null>(null);
+  const [step, setStep] = useState<'select' | 'details' | 'generating' | 'done'>('select');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
-  const [expandedSection, setExpandedSection] = useState<string | null>('name');
+  const [common, setCommon] = useState<CommonFields>(EMPTY_COMMON);
+  const [progress, setProgress] = useState(0);
+  const [progressText, setProgressText] = useState('');
+  const [generatedRows, setGeneratedRows] = useState<Array<{ product: SourceProduct; data: GeneratedRow }>>([]);
+  const [errors, setErrors] = useState<string[]>([]);
 
-  // Get products from all connected marketplaces (except uzum itself)
+  // Products from all connected marketplaces except uzum
   const sourceProducts = useMemo(() => {
-    const products: Array<{ id: string; name: string; price: number; description: string; category: string; marketplace: string }> = [];
+    const products: SourceProduct[] = [];
     for (const mp of connectedMarketplaces) {
       if (mp === 'uzum') continue;
       const mpProducts = store.getProducts(mp);
@@ -87,6 +87,7 @@ export function UzumCardHelper({ connectedMarketplaces, store }: UzumCardHelperP
           description: p.description || '',
           category: p.category || '',
           marketplace: mp,
+          images: p.pictures || [],
         });
       }
     }
@@ -94,86 +95,182 @@ export function UzumCardHelper({ connectedMarketplaces, store }: UzumCardHelperP
   }, [connectedMarketplaces, store.dataVersion]);
 
   const filteredProducts = useMemo(() => {
-    if (!searchQuery) return sourceProducts.slice(0, 20);
+    if (!searchQuery) return sourceProducts;
     const q = searchQuery.toLowerCase();
-    return sourceProducts.filter(p => p.name.toLowerCase().includes(q)).slice(0, 20);
+    return sourceProducts.filter(p => p.name.toLowerCase().includes(q));
   }, [sourceProducts, searchQuery]);
 
-  const selectedProduct = sourceProducts.find(p => p.id === selectedProductId);
+  const toggleProduct = useCallback((id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
+  const toggleAll = useCallback(() => {
+    if (selectedIds.size === filteredProducts.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredProducts.map(p => p.id)));
+    }
+  }, [filteredProducts, selectedIds.size]);
+
+  const selectedProducts = useMemo(() => 
+    sourceProducts.filter(p => selectedIds.has(p.id)), 
+    [sourceProducts, selectedIds]
+  );
+
+  // Generate AI content for each product then build Excel
   const handleGenerate = async () => {
-    const productName = mode === 'select' ? selectedProduct?.name : manualName;
-    if (!productName) {
-      toast.error("Mahsulot nomini kiriting");
-      return;
+    setStep('generating');
+    setProgress(0);
+    setErrors([]);
+    const rows: Array<{ product: SourceProduct; data: GeneratedRow }> = [];
+    const errs: string[] = [];
+    const total = selectedProducts.length;
+
+    for (let i = 0; i < total; i++) {
+      const product = selectedProducts[i];
+      setProgressText(`${i + 1}/${total}: ${product.name.slice(0, 40)}...`);
+      setProgress(Math.round(((i) / total) * 100));
+
+      try {
+        const { data, error } = await supabase.functions.invoke('prepare-uzum-card', {
+          body: {
+            productName: product.name,
+            description: product.description,
+            category: product.category || common.categoryName,
+            brand: common.brand,
+            price: product.price,
+          },
+        });
+
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        if (data?.card) {
+          rows.push({ product, data: data.card });
+        }
+      } catch (err: any) {
+        console.error(`Error for ${product.name}:`, err);
+        errs.push(`${product.name}: ${err?.message || 'Xatolik'}`);
+      }
+
+      // Small delay to avoid rate limiting
+      if (i < total - 1) {
+        await new Promise(r => setTimeout(r, 800));
+      }
     }
 
-    setIsGenerating(true);
-    setCardData(null);
+    setProgress(100);
+    setGeneratedRows(rows);
+    setErrors(errs);
+    setStep('done');
 
-    try {
-      const body: Record<string, any> = {
-        productName,
-        description: mode === 'select' ? selectedProduct?.description : manualDescription,
-        category: mode === 'select' ? selectedProduct?.category : manualCategory,
-        brand: mode === 'manual' ? manualBrand : undefined,
-        price: mode === 'select' ? selectedProduct?.price : manualPrice ? Number(manualPrice) : undefined,
-      };
-
-      const { data, error } = await supabase.functions.invoke('prepare-uzum-card', { body });
-
-      if (error) throw error;
-
-      if (data?.error) {
-        toast.error(data.error);
-        return;
-      }
-
-      if (data?.card) {
-        setCardData(data.card);
-        toast.success("Uzum kartochka ma'lumotlari tayyor!");
-      }
-    } catch (err: any) {
-      console.error('Generate error:', err);
-      toast.error(err?.message || "Xatolik yuz berdi");
-    } finally {
-      setIsGenerating(false);
+    if (rows.length > 0) {
+      toast.success(`${rows.length} ta mahsulot tayyor!`);
     }
   };
 
-  const handleCopyAll = async () => {
-    if (!cardData) return;
-    const allText = `
-=== NOM (UZ) ===
-${cardData.name_uz}
+  // Build XLSX matching Uzum template
+  const handleDownloadExcel = () => {
+    if (generatedRows.length === 0) return;
 
-=== NOM (RU) ===
-${cardData.name_ru}
+    // Header row matching Uzum template (columns A-AD)
+    const headers = [
+      'Название товара RU',           // A
+      'Идентификатор от продавца',     // B
+      'Название товара UZ',            // C
+      'Группировка SKU',               // D
+      'Название категории',            // E
+      'id категории',                  // F
+      'Бренд',                         // G
+      'Модель',                        // H
+      'Страна производства',           // I
+      'Описание товара RU',            // J
+      'Описание товара UZ',            // K
+      'Краткое описание RU',           // L
+      'Краткое описание UZ',           // M
+      'Состав RU',                     // N
+      'Состав UZ',                     // O
+      'Инструкция по уходу и эксплуатации RU', // P
+      'Инструкция по уходу и эксплуатации UZ', // Q
+      'Размерная сетка RU',            // R
+      'Размерная сетка UZ',            // S
+      'Ссылки на фото',                // T
+      'Штрихкод',                      // U
+      'ИКПУ',                          // V
+      'Цвет',                          // W
+      'Размер',                        // X
+      'Цена продажи (som)',            // Y
+      'Цена до скидки (som)',          // Z
+      'Вес (г)',                        // AA
+      'Высота (мм)',                   // AB
+      'Ширина (мм)',                   // AC
+      'Длина (мм)',                    // AD
+    ];
 
-=== QISQA TAVSIF (UZ) ===
-${cardData.short_description_uz}
+    const dataRows = generatedRows.map(({ product, data }, idx) => [
+      data.name_ru,                                        // A - Name RU
+      product.id,                                          // B - Seller ID
+      data.name_uz,                                        // C - Name UZ
+      `SKU-${idx + 1}`,                                    // D - SKU grouping
+      common.categoryName,                                 // E - Category name
+      common.categoryId,                                   // F - Category ID
+      data.brand || common.brand,                          // G - Brand
+      '',                                                  // H - Model
+      common.country,                                      // I - Country
+      data.full_description_ru,                            // J - Full description RU
+      data.full_description_uz,                            // K - Full description UZ
+      data.short_description_ru?.slice(0, 390),            // L - Short description RU (max 390)
+      data.short_description_uz?.slice(0, 390),            // M - Short description UZ (max 390)
+      '',                                                  // N - Composition RU
+      '',                                                  // O - Composition UZ
+      '',                                                  // P - Care instructions RU
+      '',                                                  // Q - Care instructions UZ
+      '',                                                  // R - Size chart RU
+      '',                                                  // S - Size chart UZ
+      (product.images || []).join('; '),                    // T - Photo URLs
+      '',                                                  // U - Barcode
+      common.ikpu,                                         // V - IKPU
+      '',                                                  // W - Color
+      '',                                                  // X - Size
+      product.price,                                       // Y - Sale price
+      product.price,                                       // Z - Original price
+      common.weight || '',                                 // AA - Weight (g)
+      common.height || '',                                 // AB - Height (mm)
+      common.width || '',                                  // AC - Width (mm)
+      common.length || '',                                 // AD - Length (mm)
+    ]);
 
-=== QISQA TAVSIF (RU) ===
-${cardData.short_description_ru}
+    const wsData = [headers, ...dataRows];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
 
-=== TO'LIQ TAVSIF (UZ) ===
-${cardData.full_description_uz}
+    // Set column widths
+    ws['!cols'] = [
+      { wch: 40 }, { wch: 20 }, { wch: 40 }, { wch: 20 },
+      { wch: 30 }, { wch: 12 }, { wch: 20 }, { wch: 15 },
+      { wch: 20 }, { wch: 50 }, { wch: 50 }, { wch: 50 },
+      { wch: 50 }, { wch: 20 }, { wch: 20 }, { wch: 20 },
+      { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 50 },
+      { wch: 15 }, { wch: 20 }, { wch: 15 }, { wch: 15 },
+      { wch: 15 }, { wch: 15 }, { wch: 10 }, { wch: 12 },
+      { wch: 12 }, { wch: 12 },
+    ];
 
-=== TO'LIQ TAVSIF (RU) ===
-${cardData.full_description_ru}
-
-=== XUSUSIYATLAR ===
-${cardData.properties.map(p => `${p.name_uz} (${p.name_ru}): ${p.value_uz} (${p.value_ru})`).join('\n')}
-${cardData.brand ? `\n=== BREND ===\n${cardData.brand}` : ''}
-${cardData.seo_keywords?.length ? `\n=== SEO ===\n${cardData.seo_keywords.join(', ')}` : ''}
-`.trim();
-    
-    await navigator.clipboard.writeText(allText);
-    toast.success("Barcha ma'lumotlar nusxalandi!");
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Товары');
+    XLSX.writeFile(wb, `uzum-products-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    toast.success('Excel fayl yuklandi!');
   };
 
-  const toggleSection = (section: string) => {
-    setExpandedSection(prev => prev === section ? null : section);
+  const handleReset = () => {
+    setStep('select');
+    setSelectedIds(new Set());
+    setGeneratedRows([]);
+    setErrors([]);
+    setProgress(0);
   };
 
   return (
@@ -183,212 +280,188 @@ ${cardData.seo_keywords?.length ? `\n=== SEO ===\n${cardData.seo_keywords.join('
         <CardHeader className="p-4">
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center">
-              <Sparkles className="h-4 w-4 text-white" />
+              <FileSpreadsheet className="h-4 w-4 text-white" />
             </div>
             <div>
-              <CardTitle className="text-base">Uzum Card Helper</CardTitle>
-              <CardDescription className="text-xs">AI orqali kartochka ma'lumotlarini tayyorlash</CardDescription>
+              <CardTitle className="text-base">Uzum Excel Generator</CardTitle>
+              <CardDescription className="text-xs">
+                AI tarjima + Uzum shablon formatida Excel fayl yaratish
+              </CardDescription>
             </div>
           </div>
         </CardHeader>
       </Card>
 
-      {/* Input Mode */}
-      {!cardData && (
+      {/* Step 1: Select Products */}
+      {step === 'select' && (
         <Card>
           <CardContent className="p-4 space-y-3">
-            <div className="flex gap-2">
-              <Button variant={mode === 'select' ? 'default' : 'outline'} size="sm" onClick={() => setMode('select')} className="flex-1 text-xs">
-                <Package className="h-3.5 w-3.5 mr-1" /> Mahsulotdan
-              </Button>
-              <Button variant={mode === 'manual' ? 'default' : 'outline'} size="sm" onClick={() => setMode('manual')} className="flex-1 text-xs">
-                ✏️ Qo'lda kiritish
-              </Button>
+            <div className="flex items-center justify-between">
+              <h3 className="font-medium text-sm">1. Mahsulotlarni tanlang</h3>
+              <Badge variant="secondary" className="text-xs">{selectedIds.size} tanlandi</Badge>
             </div>
 
-            {mode === 'select' ? (
-              <div className="space-y-2">
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                  <Input placeholder="Mahsulot qidirish..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-8 h-8 text-sm" />
-                </div>
-                <div className="max-h-48 overflow-y-auto space-y-1">
-                  {filteredProducts.length === 0 ? (
-                    <p className="text-xs text-muted-foreground text-center py-4">Mahsulotlar topilmadi. Marketplace ulang (Uzumdan boshqa).</p>
-                  ) : (
-                    filteredProducts.map(p => (
-                      <button key={p.id} onClick={() => setSelectedProductId(p.id)}
-                        className={`w-full text-left p-2 rounded-md border text-xs transition-all ${selectedProductId === p.id ? 'border-primary bg-primary/5' : 'border-transparent hover:bg-muted'}`}>
-                        <div className="font-medium truncate">{p.name}</div>
-                        <div className="text-muted-foreground flex items-center gap-2 mt-0.5">
-                          <Badge variant="outline" className="text-[10px] h-4 px-1">{p.marketplace}</Badge>
-                          {p.price > 0 && <span>{new Intl.NumberFormat('uz-UZ').format(p.price)} so'm</span>}
-                        </div>
-                      </button>
-                    ))
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <Input placeholder="Mahsulot nomi *" value={manualName} onChange={e => setManualName(e.target.value)} className="h-8 text-sm" />
-                <Textarea placeholder="Tavsif" value={manualDescription} onChange={e => setManualDescription(e.target.value)} className="min-h-[60px] text-sm" />
-                <div className="grid grid-cols-2 gap-2">
-                  <Input placeholder="Kategoriya" value={manualCategory} onChange={e => setManualCategory(e.target.value)} className="h-8 text-sm" />
-                  <Input placeholder="Brend" value={manualBrand} onChange={e => setManualBrand(e.target.value)} className="h-8 text-sm" />
-                </div>
-                <Input placeholder="Narx (so'm)" type="number" value={manualPrice} onChange={e => setManualPrice(e.target.value)} className="h-8 text-sm" />
-              </div>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input placeholder="Qidirish..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-8 h-8 text-sm" />
+            </div>
+
+            {filteredProducts.length > 0 && (
+              <button onClick={toggleAll} className="text-xs text-primary hover:underline">
+                {selectedIds.size === filteredProducts.length ? 'Hammasini bekor qilish' : 'Hammasini tanlash'}
+              </button>
             )}
 
-            <Button onClick={handleGenerate} disabled={isGenerating || (mode === 'select' && !selectedProductId) || (mode === 'manual' && !manualName)}
-              className="w-full bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700">
-              {isGenerating ? (
-                <>
-                  <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                  AI tayyorlamoqda...
-                </>
+            <div className="max-h-64 overflow-y-auto space-y-1">
+              {filteredProducts.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-4">
+                  Mahsulotlar topilmadi. Marketplace ulang (Uzumdan boshqa).
+                </p>
               ) : (
-                <>
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  Kartochka tayyorlash
-                </>
+                filteredProducts.slice(0, 50).map(p => (
+                  <label key={p.id} className="flex items-start gap-2 p-2 rounded-md border hover:bg-muted/50 cursor-pointer text-xs">
+                    <Checkbox checked={selectedIds.has(p.id)} onCheckedChange={() => toggleProduct(p.id)} className="mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium truncate">{p.name}</div>
+                      <div className="text-muted-foreground flex items-center gap-2 mt-0.5">
+                        <Badge variant="outline" className="text-[10px] h-4 px-1">{p.marketplace}</Badge>
+                        {p.price > 0 && <span>{new Intl.NumberFormat('uz-UZ').format(p.price)} so'm</span>}
+                      </div>
+                    </div>
+                  </label>
+                ))
               )}
+            </div>
+
+            <Button onClick={() => setStep('details')} disabled={selectedIds.size === 0} className="w-full" size="sm">
+              <Package className="h-4 w-4 mr-2" />
+              Davom etish ({selectedIds.size} ta mahsulot)
             </Button>
           </CardContent>
         </Card>
       )}
 
-      {/* Loading */}
-      {isGenerating && (
+      {/* Step 2: Common Details */}
+      {step === 'details' && (
         <Card>
           <CardContent className="p-4 space-y-3">
-            <Skeleton className="h-4 w-3/4" />
-            <Skeleton className="h-4 w-1/2" />
-            <Skeleton className="h-20 w-full" />
-            <Skeleton className="h-4 w-2/3" />
+            <div className="flex items-center justify-between">
+              <h3 className="font-medium text-sm">2. Umumiy ma'lumotlar</h3>
+              <Button variant="ghost" size="sm" className="text-xs h-6" onClick={() => setStep('select')}>← Orqaga</Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Barcha {selectedIds.size} ta mahsulotga tegishli umumiy maydonlarni to'ldiring.
+              Uzum shablonidagi majburiy (*) ustunlar.
+            </p>
+
+            <div className="space-y-2">
+              <Input placeholder="Kategoriya nomi * (masalan: Smartfonlar)" value={common.categoryName}
+                onChange={e => setCommon(p => ({ ...p, categoryName: e.target.value }))} className="h-8 text-sm" />
+              <Input placeholder="Kategoriya ID * (masalan: 16646)" value={common.categoryId}
+                onChange={e => setCommon(p => ({ ...p, categoryId: e.target.value }))} className="h-8 text-sm" />
+              <Input placeholder="Brend * (masalan: Samsung)" value={common.brand}
+                onChange={e => setCommon(p => ({ ...p, brand: e.target.value }))} className="h-8 text-sm" />
+              <Input placeholder="Ishlab chiqaruvchi mamlakat *" value={common.country}
+                onChange={e => setCommon(p => ({ ...p, country: e.target.value }))} className="h-8 text-sm" />
+              <Input placeholder="ИКПУ (16 ta raqam) *" value={common.ikpu} maxLength={16}
+                onChange={e => setCommon(p => ({ ...p, ikpu: e.target.value }))} className="h-8 text-sm" />
+
+              <div className="grid grid-cols-2 gap-2">
+                <Input placeholder="Og'irlik (gramm) *" type="number" value={common.weight}
+                  onChange={e => setCommon(p => ({ ...p, weight: e.target.value }))} className="h-8 text-sm" />
+                <Input placeholder="Balandlik (mm) *" type="number" value={common.height}
+                  onChange={e => setCommon(p => ({ ...p, height: e.target.value }))} className="h-8 text-sm" />
+                <Input placeholder="Kenglik (mm) *" type="number" value={common.width}
+                  onChange={e => setCommon(p => ({ ...p, width: e.target.value }))} className="h-8 text-sm" />
+                <Input placeholder="Uzunlik (mm) *" type="number" value={common.length}
+                  onChange={e => setCommon(p => ({ ...p, length: e.target.value }))} className="h-8 text-sm" />
+              </div>
+            </div>
+
+            <Button onClick={handleGenerate}
+              disabled={!common.categoryName || !common.brand}
+              className="w-full bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700">
+              <Sparkles className="h-4 w-4 mr-2" />
+              AI bilan Excel yaratish ({selectedIds.size} ta)
+            </Button>
           </CardContent>
         </Card>
       )}
 
-      {/* Results */}
-      {cardData && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-sm">Tayyor ma'lumotlar</h3>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => setCardData(null)} className="text-xs h-7">
-                Qayta yaratish
-              </Button>
-              <Button size="sm" onClick={handleCopyAll} className="text-xs h-7">
-                <Copy className="h-3 w-3 mr-1" /> Hammasini nusxalash
-              </Button>
+      {/* Step 3: Generating */}
+      {step === 'generating' && (
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+              <h3 className="font-medium text-sm">AI tayyorlamoqda...</h3>
             </div>
-          </div>
+            <Progress value={progress} className="h-2" />
+            <p className="text-xs text-muted-foreground">{progressText}</p>
+          </CardContent>
+        </Card>
+      )}
 
-          {/* Name */}
-          <Card>
-            <button onClick={() => toggleSection('name')} className="w-full p-3 flex items-center justify-between">
-              <span className="font-medium text-sm">📝 Nomi</span>
-              {expandedSection === 'name' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            </button>
-            {expandedSection === 'name' && (
-              <CardContent className="px-3 pb-3 pt-0 space-y-2">
-                <CopyField label="O'zbekcha (lotin)" value={cardData.name_uz} />
-                <CopyField label="Ruscha (kirill)" value={cardData.name_ru} />
-              </CardContent>
-            )}
-          </Card>
+      {/* Step 4: Done */}
+      {step === 'done' && (
+        <div className="space-y-3">
+          <Card className="border-green-500/30 bg-green-500/5">
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-green-500" />
+                <h3 className="font-medium text-sm">{generatedRows.length} ta mahsulot tayyor!</h3>
+              </div>
 
-          {/* Short Description */}
-          <Card>
-            <button onClick={() => toggleSection('short')} className="w-full p-3 flex items-center justify-between">
-              <span className="font-medium text-sm">📋 Qisqa tavsif</span>
-              {expandedSection === 'short' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            </button>
-            {expandedSection === 'short' && (
-              <CardContent className="px-3 pb-3 pt-0 space-y-2">
-                <CopyField label="O'zbekcha" value={cardData.short_description_uz} multiline />
-                <CopyField label="Ruscha" value={cardData.short_description_ru} multiline />
-              </CardContent>
-            )}
-          </Card>
-
-          {/* Full Description */}
-          <Card>
-            <button onClick={() => toggleSection('full')} className="w-full p-3 flex items-center justify-between">
-              <span className="font-medium text-sm">📖 To'liq tavsif</span>
-              {expandedSection === 'full' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            </button>
-            {expandedSection === 'full' && (
-              <CardContent className="px-3 pb-3 pt-0 space-y-2">
-                <CopyField label="O'zbekcha" value={cardData.full_description_uz} multiline />
-                <CopyField label="Ruscha" value={cardData.full_description_ru} multiline />
-              </CardContent>
-            )}
-          </Card>
-
-          {/* Properties */}
-          <Card>
-            <button onClick={() => toggleSection('props')} className="w-full p-3 flex items-center justify-between">
-              <span className="font-medium text-sm">⚙️ Xususiyatlar ({cardData.properties.length})</span>
-              {expandedSection === 'props' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            </button>
-            {expandedSection === 'props' && (
-              <CardContent className="px-3 pb-3 pt-0">
-                <div className="space-y-2">
-                  {cardData.properties.map((prop, i) => (
-                    <div key={i} className="bg-muted/50 rounded-md p-2 border text-xs space-y-1">
-                      <div className="flex justify-between">
-                        <span className="font-medium">{prop.name_uz} / {prop.name_ru}</span>
-                        <Button variant="ghost" size="sm" className="h-5 px-1 text-[10px]"
-                          onClick={() => {
-                            navigator.clipboard.writeText(`${prop.value_uz}`);
-                            toast.success('Nusxalandi');
-                          }}>
-                          <Copy className="h-2.5 w-2.5" />
-                        </Button>
-                      </div>
-                      <div className="text-muted-foreground">{prop.value_uz} / {prop.value_ru}</div>
-                    </div>
+              {errors.length > 0 && (
+                <div className="bg-destructive/10 rounded-md p-2 space-y-1">
+                  <div className="flex items-center gap-1 text-xs font-medium text-destructive">
+                    <AlertCircle className="h-3 w-3" />
+                    {errors.length} ta xatolik
+                  </div>
+                  {errors.slice(0, 3).map((e, i) => (
+                    <p key={i} className="text-[10px] text-muted-foreground truncate">{e}</p>
                   ))}
                 </div>
-              </CardContent>
-            )}
+              )}
+
+              <div className="space-y-1">
+                {generatedRows.slice(0, 5).map(({ product, data }, i) => (
+                  <div key={i} className="flex items-center gap-2 text-xs p-1.5 bg-muted/50 rounded">
+                    <CheckCircle2 className="h-3 w-3 text-green-500 shrink-0" />
+                    <span className="truncate flex-1">{data.name_ru}</span>
+                  </div>
+                ))}
+                {generatedRows.length > 5 && (
+                  <p className="text-[10px] text-muted-foreground text-center">
+                    ... va yana {generatedRows.length - 5} ta
+                  </p>
+                )}
+              </div>
+
+              <Button onClick={handleDownloadExcel} className="w-full" size="sm">
+                <Download className="h-4 w-4 mr-2" />
+                Excel faylni yuklab olish
+              </Button>
+
+              <Button variant="outline" size="sm" onClick={handleReset} className="w-full text-xs">
+                Qayta boshlash
+              </Button>
+            </CardContent>
           </Card>
 
-          {/* SEO Keywords */}
-          {cardData.seo_keywords && cardData.seo_keywords.length > 0 && (
-            <Card>
-              <button onClick={() => toggleSection('seo')} className="w-full p-3 flex items-center justify-between">
-                <span className="font-medium text-sm">🔍 SEO kalit so'zlar</span>
-                {expandedSection === 'seo' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-              </button>
-              {expandedSection === 'seo' && (
-                <CardContent className="px-3 pb-3 pt-0">
-                  <div className="flex flex-wrap gap-1.5">
-                    {cardData.seo_keywords.map((kw, i) => (
-                      <Badge key={i} variant="secondary" className="text-xs cursor-pointer hover:bg-primary/20"
-                        onClick={() => { navigator.clipboard.writeText(kw); toast.success('Nusxalandi'); }}>
-                        {kw}
-                      </Badge>
-                    ))}
-                  </div>
-                </CardContent>
-              )}
-            </Card>
-          )}
-
-          {/* Link to Uzum */}
+          {/* Instructions */}
           <Card className="bg-gradient-to-r from-purple-500/10 to-violet-500/10 border-purple-500/20">
-            <CardContent className="p-3">
-              <a href="https://seller.uzum.uz" target="_blank" rel="noopener noreferrer"
-                className="flex items-center justify-between text-sm font-medium text-purple-700 dark:text-purple-300">
-                <span>🟣 Uzum Seller Portal'da kartochka yaratish</span>
-                <ExternalLink className="h-4 w-4" />
-              </a>
-              <p className="text-xs text-muted-foreground mt-1">
-                Yuqoridagi ma'lumotlarni nusxalab, Uzum seller portal'ga o'ting va "Yangi tovar qo'shish" bo'limida joylashtiring.
+            <CardContent className="p-3 space-y-2">
+              <h4 className="font-medium text-sm">📋 Qo'llanma</h4>
+              <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
+                <li>Yuqoridagi tugma orqali Excel faylni yuklab oling</li>
+                <li><a href="https://seller.uzum.uz" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">seller.uzum.uz</a> ga kiring</li>
+                <li>"Товары" → "Создание товаров из файла" bo'limiga o'ting</li>
+                <li>Yuklangan Excel faylni biriktiring va "Загрузить" tugmasini bosing</li>
+              </ol>
+              <p className="text-[10px] text-muted-foreground italic">
+                ⚠️ Kategoriya ID va ИКПУ to'g'riligini Uzum portalda tekshiring.
+                Uzum shablonida kategoriya bo'yicha qo'shimcha filtrlar bo'lishi mumkin.
               </p>
             </CardContent>
           </Card>
