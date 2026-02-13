@@ -210,7 +210,7 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
       
       console.log(`Cloning "${product.name}" to ${targetMp}, cost-optimized mode, images: ${validImages.length}`);
       
-      // Only Yandex Market has create-card endpoint
+      // Yandex and Wildberries have create-card endpoints
       if (targetMp === 'yandex') {
         const { data, error } = await supabase.functions.invoke('yandex-market-create-card', {
           body: {
@@ -246,6 +246,40 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
         if (!data?.success) {
           const errMsg = data?.error || 'Marketplace API xatosi';
           console.error(`Clone to ${targetMp} API error:`, errMsg, data?.yandexResponse);
+          toast.error(`${product.name.slice(0, 30)}: ${errMsg}`);
+          return false;
+        }
+        
+        console.log(`✅ Cloned "${product.name}" to ${targetMp} (cost-optimized)`);
+        return true;
+      }
+
+      if (targetMp === 'wildberries') {
+        const { data, error } = await supabase.functions.invoke('wildberries-create-card', {
+          body: {
+            shopId: shop?.id || 'sellercloud',
+            product: {
+              name: product.name,
+              description: product.description || product.name,
+              price: product.price,
+              costPrice,
+              images: validImages,
+              category: product.category || '',
+            },
+            skipImageGeneration: true, // 💰 Reuse existing images from master card
+            cloneMode: true, // 💰 Use cheaper AI models
+          },
+        });
+        
+        if (error) {
+          console.error(`Clone to ${targetMp} invoke error:`, error.message || error);
+          toast.error(`${product.name}: ${error.message || 'Edge function xatosi'}`);
+          return false;
+        }
+        
+        if (!data?.success) {
+          const errMsg = data?.error || 'Marketplace API xatosi';
+          console.error(`Clone to ${targetMp} API error:`, errMsg);
           toast.error(`${product.name.slice(0, 30)}: ${errMsg}`);
           return false;
         }
