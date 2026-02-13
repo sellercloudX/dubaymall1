@@ -124,33 +124,33 @@ export function useMarketplaceDataStore(connectedMarketplaces: string[]) {
        gcTime: 1000 * 60 * 60 * 24, // 24h cache
        refetchOnWindowFocus: false,
        refetchOnMount: false, // Don't refetch when component mounts
-       refetchInterval: 1000 * 60 * 10, // Auto-refresh every 10 min in background
-       retry: 2,
-       retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10000),
-       networkMode: 'offlineFirst' as const,
-     })),
-   });
+        refetchInterval: false, // No auto-refresh — only manual refresh
+        retry: 2,
+        retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10000),
+        networkMode: 'offlineFirst' as const,
+      })),
+    });
 
-   // Fetch orders for each marketplace
-   const orderQueries = useQueries({
-     queries: connectedMarketplaces.map(mp => ({
-       queryKey: ['marketplace-orders', mp, 'v3-iso-dates'],
-       queryFn: async () => {
-         const result = await fetchMarketplaceDataFn(mp, 'orders', {
-           fetchAll: true,
-         });
-         return {
-           marketplace: mp,
-           data: (result.data || []) as MarketplaceOrder[],
-           total: result.data?.length || 0,
-         };
-       },
-       staleTime: 1000 * 60 * 30, // 30 min — prevent refetch on mount
-       gcTime: 1000 * 60 * 60 * 24,
-       refetchOnWindowFocus: false,
-       refetchOnMount: false, // Don't refetch when component mounts
-       refetchInterval: 1000 * 60 * 5, // Auto-refresh every 5 min in background
-       retry: 2,
+    // Fetch orders for each marketplace
+    const orderQueries = useQueries({
+      queries: connectedMarketplaces.map(mp => ({
+        queryKey: ['marketplace-orders', mp, 'v4-no-autorefresh'],
+        queryFn: async () => {
+          const result = await fetchMarketplaceDataFn(mp, 'orders', {
+            fetchAll: true,
+          });
+          return {
+            marketplace: mp,
+            data: (result.data || []) as MarketplaceOrder[],
+            total: result.data?.length || 0,
+          };
+        },
+        staleTime: 1000 * 60 * 30, // 30 min — prevent refetch on mount
+        gcTime: 1000 * 60 * 60 * 24,
+        refetchOnWindowFocus: false,
+        refetchOnMount: false, // Don't refetch when component mounts
+        refetchInterval: false, // No auto-refresh — only manual refresh
+        retry: 2,
        retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10000),
        networkMode: 'offlineFirst' as const,
      })),

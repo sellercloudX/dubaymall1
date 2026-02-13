@@ -1007,10 +1007,46 @@ serve(async (req) => {
         "Accept": "application/json",
       };
       
-      // Get shopId from credentials or account_info
-      const uzumShopId = credentials.sellerId || 
-                         (connection.account_info as any)?.shopId || 
-                         (connection.account_info as any)?.sellerId;
+      // Discover actual shopId from /v1/shops endpoint first
+      let uzumShopId = credentials.sellerId || 
+                       (connection.account_info as any)?.shopId || 
+                       (connection.account_info as any)?.sellerId;
+
+      // Always try to discover the real shopId from /v1/shops
+      try {
+        console.log(`Uzum: discovering shopId from /v1/shops...`);
+        const shopsResp = await fetch(`${uzumBaseUrl}/v1/shops`, { headers: uzumHeaders });
+        if (shopsResp.ok) {
+          const shopsData = await shopsResp.json();
+          const shops = shopsData.payload || shopsData.data || shopsData || [];
+          const shopList = Array.isArray(shops) ? shops : [shops];
+          if (shopList.length > 0) {
+            const realShopId = shopList[0].shopId || shopList[0].id;
+            if (realShopId && String(realShopId) !== String(uzumShopId)) {
+              console.log(`Uzum: discovered real shopId=${realShopId} (was ${uzumShopId})`);
+              uzumShopId = String(realShopId);
+              // Update account_info in DB with correct shopId
+              await supabase
+                .from("marketplace_connections")
+                .update({ 
+                  account_info: { 
+                    ...(connection.account_info as any),
+                    shopId: uzumShopId,
+                    storeName: shopList[0].shopTitle || shopList[0].title || shopList[0].name || "Uzum Market Store",
+                    state: "CONNECTED",
+                  }
+                })
+                .eq("id", connection.id);
+            } else {
+              console.log(`Uzum: shopId confirmed: ${uzumShopId}`);
+            }
+          }
+        } else {
+          console.log(`Uzum /v1/shops returned ${shopsResp.status}: ${await shopsResp.text()}`);
+        }
+      } catch (e) {
+        console.error("Uzum shops discovery error:", e);
+      }
 
       console.log(`Uzum API: dataType=${dataType}, shopId=${uzumShopId}`);
 
