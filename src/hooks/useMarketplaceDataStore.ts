@@ -38,6 +38,7 @@ export interface MarketplaceOrder {
     count: number;
     price: number;
     priceUZS: number;
+    photo?: string;
   }>;
 }
 

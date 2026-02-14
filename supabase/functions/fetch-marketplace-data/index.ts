@@ -1422,8 +1422,11 @@ serve(async (req) => {
               const sampleOrder = orderList[0];
               const sampleItems = sampleOrder.items || sampleOrder.orderItems || [];
               if (sampleItems.length > 0) {
-                console.log(`Uzum order item[0] keys: ${JSON.stringify(Object.keys(sampleItems[0]))}`);
-                console.log(`Uzum order item[0] productId=${sampleItems[0].productId}, skuId=${sampleItems[0].skuId}, title=${sampleItems[0].title || sampleItems[0].productTitle}`);
+                const s = sampleItems[0];
+                console.log(`Uzum order item[0] keys: ${JSON.stringify(Object.keys(s))}`);
+                console.log(`Uzum order item[0] id=${s.id}, barcode=${s.barcode}, title=${s.title}, skuTitle=${s.skuTitle}`);
+                console.log(`Uzum order item[0] identifierInfo: ${JSON.stringify(s.identifierInfo || 'N/A')}`);
+                console.log(`Uzum order item[0] photo: ${JSON.stringify(typeof s.photo === 'object' ? Object.keys(s.photo || {}) : s.photo)}`);
               }
             }
 
@@ -1449,20 +1452,38 @@ serve(async (req) => {
                   lastName: order.buyer?.lastName || '',
                 },
                 items: items.map((item: any) => {
-                  // CRITICAL: Uzum order items have productId AND skuId
-                  // Products use productId as offerId, so we MUST use productId for matching
-                  // skuId is a different entity (variant-level) and will NOT match products
-                  const itemProductId = String(item.productId || '');
-                  const itemSkuId = String(item.skuId || '');
-                  // Prefer productId for PnL/ABC matching consistency
-                  const offerId = itemProductId || itemSkuId;
+                  // CRITICAL: Uzum FBS order items have these keys:
+                  // id, barcode, skuTitle, title, price, amount, photo, identifierInfo
+                  // They do NOT have productId or skuId directly!
+                  // We must extract identifiers from identifierInfo or use item.id
+                  const identInfo = item.identifierInfo || {};
+                  const itemProductId = String(item.productId || identInfo.productId || '');
+                  const itemSkuId = String(item.skuId || identInfo.skuId || item.id || '');
+                  // Use barcode or skuTitle as human-readable identifier
+                  const itemBarcode = item.barcode || identInfo.barcode || '';
+                  // For matching with products: prefer productId, then id from identifierInfo, then item.id
+                  const offerId = itemProductId || String(identInfo.id || item.id || itemSkuId || itemBarcode || '');
+                  
+                  // Extract photo URL
+                  let itemPhoto = '';
+                  if (item.photo) {
+                    if (typeof item.photo === 'string') itemPhoto = item.photo;
+                    else if (item.photo.url) itemPhoto = item.photo.url;
+                    else if (item.photo.photo?.url) itemPhoto = item.photo.photo.url;
+                  }
+                  if (itemPhoto && !itemPhoto.startsWith('http')) {
+                    itemPhoto = `https://images.uzum.uz${itemPhoto.startsWith('/') ? '' : '/'}${itemPhoto}`;
+                  }
+                  
                   return {
                     offerId,
                     skuId: itemSkuId,
-                    offerName: item.title || item.productTitle || item.name || '',
-                    count: item.quantity || item.count || 1,
-                    price: item.price || item.amount || 0,
-                    priceUZS: item.price || item.amount || 0,
+                    barcode: itemBarcode,
+                    offerName: item.title || item.skuTitle || item.productTitle || item.name || '',
+                    count: item.quantity || item.count || item.amount || 1,
+                    price: item.price || 0,
+                    priceUZS: item.price || 0,
+                    photo: itemPhoto,
                   };
                 }),
               };
