@@ -406,7 +406,8 @@ export function MarketplaceOAuth({
                       <a 
                         href={
                           mp.id === 'yandex' ? 'https://partner.market.yandex.ru/settings/api-keys' :
-                          mp.id === 'uzum' ? 'https://seller.uzum.uz/seller/api-keys' : '#'
+                          mp.id === 'uzum' ? 'https://seller.uzum.uz/seller/api-keys' :
+                          mp.id === 'wildberries' ? 'https://seller.wildberries.ru/supplier-settings/access-to-api' : '#'
                         }
                         target="_blank"
                         rel="noopener noreferrer"

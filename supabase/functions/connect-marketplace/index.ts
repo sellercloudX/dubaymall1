@@ -197,7 +197,6 @@ serve(async (req) => {
 
         if (shopsResponse.ok) {
           const shopsData = await shopsResponse.json();
-          // API returns array directly, NOT wrapped in payload
           const shops = Array.isArray(shopsData) ? shopsData : (shopsData.payload || shopsData.data || shopsData || []);
           const shopList = Array.isArray(shops) ? shops : [shops];
           
@@ -223,7 +222,6 @@ serve(async (req) => {
           }
         } else {
           console.log("Uzum shops validation status:", shopsResponse.status);
-          // Still allow connection - API key might be valid but shops endpoint differs
           isValid = true;
           accountInfo = {
             shopId: sellerId,
@@ -282,7 +280,6 @@ serve(async (req) => {
         );
         if (ordersResponse.ok) {
           const ordersData = await ordersResponse.json();
-          // GenericResponseLong: { payload: number }
           ordersCount = typeof ordersData.payload === 'number' ? ordersData.payload : (ordersData.payload?.count || 0);
           console.log("Uzum orders count:", ordersCount);
         } else {
@@ -290,6 +287,90 @@ serve(async (req) => {
         }
       } catch (e) {
         console.error("Uzum orders fetch error:", e);
+      }
+    } else if (marketplace === "wildberries" && apiKey) {
+      // Wildberries API validation
+      console.log("Validating Wildberries API...");
+      const wbHeaders = {
+        "Authorization": apiKey,
+        "Content-Type": "application/json",
+      };
+
+      // 1. Validate API key by fetching seller info / warehouses
+      try {
+        const warehousesResp = await fetch("https://marketplace-api.wildberries.ru/api/v3/warehouses", {
+          headers: wbHeaders,
+        });
+
+        if (warehousesResp.ok) {
+          const warehouses = await warehousesResp.json();
+          isValid = true;
+          accountInfo = {
+            supplierId: sellerId || "unknown",
+            storeName: "Wildberries Store",
+            state: "CONNECTED",
+            warehousesCount: Array.isArray(warehouses) ? warehouses.length : 0,
+          };
+          console.log("WB validated, warehouses:", accountInfo.warehousesCount);
+        } else if (warehousesResp.status === 401 || warehousesResp.status === 403) {
+          console.log("WB API key invalid:", warehousesResp.status);
+          isValid = false;
+        } else {
+          // Other errors - still allow connection
+          isValid = true;
+          accountInfo = {
+            supplierId: sellerId || "unknown",
+            storeName: "Wildberries Store",
+            state: "PENDING_VALIDATION",
+          };
+        }
+      } catch (e) {
+        console.error("WB validation error:", e);
+        isValid = true;
+        accountInfo = {
+          supplierId: sellerId || "unknown",
+          storeName: "Wildberries Store",
+          state: "CONNECTION_ERROR",
+        };
+      }
+
+      // 2. Get products count
+      if (isValid) {
+        try {
+          const cardsResp = await fetch("https://content-api.wildberries.ru/content/v2/get/cards/list", {
+            method: "POST",
+            headers: wbHeaders,
+            body: JSON.stringify({
+              settings: {
+                cursor: { limit: 1 },
+                filter: { withPhoto: -1 },
+              },
+            }),
+          });
+          if (cardsResp.ok) {
+            const cardsData = await cardsResp.json();
+            productsCount = cardsData.cursor?.total || 0;
+            console.log("WB products count:", productsCount);
+          }
+        } catch (e) {
+          console.error("WB products count error:", e);
+        }
+      }
+
+      // 3. Get new orders count
+      if (isValid) {
+        try {
+          const ordersResp = await fetch("https://marketplace-api.wildberries.ru/api/v3/orders/new", {
+            headers: wbHeaders,
+          });
+          if (ordersResp.ok) {
+            const ordersData = await ordersResp.json();
+            ordersCount = ordersData.orders?.length || 0;
+            console.log("WB new orders:", ordersCount);
+          }
+        } catch (e) {
+          console.error("WB orders count error:", e);
+        }
       }
     }
 
