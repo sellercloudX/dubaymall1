@@ -1454,30 +1454,30 @@ serve(async (req) => {
                 items: items.map((item: any) => {
                   // CRITICAL: Uzum FBS order items have these keys:
                   // id, barcode, skuTitle, title, price, amount, photo, identifierInfo
-                  // They do NOT have productId or skuId directly!
-                  // We must extract identifiers from identifierInfo or use item.id
-                  const identInfo = item.identifierInfo || {};
-                  const itemProductId = String(item.productId || identInfo.productId || '');
-                  const itemSkuId = String(item.skuId || identInfo.skuId || item.id || '');
-                  // Use barcode or skuTitle as human-readable identifier
+                  // identifierInfo may be "N/A" string, not an object!
+                  const identInfo = (item.identifierInfo && typeof item.identifierInfo === 'object') ? item.identifierInfo : {};
                   const itemBarcode = item.barcode || identInfo.barcode || '';
-                  // For matching with products: prefer productId, then id from identifierInfo, then item.id
-                  const offerId = itemProductId || String(identInfo.id || item.id || itemSkuId || itemBarcode || '');
+                  // Use skuTitle (human-readable SKU like "TEXPERT-GEEMY") as primary identifier
+                  // This matches the product offerId from product sync
+                  const offerId = item.skuTitle || itemBarcode || String(item.id || '');
                   
-                  // Extract photo URL
+                  // Extract photo URL - item.photo is an OBJECT with {photo, photoKey, color, hasVerticalPhoto}
                   let itemPhoto = '';
                   if (item.photo) {
-                    if (typeof item.photo === 'string') itemPhoto = item.photo;
-                    else if (item.photo.url) itemPhoto = item.photo.url;
-                    else if (item.photo.photo?.url) itemPhoto = item.photo.photo.url;
-                  }
-                  if (itemPhoto && !itemPhoto.startsWith('http')) {
-                    itemPhoto = `https://images.uzum.uz${itemPhoto.startsWith('/') ? '' : '/'}${itemPhoto}`;
+                    if (typeof item.photo === 'string') {
+                      itemPhoto = item.photo;
+                    } else if (typeof item.photo === 'object') {
+                      // photo.photo contains the actual URL/path
+                      const photoPath = item.photo.photo || item.photo.photoKey || '';
+                      if (photoPath) {
+                        itemPhoto = photoPath.startsWith('http') ? photoPath : `https://images.uzum.uz${photoPath.startsWith('/') ? '' : '/'}${photoPath}`;
+                      }
+                    }
                   }
                   
                   return {
                     offerId,
-                    skuId: itemSkuId,
+                    skuId: String(item.id || ''),
                     barcode: itemBarcode,
                     offerName: item.title || item.skuTitle || item.productTitle || item.name || '',
                     count: item.quantity || item.count || item.amount || 1,
