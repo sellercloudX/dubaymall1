@@ -2,8 +2,13 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import { ThemeProvider } from "./contexts/ThemeContext";
- import { ErrorBoundary } from "./components/ErrorBoundary";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import "./index.css";
+
+// Detect Capacitor native environment
+if ((window as any).Capacitor) {
+  document.documentElement.classList.add('capacitor');
+}
 
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
