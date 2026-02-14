@@ -1193,11 +1193,15 @@ serve(async (req) => {
                   const skuSample = (s.skuList || s.skus || [])[0];
                   if (skuSample) {
                     console.log(`Uzum SKU[0] ALL keys: ${JSON.stringify(Object.keys(skuSample))}`);
-                    console.log(`Uzum SKU[0] barCode=${skuSample.barCode}, barcode=${skuSample.barcode}, article=${skuSample.article}, vendorCode=${skuSample.vendorCode}, sellerItemCode=${skuSample.sellerItemCode}, skuId=${skuSample.skuId}`);
+                    console.log(`Uzum SKU[0] barCode=${skuSample.barCode}, barcode=${skuSample.barcode}, article=${skuSample.article}, vendorCode=${skuSample.vendorCode}, sellerItemCode=${skuSample.sellerItemCode}, skuId=${skuSample.skuId}, skuTitle=${skuSample.skuTitle}`);
                     ['photos', 'photoList', 'photo', 'photoUrl', 'previewImage', 'image', 'imageUrl'].forEach(k => {
                       if (skuSample[k] !== undefined) console.log(`Uzum SKU[0].${k}: ${JSON.stringify(skuSample[k]).substring(0, 500)}`);
                     });
                   }
+                  // Log product-level image fields
+                  ['image', 'previewImg', 'previewImage', 'photo', 'photoUrl'].forEach(k => {
+                    if (items[0][k] !== undefined) console.log(`Uzum product[0].${k}: ${JSON.stringify(items[0][k]).substring(0, 500)}`);
+                  });
                 }
 
                 const products = items.map((card: any) => {
@@ -1226,10 +1230,12 @@ serve(async (req) => {
                   }
                   
                   // SKU identifier: use article or sellerItemCode (human-readable), NOT numeric skuId
-                  // Uzum uses lowercase 'barcode' and 'article' fields
-                  const humanSku = firstSku.article || firstSku.sellerItemCode ||
-                                   firstSku.vendorCode || firstSku.barcode || firstSku.barCode || 
-                                   card.article || card.vendorCode || card.barcode || card.barCode ||
+                  // Uzum API: SKU is set via 'sellerItemCode' or 'article' at SKU or product level
+                  // The user's Uzum portal shows SKU like "VITECH", "FERRE8213" etc.
+                  const humanSku = firstSku.sellerItemCode || firstSku.article ||
+                                   card.sellerItemCode || card.article ||
+                                   firstSku.vendorCode || card.vendorCode ||
+                                   card.skuTitle || firstSku.skuTitle ||
                                    String(firstSku.skuId || card.productId || '');
                   
                   // Extract photos from ALL possible sources
@@ -1245,17 +1251,22 @@ serve(async (req) => {
                     });
                   }
                   
-                  // 2. Card-level single photo fields
+                  // 2. Card-level single photo fields — Uzum returns 'image' and 'previewImg'
                   if (pictures.length === 0) {
-                    const directPhoto = card.photoUrl || card.previewImage || card.mainPhoto?.url || 
+                    const directPhoto = card.image || card.previewImg || card.previewImage || 
+                                       card.photoUrl || card.mainPhoto?.url || 
                                        card.photo?.url || card.photo?.photo?.url || card.imageUrl ||
                                        (typeof card.photo === 'string' ? card.photo : null);
-                    if (directPhoto) pictures.push(directPhoto);
+                    if (directPhoto) pictures.push(typeof directPhoto === 'string' ? directPhoto : (directPhoto?.url || directPhoto?.photo?.url || ''));
                   }
                   
-                  // 3. SKU-level photos
+                  // 3. SKU-level photos — Uzum SKU has 'previewImage' with full CDN URL
                   if (pictures.length === 0) {
                     skus.forEach((sku: any) => {
+                      // previewImage is the most reliable field for Uzum SKU images
+                      if (sku.previewImage && !pictures.includes(sku.previewImage)) {
+                        pictures.push(sku.previewImage);
+                      }
                       const skuPhotos = sku.photos || sku.photoList || [];
                       if (Array.isArray(skuPhotos)) {
                         skuPhotos.forEach((p: any) => {
@@ -1264,7 +1275,7 @@ serve(async (req) => {
                         });
                       }
                       if (pictures.length === 0) {
-                        const skuPhoto = sku.previewImage || sku.photoUrl || sku.photo?.url || 
+                        const skuPhoto = sku.photoUrl || sku.photo?.url || 
                                         sku.photo?.photo?.url || sku.image?.url || sku.imageUrl ||
                                         (typeof sku.photo === 'string' ? sku.photo : null) || 
                                         (typeof sku.image === 'string' ? sku.image : null);
