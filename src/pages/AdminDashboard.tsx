@@ -6,10 +6,7 @@ import { AdminStats } from '@/components/admin/AdminStats';
 import { AdminAnalytics } from '@/components/admin/AdminAnalytics';
 import { AdminFinancials } from '@/components/admin/AdminFinancials';
 import { UsersManagement } from '@/components/admin/UsersManagement';
-import { OrdersManagement } from '@/components/admin/OrdersManagement';
-import MonetizationSettings from '@/components/admin/MonetizationSettings';
 import { SellerCloudManagement } from '@/components/admin/SellerCloudManagement';
-import { SiteAnalytics } from '@/components/admin/SiteAnalytics';
 import { ActivationsManagement } from '@/components/admin/ActivationsManagement';
 import { AdminsManagement } from '@/components/admin/AdminsManagement';
 import { StartupMetrics } from '@/components/admin/StartupMetrics';
@@ -17,7 +14,7 @@ import { PlatformExpenses } from '@/components/admin/PlatformExpenses';
 import { PartnerAnalytics } from '@/components/admin/PartnerAnalytics';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
-import { Shield, Users, ShoppingCart, BarChart3, DollarSign, Wallet, Crown, Globe, UserCheck, Settings, Zap, TrendingUp, UsersRound } from 'lucide-react';
+import { Shield, Users, BarChart3, Wallet, Crown, UserCheck, Settings, Zap, TrendingUp, UsersRound } from 'lucide-react';
 
 export default function AdminDashboard() {
   const { user, loading } = useAuth();
@@ -99,11 +96,6 @@ export default function AdminDashboard() {
                 <UserCheck className="h-3.5 w-3.5" />Aktivatsiya
               </TabsTrigger>
             )}
-            {hasPermission('can_manage_orders') && (
-              <TabsTrigger value="orders" className="gap-1.5 text-xs">
-                <ShoppingCart className="h-3.5 w-3.5" />Buyurtmalar
-              </TabsTrigger>
-            )}
             {hasPermission('can_manage_finances') && (
               <TabsTrigger value="finance" className="gap-1.5 text-xs">
                 <Wallet className="h-3.5 w-3.5" />Moliya
@@ -112,11 +104,6 @@ export default function AdminDashboard() {
             {hasPermission('can_manage_finances') && (
               <TabsTrigger value="expenses" className="gap-1.5 text-xs">
                 <Zap className="h-3.5 w-3.5" />Xarajatlar
-              </TabsTrigger>
-            )}
-            {hasPermission('can_manage_content') && (
-              <TabsTrigger value="site-stats" className="gap-1.5 text-xs">
-                <Globe className="h-3.5 w-3.5" />Sayt
               </TabsTrigger>
             )}
             {isSuperAdmin && (
@@ -146,29 +133,19 @@ export default function AdminDashboard() {
             <ActivationsManagement />
           </TabsContent>
 
-          <TabsContent value="orders">
-            <OrdersManagement />
-          </TabsContent>
-
           <TabsContent value="finance">
             <Tabs defaultValue="financials" className="space-y-4">
               <TabsList className="h-auto gap-1 p-1">
-                <TabsTrigger value="financials" className="text-xs gap-1"><Wallet className="h-3.5 w-3.5" />Moliya</TabsTrigger>
-                <TabsTrigger value="monetization" className="text-xs gap-1"><DollarSign className="h-3.5 w-3.5" />Monetizatsiya</TabsTrigger>
+                <TabsTrigger value="financials" className="text-xs gap-1"><Wallet className="h-3.5 w-3.5" />Daromad</TabsTrigger>
                 <TabsTrigger value="sellercloud" className="text-xs gap-1"><Crown className="h-3.5 w-3.5" />SellerCloudX</TabsTrigger>
               </TabsList>
               <TabsContent value="financials"><AdminFinancials /></TabsContent>
-              <TabsContent value="monetization"><MonetizationSettings /></TabsContent>
               <TabsContent value="sellercloud"><SellerCloudManagement /></TabsContent>
             </Tabs>
           </TabsContent>
 
           <TabsContent value="expenses">
             <PlatformExpenses />
-          </TabsContent>
-
-          <TabsContent value="site-stats">
-            <SiteAnalytics />
           </TabsContent>
 
           <TabsContent value="admins">
