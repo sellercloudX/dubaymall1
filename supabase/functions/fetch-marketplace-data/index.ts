@@ -1469,21 +1469,26 @@ serve(async (req) => {
                        if (typeof item.photo === 'string') {
                         itemPhoto = item.photo.startsWith('http') ? item.photo : `https://images.uzum.uz/${item.photo.replace(/^\//, '')}`;
                        } else if (typeof item.photo === 'object') {
-                        // Uzum photo format: { "60": { "high": "url", "low": "url" }, "80": {...}, ... }
-                        // Get the highest quality image available (prefer 240, then 120, then 80, then 60)
+                        // Uzum order photo format: { photo: { 60: {high,low}, 80: {high,low}, ... }, photoKey: "...", ... }
+                        // The nested "photo" property contains size-based URLs
+                        const photoObj = item.photo.photo || item.photo;
                         const sizes = [240, 120, 80, 60];
                         for (const size of sizes) {
-                          const sizeData = item.photo[size];
+                          const sizeData = photoObj[size] || photoObj[String(size)];
                           if (sizeData && typeof sizeData === 'object') {
-                            // Prefer "high" quality over "low"
-                            if (sizeData.high && typeof sizeData.high === 'string') {
+                            if (typeof sizeData.high === 'string' && sizeData.high) {
                               itemPhoto = sizeData.high;
                               break;
-                            } else if (sizeData.low && typeof sizeData.low === 'string') {
+                            } else if (typeof sizeData.low === 'string' && sizeData.low) {
                               itemPhoto = sizeData.low;
                               break;
                             }
                           }
+                        }
+                        // Fallback: check photoKey as a direct path
+                        if (!itemPhoto && typeof item.photo.photoKey === 'string' && item.photo.photoKey) {
+                          const pk = item.photo.photoKey;
+                          itemPhoto = pk.startsWith('http') ? pk : `https://images.uzum.uz/${pk.replace(/^\//, '')}`;
                         }
                        }
                      }
