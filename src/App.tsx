@@ -27,6 +27,9 @@ import { PageLoader } from "@/components/PageLoader";
 import { InstallPWA } from "@/components/InstallPWA";
 import { SplashScreen } from "@/components/SplashScreen";
 
+// Skip PWA install banner in Capacitor native
+const isCapacitor = !!(window as any).Capacitor;
+
 // Lazy load pages for code splitting
 const Index = lazy(() => import("./pages/Index"));
 const Auth = lazy(() => import("./pages/Auth"));
@@ -91,7 +94,7 @@ function App() {
             <TooltipProvider>
               <Toaster />
               <Sonner />
-              <InstallPWA />
+              {!isCapacitor && <InstallPWA />}
               <BrowserRouter>
                 <Suspense fallback={<PageLoader />}>
                   <Routes>
