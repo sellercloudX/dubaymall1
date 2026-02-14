@@ -1183,22 +1183,20 @@ serve(async (req) => {
                 // Log first product's full structure for debugging photos and stock
                 if (currentPage === 0 && allProducts.length === 0 && items.length > 0) {
                   const s = items[0];
-                  console.log(`Uzum product[0] top-level keys: ${Object.keys(s).join(', ')}`);
-                  console.log(`Uzum product[0] title: ${s.title || s.name}`);
-                  // Log photo-related fields
-                  if (s.photos) console.log(`Uzum product[0].photos: ${JSON.stringify(s.photos).substring(0, 500)}`);
-                  if (s.images) console.log(`Uzum product[0].images: ${JSON.stringify(s.images).substring(0, 500)}`);
-                  if (s.photo) console.log(`Uzum product[0].photo: ${JSON.stringify(s.photo).substring(0, 300)}`);
-                  if (s.photoUrl) console.log(`Uzum product[0].photoUrl: ${s.photoUrl}`);
-                  if (s.mainPhoto) console.log(`Uzum product[0].mainPhoto: ${JSON.stringify(s.mainPhoto).substring(0, 300)}`);
-                  if (s.previewImage) console.log(`Uzum product[0].previewImage: ${s.previewImage}`);
+                  console.log(`Uzum product[0] ALL keys: ${JSON.stringify(Object.keys(s))}`);
+                  console.log(`Uzum product[0] title: ${s.title || s.name}, productId: ${s.productId || s.id}`);
+                  // Log photo-related fields exhaustively
+                  ['photos', 'images', 'photoList', 'photo', 'photoUrl', 'previewImage', 'mainPhoto', 'imageUrl'].forEach(k => {
+                    if (s[k] !== undefined) console.log(`Uzum product[0].${k}: ${JSON.stringify(s[k]).substring(0, 500)}`);
+                  });
+                  // Log SKU fields
                   const skuSample = (s.skuList || s.skus || [])[0];
                   if (skuSample) {
-                    console.log(`Uzum SKU keys: ${Object.keys(skuSample).join(', ')}`);
-                    if (skuSample.photo) console.log(`Uzum SKU photo: ${JSON.stringify(skuSample.photo).substring(0, 300)}`);
-                    if (skuSample.previewImage) console.log(`Uzum SKU previewImage: ${skuSample.previewImage}`);
-                    if (skuSample.photoUrl) console.log(`Uzum SKU photoUrl: ${skuSample.photoUrl}`);
-                    if (skuSample.image) console.log(`Uzum SKU image: ${JSON.stringify(skuSample.image).substring(0, 300)}`);
+                    console.log(`Uzum SKU[0] ALL keys: ${JSON.stringify(Object.keys(skuSample))}`);
+                    console.log(`Uzum SKU[0] barCode=${skuSample.barCode}, barcode=${skuSample.barcode}, article=${skuSample.article}, vendorCode=${skuSample.vendorCode}, sellerItemCode=${skuSample.sellerItemCode}, skuId=${skuSample.skuId}`);
+                    ['photos', 'photoList', 'photo', 'photoUrl', 'previewImage', 'image', 'imageUrl'].forEach(k => {
+                      if (skuSample[k] !== undefined) console.log(`Uzum SKU[0].${k}: ${JSON.stringify(skuSample[k]).substring(0, 500)}`);
+                    });
                   }
                 }
 
@@ -1227,34 +1225,63 @@ serve(async (req) => {
                     fbsStock = Math.max(fbsStock, fbsStockMap[skuId]);
                   }
                   
+                  // SKU identifier: use article or sellerItemCode (human-readable), NOT numeric skuId
+                  // Uzum uses lowercase 'barcode' and 'article' fields
+                  const humanSku = firstSku.article || firstSku.sellerItemCode ||
+                                   firstSku.vendorCode || firstSku.barcode || firstSku.barCode || 
+                                   card.article || card.vendorCode || card.barcode || card.barCode ||
+                                   String(firstSku.skuId || card.productId || '');
+                  
                   // Extract photos from ALL possible sources
                   const UZUM_CDN_BASE = 'https://images.uzum.uz';
                   let pictures: string[] = [];
                   
-                  // 1. Card-level photos
-                  const cardPhotos = card.photos || card.images || [];
+                  // 1. Card-level photos array
+                  const cardPhotos = card.photos || card.images || card.photoList || [];
                   if (Array.isArray(cardPhotos)) {
                     cardPhotos.forEach((p: any) => {
-                      const url = p.photo?.url || p.url || p.photoUrl || (typeof p === 'string' ? p : null);
+                      const url = p.photo?.url || p.url || p.photoUrl || p.photo || (typeof p === 'string' ? p : null);
                       if (url) pictures.push(url);
                     });
                   }
                   
                   // 2. Card-level single photo fields
                   if (pictures.length === 0) {
-                    const directPhoto = card.photoUrl || card.previewImage || card.mainPhoto?.url || card.photo?.url || (typeof card.photo === 'string' ? card.photo : null);
+                    const directPhoto = card.photoUrl || card.previewImage || card.mainPhoto?.url || 
+                                       card.photo?.url || card.photo?.photo?.url || card.imageUrl ||
+                                       (typeof card.photo === 'string' ? card.photo : null);
                     if (directPhoto) pictures.push(directPhoto);
                   }
                   
                   // 3. SKU-level photos
                   if (pictures.length === 0) {
                     skus.forEach((sku: any) => {
-                      const skuPhoto = sku.previewImage || sku.photoUrl || sku.photo?.url || sku.photo?.photo?.url || sku.image?.url || (typeof sku.photo === 'string' ? sku.photo : null) || (typeof sku.image === 'string' ? sku.image : null);
-                      if (skuPhoto && !pictures.includes(skuPhoto)) pictures.push(skuPhoto);
+                      const skuPhotos = sku.photos || sku.photoList || [];
+                      if (Array.isArray(skuPhotos)) {
+                        skuPhotos.forEach((p: any) => {
+                          const url = p.photo?.url || p.url || p.photoUrl || (typeof p === 'string' ? p : null);
+                          if (url && !pictures.includes(url)) pictures.push(url);
+                        });
+                      }
+                      if (pictures.length === 0) {
+                        const skuPhoto = sku.previewImage || sku.photoUrl || sku.photo?.url || 
+                                        sku.photo?.photo?.url || sku.image?.url || sku.imageUrl ||
+                                        (typeof sku.photo === 'string' ? sku.photo : null) || 
+                                        (typeof sku.image === 'string' ? sku.image : null);
+                        if (skuPhoto && !pictures.includes(skuPhoto)) pictures.push(skuPhoto);
+                      }
                     });
                   }
                   
-                  // 4. Ensure full URLs — Uzum may return relative paths
+                  // 4. Construct image URL from productId if no photos found
+                  // Uzum product images follow pattern: /product/{productId}
+                  if (pictures.length === 0 && (card.productId || card.id)) {
+                    // Try common Uzum image patterns
+                    const pId = card.productId || card.id;
+                    pictures.push(`${UZUM_CDN_BASE}/product/${pId}/original`);
+                  }
+                  
+                  // 5. Ensure full URLs — Uzum may return relative paths
                   pictures = pictures.map(url => {
                     if (url.startsWith('http')) return url;
                     if (url.startsWith('/')) return `${UZUM_CDN_BASE}${url}`;
@@ -1265,7 +1292,7 @@ serve(async (req) => {
                     offerId: String(card.productId || card.id || firstSku.skuId || ''),
                     name: card.title || card.name || '',
                     price,
-                    shopSku: String(firstSku.skuId || firstSku.barCode || card.productId || ''),
+                    shopSku: humanSku,
                     category: typeof card.category === 'string' ? card.category : (card.category?.title || card.categoryTitle || ''),
                     marketCategoryId: typeof card.category === 'object' ? (card.category?.id || 0) : (card.categoryId || 0),
                     pictures,
