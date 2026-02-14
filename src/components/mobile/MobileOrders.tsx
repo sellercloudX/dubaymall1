@@ -90,10 +90,16 @@ const getFirstProductName = (order: MarketplaceOrder): string => {
   return firstName.length > 40 ? firstName.substring(0, 40) + '...' : firstName;
 };
 
-const OrderRow = memo(({ order, onClick }: { order: MarketplaceOrder; onClick: (o: MarketplaceOrder) => void }) => {
+const OrderRow = memo(({ order, onClick, store, marketplace }: { order: MarketplaceOrder; onClick: (o: MarketplaceOrder) => void; store: MarketplaceDataStore; marketplace: string }) => {
   const productName = getFirstProductName(order);
   const itemCount = order.items?.length || 0;
   const totalPrice = order.itemsTotalUZS || order.itemsTotal || order.totalUZS || order.total || 0;
+  
+  // Get product image: first from order item photo, then from store products
+  const firstItem = order.items?.[0];
+  const itemPhoto = firstItem?.photo;
+  const matchedProduct = firstItem ? store.getProducts(marketplace).find(p => p.offerId === firstItem.offerId) : null;
+  const imgUrl = itemPhoto || matchedProduct?.pictures?.[0];
   
   return (
     <Card className="overflow-hidden cursor-pointer active:bg-muted/50 mx-3 border-l-4 border-l-primary/30" onClick={() => onClick(order)}>
@@ -109,7 +115,13 @@ const OrderRow = memo(({ order, onClick }: { order: MarketplaceOrder; onClick: (
           <div className="shrink-0">{getStatusBadge(order.status)}</div>
         </div>
         <div className="flex items-start gap-2">
-          <Package className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+          <div className="w-10 h-10 rounded bg-muted flex items-center justify-center overflow-hidden shrink-0">
+            {imgUrl ? (
+              <img src={imgUrl} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <Package className="h-4 w-4 text-muted-foreground" />
+            )}
+          </div>
           <div className="min-w-0 flex-1">
             <div className="text-sm font-medium line-clamp-2">{productName}</div>
             {itemCount > 1 && <span className="text-[10px] text-muted-foreground">+{itemCount - 1} ta boshqa mahsulot</span>}
@@ -220,7 +232,7 @@ export function MobileOrders({ connectedMarketplaces, store }: MobileOrdersProps
               const order = orders[virtualItem.index];
               return (
                 <div key={order.id} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: `${virtualItem.size}px`, transform: `translateY(${virtualItem.start}px)`, paddingBottom: '8px' }}>
-                  <OrderRow order={order} onClick={setSelectedOrder} />
+                  <OrderRow order={order} onClick={setSelectedOrder} store={store} marketplace={selectedMp} />
                 </div>
               );
             })}
