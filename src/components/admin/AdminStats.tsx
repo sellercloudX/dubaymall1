@@ -8,6 +8,8 @@ const USD_RATE = 12800;
 export function AdminStats() {
   const { data: stats, isLoading } = useQuery({
     queryKey: ['admin-stats-v2'],
+    staleTime: 0,
+    refetchOnMount: 'always',
     queryFn: async () => {
       const [usersRes, subsRes, aiRes] = await Promise.all([
         supabase.from('profiles').select('*', { count: 'exact', head: true }),

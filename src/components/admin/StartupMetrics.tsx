@@ -21,6 +21,8 @@ export function StartupMetrics() {
 
   const { data: metrics, isLoading } = useQuery({
     queryKey: ['startup-metrics', period],
+    staleTime: 0,
+    refetchOnMount: 'always',
     queryFn: async () => {
       const days = period === '30d' ? 30 : period === '90d' ? 90 : 365;
       const startDate = new Date();
