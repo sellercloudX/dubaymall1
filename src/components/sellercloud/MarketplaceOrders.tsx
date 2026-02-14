@@ -171,12 +171,13 @@ export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceO
                           <div className="flex items-center gap-3 min-w-0 flex-1">
                             {(() => {
                               const firstItem = order.items?.[0];
-                              const product = firstItem ? store.getProducts(selectedMarketplace).find(p => p.offerId === firstItem.offerId) : null;
-                              const imgUrl = product?.pictures?.[0];
+                              const itemPhoto = (firstItem as any)?.photo;
+                              const product = firstItem ? store.getProducts(selectedMarketplace).find(p => p.offerId === firstItem.offerId || p.shopSku === firstItem.offerId) : null;
+                              const imgUrl = itemPhoto || product?.pictures?.[0];
                               return (
                                 <div className="w-10 h-10 rounded bg-muted flex items-center justify-center overflow-hidden shrink-0">
                                   {imgUrl ? (
-                                    <img src={imgUrl} alt="" className="w-full h-full object-cover" />
+                                    <img src={imgUrl} alt="" className="w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = 'none')} />
                                   ) : (
                                     <Package className="h-5 w-5 text-muted-foreground" />
                                   )}
@@ -226,14 +227,15 @@ export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceO
                           <div className="space-y-2">
                             <h4 className="font-medium text-sm mb-3">Mahsulotlar:</h4>
                             {order.items.map((item, idx) => {
+                              const itemPhoto = (item as any)?.photo;
                               const matchedProduct = store.getProducts(selectedMarketplace).find(p => p.offerId === item.offerId || p.shopSku === item.offerId);
-                              const itemImg = matchedProduct?.pictures?.[0];
+                              const itemImg = itemPhoto || matchedProduct?.pictures?.[0];
                               return (
                               <div key={idx} className="flex items-center justify-between p-2 bg-background rounded gap-2">
                                 <div className="flex items-center gap-2 min-w-0">
                                   <div className="w-10 h-10 rounded bg-muted flex items-center justify-center overflow-hidden shrink-0">
                                     {itemImg ? (
-                                      <img src={itemImg} alt="" className="w-full h-full object-cover" />
+                                      <img src={itemImg} alt="" className="w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = 'none')} />
                                     ) : (
                                       <Package className="h-4 w-4 text-muted-foreground" />
                                     )}
