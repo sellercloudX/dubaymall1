@@ -127,7 +127,7 @@ export function InlineCamera({ onCapture, onClose }: InlineCameraProps) {
 
   if (error) {
     return (
-      <div className="fixed inset-0 z-50 bg-black">
+      <div className="fixed inset-0 z-[9999] bg-black">
         <div className="flex flex-col items-center justify-center h-full text-white p-4 text-center gap-4">
           <Camera className="h-10 w-10 opacity-50" />
           <p className="text-sm">{error}</p>
@@ -146,7 +146,7 @@ export function InlineCamera({ onCapture, onClose }: InlineCameraProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col">
+    <div className="fixed inset-0 z-[9999] bg-black flex flex-col">
       {/* Video feed — fullscreen */}
       <video
         ref={videoRef}
@@ -168,7 +168,7 @@ export function InlineCamera({ onCapture, onClose }: InlineCameraProps) {
       )}
 
       {/* Controls overlay */}
-      <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent">
+      <div className="absolute bottom-0 left-0 right-0 p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-black/80 to-transparent z-[60]">
         <div className="flex items-center justify-between">
           {/* Close */}
           <Button
