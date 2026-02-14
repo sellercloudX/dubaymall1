@@ -76,6 +76,32 @@ interface YandexOrder {
   }>;
 }
 
+// Helper to map WB order object to unified format
+function mapWBOrder(o: any, defaultStatus: string) {
+  return {
+    id: o.id || o.rid,
+    status: defaultStatus,
+    createdAt: o.createdAt || o.dateCreated || new Date().toISOString(),
+    total: o.convertedPrice || o.price || o.salePrice || 0,
+    totalUZS: o.convertedPrice || o.price || o.salePrice || 0,
+    itemsTotal: o.convertedPrice || o.price || o.salePrice || 0,
+    itemsTotalUZS: o.convertedPrice || o.price || o.salePrice || 0,
+    deliveryTotal: 0,
+    deliveryTotalUZS: 0,
+    items: [{
+      offerId: o.article || o.supplierArticle || "",
+      offerName: o.subject || "",
+      count: 1,
+      price: o.convertedPrice || o.price || 0,
+      priceUZS: o.convertedPrice || o.price || 0,
+    }],
+    buyer: { firstName: o.regionName || "", lastName: "" },
+    nmID: o.nmId,
+    warehouseName: o.warehouseName || "",
+    deliveryType: o.deliveryType || "",
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -1002,8 +1028,8 @@ serve(async (req) => {
     } else if (marketplace === "uzum") {
       // ========== UZUM MARKET SELLER OPENAPI ==========
       const uzumBaseUrl = "https://api-seller.uzum.uz/api/seller-openapi";
-      
-      
+
+
       // Uzum OpenAPI uses raw API key without prefix (not Bearer, not Token)
       const uzumHeaders: Record<string, string> = {
         "Authorization": apiKey,
@@ -1887,6 +1913,549 @@ serve(async (req) => {
       await supabase
         .from("marketplace_connections")
         .update({ 
+          last_sync_at: new Date().toISOString(),
+          products_count: result.total || connection.products_count,
+        })
+        .eq("id", connection.id);
+    } else if (marketplace === "wildberries") {
+      // ========== WILDBERRIES API ==========
+      // Important: suppliers-api.wildberries.ru was deprecated Jan 2025
+      // New domains: content-api, marketplace-api, statistics-api, discounts-prices-api, seller-analytics-api
+      const wbHeaders: Record<string, string> = {
+        "Authorization": apiKey,
+        "Content-Type": "application/json",
+      };
+
+      const supplierId = credentials.sellerId || (connection.account_info as any)?.supplierId;
+      console.log(`WB API: dataType=${dataType}, supplierId=${supplierId}`);
+
+      if (dataType === "products") {
+        // Fetch product cards via Content API v2
+        // POST https://content-api.wildberries.ru/content/v2/get/cards/list
+        try {
+          const allCards: any[] = [];
+          let cursor = { limit: 100, updatedAt: "", nmID: 0 };
+          let pageNum = 0;
+
+          do {
+            const body: any = {
+              settings: {
+                cursor: { limit: cursor.limit },
+                filter: { withPhoto: -1 }, // all cards including without photos
+              },
+            };
+            // For pagination, pass updatedAt and nmID from previous response
+            if (cursor.updatedAt && cursor.nmID) {
+              body.settings.cursor.updatedAt = cursor.updatedAt;
+              body.settings.cursor.nmID = cursor.nmID;
+            }
+
+            const resp = await fetch("https://content-api.wildberries.ru/content/v2/get/cards/list", {
+              method: "POST",
+              headers: wbHeaders,
+              body: JSON.stringify(body),
+            });
+
+            if (!resp.ok) {
+              const errText = await resp.text();
+              console.error(`WB cards list error (${resp.status}):`, errText);
+              break;
+            }
+
+            const data = await resp.json();
+            const cards = data.cards || [];
+            console.log(`WB cards page ${pageNum}: ${cards.length} cards (total cursor: ${data.cursor?.total})`);
+
+            if (cards.length === 0) break;
+
+            for (const card of cards) {
+              const sizes = card.sizes || [];
+              let totalStock = 0;
+              sizes.forEach((s: any) => {
+                (s.stocks || []).forEach((st: any) => {
+                  totalStock += st.qty || 0;
+                });
+              });
+
+              allCards.push({
+                offerId: card.vendorCode || String(card.nmID),
+                name: card.title || card.subjectName || "",
+                price: (card.sizes?.[0]?.price || 0) / 100, // WB stores prices in kopeks
+                shopSku: card.vendorCode || "",
+                category: card.subjectName || "",
+                marketCategoryId: card.subjectID || 0,
+                pictures: (card.photos || []).map((p: any) => p.big || p.c246x328 || ""),
+                description: card.description || "",
+                availability: "ACTIVE",
+                stockFBO: totalStock,
+                stockFBS: 0,
+                stockCount: totalStock,
+                nmID: card.nmID,
+                brand: card.brand || "",
+                rating: card.rating || 0,
+                feedbacks: card.feedbackCount || card.mediaCount || 0,
+              });
+            }
+
+            // Pagination: use cursor from response
+            const newCursor = data.cursor;
+            if (!newCursor || !newCursor.updatedAt || !newCursor.nmID || cards.length < cursor.limit) {
+              break;
+            }
+            cursor = { ...cursor, updatedAt: newCursor.updatedAt, nmID: newCursor.nmID };
+            pageNum++;
+            await sleep(300);
+          } while (pageNum < 50); // Safety limit
+
+          // Try to get accurate stocks from Marketplace API
+          if (allCards.length > 0) {
+            try {
+              await sleep(300);
+              // Get warehouses first
+              const whResp = await fetch("https://marketplace-api.wildberries.ru/api/v3/warehouses", {
+                headers: wbHeaders,
+              });
+              if (whResp.ok) {
+                const warehouses = await whResp.json();
+                const warehouseIds = (Array.isArray(warehouses) ? warehouses : []).map((w: any) => w.id);
+                
+                // Get stocks for each warehouse
+                for (const whId of warehouseIds.slice(0, 5)) {
+                  try {
+                    const stockResp = await fetch(`https://marketplace-api.wildberries.ru/api/v3/stocks/${whId}`, {
+                      method: "POST",
+                      headers: wbHeaders,
+                      body: JSON.stringify({ skus: allCards.slice(0, 1000).flatMap((c: any) => {
+                        const sizes = [];
+                        // Try to extract barcodes/skus
+                        return [c.offerId];
+                      }) }),
+                    });
+                    // Note: stock endpoint expects barcodes, not vendorCodes
+                    // This is a best-effort approach
+                  } catch (e) {
+                    console.warn(`Stock fetch for warehouse ${whId} failed:`, e);
+                  }
+                }
+              }
+            } catch (e) {
+              console.warn("WB stocks enrichment failed:", e);
+            }
+          }
+
+          // Try to get prices from Prices API
+          try {
+            await sleep(300);
+            const pricesResp = await fetch("https://discounts-prices-api.wildberries.ru/api/v2/list/goods/filter?limit=1000&offset=0", {
+              headers: wbHeaders,
+            });
+            if (pricesResp.ok) {
+              const pricesData = await pricesResp.json();
+              const goods = pricesData.data?.listGoods || [];
+              const priceMap = new Map<number, { price: number; discount: number }>();
+              goods.forEach((g: any) => {
+                const sizes = g.sizes || [];
+                sizes.forEach((s: any) => {
+                  priceMap.set(g.nmID, {
+                    price: s.price || g.price || 0,
+                    discount: s.discountedPrice || g.discount || 0,
+                  });
+                });
+              });
+              
+              // Enrich cards with real prices
+              allCards.forEach(card => {
+                const priceInfo = priceMap.get(card.nmID);
+                if (priceInfo) {
+                  card.price = priceInfo.price / 100; // kopeks to rubles
+                }
+              });
+              console.log(`WB prices enriched for ${priceMap.size} products`);
+            }
+          } catch (e) {
+            console.warn("WB prices enrichment failed:", e);
+          }
+
+          console.log(`WB total products: ${allCards.length}`);
+
+          result = {
+            success: true,
+            data: allCards,
+            total: allCards.length,
+          };
+        } catch (e) {
+          console.error("WB products fetch error:", e);
+          result = { success: false, error: "Error fetching WB products" };
+        }
+      } else if (dataType === "orders") {
+        // Fetch orders via Marketplace API
+        // New orders: GET /api/v3/orders/new
+        // All orders with status: POST /api/v3/orders/status
+        try {
+          const allOrders: any[] = [];
+          const orderIdsSeen = new Set<number>();
+
+          // 1. Get new orders
+          const newOrdersResp = await fetch("https://marketplace-api.wildberries.ru/api/v3/orders/new", {
+            headers: wbHeaders,
+          });
+          if (newOrdersResp.ok) {
+            const newData = await newOrdersResp.json();
+            const newOrders = newData.orders || [];
+            console.log(`WB new orders: ${newOrders.length}`);
+            for (const o of newOrders) {
+              if (orderIdsSeen.has(o.id)) continue;
+              orderIdsSeen.add(o.id);
+              allOrders.push(mapWBOrder(o, "NEW"));
+            }
+          }
+
+          // 2. Get recent orders (last 30 days via Statistics API)
+          await sleep(300);
+          const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+          const dateFrom = thirtyDaysAgo.toISOString().split('.')[0];
+          
+          const statsOrdersResp = await fetch(
+            `https://statistics-api.wildberries.ru/api/v1/supplier/orders?dateFrom=${dateFrom}`,
+            { headers: wbHeaders }
+          );
+          if (statsOrdersResp.ok) {
+            const statsOrders = await statsOrdersResp.json();
+            const ordersList = Array.isArray(statsOrders) ? statsOrders : [];
+            console.log(`WB stats orders: ${ordersList.length}`);
+            for (const o of ordersList) {
+              const orderId = o.orderID || o.odid || o.srid;
+              if (!orderId || orderIdsSeen.has(orderId)) continue;
+              orderIdsSeen.add(orderId);
+              allOrders.push({
+                id: orderId,
+                status: o.isCancel ? "CANCELLED" : "DELIVERED",
+                createdAt: o.date || o.lastChangeDate || new Date().toISOString(),
+                total: o.totalPrice || o.finishedPrice || 0,
+                totalUZS: o.totalPrice || o.finishedPrice || 0,
+                itemsTotal: o.totalPrice || o.finishedPrice || 0,
+                itemsTotalUZS: o.totalPrice || o.finishedPrice || 0,
+                deliveryTotal: 0,
+                deliveryTotalUZS: 0,
+                items: [{
+                  offerId: o.supplierArticle || o.techSize || "",
+                  offerName: o.subject || o.category || "",
+                  count: 1,
+                  price: o.totalPrice || o.finishedPrice || 0,
+                  priceUZS: o.totalPrice || o.finishedPrice || 0,
+                }],
+                buyer: { firstName: o.regionName || "", lastName: "" },
+                nmID: o.nmId,
+                warehouseName: o.warehouseName || "",
+              });
+            }
+          } else {
+            console.warn(`WB stats orders failed: ${statsOrdersResp.status}`);
+          }
+
+          // 3. Also fetch sales data for revenue accuracy
+          await sleep(300);
+          const salesResp = await fetch(
+            `https://statistics-api.wildberries.ru/api/v1/supplier/sales?dateFrom=${dateFrom}`,
+            { headers: wbHeaders }
+          );
+          if (salesResp.ok) {
+            const salesData = await salesResp.json();
+            const salesList = Array.isArray(salesData) ? salesData : [];
+            console.log(`WB sales entries: ${salesList.length}`);
+            // Sales data enriches order revenue info
+            for (const sale of salesList) {
+              const saleId = sale.saleID || sale.odid;
+              if (!saleId || orderIdsSeen.has(saleId)) continue;
+              orderIdsSeen.add(saleId);
+              allOrders.push({
+                id: saleId,
+                status: sale.saleID?.startsWith("R") ? "RETURNED" : "DELIVERED",
+                createdAt: sale.date || new Date().toISOString(),
+                total: sale.totalPrice || sale.finishedPrice || sale.priceWithDisc || 0,
+                totalUZS: sale.totalPrice || sale.finishedPrice || sale.priceWithDisc || 0,
+                itemsTotal: sale.totalPrice || sale.finishedPrice || sale.priceWithDisc || 0,
+                itemsTotalUZS: sale.totalPrice || sale.finishedPrice || sale.priceWithDisc || 0,
+                deliveryTotal: 0,
+                deliveryTotalUZS: 0,
+                items: [{
+                  offerId: sale.supplierArticle || "",
+                  offerName: sale.subject || sale.category || "",
+                  count: 1,
+                  price: sale.totalPrice || sale.finishedPrice || sale.priceWithDisc || 0,
+                  priceUZS: sale.totalPrice || sale.finishedPrice || sale.priceWithDisc || 0,
+                }],
+                buyer: { firstName: sale.regionName || "", lastName: "" },
+              });
+            }
+          }
+
+          console.log(`WB total orders: ${allOrders.length}`);
+
+          result = {
+            success: true,
+            data: allOrders,
+            total: allOrders.length,
+          };
+        } catch (e) {
+          console.error("WB orders fetch error:", e);
+          result = { success: false, error: "Error fetching WB orders" };
+        }
+      } else if (dataType === "stocks") {
+        // Get stocks from warehouses
+        try {
+          const whResp = await fetch("https://marketplace-api.wildberries.ru/api/v3/warehouses", {
+            headers: wbHeaders,
+          });
+          
+          if (!whResp.ok) {
+            result = { success: false, error: "Failed to fetch warehouses" };
+          } else {
+            const warehouses = await whResp.json();
+            const stockData: any[] = [];
+            
+            for (const wh of (Array.isArray(warehouses) ? warehouses : []).slice(0, 10)) {
+              try {
+                await sleep(200);
+                const stockResp = await fetch(`https://marketplace-api.wildberries.ru/api/v3/stocks/${wh.id}`, {
+                  method: "POST",
+                  headers: wbHeaders,
+                  body: JSON.stringify({ skus: [] }), // Empty = get all
+                });
+                if (stockResp.ok) {
+                  const data = await stockResp.json();
+                  const stocks = data.stocks || [];
+                  stocks.forEach((s: any) => {
+                    stockData.push({
+                      offerId: s.sku || "",
+                      fbo: 0,
+                      fbs: s.amount || 0,
+                      total: s.amount || 0,
+                      warehouseId: wh.id,
+                      warehouseName: wh.name || "",
+                    });
+                  });
+                }
+              } catch (e) {
+                console.warn(`WB stock fetch for warehouse ${wh.id} error:`, e);
+              }
+            }
+
+            result = { success: true, data: stockData, total: stockData.length };
+          }
+        } catch (e) {
+          console.error("WB stocks error:", e);
+          result = { success: false, error: "Error fetching WB stocks" };
+        }
+      } else if (dataType === "tariffs") {
+        // WB commission tariffs — get from API
+        try {
+          const commResp = await fetch("https://common-api.wildberries.ru/api/v1/tariffs/commission", {
+            headers: wbHeaders,
+          });
+          if (commResp.ok) {
+            const commData = await commResp.json();
+            result = { success: true, data: commData.report || [] };
+          } else {
+            result = { success: false, error: `WB tariffs failed: ${commResp.status}` };
+          }
+        } catch (e) {
+          console.error("WB tariffs error:", e);
+          result = { success: false, error: "Error fetching WB tariffs" };
+        }
+      } else if (dataType === "update-prices") {
+        // Update prices via Discounts/Prices API
+        try {
+          const { offers: priceOffers } = requestBody;
+          if (!priceOffers || priceOffers.length === 0) {
+            result = { success: false, error: "No offers provided" };
+          } else {
+            const pricePayload = priceOffers.map((o: any) => ({
+              nmID: o.nmID || parseInt(o.offerId),
+              price: Math.round(o.price * 100), // to kopeks
+              discount: o.discount || 0,
+            }));
+
+            const resp = await fetch("https://discounts-prices-api.wildberries.ru/api/v2/upload/task", {
+              method: "POST",
+              headers: wbHeaders,
+              body: JSON.stringify(pricePayload),
+            });
+
+            if (resp.ok) {
+              const data = await resp.json();
+              result = { success: true, data, updated: priceOffers.length };
+            } else {
+              const errText = await resp.text();
+              result = { success: false, error: `WB price update failed: ${resp.status}`, details: errText };
+            }
+          }
+        } catch (e) {
+          console.error("WB price update error:", e);
+          result = { success: false, error: "Error updating WB prices" };
+        }
+      } else if (dataType === "stats" || dataType === "financials") {
+        // Financial report from Statistics API
+        try {
+          const endDate = new Date();
+          const startDate = new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+          const from = startDate.toISOString().split('T')[0];
+          const to = endDate.toISOString().split('T')[0];
+
+          const reportResp = await fetch(
+            `https://statistics-api.wildberries.ru/api/v5/supplier/reportDetailByPeriod?dateFrom=${from}&dateTo=${to}`,
+            { headers: wbHeaders }
+          );
+
+          if (reportResp.ok) {
+            const reportData = await reportResp.json();
+            const entries = Array.isArray(reportData) ? reportData : [];
+            console.log(`WB financial report: ${entries.length} entries`);
+
+            // Aggregate by subject
+            const summary = {
+              totalSales: 0,
+              totalCommission: 0,
+              totalLogistics: 0,
+              totalPenalties: 0,
+              totalReturns: 0,
+              netIncome: 0,
+            };
+
+            entries.forEach((e: any) => {
+              summary.totalSales += e.retail_price_withdisc_rub || e.ppvz_for_pay || 0;
+              summary.totalCommission += e.commission_percent ? (e.retail_price_withdisc_rub * e.commission_percent / 100) : 0;
+              summary.totalLogistics += e.delivery_rub || 0;
+              summary.totalPenalties += e.penalty || 0;
+              summary.totalReturns += e.return_amount || 0;
+            });
+            summary.netIncome = summary.totalSales - summary.totalCommission - summary.totalLogistics - summary.totalPenalties;
+
+            result = { 
+              success: true, 
+              data: { entries, summary, period: { from, to } },
+              total: entries.length,
+            };
+          } else {
+            console.warn(`WB financial report failed: ${reportResp.status}`);
+            result = { success: false, error: `WB report failed: ${reportResp.status}` };
+          }
+        } catch (e) {
+          console.error("WB financials error:", e);
+          result = { success: false, error: "Error fetching WB financials" };
+        }
+      } else if (dataType === "balance") {
+        // WB doesn't have a direct balance endpoint like Yandex
+        // Use sales report as a proxy
+        result = { success: true, data: { message: "Use 'stats' dataType for WB financial data" } };
+      } else if (dataType === "inventory-reconciliation") {
+        // WB: get products + orders + sales to calculate loss
+        try {
+          console.log("WB inventory reconciliation starting...");
+          const productMap = new Map<string, { name: string; price: number }>();
+          const stockMap = new Map<string, number>();
+          const soldMap = new Map<string, number>();
+          const returnMap = new Map<string, number>();
+
+          // Fetch products
+          const cardsResp = await fetch("https://content-api.wildberries.ru/content/v2/get/cards/list", {
+            method: "POST",
+            headers: wbHeaders,
+            body: JSON.stringify({ settings: { cursor: { limit: 100 }, filter: { withPhoto: -1 } } }),
+          });
+          if (cardsResp.ok) {
+            const cd = await cardsResp.json();
+            (cd.cards || []).forEach((c: any) => {
+              productMap.set(c.vendorCode || String(c.nmID), {
+                name: c.title || c.subjectName || "",
+                price: (c.sizes?.[0]?.price || 0) / 100,
+              });
+              let totalStock = 0;
+              (c.sizes || []).forEach((s: any) => {
+                (s.stocks || []).forEach((st: any) => { totalStock += st.qty || 0; });
+              });
+              stockMap.set(c.vendorCode || String(c.nmID), totalStock);
+            });
+          }
+
+          // Fetch orders and sales
+          await sleep(300);
+          const dateFrom90 = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('.')[0];
+          
+          const ordersResp = await fetch(
+            `https://statistics-api.wildberries.ru/api/v1/supplier/orders?dateFrom=${dateFrom90}`,
+            { headers: wbHeaders }
+          );
+          if (ordersResp.ok) {
+            const orders = await ordersResp.json();
+            (Array.isArray(orders) ? orders : []).forEach((o: any) => {
+              const sku = o.supplierArticle || "";
+              if (!sku) return;
+              if (o.isCancel) return;
+              soldMap.set(sku, (soldMap.get(sku) || 0) + 1);
+            });
+          }
+
+          await sleep(300);
+          const salesResp = await fetch(
+            `https://statistics-api.wildberries.ru/api/v1/supplier/sales?dateFrom=${dateFrom90}`,
+            { headers: wbHeaders }
+          );
+          if (salesResp.ok) {
+            const sales = await salesResp.json();
+            (Array.isArray(sales) ? sales : []).forEach((s: any) => {
+              const sku = s.supplierArticle || "";
+              if (!sku) return;
+              if (s.saleID?.startsWith("R")) {
+                returnMap.set(sku, (returnMap.get(sku) || 0) + 1);
+              }
+            });
+          }
+
+          // Calculate
+          const allSkus = new Set([...productMap.keys(), ...soldMap.keys()]);
+          const reconciliation = Array.from(allSkus).map(sku => {
+            const sold = soldMap.get(sku) || 0;
+            const stock = stockMap.get(sku) || 0;
+            const returned = returnMap.get(sku) || 0;
+            const productInfo = productMap.get(sku);
+            const accountedFor = sold + stock + returned;
+
+            return {
+              skuId: sku,
+              name: productInfo?.name || sku,
+              price: productInfo?.price || 0,
+              invoiced: accountedFor,
+              sold,
+              currentStock: stock,
+              returned,
+              lost: 0,
+              reconciled: true,
+            };
+          }).filter(item => item.sold > 0 || item.currentStock > 0)
+          .sort((a, b) => b.sold - a.sold);
+
+          result = {
+            success: true,
+            data: reconciliation,
+            summary: {
+              totalProducts: productMap.size,
+              totalSold: Array.from(soldMap.values()).reduce((a, b) => a + b, 0),
+              totalStock: Array.from(stockMap.values()).reduce((a, b) => a + b, 0),
+              totalReturned: Array.from(returnMap.values()).reduce((a, b) => a + b, 0),
+            },
+            total: reconciliation.length,
+          };
+        } catch (e) {
+          console.error("WB reconciliation error:", e);
+          result = { success: false, error: "WB inventory reconciliation error" };
+        }
+      }
+
+      // Update connection with latest sync time
+      await supabase
+        .from("marketplace_connections")
+        .update({
           last_sync_at: new Date().toISOString(),
           products_count: result.total || connection.products_count,
         })
