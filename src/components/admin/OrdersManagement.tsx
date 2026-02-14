@@ -116,8 +116,27 @@ export function OrdersManagement() {
               return (
                 <TableRow key={order.id}>
                   <TableCell className="font-mono font-medium">{order.order_number}</TableCell>
-                  <TableCell>{order.order_items?.length || 0} ta</TableCell>
-                  <TableCell className="font-medium">{order.total_amount.toLocaleString()} so'm</TableCell>
+                   <TableCell>
+                     <div className="flex flex-col gap-1">
+                       {order.order_items?.slice(0, 2).map((item: any) => (
+                         <div key={item.id} className="flex items-center gap-2">
+                           {item.photo && (
+                             <img 
+                               src={item.photo} 
+                               alt={item.product_name}
+                               className="h-8 w-8 rounded object-cover"
+                               onError={(e) => (e.currentTarget.style.display = 'none')}
+                             />
+                           )}
+                           <span className="text-xs">{item.product_name}</span>
+                         </div>
+                       ))}
+                       {order.order_items?.length > 2 && (
+                         <span className="text-xs text-muted-foreground">+{order.order_items.length - 2} more</span>
+                       )}
+                     </div>
+                   </TableCell>
+                   <TableCell className="font-medium">{order.total_amount.toLocaleString()} so'm</TableCell>
                   <TableCell>
                     <Badge variant={order.payment_status === 'paid' ? 'default' : 'secondary'}>
                       {order.payment_status === 'paid' ? "To'langan" : 'Kutilmoqda'}
