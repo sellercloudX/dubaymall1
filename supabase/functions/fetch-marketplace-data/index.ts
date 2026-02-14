@@ -620,13 +620,27 @@ serve(async (req) => {
           await sleep(300); // Small delay between chunks
         }
 
-        console.log(`Total orders fetched: ${allOrders.length}`);
+        // Calculate total revenue from non-cancelled orders
+        const activeYandexOrders = allOrders.filter(o => !['CANCELLED', 'RETURNED'].includes(o.status));
+        const yandexTotalRevenue = activeYandexOrders.reduce((sum, o) => sum + (o.totalUZS || o.total || 0), 0);
+
+        console.log(`Total orders fetched: ${allOrders.length}, active: ${activeYandexOrders.length}, revenue: ${yandexTotalRevenue}`);
 
         result = {
           success: true,
           data: allOrders,
           total: allOrders.length,
         };
+
+        // Update connection with orders count and revenue
+        await supabase
+          .from("marketplace_connections")
+          .update({
+            orders_count: allOrders.length,
+            total_revenue: yandexTotalRevenue,
+            last_sync_at: new Date().toISOString(),
+          })
+          .eq("id", connection.id);
       } else if (dataType === "stocks") {
         // Dedicated stocks endpoint with FBO/FBS breakdown
         if (!campaignId) {
@@ -1232,10 +1246,12 @@ serve(async (req) => {
                   // SKU identifier: use article or sellerItemCode (human-readable), NOT numeric skuId
                   // Uzum API: SKU is set via 'sellerItemCode' or 'article' at SKU or product level
                   // The user's Uzum portal shows SKU like "VITECH", "FERRE8213" etc.
+                  // Check both camelCase and lowercase variants of barcode field
                   const humanSku = firstSku.sellerItemCode || firstSku.article ||
                                    card.sellerItemCode || card.article ||
                                    firstSku.vendorCode || card.vendorCode ||
                                    card.skuTitle || firstSku.skuTitle ||
+                                   firstSku.barcode || firstSku.barCode ||
                                    String(firstSku.skuId || card.productId || '');
                   
                   // Extract photos from ALL possible sources
@@ -1401,6 +1417,16 @@ serve(async (req) => {
             
             console.log(`Uzum orders (${orderStatus}) page ${page}: ${orderList.length} orders`);
 
+            // Log first order item structure for debugging
+            if (page === 0 && allOrders.length === 0 && orderList.length > 0) {
+              const sampleOrder = orderList[0];
+              const sampleItems = sampleOrder.items || sampleOrder.orderItems || [];
+              if (sampleItems.length > 0) {
+                console.log(`Uzum order item[0] keys: ${JSON.stringify(Object.keys(sampleItems[0]))}`);
+                console.log(`Uzum order item[0] productId=${sampleItems[0].productId}, skuId=${sampleItems[0].skuId}, title=${sampleItems[0].title || sampleItems[0].productTitle}`);
+              }
+            }
+
             const mapped = orderList.map((order: any) => {
               const items = order.items || order.orderItems || [];
               const itemsTotal = items.reduce((sum: number, item: any) => {
@@ -1422,13 +1448,23 @@ serve(async (req) => {
                   firstName: order.customerName || order.buyer?.firstName || '',
                   lastName: order.buyer?.lastName || '',
                 },
-                items: items.map((item: any) => ({
-                  offerId: String(item.productId || item.skuId || ''),
-                  offerName: item.title || item.productTitle || item.name || '',
-                  count: item.quantity || item.count || 1,
-                  price: item.price || item.amount || 0,
-                  priceUZS: item.price || item.amount || 0,
-                })),
+                items: items.map((item: any) => {
+                  // CRITICAL: Uzum order items have productId AND skuId
+                  // Products use productId as offerId, so we MUST use productId for matching
+                  // skuId is a different entity (variant-level) and will NOT match products
+                  const itemProductId = String(item.productId || '');
+                  const itemSkuId = String(item.skuId || '');
+                  // Prefer productId for PnL/ABC matching consistency
+                  const offerId = itemProductId || itemSkuId;
+                  return {
+                    offerId,
+                    skuId: itemSkuId,
+                    offerName: item.title || item.productTitle || item.name || '',
+                    count: item.quantity || item.count || 1,
+                    price: item.price || item.amount || 0,
+                    priceUZS: item.price || item.amount || 0,
+                  };
+                }),
               };
             });
 
@@ -1443,12 +1479,26 @@ serve(async (req) => {
             } // end while
           } // end for statuses
 
-          console.log(`Uzum total orders: ${allOrders.length}`);
+          // Calculate total revenue from non-cancelled orders
+          const activeUzumOrders = allOrders.filter((o: any) => !['CANCELED', 'CANCELLED', 'RETURNED'].includes(o.status));
+          const uzumTotalRevenue = activeUzumOrders.reduce((sum: number, o: any) => sum + (o.totalUZS || o.total || 0), 0);
+          
+          console.log(`Uzum total orders: ${allOrders.length}, active: ${activeUzumOrders.length}, revenue: ${uzumTotalRevenue}`);
           result = {
             success: true,
             data: allOrders,
             total: allOrders.length,
           };
+
+          // Update connection with orders count and revenue
+          await supabase
+            .from("marketplace_connections")
+            .update({
+              orders_count: allOrders.length,
+              total_revenue: uzumTotalRevenue,
+              last_sync_at: new Date().toISOString(),
+            })
+            .eq("id", connection.id);
         } catch (e) {
           console.error("Uzum orders error:", e);
           result = { success: false, error: "Uzum orders fetch error" };
