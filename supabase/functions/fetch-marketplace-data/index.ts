@@ -1466,18 +1466,28 @@ serve(async (req) => {
                   let itemPhoto = '';
                   try {
                     if (item.photo) {
+                      // Debug: log first item's photo structure
+                      if (items.indexOf(item) === 0 && page === 0) {
+                        console.log('Uzum item.photo raw:', JSON.stringify(item.photo).substring(0, 500));
+                      }
                       if (typeof item.photo === 'string') {
-                        itemPhoto = item.photo;
+                        itemPhoto = item.photo.startsWith('http') ? item.photo : `https://images.uzum.uz/${item.photo.replace(/^\//, '')}`;
                       } else if (typeof item.photo === 'object') {
-                        // Try photoKey first (usually a string path), then photo
-                        let photoPath = '';
-                        if (typeof item.photo.photoKey === 'string' && item.photo.photoKey) {
-                          photoPath = item.photo.photoKey;
-                        } else if (typeof item.photo.photo === 'string' && item.photo.photo) {
-                          photoPath = item.photo.photo;
+                        // Try all possible string fields
+                        const candidates = [item.photo.photoKey, item.photo.photo, item.photo.uri, item.photo.url, item.photo.src];
+                        for (const candidate of candidates) {
+                          if (typeof candidate === 'string' && candidate) {
+                            itemPhoto = candidate.startsWith('http') ? candidate : `https://images.uzum.uz/${candidate.replace(/^\//, '')}`;
+                            break;
+                          }
                         }
-                        if (photoPath) {
-                          itemPhoto = photoPath.startsWith('http') ? photoPath : `https://images.uzum.uz/${photoPath.replace(/^\//, '')}`;
+                        // If still no photo, try to stringify and find a path pattern
+                        if (!itemPhoto) {
+                          const jsonStr = JSON.stringify(item.photo);
+                          const match = jsonStr.match(/"([\w\-\/]+\.(jpg|jpeg|png|webp))"/i);
+                          if (match) {
+                            itemPhoto = `https://images.uzum.uz/${match[1]}`;
+                          }
                         }
                       }
                     }
