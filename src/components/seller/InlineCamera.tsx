@@ -127,8 +127,8 @@ export function InlineCamera({ onCapture, onClose }: InlineCameraProps) {
 
   if (error) {
     return (
-      <div className="relative bg-black rounded-lg overflow-hidden">
-        <div className="flex flex-col items-center justify-center h-64 text-white p-4 text-center gap-4">
+      <div className="fixed inset-0 z-50 bg-black">
+        <div className="flex flex-col items-center justify-center h-full text-white p-4 text-center gap-4">
           <Camera className="h-10 w-10 opacity-50" />
           <p className="text-sm">{error}</p>
           <div className="flex gap-2">
@@ -146,14 +146,14 @@ export function InlineCamera({ onCapture, onClose }: InlineCameraProps) {
   }
 
   return (
-    <div className="relative bg-black rounded-lg overflow-hidden">
-      {/* Video feed */}
+    <div className="fixed inset-0 z-50 bg-black flex flex-col">
+      {/* Video feed — fullscreen */}
       <video
         ref={videoRef}
         autoPlay
         playsInline
         muted
-        className="w-full h-64 object-cover"
+        className="w-full flex-1 object-cover"
         style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }}
       />
 

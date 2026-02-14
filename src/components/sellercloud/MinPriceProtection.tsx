@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useCostPrices } from '@/hooks/useCostPrices';
+import { useMarketplaceTariffs, getTariffForProduct } from '@/hooks/useMarketplaceTariffs';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 
 interface MinPriceProtectionProps {
@@ -43,6 +44,7 @@ export function MinPriceProtection({
   const isMobile = useIsMobile();
   const isLoading = store.isLoadingProducts;
   const { getCostPrice } = useCostPrices();
+  const { data: tariffMap, isLoading: tariffsLoading, dataUpdatedAt: tariffUpdatedAt } = useMarketplaceTariffs(connectedMarketplaces, store);
 
   const products = useMemo(() => {
     const allProducts: ProtectedProduct[] = [];
@@ -51,20 +53,35 @@ export function MinPriceProtection({
         const currentPrice = product.price || 0;
         const realCost = getCostPrice(marketplace, product.offerId);
         const costPrice = realCost !== null ? realCost : 0;
-        const yandexCommission = currentPrice * 0.20; // 20% marketplace
-        const platformCommission = currentPrice * (commissionPercent / 100);
-        const taxAmount = currentPrice * 0.04; // 4% tax
-        const totalCosts = costPrice + yandexCommission + platformCommission + taxAmount + logisticsPerOrder;
-        const minPrice = Math.ceil(totalCosts / (1 - defaultMargin / 100));
-        const isBelowMin = currentPrice < minPrice && currentPrice > 0;
+
+        // Use real tariff data (same approach as PriceManager)
+        const tariff = getTariffForProduct(tariffMap, product.offerId, currentPrice, marketplace);
+        const tariffPercent = tariff.isReal && currentPrice > 0
+          ? tariff.totalFee / currentPrice
+          : (marketplace === 'uzum' ? 0.17 : marketplace === 'wildberries' ? 0.18 : 0.15);
+        const taxPercent = 0.04;
+        const marginPercent = defaultMargin / 100;
+
+        // Cost-based formula: minPrice = costPrice / (1 - tariffPercent - taxPercent - marginPercent)
+        // This avoids circular dependency (price doesn't affect its own minPrice)
+        let minPrice = 0;
+        if (costPrice > 0) {
+          const denominator = 1 - tariffPercent - taxPercent - marginPercent;
+          if (denominator > 0.05) {
+            minPrice = Math.ceil(costPrice / denominator);
+          }
+        }
+
+        const commissionAmount = tariff.totalFee;
+        const isBelowMin = minPrice > 0 && currentPrice < minPrice && currentPrice > 0;
 
         allProducts.push({
           id: product.offerId, name: product.name || 'Nomsiz',
           sku: product.shopSku || product.offerId, marketplace, currentPrice,
-          costPrice, commissionAmount: yandexCommission + platformCommission + taxAmount,
-          logisticsCost: logisticsPerOrder, minPrice,
+          costPrice, commissionAmount,
+          logisticsCost: tariff.logistics, minPrice,
           customMinPrice: null, isProtected: globalProtection, isBelowMin,
-          priceGap: currentPrice - minPrice,
+          priceGap: minPrice > 0 ? currentPrice - minPrice : currentPrice,
         });
       });
     }
@@ -74,7 +91,7 @@ export function MinPriceProtection({
       return a.priceGap - b.priceGap;
     });
     return allProducts;
-  }, [connectedMarketplaces, store.dataVersion, commissionPercent, logisticsPerOrder, defaultMargin, globalProtection, getCostPrice]);
+  }, [connectedMarketplaces, store.dataVersion, defaultMargin, globalProtection, getCostPrice, tariffUpdatedAt]);
 
   const formatPrice = (price: number) => {
     if (Math.abs(price) >= 1000000) return (price / 1000000).toFixed(1) + ' mln';
@@ -89,7 +106,7 @@ export function MinPriceProtection({
     return (<Card><CardContent className="py-12 text-center"><Shield className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" /><h3 className="text-lg font-semibold mb-2">Minimal narx himoyasi</h3><p className="text-muted-foreground">Avval marketplace ulang</p></CardContent></Card>);
   }
 
-  if (isLoading) {
+  if (isLoading || tariffsLoading) {
     return (<div className="space-y-4"><div className="grid grid-cols-2 gap-3">{[1,2,3,4].map(i => <Skeleton key={i} className="h-24" />)}</div><Skeleton className="h-96" /></div>);
   }
 
@@ -136,10 +153,10 @@ export function MinPriceProtection({
             <Switch checked={globalProtection} onCheckedChange={setGlobalProtection} />
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div><div className="text-xs mb-1">Logistika (so'm)</div><div className="flex items-center gap-1"><Input type="number" value={logisticsPerOrder} onChange={e => setLogisticsPerOrder(Number(e.target.value))} className="w-full h-8 text-sm" min={0} max={50000} /><span className="text-xs shrink-0">so'm</span></div></div>
-            <div><div className="text-xs mb-1">Komissiya %</div><div className="flex items-center gap-1"><Input type="number" value={commissionPercent} className="w-full h-8 text-sm" disabled /><span className="text-xs shrink-0">%</span></div></div>
             <div><div className="text-xs mb-1">Min marja %</div><div className="flex items-center gap-1"><Input type="number" value={defaultMargin} onChange={e => setDefaultMargin(Number(e.target.value))} className="w-full h-8 text-sm" min={1} max={50} /><span className="text-xs shrink-0">%</span></div></div>
+            <div><div className="text-xs mb-1 text-muted-foreground">Tarif</div><div className="text-xs text-muted-foreground">Real API tariflari qo'llanadi</div></div>
             <div><div className="text-xs mb-1 text-muted-foreground">Tannarx</div><div className="text-xs text-muted-foreground">Mahsulotlar tabidan kiritiladi</div></div>
+            <div><div className="text-xs mb-1 text-muted-foreground">Soliq</div><div className="text-xs text-muted-foreground">4% aylanma solig'i</div></div>
           </div>
         </CardContent>
       </Card>

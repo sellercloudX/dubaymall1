@@ -128,6 +128,27 @@ export function useMarketplaceTariffs(
           continue;
         }
 
+        if (mp === 'wildberries') {
+          // WB: commission ~15-20% depending on category, logistics ~50-100 RUB
+          for (const p of products) {
+            const price = p.price || 0;
+            if (price <= 0) continue;
+            // WB typical: 15% commission + logistics
+            const commission = price * 0.15;
+            const logistics = price > 500000 ? 15000 : price > 100000 ? 8000 : 5000;
+            const totalTariff = commission + logistics;
+            tariffMap.set(p.offerId, {
+              offerId: p.offerId,
+              agencyCommission: commission,
+              fulfillment: logistics,
+              delivery: 0,
+              totalTariff,
+              tariffPercent: price > 0 ? (totalTariff / price) * 100 : 0,
+            });
+          }
+          continue;
+        }
+
         if (mp !== 'yandex') continue;
 
         // Yandex: fetch real tariffs from API
@@ -273,7 +294,18 @@ export function getTariffForProduct(
     };
   }
 
-  // Yandex: use average from real data
+  // WB fallback
+  if (marketplace === 'wildberries') {
+    const commission = price * 0.15;
+    const logistics = price > 500000 ? 15000 : price > 100000 ? 8000 : 5000;
+    return {
+      commission,
+      logistics,
+      totalFee: commission + logistics,
+      isReal: false,
+    };
+  }
+
   if (safeMapSize(tariffMap) > 0) {
     const values = safeMapValues(tariffMap);
     const avgPercent = values.reduce((s, t) => s + t.tariffPercent, 0) / values.length;
