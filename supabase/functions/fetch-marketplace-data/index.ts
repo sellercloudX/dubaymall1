@@ -1464,33 +1464,29 @@ serve(async (req) => {
                   // Extract photo URL - item.photo is an OBJECT with {photo, photoKey, color, hasVerticalPhoto}
                   // photo.photo or photo.photoKey may also be objects - we need a string path
                   let itemPhoto = '';
-                  try {
-                    if (item.photo) {
-                      // Debug: log first item's photo structure
-                      if (items.indexOf(item) === 0 && page === 0) {
-                        console.log('Uzum item.photo raw:', JSON.stringify(item.photo).substring(0, 500));
-                      }
-                      if (typeof item.photo === 'string') {
+                   try {
+                     if (item.photo) {
+                       if (typeof item.photo === 'string') {
                         itemPhoto = item.photo.startsWith('http') ? item.photo : `https://images.uzum.uz/${item.photo.replace(/^\//, '')}`;
-                      } else if (typeof item.photo === 'object') {
-                        // Try all possible string fields
-                        const candidates = [item.photo.photoKey, item.photo.photo, item.photo.uri, item.photo.url, item.photo.src];
-                        for (const candidate of candidates) {
-                          if (typeof candidate === 'string' && candidate) {
-                            itemPhoto = candidate.startsWith('http') ? candidate : `https://images.uzum.uz/${candidate.replace(/^\//, '')}`;
-                            break;
+                       } else if (typeof item.photo === 'object') {
+                        // Uzum photo format: { "60": { "high": "url", "low": "url" }, "80": {...}, ... }
+                        // Get the highest quality image available (prefer 240, then 120, then 80, then 60)
+                        const sizes = [240, 120, 80, 60];
+                        for (const size of sizes) {
+                          const sizeData = item.photo[size];
+                          if (sizeData && typeof sizeData === 'object') {
+                            // Prefer "high" quality over "low"
+                            if (sizeData.high && typeof sizeData.high === 'string') {
+                              itemPhoto = sizeData.high;
+                              break;
+                            } else if (sizeData.low && typeof sizeData.low === 'string') {
+                              itemPhoto = sizeData.low;
+                              break;
+                            }
                           }
                         }
-                        // If still no photo, try to stringify and find a path pattern
-                        if (!itemPhoto) {
-                          const jsonStr = JSON.stringify(item.photo);
-                          const match = jsonStr.match(/"([\w\-\/]+\.(jpg|jpeg|png|webp))"/i);
-                          if (match) {
-                            itemPhoto = `https://images.uzum.uz/${match[1]}`;
-                          }
-                        }
-                      }
-                    }
+                       }
+                     }
                   } catch (_) { /* ignore photo parse errors */ }
                   
                   return {
