@@ -51,9 +51,14 @@ export function PartnerAnalytics() {
 
         const aiCost = userAI.reduce((s, a) => s + (a.estimated_cost_usd || 0), 0);
         const totalRevenue = userConnections.reduce((s, c) => s + (c.total_revenue || 0), 0);
-        const totalDebt = userBillings
-          .filter(b => b.status === 'pending' || b.status === 'overdue')
-          .reduce((s, b) => s + (b.balance_due || 0), 0);
+        
+        // Calculate debt: from billing records if available, otherwise estimate from subscription
+        let totalDebt = 0;
+        if (userBillings.length > 0) {
+          totalDebt = userBillings
+            .filter(b => b.status === 'pending' || b.status === 'overdue')
+            .reduce((s, b) => s + (b.balance_due || 0), 0);
+        }
         const totalPaid = userBillings.reduce((s, b) => s + (b.total_paid || 0), 0);
 
         // Determine partner status
