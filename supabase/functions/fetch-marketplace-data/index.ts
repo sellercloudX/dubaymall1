@@ -1462,18 +1462,26 @@ serve(async (req) => {
                   const offerId = item.skuTitle || itemBarcode || String(item.id || '');
                   
                   // Extract photo URL - item.photo is an OBJECT with {photo, photoKey, color, hasVerticalPhoto}
+                  // photo.photo or photo.photoKey may also be objects - we need a string path
                   let itemPhoto = '';
-                  if (item.photo) {
-                    if (typeof item.photo === 'string') {
-                      itemPhoto = item.photo;
-                    } else if (typeof item.photo === 'object') {
-                      // photo.photo contains the actual URL/path
-                      const photoPath = item.photo.photo || item.photo.photoKey || '';
-                      if (photoPath) {
-                        itemPhoto = photoPath.startsWith('http') ? photoPath : `https://images.uzum.uz${photoPath.startsWith('/') ? '' : '/'}${photoPath}`;
+                  try {
+                    if (item.photo) {
+                      if (typeof item.photo === 'string') {
+                        itemPhoto = item.photo;
+                      } else if (typeof item.photo === 'object') {
+                        // Try photoKey first (usually a string path), then photo
+                        let photoPath = '';
+                        if (typeof item.photo.photoKey === 'string' && item.photo.photoKey) {
+                          photoPath = item.photo.photoKey;
+                        } else if (typeof item.photo.photo === 'string' && item.photo.photo) {
+                          photoPath = item.photo.photo;
+                        }
+                        if (photoPath) {
+                          itemPhoto = photoPath.startsWith('http') ? photoPath : `https://images.uzum.uz/${photoPath.replace(/^\//, '')}`;
+                        }
                       }
                     }
-                  }
+                  } catch (_) { /* ignore photo parse errors */ }
                   
                   return {
                     offerId,
