@@ -97,8 +97,8 @@ function App() {
               {!isCapacitor && <InstallPWA />}
               <BrowserRouter>
                 <Suspense fallback={<PageLoader />}>
-                  <Routes>
-                    <Route path="/" element={<Index />} />
+                <Routes>
+                    <Route path="/" element={isCapacitor ? <Navigate to="/auth" replace /> : <Index />} />
                     <Route path="/auth" element={<Auth />} />
                     <Route path="/seller-cloud" element={<SellerCloudX />} />
                     <Route path="/seller-cloud-mobile" element={<SellerCloudMobile />} />

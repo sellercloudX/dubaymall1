@@ -27,7 +27,7 @@ export function MobileSellerCloudNav({ activeTab, onTabChange }: MobileSellerClo
   const isMoreActive = !primaryTabIds.includes(activeTab);
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t safe-area-bottom safe-area-left safe-area-right">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t safe-area-bottom safe-area-left safe-area-right" style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 4px)' }}>
       <div className="flex items-center justify-around h-14">
         {navItems.map((item) => {
           const Icon = item.icon;

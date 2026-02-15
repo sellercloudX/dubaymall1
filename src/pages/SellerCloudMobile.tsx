@@ -202,9 +202,9 @@ export default function SellerCloudMobile() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-16 overflow-x-hidden">
+    <div className="min-h-screen bg-background pb-20 overflow-x-hidden safe-area-bottom">
       <MobileSellerCloudHeader connectedCount={connectedMarketplaces.length} onRefresh={refetch} isLoading={connectionsLoading} />
-      <main className="pt-14">
+      <main className="pt-[calc(3.5rem+env(safe-area-inset-top,0px))]">
         {isMoreActive && (
           <div className="flex gap-2 px-4 py-3 overflow-x-auto no-scrollbar border-b bg-background/95 backdrop-blur-sm sticky top-14 z-40">
             {moreSubTabs.map((tab) => {

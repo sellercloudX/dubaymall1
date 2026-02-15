@@ -56,9 +56,11 @@ export function InlineCamera({ onCapture, onClose }: InlineCameraProps) {
   }, []);
 
   useEffect(() => {
-    startCamera(facingMode);
+    // Small delay to ensure this runs after the user gesture event chain
+    const timer = setTimeout(() => startCamera(facingMode), 100);
 
     return () => {
+      clearTimeout(timer);
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(t => t.stop());
         streamRef.current = null;
@@ -127,11 +129,12 @@ export function InlineCamera({ onCapture, onClose }: InlineCameraProps) {
 
   if (error) {
     return (
-      <div className="fixed inset-0 z-[9999] bg-black">
-        <div className="flex flex-col items-center justify-center h-full text-white p-4 text-center gap-4">
-          <Camera className="h-10 w-10 opacity-50" />
-          <p className="text-sm">{error}</p>
-          <div className="flex gap-2">
+      <div className="fixed inset-0 z-[9999] bg-black safe-area-top safe-area-bottom">
+        <div className="flex flex-col items-center justify-center h-full text-white p-6 text-center gap-4">
+          <Camera className="h-12 w-12 opacity-50" />
+          <p className="text-sm max-w-xs">{error}</p>
+          <p className="text-xs text-white/50">Kamera ruxsatini telefoningiz sozlamalaridan yoqing</p>
+          <div className="flex gap-3">
             <Button variant="secondary" size="sm" onClick={() => startCamera(facingMode)}>
               <RotateCcw className="h-4 w-4 mr-1" />
               Qayta urinish
