@@ -1461,16 +1461,20 @@ serve(async (req) => {
                   // This matches the product offerId from product sync
                   const offerId = item.skuTitle || itemBarcode || String(item.id || '');
                   
-                  // Extract photo URL - item.photo is an OBJECT with {photo, photoKey, color, hasVerticalPhoto}
-                  // photo.photo or photo.photoKey may also be objects - we need a string path
+                  // Extract photo URL - item.photo can be various structures
                   let itemPhoto = '';
                    try {
                      if (item.photo) {
+                       // Log the raw photo structure for first item to debug
+                       if (items.indexOf(item) === 0) {
+                         console.log('[UZUM ORDER PHOTO DEBUG] Raw item.photo type:', typeof item.photo);
+                         console.log('[UZUM ORDER PHOTO DEBUG] Raw item.photo keys:', typeof item.photo === 'object' ? Object.keys(item.photo) : 'N/A');
+                         console.log('[UZUM ORDER PHOTO DEBUG] Raw item.photo JSON:', JSON.stringify(item.photo).substring(0, 500));
+                       }
                        if (typeof item.photo === 'string') {
                         itemPhoto = item.photo.startsWith('http') ? item.photo : `https://images.uzum.uz/${item.photo.replace(/^\//, '')}`;
                        } else if (typeof item.photo === 'object') {
-                        // Uzum order photo format: { photo: { 60: {high,low}, 80: {high,low}, ... }, photoKey: "...", ... }
-                        // The nested "photo" property contains size-based URLs
+                        // Try nested photo.photo first, then direct item.photo
                         const photoObj = item.photo.photo || item.photo;
                         const sizes = [240, 120, 80, 60];
                         for (const size of sizes) {
@@ -1490,9 +1494,36 @@ serve(async (req) => {
                           const pk = item.photo.photoKey;
                           itemPhoto = pk.startsWith('http') ? pk : `https://images.uzum.uz/${pk.replace(/^\//, '')}`;
                         }
+                        // Fallback: deep search for any URL-like string in the photo object
+                        if (!itemPhoto) {
+                          const photoStr = JSON.stringify(item.photo);
+                          // Look for full URLs first
+                          const urlMatch = photoStr.match(/https?:\/\/[^\s"',}]+\.(jpg|jpeg|png|webp)/i);
+                          if (urlMatch) {
+                            itemPhoto = urlMatch[0];
+                          } else {
+                            // Look for path-like strings (e.g. "product/abc-123.jpg")
+                            const pathMatch = photoStr.match(/"([\w\-\/\.]+\.(jpg|jpeg|png|webp))"/i);
+                            if (pathMatch) {
+                              itemPhoto = `https://images.uzum.uz/${pathMatch[1]}`;
+                            }
+                          }
+                        }
                        }
                      }
-                  } catch (_) { /* ignore photo parse errors */ }
+                     // Also try item.productPhoto, item.image, item.imageUrl as last resort
+                     if (!itemPhoto) {
+                       const fallbackPhoto = item.productPhoto || item.image || item.imageUrl || item.img;
+                       if (typeof fallbackPhoto === 'string' && fallbackPhoto) {
+                         itemPhoto = fallbackPhoto.startsWith('http') ? fallbackPhoto : `https://images.uzum.uz/${fallbackPhoto.replace(/^\//, '')}`;
+                       }
+                     }
+                     if (items.indexOf(item) === 0) {
+                       console.log('[UZUM ORDER PHOTO DEBUG] Final itemPhoto:', itemPhoto || 'EMPTY');
+                     }
+                  } catch (photoErr) { 
+                    console.error('[UZUM ORDER PHOTO ERROR]', photoErr);
+                  }
                   
                   return {
                     offerId,

@@ -20,7 +20,7 @@ export function MobileSellerCloudHeader({ connectedCount, onRefresh, isLoading }
   };
   
   return (
-    <header className="fixed top-0 left-0 right-0 z-40 bg-background/95 backdrop-blur border-b safe-area-top safe-area-left safe-area-right">
+    <header className="fixed top-0 left-0 right-0 z-40 bg-background/95 backdrop-blur border-b safe-area-top safe-area-left safe-area-right" style={{ paddingTop: 'max(env(safe-area-inset-top, 0px), 4px)' }}>
       <div className="flex items-center justify-between h-14 px-3">
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center shrink-0">

@@ -39,14 +39,17 @@ export default function Auth() {
   
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Redirect if already logged in
+   // Redirect if already logged in
   useEffect(() => {
     if (user) {
        const redirect = searchParams.get('redirect');
        if (redirect) {
          navigate(redirect);
        } else {
-         navigate('/seller-cloud');
+         // Capacitor native app or mobile → mobile dashboard
+         const isNative = !!(window as any).Capacitor;
+         const isMobile = window.innerWidth < 768;
+         navigate(isNative || isMobile ? '/seller-cloud-mobile' : '/seller-cloud');
        }
     }
    }, [user, navigate, searchParams]);
@@ -196,20 +199,22 @@ export default function Auth() {
     }
   };
 
+  const isCapacitor = !!(window as any).Capacitor;
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-primary/5 to-background p-4">
+    <div className={`min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-primary/5 to-background p-4 ${isCapacitor ? 'safe-area-top safe-area-bottom' : ''}`}>
       {/* Header */}
-      <div className="absolute top-4 right-4">
+      <div className={`absolute ${isCapacitor ? 'top-[max(env(safe-area-inset-top),20px)]' : 'top-4'} right-4`}>
         <LanguageSwitcher />
       </div>
       
       {/* Logo */}
-      <Link to="/" className="flex items-center gap-2 mb-8">
+      <div className="flex items-center gap-2 mb-8">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/20">
           <Crown className="h-5 w-5 text-white" />
         </div>
         <span className="text-2xl font-bold font-display">SellerCloudX</span>
-      </Link>
+      </div>
       
       {/* Auth Card */}
       <Card className="w-full max-w-md animate-fade-in">
