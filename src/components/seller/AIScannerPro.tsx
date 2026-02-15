@@ -1006,7 +1006,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
               </div>
             )}
 
-            <div className="flex gap-3 pt-4">
+            <div className="flex gap-3 pt-4 pb-8">
               <Button variant="outline" onClick={() => setCurrentStep('capture')}>
                 Orqaga
               </Button>

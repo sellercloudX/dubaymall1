@@ -202,7 +202,7 @@ export default function SellerCloudMobile() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-20 overflow-x-hidden safe-area-bottom">
+    <div className="min-h-screen bg-background pb-28 overflow-x-hidden safe-area-bottom">
       <MobileSellerCloudHeader connectedCount={connectedMarketplaces.length} onRefresh={refetch} isLoading={connectionsLoading} />
       <main className="pt-[calc(3.5rem+env(safe-area-inset-top,0px))]">
         {isMoreActive && (
