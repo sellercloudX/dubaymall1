@@ -1,4 +1,4 @@
-import { useEffect, useState, lazy, Suspense } from 'react';
+import { useEffect, useState, useMemo, lazy, Suspense } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -89,7 +89,7 @@ export default function SellerCloudX() {
      createSubscription,
    } = useSellerCloudSubscription();
   
-   const connectedMarketplaces = connections.map(c => c.marketplace);
+   const connectedMarketplaces = useMemo(() => connections.map(c => c.marketplace), [connections]);
    
    // Centralized data store — fetches once, cached for all tabs
    const store = useMarketplaceDataStore(connectedMarketplaces);
