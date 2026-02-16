@@ -289,15 +289,23 @@ serve(async (req) => {
               if (offer.warehouses && Array.isArray(offer.warehouses)) {
                 offer.warehouses.forEach((wh: any) => {
                   const stocks = wh.stocks || [];
-                  const warehouseStock = stocks.reduce((s: number, st: any) => s + (st.count || 0), 0);
-                  if (wh.warehouseId && wh.warehouseId < 100000) {
-                    stockFBO += warehouseStock;
-                  } else {
-                    stockFBS += warehouseStock;
-                  }
+                  stocks.forEach((st: any) => {
+                    const count = st.count || 0;
+                    if (st.type === "FIT") {
+                      stockFBO += count;
+                    } else {
+                      stockFBS += count;
+                    }
+                  });
                 });
               } else if (offer.stocks && Array.isArray(offer.stocks)) {
-                stockFBS = offer.stocks.reduce((sum: number, s: any) => sum + (s.count || 0), 0);
+                offer.stocks.forEach((s: any) => {
+                  if (s.type === "FIT") {
+                    stockFBO += s.count || 0;
+                  } else {
+                    stockFBS += s.count || 0;
+                  }
+                });
               }
               
               newProductsOnPage++;
@@ -438,18 +446,22 @@ serve(async (req) => {
               console.log(`Stocks page ${stockPage}: ${warehouseOffers.length} warehouses`);
               
               warehouseOffers.forEach((wh: any) => {
+                console.log(`  Warehouse ${wh.warehouseId} (${wh.warehouseName || 'no name'})`);
                 const offers = wh.offers || [];
                 offers.forEach((offer: any) => {
                   const offerId = offer.offerId;
                   const items = offer.stocks || [];
-                  const count = items.reduce((sum: number, s: any) => sum + (s.count || 0), 0);
                   
                   const existing = stockMap.get(offerId) || { fbo: 0, fbs: 0 };
-                  if (wh.warehouseId < 100000) {
-                    existing.fbo += count;
-                  } else {
-                    existing.fbs += count;
-                  }
+                  items.forEach((s: any) => {
+                    const count = s.count || 0;
+                    // FIT = at Yandex warehouse (FBO), AVAILABLE = seller warehouse (FBS)
+                    if (s.type === "FIT") {
+                      existing.fbo += count;
+                    } else {
+                      existing.fbs += count;
+                    }
+                  });
                   stockMap.set(offerId, existing);
                 });
               });
@@ -664,21 +676,20 @@ serve(async (req) => {
               const stockMap = new Map<string, { offerId: string; fbo: number; fbs: number; total: number }>();
               
               warehouseOffers.forEach((wh: any) => {
-                const warehouseName = wh.warehouseName || '';
-                const isFBO = warehouseName.toLowerCase().includes('yandex') || wh.warehouseId < 100000;
-                
                 const offers = wh.offers || [];
                 offers.forEach((offer: any) => {
                   const offerId = offer.offerId;
                   const items = offer.stocks || [];
-                  const count = items.reduce((sum: number, s: any) => sum + (s.count || 0), 0);
                   
                   const existing = stockMap.get(offerId) || { offerId, fbo: 0, fbs: 0, total: 0 };
-                  if (isFBO) {
-                    existing.fbo += count;
-                  } else {
-                    existing.fbs += count;
-                  }
+                  items.forEach((s: any) => {
+                    const count = s.count || 0;
+                    if (s.type === "FIT") {
+                      existing.fbo += count;
+                    } else {
+                      existing.fbs += count;
+                    }
+                  });
                   existing.total = existing.fbo + existing.fbs;
                   stockMap.set(offerId, existing);
                 });
