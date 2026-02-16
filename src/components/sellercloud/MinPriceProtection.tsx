@@ -51,10 +51,13 @@ export function MinPriceProtection({
     for (const marketplace of connectedMarketplaces) {
       store.getProducts(marketplace).forEach(product => {
         const currentPrice = product.price || 0;
+        if (currentPrice <= 0) return; // Skip products without price
+        
         const realCost = getCostPrice(marketplace, product.offerId);
-        const costPrice = realCost !== null ? realCost : 0;
+        const hasCostPrice = realCost !== null && realCost > 0;
+        const costPrice = hasCostPrice ? realCost : 0;
 
-        // Use real tariff data (same approach as PriceManager)
+        // Use real tariff data
         const tariff = getTariffForProduct(tariffMap, product.offerId, currentPrice, marketplace);
         const tariffPercent = tariff.isReal && currentPrice > 0
           ? tariff.totalFee / currentPrice
@@ -62,18 +65,31 @@ export function MinPriceProtection({
         const taxPercent = 0.04;
         const marginPercent = defaultMargin / 100;
 
-        // Cost-based formula: minPrice = costPrice / (1 - tariffPercent - taxPercent - marginPercent)
-        // This avoids circular dependency (price doesn't affect its own minPrice)
         let minPrice = 0;
-        if (costPrice > 0) {
+        if (hasCostPrice) {
+          // Cost-based formula: minPrice = costPrice / (1 - tariffPercent - taxPercent - marginPercent)
           const denominator = 1 - tariffPercent - taxPercent - marginPercent;
           if (denominator > 0.05) {
             minPrice = Math.ceil(costPrice / denominator);
           }
+        } else {
+          // No cost price entered — use reverse check: 
+          // Check if at current price, after fees+tax, the margin is below target
+          // minPrice based on estimated cost (tariff+tax eat into price, remainder is cost+margin)
+          // If no cost price, show warning but still calculate based on tariff exposure
+          const totalFeePercent = tariffPercent + taxPercent;
+          // Estimate: if seller needs at least marginPercent profit, then:
+          // costPrice must be <= price * (1 - tariffPercent - taxPercent - marginPercent)
+          // Without cost data, we flag if fee structure is dangerous (>60% of price)
+          if (totalFeePercent > 0.5) {
+            minPrice = Math.ceil(currentPrice * 1.2); // Flag as dangerous
+          }
         }
 
         const commissionAmount = tariff.totalFee;
-        const isBelowMin = minPrice > 0 && currentPrice < minPrice && currentPrice > 0;
+        const isBelowMin = hasCostPrice 
+          ? (minPrice > 0 && currentPrice < minPrice) 
+          : false; // Don't flag without cost data, but show warning
 
         allProducts.push({
           id: product.offerId, name: product.name || 'Nomsiz',
@@ -86,8 +102,13 @@ export function MinPriceProtection({
       });
     }
     allProducts.sort((a, b) => {
+      // Products without cost price go to bottom with warning
+      const aNoCost = a.costPrice <= 0;
+      const bNoCost = b.costPrice <= 0;
       if (a.isBelowMin && !b.isBelowMin) return -1;
       if (!a.isBelowMin && b.isBelowMin) return 1;
+      if (!aNoCost && bNoCost) return -1;
+      if (aNoCost && !bNoCost) return 1;
       return a.priceGap - b.priceGap;
     });
     return allProducts;
@@ -179,6 +200,8 @@ export function MinPriceProtection({
                     </div>
                     {product.isBelowMin ? (
                       <Badge variant="destructive" className="text-[10px] shrink-0"><TrendingDown className="h-3 w-3 mr-0.5" />Xavfli</Badge>
+                    ) : product.costPrice <= 0 ? (
+                      <Badge variant="outline" className="bg-yellow-500/10 text-yellow-600 border-yellow-500/30 text-[10px] shrink-0">⚠️ Tannarx yo'q</Badge>
                     ) : (
                       <Badge variant="outline" className="bg-success/10 text-success border-success/30 text-[10px] shrink-0"><ShieldCheck className="h-3 w-3 mr-0.5" />OK</Badge>
                     )}
@@ -215,6 +238,7 @@ export function MinPriceProtection({
                       <TableCell className="text-right"><span className={`font-medium whitespace-nowrap ${product.priceGap >= 0 ? 'text-success' : 'text-destructive'}`}>{product.priceGap >= 0 ? '+' : ''}{formatPrice(product.priceGap)}</span></TableCell>
                       <TableCell className="text-center">
                         {product.isBelowMin ? <Badge variant="destructive" className="whitespace-nowrap"><TrendingDown className="h-3 w-3 mr-1" />Xavfli</Badge>
+                          : product.costPrice <= 0 ? <Badge variant="outline" className="bg-yellow-500/10 text-yellow-600 border-yellow-500/30 whitespace-nowrap">⚠️ Tannarx yo'q</Badge>
                           : <Badge variant="outline" className="bg-success/10 text-success border-success/30 whitespace-nowrap"><ShieldCheck className="h-3 w-3 mr-1" />OK</Badge>}
                       </TableCell>
                     </TableRow>
