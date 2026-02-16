@@ -689,7 +689,21 @@ serve(async (req) => {
 
     if (!connections?.length) throw new Error(`${mp} marketplace ulanmagan`);
 
-    const credentials = connections[0].credentials as any;
+    // Decrypt credentials from encrypted_credentials field
+    let credentials: any = connections[0].credentials;
+    
+    if (connections[0].encrypted_credentials) {
+      const { data: decrypted, error: decryptErr } = await supabase
+        .rpc('decrypt_credentials', { p_encrypted: connections[0].encrypted_credentials });
+      
+      if (!decryptErr && decrypted) {
+        credentials = typeof decrypted === 'string' ? JSON.parse(decrypted) : decrypted;
+        console.log('Using decrypted credentials');
+      } else {
+        console.log('Decrypt failed, falling back to plain credentials:', decryptErr?.message);
+      }
+    }
+    
     const { apiKey, businessId } = await getBusinessId(credentials);
 
     switch (action) {
