@@ -179,15 +179,33 @@ serve(async (req) => {
 
     console.log('[MXIK] Looking up:', productName);
 
-    // Step 1: Try tasnif.soliq.uz API (parallel with ru + uz)
-    const [ruResults, uzResults] = await Promise.all([
-      searchTasnif(productName, 'ru'),
-      searchTasnif(productName, 'uz'),
-    ]);
+    // Extract meaningful keywords (remove brand/model noise)
+    const cleanName = productName
+      .replace(/[^a-zA-Zа-яА-ЯёЁa-zA-Z\s]/g, ' ')
+      .replace(/\b(для|с|и|в|на|от|из|к|по|без|до|за|не|ни|же|или|но|а|то|это)\b/gi, '')
+      .trim();
+    
+    // Extract category-level keyword (first 2-3 meaningful words)
+    const words = cleanName.split(/\s+/).filter(w => w.length > 2);
+    const searchTerms = [
+      productName.slice(0, 50), // full name (truncated)
+      words.slice(0, 3).join(' '), // first 3 words
+      category || '',
+    ].filter(Boolean);
 
-    const allResults = [...ruResults, ...uzResults];
+    // Step 1: Try tasnif.soliq.uz API with multiple search terms
+    const allResults: TasnifItem[] = [];
+    for (const term of searchTerms) {
+      if (!term) continue;
+      const [ruRes, uzRes] = await Promise.all([
+        searchTasnif(term, 'ru'),
+        searchTasnif(term, 'uz'),
+      ]);
+      allResults.push(...ruRes, ...uzRes);
+    }
+
     const unique = Array.from(new Map(allResults.map(i => [i.mxikCode, i])).values());
-    console.log('[MXIK] Tasnif results:', unique.length);
+    console.log('[MXIK] Tasnif results:', unique.length, 'from', searchTerms.length, 'queries');
 
     // Step 2: AI determines best MXIK code (using tasnif results if available)
     const result = await aiLookupMxik(productName, category, description, unique.length > 0 ? unique : undefined);

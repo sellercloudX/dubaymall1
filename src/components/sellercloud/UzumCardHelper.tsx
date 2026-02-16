@@ -70,7 +70,7 @@ export function UzumCardHelper({ connectedMarketplaces, store }: UzumCardHelperP
   const [common, setCommon] = useState<CommonFields>(EMPTY_COMMON);
   const [progress, setProgress] = useState(0);
   const [progressText, setProgressText] = useState('');
-  const [generatedRows, setGeneratedRows] = useState<Array<{ product: SourceProduct; data: GeneratedRow }>>([]);
+  const [generatedRows, setGeneratedRows] = useState<Array<{ product: SourceProduct; data: GeneratedRow; mxik?: string }>>([]);
   const [errors, setErrors] = useState<string[]>([]);
 
   // Products from all connected marketplaces except uzum
@@ -122,12 +122,12 @@ export function UzumCardHelper({ connectedMarketplaces, store }: UzumCardHelperP
     [sourceProducts, selectedIds]
   );
 
-  // Generate AI content for each product then build Excel
+  // Generate AI content + auto MXIK for each product then build Excel
   const handleGenerate = async () => {
     setStep('generating');
     setProgress(0);
     setErrors([]);
-    const rows: Array<{ product: SourceProduct; data: GeneratedRow }> = [];
+    const rows: Array<{ product: SourceProduct; data: GeneratedRow; mxik?: string }> = [];
     const errs: string[] = [];
     const total = selectedProducts.length;
 
@@ -137,20 +137,35 @@ export function UzumCardHelper({ connectedMarketplaces, store }: UzumCardHelperP
       setProgress(Math.round(((i) / total) * 100));
 
       try {
-        const { data, error } = await supabase.functions.invoke('prepare-uzum-card', {
-          body: {
-            productName: product.name,
-            description: product.description,
-            category: product.category || common.categoryName,
-            brand: common.brand,
-            price: product.price,
-          },
-        });
+        // Parallel: AI card + MXIK lookup
+        const [cardResult, mxikResult] = await Promise.all([
+          supabase.functions.invoke('prepare-uzum-card', {
+            body: {
+              productName: product.name,
+              description: product.description,
+              category: product.category || common.categoryName,
+              brand: common.brand,
+              price: product.price,
+            },
+          }),
+          // Auto MXIK lookup per product (skip if common IKPU is set)
+          common.ikpu ? Promise.resolve({ data: null, error: null }) :
+          supabase.functions.invoke('lookup-mxik-code', {
+            body: {
+              productName: product.name,
+              category: product.category || common.categoryName,
+              description: product.description?.slice(0, 200),
+            },
+          }),
+        ]);
 
-        if (error) throw error;
-        if (data?.error) throw new Error(data.error);
-        if (data?.card) {
-          rows.push({ product, data: data.card });
+        if (cardResult.error) throw cardResult.error;
+        if (cardResult.data?.error) throw new Error(cardResult.data.error);
+        
+        const mxikCode = common.ikpu || mxikResult.data?.mxik_code || '';
+        
+        if (cardResult.data?.card) {
+          rows.push({ product, data: cardResult.data.card, mxik: mxikCode });
         }
       } catch (err: any) {
         console.error(`Error for ${product.name}:`, err);
@@ -159,7 +174,7 @@ export function UzumCardHelper({ connectedMarketplaces, store }: UzumCardHelperP
 
       // Small delay to avoid rate limiting
       if (i < total - 1) {
-        await new Promise(r => setTimeout(r, 800));
+        await new Promise(r => setTimeout(r, 1000));
       }
     }
 
@@ -211,7 +226,7 @@ export function UzumCardHelper({ connectedMarketplaces, store }: UzumCardHelperP
       'Длина (мм)',                    // AD
     ];
 
-    const dataRows = generatedRows.map(({ product, data }, idx) => [
+    const dataRows = generatedRows.map(({ product, data, mxik }, idx) => [
       data.name_ru,                                        // A - Name RU
       product.id,                                          // B - Seller ID
       data.name_uz,                                        // C - Name UZ
@@ -233,7 +248,7 @@ export function UzumCardHelper({ connectedMarketplaces, store }: UzumCardHelperP
       '',                                                  // S - Size chart UZ
       (product.images || []).join('; '),                    // T - Photo URLs
       '',                                                  // U - Barcode
-      common.ikpu,                                         // V - IKPU
+      mxik || common.ikpu,                                // V - IKPU (per-product or common)
       '',                                                  // W - Color
       '',                                                  // X - Size
       product.price,                                       // Y - Sale price
@@ -363,7 +378,7 @@ export function UzumCardHelper({ connectedMarketplaces, store }: UzumCardHelperP
                 onChange={e => setCommon(p => ({ ...p, brand: e.target.value }))} className="h-8 text-sm" />
               <Input placeholder="Ishlab chiqaruvchi mamlakat *" value={common.country}
                 onChange={e => setCommon(p => ({ ...p, country: e.target.value }))} className="h-8 text-sm" />
-              <Input placeholder="ИКПУ (16 ta raqam) *" value={common.ikpu} maxLength={16}
+              <Input placeholder="ИКПУ (avtomatik aniqlanadi yoki qo'lda kiriting)" value={common.ikpu} maxLength={17}
                 onChange={e => setCommon(p => ({ ...p, ikpu: e.target.value }))} className="h-8 text-sm" />
 
               <div className="grid grid-cols-2 gap-2">
