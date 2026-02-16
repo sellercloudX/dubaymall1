@@ -22,7 +22,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AuthProvider } from "@/contexts/AuthContext";
-import { CartProvider } from "@/contexts/CartContext";
+
 import { PageLoader } from "@/components/PageLoader";
 import { InstallPWA } from "@/components/InstallPWA";
 import { SplashScreen } from "@/components/SplashScreen";
@@ -90,7 +90,6 @@ function App() {
     >
       <LanguageProvider>
         <AuthProvider>
-          <CartProvider>
             <TooltipProvider>
               <Toaster />
               <Sonner />
@@ -114,7 +113,7 @@ function App() {
                 </Suspense>
               </BrowserRouter>
             </TooltipProvider>
-          </CartProvider>
+          
         </AuthProvider>
       </LanguageProvider>
     </PersistQueryClientProvider>
