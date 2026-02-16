@@ -421,6 +421,26 @@ serve(async (req) => {
           try {
             await sleep(800);
             const stockMap = new Map<string, { fbo: number; fbs: number }>();
+            
+            // First, get seller's own warehouses (FBS) to distinguish from Yandex warehouses (FBO)
+            const sellerWarehouseIds = new Set<number>();
+            try {
+              const whResp = await fetchWithRetry(
+                `https://api.partner.market.yandex.ru/campaigns/${campaignId}/warehouses`,
+                { headers }
+              );
+              if (whResp.ok) {
+                const whData = await whResp.json();
+                const warehouses = whData.result?.warehouses || whData.warehouses || [];
+                warehouses.forEach((wh: any) => {
+                  if (wh.id) sellerWarehouseIds.add(wh.id);
+                });
+                console.log(`Seller warehouses (FBS): ${Array.from(sellerWarehouseIds).join(', ')}`);
+              }
+            } catch (e) {
+              console.error("Error fetching seller warehouses:", e);
+            }
+            
             let stockPageToken: string | undefined;
             let stockPage = 0;
 
@@ -446,22 +466,24 @@ serve(async (req) => {
               console.log(`Stocks page ${stockPage}: ${warehouseOffers.length} warehouses`);
               
               warehouseOffers.forEach((wh: any) => {
-                console.log(`  Warehouse ${wh.warehouseId} (${wh.warehouseName || 'no name'})`);
+                const whId = wh.warehouseId;
+                const isFBS = sellerWarehouseIds.has(whId) || sellerWarehouseIds.size === 0;
+                console.log(`  Warehouse ${whId} => ${isFBS ? 'FBS' : 'FBO'}`);
+                
                 const offers = wh.offers || [];
                 offers.forEach((offer: any) => {
                   const offerId = offer.offerId;
                   const items = offer.stocks || [];
+                  const fitCount = items
+                    .filter((s: any) => s.type === "FIT" || s.type === "AVAILABLE")
+                    .reduce((sum: number, s: any) => sum + (s.count || 0), 0);
                   
                   const existing = stockMap.get(offerId) || { fbo: 0, fbs: 0 };
-                  items.forEach((s: any) => {
-                    const count = s.count || 0;
-                    // FIT = at Yandex warehouse (FBO), AVAILABLE = seller warehouse (FBS)
-                    if (s.type === "FIT") {
-                      existing.fbo += count;
-                    } else {
-                      existing.fbs += count;
-                    }
-                  });
+                  if (isFBS) {
+                    existing.fbs += fitCount;
+                  } else {
+                    existing.fbo += fitCount;
+                  }
                   stockMap.set(offerId, existing);
                 });
               });
@@ -659,6 +681,21 @@ serve(async (req) => {
           result = { success: false, error: "Campaign ID required for stocks" };
         } else {
           try {
+            // Get seller warehouses to distinguish FBS from FBO
+            const sellerWhIds = new Set<number>();
+            try {
+              const whResp = await fetchWithRetry(
+                `https://api.partner.market.yandex.ru/campaigns/${campaignId}/warehouses`,
+                { headers }
+              );
+              if (whResp.ok) {
+                const whData = await whResp.json();
+                (whData.result?.warehouses || whData.warehouses || []).forEach((wh: any) => {
+                  if (wh.id) sellerWhIds.add(wh.id);
+                });
+              }
+            } catch (_) {}
+            
             const stocksResponse = await fetchWithRetry(
               `https://api.partner.market.yandex.ru/campaigns/${campaignId}/offers/stocks`,
               {
@@ -672,24 +709,26 @@ serve(async (req) => {
               const stocksData = await stocksResponse.json();
               const warehouseOffers = stocksData.result?.warehouses || [];
               
-              // Aggregate by offerId
               const stockMap = new Map<string, { offerId: string; fbo: number; fbs: number; total: number }>();
               
               warehouseOffers.forEach((wh: any) => {
+                const whId = wh.warehouseId;
+                const isFBS = sellerWhIds.has(whId) || sellerWhIds.size === 0;
+                
                 const offers = wh.offers || [];
                 offers.forEach((offer: any) => {
                   const offerId = offer.offerId;
                   const items = offer.stocks || [];
                   
                   const existing = stockMap.get(offerId) || { offerId, fbo: 0, fbs: 0, total: 0 };
-                  items.forEach((s: any) => {
-                    const count = s.count || 0;
-                    if (s.type === "FIT") {
-                      existing.fbo += count;
-                    } else {
-                      existing.fbs += count;
-                    }
-                  });
+                  const fitCount = items
+                    .filter((s: any) => s.type === "FIT" || s.type === "AVAILABLE")
+                    .reduce((sum: number, s: any) => sum + (s.count || 0), 0);
+                  if (isFBS) {
+                    existing.fbs += fitCount;
+                  } else {
+                    existing.fbo += fitCount;
+                  }
                   existing.total = existing.fbo + existing.fbs;
                   stockMap.set(offerId, existing);
                 });
