@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -12,6 +13,8 @@ import {
   ArrowDownUp, Settings, Search, TrendingDown,
   AlertOctagon, FileWarning, BarChart3, Filter
 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import type { MarketplaceDataStore, MarketplaceProduct } from '@/hooks/useMarketplaceDataStore';
 
 type StockFilter = 'all' | 'in_stock' | 'low_stock' | 'out_of_stock';
@@ -58,7 +61,19 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
   const [selectedMarketplace, setSelectedMarketplace] = useState<string>('all');
   const [stockFilter, setStockFilter] = useState<StockFilter>('all');
   const [lossFilter, setLossFilter] = useState<LossFilter>('all');
+  const [stockSelectedIds, setStockSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkStockValue, setBulkStockValue] = useState<string>('');
+  const [stockUpdateFilter, setStockUpdateFilter] = useState<'selected' | 'out_of_stock' | 'all'>('selected');
+  const [isUpdatingStock, setIsUpdatingStock] = useState(false);
   const isLoading = store.isLoadingProducts;
+
+  const toggleStockSelect = useCallback((key: string) => {
+    setStockSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }, []);
 
   // Stock data
   const products = useMemo(() => {
@@ -176,6 +191,72 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
   const inStockCount = products.filter(p => p.totalStock > 0 && !p.lowStockAlert).length;
   const totalLost = reconciliation.reduce((sum, r) => sum + r.lost, 0);
   const itemsWithLoss = reconciliation.filter(r => r.lost > 0);
+
+  const toggleSelectAllStock = useCallback(() => {
+    const allKeys = filteredProducts.map(p => `${p.id}-${p.marketplace}`);
+    const allSelected = allKeys.every(k => stockSelectedIds.has(k));
+    if (allSelected) {
+      setStockSelectedIds(new Set());
+    } else {
+      setStockSelectedIds(new Set(allKeys));
+    }
+  }, [filteredProducts, stockSelectedIds]);
+
+  const handleBulkStockUpdate = useCallback(async () => {
+    const qty = parseInt(bulkStockValue);
+    if (isNaN(qty) || qty < 0) { toast.error("Noto'g'ri miqdor"); return; }
+    
+    let targets: ProductStock[] = [];
+    if (stockUpdateFilter === 'selected') {
+      targets = filteredProducts.filter(p => stockSelectedIds.has(`${p.id}-${p.marketplace}`));
+    } else if (stockUpdateFilter === 'out_of_stock') {
+      targets = filteredProducts.filter(p => p.totalStock === 0);
+    } else {
+      targets = filteredProducts;
+    }
+    
+    if (targets.length === 0) { toast.error("Mahsulot tanlanmagan"); return; }
+    
+    setIsUpdatingStock(true);
+    let successCount = 0;
+    let failCount = 0;
+    
+    const byMarketplace = new Map<string, ProductStock[]>();
+    for (const t of targets) {
+      const arr = byMarketplace.get(t.marketplace) || [];
+      arr.push(t);
+      byMarketplace.set(t.marketplace, arr);
+    }
+    
+    for (const [marketplace, prods] of byMarketplace) {
+      try {
+        const { data, error } = await supabase.functions.invoke('fetch-marketplace-data', {
+          body: {
+            marketplace,
+            dataType: 'update-stock',
+            stocks: prods.map(p => ({
+              sku: p.sku,
+              offerId: p.id,
+              quantity: qty,
+            })),
+          },
+        });
+        
+        if (!error && data?.success) {
+          successCount += prods.length;
+        } else {
+          failCount += prods.length;
+        }
+      } catch (e) {
+        failCount += prods.length;
+      }
+    }
+    
+    setIsUpdatingStock(false);
+    if (successCount > 0) toast.success(`${successCount} ta mahsulotga ${qty} dona qoldiq qo'yildi`);
+    if (failCount > 0) toast.error(`${failCount} ta mahsulotda xato`);
+    store.refetchProducts();
+  }, [bulkStockValue, stockUpdateFilter, stockSelectedIds, filteredProducts, store]);
 
   if (connectedMarketplaces.length === 0) {
     return (
@@ -295,11 +376,68 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
             </CardContent>
           </Card>
 
+          {/* FBS Stock Update Section */}
+          <Card className="mb-4 border-primary/30">
+            <CardHeader className="py-3 px-4">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Package className="h-4 w-4" />
+                FBS Qoldiq qo'yish
+              </CardTitle>
+              <CardDescription className="text-xs">Tanlangan tovarlarga qoldiq miqdorini belgilang</CardDescription>
+            </CardHeader>
+            <CardContent className="px-4 pb-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-3">
+                <div className="flex items-center gap-2 flex-1 w-full sm:w-auto">
+                  <Input
+                    type="number"
+                    min={0}
+                    placeholder="Qoldiq soni"
+                    value={bulkStockValue}
+                    onChange={e => setBulkStockValue(e.target.value)}
+                    className="h-9 w-28 text-sm"
+                  />
+                  <Select value={stockUpdateFilter} onValueChange={v => setStockUpdateFilter(v as any)}>
+                    <SelectTrigger className="h-9 w-[150px] text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="selected">Tanlanganlar</SelectItem>
+                      <SelectItem value="out_of_stock">Tugaganlar</SelectItem>
+                      <SelectItem value="all">Barchasi</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    disabled={!bulkStockValue || isUpdatingStock || stockSelectedIds.size === 0 && stockUpdateFilter === 'selected'}
+                    onClick={handleBulkStockUpdate}
+                  >
+                    {isUpdatingStock ? <RefreshCw className="h-3.5 w-3.5 animate-spin mr-1" /> : <Check className="h-3.5 w-3.5 mr-1" />}
+                    Qoldiq qo'yish
+                  </Button>
+                  <span className="text-xs text-muted-foreground">
+                    {stockUpdateFilter === 'selected' ? `${stockSelectedIds.size} ta` :
+                     stockUpdateFilter === 'out_of_stock' ? `${outOfStockCount} ta` :
+                     `${filteredProducts.length} ta`}
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Product Stock List */}
           <Card>
             <CardHeader className="py-3 px-4">
-              <CardTitle className="text-sm">Zaxira holati</CardTitle>
-              <CardDescription className="text-xs">{filteredProducts.length} ta mahsulot</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-sm">Zaxira holati</CardTitle>
+                  <CardDescription className="text-xs">{filteredProducts.length} ta mahsulot</CardDescription>
+                </div>
+                <Button variant="outline" size="sm" className="text-xs h-7" onClick={toggleSelectAllStock}>
+                  {stockSelectedIds.size === filteredProducts.length && filteredProducts.length > 0 ? 'Bekor' : 'Barchasini tanlash'}
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="px-4 pb-4">
               {isLoading ? (
@@ -313,22 +451,27 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
                   {filteredProducts
                     .sort((a, b) => a.totalStock - b.totalStock)
                     .map(product => (
-                      <div key={`${product.id}-${product.marketplace}`} className="flex items-center justify-between p-3 rounded-lg border">
+                      <div 
+                        key={`${product.id}-${product.marketplace}`} 
+                        className={`flex items-center gap-2.5 p-3 rounded-lg border cursor-pointer transition-colors ${stockSelectedIds.has(`${product.id}-${product.marketplace}`) ? 'bg-primary/5 border-primary/30' : 'hover:bg-muted'}`}
+                        onClick={() => toggleStockSelect(`${product.id}-${product.marketplace}`)}
+                      >
+                        <Checkbox checked={stockSelectedIds.has(`${product.id}-${product.marketplace}`)} className="shrink-0" />
                         <div className="min-w-0 flex-1">
                           <div className="font-medium text-sm truncate">{product.name}</div>
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
                             <Badge variant="outline" className="text-xs">{MARKETPLACE_NAMES[product.marketplace]}</Badge>
-                            <span>{product.sku}</span>
+                            <span className="truncate">{product.sku}</span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-3 ml-4">
+                        <div className="flex items-center gap-3 ml-2 shrink-0">
                           <div className="text-right">
                             <div className="text-xs text-muted-foreground">FBO</div>
-                            <div className="font-medium">{product.stockFBO}</div>
+                            <div className="font-medium text-sm">{product.stockFBO}</div>
                           </div>
                           <div className="text-right">
                             <div className="text-xs text-muted-foreground">FBS</div>
-                            <div className="font-medium">{product.stockFBS}</div>
+                            <div className="font-medium text-sm">{product.stockFBS}</div>
                           </div>
                           <Badge variant={product.totalStock === 0 ? 'destructive' : product.lowStockAlert ? 'outline' : 'default'}
                             className={product.lowStockAlert && product.totalStock > 0 ? 'bg-amber-100 text-amber-800 border-amber-300' : ''}>

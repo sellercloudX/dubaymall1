@@ -488,8 +488,8 @@ MAHSULOT:
 ${allParams.map(formatParam).join("\n")}
 
 QOIDALAR:
-1. name_ru: Ruscha SEO-nom, 80-150 belgi. Format: "[Tur] [Brend] [Model] [Xususiyatlar], [rang]"
-2. name_uz: O'zbekcha LOTIN, 80-150 belgi
+1. name_ru: Ruscha SEO-nom, 80-150 belgi. Format: "[Tur] [Brend] [Model] [Xususiyatlar], [rang]". MAJBURIY!
+2. name_uz: O'ZBEKCHA LOTIN yozuvida nom, 80-150 belgi. MAJBURIY! Bu KIRILL emas, LOTIN yozuvi! Masalan: "Tonal krem Estée Lauder Double Wear, to'q jigarrang". Ruscha so'zlar bo'lmasin!
 3. description_ru: 800-3000 belgi ruscha tavsif. HTML TEGLARISIZ! Oddiy matn. 6+ paragraf.
 4. description_uz: 600-2000 belgi o'zbekcha LOTIN tavsif. HTML TEGLARISIZ!
 5. vendor: Aniq brend nomi
@@ -973,10 +973,80 @@ serve(async (req) => {
               
               console.log(`📊 Quality: status=${cardStatus}, errors=${errors.length}, warnings=${warnings.length}`);
               
-              // If there are fixable errors, try to auto-fix
-              if (errors.length > 0 && ai) {
-                console.log("🔧 Attempting auto-fix for errors:", errors.slice(0, 3).map((e: any) => e.message || e.code));
-                // Re-submit with fixes if critical errors found
+              // Auto-fix errors by asking AI to correct and re-submitting
+              if (errors.length > 0 && LOVABLE_KEY) {
+                console.log("🔧 Auto-fixing errors:", errors.slice(0, 5).map((e: any) => e.message || e.code));
+                try {
+                  const errorMessages = errors.map((e: any) => e.message || e.code || JSON.stringify(e)).join("\n");
+                  const fixPrompt = `Yandex Market kartochkasida quyidagi xatolar topildi:
+${errorMessages}
+
+Joriy offer ma'lumotlari:
+- name: ${offer.name}
+- vendor: ${offer.vendor}
+- vendorCode: ${offer.vendorCode}
+- categoryId: ${leafCat.id} (${leafCat.name})
+- parameterValues count: ${offer.parameterValues?.length || 0}
+- shelfLife: ${JSON.stringify(offer.shelfLife)}
+- lifeTime: ${JSON.stringify(offer.lifeTime)}
+- weightDimensions: ${JSON.stringify(offer.weightDimensions)}
+
+Xatolarni tuzatish uchun qaysi maydonlarni o'zgartirish kerak? Javob FAQAT JSON:
+{"fixes": {"name": "yangi nom yoki null", "shelfLife": {"timePeriod": 36, "timeUnit": "MONTH"}, "lifeTime": {"timePeriod": 36, "timeUnit": "MONTH"}, "parameterValues": [{"parameterId": 123, "value": "qiymat"}], "vendor": "yangi vendor yoki null"}}
+Faqat tuzatish kerak bo'lgan maydonlarni ber. null = o'zgartirma.`;
+
+                  const fixResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+                    method: "POST",
+                    headers: { Authorization: `Bearer ${LOVABLE_KEY}`, "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      model: "google/gemini-2.5-flash",
+                      messages: [{ role: "user", content: fixPrompt }],
+                      temperature: 0, max_tokens: 2000,
+                    }),
+                  });
+
+                  if (fixResp.ok) {
+                    const fixData = await fixResp.json();
+                    const fixContent = fixData.choices?.[0]?.message?.content || "";
+                    const fixMatch = fixContent.match(/\{[\s\S]*\}/);
+                    if (fixMatch) {
+                      const fixes = JSON.parse(fixMatch[0]).fixes || JSON.parse(fixMatch[0]);
+                      console.log("🔧 AI fixes:", Object.keys(fixes));
+                      
+                      // Apply fixes to offer
+                      if (fixes.name && fixes.name !== "null") offer.name = fixes.name;
+                      if (fixes.vendor && fixes.vendor !== "null") offer.vendor = fixes.vendor;
+                      if (fixes.shelfLife) offer.shelfLife = fixes.shelfLife;
+                      if (fixes.lifeTime) offer.lifeTime = fixes.lifeTime;
+                      if (fixes.parameterValues?.length) {
+                        // Merge: replace existing or add new
+                        const existingMap = new Map((offer.parameterValues || []).map((p: any) => [p.parameterId, p]));
+                        for (const fp of fixes.parameterValues) {
+                          existingMap.set(fp.parameterId, fp);
+                        }
+                        offer.parameterValues = Array.from(existingMap.values());
+                      }
+
+                      // Re-submit fixed offer
+                      console.log("📤 Re-submitting fixed offer...");
+                      const fixedResp = await fetch(`${YANDEX_API}/businesses/${creds.businessId}/offer-mappings/update`, {
+                        method: "POST",
+                        headers: { "Api-Key": creds.apiKey, "Content-Type": "application/json" },
+                        body: JSON.stringify({ offerMappings: [{ offer }] }),
+                      });
+                      
+                      if (fixedResp.ok) {
+                        console.log("✅ Auto-fix submitted successfully");
+                        qualityCheck.autoFixed = true;
+                        qualityCheck.fixedFields = Object.keys(fixes).filter(k => fixes[k] !== null && fixes[k] !== "null");
+                      } else {
+                        console.warn("⚠️ Auto-fix re-submission failed:", fixedResp.status);
+                      }
+                    }
+                  }
+                } catch (fixErr) {
+                  console.warn("Auto-fix error:", fixErr);
+                }
               }
             }
           } catch (e) {
