@@ -1029,6 +1029,76 @@ serve(async (req) => {
           console.error("Yandex inventory reconciliation error:", e);
           result = { success: false, error: "Inventory reconciliation error" };
         }
+      } else if (dataType === "update-stock") {
+        // PUT /campaigns/{campaignId}/offers/stocks — update stock quantities
+        try {
+          const { stocks } = requestBody;
+          
+          if (!stocks || stocks.length === 0 || !campaignId) {
+            result = { success: false, error: "No stocks provided or campaignId missing" };
+          } else {
+            // First get warehouseId from stocks endpoint to find seller's FBS warehouse
+            let warehouseId: number | undefined;
+            try {
+              const stocksCheckResp = await fetchWithRetry(
+                `https://api.partner.market.yandex.ru/campaigns/${campaignId}/offers/stocks`,
+                {
+                  method: 'POST',
+                  headers,
+                  body: JSON.stringify({ limit: 1 })
+                }
+              );
+              if (stocksCheckResp.ok) {
+                const stocksCheckData = await stocksCheckResp.json();
+                const warehouses = stocksCheckData.result?.warehouses || [];
+                // Find FBS warehouse (warehouseId >= 100000) or use first available
+                const fbsWh = warehouses.find((wh: any) => wh.warehouseId >= 100000);
+                warehouseId = fbsWh?.warehouseId || warehouses[0]?.warehouseId;
+                console.log(`Found warehouseId: ${warehouseId}`);
+              }
+            } catch (e) {
+              console.error("Error fetching warehouse info:", e);
+            }
+
+            if (!warehouseId) {
+              result = { success: false, error: "Could not determine warehouseId for stock update" };
+            } else {
+              const skus = stocks.map((s: any) => ({
+                sku: s.sku || s.offerId,
+                warehouseId: warehouseId,
+                items: [{
+                  type: "FIT",
+                  count: s.quantity,
+                  updatedAt: new Date().toISOString(),
+                }],
+              }));
+
+              console.log(`Updating stocks for ${skus.length} SKUs in warehouse ${warehouseId}`);
+
+              const response = await fetchWithRetry(
+                `https://api.partner.market.yandex.ru/campaigns/${campaignId}/offers/stocks`,
+                {
+                  method: 'PUT',
+                  headers,
+                  body: JSON.stringify({ skus }),
+                }
+              );
+
+              if (response.ok) {
+                const data = await response.json();
+                console.log("Yandex stock update response:", JSON.stringify(data));
+                result = { success: true, data, updated: skus.length };
+              } else {
+                const errText = await response.text();
+                console.error("Yandex stock update failed:", response.status, errText);
+                result = { success: false, error: `Stock update failed: ${response.status}`, details: errText };
+              }
+            }
+          }
+        } catch (e) {
+          console.error("Yandex stock update error:", e);
+          result = { success: false, error: "Stock update error" };
+        }
       }
 
       // Update connection with latest sync time
@@ -1682,12 +1752,13 @@ serve(async (req) => {
           result = { success: false, error: "Price update error" };
         }
 
-      } else if (dataType === "update-stocks") {
+      } else if (dataType === "update-stock") {
         // POST /v2/fbs/sku/stocks
         try {
-          const { stockUpdates } = requestBody;
+          const { stocks, stockUpdates } = requestBody;
+          const updates = stocks || stockUpdates;
           
-          if (!stockUpdates || stockUpdates.length === 0) {
+          if (!updates || updates.length === 0) {
             result = { success: false, error: "No stock updates provided" };
           } else {
             const response = await fetch(
@@ -1699,9 +1770,9 @@ serve(async (req) => {
                   "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                  skuAmountList: stockUpdates.map((s: any) => ({
-                    skuId: s.skuId || s.offerId,
-                    amount: s.amount || s.stock || 0,
+                  skuAmountList: updates.map((s: any) => ({
+                    skuId: s.skuId || s.offerId || s.sku,
+                    amount: s.amount || s.quantity || s.stock || 0,
                   })),
                 }),
               }
