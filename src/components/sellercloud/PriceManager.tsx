@@ -106,15 +106,24 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
 
   const handleAutoPrice = () => {
     const newChanges: Record<string, number> = {};
+    let noCostCount = 0;
+    let belowMinCount = 0;
     products.forEach(p => {
-      if (p.costPrice !== null && p.minPrice > 0 && p.price < p.minPrice) {
+      if (p.costPrice === null || p.costPrice <= 0) {
+        noCostCount++;
+        return;
+      }
+      if (p.minPrice > 0 && p.price < p.minPrice) {
         newChanges[`${p.marketplace}-${p.id}`] = p.minPrice;
+        belowMinCount++;
       }
     });
     setPriceChanges(prev => ({ ...prev, ...newChanges }));
     const count = Object.keys(newChanges).length;
     if (count > 0) {
       toast.info(`${count} ta mahsulot narxi minimal foydaga moslanadi`);
+    } else if (noCostCount > 0 && belowMinCount === 0) {
+      toast.warning(`${noCostCount} ta mahsulotda tannarx kiritilmagan — avval tannarx kiriting`);
     } else {
       toast.success('Barcha narxlar yetarli darajada');
     }
@@ -230,6 +239,17 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
           </span>
         </div>
       )}
+      {(() => {
+        const noCostCount = products.filter(p => p.costPrice === null || p.costPrice <= 0).length;
+        return noCostCount > 0 ? (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+            <AlertTriangle className="h-4 w-4 text-yellow-600 shrink-0" />
+            <span className="text-xs text-yellow-700 dark:text-yellow-400">
+              {noCostCount} ta mahsulotda tannarx kiritilmagan — aniq hisoblash uchun tannarx kiriting
+            </span>
+          </div>
+        ) : null;
+      })()}
 
       {/* Auto Pricing */}
       <Card className="overflow-hidden">
