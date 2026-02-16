@@ -202,25 +202,27 @@ export default function SellerCloudMobile() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-28 overflow-x-hidden safe-area-bottom">
+    <div className="min-h-screen bg-background pb-32 overflow-x-hidden safe-area-bottom">
       <MobileSellerCloudHeader connectedCount={connectedMarketplaces.length} onRefresh={refetch} isLoading={connectionsLoading} />
       <main className="pt-[calc(3.5rem+env(safe-area-inset-top,0px))]">
         {isMoreActive && (
-          <div className="flex gap-2 px-4 py-3 overflow-x-auto no-scrollbar border-b bg-background/95 backdrop-blur-sm sticky top-14 z-40">
+          <div className="flex gap-2 px-3 py-2.5 overflow-x-auto no-scrollbar border-b bg-background/95 backdrop-blur-sm sticky top-[calc(3.5rem+env(safe-area-inset-top,0px))] z-40">
             {moreSubTabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
               return (
                 <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                  className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors",
-                    isActive ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
-                  <Icon className="h-3.5 w-3.5" />{tab.label}
+                  className={cn("flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-medium whitespace-nowrap transition-colors min-h-[36px]",
+                    isActive ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/80")}>
+                  <Icon className="h-3.5 w-3.5 shrink-0" />{tab.label}
                 </button>
               );
             })}
           </div>
         )}
-        {renderContent()}
+        <div className={isMoreActive ? "pt-1" : ""}>
+          {renderContent()}
+        </div>
       </main>
       <MobileSellerCloudNav activeTab={activeTab} onTabChange={setActiveTab} />
       <BackgroundTasksPanel />
