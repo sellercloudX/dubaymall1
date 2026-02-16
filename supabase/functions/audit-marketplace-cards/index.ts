@@ -171,15 +171,16 @@ async function fetchCardQuality(
 
 // ===== FETCH REAL CATEGORY PARAMETERS FROM YANDEX =====
 async function fetchCategoryParameters(
-  apiKey: string, categoryId: number
+  apiKey: string, categoryId: number, businessId: string
 ): Promise<any[]> {
   if (!categoryId || categoryId === 0) return [];
 
   const headers = { "Api-Key": apiKey, "Content-Type": "application/json" };
   try {
+    // POST request with businessId as query parameter (required by Yandex API)
     const resp = await fetchWithRetry(
-      `https://api.partner.market.yandex.ru/category/${categoryId}/parameters`,
-      { headers }
+      `https://api.partner.market.yandex.ru/v2/category/${categoryId}/parameters?businessId=${businessId}`,
+      { method: 'POST', headers, body: '{}' }
     );
     if (resp.ok) {
       const data = await resp.json();
@@ -187,7 +188,8 @@ async function fetchCategoryParameters(
       console.log(`Category ${categoryId}: ${params.length} parameters available`);
       return params;
     } else {
-      console.error(`Category params error: ${resp.status}`);
+      const errText = await resp.text();
+      console.error(`Category params error: ${resp.status} ${errText.substring(0, 200)}`);
     }
   } catch (e) {
     console.error(`Category params fetch error:`, e);
@@ -419,13 +421,13 @@ async function generateAIFixes(
     `- [${i.severity.toUpperCase()}] ${i.field}: ${i.message} (hozirgi: ${i.currentValue || 'bo\'sh'})`
   ).join('\n');
 
-  // Build REAL parameter list from Yandex category API
-  const requiredParamsList = categoryParams
-    .filter(p => p.required || fixableIssues.some(i => i.field === p.name))
-    .slice(0, 30)
+  // Build REAL parameter list from Yandex category API - include ALL required + recommended
+  const allParams = categoryParams.slice(0, 40);
+  const requiredParamsList = allParams
     .map(p => {
       const allowedValues = p.values?.map((v: any) => v.value || v.name).slice(0, 10).join(', ') || '';
-      return `  - parameterId: ${p.id}, name: "${p.name}", type: ${p.type || 'string'}${allowedValues ? `, allowedValues: [${allowedValues}]` : ''}`;
+      const isRequired = p.required ? ' [REQUIRED]' : '';
+      return `  - parameterId: ${p.id}, name: "${p.name}", type: ${p.type || 'string'}${isRequired}${allowedValues ? `, allowedValues: [${allowedValues}]` : ''}`;
     }).join('\n');
 
   const existingParams = (currentData.params || [])
@@ -455,7 +457,10 @@ ${issuesList}
 HAQIQIY KATEGORIYA PARAMETRLARI (Yandex API dan):
 ${requiredParamsList || '  (parametrlar mavjud emas)'}
 
-VAZIFA: Har bir xatolik uchun aniq tuzatish qiymatini ber.
+VAZIFA: 
+1. Xatoliklarni tuzat (nom, tavsif, brend)
+2. Yuqoridagi HAQIQIY parametrlar ro'yxatidan [REQUIRED] belgilangan BARCHA parametrlarni to'ldir
+3. Mahsulot haqidagi ma'lumotlardan kelib chiqib, har bir parametr uchun mos qiymat tanlang
 
 JAVOBNI FAQAT JSON formatda ber:
 {
@@ -466,7 +471,7 @@ JAVOBNI FAQAT JSON formatda ber:
     "barcode": "460XXXXXXXXXX formatda EAN-13 (agar barcode xatosi bo'lsa)",
     "weightDimensions": { "weight": 0.5, "length": 20, "width": 15, "height": 10 },
     "parameterValues": [
-      { "parameterId": REAL_ID_FROM_LIST_ABOVE, "value": "qiymati" }
+      { "parameterId": 12345, "value": "qiymati" }
     ]
   },
   "expectedScore": 90,
@@ -474,12 +479,12 @@ JAVOBNI FAQAT JSON formatda ber:
 }
 
 MUHIM QOIDALAR:
-1. Faqat xatolikka ega bo'lgan maydonlarni tuzat
-2. parameterValues da FAQAT yuqoridagi ro'yxatdagi HAQIQIY parameterId lardan foydalan!
-3. Agar parametr uchun allowedValues berilgan bo'lsa, FAQAT o'sha qiymatlardan birini tanlang
-4. O'ylab topilgan (fake) parameterId ISHLATMA - bu Yandex API da xatolik beradi
-5. Nom va tavsifni FAQAT ruscha yoz (Yandex Market uchun)
-6. Agar MXIK kod topilgan bo'lsa, uni ishlatma - bu alohida tizim orqali boshqariladi`;
+1. parameterValues da FAQAT yuqoridagi ro'yxatdagi HAQIQIY parameterId lardan foydalan! O'ylab topilgan ID ISHLATMA!
+2. Agar parametr uchun allowedValues berilgan bo'lsa, FAQAT o'sha qiymatlardan birini tanlang (aynan shu tekst)
+3. [REQUIRED] belgilangan BARCHA parametrlarni to'ldirish SHART
+4. Nom va tavsifni FAQAT ruscha yoz (Yandex Market uchun)
+5. Agar MXIK kod topilgan bo'lsa, uni ishlatma - bu alohida tizim orqali boshqariladi
+6. Faqat xatolikka ega bo'lgan maydonlarni tuzat, to'g'ri maydonlarni o'zgartirma`;
 
   const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
@@ -723,7 +728,7 @@ serve(async (req) => {
         const issue = issues[0];
 
         // 2. Fetch REAL category parameters from Yandex
-        const categoryParams = await fetchCategoryParameters(apiKey, issue.categoryId || 0);
+        const categoryParams = await fetchCategoryParameters(apiKey, issue.categoryId || 0, businessId);
         console.log(`Fetched ${categoryParams.length} real params for category ${issue.categoryId}`);
 
         // 3. Lookup MXIK code from our database
