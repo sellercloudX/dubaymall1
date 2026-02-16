@@ -705,6 +705,17 @@ serve(async (req) => {
 
     console.log(`Audit action: ${action}, marketplace: ${mp}, user: ${user.id}`);
 
+    // Only Yandex Market is supported for card quality audit
+    if (mp !== 'yandex') {
+      return new Response(JSON.stringify({
+        success: false,
+        error: `Kartochka sifat auditi hozircha faqat Yandex Market uchun ishlaydi. "${mp}" qo'llab-quvvatlanmaydi.`,
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Get marketplace connection
     const { data: connections } = await supabase
       .from("marketplace_connections")
