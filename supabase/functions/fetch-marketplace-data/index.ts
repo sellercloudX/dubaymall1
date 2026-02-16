@@ -283,30 +283,9 @@ serve(async (req) => {
               if (!offerId || productMap.has(offerId)) return;
               
               const price = offer.basicPrice?.value || offer.price?.value || offer.price || 0;
+              // Initial stock = 0; will be replaced by dedicated stocks endpoint below
               let stockFBO = 0;
               let stockFBS = 0;
-              
-              if (offer.warehouses && Array.isArray(offer.warehouses)) {
-                offer.warehouses.forEach((wh: any) => {
-                  const stocks = wh.stocks || [];
-                  stocks.forEach((st: any) => {
-                    const count = st.count || 0;
-                    if (st.type === "FIT") {
-                      stockFBO += count;
-                    } else {
-                      stockFBS += count;
-                    }
-                  });
-                });
-              } else if (offer.stocks && Array.isArray(offer.stocks)) {
-                offer.stocks.forEach((s: any) => {
-                  if (s.type === "FIT") {
-                    stockFBO += s.count || 0;
-                  } else {
-                    stockFBS += s.count || 0;
-                  }
-                });
-              }
               
               newProductsOnPage++;
               productMap.set(offerId, {
@@ -343,23 +322,9 @@ serve(async (req) => {
                            offer.price ||
                            mapping.price?.value || 0;
               
+              // Initial stock = 0; will be replaced by dedicated stocks endpoint below
               let stockFBO = 0;
               let stockFBS = 0;
-              
-              if (offer.stocks && Array.isArray(offer.stocks)) {
-                offer.stocks.forEach((s: any) => {
-                  const count = s.count || s.available || 0;
-                  if (s.type === 'FBO' || s.warehouseType === 'FBO') stockFBO += count;
-                  else stockFBS += count;
-                });
-              }
-              if (mapping.stocks && Array.isArray(mapping.stocks)) {
-                mapping.stocks.forEach((s: any) => {
-                  const count = s.count || s.available || 0;
-                  if (s.type === 'FBO' || s.warehouseType === 'FBO') stockFBO += count;
-                  else stockFBS += count;
-                });
-              }
               
               const statusValue = mapping.status || 
                                  awaitingMapping?.cardStatus || 
@@ -506,6 +471,11 @@ serve(async (req) => {
               return p;
             });
             
+            // Log sample stock data for debugging
+            const sampleProducts = allProducts.slice(0, 3);
+            sampleProducts.forEach(p => {
+              console.log(`Stock debug: ${p.offerId} => FBO=${p.stockFBO}, FBS=${p.stockFBS}, total=${p.stockCount}`);
+            });
             console.log(`Updated stocks for ${stockMap.size} products`);
           } catch (e) {
             console.error("Error fetching stocks:", e);
