@@ -294,7 +294,7 @@ export default function SellerCloudX() {
             </TabsContent>
 
             {/* Tools - sub-tabs */}
-            <TabsContent value="tools">
+            <TabsContent value="tools" forceMount className="data-[state=inactive]:hidden">
               <Suspense fallback={<TabLoader />}>
                 <ToolsSubTabs connectedMarketplaces={connectedMarketplaces} store={store} subscription={subscription} />
               </Suspense>
@@ -351,7 +351,7 @@ function ToolsSubTabs({ connectedMarketplaces, store, subscription }: {
         <TabsTrigger value="problems" className="text-xs gap-1"><AlertOctagon className="h-3.5 w-3.5" />Muammolar</TabsTrigger>
         <TabsTrigger value="mxik" className="text-xs gap-1"><FileSpreadsheet className="h-3.5 w-3.5" />MXIK baza</TabsTrigger>
       </TabsList>
-      <TabsContent value="audit"><Suspense fallback={<TabLoader />}><CardQualityAudit connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
+      <TabsContent value="audit" forceMount className="data-[state=inactive]:hidden"><Suspense fallback={<TabLoader />}><CardQualityAudit connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
       <TabsContent value="inventory"><Suspense fallback={<TabLoader />}><InventorySync connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
       <TabsContent value="pricing"><Suspense fallback={<TabLoader />}><PriceManager connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
       <TabsContent value="publish"><Suspense fallback={<TabLoader />}><MultiPublish connectedMarketplaces={connectedMarketplaces} /></Suspense></TabsContent>
