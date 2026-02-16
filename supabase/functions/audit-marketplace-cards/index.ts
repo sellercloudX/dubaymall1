@@ -278,14 +278,14 @@ function analyzeOffers(
         type: 'missing_content', severity: 'error', field: 'description',
         message: 'Tavsif yo\'q yoki juda qisqa',
         currentValue: offer.description ? `${offer.description.length} belgi` : '(bo\'sh)',
-        suggestedFix: 'AI yordamida batafsil tavsif yaratish (300+ belgi)',
+        suggestedFix: 'AI yordamida batafsil tavsif yaratish (1000+ belgi)',
       });
-    } else if (offer.description.length < 150) {
+    } else if (offer.description.length < 1000) {
       issues.push({
         type: 'low_quality', severity: 'warning', field: 'description',
-        message: `Tavsif qisqa (${offer.description.length} belgi)`,
+        message: `Tavsif qisqa (${offer.description.length} belgi), 1000+ tavsiya`,
         currentValue: `${offer.description.length} belgi`,
-        suggestedFix: 'Tavsifni 300+ belgigacha kengaytirish',
+        suggestedFix: 'Tavsifni 1000+ belgigacha kengaytirish',
       });
     }
 
@@ -462,8 +462,9 @@ MUHIM QOIDALAR (QATTIQ AMAL QIL!):
    Agar hozirgi nom 60+ belgi va sifatli bo'lsa - UNI O'ZGARTIRMA!
    Agar 60 dan kam bo'lsa: Brend + Mahsulot turi + Model/Liniya + Asosiy xususiyat + Hajm/O'lcham formatda ruscha yoz.
    Masalan: "Шампунь против перхоти Head & Shoulders Цитрусовая свежесть для жирных волос, 400 мл"
-2. TAVSIF HAQIDA: Agar hozirgi tavsif bor va 100+ belgi bo'lsa - UNI O'ZGARTIRMA!
-   Faqat bo'sh yoki juda qisqa bo'lsa: 300+ belgili batafsil tavsif yoz ruscha.
+2. TAVSIF HAQIDA: Tavsif MINIMUM 1000 belgi bo'lishi SHART! 999 belgi ham kam!
+   Agar hozirgi tavsif 1000+ belgi bo'lsa - UNI O'ZGARTIRMA!
+   Agar 1000 dan kam bo'lsa: Batafsil, professional, SEO-optimallashgan tavsif yoz ruscha. Mahsulot afzalliklari, xususiyatlari, qo'llanilishi, tarkibi haqida yoz.
 3. BREND (vendor): Agar hozirgi brend bor - UNI AYNAN QAYTARING. Bo'sh bo'lsa mahsulotdan aniqlang.
 4. parameterValues: FAQAT yuqoridagi ro'yxatdagi HAQIQIY parameterId lardan foydalan!
 5. allowedValues berilgan parametrlar uchun FAQAT o'sha qiymatlardan birini tanlang (aynan shu tekst).
@@ -565,9 +566,11 @@ async function applyFixes(
     }
   }
   if (fixData.description && fixData.description !== 'NULL' && fixData.description !== 'null' && fixData.description !== currentData?.description) {
-    if (!currentData?.description || currentData.description.length < 100 || fixData.description.length >= currentData.description.length) {
-      offerUpdate.description = fixData.description;
-      needsBaseUpdate = true;
+    if (!currentData?.description || currentData.description.length < 1000 || fixData.description.length >= currentData.description.length) {
+      if (fixData.description.length >= 500) { // Accept if at least 500 chars (AI may not always hit 1000)
+        offerUpdate.description = fixData.description;
+        needsBaseUpdate = true;
+      }
     }
   }
   if (fixData.vendor && fixData.vendor !== 'NULL' && fixData.vendor !== 'null') { offerUpdate.vendor = fixData.vendor; needsBaseUpdate = true; }
@@ -722,42 +725,70 @@ serve(async (req) => {
         const targetId = offerId || body.offerId;
         if (!targetId) throw new Error("offerId kerak");
 
-        // 1. Get current card data
-        const offers = await fetchAllOffers(apiKey, businessId);
-        const cardQuality = await fetchCardQuality(apiKey, businessId, [targetId]);
-        const issues = analyzeOffers(offers, cardQuality, [targetId]);
+        const maxRetries = 2; // Up to 2 rounds of fixes
+        let lastResult: any = null;
+        let totalFixes: string[] = [];
 
-        if (issues.length === 0) {
-          return new Response(JSON.stringify({
-            success: true, data: { message: "Bu kartochkada xatolik topilmadi ✅", applied: false },
-          }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        for (let round = 0; round < maxRetries; round++) {
+          console.log(`=== Fix round ${round + 1} for ${targetId} ===`);
+
+          // 1. Get current card data (fresh each round)
+          const offers = await fetchAllOffers(apiKey, businessId);
+          const cardQuality = await fetchCardQuality(apiKey, businessId, [targetId]);
+          const issues = analyzeOffers(offers, cardQuality, [targetId]);
+
+          if (issues.length === 0) {
+            return new Response(JSON.stringify({
+              success: true, data: { 
+                message: totalFixes.length > 0 
+                  ? `✅ Kartochka tuzatildi (${round} bosqich)\n${totalFixes.join('\n')}`
+                  : "Bu kartochkada xatolik topilmadi ✅", 
+                applied: totalFixes.length > 0 
+              },
+            }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          }
+
+          const issue = issues[0];
+
+          // Check if score is already 90+
+          if (issue.qualityScore >= 90 && round > 0) {
+            console.log(`Score ${issue.qualityScore} >= 90, stopping.`);
+            break;
+          }
+
+          // 2. Fetch REAL category parameters from Yandex
+          const categoryParams = await fetchCategoryParameters(apiKey, issue.categoryId || 0, businessId);
+          console.log(`Fetched ${categoryParams.length} real params for category ${issue.categoryId}`);
+
+          // 3. Lookup MXIK code from our database
+          const mxikCode = await lookupMxikCode(supabase, issue.productName, issue.category || '');
+          if (mxikCode) {
+            console.log(`Found MXIK code: ${mxikCode.code} for ${issue.productName.substring(0, 50)}`);
+          }
+
+          // 4. Generate AI fixes with real parameter IDs
+          const aiResult = await generateAIFixes(issue, categoryParams, mxikCode);
+          if (aiResult.error) throw new Error(aiResult.error);
+
+          // 5. Apply fixes via API
+          const result = await applyFixes(apiKey, businessId, targetId, aiResult, issue.currentData);
+          lastResult = { ...result, issue: { ...issue, currentData: undefined }, fixes: aiResult };
+          totalFixes.push(`Bosqich ${round + 1}: ${result.message}`);
+
+          // If score was already checked and < 90, wait and retry
+          if (round < maxRetries - 1 && issue.qualityScore < 90) {
+            console.log(`Score ${issue.qualityScore} < 90, waiting 3s before retry...`);
+            await sleep(3000);
+          } else {
+            break;
+          }
         }
-
-        const issue = issues[0];
-
-        // 2. Fetch REAL category parameters from Yandex
-        const categoryParams = await fetchCategoryParameters(apiKey, issue.categoryId || 0, businessId);
-        console.log(`Fetched ${categoryParams.length} real params for category ${issue.categoryId}`);
-
-        // 3. Lookup MXIK code from our database
-        const mxikCode = await lookupMxikCode(supabase, issue.productName, issue.category || '');
-        if (mxikCode) {
-          console.log(`Found MXIK code: ${mxikCode.code} for ${issue.productName.substring(0, 50)}`);
-        }
-
-        // 4. Generate AI fixes with real parameter IDs
-        const aiResult = await generateAIFixes(issue, categoryParams, mxikCode);
-        if (aiResult.error) throw new Error(aiResult.error);
-
-        // 5. Apply fixes via API
-        const result = await applyFixes(apiKey, businessId, targetId, aiResult, issue.currentData);
 
         return new Response(JSON.stringify({
           success: true,
           data: {
-            ...result,
-            issue: { ...issue, currentData: undefined },
-            fixes: aiResult,
+            ...lastResult,
+            message: totalFixes.join('\n'),
           },
         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
