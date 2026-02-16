@@ -3,7 +3,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { NotificationsDropdown } from '@/components/notifications/NotificationsDropdown';
+
 import { Button } from '@/components/ui/button';
 import { useUserRoles } from '@/hooks/useUserRoles';
 import { Crown, User, LogOut, Menu, X, Shield } from 'lucide-react';
@@ -54,7 +54,6 @@ export function Navbar() {
           <div className="hidden md:flex items-center gap-3">
             <ThemeToggle />
             <LanguageSwitcher />
-            {user && <NotificationsDropdown />}
             {user ? (
               <Button variant="ghost" size="sm" onClick={handleSignOut} aria-label="Chiqish">
                 <LogOut className="h-4 w-4" />
@@ -85,7 +84,7 @@ export function Navbar() {
               <div className="flex items-center gap-2 pb-3 border-b">
                 <ThemeToggle />
                 <LanguageSwitcher />
-                {user && <NotificationsDropdown />}
+                
               </div>
               <Link to="/seller-cloud" className="text-sm py-2 flex items-center gap-2" onClick={() => setMobileMenuOpen(false)}>
                 <Crown className="h-4 w-4" /> Dashboard

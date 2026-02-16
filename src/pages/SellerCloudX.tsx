@@ -29,7 +29,7 @@ const MarketplaceOrders = lazy(() => import('@/components/sellercloud/Marketplac
 const MarketplaceAnalytics = lazy(() => import('@/components/sellercloud/MarketplaceAnalytics').then(m => ({ default: m.MarketplaceAnalytics })));
 const InventorySync = lazy(() => import('@/components/sellercloud/InventorySync').then(m => ({ default: m.InventorySync })));
 const PriceManager = lazy(() => import('@/components/sellercloud/PriceManager').then(m => ({ default: m.PriceManager })));
-const MultiPublish = lazy(() => import('@/components/sellercloud/MultiPublish').then(m => ({ default: m.MultiPublish })));
+
 const NotificationCenter = lazy(() => import('@/components/sellercloud/NotificationCenter').then(m => ({ default: m.NotificationCenter })));
 const ReportsExport = lazy(() => import('@/components/sellercloud/ReportsExport').then(m => ({ default: m.ReportsExport })));
 const SubscriptionBilling = lazy(() => import('@/components/sellercloud/SubscriptionBilling').then(m => ({ default: m.SubscriptionBilling })));
@@ -345,7 +345,7 @@ function ToolsSubTabs({ connectedMarketplaces, store, subscription }: {
         <TabsTrigger value="audit" className="text-xs gap-1"><Sparkles className="h-3.5 w-3.5" />Sifat auditi</TabsTrigger>
         <TabsTrigger value="inventory" className="text-xs gap-1"><ArrowDownUp className="h-3.5 w-3.5" />Zaxira</TabsTrigger>
         <TabsTrigger value="pricing" className="text-xs gap-1"><DollarSign className="h-3.5 w-3.5" />Narxlar</TabsTrigger>
-        <TabsTrigger value="publish" className="text-xs gap-1"><Upload className="h-3.5 w-3.5" />Joylash</TabsTrigger>
+        
         <TabsTrigger value="min-price" className="text-xs gap-1"><Shield className="h-3.5 w-3.5" />Min narx</TabsTrigger>
         <TabsTrigger value="clone" className="text-xs gap-1"><Copy className="h-3.5 w-3.5" />Klonlash</TabsTrigger>
         <TabsTrigger value="problems" className="text-xs gap-1"><AlertOctagon className="h-3.5 w-3.5" />Muammolar</TabsTrigger>
@@ -354,7 +354,7 @@ function ToolsSubTabs({ connectedMarketplaces, store, subscription }: {
       <TabsContent value="audit" forceMount className="data-[state=inactive]:hidden"><Suspense fallback={<TabLoader />}><CardQualityAudit connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
       <TabsContent value="inventory"><Suspense fallback={<TabLoader />}><InventorySync connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
       <TabsContent value="pricing"><Suspense fallback={<TabLoader />}><PriceManager connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
-      <TabsContent value="publish"><Suspense fallback={<TabLoader />}><MultiPublish connectedMarketplaces={connectedMarketplaces} /></Suspense></TabsContent>
+      
       <TabsContent value="min-price"><Suspense fallback={<TabLoader />}><MinPriceProtection connectedMarketplaces={connectedMarketplaces} store={store} commissionPercent={subscription?.commission_percent || 4} /></Suspense></TabsContent>
       <TabsContent value="clone"><Suspense fallback={<TabLoader />}><CardCloner connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
       <TabsContent value="problems"><Suspense fallback={<TabLoader />}><ProblematicProducts connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>

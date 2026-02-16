@@ -21,7 +21,7 @@ import { ProfitCalculator } from '@/components/sellercloud/ProfitCalculator';
 import { MarketplaceOAuth } from '@/components/sellercloud/MarketplaceOAuth';
 import { InventorySync } from '@/components/sellercloud/InventorySync';
 import { PriceManager } from '@/components/sellercloud/PriceManager';
-import { MultiPublish } from '@/components/sellercloud/MultiPublish';
+
 import { ReportsExport } from '@/components/sellercloud/ReportsExport';
 import { NotificationCenter } from '@/components/sellercloud/NotificationCenter';
 import { SubscriptionBilling } from '@/components/sellercloud/SubscriptionBilling';
@@ -189,7 +189,7 @@ export default function SellerCloudMobile() {
       case 'pricing':
         return <div className="p-4"><PriceManager connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'publish':
-        return <div className="p-4"><MultiPublish connectedMarketplaces={connectedMarketplaces} /></div>;
+        return <div className="p-4 text-center text-muted-foreground">Bu funksiya olib tashlandi</div>;
       case 'reports':
         return <div className="p-4"><ReportsExport connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'notifications':
