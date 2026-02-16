@@ -19,9 +19,8 @@ interface ParsedMxikRecord {
   vat_rate?: number;
 }
 
-// Normalize column headers for flexible matching
 function normalizeColumnName(name: string): string {
-  return name
+  return String(name || '')
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -30,23 +29,36 @@ function normalizeColumnName(name: string): string {
 }
 
 function findColumnIndex(headers: string[], possibleNames: string[]): number {
-  const normalizedHeaders = headers.map(h => h ? normalizeColumnName(String(h)) : '');
+  const normalizedHeaders = headers.map(h => normalizeColumnName(h));
   const normalizedNames = possibleNames.map(normalizeColumnName);
 
-  // Exact match
   for (const name of normalizedNames) {
     const idx = normalizedHeaders.indexOf(name);
     if (idx !== -1) return idx;
   }
-  // Starts with
   for (const name of normalizedNames) {
     const idx = normalizedHeaders.findIndex(h => h.startsWith(name));
     if (idx !== -1) return idx;
   }
-  // Contains
   for (const name of normalizedNames) {
     const idx = normalizedHeaders.findIndex(h => h.includes(name));
     if (idx !== -1) return idx;
+  }
+  return -1;
+}
+
+// Detect column by scanning data rows for patterns
+function findColumnByContent(rows: any[][], startRow: number, test: (val: string) => boolean): number {
+  const samplesToCheck = Math.min(10, rows.length - startRow);
+  for (let col = 0; col < (rows[startRow]?.length || 0); col++) {
+    let matches = 0;
+    for (let r = startRow; r < startRow + samplesToCheck; r++) {
+      if (!rows[r]) continue;
+      const val = String(rows[r][col] || '').trim();
+      if (val && test(val)) matches++;
+    }
+    // If at least 50% of sampled rows match, this is likely our column
+    if (matches >= Math.max(1, samplesToCheck * 0.3)) return col;
   }
   return -1;
 }
@@ -56,86 +68,153 @@ export function MxikImport() {
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<{ inserted: number; errors: number; total: number } | null>(null);
   const [parsedCount, setParsedCount] = useState(0);
+  const [debugInfo, setDebugInfo] = useState<string>('');
   const fileRef = useRef<HTMLInputElement>(null);
 
   const parseExcelFile = async (file: File): Promise<ParsedMxikRecord[]> => {
     const arrayBuffer = await file.arrayBuffer();
     const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    
+    // Log all sheet names
+    console.log('Sheet names:', workbook.SheetNames);
+    
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
     const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
 
+    console.log(`Total rows: ${rows.length}`);
+    console.log('First 3 rows:', JSON.stringify(rows.slice(0, 3)));
+
     if (rows.length < 2) throw new Error('Excel fayl bo\'sh yoki noto\'g\'ri formatda');
 
-    // Find header row (first row with recognizable headers)
-    let headerRowIndex = 0;
+    // Find header row - check first 10 rows
+    let headerRowIndex = -1;
     let headers: string[] = [];
 
-    for (let i = 0; i < Math.min(5, rows.length); i++) {
+    for (let i = 0; i < Math.min(10, rows.length); i++) {
       const row = rows[i].map(cell => String(cell || ''));
-      const hasCode = row.some(c => normalizeColumnName(c).includes('mxik') || normalizeColumnName(c).includes('ikpu') || normalizeColumnName(c).includes('kod'));
-      const hasName = row.some(c => normalizeColumnName(c).includes('nom') || normalizeColumnName(c).includes('name') || normalizeColumnName(c).includes('наименование'));
-      if (hasCode || hasName) {
+      const normalized = row.map(normalizeColumnName);
+      
+      // Check if this row looks like headers (has text, not numbers)
+      const hasTextCells = normalized.filter(c => c.length > 1 && !/^\d+$/.test(c)).length >= 2;
+      const hasCodeHeader = normalized.some(c => 
+        c.includes('mxik') || c.includes('ikpu') || c.includes('kod') || c.includes('code') || c.includes('код')
+      );
+      const hasNameHeader = normalized.some(c => 
+        c.includes('nom') || c.includes('name') || c.includes('наименование') || c.includes('название') || c.includes('tovar')
+      );
+      
+      if (hasCodeHeader || hasNameHeader || (hasTextCells && i === 0)) {
         headerRowIndex = i;
         headers = row;
         break;
       }
     }
 
-    if (headers.length === 0) {
-      // Try first row as headers
-      headers = rows[0].map(cell => String(cell || ''));
+    // Fallback: use first row
+    if (headerRowIndex === -1) {
       headerRowIndex = 0;
+      headers = rows[0].map(cell => String(cell || ''));
     }
 
-    console.log('Headers found:', headers);
+    const debugHeaders = `Headers (row ${headerRowIndex}): ${headers.join(' | ')}`;
+    console.log(debugHeaders);
+    setDebugInfo(debugHeaders);
 
-    // Map columns
-    const codeCol = findColumnIndex(headers, ['mxik kod', 'mxik code', 'kod mxik', 'mxik', 'ikpu', 'code', 'код', 'mxik kodi']);
-    const nameUzCol = findColumnIndex(headers, ['nomi', 'nom', 'name_uz', 'mahsulot nomi', 'наименование на узбекском', 'tovar nomi', 'name']);
-    const nameRuCol = findColumnIndex(headers, ['name_ru', 'наименование', 'название', 'ruscha nomi', 'наименование на русском']);
-    const groupCol = findColumnIndex(headers, ['guruh', 'group', 'группа', 'group_name', 'kategoriya', 'категория']);
-    const vatCol = findColumnIndex(headers, ['qqs', 'vat', 'ндс', 'vat_rate', 'qqs stavka']);
+    // Map columns by header names
+    let codeCol = findColumnIndex(headers, [
+      'mxik kod', 'mxik code', 'kod mxik', 'mxik', 'ikpu', 'code', 'код', 
+      'mxik kodi', 'классификатор', 'ikpu kod', 'ikpu kodi', 'mxik(ikpu)',
+      'mxik (ikpu)', 'mxik/ikpu', 'commodity code'
+    ]);
+    let nameUzCol = findColumnIndex(headers, [
+      'nomi', 'nom', 'name_uz', 'mahsulot nomi', 'tovar nomi', 'name',
+      'наименование на узбекском', 'o\'zbek tilida', 'uzbek nomi', 'описание'
+    ]);
+    let nameRuCol = findColumnIndex(headers, [
+      'name_ru', 'наименование', 'название', 'ruscha nomi', 'наименование на русском',
+      'rus tilida', 'russian name', 'описание на русском'
+    ]);
+    const groupCol = findColumnIndex(headers, [
+      'guruh', 'group', 'группа', 'group_name', 'kategoriya', 'категория', 'sinf', 'класс'
+    ]);
+    const vatCol = findColumnIndex(headers, [
+      'qqs', 'vat', 'ндс', 'vat_rate', 'qqs stavka', 'soliq', 'налог'
+    ]);
 
     console.log(`Column mapping: code=${codeCol}, nameUz=${nameUzCol}, nameRu=${nameRuCol}, group=${groupCol}, vat=${vatCol}`);
 
-    // If no code column found, try to detect by content (17-digit numbers)
-    let effectiveCodeCol = codeCol;
-    if (effectiveCodeCol === -1) {
-      for (let col = 0; col < (rows[headerRowIndex + 1]?.length || 0); col++) {
-        const val = String(rows[headerRowIndex + 1][col] || '');
-        if (/^\d{5,17}$/.test(val.trim())) {
-          effectiveCodeCol = col;
-          console.log(`Detected code column by content at index ${col}`);
-          break;
+    const dataStartRow = headerRowIndex + 1;
+
+    // Content-based detection for MXIK code column (numbers 5-17 digits)
+    if (codeCol === -1) {
+      codeCol = findColumnByContent(rows, dataStartRow, (val) => {
+        const cleaned = val.replace(/\s/g, '');
+        return /^\d{5,17}$/.test(cleaned);
+      });
+      if (codeCol !== -1) console.log(`Auto-detected code column at index ${codeCol} by content`);
+    }
+
+    // Content-based detection for name column (text strings > 3 chars, not pure numbers)
+    if (nameUzCol === -1 && nameRuCol === -1) {
+      // Find columns with text (not numbers, not the code column)
+      for (let col = 0; col < (rows[dataStartRow]?.length || 0); col++) {
+        if (col === codeCol || col === groupCol || col === vatCol) continue;
+        let textCount = 0;
+        const samplesToCheck = Math.min(5, rows.length - dataStartRow);
+        for (let r = dataStartRow; r < dataStartRow + samplesToCheck; r++) {
+          const val = String(rows[r]?.[col] || '').trim();
+          if (val.length > 3 && !/^\d+([.,]\d+)?$/.test(val)) textCount++;
+        }
+        if (textCount >= Math.max(1, samplesToCheck * 0.5)) {
+          if (nameUzCol === -1) {
+            nameUzCol = col;
+            console.log(`Auto-detected name column at index ${col} by content`);
+          } else if (nameRuCol === -1 && col !== nameUzCol) {
+            nameRuCol = col;
+            console.log(`Auto-detected name_ru column at index ${col} by content`);
+            break;
+          }
         }
       }
     }
 
-    if (effectiveCodeCol === -1) {
-      throw new Error('MXIK kod ustuni topilmadi. Excel faylda "MXIK kod" yoki "Kod" ustuni bo\'lishi kerak.');
+    if (codeCol === -1 && nameUzCol === -1) {
+      throw new Error(`Ustunlar topilmadi. Sarlavhalar: ${headers.join(', ')}`);
+    }
+
+    // If we have no code column but have names, we can still import with generated placeholder
+    if (codeCol === -1) {
+      throw new Error(`MXIK kod ustuni topilmadi. Sarlavhalar: ${headers.join(', ')}`);
     }
 
     const records: ParsedMxikRecord[] = [];
 
-    for (let i = headerRowIndex + 1; i < rows.length; i++) {
+    for (let i = dataStartRow; i < rows.length; i++) {
       const row = rows[i];
-      const code = String(row[effectiveCodeCol] || '').trim();
+      if (!row || row.length === 0) continue;
 
-      if (!code || code.length < 5) continue;
-
+      // Get code - handle both string and number formats
+      let code = String(row[codeCol] || '').trim().replace(/\s/g, '');
+      
+      // Skip empty or non-numeric codes
+      if (!code || !/^\d+$/.test(code)) continue;
+      
       // Pad code to 17 digits if needed
-      const paddedCode = code.length < 17 ? code.padEnd(17, '0') : code;
+      if (code.length < 17) code = code.padEnd(17, '0');
+      // Truncate if too long
+      if (code.length > 17) code = code.substring(0, 17);
 
       const nameUz = nameUzCol >= 0 ? String(row[nameUzCol] || '').trim() : '';
       const nameRu = nameRuCol >= 0 ? String(row[nameRuCol] || '').trim() : '';
       const group = groupCol >= 0 ? String(row[groupCol] || '').trim() : '';
       const vat = vatCol >= 0 ? parseFloat(String(row[vatCol] || '12')) : 12;
 
+      // Must have at least a name
       if (!nameUz && !nameRu) continue;
 
       records.push({
-        code: paddedCode,
+        code,
         name_uz: nameUz || nameRu || code,
         name_ru: nameRu || undefined,
         group_name: group || undefined,
@@ -153,22 +232,22 @@ export function MxikImport() {
     setIsLoading(true);
     setProgress(10);
     setResult(null);
+    setDebugInfo('');
 
     try {
-      // Parse Excel
       toast.info('Excel fayl o\'qilmoqda...');
       const records = await parseExcelFile(file);
       setParsedCount(records.length);
       setProgress(40);
 
       if (records.length === 0) {
-        toast.error('Excel fayldan MXIK kodlar topilmadi');
+        toast.error('Excel fayldan MXIK kodlar topilmadi. Konsolda batafsil ma\'lumot.');
+        setIsLoading(false);
         return;
       }
 
       toast.info(`${records.length} ta MXIK kod topildi, bazaga yuklanmoqda...`);
 
-      // Send to edge function in batches
       const batchSize = 2000;
       let totalInserted = 0;
       let totalErrors = 0;
@@ -178,7 +257,7 @@ export function MxikImport() {
         const { data, error } = await supabase.functions.invoke('import-mxik-codes', {
           body: {
             records: batch,
-            clearExisting: i === 0, // Only clear on first batch
+            clearExisting: i === 0,
           },
         });
 
@@ -195,10 +274,16 @@ export function MxikImport() {
 
       setProgress(100);
       setResult({ inserted: totalInserted, errors: totalErrors, total: records.length });
-      toast.success(`${totalInserted} ta MXIK kod muvaffaqiyatli yuklandi!`);
+      
+      if (totalInserted > 0) {
+        toast.success(`${totalInserted} ta MXIK kod muvaffaqiyatli yuklandi!`);
+      } else {
+        toast.error('Hech qanday kod yuklanmadi. Xatolarni tekshiring.');
+      }
     } catch (error: any) {
       console.error('Import error:', error);
       toast.error(error.message || 'Import xatosi');
+      setDebugInfo(prev => prev + '\n' + (error.message || ''));
     } finally {
       setIsLoading(false);
       if (fileRef.current) fileRef.current.value = '';
@@ -249,6 +334,12 @@ export function MxikImport() {
                progress < 95 ? `Bazaga yuklanmoqda... (${parsedCount} ta kod)` :
                'Yakunlanmoqda...'}
             </p>
+          </div>
+        )}
+
+        {debugInfo && (
+          <div className="rounded-md bg-muted p-3 text-xs font-mono break-all text-muted-foreground">
+            {debugInfo}
           </div>
         )}
 
