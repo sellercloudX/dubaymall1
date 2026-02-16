@@ -20,116 +20,150 @@ interface InfographicRequest {
 function getInfographicPrompts(productName: string, category: string): string[] {
   const cat = (category || "").toLowerCase();
 
-  // Category-specific background descriptions
-  let bgStyle = "clean white gradient";
-  let accent = "soft blue";
-  let mood = "professional and trustworthy";
+  // Category-specific professional configurations
+  let bgStyle = "clean white-to-light-gray gradient studio";
+  let accent = "soft neutral";
+  let mood = "professional marketplace listing, clean and trustworthy";
+  let extraInstruction = "";
 
-  if (cat.includes("kosmetik") || cat.includes("beauty") || cat.includes("go'zallik") || cat.includes("parfum")) {
-    bgStyle = "soft pink-to-cream gradient with subtle golden sparkle particles";
-    accent = "rose gold";
-    mood = "luxurious and feminine";
-  } else if (cat.includes("elektron") || cat.includes("phone") || cat.includes("smartfon") || cat.includes("kompyuter") || cat.includes("audio")) {
-    bgStyle = "sleek dark charcoal-to-black gradient with subtle blue tech glow";
-    accent = "electric blue neon";
-    mood = "premium tech and futuristic";
-  } else if (cat.includes("kiyim") || cat.includes("fashion") || cat.includes("poyabzal")) {
-    bgStyle = "clean off-white to warm beige gradient";
-    accent = "warm gold";
-    mood = "elegant fashion editorial";
-  } else if (cat.includes("sport") || cat.includes("fitness")) {
-    bgStyle = "dynamic dark gradient with energetic orange-red accent streaks";
-    accent = "fiery orange";
-    mood = "powerful and dynamic";
-  } else if (cat.includes("bolalar") || cat.includes("kids") || cat.includes("baby") || cat.includes("toy")) {
-    bgStyle = "cheerful soft pastel rainbow gradient";
-    accent = "bright cheerful";
-    mood = "safe, playful, parent-friendly";
-  } else if (cat.includes("oziq") || cat.includes("food") || cat.includes("ovqat")) {
-    bgStyle = "warm appetizing gradient with subtle wooden texture";
-    accent = "warm amber";
-    mood = "fresh and appetizing";
-  } else if (cat.includes("uy") || cat.includes("maishiy") || cat.includes("texnika") || cat.includes("appliance")) {
-    bgStyle = "clean bright white studio with warm ambient glow";
-    accent = "clean silver";
-    mood = "reliable and professional";
+  if (cat.includes("kosmetik") || cat.includes("beauty") || cat.includes("go'zallik") || cat.includes("parfum") || cat.includes("cream") || cat.includes("makeup")) {
+    bgStyle = "luxurious rose-gold to champagne gradient with subtle golden bokeh particles floating in background, marble surface beneath";
+    accent = "rose gold metallic shimmer, warm golden rim light";
+    mood = "Sephora/Charlotte Tilbury luxury beauty campaign, editorial cosmetics photography";
+    extraInstruction = "Show texture/shimmer of the product packaging. Emphasize premium brand feel.";
+  } else if (cat.includes("elektron") || cat.includes("phone") || cat.includes("smartfon") || cat.includes("kompyuter") || cat.includes("audio") || cat.includes("tech") || cat.includes("gadget")) {
+    bgStyle = "ultra-sleek dark gradient (#080810 to #1a1a2e) with subtle electric blue ambient light rays, polished reflective dark surface";
+    accent = "electric blue neon edge glow, holographic prismatic light leak";
+    mood = "Apple/Samsung flagship product launch, cutting-edge premium tech showcase";
+    extraInstruction = "Show reflections on the surface. Make the device look futuristic and desirable.";
+  } else if (cat.includes("kiyim") || cat.includes("fashion") || cat.includes("poyabzal") || cat.includes("shoes") || cat.includes("sumka") || cat.includes("bag")) {
+    bgStyle = "warm off-white to cream gradient with subtle linen texture overlay, natural diffused window lighting";
+    accent = "warm gold accent lines, editorial fashion composition";
+    mood = "ZARA/COS catalog photography, minimalist Scandinavian fashion editorial";
+    extraInstruction = "Show fabric texture and stitching quality. Use natural light feel.";
+  } else if (cat.includes("sport") || cat.includes("fitness") || cat.includes("velosiped")) {
+    bgStyle = "high-contrast dark gradient with dynamic orange-to-red energy streaks and motion blur accents";
+    accent = "fiery orange rim lighting with speed-line energy effects";
+    mood = "Nike/Adidas performance campaign, explosive dynamic energy";
+    extraInstruction = "Add sense of motion and energy. Product should feel powerful.";
+  } else if (cat.includes("bolalar") || cat.includes("kids") || cat.includes("baby") || cat.includes("toy") || cat.includes("o'yinchoq")) {
+    bgStyle = "cheerful soft pastel gradient (light sky blue to mint to soft yellow) with playful confetti dots and star shapes";
+    accent = "bright cheerful primary colors, playful rounded shapes";
+    mood = "premium children's brand like Mothercare/LEGO, safe and joyful";
+    extraInstruction = "Make it feel safe, bright, and fun. Parents should feel confident about quality.";
+  } else if (cat.includes("oziq") || cat.includes("food") || cat.includes("ovqat") || cat.includes("drink") || cat.includes("ichimlik")) {
+    bgStyle = "warm appetizing gradient with rustic wooden board surface, fresh herbs/ingredients scattered artfully";
+    accent = "warm amber glow, steam/freshness visual cues";
+    mood = "premium food photography, restaurant-quality presentation, appetizing";
+    extraInstruction = "Make the food/drink look fresh, appetizing, and premium. Add freshness cues.";
+  } else if (cat.includes("uy") || cat.includes("maishiy") || cat.includes("texnika") || cat.includes("appliance") || cat.includes("mebel")) {
+    bgStyle = "clean bright Scandinavian interior-inspired gradient, warm white with subtle wood accents";
+    accent = "clean metallic silver/chrome highlights, warm ambient glow";
+    mood = "IKEA/Dyson product showcase, reliable and modern home design";
+    extraInstruction = "Show the product in a modern home context. Emphasize sleek design.";
+  } else if (cat.includes("avtomobil") || cat.includes("car") || cat.includes("motor")) {
+    bgStyle = "dark carbon fiber textured gradient with metallic blue accent lighting";
+    accent = "chrome metallic highlights, automotive grade finish";
+    mood = "premium automotive accessories catalog, performance and reliability";
+    extraInstruction = "Emphasize durability and precision engineering.";
   }
 
   return [
-    // 1. Hero shot — asosiy rasm
-    `Edit this product photo into a HERO marketplace listing image:
+    // 1. Hero shot — main marketplace listing image
+    `You are a world-class product photographer creating PREMIUM MARKETPLACE LISTING images.
+Edit this product photo:
 - Background: ${bgStyle}
-- Product centered, fills 75% of frame
-- Professional three-point studio lighting
-- Subtle shadow beneath for grounding
+- Product perfectly centered, fills 70-80% of frame
+- Professional three-point studio lighting (key, fill, rim)
+- Subtle realistic shadow and reflection beneath for grounding
 - ${mood} atmosphere
-- KEEP product EXACTLY identical
+- ${accent}
+- ${extraInstruction}
+- CRITICAL: Keep the product 100% IDENTICAL — same brand, color, shape, every detail unchanged
+- NO text, NO watermarks, NO labels, NO badges overlaid on the image
 Product: "${productName}"
-Output: Premium marketplace hero shot, 3:4 ratio`,
+Output: Premium hero marketplace listing image, 3:4 aspect ratio, ultra-sharp 4K quality`,
 
     // 2. Lifestyle/mood shot
-    `Edit this product photo into a LIFESTYLE marketplace image:
-- Background: ${bgStyle} with subtle lifestyle elements (soft bokeh, ambient glow)
-- Product slightly angled at 15 degrees for dynamic feel
-- Warm inviting lighting that creates emotional connection
-- ${accent} accent highlights
-- KEEP product EXACTLY identical
+    `You are a luxury brand photographer creating LIFESTYLE MARKETPLACE images.
+Edit this product photo:
+- Background: ${bgStyle} with subtle lifestyle context (soft bokeh, ambient glow, aspirational elements)
+- Product at slight 10-15 degree angle for dynamic dimensional feel
+- Warm cinematic lighting creating emotional desire and connection
+- ${accent}
+- ${extraInstruction}
+- CRITICAL: Product must be 100% IDENTICAL to the original — same brand, color, shape
+- NO text, NO watermarks, NO overlays
 Product: "${productName}"
-Output: Lifestyle mood shot that creates desire to purchase`,
+Output: Aspirational lifestyle shot that creates immediate desire to purchase`,
 
-    // 3. Detail/texture focus
-    `Edit this product photo to emphasize DETAILS and QUALITY:
+    // 3. Detail/texture close-up
+    `You are a luxury brand macro photographer showing PREMIUM QUALITY and CRAFTSMANSHIP.
+Edit this product photo to emphasize fine details:
 - Background: ${bgStyle}
-- Bright, even lighting to show every detail clearly
-- Enhanced texture visibility — material quality must be obvious
-- Slight close-up crop, product fills 85% of frame
-- Professional macro-style product photography
-- KEEP product EXACTLY identical
+- Bright, even studio lighting revealing every texture and material quality
+- Slight close-up crop, product fills 85-90% of frame
+- Enhanced texture visibility — material quality, stitching, finish must be crystal clear
+- ${accent}
+- ${extraInstruction}
+- CRITICAL: Product must be 100% IDENTICAL — same brand, color, shape
+- NO text, NO watermarks, NO overlays
 Product: "${productName}"
-Output: Detail shot showing premium quality and craftsmanship`,
+Output: Detail quality shot showing premium craftsmanship, macro studio photography`,
 
-    // 4. Premium angle shot
-    `Edit this product photo into a PREMIUM angle marketplace image:
+    // 4. Premium 3D angle
+    `You are an award-winning product photographer creating PREMIUM ANGLE SHOWCASE images.
+Edit this product photo:
 - Background: ${bgStyle}
-- Three-quarter angle perspective for 3D depth
-- Dramatic rim lighting creating premium silhouette edge
-- Sophisticated composition with artistic negative space
-- ${accent} subtle light accents
-- KEEP product EXACTLY identical
+- Three-quarter angle perspective showing beautiful 3D depth and volume
+- Dramatic rim lighting creating stunning silhouette edge highlight
+- Sophisticated composition with strategic negative space
+- ${accent}
+- ${extraInstruction}
+- CRITICAL: Product must be 100% IDENTICAL — same brand, color, shape
+- NO text, NO watermarks, NO overlays
 Product: "${productName}"
-Output: Premium perspective shot, luxury catalog quality`,
+Output: Premium perspective shot, luxury catalog quality with cinematic depth`,
 
-    // 5. Clean catalog shot
-    `Edit this product photo into a CLEAN CATALOG image:
-- Background: pure white (#FFFFFF) studio background
-- Even, shadowless lighting (product photography lightbox style)
-- Perfect color accuracy — what you see is what you get
-- Product centered with symmetrical composition
-- Razor-sharp focus on entire product
-- KEEP product EXACTLY identical
+    // 5. Clean white catalog (marketplace technical requirement)
+    `You are a professional e-commerce photographer creating CLEAN CATALOG images.
+Edit this product photo:
+- Background: pure white (#FFFFFF) studio background, no shadows, no gradients
+- Even, diffused lightbox-style lighting for perfect color accuracy
+- Product perfectly centered with symmetrical composition
+- Razor-sharp focus on entire product, what-you-see-is-what-you-get accuracy
+- CRITICAL: Product must be 100% IDENTICAL — same brand, color, shape
+- NO text, NO watermarks, NO overlays, NO artistic effects
 Product: "${productName}"
-Output: Clean catalog image for marketplace technical requirement`,
+Output: Clean white-background catalog image meeting marketplace technical requirements`,
 
-    // 6. Dramatic/cinematic shot
-    `Edit this product photo into a DRAMATIC marketplace image:
-- Background: ${bgStyle} with dramatic lighting contrast
-- Cinematic lighting — strong key light, deep shadows for drama
-- ${accent} rim light creating stunning edge highlight
-- Product looks premium, desirable, must-have
-- Slight vignette effect for focus
-- KEEP product EXACTLY identical
+    // 6. Cinematic dramatic hero
+    `You are a cinematic advertising photographer creating SCROLL-STOPPING marketplace hero images.
+Edit this product photo:
+- Background: ${bgStyle} with dramatic cinematic lighting contrast
+- Strong key light with deep artistic shadows for drama and impact
+- ${accent} creating stunning edge highlight and volumetric glow
+- Product looks premium, desirable, must-have — scroll-stopping impact
+- Subtle cinematic vignette for focus
+- ${extraInstruction}
+- CRITICAL: Product must be 100% IDENTICAL — same brand, color, shape
+- NO text, NO watermarks, NO overlays
 Product: "${productName}"
-Output: Cinematic hero image that stops scrolling and drives sales`,
+Output: Cinematic hero image that stops scrolling and drives immediate purchase, advertising-quality`,
   ];
 }
 
-// ==================== LOVABLE AI — PRIMARY ====================
+// ==================== LOVABLE AI — PRIMARY (High Quality) ====================
 async function generateWithLovableAI(
   productImage: string,
-  prompt: string
+  prompt: string,
+  useHighQuality: boolean = true
 ): Promise<string | null> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!LOVABLE_API_KEY) return null;
+
+  // Use Pro model for high quality, Flash for speed
+  const model = useHighQuality ? "google/gemini-3-pro-image-preview" : "google/gemini-2.5-flash-image";
 
   try {
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -139,7 +173,7 @@ async function generateWithLovableAI(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image",
+        model,
         messages: [{
           role: "user",
           content: [
@@ -153,16 +187,22 @@ async function generateWithLovableAI(
 
     if (!res.ok) {
       const errText = await res.text();
-      console.error(`Lovable AI error: ${res.status} ${errText.substring(0, 200)}`);
-      if (res.status === 429) return null; // rate limited
-      if (res.status === 402) return null; // credits exhausted
+      console.error(`Lovable AI error (${model}): ${res.status} ${errText.substring(0, 200)}`);
+      if (res.status === 429 || res.status === 402) {
+        // Rate limited or credits exhausted — try fallback model
+        if (useHighQuality) {
+          console.log("⚠️ Pro model unavailable, falling back to Flash...");
+          return generateWithLovableAI(productImage, prompt, false);
+        }
+        return null;
+      }
       return null;
     }
 
     const data = await res.json();
     const img = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
     if (img) {
-      console.log("✅ Lovable AI infographic generated");
+      console.log(`✅ Infographic generated with ${model}`);
       return img;
     }
     return null;

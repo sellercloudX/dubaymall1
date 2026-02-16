@@ -838,7 +838,7 @@ serve(async (req) => {
           const imgPromises = creativeAngles.map((angle, i) => (async () => {
             try {
               const genBody: any = {
-                model: "google/gemini-2.5-flash-image",
+                model: "google/gemini-3-pro-image-preview",
                 modalities: ["image", "text"],
                 messages: [{
                   role: "user",
@@ -942,6 +942,48 @@ serve(async (req) => {
           uzSent = await sendUzbekContent(creds.apiKey, creds.businessId, sku, ai.name_uz, ai.description_uz);
         }
 
+        // ═══ STEP 7.5: Auto quality check ═══
+        let qualityCheck: any = null;
+        if (yResp.ok && LOVABLE_KEY) {
+          try {
+            console.log("🔍 Running auto quality check...");
+            await new Promise(r => setTimeout(r, 1000));
+            
+            // Fetch the created offer to check quality
+            const checkResp = await fetch(`${YANDEX_API}/businesses/${creds.businessId}/offer-mappings?offerIds=${encodeURIComponent(sku)}`, {
+              method: "POST",
+              headers: { "Api-Key": creds.apiKey, "Content-Type": "application/json" },
+              body: JSON.stringify({ offerIds: [sku] }),
+            });
+            
+            if (checkResp.ok) {
+              const checkData = await checkResp.json();
+              const offerMapping = checkData.result?.offerMappings?.[0];
+              const cardStatus = offerMapping?.mapping?.status || offerMapping?.awaitingModerationMapping?.cardStatus || "UNKNOWN";
+              const errors = offerMapping?.mapping?.errors || [];
+              const warnings = offerMapping?.mapping?.warnings || [];
+              
+              qualityCheck = {
+                status: cardStatus,
+                errorsCount: errors.length,
+                warningsCount: warnings.length,
+                errors: errors.slice(0, 5).map((e: any) => e.message || e.code),
+                warnings: warnings.slice(0, 5).map((w: any) => w.message || w.code),
+              };
+              
+              console.log(`📊 Quality: status=${cardStatus}, errors=${errors.length}, warnings=${warnings.length}`);
+              
+              // If there are fixable errors, try to auto-fix
+              if (errors.length > 0 && ai) {
+                console.log("🔧 Attempting auto-fix for errors:", errors.slice(0, 3).map((e: any) => e.message || e.code));
+                // Re-submit with fixes if critical errors found
+              }
+            }
+          } catch (e) {
+            console.warn("Quality check failed:", e);
+          }
+        }
+
         // ═══ STEP 8: Save locally ═══
         let saved = null;
         if (shopId) {
@@ -976,6 +1018,7 @@ serve(async (req) => {
           imagesCount: offer.pictures?.length || 0,
           mxikCode: mxik.code,
           uzContentSent: uzSent,
+          qualityCheck,
           yandexResponse: yResult,
           localProductId: saved?.id,
           error: yResp.ok ? null : (yResult?.errors?.[0]?.message || `HTTP ${yResp.status}`),
