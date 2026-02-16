@@ -129,12 +129,18 @@ export function CardQualityAudit({ connectedMarketplaces, store }: CardQualityAu
       if (error) throw error;
       if (!data.success) throw new Error(data.error);
 
+      const msg = data.data.message || 'Tuzatildi ✅';
+      const details = data.data.details || '';
       setFixResults(prev => new Map(prev).set(offerId, {
-        offerId, status: 'success',
-        message: data.data.message || 'Tuzatildi ✅',
+        offerId, status: data.data.success === false ? 'error' : 'success',
+        message: details ? `${msg}\n${details}` : msg,
         fixes: data.data.fixes,
       }));
-      toast.success(`${offerId} kartochkasi tuzatildi`);
+      if (data.data.success !== false) {
+        toast.success(`${offerId} kartochkasi tuzatildi`);
+      } else {
+        toast.warning(`${offerId}: qisman tuzatildi`);
+      }
     } catch (e: any) {
       setFixResults(prev => new Map(prev).set(offerId, {
         offerId, status: 'error',
@@ -447,7 +453,7 @@ export function CardQualityAudit({ connectedMarketplaces, store }: CardQualityAu
 
                         {/* Fix result message */}
                         {fixResult?.message && (
-                          <div className={`mt-2 p-2 rounded text-xs ${
+                          <div className={`mt-2 p-2 rounded text-xs whitespace-pre-line ${
                             fixResult.status === 'success' ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400' :
                             fixResult.status === 'error' ? 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400' : ''
                           }`}>

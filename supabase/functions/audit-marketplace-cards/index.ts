@@ -10,25 +10,34 @@ const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3): Promise<Response> {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
-    const response = await fetch(url, options);
-    if (response.status === 420 || response.status === 429) {
-      await sleep(Math.min(1000 * Math.pow(2, attempt), 5000));
-      continue;
+    try {
+      const response = await fetch(url, options);
+      if (response.status === 420 || response.status === 429) {
+        const wait = Math.min(1000 * Math.pow(2, attempt), 8000);
+        console.log(`Rate limited (${response.status}), waiting ${wait}ms...`);
+        await sleep(wait);
+        continue;
+      }
+      return response;
+    } catch (e) {
+      if (attempt < maxRetries - 1) {
+        await sleep(1000 * (attempt + 1));
+        continue;
+      }
+      throw e;
     }
-    return response;
   }
   return fetch(url, options);
 }
 
-// ============ YANDEX QUALITY AUDIT ============
-
+// ===== TYPES =====
 interface QualityIssue {
   offerId: string;
   productName: string;
   marketplace: string;
   qualityScore: number;
   issues: Array<{
-    type: string; // missing_param, bad_description, no_images, low_quality_image, missing_barcode, etc.
+    type: string;
     severity: 'error' | 'warning' | 'info';
     field: string;
     message: string;
@@ -38,431 +47,579 @@ interface QualityIssue {
   fixable: boolean;
   category?: string;
   categoryId?: number;
+  currentData?: Record<string, any>;
 }
 
-async function auditYandexCards(
-  credentials: any,
-  offerIds?: string[] // if empty, audit all
-): Promise<QualityIssue[]> {
+// ===== GET BUSINESS ID =====
+async function getBusinessId(credentials: any): Promise<{ apiKey: string; businessId: string; campaignId: string }> {
   const apiKey = credentials.apiKey || credentials.api_key;
   const campaignId = credentials.campaignId || credentials.campaign_id;
-  const businessId = credentials.businessId || credentials.business_id;
+  let businessId = credentials.businessId || credentials.business_id;
 
-  if (!apiKey || !campaignId) throw new Error("Missing Yandex API credentials");
+  if (!apiKey) throw new Error("Yandex API key topilmadi");
 
-  const headers: Record<string, string> = {
-    "Api-Key": apiKey,
-    "Content-Type": "application/json",
-  };
+  const headers = { "Api-Key": apiKey, "Content-Type": "application/json" };
 
-  // Get businessId if not provided
-  let effectiveBusinessId = businessId;
-  if (!effectiveBusinessId) {
-    try {
-      const resp = await fetchWithRetry(
-        `https://api.partner.market.yandex.ru/campaigns/${campaignId}`,
-        { headers }
-      );
-      if (resp.ok) {
-        const data = await resp.json();
-        effectiveBusinessId = data.campaign?.business?.id;
-      }
-    } catch (e) { console.error("Error getting businessId:", e); }
+  if (!businessId && campaignId) {
+    const resp = await fetchWithRetry(
+      `https://api.partner.market.yandex.ru/campaigns/${campaignId}`,
+      { headers }
+    );
+    if (resp.ok) {
+      const data = await resp.json();
+      businessId = data.campaign?.business?.id;
+      console.log(`Resolved businessId: ${businessId} from campaignId: ${campaignId}`);
+    } else {
+      const errText = await resp.text();
+      console.error(`Failed to get businessId: ${resp.status} ${errText}`);
+    }
   }
 
-  // Step 1: Get quality ratings for offers
-  const qualityIssues: QualityIssue[] = [];
+  if (!businessId) throw new Error("Business ID topilmadi. Kampaniya sozlamalarini tekshiring.");
 
-  // Fetch offer mappings to get full card data
+  return { apiKey, businessId: String(businessId), campaignId: String(campaignId || '') };
+}
+
+// ===== FETCH ALL OFFERS WITH FULL DATA =====
+async function fetchAllOffers(apiKey: string, businessId: string): Promise<any[]> {
+  const headers = { "Api-Key": apiKey, "Content-Type": "application/json" };
   const allOffers: any[] = [];
   let pageToken: string | undefined;
   let page = 0;
 
   do {
-    let apiPath: string;
-    let method = 'POST';
-    let body: any = {};
+    let url = `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-mappings?limit=200`;
+    if (pageToken) url += `&page_token=${encodeURIComponent(pageToken)}`;
 
-    if (effectiveBusinessId) {
-      apiPath = `https://api.partner.market.yandex.ru/v2/businesses/${effectiveBusinessId}/offer-mappings?limit=100`;
-      if (pageToken) apiPath += `&page_token=${encodeURIComponent(pageToken)}`;
-    } else {
-      apiPath = `https://api.partner.market.yandex.ru/campaigns/${campaignId}/offers`;
-      body = { limit: 100 };
-      if (pageToken) body.page_token = pageToken;
+    const resp = await fetchWithRetry(url, { method: 'POST', headers, body: '{}' });
+
+    if (!resp.ok) {
+      const errText = await resp.text();
+      console.error(`Offer mappings error: ${resp.status} ${errText}`);
+      break;
     }
 
-    const resp = await fetchWithRetry(apiPath, {
-      method,
-      headers,
-      body: JSON.stringify(body),
-    });
-
-    if (!resp.ok) break;
     const data = await resp.json();
-
     const mappings = data.result?.offerMappings || [];
-    const offers = data.result?.offers || [];
-    const items = mappings.length > 0 ? mappings : offers;
 
-    items.forEach((entry: any) => {
-      const offer = entry.offer || entry;
+    for (const entry of mappings) {
+      const offer = entry.offer || {};
       const mapping = entry.mapping || {};
-      allOffers.push({ offer, mapping });
-    });
+      allOffers.push({
+        offerId: offer.offerId || '',
+        name: offer.name || '',
+        description: offer.description || '',
+        pictures: offer.pictures || [],
+        barcodes: offer.barcodes || [],
+        vendor: offer.vendor || '',
+        vendorCode: offer.vendorCode || '',
+        category: mapping.marketCategoryName || '',
+        categoryId: mapping.marketCategoryId || 0,
+        cardStatus: mapping.cardStatus || '',
+        params: offer.parameterValues || [],
+        weightDimensions: offer.weightDimensions || null,
+        urls: offer.urls || [],
+        rawOffer: offer,
+      });
+    }
 
     pageToken = data.result?.paging?.nextPageToken;
     page++;
-    if (pageToken) await sleep(500);
-  } while (pageToken && page < 20);
+    if (pageToken) await sleep(400);
+  } while (pageToken && page < 30);
 
-  console.log(`Fetched ${allOffers.length} offers for audit`);
+  console.log(`Fetched ${allOffers.length} offers from Yandex`);
+  return allOffers;
+}
 
-  // Step 2: Try to get quality ratings from Yandex API
-  const qualityMap = new Map<string, any>();
-  if (effectiveBusinessId) {
+// ===== FETCH CARD QUALITY & RECOMMENDATIONS =====
+async function fetchCardQuality(
+  apiKey: string,
+  businessId: string,
+  offerIds: string[]
+): Promise<Map<string, any>> {
+  const headers = { "Api-Key": apiKey, "Content-Type": "application/json" };
+  const cardMap = new Map<string, any>();
+
+  // Process in batches of 200
+  for (let i = 0; i < offerIds.length; i += 200) {
+    const batch = offerIds.slice(i, i + 200);
+
     try {
-      await sleep(300);
-      const qualityResp = await fetchWithRetry(
-        `https://api.partner.market.yandex.ru/businesses/${effectiveBusinessId}/offer-cards`,
+      const resp = await fetchWithRetry(
+        `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-cards`,
         {
           method: 'POST',
           headers,
           body: JSON.stringify({
-            offerIds: offerIds && offerIds.length > 0
-              ? offerIds
-              : allOffers.slice(0, 200).map((o: any) => o.offer.offerId).filter(Boolean),
-            cardStatuses: ["HAS_CARD_CAN_NOT_BE_IMPROVED", "HAS_CARD_CAN_BE_IMPROVED", "NO_CARD_NEED_CONTENT"],
+            offerIds: batch,
+            // CRITICAL: this flag enables recommendations and content rating
+            withRecommendations: true,
           }),
         }
       );
-      if (qualityResp.ok) {
-        const qualityData = await qualityResp.json();
-        const cards = qualityData.result?.offerCards || [];
-        cards.forEach((card: any) => {
-          qualityMap.set(card.offerId, card);
-        });
-        console.log(`Got quality data for ${qualityMap.size} cards`);
-      }
-    } catch (e) {
-      console.error("Error fetching quality ratings:", e);
-    }
-  }
 
-  // Step 3: Get recommendations from Yandex for each card
-  const recommendationsMap = new Map<string, any[]>();
-  if (effectiveBusinessId) {
-    try {
-      await sleep(300);
-      const recResp = await fetchWithRetry(
-        `https://api.partner.market.yandex.ru/businesses/${effectiveBusinessId}/offer-cards`,
-        {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            offerIds: offerIds && offerIds.length > 0
-              ? offerIds
-              : allOffers.slice(0, 200).map((o: any) => o.offer.offerId).filter(Boolean),
-          }),
+      if (resp.ok) {
+        const data = await resp.json();
+        const cards = data.result?.offerCards || [];
+        console.log(`Batch ${i}: got ${cards.length} cards with quality data`);
+
+        for (const card of cards) {
+          cardMap.set(card.offerId, {
+            contentRating: card.contentRating || null,
+            averageContentRating: card.averageContentRating || null,
+            recommendations: card.recommendations || card.cardRecommendations || [],
+            cardStatus: card.cardStatus || '',
+            errors: card.errors || [],
+            warnings: card.warnings || [],
+            parameterValues: card.parameterValues || [],
+          });
         }
-      );
-      if (recResp.ok) {
-        const recData = await recResp.json();
-        const cards = recData.result?.offerCards || [];
-        cards.forEach((card: any) => {
-          const recs = card.cardRecommendations || card.recommendations || [];
-          if (recs.length > 0) recommendationsMap.set(card.offerId, recs);
-          // Also get content rating
-          if (card.contentRating) {
-            const existing = qualityMap.get(card.offerId) || {};
-            qualityMap.set(card.offerId, { ...existing, contentRating: card.contentRating });
-          }
-        });
-        console.log(`Got recommendations for ${recommendationsMap.size} cards`);
+      } else {
+        const errText = await resp.text();
+        console.error(`Card quality API error: ${resp.status} ${errText}`);
       }
     } catch (e) {
-      console.error("Error fetching recommendations:", e);
+      console.error(`Card quality fetch error:`, e);
     }
+
+    if (i + 200 < offerIds.length) await sleep(500);
   }
 
-  // Step 4: Analyze each offer for quality issues
-  for (const { offer, mapping } of allOffers) {
-    const offerId = offer.offerId || '';
-    if (!offerId) continue;
-    if (offerIds && offerIds.length > 0 && !offerIds.includes(offerId)) continue;
+  console.log(`Total card quality data: ${cardMap.size} cards`);
+  return cardMap;
+}
 
+// ===== ANALYZE OFFERS =====
+function analyzeOffers(
+  offers: any[],
+  cardQualityMap: Map<string, any>,
+  filterOfferIds?: string[]
+): QualityIssue[] {
+  const results: QualityIssue[] = [];
+
+  for (const offer of offers) {
+    if (!offer.offerId) continue;
+    if (filterOfferIds?.length && !filterOfferIds.includes(offer.offerId)) continue;
+
+    const quality = cardQualityMap.get(offer.offerId);
     const issues: QualityIssue['issues'] = [];
-    const name = offer.name || mapping.marketSkuName || '';
-    const description = offer.description || '';
-    const pictures = offer.pictures || offer.urls || [];
-    const barcode = offer.barcodes?.[0] || '';
-    const category = mapping.marketCategoryName || offer.category?.name || '';
-    const categoryId = mapping.marketCategoryId || offer.marketCategoryId || 0;
-    const qualityCard = qualityMap.get(offerId);
-    const recommendations = recommendationsMap.get(offerId) || [];
 
-    // Content rating score
-    let qualityScore = 0;
-    if (qualityCard?.contentRating?.rating) {
-      qualityScore = qualityCard.contentRating.rating;
-    } else if (qualityCard?.cardStatus === 'HAS_CARD_CAN_NOT_BE_IMPROVED') {
+    // === Quality score ===
+    let qualityScore = 50;
+    if (quality?.contentRating?.rating != null) {
+      qualityScore = quality.contentRating.rating;
+    } else if (quality?.averageContentRating != null) {
+      qualityScore = quality.averageContentRating;
+    } else if (quality?.cardStatus === 'HAS_CARD_CAN_NOT_BE_IMPROVED') {
       qualityScore = 100;
-    } else if (qualityCard?.cardStatus === 'HAS_CARD_CAN_BE_IMPROVED') {
-      qualityScore = 70;
-    } else if (qualityCard?.cardStatus === 'NO_CARD_NEED_CONTENT') {
-      qualityScore = 30;
-    } else {
-      qualityScore = 50; // Unknown
+    } else if (quality?.cardStatus === 'HAS_CARD_CAN_BE_IMPROVED') {
+      qualityScore = 65;
+    } else if (quality?.cardStatus === 'NO_CARD_NEED_CONTENT') {
+      qualityScore = 25;
     }
 
-    // Check missing/short name
-    if (!name || name.length < 10) {
-      issues.push({ type: 'missing_param', severity: 'error', field: 'name',
-        message: 'Mahsulot nomi juda qisqa yoki yo\'q', currentValue: name || '(bo\'sh)',
-        suggestedFix: 'AI yordamida to\'liq SEO-optimallashtirilgan nom yaratish' });
+    // === Name check ===
+    if (!offer.name || offer.name.trim().length < 5) {
+      issues.push({
+        type: 'missing_content', severity: 'error', field: 'name',
+        message: 'Mahsulot nomi yo\'q yoki juda qisqa',
+        currentValue: offer.name || '(bo\'sh)',
+        suggestedFix: 'AI yordamida to\'liq SEO nom yaratish',
+      });
+    } else if (offer.name.length < 20) {
+      issues.push({
+        type: 'low_quality', severity: 'warning', field: 'name',
+        message: `Nom qisqa (${offer.name.length} belgi), 30+ tavsiya`,
+        currentValue: offer.name,
+        suggestedFix: 'Nomga brend, model, asosiy xususiyat qo\'shish',
+      });
     }
 
-    // Check description
-    if (!description || description.length < 50) {
-      issues.push({ type: 'bad_description', severity: 'error', field: 'description',
-        message: 'Tavsif juda qisqa yoki yo\'q', currentValue: description ? `${description.length} belgi` : '(bo\'sh)',
-        suggestedFix: 'AI yordamida batafsil tavsif yaratish (min 300 belgi)' });
-    } else if (description.length < 200) {
-      issues.push({ type: 'bad_description', severity: 'warning', field: 'description',
-        message: 'Tavsif yetarlicha batafsil emas', currentValue: `${description.length} belgi`,
-        suggestedFix: 'Tavsifni 300+ belgigacha kengaytirish' });
+    // === Description check ===
+    if (!offer.description || offer.description.trim().length < 10) {
+      issues.push({
+        type: 'missing_content', severity: 'error', field: 'description',
+        message: 'Tavsif yo\'q yoki juda qisqa',
+        currentValue: offer.description ? `${offer.description.length} belgi` : '(bo\'sh)',
+        suggestedFix: 'AI yordamida batafsil tavsif yaratish (300+ belgi)',
+      });
+    } else if (offer.description.length < 150) {
+      issues.push({
+        type: 'low_quality', severity: 'warning', field: 'description',
+        message: `Tavsif qisqa (${offer.description.length} belgi)`,
+        currentValue: `${offer.description.length} belgi`,
+        suggestedFix: 'Tavsifni 300+ belgigacha kengaytirish',
+      });
     }
 
-    // Check images
-    if (!pictures || pictures.length === 0) {
-      issues.push({ type: 'no_images', severity: 'error', field: 'pictures',
-        message: 'Rasmlar mavjud emas', currentValue: '0 ta',
-        suggestedFix: 'Mahsulot rasmlari qo\'shish (min 3 ta)' });
-    } else if (pictures.length < 3) {
-      issues.push({ type: 'no_images', severity: 'warning', field: 'pictures',
-        message: `Faqat ${pictures.length} ta rasm (min 3 tavsiya)`,
-        currentValue: `${pictures.length} ta`,
-        suggestedFix: 'Qo\'shimcha burchak va detail rasmlarini qo\'shish' });
+    // === Images check ===
+    const totalImages = (offer.pictures?.length || 0) + (offer.urls?.length || 0);
+    if (totalImages === 0) {
+      issues.push({
+        type: 'missing_content', severity: 'error', field: 'pictures',
+        message: 'Rasmlar mavjud emas',
+        currentValue: '0 ta',
+        suggestedFix: 'Kamida 3 ta sifatli rasm qo\'shish',
+      });
+    } else if (totalImages < 3) {
+      issues.push({
+        type: 'low_quality', severity: 'warning', field: 'pictures',
+        message: `Faqat ${totalImages} ta rasm (3+ tavsiya)`,
+        currentValue: `${totalImages} ta`,
+        suggestedFix: 'Qo\'shimcha rasmlar qo\'shish',
+      });
     }
 
-    // Check barcode
-    if (!barcode) {
-      issues.push({ type: 'missing_barcode', severity: 'warning', field: 'barcode',
-        message: 'Shtrix-kod mavjud emas', currentValue: '(bo\'sh)',
-        suggestedFix: 'EAN-13 shtrix-kod generatsiya qilish' });
+    // === Barcode check ===
+    if (!offer.barcodes || offer.barcodes.length === 0) {
+      issues.push({
+        type: 'missing_content', severity: 'warning', field: 'barcode',
+        message: 'Shtrix-kod mavjud emas',
+        currentValue: '(bo\'sh)',
+        suggestedFix: 'EAN-13 shtrix-kod qo\'shish',
+      });
     }
 
-    // Check category
-    if (!category && categoryId === 0) {
-      issues.push({ type: 'missing_param', severity: 'error', field: 'category',
-        message: 'Kategoriya belgilanmagan', currentValue: '(bo\'sh)',
-        suggestedFix: 'AI yordamida mos kategoriyani aniqlash' });
+    // === Vendor check ===
+    if (!offer.vendor) {
+      issues.push({
+        type: 'missing_content', severity: 'warning', field: 'vendor',
+        message: 'Brend/ishlab chiqaruvchi ko\'rsatilmagan',
+        currentValue: '(bo\'sh)',
+        suggestedFix: 'Brend nomini qo\'shish',
+      });
     }
 
-    // Process Yandex-specific recommendations
-    for (const rec of recommendations) {
-      const paramName = rec.parameterName || rec.parameter || rec.name || '';
-      const recType = rec.type || 'REQUIRED';
-      
-      if (recType === 'REQUIRED' || recType === 'MAIN') {
-        issues.push({ type: 'missing_param', severity: 'error', field: paramName,
-          message: `Majburiy parametr to'ldirilmagan: ${paramName}`,
-          currentValue: '(bo\'sh)',
-          suggestedFix: `AI yordamida "${paramName}" qiymatini aniqlash` });
-      } else if (recType === 'ADDITIONAL' || recType === 'DISTINCTIVE') {
-        issues.push({ type: 'missing_param', severity: 'warning', field: paramName,
-          message: `Qo'shimcha parametr: ${paramName}`,
-          currentValue: '(bo\'sh)',
-          suggestedFix: `"${paramName}" ni to'ldirish sifat indeksini oshiradi` });
+    // === Weight/dimensions ===
+    if (!offer.weightDimensions) {
+      issues.push({
+        type: 'missing_content', severity: 'info', field: 'weightDimensions',
+        message: 'Og\'irlik va o\'lchamlar ko\'rsatilmagan',
+        currentValue: '(bo\'sh)',
+        suggestedFix: 'Og\'irlik (kg), uzunlik, kenglik, balandlik qo\'shish',
+      });
+    }
+
+    // === Yandex API recommendations (CRITICAL - real missing params) ===
+    if (quality?.recommendations) {
+      for (const rec of quality.recommendations) {
+        const paramName = rec.parameterName || rec.parameter || rec.name || 'unknown';
+        const recType = rec.type || 'REQUIRED';
+
+        if (recType === 'REQUIRED' || recType === 'MAIN') {
+          issues.push({
+            type: 'yandex_required', severity: 'error', field: paramName,
+            message: `Majburiy parametr: "${paramName}"`,
+            currentValue: '(to\'ldirilmagan)',
+            suggestedFix: `AI "${paramName}" qiymatini aniqlaydi va to\'ldiradi`,
+          });
+        } else if (recType === 'ADDITIONAL' || recType === 'DISTINCTIVE') {
+          issues.push({
+            type: 'yandex_recommended', severity: 'warning', field: paramName,
+            message: `Tavsiya etiladigan parametr: "${paramName}"`,
+            currentValue: '(to\'ldirilmagan)',
+            suggestedFix: `"${paramName}" sifat indeksini oshiradi`,
+          });
+        }
       }
     }
 
-    // Only add if there are issues or score < 90
-    if (issues.length > 0 || qualityScore < 90) {
-      qualityIssues.push({
-        offerId,
-        productName: name,
+    // === Yandex errors ===
+    if (quality?.errors?.length) {
+      for (const err of quality.errors) {
+        issues.push({
+          type: 'yandex_error', severity: 'error', field: err.parameter || 'unknown',
+          message: err.message || err.description || 'Yandex xatolik',
+          currentValue: err.currentValue || '',
+          suggestedFix: err.recommendation || 'Xatolikni tuzatish kerak',
+        });
+      }
+    }
+
+    // === Yandex warnings ===
+    if (quality?.warnings?.length) {
+      for (const warn of quality.warnings) {
+        issues.push({
+          type: 'yandex_warning', severity: 'warning', field: warn.parameter || 'unknown',
+          message: warn.message || warn.description || 'Yandex ogohlantirish',
+          currentValue: warn.currentValue || '',
+          suggestedFix: warn.recommendation || '',
+        });
+      }
+    }
+
+    // Only include cards with issues or low score
+    if (issues.length > 0 || qualityScore < 85) {
+      results.push({
+        offerId: offer.offerId,
+        productName: offer.name || offer.offerId,
         marketplace: 'yandex',
         qualityScore,
         issues,
         fixable: issues.some(i => i.severity === 'error' || i.severity === 'warning'),
-        category,
-        categoryId,
+        category: offer.category,
+        categoryId: offer.categoryId,
+        currentData: {
+          name: offer.name,
+          description: offer.description,
+          vendor: offer.vendor,
+          vendorCode: offer.vendorCode,
+          barcodes: offer.barcodes,
+          pictures: offer.pictures,
+          params: offer.params,
+          weightDimensions: offer.weightDimensions,
+        },
       });
     }
   }
 
-  // Sort by score ascending (worst first)
-  qualityIssues.sort((a, b) => a.qualityScore - b.qualityScore);
-
-  return qualityIssues;
+  results.sort((a, b) => a.qualityScore - b.qualityScore);
+  return results;
 }
 
-// ============ AI FIX GENERATION ============
-
-async function generateAIFixes(
-  issue: QualityIssue,
-  credentials: any,
-): Promise<Record<string, any>> {
+// ===== AI FIX GENERATION =====
+async function generateAIFixes(issue: QualityIssue): Promise<Record<string, any>> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+  if (!LOVABLE_API_KEY) throw new Error("AI xizmati sozlanmagan");
 
-  const fixableIssues = issue.issues.filter(i => i.severity === 'error' || i.severity === 'warning');
-  if (fixableIssues.length === 0) return {};
+  const fixableIssues = issue.issues.filter(i => i.severity !== 'info');
+  if (fixableIssues.length === 0) return { fixes: {}, summary: "Tuzatish kerak emas" };
 
-  const issuesList = fixableIssues.map(i => 
-    `- ${i.field}: ${i.message} (hozirgi: ${i.currentValue || 'bo\'sh'})`
+  const currentData = issue.currentData || {};
+  const issuesList = fixableIssues.map(i =>
+    `- [${i.severity.toUpperCase()}] ${i.field}: ${i.message} (hozirgi: ${i.currentValue || 'bo\'sh'})`
   ).join('\n');
 
-  const prompt = `Sen Yandex Market kartochka sifat ekspertisan. Quyidagi mahsulot kartochkasida xatoliklar topildi.
+  const existingParams = (currentData.params || [])
+    .map((p: any) => `  ${p.name || p.parameterName}: ${p.value || JSON.stringify(p.values)}`)
+    .join('\n');
 
-Mahsulot: "${issue.productName}"
-Kategoriya: ${issue.category || 'Noma\'lum'}
-Sifat indeksi: ${issue.qualityScore}/100
+  const prompt = `Sen Yandex Market kartochka sifat ekspertisan. Mavjud kartochkani tahlil qil va xatoliklarni tuzat.
 
-Topilgan xatoliklar:
+MAHSULOT MA'LUMOTLARI:
+- Nom: "${currentData.name || '(bo\'sh)'}"
+- Tavsif: "${(currentData.description || '').substring(0, 500)}"
+- Kategoriya: ${issue.category || 'Noma\'lum'}
+- Brend: ${currentData.vendor || '(bo\'sh)'}
+- Shtrixkod: ${currentData.barcodes?.join(', ') || '(bo\'sh)'}
+- Rasmlar soni: ${currentData.pictures?.length || 0}
+- Mavjud parametrlar:
+${existingParams || '  (yo\'q)'}
+
+TOPILGAN XATOLIKLAR:
 ${issuesList}
 
-Har bir xatolik uchun tuzatish qiymatini yoz. Javobni FAQAT JSON formatda ber, boshqa matn yozma.
-JSON tuzilishi:
+VAZIFA: Har bir xatolik uchun aniq tuzatish qiymatini ber.
+
+JAVOBNI FAQAT JSON formatda ber:
 {
   "fixes": {
-    "name": "To'liq SEO-optimallashtirilgan nom (agar nom xatosi bo'lsa)",
-    "description": "Batafsil tavsif 300+ belgi (agar tavsif xatosi bo'lsa)",
-    "barcode": "EAN-13 (agar barcode xatosi bo'lsa)",
-    "params": { "paramName": "value" }
+    "name": "To'liq SEO nom: Brend + Mahsulot turi + Asosiy xususiyat + Model (agar nom xatosi bo'lsa)",
+    "description": "Batafsil HTML-siz tavsif 300+ belgi, foyda va xususiyatlarni yoz (agar tavsif xatosi bo'lsa)",
+    "vendor": "Brend nomi (agar brend xatosi bo'lsa)",
+    "vendorCode": "Model raqami (agar kerak bo'lsa)",
+    "barcode": "460XXXXXXXXXX formatda EAN-13 (agar barcode xatosi bo'lsa)",
+    "weightDimensions": { "weight": 0.5, "length": 20, "width": 15, "height": 10 },
+    "parameterValues": [
+      { "parameterId": 0, "name": "param_nomi", "value": "qiymati" }
+    ]
   },
-  "expectedScore": 95,
-  "summary": "Qisqa tuzatish xulosa"
+  "expectedScore": 90,
+  "summary": "Qisqa xulosa"
 }
 
-MUHIM: Faqat xatolikka ega maydonlar uchun tuzatish ber. O'zbek va rus tillarida yoz.`;
+MUHIM QOIDALAR:
+1. Faqat xatolikka ega bo'lgan maydonlarni tuzat, to'g'ri maydonlarni o'zgartirma
+2. Nom: brend + mahsulot turi + asosiy xususiyat, 50-100 belgi
+3. Tavsif: foyda, xususiyat, material, qo'llanilishi haqida 300-500 belgi
+4. parameterValues: Yandex tavsiya qilgan REQUIRED parametrlarni AI bilan bashorat qilib to'ldir
+5. Og'irlik kg da, o'lchamlar sm da
+6. Barcode: haqiqiy EAN-13 format (13 raqam, 460 bilan boshlansin)
+7. Ruscha va o'zbekcha aralash yozma, faqat ruscha yoz (Yandex Market uchun)`;
 
-  try {
-    const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: "Sen marketplace kartochka optimizatsiya ekspertisan. Faqat JSON formatda javob ber." },
-          { role: "user", content: prompt },
-        ],
-        temperature: 0.3,
-      }),
-    });
+  const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${LOVABLE_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "google/gemini-2.5-flash",
+      messages: [
+        { role: "system", content: "Sen Yandex Market kartochka sifat ekspertisan. Faqat JSON formatda javob ber, boshqa hech narsa yozma." },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.2,
+    }),
+  });
 
-    if (!aiResp.ok) {
-      if (aiResp.status === 429) throw new Error("AI rate limit. Biroz kuting.");
-      if (aiResp.status === 402) throw new Error("AI krediti tugagan.");
-      throw new Error(`AI xatolik: ${aiResp.status}`);
-    }
-
-    const aiData = await aiResp.json();
-    const content = aiData.choices?.[0]?.message?.content || '';
-    
-    // Extract JSON from response
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
-    }
-    return { error: "AI javobini parse qilib bo'lmadi" };
-  } catch (e) {
-    console.error("AI fix generation error:", e);
-    throw e;
+  if (!aiResp.ok) {
+    const errText = await aiResp.text();
+    console.error(`AI error ${aiResp.status}: ${errText}`);
+    throw new Error(`AI xatolik: ${aiResp.status}`);
   }
+
+  const aiData = await aiResp.json();
+  const content = aiData.choices?.[0]?.message?.content || '';
+
+  // Extract JSON
+  const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || content.match(/(\{[\s\S]*\})/);
+  if (jsonMatch) {
+    try {
+      const parsed = JSON.parse(jsonMatch[1] || jsonMatch[0]);
+      console.log(`AI fixes generated for ${issue.offerId}:`, JSON.stringify(parsed).substring(0, 200));
+      return parsed;
+    } catch (e) {
+      console.error("JSON parse error:", e, "Content:", content.substring(0, 300));
+    }
+  }
+
+  throw new Error("AI javobini tahlil qilib bo'lmadi");
 }
 
-// ============ APPLY FIXES ============
-
-async function applyYandexFixes(
-  credentials: any,
+// ===== APPLY FIXES VIA YANDEX API =====
+async function applyFixes(
+  apiKey: string,
+  businessId: string,
   offerId: string,
-  fixes: Record<string, any>
-): Promise<{ success: boolean; message: string }> {
-  const apiKey = credentials.apiKey || credentials.api_key;
-  const businessId = credentials.businessId || credentials.business_id;
-  const campaignId = credentials.campaignId || credentials.campaign_id;
+  fixes: Record<string, any>,
+  currentData?: Record<string, any>
+): Promise<{ success: boolean; message: string; details?: string }> {
+  const headers = { "Api-Key": apiKey, "Content-Type": "application/json" };
+  const fixData = fixes.fixes || fixes;
+  const results: string[] = [];
+  let hasError = false;
 
-  if (!apiKey) return { success: false, message: "API key yo'q" };
+  // === Step 1: Update offer base data via offer-mappings/update ===
+  const offerUpdate: any = { offerId };
+  let needsBaseUpdate = false;
 
-  const headers: Record<string, string> = {
-    "Api-Key": apiKey,
-    "Content-Type": "application/json",
-  };
+  if (fixData.name && fixData.name !== currentData?.name) {
+    offerUpdate.name = fixData.name;
+    needsBaseUpdate = true;
+  }
+  if (fixData.description && fixData.description !== currentData?.description) {
+    offerUpdate.description = fixData.description;
+    needsBaseUpdate = true;
+  }
+  if (fixData.vendor) {
+    offerUpdate.vendor = fixData.vendor;
+    needsBaseUpdate = true;
+  }
+  if (fixData.vendorCode) {
+    offerUpdate.vendorCode = fixData.vendorCode;
+    needsBaseUpdate = true;
+  }
+  if (fixData.barcode) {
+    offerUpdate.barcodes = [fixData.barcode];
+    needsBaseUpdate = true;
+  }
+  if (fixData.weightDimensions) {
+    offerUpdate.weightDimensions = fixData.weightDimensions;
+    needsBaseUpdate = true;
+  }
 
-  // Get businessId if needed
-  let effectiveBusinessId = businessId;
-  if (!effectiveBusinessId && campaignId) {
+  if (needsBaseUpdate) {
+    console.log(`Updating base data for ${offerId}:`, JSON.stringify(offerUpdate).substring(0, 300));
+
     try {
       const resp = await fetchWithRetry(
-        `https://api.partner.market.yandex.ru/campaigns/${campaignId}`,
-        { headers }
+        `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-mappings/update`,
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            offerMappings: [{ offer: offerUpdate }],
+          }),
+        }
       );
+
       if (resp.ok) {
-        const data = await resp.json();
-        effectiveBusinessId = data.campaign?.business?.id;
+        const respData = await resp.json();
+        const errs = respData.results?.[0]?.errors || respData.result?.errors || [];
+        if (errs.length > 0) {
+          results.push(`⚠️ Asosiy ma'lumotlar: ${errs.map((e: any) => e.message || e.code).join(', ')}`);
+          console.error(`Base update errors:`, JSON.stringify(errs));
+          hasError = true;
+        } else {
+          results.push('✅ Nom, tavsif, brend yangilandi');
+        }
+      } else {
+        const errText = await resp.text();
+        results.push(`❌ Asosiy yangilash xatosi: ${resp.status}`);
+        console.error(`Base update failed: ${resp.status} ${errText}`);
+        hasError = true;
       }
-    } catch (e) { /* ignore */ }
-  }
-
-  if (!effectiveBusinessId) {
-    return { success: false, message: "Business ID topilmadi" };
-  }
-
-  const fixData = fixes.fixes || fixes;
-  const updateBody: any = {
-    offerIds: [offerId],
-  };
-
-  // Build update payload for offer-cards/update
-  const cardUpdate: any = {};
-
-  if (fixData.name) cardUpdate.name = fixData.name;
-  if (fixData.description) cardUpdate.description = fixData.description;
-  if (fixData.barcode) cardUpdate.barcodes = [fixData.barcode];
-  if (fixData.params) {
-    cardUpdate.parameterValues = Object.entries(fixData.params).map(([name, value]) => ({
-      parameterName: name,
-      value: String(value),
-    }));
-  }
-
-  // Use update-offer-mappings endpoint
-  try {
-    const updateResp = await fetchWithRetry(
-      `https://api.partner.market.yandex.ru/v2/businesses/${effectiveBusinessId}/offer-mappings/update`,
-      {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          offerMappings: [{
-            offer: {
-              offerId,
-              ...cardUpdate,
-            },
-          }],
-        }),
-      }
-    );
-
-    if (updateResp.ok) {
-      return { success: true, message: `Kartochka yangilandi. Kutilayotgan sifat: ${fixes.expectedScore || '95+'}` };
-    } else {
-      const errorText = await updateResp.text();
-      console.error("Update error:", errorText);
-      return { success: false, message: `Yangilash xatolik: ${updateResp.status}` };
+    } catch (e) {
+      results.push(`❌ Tarmoq xatosi (base update)`);
+      console.error("Base update network error:", e);
+      hasError = true;
     }
-  } catch (e) {
-    return { success: false, message: `Tarmoq xatolik: ${e instanceof Error ? e.message : 'unknown'}` };
   }
+
+  // === Step 2: Update card content (parameterValues) via offer-cards/update ===
+  if (fixData.parameterValues && fixData.parameterValues.length > 0) {
+    await sleep(600);
+
+    const cardUpdate: any = {
+      offerId,
+      parameterValues: fixData.parameterValues.map((p: any) => {
+        // Yandex expects specific format
+        if (p.parameterId && p.parameterId > 0) {
+          return { parameterId: p.parameterId, value: p.value ? [{ value: String(p.value) }] : undefined };
+        }
+        // If we only have name, try name-based approach
+        return { parameterId: p.parameterId || 0, name: p.name, value: [{ value: String(p.value) }] };
+      }).filter((p: any) => p.value),
+    };
+
+    console.log(`Updating card params for ${offerId}:`, JSON.stringify(cardUpdate).substring(0, 300));
+
+    try {
+      const resp = await fetchWithRetry(
+        `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-cards/update`,
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            offerCards: [cardUpdate],
+          }),
+        }
+      );
+
+      if (resp.ok) {
+        const respData = await resp.json();
+        const errs = respData.results?.[0]?.errors || respData.result?.errors || [];
+        if (errs.length > 0) {
+          results.push(`⚠️ Parametrlar: ${errs.map((e: any) => e.message || e.code).join(', ')}`);
+          console.error(`Card update errors:`, JSON.stringify(errs));
+        } else {
+          results.push(`✅ ${fixData.parameterValues.length} ta parametr yangilandi`);
+        }
+      } else {
+        const errText = await resp.text();
+        results.push(`⚠️ Parametr yangilash: ${resp.status}`);
+        console.error(`Card update failed: ${resp.status} ${errText}`);
+      }
+    } catch (e) {
+      results.push(`⚠️ Parametr yangilash tarmoq xatosi`);
+      console.error("Card update network error:", e);
+    }
+  }
+
+  if (results.length === 0) {
+    return { success: true, message: "Tuzatish kerak bo'lgan narsa yo'q" };
+  }
+
+  return {
+    success: !hasError,
+    message: results.join('\n'),
+    details: `Kutilayotgan sifat: ${fixes.expectedScore || '85+'}. ${fixes.summary || ''}`,
+  };
 }
 
-// ============ MAIN HANDLER ============
-
+// ===== MAIN HANDLER =====
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -479,116 +636,103 @@ serve(async (req) => {
     if (authError || !user) throw new Error("Avtorizatsiya xatosi");
 
     const body = await req.json();
-    const { action, marketplace, offerIds } = body;
+    const { action, marketplace, offerIds, offerId } = body;
+    const mp = marketplace || 'yandex';
+
+    console.log(`Audit action: ${action}, marketplace: ${mp}, user: ${user.id}`);
 
     // Get marketplace connection
     const { data: connections } = await supabase
       .from("marketplace_connections")
       .select("*")
       .eq("user_id", user.id)
-      .eq("marketplace", marketplace || 'yandex')
+      .eq("marketplace", mp)
       .eq("is_active", true)
       .limit(1);
 
-    if (!connections || connections.length === 0) {
-      throw new Error(`${marketplace || 'yandex'} marketplace ulanmagan`);
+    if (!connections?.length) {
+      throw new Error(`${mp} marketplace ulanmagan`);
     }
 
-    const connection = connections[0];
-    const credentials = connection.credentials as any;
+    const credentials = connections[0].credentials as any;
+    const { apiKey, businessId, campaignId } = await getBusinessId(credentials);
+    const apiHeaders = { "Api-Key": apiKey, "Content-Type": "application/json" };
 
     switch (action) {
       case 'audit': {
-        // Audit cards and return quality issues
-        const issues = await auditYandexCards(credentials, offerIds);
-        return new Response(JSON.stringify({
-          success: true,
-          data: issues,
-          summary: {
-            total: issues.length,
-            critical: issues.filter(i => i.issues.some(ii => ii.severity === 'error')).length,
-            warning: issues.filter(i => i.issues.some(ii => ii.severity === 'warning') && !i.issues.some(ii => ii.severity === 'error')).length,
-            avgScore: issues.length > 0 ? Math.round(issues.reduce((s, i) => s + i.qualityScore, 0) / issues.length) : 100,
-            fixable: issues.filter(i => i.fixable).length,
-          },
-        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-
-      case 'generate-fix': {
-        // Generate AI fix for a specific card
-        const { offerId: targetOfferId } = body;
-        if (!targetOfferId) throw new Error("offerId kerak");
-
-        // First audit this specific card
-        const issues = await auditYandexCards(credentials, [targetOfferId]);
-        if (issues.length === 0) {
+        // 1. Fetch all offers
+        const offers = await fetchAllOffers(apiKey, businessId);
+        if (offers.length === 0) {
           return new Response(JSON.stringify({
-            success: true,
-            data: { message: "Bu kartochkada xatolik topilmadi", fixes: null },
+            success: true, data: [], summary: { total: 0, critical: 0, warning: 0, avgScore: 100, fixable: 0 },
           }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
 
-        const fixes = await generateAIFixes(issues[0], credentials);
-        return new Response(JSON.stringify({
-          success: true,
-          data: { issue: issues[0], fixes },
-        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
+        // 2. Fetch quality data with recommendations
+        const offerIdList = offerIds?.length ? offerIds : offers.map(o => o.offerId).filter(Boolean);
+        const cardQuality = await fetchCardQuality(apiKey, businessId, offerIdList);
 
-      case 'apply-fix': {
-        // Apply AI-generated fix to a card
-        const { offerId: fixOfferId, fixes } = body;
-        if (!fixOfferId || !fixes) throw new Error("offerId va fixes kerak");
+        // 3. Analyze
+        const issues = analyzeOffers(offers, cardQuality, offerIds);
 
-        const result = await applyYandexFixes(credentials, fixOfferId, fixes);
+        const summary = {
+          total: issues.length,
+          critical: issues.filter(i => i.issues.some(ii => ii.severity === 'error')).length,
+          warning: issues.filter(i => i.issues.some(ii => ii.severity === 'warning') && !i.issues.some(ii => ii.severity === 'error')).length,
+          avgScore: issues.length > 0 ? Math.round(issues.reduce((s, i) => s + i.qualityScore, 0) / issues.length) : 100,
+          fixable: issues.filter(i => i.fixable).length,
+        };
+
+        console.log(`Audit complete: ${summary.total} cards, ${summary.critical} critical, ${summary.fixable} fixable`);
+
         return new Response(JSON.stringify({
-          success: true,
-          data: result,
+          success: true, data: issues, summary,
         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
       case 'auto-fix': {
-        // Full auto: audit + generate fix + apply — for single card
-        const { offerId: autoOfferId } = body;
-        if (!autoOfferId) throw new Error("offerId kerak");
+        const targetId = offerId || body.offerId;
+        if (!targetId) throw new Error("offerId kerak");
 
-        const issues = await auditYandexCards(credentials, [autoOfferId]);
+        // 1. Get current card data
+        const offers = await fetchAllOffers(apiKey, businessId);
+        const cardQuality = await fetchCardQuality(apiKey, businessId, [targetId]);
+        const issues = analyzeOffers(offers, cardQuality, [targetId]);
+
         if (issues.length === 0) {
           return new Response(JSON.stringify({
-            success: true,
-            data: { message: "Xatolik topilmadi", applied: false },
+            success: true, data: { message: "Bu kartochkada xatolik topilmadi ✅", applied: false },
           }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
 
-        const fixes = await generateAIFixes(issues[0], credentials);
-        if (fixes.error) {
-          return new Response(JSON.stringify({
-            success: false,
-            error: fixes.error,
-          }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-        }
+        // 2. Generate AI fixes
+        const aiResult = await generateAIFixes(issues[0]);
+        if (aiResult.error) throw new Error(aiResult.error);
 
-        const result = await applyYandexFixes(credentials, autoOfferId, fixes);
+        // 3. Apply fixes via API
+        const result = await applyFixes(apiKey, businessId, targetId, aiResult, issues[0].currentData);
+
         return new Response(JSON.stringify({
           success: true,
           data: {
             ...result,
-            issue: issues[0],
-            fixes,
+            issue: { ...issues[0], currentData: undefined },
+            fixes: aiResult,
           },
         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
       default:
-        throw new Error(`Noma'lum action: ${action}`);
+        throw new Error(`Noma'lum action: ${action}. Foydalaning: audit, auto-fix`);
     }
   } catch (e) {
-    console.error("Audit error:", e);
-    const status = e instanceof Error && e.message.includes("rate limit") ? 429
-      : e instanceof Error && e.message.includes("kredit") ? 402 : 500;
+    console.error("Audit handler error:", e);
     return new Response(JSON.stringify({
       success: false,
       error: e instanceof Error ? e.message : "Noma'lum xatolik",
-    }), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }), {
+      status: e instanceof Error && e.message.includes("rate limit") ? 429 : 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
