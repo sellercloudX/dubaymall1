@@ -385,7 +385,24 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
       updateTaskProgress(1, 'completed');
       updateTaskProgress(2, 'completed');
 
-      // Step 4: Card creator handles MXIK with better context (category + params)
+      // Step 4: MXIK code lookup from database + AI
+      updateTaskProgress(3, 'running');
+      let mxikResult: any = null;
+      try {
+        const { data: mxikData } = await supabase.functions.invoke('lookup-mxik-code', {
+          body: {
+            productName: normalizedProductName,
+            category: analyzed?.category || '',
+            description: analyzed?.description || product.description || '',
+          },
+        });
+        if (mxikData?.mxik_code) {
+          mxikResult = mxikData;
+          console.log(`✅ MXIK: ${mxikData.mxik_code} (${mxikData.mxik_name}) confidence: ${mxikData.confidence}%`);
+        }
+      } catch (e) {
+        console.warn('MXIK lookup failed:', e);
+      }
       updateTaskProgress(3, 'completed');
 
       // Step 5: Pinterest design search + Infographic generation
@@ -483,6 +500,8 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
             images: imagesToUpload,
             sourceUrl: product.url,
             specifications: analyzed?.specifications,
+            mxikCode: mxikResult?.mxik_code,
+            mxikName: mxikResult?.mxik_name,
           },
           pricing: {
             costPrice: pricingData.costPrice,
