@@ -438,11 +438,11 @@ async function generateAIFixes(
     ? `\nMXIK/IKPU kod topildi bazadan: ${mxikCode.code} (${mxikCode.name})`
     : '\nMXIK/IKPU kod bazadan topilmadi - bu maydonni o\'tkazib yubor';
 
-  const prompt = `Sen Yandex Market kartochka sifat ekspertisan. Mavjud kartochkani tahlil qil va xatoliklarni tuzat.
+  const prompt = `Sen Yandex Market kartochka sifat ekspertisan. Mavjud kartochkani tahlil qil va SIFATINI OSHIR.
 
 MAHSULOT MA'LUMOTLARI:
-- Nom: "${currentData.name || '(bo\'sh)'}"
-- Tavsif: "${(currentData.description || '').substring(0, 500)}"
+- Hozirgi nom: "${currentData.name || '(bo\'sh)'}"
+- Hozirgi tavsif: "${(currentData.description || '').substring(0, 500)}"
 - Kategoriya: ${issue.category || 'Noma\'lum'} (ID: ${issue.categoryId})
 - Brend: ${currentData.vendor || '(bo\'sh)'}
 - Shtrixkod: ${currentData.barcodes?.join(', ') || '(bo\'sh)'}
@@ -457,34 +457,33 @@ ${issuesList}
 HAQIQIY KATEGORIYA PARAMETRLARI (Yandex API dan):
 ${requiredParamsList || '  (parametrlar mavjud emas)'}
 
-VAZIFA: 
-1. Xatoliklarni tuzat (nom, tavsif, brend)
-2. Yuqoridagi HAQIQIY parametrlar ro'yxatidan [REQUIRED] belgilangan BARCHA parametrlarni to'ldir
-3. Mahsulot haqidagi ma'lumotlardan kelib chiqib, har bir parametr uchun mos qiymat tanlang
+MUHIM QOIDALAR (QATTIQ AMAL QIL!):
+1. NOM HAQIDA: Agar hozirgi nom bor va 20+ belgi bo'lsa - UNI O'ZGARTIRMA! Faqat qisqa yoki bo'sh bo'lsa yaxshila.
+   Yaxshilash kerak bo'lsa: Brend + Mahsulot turi + Model/Xususiyat + Hajm/O'lcham formatda ruscha yoz.
+   Hozirgi nomning ma'nosini SAQLASH SHART. Hech qachon qisqartirma!
+2. TAVSIF HAQIDA: Agar hozirgi tavsif bor va 100+ belgi bo'lsa - UNI O'ZGARTIRMA!
+   Faqat bo'sh yoki juda qisqa bo'lsa: 300+ belgili batafsil tavsif yoz ruscha.
+3. BREND (vendor): Agar hozirgi brend bor - UNI AYNAN QAYTARING. Bo'sh bo'lsa mahsulotdan aniqlang.
+4. parameterValues: FAQAT yuqoridagi ro'yxatdagi HAQIQIY parameterId lardan foydalan!
+5. allowedValues berilgan parametrlar uchun FAQAT o'sha qiymatlardan birini tanlang (aynan shu tekst).
+6. [REQUIRED] belgilangan parametrlarni to'ldirish SHART.
+7. Ruscha yoz (Yandex Market uchun).
 
 JAVOBNI FAQAT JSON formatda ber:
 {
   "fixes": {
-    "name": "To'liq SEO nom (agar nom xatosi bo'lsa)",
-    "description": "Batafsil tavsif 300+ belgi (agar tavsif xatosi bo'lsa)",
-    "vendor": "Brend nomi (agar brend xatosi bo'lsa)",
-    "barcode": "460XXXXXXXXXX formatda EAN-13 (agar barcode xatosi bo'lsa)",
+    "name": "FAQAT nom qisqa/bo'sh bo'lsa yangi nom, aks holda NULL",
+    "description": "FAQAT tavsif qisqa/bo'sh bo'lsa yangi tavsif, aks holda NULL",
+    "vendor": "Brend nomi (mavjud bo'lsa aynan shu, yo'q bo'lsa aniqlang)",
+    "barcode": "EAN-13 shtrixkod (faqat bo'sh bo'lsa)",
     "weightDimensions": { "weight": 0.5, "length": 20, "width": 15, "height": 10 },
     "parameterValues": [
-      { "parameterId": 12345, "value": "qiymati" }
+      { "parameterId": HAQIQIY_ID, "value": "qiymati" }
     ]
   },
   "expectedScore": 90,
   "summary": "Qisqa xulosa"
-}
-
-MUHIM QOIDALAR:
-1. parameterValues da FAQAT yuqoridagi ro'yxatdagi HAQIQIY parameterId lardan foydalan! O'ylab topilgan ID ISHLATMA!
-2. Agar parametr uchun allowedValues berilgan bo'lsa, FAQAT o'sha qiymatlardan birini tanlang (aynan shu tekst)
-3. [REQUIRED] belgilangan BARCHA parametrlarni to'ldirish SHART
-4. Nom va tavsifni FAQAT ruscha yoz (Yandex Market uchun)
-5. Agar MXIK kod topilgan bo'lsa, uni ishlatma - bu alohida tizim orqali boshqariladi
-6. Faqat xatolikka ega bo'lgan maydonlarni tuzat, to'g'ri maydonlarni o'zgartirma`;
+}`;
 
   const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
@@ -554,18 +553,24 @@ async function applyFixes(
   const offerUpdate: any = { offerId };
   let needsBaseUpdate = false;
 
-  if (fixData.name && fixData.name !== currentData?.name) {
-    offerUpdate.name = fixData.name;
-    needsBaseUpdate = true;
+  // Only update name if AI provided non-null and it's actually different/better
+  if (fixData.name && fixData.name !== 'NULL' && fixData.name !== 'null' && fixData.name !== currentData?.name) {
+    // Don't replace a longer name with a shorter one
+    if (!currentData?.name || currentData.name.length < 20 || fixData.name.length >= currentData.name.length) {
+      offerUpdate.name = fixData.name;
+      needsBaseUpdate = true;
+    }
   }
-  if (fixData.description && fixData.description !== currentData?.description) {
-    offerUpdate.description = fixData.description;
-    needsBaseUpdate = true;
+  if (fixData.description && fixData.description !== 'NULL' && fixData.description !== 'null' && fixData.description !== currentData?.description) {
+    if (!currentData?.description || currentData.description.length < 100 || fixData.description.length >= currentData.description.length) {
+      offerUpdate.description = fixData.description;
+      needsBaseUpdate = true;
+    }
   }
-  if (fixData.vendor) { offerUpdate.vendor = fixData.vendor; needsBaseUpdate = true; }
+  if (fixData.vendor && fixData.vendor !== 'NULL' && fixData.vendor !== 'null') { offerUpdate.vendor = fixData.vendor; needsBaseUpdate = true; }
   if (fixData.vendorCode) { offerUpdate.vendorCode = fixData.vendorCode; needsBaseUpdate = true; }
-  if (fixData.barcode) { offerUpdate.barcodes = [fixData.barcode]; needsBaseUpdate = true; }
-  if (fixData.weightDimensions) { offerUpdate.weightDimensions = fixData.weightDimensions; needsBaseUpdate = true; }
+  if (fixData.barcode && !currentData?.barcodes?.length) { offerUpdate.barcodes = [fixData.barcode]; needsBaseUpdate = true; }
+  if (fixData.weightDimensions && !currentData?.weightDimensions) { offerUpdate.weightDimensions = fixData.weightDimensions; needsBaseUpdate = true; }
 
   if (needsBaseUpdate) {
     console.log(`Updating base data for ${offerId}:`, JSON.stringify(offerUpdate).substring(0, 300));
@@ -612,7 +617,7 @@ async function applyFixes(
     try {
       const resp = await fetchWithRetry(
         `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-cards/update`,
-        { method: 'POST', headers, body: JSON.stringify({ offerCards: [cardUpdate] }) }
+        { method: 'POST', headers, body: JSON.stringify({ offersContent: [cardUpdate] }) }
       );
       if (resp.ok) {
         const respData = await resp.json();
