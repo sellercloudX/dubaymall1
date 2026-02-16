@@ -261,14 +261,14 @@ function analyzeOffers(
         type: 'missing_content', severity: 'error', field: 'name',
         message: 'Mahsulot nomi yo\'q yoki juda qisqa',
         currentValue: offer.name || '(bo\'sh)',
-        suggestedFix: 'AI yordamida to\'liq SEO nom yaratish',
+        suggestedFix: 'AI yordamida to\'liq SEO nom yaratish (60+ belgi)',
       });
-    } else if (offer.name.length < 20) {
+    } else if (offer.name.length < 60) {
       issues.push({
         type: 'low_quality', severity: 'warning', field: 'name',
-        message: `Nom qisqa (${offer.name.length} belgi), 30+ tavsiya`,
+        message: `Nom qisqa (${offer.name.length} belgi), 60+ tavsiya`,
         currentValue: offer.name,
-        suggestedFix: 'Nomga brend, model, asosiy xususiyat qo\'shish',
+        suggestedFix: 'Nomga brend, model, asosiy xususiyat, hajm qo\'shish (60+ belgi)',
       });
     }
 
@@ -458,9 +458,10 @@ HAQIQIY KATEGORIYA PARAMETRLARI (Yandex API dan):
 ${requiredParamsList || '  (parametrlar mavjud emas)'}
 
 MUHIM QOIDALAR (QATTIQ AMAL QIL!):
-1. NOM HAQIDA: Agar hozirgi nom bor va 20+ belgi bo'lsa - UNI O'ZGARTIRMA! Faqat qisqa yoki bo'sh bo'lsa yaxshila.
-   Yaxshilash kerak bo'lsa: Brend + Mahsulot turi + Model/Xususiyat + Hajm/O'lcham formatda ruscha yoz.
-   Hozirgi nomning ma'nosini SAQLASH SHART. Hech qachon qisqartirma!
+1. NOM HAQIDA: Nom MINIMUM 60 belgi bo'lishi SHART! 59 belgi ham kam!
+   Agar hozirgi nom 60+ belgi va sifatli bo'lsa - UNI O'ZGARTIRMA!
+   Agar 60 dan kam bo'lsa: Brend + Mahsulot turi + Model/Liniya + Asosiy xususiyat + Hajm/O'lcham formatda ruscha yoz.
+   Masalan: "Шампунь против перхоти Head & Shoulders Цитрусовая свежесть для жирных волос, 400 мл"
 2. TAVSIF HAQIDA: Agar hozirgi tavsif bor va 100+ belgi bo'lsa - UNI O'ZGARTIRMA!
    Faqat bo'sh yoki juda qisqa bo'lsa: 300+ belgili batafsil tavsif yoz ruscha.
 3. BREND (vendor): Agar hozirgi brend bor - UNI AYNAN QAYTARING. Bo'sh bo'lsa mahsulotdan aniqlang.
@@ -555,10 +556,12 @@ async function applyFixes(
 
   // Only update name if AI provided non-null and it's actually different/better
   if (fixData.name && fixData.name !== 'NULL' && fixData.name !== 'null' && fixData.name !== currentData?.name) {
-    // Don't replace a longer name with a shorter one
-    if (!currentData?.name || currentData.name.length < 20 || fixData.name.length >= currentData.name.length) {
-      offerUpdate.name = fixData.name;
-      needsBaseUpdate = true;
+    // Only accept if new name is 60+ chars and at least as long as current
+    if (!currentData?.name || currentData.name.length < 60 || fixData.name.length >= currentData.name.length) {
+      if (fixData.name.length >= 60) {
+        offerUpdate.name = fixData.name;
+        needsBaseUpdate = true;
+      }
     }
   }
   if (fixData.description && fixData.description !== 'NULL' && fixData.description !== 'null' && fixData.description !== currentData?.description) {
