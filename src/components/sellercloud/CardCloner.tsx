@@ -270,7 +270,7 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
   }
 
   return (
-    <div className="space-y-4 overflow-hidden">
+    <div className="space-y-4 overflow-hidden pb-20">
       {/* Source/Target Selection */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Card className="overflow-hidden">
