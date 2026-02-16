@@ -49,6 +49,28 @@ export default function SellerCloudX() {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  
+  // Persist active tab in URL hash so it survives re-renders and refreshes
+  const getInitialTab = () => {
+    const hash = window.location.hash.replace('#', '');
+    return hash || 'marketplaces';
+  };
+  const [activeTab, setActiveTab] = useState(getInitialTab);
+  
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    window.history.replaceState(null, '', `#${value}`);
+  };
+  
+  // Listen for hash changes (e.g. back/forward)
+  useEffect(() => {
+    const onHashChange = () => {
+      const hash = window.location.hash.replace('#', '');
+      if (hash) setActiveTab(hash);
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
   const { 
     connections, 
     isLoading: connectionsLoading, 
@@ -235,7 +257,7 @@ export default function SellerCloudX() {
             <TabsContent value="notifications"><Suspense fallback={<TabLoader />}><NotificationCenter /></Suspense></TabsContent>
           </Tabs>
         ) : (
-          <Tabs defaultValue="marketplaces" className="space-y-6">
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
             {/* Primary navigation - main sections */}
             <TabsList className="flex flex-wrap h-auto gap-1.5 p-1.5 w-full">
               <TabsTrigger value="marketplaces" className="gap-1.5 text-xs sm:text-sm"><Globe className="h-4 w-4 shrink-0" /><span className="hidden md:inline">Marketplacelar</span></TabsTrigger>
