@@ -27,8 +27,8 @@ export function MobileSellerCloudNav({ activeTab, onTabChange }: MobileSellerClo
   const isMoreActive = !primaryTabIds.includes(activeTab);
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t safe-area-bottom safe-area-left safe-area-right" style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 4px)' }}>
-      <div className="flex items-center justify-around h-14">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-t safe-area-bottom safe-area-left safe-area-right shadow-[0_-2px_10px_rgba(0,0,0,0.1)]" style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 6px)' }}>
+      <div className="flex items-center justify-around h-16">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = item.id === 'more' ? isMoreActive : activeTab === item.id;
@@ -46,18 +46,18 @@ export function MobileSellerCloudNav({ activeTab, onTabChange }: MobileSellerClo
                 }
               }}
               className={cn(
-                "flex flex-col items-center justify-center w-full h-full gap-1 transition-colors",
+                "flex flex-col items-center justify-center w-full h-full gap-0.5 transition-colors",
                 isActive ? "text-primary" : "text-muted-foreground"
               )}
             >
               <div className={cn(
-                "flex items-center justify-center w-8 h-8 rounded-lg transition-colors",
-                isActive && "bg-primary/10"
+                "flex items-center justify-center w-10 h-10 rounded-xl transition-all",
+                isActive && "bg-primary/10 scale-105"
               )}>
-                <Icon className={cn("h-4 w-4", isActive && "stroke-[2.5]")} />
+                <Icon className={cn("h-5 w-5", isActive && "stroke-[2.5]")} />
               </div>
               <span className={cn(
-                "text-[9px] font-medium leading-tight",
+                "text-[10px] font-medium leading-tight",
                 isActive && "font-semibold"
               )}>
                 {item.label}

@@ -237,14 +237,14 @@ export default function SellerCloudX() {
         ) : (
           <Tabs defaultValue="marketplaces" className="space-y-6">
             {/* Primary navigation - main sections */}
-            <TabsList className="flex flex-wrap h-auto gap-1 p-1">
-              <TabsTrigger value="marketplaces" className="gap-1.5"><Globe className="h-4 w-4" /><span className="hidden sm:inline">Marketplacelar</span></TabsTrigger>
-              <TabsTrigger value="scanner" className="gap-1.5"><Scan className="h-4 w-4" /><span className="hidden sm:inline">AI Scanner</span></TabsTrigger>
-              <TabsTrigger value="products" className="gap-1.5"><Package className="h-4 w-4" /><span className="hidden sm:inline">Mahsulotlar</span></TabsTrigger>
-              <TabsTrigger value="orders" className="gap-1.5"><ShoppingCart className="h-4 w-4" /><span className="hidden sm:inline">Buyurtmalar</span></TabsTrigger>
-              <TabsTrigger value="analytics" className="gap-1.5"><BarChart3 className="h-4 w-4" /><span className="hidden sm:inline">Analitika</span></TabsTrigger>
-              <TabsTrigger value="tools" className="gap-1.5"><Wrench className="h-4 w-4" /><span className="hidden sm:inline">Asboblar</span></TabsTrigger>
-              <TabsTrigger value="settings" className="gap-1.5"><CreditCard className="h-4 w-4" /><span className="hidden sm:inline">Sozlamalar</span></TabsTrigger>
+            <TabsList className="flex flex-wrap h-auto gap-1.5 p-1.5 w-full">
+              <TabsTrigger value="marketplaces" className="gap-1.5 text-xs sm:text-sm"><Globe className="h-4 w-4 shrink-0" /><span className="hidden md:inline">Marketplacelar</span></TabsTrigger>
+              <TabsTrigger value="scanner" className="gap-1.5 text-xs sm:text-sm"><Scan className="h-4 w-4 shrink-0" /><span className="hidden md:inline">AI Scanner</span></TabsTrigger>
+              <TabsTrigger value="products" className="gap-1.5 text-xs sm:text-sm"><Package className="h-4 w-4 shrink-0" /><span className="hidden md:inline">Mahsulotlar</span></TabsTrigger>
+              <TabsTrigger value="orders" className="gap-1.5 text-xs sm:text-sm"><ShoppingCart className="h-4 w-4 shrink-0" /><span className="hidden md:inline">Buyurtmalar</span></TabsTrigger>
+              <TabsTrigger value="analytics" className="gap-1.5 text-xs sm:text-sm"><BarChart3 className="h-4 w-4 shrink-0" /><span className="hidden md:inline">Analitika</span></TabsTrigger>
+              <TabsTrigger value="tools" className="gap-1.5 text-xs sm:text-sm"><Wrench className="h-4 w-4 shrink-0" /><span className="hidden md:inline">Asboblar</span></TabsTrigger>
+              <TabsTrigger value="settings" className="gap-1.5 text-xs sm:text-sm"><CreditCard className="h-4 w-4 shrink-0" /><span className="hidden md:inline">Sozlamalar</span></TabsTrigger>
             </TabsList>
 
             <TabsContent value="marketplaces">
