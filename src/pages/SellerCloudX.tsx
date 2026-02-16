@@ -39,6 +39,7 @@ const MinPriceProtection = lazy(() => import('@/components/sellercloud/MinPriceP
 const CardCloner = lazy(() => import('@/components/sellercloud/CardCloner').then(m => ({ default: m.CardCloner })));
 const ProblematicProducts = lazy(() => import('@/components/sellercloud/ProblematicProducts').then(m => ({ default: m.ProblematicProducts })));
 const CardQualityAudit = lazy(() => import('@/components/sellercloud/CardQualityAudit').then(m => ({ default: m.CardQualityAudit })));
+const MxikImport = lazy(() => import('@/components/sellercloud/MxikImport').then(m => ({ default: m.MxikImport })));
 const ProfitCalculator = lazy(() => import('@/components/sellercloud/ProfitCalculator').then(m => ({ default: m.ProfitCalculator })));
 const CostPriceManager = lazy(() => import('@/components/sellercloud/CostPriceManager').then(m => ({ default: m.CostPriceManager })));
 const AIScannerPro = lazy(() => import('@/components/seller/AIScannerPro').then(m => ({ default: m.AIScannerPro })));
@@ -348,6 +349,7 @@ function ToolsSubTabs({ connectedMarketplaces, store, subscription }: {
         <TabsTrigger value="min-price" className="text-xs gap-1"><Shield className="h-3.5 w-3.5" />Min narx</TabsTrigger>
         <TabsTrigger value="clone" className="text-xs gap-1"><Copy className="h-3.5 w-3.5" />Klonlash</TabsTrigger>
         <TabsTrigger value="problems" className="text-xs gap-1"><AlertOctagon className="h-3.5 w-3.5" />Muammolar</TabsTrigger>
+        <TabsTrigger value="mxik" className="text-xs gap-1"><FileSpreadsheet className="h-3.5 w-3.5" />MXIK baza</TabsTrigger>
       </TabsList>
       <TabsContent value="audit"><Suspense fallback={<TabLoader />}><CardQualityAudit connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
       <TabsContent value="inventory"><Suspense fallback={<TabLoader />}><InventorySync connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
@@ -356,6 +358,7 @@ function ToolsSubTabs({ connectedMarketplaces, store, subscription }: {
       <TabsContent value="min-price"><Suspense fallback={<TabLoader />}><MinPriceProtection connectedMarketplaces={connectedMarketplaces} store={store} commissionPercent={subscription?.commission_percent || 4} /></Suspense></TabsContent>
       <TabsContent value="clone"><Suspense fallback={<TabLoader />}><CardCloner connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
       <TabsContent value="problems"><Suspense fallback={<TabLoader />}><ProblematicProducts connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
+      <TabsContent value="mxik"><Suspense fallback={<TabLoader />}><MxikImport /></Suspense></TabsContent>
     </Tabs>
   );
 }

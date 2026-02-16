@@ -74,3 +74,6 @@ verify_jwt = false
 
 [functions.pinterest-design-search]
 verify_jwt = false
+
+[functions.import-mxik-codes]
+verify_jwt = false
