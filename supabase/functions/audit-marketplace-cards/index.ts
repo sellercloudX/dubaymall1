@@ -56,23 +56,50 @@ async function getBusinessId(credentials: any): Promise<{ apiKey: string; busine
   const campaignId = credentials.campaignId || credentials.campaign_id;
   let businessId = credentials.businessId || credentials.business_id;
 
+  console.log(`getBusinessId: apiKey=${apiKey ? 'present' : 'missing'}, campaignId=${campaignId}, businessId=${businessId}`);
+
   if (!apiKey) throw new Error("Yandex API key topilmadi");
 
   const headers = { "Api-Key": apiKey, "Content-Type": "application/json" };
 
   if (!businessId && campaignId) {
-    const resp = await fetchWithRetry(
-      `https://api.partner.market.yandex.ru/campaigns/${campaignId}`,
-      { headers }
-    );
-    if (resp.ok) {
+    try {
+      const resp = await fetchWithRetry(
+        `https://api.partner.market.yandex.ru/campaigns/${campaignId}`,
+        { headers }
+      );
       const data = await resp.json();
-      businessId = data.campaign?.business?.id;
-      console.log(`Resolved businessId: ${businessId} from campaignId: ${campaignId}`);
+      if (resp.ok) {
+        businessId = data.campaign?.business?.id;
+        console.log(`Resolved businessId: ${businessId} from campaignId: ${campaignId}`);
+      } else {
+        console.log(`Campaign API failed (${resp.status}):`, JSON.stringify(data));
+      }
+    } catch (e) {
+      console.log(`Campaign API error:`, e.message);
     }
   }
 
-  if (!businessId) throw new Error("Business ID topilmadi");
+  // Fallback: try /businesses endpoint
+  if (!businessId) {
+    try {
+      const resp = await fetchWithRetry(
+        `https://api.partner.market.yandex.ru/businesses`,
+        { headers }
+      );
+      const data = await resp.json();
+      if (resp.ok && data.businesses?.length > 0) {
+        businessId = data.businesses[0].id;
+        console.log(`Resolved businessId from /businesses: ${businessId}`);
+      } else {
+        console.log(`Businesses API failed (${resp.status}):`, JSON.stringify(data));
+      }
+    } catch (e) {
+      console.log(`Businesses API error:`, e.message);
+    }
+  }
+
+  if (!businessId) throw new Error("Business ID topilmadi. Credentials: apiKey=" + (apiKey ? "bor" : "yo'q") + ", campaignId=" + (campaignId || "yo'q"));
 
   return { apiKey, businessId: String(businessId), campaignId: String(campaignId || '') };
 }
