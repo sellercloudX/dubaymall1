@@ -108,7 +108,7 @@ serve(async (req) => {
 
     // Validate context
     if (context) {
-      if (context.userRole && !['seller', 'blogger', 'buyer', 'admin'].includes(context.userRole)) {
+      if (context.userRole && !['seller', 'admin'].includes(context.userRole)) {
         return new Response(
           JSON.stringify({ error: 'Invalid user role', success: false }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -127,28 +127,17 @@ serve(async (req) => {
 
     if (context?.userRole === 'seller') {
       systemPrompt += `\n\n👤 KONTEKST: Foydalanuvchi SOTUVCHI. Unga quyidagilarda yordam bering:
-- Do'kon boshqarish va optimizatsiya
-- Mahsulot qo'shish va tahrirash
+- Marketplace boshqarish va optimizatsiya
+- Mahsulot kartochkalarini yaratish va tahrirash
 - Narx strategiyasi va raqobat tahlili
 - Buyurtma va moliya boshqaruvi
-- Affiliate dasturi orqali sotuvni oshirish`;
+- ABC-analiz va PnL hisobotlari
+- Inventarizatsiya auditi`;
       if (context?.shopName) {
         systemPrompt += `\nUning do'koni: "${context.shopName.slice(0, 100)}"`;
       }
-    } else if (context?.userRole === 'blogger') {
-      systemPrompt += `\n\n👤 KONTEKST: Foydalanuvchi BLOGGER. Unga quyidagilarda yordam bering:
-- Eng daromadli mahsulotlarni tanlash
-- Affiliate havolalarni samarali tarqatish
-- Auditoriyaga mos mahsulotlar tavsiyasi
-- Komissiya hisobi va statistika
-- Kontent yaratish maslahatlari`;
     } else {
-      systemPrompt += `\n\n👤 KONTEKST: Foydalanuvchi XARIDOR. Unga quyidagilarda yordam bering:
-- Mahsulot qidirish va tanlash
-- Narxlarni solishtirish
-- Xavfsiz xarid qilish
-- Yetkazib berish haqida ma'lumot
-- Sotuvchi yoki blogger bo'lish imkoniyatlari`;
+      systemPrompt += `\n\n👤 KONTEKST: Foydalanuvchi SellerCloudX platformasidan foydalanmoqda. Marketplace avtomatizatsiya bo'yicha yordam bering.`;
     }
 
     // Try OpenAI first, then Claude, then Lovable AI as fallback
