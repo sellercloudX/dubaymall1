@@ -696,16 +696,24 @@ async function applyFixes(
     const cardUpdate = {
       offerId,
       parameterValues: validParams.map((p: any) => {
-        // Build proper value entry based on Yandex API format
-        const valueEntry: any = { value: String(p.value) };
-        // Add unitId if present (for numeric params with units like mm, cm, g, kg)
-        if (p.unitId) {
-          valueEntry.unitId = String(p.unitId);
+        const unitId = p.unitId ? String(p.unitId) : undefined;
+        
+        // If value is already an array (AI sent it pre-formatted), ensure unitId is injected
+        if (Array.isArray(p.value)) {
+          const fixedValues = p.value.map((v: any) => {
+            const entry: any = { value: String(v.value || v) };
+            // Inject unitId if present and not already in the entry
+            if (unitId && !v.unitId) entry.unitId = unitId;
+            else if (v.unitId) entry.unitId = String(v.unitId);
+            return entry;
+          });
+          return { parameterId: p.parameterId, value: fixedValues };
         }
-        return {
-          parameterId: p.parameterId,
-          value: Array.isArray(p.value) ? p.value : [valueEntry],
-        };
+        
+        // Value is a plain string/number — wrap it
+        const valueEntry: any = { value: String(p.value) };
+        if (unitId) valueEntry.unitId = unitId;
+        return { parameterId: p.parameterId, value: [valueEntry] };
       }),
     };
 
