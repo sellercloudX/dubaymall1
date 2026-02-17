@@ -816,30 +816,52 @@ serve(async (req) => {
                 let delivery = 0;
                 let sorting = 0;
                 let other = 0;
+                // Extract EXACT commission percentage from API parameters
+                let commissionPercentFromApi = 0;
                 
                 tariffs.forEach((tariff: any) => {
                   const amount = tariff.amount || 0;
                   const type = tariff.type || '';
-                  if (type === 'AGENCY_COMMISSION' || type === 'PAYMENT_TRANSFER') agencyCommission += amount;
-                  else if (type === 'FEE') agencyCommission += amount;
-                  else if (type === 'DELIVERY_TO_CUSTOMER' || type === 'CROSSREGIONAL_DELIVERY' || type === 'EXPRESS_DELIVERY' || type === 'MIDDLE_MILE') delivery += amount;
-                  else if (type === 'SORTING') sorting += amount;
-                  else other += amount;
+                  
+                  // Extract percentage from parameters array (most accurate source)
+                  const params = tariff.parameters || [];
+                  const valueParam = params.find((p: any) => p.name === 'value');
+                  const valueType = params.find((p: any) => p.name === 'valueType');
+                  const isRelative = valueType?.value === 'relative';
+                  
+                  if (type === 'FEE' || type === 'AGENCY_COMMISSION' || type === 'PAYMENT_TRANSFER') {
+                    agencyCommission += amount;
+                    // Accumulate exact % from API for commission-type fees
+                    if (isRelative && valueParam?.value) {
+                      commissionPercentFromApi += parseFloat(valueParam.value) || 0;
+                    }
+                  } else if (type === 'DELIVERY_TO_CUSTOMER' || type === 'CROSSREGIONAL_DELIVERY' || type === 'EXPRESS_DELIVERY' || type === 'MIDDLE_MILE') {
+                    delivery += amount;
+                  } else if (type === 'SORTING') {
+                    sorting += amount;
+                  } else {
+                    other += amount;
+                  }
                 });
+                
+                const price = offersForCalc[idx]?.price || 0;
+                const totalTariff = agencyCommission + fulfillment + delivery + sorting + other;
                 
                 return {
                   index: idx,
                   categoryId: offersForCalc[idx]?.categoryId,
-                  price: offersForCalc[idx]?.price,
+                  price,
                   agencyCommission,
+                  // EXACT commission % from API parameters (e.g. FEE 5.50% + PAYMENT_TRANSFER 1.50% = 7%)
+                  commissionPercent: commissionPercentFromApi > 0 
+                    ? Math.round(commissionPercentFromApi * 100) / 100
+                    : (price > 0 ? Math.round((agencyCommission / price) * 10000) / 100 : 0),
                   fulfillment,
                   delivery,
                   sorting,
                   other,
-                  totalTariff: agencyCommission + fulfillment + delivery + sorting + other,
-                  tariffPercent: offersForCalc[idx]?.price > 0 
-                    ? ((agencyCommission + fulfillment + delivery + sorting + other) / offersForCalc[idx].price * 100)
-                    : 0,
+                  totalTariff,
+                  tariffPercent: price > 0 ? Math.round((totalTariff / price) * 10000) / 100 : 0,
                   rawTariffs: tariffs,
                 };
               });

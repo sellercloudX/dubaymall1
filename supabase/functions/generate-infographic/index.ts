@@ -50,45 +50,49 @@ serve(async (req) => {
     let prompt: string;
 
     if (isInfographic) {
-      // FIRST IMAGE: Strong infographic with product function explanation
-      prompt = `Create a professional e-commerce product infographic for "${productName}" (category: ${category || 'general'}).
+      // FIRST IMAGE: Professional marketplace infographic card
+      // Inspired by top Wildberries/Ozon sellers and Pinterest marketplace card designs
+      prompt = `Create a PREMIUM e-commerce product card infographic for "${productName}" (category: ${category || 'general'}).
 
-The image should be a STRONG INFOGRAPHIC that:
-- Shows the product prominently in the center
-- Has clean arrows/callouts pointing to key features
-- Includes 3-5 feature highlight labels (in Russian language)
-- Uses a modern, clean gradient background (not plain white)
-- Has professional typography and icons
-- Explains the product's main function and benefits visually
-- Style: Premium marketplace listing, like top Wildberries/Ozon sellers
-- Aspect ratio: square (1:1)
-- Ultra high resolution, photorealistic product render
+STRICT REQUIREMENTS — follow exactly like top Wildberries and Ozon bestseller cards:
+- Clean, minimalist gradient background (soft blue-to-white, or warm beige-to-cream, or mint-to-white)
+- Product rendered LARGE and crisp in center (photorealistic, studio quality)
+- 3-5 KEY FEATURES shown with thin elegant lines/arrows pointing to product parts
+- Feature labels in RUSSIAN language, modern sans-serif font (like Montserrat or Gilroy)
+- Each feature has a small ICON (flat style, matching color scheme)
+- Bottom strip with: brand logo area, "✓ Сертифицировано" badge, rating stars
+- Color scheme: premium, NOT generic — use brand-appropriate colors
+- NO watermarks, NO stock photo feel
+- Aspect ratio: 1:1 square
+- Ultra high resolution, photorealistic product, magazine-quality layout
+- Style reference: like Sephora product cards or Apple product pages
+- Typography: clean, bold headlines, thin body text, excellent hierarchy
 
-DO NOT include any watermarks or logos.`;
+DO NOT make it look like a cheap template. Make it PREMIUM and PROFESSIONAL.`;
     } else {
-      // REMAINING IMAGES: Product on #efefef background from different angles
+      // REMAINING IMAGES: Product on clean background from different angles
       const angleMap: Record<string, string> = {
-        'minimalist': 'front view, straight-on angle',
-        'vibrant': '45-degree angle, three-quarter view',
-        'luxury': 'side profile view, showing depth',
-        'tech': 'top-down flat lay, bird eye view',
+        'minimalist': 'front view, perfectly centered, symmetrical',
+        'vibrant': '45-degree angle, three-quarter view showing depth and texture',
+        'luxury': 'close-up detail shot showing material quality and craftsmanship',
+        'tech': 'lifestyle context shot — product in use, elegant setting',
       };
       const angle = angleMap[style] || 'slightly angled professional view';
 
       prompt = `Professional product photography of "${productName}" (${category || 'product'}).
 
-Requirements:
-- Product shot on a clean, solid #efefef (light gray) background
+STRICT REQUIREMENTS:
 - ${angle}
-- Studio lighting, soft shadows
-- Product fills 60-70% of the frame
-- No text, no labels, no watermarks
-- Photorealistic, high-end e-commerce style
-- Like professional Amazon/marketplace product photo
-- Aspect ratio: square (1:1)
-- Ultra high resolution
+- Clean, solid #EFEFEF (light gray) background — NO shadows on background
+- Soft diffused studio lighting from top-left, subtle reflection below product
+- Product fills 65-75% of frame — not too small, not cropped
+- NO text, NO labels, NO watermarks, NO props
+- Photorealistic, high-end marketplace product photo
+- Match quality of Apple Store or Sephora product images
+- Aspect ratio: 1:1 square
+- Ultra high resolution, every detail sharp and clear
 
-The product must look EXACTLY like a real "${productName}" - accurate shape, color, and details.`;
+The product must look EXACTLY like a real "${productName}" — accurate shape, proportions, color, and surface texture.`;
     }
 
     try {
