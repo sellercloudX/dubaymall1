@@ -386,12 +386,14 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
       updateTaskProgress(2, 'completed');
 
       // Step 4: MXIK code lookup from database + AI
+      // Use ORIGINAL name (not normalized latin) for better DB matching since MXIK codes are in Uzbek/Russian
       updateTaskProgress(3, 'running');
       let mxikResult: any = null;
       try {
+        const originalName = analyzed?.name || product.title;
         const { data: mxikData } = await supabase.functions.invoke('lookup-mxik-code', {
           body: {
-            productName: normalizedProductName,
+            productName: originalName,
             category: analyzed?.category || '',
             description: analyzed?.description || product.description || '',
           },

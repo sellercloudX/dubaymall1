@@ -21,7 +21,7 @@ import { ProfitCalculator } from '@/components/sellercloud/ProfitCalculator';
 import { MarketplaceOAuth } from '@/components/sellercloud/MarketplaceOAuth';
 import { InventorySync } from '@/components/sellercloud/InventorySync';
 import { PriceManager } from '@/components/sellercloud/PriceManager';
-
+import { CardQualityAudit } from '@/components/sellercloud/CardQualityAudit';
 import { ReportsExport } from '@/components/sellercloud/ReportsExport';
 import { NotificationCenter } from '@/components/sellercloud/NotificationCenter';
 import { SubscriptionBilling } from '@/components/sellercloud/SubscriptionBilling';
@@ -34,6 +34,8 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
 const moreSubTabs = [
+  { id: 'quality-audit' as const, icon: Sparkles, label: 'Sifat auditi' },
+  { id: 'inventory' as const, icon: ArrowDownUp, label: 'Qoldiq' },
   { id: 'financials' as const, icon: DollarSign, label: 'Moliya' },
   { id: 'calculator' as const, icon: Calculator, label: 'Kalkulyator' },
   { id: 'abc-analysis' as const, icon: BarChart3, label: 'ABC-analiz' },
@@ -42,9 +44,7 @@ const moreSubTabs = [
   { id: 'card-clone' as const, icon: Copy, label: 'Klonlash' },
   { id: 'uzum-card' as const, icon: Sparkles, label: 'Uzum Card' },
   { id: 'problems' as const, icon: AlertOctagon, label: 'Muammolar' },
-  { id: 'inventory' as const, icon: ArrowDownUp, label: 'Zaxira' },
   { id: 'pricing' as const, icon: Tag, label: 'Narxlar' },
-  { id: 'publish' as const, icon: Upload, label: 'Joylash' },
   { id: 'reports' as const, icon: FileSpreadsheet, label: 'Hisobotlar' },
   { id: 'notifications' as const, icon: Bell, label: 'Bildirishnoma' },
   { id: 'subscription' as const, icon: CreditCard, label: 'Obuna' },
@@ -186,6 +186,8 @@ export default function SellerCloudMobile() {
         return <div className="p-4"><ProfitCalculator commissionPercent={subscription?.commission_percent || 4} /></div>;
       case 'inventory':
         return <div className="p-4"><InventorySync connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
+      case 'quality-audit':
+        return <div className="p-4"><CardQualityAudit connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'pricing':
         return <div className="p-4"><PriceManager connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'publish':
