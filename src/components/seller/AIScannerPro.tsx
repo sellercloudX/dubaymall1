@@ -258,12 +258,15 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
 
       if (!error && data?.success && data.data?.length > 0) {
         const t = data.data[0];
-        // Use tariffPercent directly from API if available (most accurate)
-        if (t.tariffPercent && t.tariffPercent > 0) {
-          setCommissionPercent(Math.round(t.tariffPercent * 10) / 10);
-        } else if (t.totalTariff && estimatedPrice > 0) {
-          // Calculate total tariff as % of price
-          setCommissionPercent(Math.round((t.totalTariff / estimatedPrice) * 1000) / 10);
+        // CRITICAL: Use only agencyCommission as commission percent, NOT tariffPercent
+        // tariffPercent = TOTAL (commission + delivery + sorting) which can be 40%+ for cheap items
+        // agencyCommission = only marketplace commission (typically 5-15%)
+        if (t.agencyCommission && estimatedPrice > 0) {
+          const realCommissionPercent = Math.round((t.agencyCommission / estimatedPrice) * 1000) / 10;
+          setCommissionPercent(realCommissionPercent);
+        } else if (t.tariffPercent && t.tariffPercent > 0) {
+          // Fallback: cap at reasonable commission (max 25%)
+          setCommissionPercent(Math.min(Math.round(t.tariffPercent * 10) / 10, 25));
         }
         const logistics = (t.fulfillment || 0) + (t.delivery || 0) + (t.sorting || 0);
         if (logistics > 0) setLogisticsCost(logistics);

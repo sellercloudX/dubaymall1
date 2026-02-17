@@ -37,6 +37,7 @@ export function ProfitCalculator({ commissionPercent = 4, categoryId }: ProfitCa
 
         if (!error && data?.success && data.data?.length > 0) {
           const t = data.data[0];
+          // Use agencyCommission only (NOT tariffPercent which includes delivery+sorting)
           if (t.agencyCommission && sellingPrice > 0) {
             setYandexCommissionPercent(Math.round((t.agencyCommission / sellingPrice) * 1000) / 10);
           }

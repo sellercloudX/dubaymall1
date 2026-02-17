@@ -8,7 +8,8 @@ export interface TariffInfo {
   fulfillment: number;
   delivery: number;
   totalTariff: number;
-  tariffPercent: number;
+  tariffPercent: number; // TOTAL tariff as % of price (commission + logistics + all fees)
+  commissionPercent: number; // ONLY marketplace commission as % of price (without logistics)
 }
 
 // Uzum tariff rates — based on official Uzum Market docs
@@ -107,6 +108,7 @@ export function useMarketplaceTariffs(
                 delivery: 0,
                 totalTariff,
                 tariffPercent: price > 0 ? (totalTariff / price) * 100 : 0,
+                commissionPercent: price > 0 ? (realExp.commission / price) * 100 : 0,
               });
             } else {
               // Use estimated tariffs based on price tier
@@ -122,6 +124,7 @@ export function useMarketplaceTariffs(
                 delivery: 0,
                 totalTariff,
                 tariffPercent: price > 0 ? (totalTariff / price) * 100 : 0,
+                commissionPercent: price > 0 ? ((commission + serviceFee) / price) * 100 : 0,
               });
             }
           }
@@ -144,6 +147,7 @@ export function useMarketplaceTariffs(
               delivery: 0,
               totalTariff,
               tariffPercent: price > 0 ? (totalTariff / price) * 100 : 0,
+              commissionPercent: price > 0 ? (commission / price) * 100 : 0,
             });
           }
           continue;
@@ -194,13 +198,16 @@ export function useMarketplaceTariffs(
           tariffResults.forEach((t: any, idx: number) => {
             if (idx >= sendBatch.length) return;
             const offerId = sendBatch[idx].offerId;
+            const commission = t.agencyCommission || 0;
+            const offerPrice = sendBatch[idx]?.price || 0;
             tariffMap.set(offerId, {
               offerId,
-              agencyCommission: t.agencyCommission || 0,
+              agencyCommission: commission,
               fulfillment: t.fulfillment || 0,
               delivery: (t.delivery || 0) + (t.sorting || 0),
               totalTariff: t.totalTariff || 0,
               tariffPercent: t.tariffPercent || 0,
+              commissionPercent: offerPrice > 0 ? (commission / offerPrice) * 100 : 0,
             });
           });
 
@@ -308,9 +315,10 @@ export function getTariffForProduct(
 
   if (safeMapSize(tariffMap) > 0) {
     const values = safeMapValues(tariffMap);
-    const avgPercent = values.reduce((s, t) => s + t.tariffPercent, 0) / values.length;
+    // Use average COMMISSION percent (not total tariff) for estimation
+    const avgCommissionPercent = values.reduce((s, t) => s + t.commissionPercent, 0) / values.length;
     const avgLogistics = values.reduce((s, t) => s + t.fulfillment + t.delivery, 0) / values.length;
-    const estCommission = price * (avgPercent / 100) * 0.6;
+    const estCommission = price * (avgCommissionPercent / 100);
     return {
       commission: estCommission,
       logistics: avgLogistics,
