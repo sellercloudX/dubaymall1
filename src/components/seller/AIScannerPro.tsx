@@ -434,7 +434,8 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
           console.warn('Pinterest search failed, using standard prompts:', e);
         }
 
-        const styles = ['professional', 'minimalist', 'vibrant', 'luxury', 'tech', 'professional'];
+        // Styles: 1st = infographic, rest = angle shots on #efefef
+        const styles = ['professional', 'minimalist', 'vibrant', 'luxury', 'tech'];
 
         // Parallel infographic generation (3 at a time) with Pinterest-enhanced prompts
         const batchSize = 3;

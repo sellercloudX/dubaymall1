@@ -237,35 +237,46 @@ async function fetchCategoryParameters(
   return [];
 }
 
-// ===== LOOKUP MXIK CODE FROM DATABASE =====
+// ===== LOOKUP MXIK CODE VIA EDGE FUNCTION (per-product AI selection) =====
 async function lookupMxikCode(
-  supabase: any, productName: string, category: string
+  _supabase: any, productName: string, category: string, authToken?: string
 ): Promise<{ code: string; name: string } | null> {
-  // Search by product name keywords
-  const keywords = (productName + ' ' + category)
-    .replace(/[^\w\sа-яА-ЯёЁ]/g, ' ')
-    .split(/\s+/)
-    .filter(w => w.length > 2)
-    .slice(0, 5);
+  if (!productName || productName.length < 3) return null;
 
-  if (keywords.length === 0) return null;
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY");
+    
+    console.log(`[MXIK Audit] Looking up code for: "${productName.substring(0, 60)}"`);
+    
+    const resp = await fetch(`${supabaseUrl}/functions/v1/lookup-mxik-code`, {
+      method: "POST",
+      headers: {
+        "Authorization": authToken || `Bearer ${supabaseKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        productName: productName,
+        category: category || '',
+        description: '',
+      }),
+    });
 
-  // Try ILIKE search
-  for (const keyword of keywords) {
-    const { data } = await supabase
-      .from('mxik_codes')
-      .select('code, name_uz, name_ru')
-      .or(`name_uz.ilike.%${keyword}%,name_ru.ilike.%${keyword}%`)
-      .limit(5);
-
-    if (data?.length) {
-      // Return best match
-      const best = data[0];
-      return { code: best.code, name: best.name_ru || best.name_uz };
+    if (!resp.ok) {
+      console.warn(`[MXIK Audit] lookup failed for "${productName.substring(0, 40)}": ${resp.status}`);
+      return null;
     }
-  }
 
-  return null;
+    const data = await resp.json();
+    if (data?.mxik_code) {
+      console.log(`[MXIK Audit] Found: ${data.mxik_code} (${data.mxik_name}) confidence: ${data.confidence}%`);
+      return { code: data.mxik_code, name: data.mxik_name || data.name_ru || '' };
+    }
+    return null;
+  } catch (e) {
+    console.warn(`[MXIK Audit] Error for "${productName.substring(0, 40)}":`, e);
+    return null;
+  }
 }
 
 // ===== ANALYZE OFFERS =====
@@ -865,8 +876,8 @@ serve(async (req) => {
           const categoryParams = await fetchCategoryParameters(apiKey, issue.categoryId || 0, businessId);
           console.log(`Fetched ${categoryParams.length} real params for category ${issue.categoryId}`);
 
-          // 3. Lookup MXIK code from our database
-          const mxikCode = await lookupMxikCode(supabase, issue.productName, issue.category || '');
+          // 3. Lookup MXIK code via AI-powered edge function (per-product)
+          const mxikCode = await lookupMxikCode(supabase, issue.productName, issue.category || '', authHeader);
           if (mxikCode) {
             console.log(`Found MXIK code: ${mxikCode.code} for ${issue.productName.substring(0, 50)}`);
           }
