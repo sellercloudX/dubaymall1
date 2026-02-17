@@ -45,8 +45,6 @@ export const translations = {
     selectRole: 'Rolni tanlang',
     seller: 'Sotuvchi',
     sellerDesc: 'O\'z do\'koningizni yarating va mahsulotlar soting',
-    blogger: 'Blogger',
-    bloggerDesc: 'Mahsulotlarni reklama qiling va komissiya oling',
     buyer: 'Xaridor',
     buyerDesc: 'Mahsulotlarni xarid qiling',
     
@@ -64,8 +62,8 @@ export const translations = {
     feature2Desc: 'Rasmni yuklang - AI nom, ta\'rif va narx taklif qiladi',
     feature3Title: 'Dropshipping',
     feature3Desc: 'AliExpress va CJ dan mahsulotlarni import qiling',
-    feature4Title: 'Affiliate tizimi',
-    feature4Desc: 'Bloggerlar uchun komissiya dasturi',
+    feature4Title: 'Smart narxlash',
+    feature4Desc: 'Real tariflarga asoslangan avtomatik narx hisoblash',
     
     // Footer
     allRightsReserved: 'Barcha huquqlar himoyalangan',
@@ -222,8 +220,6 @@ export const translations = {
     selectRole: 'Выберите роль',
     seller: 'Продавец',
     sellerDesc: 'Создайте свой магазин и продавайте товары',
-    blogger: 'Блогер',
-    bloggerDesc: 'Рекламируйте товары и получайте комиссию',
     buyer: 'Покупатель',
     buyerDesc: 'Покупайте товары',
     
@@ -241,8 +237,8 @@ export const translations = {
     feature2Desc: 'Загрузите фото - AI предложит название, описание и цену',
     feature3Title: 'Дропшиппинг',
     feature3Desc: 'Импортируйте товары с AliExpress и CJ',
-    feature4Title: 'Партнерская система',
-    feature4Desc: 'Комиссионная программа для блогеров',
+    feature4Title: 'Умное ценообразование',
+    feature4Desc: 'Автоматический расчёт цен на основе реальных тарифов',
     
     // Footer
     allRightsReserved: 'Все права защищены',
@@ -399,8 +395,6 @@ export const translations = {
     selectRole: 'Select Role',
     seller: 'Seller',
     sellerDesc: 'Create your shop and sell products',
-    blogger: 'Blogger',
-    bloggerDesc: 'Promote products and earn commission',
     buyer: 'Buyer',
     buyerDesc: 'Buy products',
     
@@ -418,8 +412,8 @@ export const translations = {
     feature2Desc: 'Upload a photo - AI suggests name, description and price',
     feature3Title: 'Dropshipping',
     feature3Desc: 'Import products from AliExpress and CJ',
-    feature4Title: 'Affiliate System',
-    feature4Desc: 'Commission program for bloggers',
+    feature4Title: 'Smart Pricing',
+    feature4Desc: 'Automated price calculation based on real tariffs',
     
     // Footer
     allRightsReserved: 'All rights reserved',

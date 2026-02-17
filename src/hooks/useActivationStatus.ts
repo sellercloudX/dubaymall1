@@ -6,23 +6,19 @@ export type ActivationStatus = 'none' | 'pending' | 'approved' | 'rejected';
 
 interface ActivationState {
   sellerStatus: ActivationStatus;
-  bloggerStatus: ActivationStatus;
   isSellerApproved: boolean;
-  isBloggerApproved: boolean;
   loading: boolean;
 }
 
 export function useActivationStatus(): ActivationState {
   const { user } = useAuth();
   const [sellerStatus, setSellerStatus] = useState<ActivationStatus>('none');
-  const [bloggerStatus, setBloggerStatus] = useState<ActivationStatus>('none');
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user) {
       setSellerStatus('none');
-      setBloggerStatus('none');
       setIsAdmin(false);
       setLoading(false);
       return;
@@ -30,32 +26,17 @@ export function useActivationStatus(): ActivationState {
 
     const fetchStatuses = async () => {
       try {
-        const [sellerResult, bloggerResult, adminResult] = await Promise.all([
+        const [adminResult] = await Promise.all([
           supabase
-            .from('seller_profiles')
-            .select('status')
+            .from('admin_permissions')
+            .select('is_super_admin')
             .eq('user_id', user.id)
-            .maybeSingle(),
-          supabase
-            .from('blogger_profiles')
-            .select('status')
-            .eq('user_id', user.id)
-            .maybeSingle(),
-          supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', user.id)
-            .eq('role', 'admin')
             .maybeSingle(),
         ]);
 
         setIsAdmin(!!adminResult.data);
-        setSellerStatus(
-          (sellerResult.data?.status as ActivationStatus) || 'none'
-        );
-        setBloggerStatus(
-          (bloggerResult.data?.status as ActivationStatus) || 'none'
-        );
+        // SellerCloudX: all authenticated users are considered sellers
+        setSellerStatus('approved');
       } catch (err) {
         console.error('Error fetching activation status:', err);
       } finally {
@@ -68,9 +49,7 @@ export function useActivationStatus(): ActivationState {
 
   return {
     sellerStatus,
-    bloggerStatus,
     isSellerApproved: isAdmin || sellerStatus === 'approved',
-    isBloggerApproved: isAdmin || bloggerStatus === 'approved',
     loading,
   };
 }

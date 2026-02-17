@@ -2,42 +2,39 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 
-export type UserRole = 'seller' | 'blogger' | 'buyer' | 'admin';
+export type UserRole = 'seller' | 'admin';
 
 interface UserRolesState {
   roles: UserRole[];
   isAdmin: boolean;
   isSeller: boolean;
-  isBlogger: boolean;
   loading: boolean;
 }
 
 export function useUserRoles(): UserRolesState {
   const { user } = useAuth();
-  const [roles, setRoles] = useState<UserRole[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchRoles = async () => {
       if (!user) {
-        setRoles([]);
+        setIsAdmin(false);
         setLoading(false);
         return;
       }
 
       try {
-        const { data, error } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id);
+        const { data } = await supabase
+          .from('admin_permissions')
+          .select('is_super_admin')
+          .eq('user_id', user.id)
+          .maybeSingle();
 
-        if (error) throw error;
-
-        const userRoles = data?.map(r => r.role as UserRole) || [];
-        setRoles(userRoles);
+        setIsAdmin(!!data);
       } catch (err) {
         console.error('Error fetching user roles:', err);
-        setRoles([]);
+        setIsAdmin(false);
       } finally {
         setLoading(false);
       }
@@ -46,11 +43,14 @@ export function useUserRoles(): UserRolesState {
     fetchRoles();
   }, [user]);
 
+  const roles: UserRole[] = [];
+  if (isAdmin) roles.push('admin');
+  if (user) roles.push('seller'); // All authenticated users are sellers in SellerCloudX
+
   return {
     roles,
-    isAdmin: roles.includes('admin'),
-    isSeller: roles.includes('seller'),
-    isBlogger: roles.includes('blogger'),
+    isAdmin,
+    isSeller: !!user,
     loading,
   };
 }
