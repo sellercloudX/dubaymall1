@@ -470,13 +470,17 @@ async function generateAIFixes(
     `- [${i.severity.toUpperCase()}] ${i.field}: ${i.message} (hozirgi: ${i.currentValue || 'bo\'sh'})`
   ).join('\n');
 
-  // Build REAL parameter list from Yandex category API - include ALL required + recommended
+  // Build REAL parameter list from Yandex category API
   const allParams = categoryParams.slice(0, 40);
+  // Build a map for quick lookup later
+  const paramTypeMap = new Map<number, any>();
   const requiredParamsList = allParams
     .map(p => {
+      paramTypeMap.set(p.id, p);
       const allowedValues = p.values?.map((v: any) => v.value || v.name).slice(0, 10).join(', ') || '';
       const isRequired = p.required ? ' [REQUIRED]' : '';
-      return `  - parameterId: ${p.id}, name: "${p.name}", type: ${p.type || 'string'}${isRequired}${allowedValues ? `, allowedValues: [${allowedValues}]` : ''}`;
+      const unitInfo = p.unit ? `, unit: "${p.unit.name || p.unit}" (unitId: ${p.unit.id || ''})` : '';
+      return `  - parameterId: ${p.id}, name: "${p.name}", type: ${p.type || 'string'}${isRequired}${unitInfo}${allowedValues ? `, allowedValues: [${allowedValues}]` : ''}`;
     }).join('\n');
 
   const existingParams = (currentData.params || [])
@@ -510,26 +514,32 @@ MUHIM QOIDALAR (QATTIQ AMAL QIL!):
 1. NOM HAQIDA: Nom MINIMUM 60 belgi bo'lishi SHART! 59 belgi ham kam!
    Agar hozirgi nom 60+ belgi va sifatli bo'lsa - UNI O'ZGARTIRMA!
    Agar 60 dan kam bo'lsa: Brend + Mahsulot turi + Model/Liniya + Asosiy xususiyat + Hajm/O'lcham formatda ruscha yoz.
-   Masalan: "Шампунь против перхоти Head & Shoulders Цитрусовая свежесть для жирных волос, 400 мл"
-2. TAVSIF HAQIDA: Tavsif MINIMUM 1000 belgi bo'lishi SHART! 999 belgi ham kam!
+2. TAVSIF HAQIDA: Tavsif MINIMUM 1000 belgi bo'lishi SHART!
    Agar hozirgi tavsif 1000+ belgi bo'lsa - UNI O'ZGARTIRMA!
-   Agar 1000 dan kam bo'lsa: Batafsil, professional, SEO-optimallashgan tavsif yoz ruscha. Mahsulot afzalliklari, xususiyatlari, qo'llanilishi, tarkibi haqida yoz.
-3. BREND (vendor): Agar hozirgi brend bor - UNI AYNAN QAYTARING. Bo'sh bo'lsa mahsulotdan aniqlang.
+3. BREND (vendor): Agar hozirgi brend bor - UNI AYNAN QAYTARING.
 4. parameterValues: FAQAT yuqoridagi ro'yxatdagi HAQIQIY parameterId lardan foydalan!
 5. allowedValues berilgan parametrlar uchun FAQAT o'sha qiymatlardan birini tanlang (aynan shu tekst).
 6. [REQUIRED] belgilangan parametrlarni to'ldirish SHART.
 7. Ruscha yoz (Yandex Market uchun).
+
+PARAMETR QIYMATLARI FORMATI (MUHIM!):
+- STRING/ENUM parametrlar uchun: { "parameterId": ID, "value": "qiymat teksti" }
+- RAQAMLI (NUMERIC) parametrlar uchun o'lchov birligi BOR bo'lsa: { "parameterId": ID, "value": "raqam", "unitId": UNIT_ID }
+  Masalan: uzunlik 12mm => { "parameterId": 37901130, "value": "12", "unitId": 6 }
+  RAQAM VA BIRLIK ALOHIDA! "12 мм" emas, faqat "12" va unitId!
+- BOOLEAN parametrlar uchun: { "parameterId": ID, "value": "true" yoki "false" }
+- HECH QACHON qiymatga birlik qo'shma! "12 мм" emas, "12"!
 
 JAVOBNI FAQAT JSON formatda ber:
 {
   "fixes": {
     "name": "FAQAT nom qisqa/bo'sh bo'lsa yangi nom, aks holda NULL",
     "description": "FAQAT tavsif qisqa/bo'sh bo'lsa yangi tavsif, aks holda NULL",
-    "vendor": "Brend nomi (mavjud bo'lsa aynan shu, yo'q bo'lsa aniqlang)",
+    "vendor": "Brend nomi",
     "barcode": "EAN-13 shtrixkod (faqat bo'sh bo'lsa)",
     "weightDimensions": { "weight": 0.5, "length": 20, "width": 15, "height": 10 },
     "parameterValues": [
-      { "parameterId": HAQIQIY_ID, "value": "qiymati" }
+      { "parameterId": HAQIQIY_ID, "value": "FAQAT_QIYMAT_BIRLISIZ", "unitId": UNIT_ID_AGAR_BOR }
     ]
   },
   "expectedScore": 90,
@@ -576,8 +586,21 @@ JAVOBNI FAQAT JSON formatda ber:
           }
           return isValid;
         });
+
+        // Clean up values: strip unit suffixes from numeric values
+        for (const param of validParams) {
+          if (typeof param.value === 'string') {
+            // Remove unit suffixes like "мм", "см", "г", "кг", "мл", "л", "шт" etc.
+            const cleaned = param.value.replace(/\s*(мм|см|м|г|кг|мл|л|шт|мин|ч|дн|мес|год|%|°|℃)\.?\s*$/i, '').trim();
+            if (cleaned !== param.value) {
+              console.log(`Cleaned param ${param.parameterId}: "${param.value}" -> "${cleaned}"`);
+              param.value = cleaned;
+            }
+          }
+        }
+
         parsed.fixes.parameterValues = validParams;
-        console.log(`Validated params: ${validParams.length} real out of ${parsed.fixes.parameterValues?.length || 0} total`);
+        console.log(`Validated params: ${validParams.length} real`);
       }
 
       console.log(`AI fixes generated for ${issue.offerId}:`, JSON.stringify(parsed).substring(0, 200));
@@ -661,10 +684,18 @@ async function applyFixes(
 
     const cardUpdate = {
       offerId,
-      parameterValues: validParams.map((p: any) => ({
-        parameterId: p.parameterId,
-        value: Array.isArray(p.value) ? p.value : [{ value: String(p.value) }],
-      })),
+      parameterValues: validParams.map((p: any) => {
+        // Build proper value entry based on Yandex API format
+        const valueEntry: any = { value: String(p.value) };
+        // Add unitId if present (for numeric params with units like mm, cm, g, kg)
+        if (p.unitId) {
+          valueEntry.unitId = String(p.unitId);
+        }
+        return {
+          parameterId: p.parameterId,
+          value: Array.isArray(p.value) ? p.value : [valueEntry],
+        };
+      }),
     };
 
     console.log(`Updating ${validParams.length} card params for ${offerId}:`, JSON.stringify(cardUpdate).substring(0, 300));
