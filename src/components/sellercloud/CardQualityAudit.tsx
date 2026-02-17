@@ -241,12 +241,27 @@ export function CardQualityAudit({ connectedMarketplaces, store }: CardQualityAu
             ))}
           </div>
           {isAuditing && (
-            <div className="mt-3 space-y-1">
+            <div className="mt-3 space-y-2">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 Kartochkalar tekshirilmoqda... Bu 15-30 soniya davom etishi mumkin.
               </div>
               <Progress value={30} className="h-1.5" />
+            </div>
+          )}
+          {/* Real-time quality score overview */}
+          {summary && !isAuditing && (
+            <div className="mt-3 flex items-center gap-3">
+              <div className={`text-2xl font-bold ${SCORE_COLORS(summary.avgScore)}`}>{summary.avgScore}%</div>
+              <div className="flex-1">
+                <div className="text-xs text-muted-foreground mb-1">O'rtacha sifat ko'rsatkichi</div>
+                <Progress value={summary.avgScore} className="h-2" />
+              </div>
+              <div className="flex gap-1.5 text-xs">
+                <span className="text-red-600 font-medium">{summary.critical} xato</span>
+                <span className="text-muted-foreground">·</span>
+                <span className="text-amber-600 font-medium">{summary.warning} ogoh.</span>
+              </div>
             </div>
           )}
         </CardContent>
