@@ -51,14 +51,14 @@ export function MobileSellerCloudNav({ activeTab, onTabChange }: MobileSellerClo
               )}
             >
               <div className={cn(
-                "flex items-center justify-center w-10 h-10 rounded-xl transition-all",
-                isActive && "bg-primary/10 scale-105"
+                "flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-200",
+                isActive ? "bg-primary/10 scale-110" : "active:scale-90"
               )}>
-                <Icon className={cn("h-5 w-5", isActive && "stroke-[2.5]")} />
+                <Icon className={cn("h-5 w-5 transition-all duration-200", isActive && "stroke-[2.5] text-primary")} />
               </div>
               <span className={cn(
-                "text-[10px] font-medium leading-tight",
-                isActive && "font-semibold"
+                "text-[10px] font-medium leading-tight transition-colors duration-200",
+                isActive ? "font-bold text-primary" : "text-muted-foreground"
               )}>
                 {item.label}
               </span>

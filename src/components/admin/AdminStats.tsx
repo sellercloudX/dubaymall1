@@ -44,11 +44,15 @@ export function AdminStats() {
     </div>;
   }
 
+  const conversionRate = (stats?.usersCount || 0) > 0 
+    ? ((stats?.activeSubs || 0) / (stats?.usersCount || 1) * 100).toFixed(1) 
+    : '0';
+
   const statItems = [
-    { label: 'Foydalanuvchilar', value: stats?.usersCount || 0, icon: Users, color: 'text-blue-500' },
-    { label: 'Faol obunalar', value: `${stats?.activeSubs || 0}/${stats?.totalSubs || 0}`, icon: Crown, color: 'text-amber-500' },
-    { label: 'MRR', value: `${((stats?.mrr || 0) / 1e6).toFixed(1)} mln`, icon: DollarSign, color: 'text-emerald-500' },
-    { label: 'AI rasxodi', value: `$${(stats?.aiCost || 0).toFixed(2)}`, icon: Zap, color: 'text-orange-500' },
+    { label: 'Foydalanuvchilar', value: stats?.usersCount || 0, icon: Users, color: 'text-blue-500', sub: `${conversionRate}% konversiya` },
+    { label: 'Faol obunalar', value: `${stats?.activeSubs || 0}/${stats?.totalSubs || 0}`, icon: Crown, color: 'text-amber-500', sub: `${stats?.totalSubs ? ((stats.activeSubs / stats.totalSubs) * 100).toFixed(0) : 0}% faol` },
+    { label: 'MRR', value: `${((stats?.mrr || 0) / 1e6).toFixed(1)} mln`, icon: DollarSign, color: 'text-emerald-500', sub: `ARR: ${((stats?.mrr || 0) * 12 / 1e6).toFixed(1)} mln` },
+    { label: 'AI rasxodi', value: `$${(stats?.aiCost || 0).toFixed(2)}`, icon: Zap, color: 'text-orange-500', sub: `${stats?.aiActions || 0} amal` },
   ];
 
   return (
@@ -61,6 +65,7 @@ export function AdminStats() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{item.value}</div>
+            <p className="text-xs text-muted-foreground mt-1">{item.sub}</p>
           </CardContent>
         </Card>
       ))}

@@ -27,6 +27,7 @@ import { NotificationCenter } from '@/components/sellercloud/NotificationCenter'
 import { SubscriptionBilling } from '@/components/sellercloud/SubscriptionBilling';
 import { CostPriceManager } from '@/components/sellercloud/CostPriceManager';
 import { UzumCardHelper } from '@/components/sellercloud/UzumCardHelper';
+import { PullToRefresh } from '@/components/mobile/PullToRefresh';
 import { Loader2, Lock, TrendingUp, Calculator, DollarSign, BarChart3, Shield, Copy, AlertOctagon, ArrowDownUp, Tag, Upload, FileSpreadsheet, Bell, CreditCard, Coins, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -205,6 +206,7 @@ export default function SellerCloudMobile() {
     <div className="min-h-screen bg-background pb-32 overflow-x-hidden safe-area-bottom">
       <MobileSellerCloudHeader connectedCount={connectedMarketplaces.length} onRefresh={refetch} isLoading={connectionsLoading} />
       <main className="pt-[calc(3.5rem+env(safe-area-inset-top,0px))]">
+        <PullToRefresh onRefresh={async () => { await refetch(); toast.success("Ma'lumotlar yangilandi"); }}>
         {isMoreActive && (
           <div className="flex gap-2 px-3 py-2.5 overflow-x-auto no-scrollbar border-b bg-background/95 backdrop-blur-sm sticky top-[calc(3.5rem+env(safe-area-inset-top,0px))] z-40">
             {moreSubTabs.map((tab) => {
@@ -212,17 +214,18 @@ export default function SellerCloudMobile() {
               const isActive = activeTab === tab.id;
               return (
                 <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                  className={cn("flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-medium whitespace-nowrap transition-colors min-h-[36px]",
-                    isActive ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/80")}>
+                  className={cn("flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-medium whitespace-nowrap transition-all duration-200 min-h-[36px]",
+                    isActive ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]" : "bg-muted text-muted-foreground hover:bg-muted/80 active:scale-95")}>
                   <Icon className="h-3.5 w-3.5 shrink-0" />{tab.label}
                 </button>
               );
             })}
           </div>
         )}
-        <div className={isMoreActive ? "pt-1" : ""}>
+        <div className={cn("transition-all duration-200", isMoreActive ? "pt-1" : "")}>
           {renderContent()}
         </div>
+        </PullToRefresh>
       </main>
       <MobileSellerCloudNav activeTab={activeTab} onTabChange={setActiveTab} />
       <BackgroundTasksPanel />

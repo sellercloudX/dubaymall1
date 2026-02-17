@@ -19,6 +19,10 @@ export function UsersManagement() {
     user.phone?.includes(search)
   );
 
+  const totalUsers = users?.length || 0;
+  const adminCount = users?.filter(u => u.roles?.includes('admin')).length || 0;
+  const partnerCount = users?.filter(u => u.roles?.includes('sellercloud')).length || 0;
+
   if (isLoading) {
     return <Card><CardContent className="p-8 text-center">Yuklanmoqda...</CardContent></Card>;
   }
@@ -28,9 +32,14 @@ export function UsersManagement() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Users className="h-5 w-5" />
-          Foydalanuvchilar ({users?.length || 0})
+          Foydalanuvchilar ({totalUsers})
         </CardTitle>
-        <p className="text-sm text-muted-foreground">Barcha ro'yxatdan o'tgan foydalanuvchilar</p>
+        <div className="flex flex-wrap gap-2 mt-2">
+          <Badge variant="secondary" className="text-xs">{totalUsers} jami</Badge>
+          <Badge className="bg-red-500 text-white text-xs">{adminCount} admin</Badge>
+          <Badge className="bg-amber-500 text-white text-xs">{partnerCount} hamkor</Badge>
+          <Badge variant="outline" className="text-xs">{totalUsers - adminCount - partnerCount} oddiy</Badge>
+        </div>
         <div className="flex items-center gap-2 mt-4">
           <Search className="h-4 w-4 text-muted-foreground" />
           <Input
