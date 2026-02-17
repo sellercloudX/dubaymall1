@@ -200,6 +200,8 @@ export function useMarketplaceTariffs(
             const offerId = sendBatch[idx].offerId;
             const commission = t.agencyCommission || 0;
             const offerPrice = sendBatch[idx]?.price || 0;
+            // Use API-extracted commissionPercent directly (most accurate)
+            const apiCommissionPercent = t.commissionPercent || (offerPrice > 0 ? (commission / offerPrice) * 100 : 0);
             tariffMap.set(offerId, {
               offerId,
               agencyCommission: commission,
@@ -207,7 +209,7 @@ export function useMarketplaceTariffs(
               delivery: (t.delivery || 0) + (t.sorting || 0),
               totalTariff: t.totalTariff || 0,
               tariffPercent: t.tariffPercent || 0,
-              commissionPercent: offerPrice > 0 ? (commission / offerPrice) * 100 : 0,
+              commissionPercent: apiCommissionPercent,
             });
           });
 

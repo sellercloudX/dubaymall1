@@ -17,6 +17,8 @@ interface MxikDbRow {
 }
 
 // ===== STEP 1: Search local mxik_codes database =====
+// MXIK DB stores CATEGORY-level descriptions (e.g. "Косметик воситалар"), NOT product names
+// So we must search by category keywords, not exact product names
 async function searchLocalDB(
   supabase: any,
   productName: string,
@@ -24,17 +26,48 @@ async function searchLocalDB(
 ): Promise<MxikDbRow[]> {
   const results: MxikDbRow[] = [];
 
-  // Clean search terms
-  const cleanName = productName
-    .replace(/[^a-zA-Zа-яА-ЯёЁ\s]/g, ' ')
-    .replace(/\b(для|с|и|в|на|от|из|к|по|без|до|за|не|ни|же|или|но|а|то|это|the|a|an|of|for|with)\b/gi, '')
+  // Build search terms from BOTH product name AND category
+  // Priority: category keywords first (more likely to match MXIK categories)
+  const allText = `${category || ''} ${productName}`.toLowerCase();
+  
+  // Remove stop words and short words
+  const cleanText = allText
+    .replace(/[^a-zA-Zа-яА-ЯёЁўқғҳ\s]/g, ' ')
+    .replace(/\b(для|с|и|в|на|от|из|к|по|без|до|за|не|ни|же|или|но|а|то|это|the|a|an|of|for|with|uchun|va|bilan|dan|ga|ning)\b/gi, '')
     .trim();
 
-  const words = cleanName.split(/\s+/).filter(w => w.length > 2);
+  const words = cleanText.split(/\s+/).filter(w => w.length > 2);
+  
+  // Generate category-level search terms (broader matches)
+  // E.g. for "Накладные ресницы для глаз" → search "косметик", "ресниц", "глаз"
+  const searchTermSets = [
+    // Full category if provided
+    category ? [category] : [],
+    // Individual words from category + product name
+    words.slice(0, 5),
+  ].flat().filter(Boolean);
 
-  // Try full-text search first
-  if (words.length > 0) {
-    const searchQuery = words.slice(0, 4).join(' & ');
+  // Try ILIKE search with each term (most reliable for Uzbek Cyrillic data)
+  for (const term of searchTermSets) {
+    if (term.length < 3) continue;
+    try {
+      const { data } = await supabase
+        .from('mxik_codes')
+        .select('code, name_uz, name_ru, group_name, vat_rate')
+        .or(`name_uz.ilike.%${term}%,name_ru.ilike.%${term}%`)
+        .eq('is_active', true)
+        .limit(20);
+      if (data?.length) results.push(...data);
+    } catch (e) {
+      console.log(`[MXIK DB] Search failed for "${term}":`, e);
+    }
+    // Stop if we have enough results
+    if (results.length >= 30) break;
+  }
+
+  // If still no results, try full-text search
+  if (results.length === 0 && words.length > 0) {
+    const searchQuery = words.slice(0, 3).join(' & ');
     try {
       const { data } = await supabase
         .from('mxik_codes')
@@ -44,41 +77,13 @@ async function searchLocalDB(
         .limit(20);
       if (data?.length) results.push(...data);
     } catch (e) {
-      console.log('[MXIK DB] Full-text search failed, trying ILIKE');
+      console.log('[MXIK DB] Full-text search failed');
     }
   }
 
-  // If no results, try ILIKE search with individual words
-  if (results.length === 0) {
-    for (const word of words.slice(0, 3)) {
-      if (word.length < 3) continue;
-      const { data } = await supabase
-        .from('mxik_codes')
-        .select('code, name_uz, name_ru, group_name, vat_rate')
-        .or(`name_uz.ilike.%${word}%,name_ru.ilike.%${word}%,group_name.ilike.%${word}%`)
-        .eq('is_active', true)
-        .limit(15);
-      if (data?.length) results.push(...data);
-    }
-  }
-
-  // Also search by category if provided
-  if (category && results.length < 5) {
-    const catWords = category.split(/\s+/).filter(w => w.length > 2).slice(0, 2);
-    for (const word of catWords) {
-      const { data } = await supabase
-        .from('mxik_codes')
-        .select('code, name_uz, name_ru, group_name, vat_rate')
-        .or(`name_uz.ilike.%${word}%,name_ru.ilike.%${word}%,group_name.ilike.%${word}%`)
-        .eq('is_active', true)
-        .limit(10);
-      if (data?.length) results.push(...data);
-    }
-  }
-
-  // Deduplicate
+  // Deduplicate by code
   const unique = Array.from(new Map(results.map(r => [r.code, r])).values());
-  console.log(`[MXIK DB] Found ${unique.length} results from local DB`);
+  console.log(`[MXIK DB] Found ${unique.length} results from local DB for: "${productName.substring(0, 50)}"`);
   return unique;
 }
 
