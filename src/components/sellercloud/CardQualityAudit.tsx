@@ -503,25 +503,17 @@ export function CardQualityAudit({ connectedMarketplaces, store }: CardQualityAu
         </Card>
       )}
 
-      {/* Empty State */}
+      {/* Empty State - no duplicate buttons, header already has them */}
       {!isAuditing && auditResults.length === 0 && !summary && (
         <Card><CardContent className="py-12 text-center">
           <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center mx-auto mb-4">
             <Shield className="h-10 w-10 text-primary/60" />
           </div>
           <h3 className="text-lg font-semibold mb-2">Kartochkalarni tekshiring</h3>
-          <p className="text-sm text-muted-foreground max-w-md mx-auto mb-4">
-            Mavjud kartochkalaringizni AI yordamida tahlil qiling. Tizim xatoliklarni topadi, 
-            to'ldirilmagan maydonlarni aniqlaydi va sifat indeksini ko'tarish uchun avtomatik tuzatishlar qiladi.
+          <p className="text-sm text-muted-foreground max-w-md mx-auto">
+            Yuqoridagi tugmalar orqali marketplace kartochkalaringizni AI yordamida tahlil qiling.
+            Tizim xatoliklarni topadi va sifat indeksini ko'tarish uchun avtomatik tuzatishlar qiladi.
           </p>
-          <div className="flex flex-wrap justify-center gap-2">
-            {connectedMarketplaces.map(mp => (
-              <Button key={mp} onClick={() => runAudit(mp)} className="gap-2">
-                <Play className="h-4 w-4" />
-                {MARKETPLACE_NAMES[mp] || mp} auditini boshlash
-              </Button>
-            ))}
-          </div>
         </CardContent></Card>
       )}
 
