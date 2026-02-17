@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 export type MobileTabType = 
   | 'marketplaces' | 'analytics' | 'scanner' | 'products' | 'orders' 
   | 'abc-analysis' | 'min-price' | 'card-clone' | 'uzum-card' | 'problems' 
-  | 'financials' | 'calculator' | 'inventory' | 'pricing' | 'publish' 
+  | 'financials' | 'calculator' | 'inventory' | 'pricing'
   | 'reports' | 'notifications' | 'subscription' | 'cost-prices' | 'quality-audit';
 
 interface MobileSellerCloudNavProps {
