@@ -306,7 +306,6 @@ serve(async (req) => {
           const warehouses = await warehousesResp.json();
           isValid = true;
           accountInfo = {
-            supplierId: sellerId || "unknown",
             storeName: "Wildberries Store",
             state: "CONNECTED",
             warehousesCount: Array.isArray(warehouses) ? warehouses.length : 0,
@@ -319,7 +318,6 @@ serve(async (req) => {
           // Other errors - still allow connection
           isValid = true;
           accountInfo = {
-            supplierId: sellerId || "unknown",
             storeName: "Wildberries Store",
             state: "PENDING_VALIDATION",
           };
@@ -328,7 +326,6 @@ serve(async (req) => {
         console.error("WB validation error:", e);
         isValid = true;
         accountInfo = {
-          supplierId: sellerId || "unknown",
           storeName: "Wildberries Store",
           state: "CONNECTION_ERROR",
         };
