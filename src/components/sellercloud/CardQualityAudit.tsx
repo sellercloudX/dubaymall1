@@ -199,29 +199,23 @@ export function CardQualityAudit({ connectedMarketplaces, store }: CardQualityAu
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <Card className="overflow-hidden border-2 border-primary/10 bg-gradient-to-br from-primary/5 to-transparent">
-        <CardHeader className="pb-3">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shrink-0">
-                <Sparkles className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  Kartochka Sifat Auditi
-                  <Badge variant="secondary" className="text-[10px]">AI</Badge>
-                </CardTitle>
-                <CardDescription className="text-xs mt-0.5">
-                  Mavjud kartochkalarni tahlil qilish, xatoliklarni topish va AI yordamida avtomatik tuzatish
-                </CardDescription>
-              </div>
+    <div className="space-y-3">
+      {/* Header - compact */}
+      <Card className="overflow-hidden border-primary/10">
+        <CardContent className="p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shrink-0">
+              <Sparkles className="h-4 w-4 text-white" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold flex items-center gap-1.5">
+                Sifat Auditi
+                <Badge variant="secondary" className="text-[9px] px-1 py-0">AI</Badge>
+              </h3>
+              <p className="text-[10px] text-muted-foreground truncate">Kartochkalarni tahlil va avtomatik tuzatish</p>
             </div>
           </div>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             {connectedMarketplaces.map(mp => (
               <Button
                 key={mp}
@@ -229,38 +223,37 @@ export function CardQualityAudit({ connectedMarketplaces, store }: CardQualityAu
                 size="sm"
                 onClick={() => runAudit(mp)}
                 disabled={isAuditing}
-                className="gap-1.5"
+                className="gap-1 h-8 text-xs px-2.5"
               >
                 {isAuditing && auditedMarketplace === mp ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <Loader2 className="h-3 w-3 animate-spin" />
                 ) : (
-                  <Play className="h-3.5 w-3.5" />
+                  <Play className="h-3 w-3" />
                 )}
-                {MARKETPLACE_NAMES[mp] || mp} audit
+                {MARKETPLACE_NAMES[mp] || mp}
               </Button>
             ))}
           </div>
           {isAuditing && (
-            <div className="mt-3 space-y-2">
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Kartochkalar tekshirilmoqda... Bu 15-30 soniya davom etishi mumkin.
+            <div className="mt-2">
+              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mb-1">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Tekshirilmoqda... (15-30 soniya)
               </div>
-              <Progress value={30} className="h-1.5" />
+              <Progress value={30} className="h-1" />
             </div>
           )}
-          {/* Real-time quality score overview */}
+          {/* Real-time quality overview */}
           {summary && !isAuditing && (
-            <div className="mt-3 flex items-center gap-3">
-              <div className={`text-2xl font-bold ${SCORE_COLORS(summary.avgScore)}`}>{summary.avgScore}%</div>
-              <div className="flex-1">
-                <div className="text-xs text-muted-foreground mb-1">O'rtacha sifat ko'rsatkichi</div>
-                <Progress value={summary.avgScore} className="h-2" />
+            <div className="mt-2 flex items-center gap-2 p-2 rounded-lg bg-muted/50">
+              <div className={`text-xl font-bold ${SCORE_COLORS(summary.avgScore)}`}>{summary.avgScore}%</div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[10px] text-muted-foreground">O'rtacha sifat</div>
+                <Progress value={summary.avgScore} className="h-1.5 mt-0.5" />
               </div>
-              <div className="flex gap-1.5 text-xs">
-                <span className="text-red-600 font-medium">{summary.critical} xato</span>
-                <span className="text-muted-foreground">·</span>
-                <span className="text-amber-600 font-medium">{summary.warning} ogoh.</span>
+              <div className="flex gap-1 text-[10px] shrink-0">
+                <span className="text-destructive font-medium">{summary.critical}❌</span>
+                <span className="text-amber-600 font-medium">{summary.warning}⚠️</span>
               </div>
             </div>
           )}
@@ -269,81 +262,49 @@ export function CardQualityAudit({ connectedMarketplaces, store }: CardQualityAu
 
       {/* Summary KPIs */}
       {summary && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          <Card className="overflow-hidden"><CardContent className="p-3">
-            <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
-              <Package className="h-3.5 w-3.5" /><span className="text-xs">Jami</span>
-            </div>
-            <div className="text-xl font-bold">{summary.total}</div>
-          </CardContent></Card>
-          <Card className={`overflow-hidden ${summary.critical > 0 ? 'border-red-500/30' : ''}`}><CardContent className="p-3">
-            <div className="flex items-center gap-1.5 text-red-600 mb-1">
-              <XCircle className="h-3.5 w-3.5" /><span className="text-xs">Xatolik</span>
-            </div>
-            <div className="text-xl font-bold text-red-600">{summary.critical}</div>
-          </CardContent></Card>
-          <Card className="overflow-hidden"><CardContent className="p-3">
-            <div className="flex items-center gap-1.5 text-amber-600 mb-1">
-              <AlertTriangle className="h-3.5 w-3.5" /><span className="text-xs">Ogohlant.</span>
-            </div>
-            <div className="text-xl font-bold text-amber-600">{summary.warning}</div>
-          </CardContent></Card>
-          <Card className="overflow-hidden"><CardContent className="p-3">
-            <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
-              <Star className="h-3.5 w-3.5" /><span className="text-xs">O'rtacha sifat</span>
-            </div>
-            <div className={`text-xl font-bold ${SCORE_COLORS(summary.avgScore)}`}>{summary.avgScore}%</div>
-          </CardContent></Card>
-          <Card className="overflow-hidden"><CardContent className="p-3">
-            <div className="flex items-center gap-1.5 text-green-600 mb-1">
-              <CheckCircle2 className="h-3.5 w-3.5" /><span className="text-xs">Tuzatildi</span>
-            </div>
-            <div className="text-xl font-bold text-green-600">{successCount}</div>
-          </CardContent></Card>
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
+          {[
+            { icon: Package, label: 'Jami', value: summary.total, color: '' },
+            { icon: XCircle, label: 'Xato', value: summary.critical, color: 'text-destructive' },
+            { icon: AlertTriangle, label: 'Ogoh.', value: summary.warning, color: 'text-amber-600' },
+            { icon: Star, label: 'Ball', value: `${summary.avgScore}%`, color: SCORE_COLORS(summary.avgScore) },
+            { icon: CheckCircle2, label: 'OK', value: successCount, color: 'text-green-600' },
+          ].map((kpi, idx) => (
+            <Card key={idx} className="overflow-hidden"><CardContent className="p-2 text-center">
+              <kpi.icon className={`h-3 w-3 mx-auto mb-0.5 ${kpi.color || 'text-muted-foreground'}`} />
+              <div className={`text-base font-bold ${kpi.color}`}>{kpi.value}</div>
+              <div className="text-[9px] text-muted-foreground">{kpi.label}</div>
+            </CardContent></Card>
+          ))}
         </div>
       )}
 
       {/* Batch Fix Button */}
       {summary && summary.fixable > 0 && (
         <Card className="overflow-hidden border-primary/20">
-          <CardContent className="p-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shrink-0">
-                  <Bot className="h-5 w-5 text-white" />
-                </div>
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Bot className="h-5 w-5 text-green-600 shrink-0" />
                 <div>
-                  <h4 className="font-semibold text-sm">Avtomatik tuzatish</h4>
-                  <p className="text-xs text-muted-foreground">
-                    {summary.fixable} ta kartochkani AI yordamida bir tugmada tuzatish
-                  </p>
+                  <h4 className="font-semibold text-xs">Avtomatik tuzatish ({summary.fixable} ta)</h4>
                 </div>
               </div>
               <Button
                 onClick={batchFixAll}
                 disabled={isBatchFixing || summary.fixable === 0}
-                className="gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 shrink-0"
+                size="sm"
+                className="gap-1.5 h-8 text-xs bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 shrink-0"
               >
                 {isBatchFixing ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    {batchProgress.current}/{batchProgress.total}
-                  </>
+                  <><Loader2 className="h-3 w-3 animate-spin" />{batchProgress.current}/{batchProgress.total}</>
                 ) : (
-                  <>
-                    <Zap className="h-4 w-4" />
-                    Barchasini tuzatish
-                  </>
+                  <><Zap className="h-3 w-3" />Tuzatish</>
                 )}
               </Button>
             </div>
             {isBatchFixing && (
-              <div className="mt-3">
-                <Progress value={(batchProgress.current / batchProgress.total) * 100} className="h-2" />
-                <p className="text-xs text-muted-foreground mt-1">
-                  {batchProgress.current} / {batchProgress.total} kartochka qayta ishlanmoqda...
-                </p>
-              </div>
+              <Progress value={(batchProgress.current / batchProgress.total) * 100} className="h-1.5 mt-2" />
             )}
           </CardContent>
         </Card>
@@ -352,16 +313,14 @@ export function CardQualityAudit({ connectedMarketplaces, store }: CardQualityAu
       {/* Results List */}
       {filteredResults.length > 0 && (
         <Card className="overflow-hidden">
-          <CardHeader className="p-3 sm:p-4">
-            <div className="flex items-center justify-between gap-2">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Shield className="h-4 w-4" /> Audit natijalari
-              </CardTitle>
-              <Badge variant="outline" className="text-xs">{filteredResults.length} ta kartochka</Badge>
+          <CardContent className="p-2">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-medium flex items-center gap-1.5">
+                <Shield className="h-3.5 w-3.5" /> Natijalar
+              </span>
+              <Badge variant="outline" className="text-[10px]">{filteredResults.length} ta</Badge>
             </div>
-          </CardHeader>
-          <CardContent className="p-3 sm:p-4 pt-0">
-            <div className="space-y-2 max-h-[600px] overflow-y-auto">
+            <div className="space-y-1.5 max-h-[500px] overflow-y-auto">
               {filteredResults.map((result) => {
                 const isExpanded = expandedCards.has(result.offerId);
                 const fixResult = fixResults.get(result.offerId);
@@ -371,66 +330,54 @@ export function CardQualityAudit({ connectedMarketplaces, store }: CardQualityAu
                 return (
                   <div
                     key={result.offerId}
-                    className={`rounded-lg border overflow-hidden transition-all ${
+                    className={`rounded-md border overflow-hidden transition-all ${
                       fixResult?.status === 'success' ? 'border-green-500/30 bg-green-50/50 dark:bg-green-950/10' :
-                      fixResult?.status === 'error' ? 'border-red-500/30' : ''
+                      fixResult?.status === 'error' ? 'border-destructive/30' : ''
                     }`}
                   >
-                    {/* Card Header Row */}
                     <div
-                      className="p-3 cursor-pointer hover:bg-muted/50 transition-colors"
+                      className="p-2 cursor-pointer hover:bg-muted/50 transition-colors"
                       onClick={() => toggleExpand(result.offerId)}
                     >
-                      <div className="flex items-center gap-2">
-                        {/* Score Badge */}
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-sm shrink-0 ${SCORE_BG(result.qualityScore)}`}>
+                      <div className="flex items-center gap-1.5">
+                        {/* Score Badge - compact */}
+                        <div className={`w-8 h-8 rounded-md flex items-center justify-center text-white font-bold text-xs shrink-0 ${SCORE_BG(result.qualityScore)}`}>
                           {result.qualityScore}
                         </div>
 
                         {/* Product Info */}
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm truncate">{result.productName || result.offerId}</div>
-                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                            <span className="text-[10px] text-muted-foreground font-mono">{result.offerId}</span>
-                            {result.category && (
-                              <Badge variant="outline" className="text-[10px] px-1">{result.category}</Badge>
-                            )}
-                          </div>
+                          <div className="font-medium text-xs truncate">{result.productName || result.offerId}</div>
+                          <div className="text-[9px] text-muted-foreground font-mono truncate">{result.offerId}</div>
                         </div>
 
-                        {/* Issue Badges */}
-                        <div className="flex items-center gap-1 shrink-0">
+                        {/* Issue counts inline */}
+                        <div className="flex items-center gap-1 shrink-0 text-[10px]">
                           {errorIssues.length > 0 && (
-                            <Badge className="bg-red-500 text-white text-[10px] px-1.5">{errorIssues.length} xato</Badge>
+                            <span className="text-destructive font-medium">{errorIssues.length}❌</span>
                           )}
                           {warningIssues.length > 0 && (
-                            <Badge className="bg-amber-500 text-white text-[10px] px-1.5">{warningIssues.length} ogoh.</Badge>
+                            <span className="text-amber-600 font-medium">{warningIssues.length}⚠️</span>
                           )}
-                          {fixResult?.status === 'success' && (
-                            <Badge className="bg-green-500 text-white text-[10px] px-1.5">✅ Tuzatildi</Badge>
-                          )}
+                          {fixResult?.status === 'success' && <span>✅</span>}
                         </div>
 
-                        {/* Fix Button */}
+                        {/* Fix + Expand */}
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="shrink-0 h-8 px-2"
+                          className="shrink-0 h-7 w-7 p-0"
                           onClick={(e) => { e.stopPropagation(); fixCard(result.offerId); }}
                           disabled={fixResult?.status === 'fixing' || fixResult?.status === 'success'}
                         >
                           {fixResult?.status === 'fixing' ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : fixResult?.status === 'success' ? (
-                            <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+                            <Loader2 className="h-3 w-3 animate-spin" />
                           ) : (
-                            <Wrench className="h-3.5 w-3.5" />
+                            <Wrench className="h-3 w-3" />
                           )}
                         </Button>
-
-                        {/* Expand Toggle */}
                         {isExpanded ? (
-                          <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <ChevronUp className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                         ) : (
                           <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
                         )}

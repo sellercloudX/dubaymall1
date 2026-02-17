@@ -174,9 +174,22 @@ async function fetchCardQuality(
         const cards = data.result?.offerCards || [];
         console.log(`Batch ${i}: got ${cards.length} cards with quality data`);
 
+        // Log first card's raw fields to understand API structure
+        if (cards.length > 0 && i === 0) {
+          const sample = cards[0];
+          console.log(`Sample card keys: ${Object.keys(sample).join(', ')}`);
+          console.log(`Sample card offerId=${sample.offerId}, contentRating=${JSON.stringify(sample.contentRating)}, cardStatus=${sample.cardStatus}`);
+          if (sample.contentRating) console.log(`contentRating details: ${JSON.stringify(sample.contentRating)}`);
+        }
+
         for (const card of cards) {
+          // Yandex API returns contentRating as number (0-100) directly
+          const rating = typeof card.contentRating === 'number' 
+            ? card.contentRating 
+            : card.contentRating?.rating ?? card.contentRating?.score ?? null;
+
           cardMap.set(card.offerId, {
-            contentRating: card.contentRating || null,
+            contentRating: rating != null ? { rating } : null,
             averageContentRating: card.averageContentRating || null,
             recommendations: card.recommendations || card.cardRecommendations || [],
             cardStatus: card.cardStatus || '',
@@ -268,18 +281,15 @@ function analyzeOffers(
     const quality = cardQualityMap.get(offer.offerId);
     const issues: QualityIssue['issues'] = [];
 
-    // === Quality score ===
-    let qualityScore = 50;
+    // === Quality score from Yandex API ===
+    let qualityScore = -1; // -1 = unknown, will calculate after issues
+    let hasApiScore = false;
     if (quality?.contentRating?.rating != null) {
-      qualityScore = quality.contentRating.rating;
+      qualityScore = Math.round(quality.contentRating.rating);
+      hasApiScore = true;
     } else if (quality?.averageContentRating != null) {
-      qualityScore = quality.averageContentRating;
-    } else if (quality?.cardStatus === 'HAS_CARD_CAN_NOT_BE_IMPROVED') {
-      qualityScore = 100;
-    } else if (quality?.cardStatus === 'HAS_CARD_CAN_BE_IMPROVED') {
-      qualityScore = 65;
-    } else if (quality?.cardStatus === 'NO_CARD_NEED_CONTENT') {
-      qualityScore = 25;
+      qualityScore = Math.round(quality.averageContentRating);
+      hasApiScore = true;
     }
 
     // === Name check ===
@@ -404,6 +414,18 @@ function analyzeOffers(
           currentValue: warn.currentValue || '',
           suggestedFix: warn.recommendation || '',
         });
+      }
+    }
+
+    // If no API score, calculate from issues + cardStatus
+    if (!hasApiScore) {
+      if (quality?.cardStatus === 'HAS_CARD_CAN_NOT_BE_IMPROVED') {
+        qualityScore = 100;
+      } else {
+        // Calculate based on issue severity
+        const errorCount = issues.filter(i => i.severity === 'error').length;
+        const warningCount = issues.filter(i => i.severity === 'warning').length;
+        qualityScore = Math.max(10, 100 - (errorCount * 15) - (warningCount * 5));
       }
     }
 
