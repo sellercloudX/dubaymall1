@@ -77,3 +77,9 @@ verify_jwt = false
 
 [functions.import-mxik-codes]
 verify_jwt = false
+
+[functions.create-uzum-card]
+verify_jwt = false
+
+[functions.fetch-wildberries-data]
+verify_jwt = false

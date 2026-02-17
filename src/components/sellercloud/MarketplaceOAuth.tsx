@@ -92,7 +92,6 @@ const MARKETPLACES: Marketplace[] = [
      requiresManualKey: true,
      fields: [
        { key: 'apiKey', label: 'API Token', placeholder: 'eyJhbGciOi...' },
-       { key: 'supplierId', label: 'Supplier ID', placeholder: '123456' },
      ],
      status: 'available',
    },

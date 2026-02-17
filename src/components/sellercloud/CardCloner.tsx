@@ -196,6 +196,35 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
         return true;
       }
       
+      if (targetMp === 'uzum') {
+        const { data, error } = await supabase.functions.invoke('create-uzum-card', {
+          body: {
+            product: {
+              name: product.name,
+              description: product.description || product.name,
+              price: product.price,
+              costPrice: costPrice,
+              images: validImages,
+              category: product.category || '',
+            },
+            cloneMode: true,
+          },
+        });
+        
+        if (error) {
+          toast.error(`${product.name}: ${error.message || 'Edge function xatosi'}`);
+          return false;
+        }
+        if (!data?.success) {
+          toast.error(`${product.name.slice(0, 30)}: ${data?.error || 'API xatosi'}`);
+          return false;
+        }
+        if (data.method === 'prepared') {
+          toast.info(`${product.name.slice(0, 25)}: Ma'lumotlar tayyor (qo'lda yuklash kerak)`);
+        }
+        return true;
+      }
+      
       console.warn(`⚠️ ${targetMp} API does not support card creation`);
       toast.error(`${MARKETPLACE_INFO[targetMp]?.name || targetMp}: Kartochka yaratish qo'llab-quvvatlanmaydi`);
       return false;
