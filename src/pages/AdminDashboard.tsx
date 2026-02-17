@@ -21,6 +21,12 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const { permissions, isLoading: permissionsLoading, hasPermission, isSuperAdmin } = useAdminPermissions();
 
+  useEffect(() => {
+    if (!loading && !permissionsLoading && !user) {
+      navigate('/auth');
+    }
+  }, [user, loading, permissionsLoading, navigate]);
+
   if (loading || permissionsLoading) {
     return (
       <Layout>
@@ -31,10 +37,7 @@ export default function AdminDashboard() {
     );
   }
 
-  if (!user) {
-    navigate('/auth');
-    return null;
-  }
+  if (!user) return null;
 
   if (!permissions) {
     return (

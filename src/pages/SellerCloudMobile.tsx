@@ -190,8 +190,6 @@ export default function SellerCloudMobile() {
         return <div className="p-4"><CardQualityAudit connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'pricing':
         return <div className="p-4"><PriceManager connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
-      case 'publish':
-        return <div className="p-4 text-center text-muted-foreground">Bu funksiya olib tashlandi</div>;
       case 'reports':
         return <div className="p-4"><ReportsExport connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'notifications':

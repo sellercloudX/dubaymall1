@@ -17,9 +17,13 @@
      this.state = { hasError: false };
    }
  
-   static getDerivedStateFromError(error: Error): State {
-     return { hasError: true, error };
-   }
+    static getDerivedStateFromError(error: Error): State {
+      return { hasError: true, error };
+    }
+
+    componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+      console.error('[ErrorBoundary]', error.message, errorInfo.componentStack);
+    }
  
    handleReset = () => {
      // Clear potentially corrupted cache
