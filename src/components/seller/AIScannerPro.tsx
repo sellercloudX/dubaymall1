@@ -812,10 +812,29 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
       {/* Step 2: Analyzing */}
       {currentStep === 'analyzing' && (
         <Card>
-          <CardContent className="py-12 text-center">
-            <Loader2 className="h-12 w-12 animate-spin mx-auto text-primary mb-4" />
-            <p className="text-lg font-medium">Mahsulot tahlil qilinmoqda...</p>
-            <p className="text-sm text-muted-foreground">AI rasm orqali mahsulotni aniqlayapti</p>
+          <CardContent className="py-12 text-center space-y-4">
+            <div className="relative mx-auto w-16 h-16">
+              <Loader2 className="h-16 w-16 animate-spin text-primary/20" />
+              <Sparkles className="h-6 w-6 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse" />
+            </div>
+            <div>
+              <p className="text-lg font-semibold">AI tahlil qilmoqda...</p>
+              <p className="text-sm text-muted-foreground mt-1">Mahsulot turi, brend va kategoriya aniqlanmoqda</p>
+            </div>
+            <div className="flex justify-center gap-6 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                Vizual tahlil
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-muted" />
+                Narx taxmin
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-muted" />
+                Kategoriya
+              </div>
+            </div>
           </CardContent>
         </Card>
       )}
