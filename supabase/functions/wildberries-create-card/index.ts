@@ -139,7 +139,7 @@ serve(async (req) => {
       vendorCode: sku,
       title: product.name.slice(0, 100),
       description: stripHtml(product.description || product.name).slice(0, 1000),
-      brand: "DubayMall",
+      brand: "SellerCloudX",
       categoryId: 1, // Default to general category
       price: Math.round(product.price * 100), // Wildberries uses kopeks
       currencyIso3: "UZS", // Uzbek Som

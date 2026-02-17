@@ -20,9 +20,9 @@ export default defineConfig(({ mode }) => ({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'robots.txt'],
       manifest: {
-        name: 'Dubay Mall',
-        short_name: 'Dubay Mall',
-        description: "O'zbekistonning eng yirik onlayn savdo platformasi",
+        name: 'SellerCloudX',
+        short_name: 'SellerCloudX',
+        description: "Marketplace avtomatizatsiya platformasi",
         start_url: '/',
         display: 'standalone',
         background_color: '#ffffff',
@@ -52,18 +52,6 @@ export default defineConfig(({ mode }) => ({
         ],
         categories: ['shopping', 'business'],
         shortcuts: [
-          {
-            name: 'Marketplace',
-            short_name: 'Bozor',
-            url: '/marketplace',
-            icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }]
-          },
-          {
-            name: 'Savatcham',
-            short_name: 'Savat',
-            url: '/cart',
-            icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }]
-          },
           {
             name: 'SellerCloudX',
             short_name: 'SellerCloud',
