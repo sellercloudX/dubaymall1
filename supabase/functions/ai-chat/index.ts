@@ -12,7 +12,7 @@ interface ChatMessage {
   content: string;
 }
 
-// System prompt focused on Dubay Mall platform and e-commerce
+// System prompt focused on SellerCloudX platform
 const PLATFORM_SYSTEM_PROMPT = `Siz SellerCloudX platformasining savdo yordamchi AI botisiz.
 
 🎯 ASOSIY MAQSAD: Foydalanuvchilarga marketplace avtomatizatsiyasi, mahsulot boshqaruvi va analitika bo'yicha yordam berish.
