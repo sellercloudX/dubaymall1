@@ -146,7 +146,50 @@ async function aiSelectBestCode(
   }
 
   if (candidates.length === 0) {
-    throw new Error('Hech qanday MXIK kod topilmadi');
+    // No candidates found — use AI to suggest the most likely MXIK category
+    console.log('[MXIK] No candidates from DB/Tasnif, using AI fallback');
+    const apiKey = Deno.env.get('LOVABLE_API_KEY');
+    if (!apiKey) throw new Error('LOVABLE_API_KEY not configured');
+    
+    const fallbackResp = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          { role: 'system', content: 'Sen O\'zbekiston MXIK (IKPU) kod mutaxassisizan. Mahsulot nomi asosida eng mos MXIK kodni taklif qil. MXIK kodlar 17 xonali raqam. Faqat JSON javob ber.' },
+          { role: 'user', content: `Mahsulot: "${productName}"\n${category ? `Kategoriya: "${category}"` : ''}\n\nEng mos MXIK kodni 17 xonali formatda taklif qil.\nJSON: {"mxik_code":"17_digit_code","mxik_name":"nomi","vat_rate":12,"confidence":50}` },
+        ],
+        temperature: 0.2,
+        max_tokens: 300,
+      }),
+    });
+    
+    if (fallbackResp.ok) {
+      const fbData = await fallbackResp.json();
+      const fbContent = fbData.choices?.[0]?.message?.content?.trim() || '';
+      const fbMatch = fbContent.match(/\{[\s\S]*\}/);
+      if (fbMatch) {
+        const fbResult = JSON.parse(fbMatch[0]);
+        const code = String(fbResult.mxik_code || '').replace(/\D/g, '').padEnd(17, '0').slice(0, 17);
+        return {
+          mxik_code: code,
+          mxik_name: fbResult.mxik_name || productName,
+          vat_rate: fbResult.vat_rate ?? 12,
+          confidence: Math.min(fbResult.confidence || 40, 60), // Low confidence for AI-generated
+          alternatives: [],
+        };
+      }
+    }
+    
+    // Ultimate fallback — return generic code
+    return {
+      mxik_code: '06912001001000000',
+      mxik_name: 'Boshqa tayyor mahsulotlar',
+      vat_rate: 12,
+      confidence: 20,
+      alternatives: [],
+    };
   }
 
   const candidateList = candidates.slice(0, 30).map((c, i) =>
@@ -311,6 +354,8 @@ serve(async (req) => {
     const searchTerms = [
       productName.slice(0, 50),
       words.slice(0, 3).join(' '),
+      words.slice(0, 2).join(' '),
+      words[0] || '', // Single most important word
       category || '',
     ].filter(Boolean);
 
