@@ -115,10 +115,6 @@ export const translations = {
     analyzeImage: 'Rasmni tahlil qilish',
     aiSuggestion: 'AI tavsiyasi',
     
-    // Affiliate
-    enableAffiliate: 'Affiliate rejimini yoqish',
-    commissionPercent: 'Komissiya foizi',
-    
     // Stats
     totalProducts: 'Jami mahsulotlar',
     totalSales: 'Jami sotuvlar',
@@ -290,10 +286,6 @@ export const translations = {
     analyzeImage: 'Анализировать изображение',
     aiSuggestion: 'Предложение AI',
     
-    // Affiliate
-    enableAffiliate: 'Включить партнерский режим',
-    commissionPercent: 'Процент комиссии',
-    
     // Stats
     totalProducts: 'Всего товаров',
     totalSales: 'Всего продаж',
@@ -464,10 +456,6 @@ export const translations = {
     uploadImage: 'Upload Image',
     analyzeImage: 'Analyze Image',
     aiSuggestion: 'AI Suggestion',
-    
-    // Affiliate
-    enableAffiliate: 'Enable Affiliate Mode',
-    commissionPercent: 'Commission Percent',
     
     // Stats
     totalProducts: 'Total Products',

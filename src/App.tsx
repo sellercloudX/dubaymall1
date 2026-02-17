@@ -103,9 +103,7 @@ function App() {
                     <Route path="/seller-cloud-mobile" element={<SellerCloudMobile />} />
                     <Route path="/admin" element={<AdminDashboard />} />
                     {/* Redirect old routes to landing */}
-                    <Route path="/partnership" element={<Navigate to="/" replace />} />
                     <Route path="/seller" element={<Navigate to="/seller-cloud" replace />} />
-                    <Route path="/blogger" element={<Navigate to="/" replace />} />
                     <Route path="/dashboard" element={<Navigate to="/seller-cloud" replace />} />
                     <Route path="/marketplace" element={<Navigate to="/" replace />} />
                     <Route path="*" element={<NotFound />} />

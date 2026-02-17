@@ -9,13 +9,6 @@ export interface SalesCommissionSettings {
   promo_end_date: string | null;
 }
 
-export interface BloggerFeeSettings {
-  percent: number;
-  is_promo: boolean;
-  promo_percent: number;
-  promo_end_date: string | null;
-}
-
 export interface SubscriptionPlan {
   price: number;
   name: string;
@@ -58,7 +51,6 @@ export function usePlatformSettings() {
 
       return {
         salesCommission: settingsMap['sales_commission'] as SalesCommissionSettings,
-        bloggerFee: settingsMap['blogger_platform_fee'] as BloggerFeeSettings,
         subscriptionPlans: settingsMap['subscription_plans'] as SubscriptionPlans,
         promoPeriod: settingsMap['promo_period'] as PromoPeriod,
       };
@@ -115,26 +107,10 @@ export function usePlatformSettings() {
     return percent;
   };
 
-  const getEffectiveBloggerFee = () => {
-    if (!settings?.bloggerFee) return 15;
-    
-    const { percent, is_promo, promo_percent, promo_end_date } = settings.bloggerFee;
-    
-    if (is_promo && promo_end_date) {
-      const endDate = new Date(promo_end_date);
-      if (endDate > new Date()) {
-        return promo_percent;
-      }
-    }
-    
-    return percent;
-  };
-
   return {
     settings,
     isLoading,
     updateSetting,
     getEffectiveCommission,
-    getEffectiveBloggerFee,
   };
 }
