@@ -6,82 +6,82 @@ const corsHeaders = {
 };
 
 /**
- * Product image generation pipeline using FREE Lovable AI (Gemini).
- * NO Fal.ai costs — all images generated via Lovable AI gateway.
+ * HYBRID ARCHITECTURE: Gemini (image) + Code (text overlay)
  * 
- * Image types:
- * - "professional": Infographic card with features/specs overlay
- * - "minimalist/vibrant/luxury": Clean product angles on #efefef background
+ * Stage 1: Gemini generates TEXT-FREE product images with proper negative space
+ * Stage 2: Frontend renders infographic text overlay via Canvas API
  * 
- * Output: 1080x1440 (3:4) vertical marketplace images
+ * Cost: $0.00 (Gemini via Lovable AI is free)
+ * Speed: 5-10 seconds per image
+ * Text quality: 100% accurate (rendered by code, not AI)
  */
 
-// Category → Design Matrix
+// Category → Design Matrix (Pinterest/Behance quality)
 const CATEGORY_DESIGN_MATRIX: Record<string, {
   background: string;
   lighting: string;
-  infographicStyle: string;
   colorScheme: string;
+  composition: string;
 }> = {
   'kosmetika': {
-    background: 'marble surface with soft silk curtains, water reflections, rose petals',
-    lighting: 'soft glow, diffused warm light, beauty lighting',
-    infographicStyle: 'elegant thin serif fonts, gold accents, luxurious feel',
+    background: 'marble surface with soft silk curtains, water reflections, rose petals, bokeh effect',
+    lighting: 'soft glow, diffused warm beauty lighting, premium aura',
     colorScheme: 'soft pinks, cream whites, gold metallic',
+    composition: 'product centered with generous space on sides and bottom for text overlay',
   },
   'parfyumeriya': {
-    background: 'marble surface with soft silk curtains, sunlight shadows',
-    lighting: 'soft glow, golden hour backlight, premium feel',
-    infographicStyle: 'elegant thin fonts, gold/silver accents, Sephora-style',
+    background: 'marble surface with soft silk curtains, sunlight shadows, elegant podium',
+    lighting: 'soft golden hour backlight, cinematic, premium feel',
     colorScheme: 'gold, white, deep navy or burgundy',
+    composition: 'product on podium centered, space around edges for text overlay',
   },
   'elektronika': {
     background: 'dark gradient surface, subtle tech grid pattern, floating reflections',
     lighting: 'dramatic rim lighting, tech-forward, precision shadows',
-    infographicStyle: 'modern sans-serif, neon accents, Apple Store aesthetic',
     colorScheme: 'deep black, white, electric blue or silver',
+    composition: 'product centered with clean space on left and right for feature callouts',
   },
   'kiyim': {
-    background: 'neutral studio backdrop, clean concrete or fabric texture',
+    background: 'neutral studio backdrop, clean concrete or soft fabric texture',
     lighting: 'bright editorial, sharp shadows, fashion-forward',
-    infographicStyle: 'trendy bold fonts, ZARA/H&M aesthetic, minimal text',
     colorScheme: 'neutral tones, black and white with single accent color',
+    composition: 'product centered vertically, space on sides for text',
   },
   'oshxona': {
-    background: 'Scandinavian kitchen, light wood surface, fresh herbs',
+    background: 'Scandinavian minimalist kitchen, light wood surface, natural setting',
     lighting: 'natural sunlight from window, warm and inviting',
-    infographicStyle: 'minimalist bold fonts, clean icons, IKEA style',
     colorScheme: 'warm whites, light wood tones, fresh green accents',
+    composition: 'product centered with kitchen context, space for overlay text',
   },
   'sport': {
-    background: 'dynamic gradient, motion blur elements, gym/outdoor',
+    background: 'dynamic gradient, subtle motion blur elements, energetic backdrop',
     lighting: 'energetic bright, dramatic contrast, action-oriented',
-    infographicStyle: 'bold impact fonts, Nike/Adidas aesthetic, dynamic angles',
     colorScheme: 'bold primary colors, black, energetic contrasts',
+    composition: 'product large in center, dynamic angle, space for feature badges',
   },
   'bolalar': {
-    background: 'soft pastel gradient, playful elements, stars/clouds',
+    background: 'soft pastel gradient, playful subtle elements, stars or clouds',
     lighting: 'warm, soft, safe-feeling, no harsh shadows',
-    infographicStyle: 'rounded friendly fonts, colorful icons, child-appropriate',
     colorScheme: 'bright pastels, sky blue, warm yellow, soft pink',
+    composition: 'product centered with cheerful space around for kid-friendly text',
   },
   'oziq-ovqat': {
-    background: 'rustic wood table, fresh ingredients, appetizing arrangement',
+    background: 'rustic wood table, fresh ingredients nearby, appetizing arrangement',
     lighting: 'warm food photography lighting, appetizing glow',
-    infographicStyle: 'organic handwritten-style fonts, natural icons',
     colorScheme: 'warm earth tones, vibrant food colors, green freshness',
+    composition: 'product centered with appetizing context, space for text overlay',
   },
   'aksessuarlar': {
     background: 'clean gradient surface, lifestyle composition, travel vibes',
     lighting: 'bright natural daylight, soft studio fill',
-    infographicStyle: 'modern clean fonts, minimal icons, lifestyle brand feel',
     colorScheme: 'earthy tones, warm grays, subtle accent colors',
+    composition: 'product centered with lifestyle context, space for text badges',
   },
   'default': {
     background: 'clean gradient surface, subtle professional texture',
     lighting: 'soft studio lighting, professional product photography',
-    infographicStyle: 'modern clean fonts, professional icons, premium feel',
     colorScheme: 'professional blues, clean whites, subtle gradients',
+    composition: 'product centered (60% of frame), generous negative space around edges for text',
   },
 };
 
@@ -99,8 +99,8 @@ function getCategoryKey(category: string): string {
   return 'default';
 }
 
-// Generate image using FREE Lovable AI (Gemini image generation)
-async function generateWithGemini(
+// Generate TEXT-FREE image using Gemini
+async function generateTextFreeImage(
   prompt: string,
   lovableKey: string,
   productImage?: string
@@ -130,15 +130,13 @@ async function generateWithGemini(
     });
 
     if (!response.ok) {
-      console.error(`Gemini image gen error: ${response.status}`);
+      console.error(`Gemini error: ${response.status}`);
       return null;
     }
 
     const data = await response.json();
     const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-    if (imageUrl) {
-      console.log("✅ Gemini image generated (FREE)");
-    }
+    if (imageUrl) console.log("✅ Gemini text-free image generated (FREE)");
     return imageUrl || null;
   } catch (e) {
     console.error("Gemini image error:", e);
@@ -146,7 +144,7 @@ async function generateWithGemini(
   }
 }
 
-// Upload image to Supabase storage
+// Upload to Supabase storage
 async function uploadToStorage(imageData: string, style: string): Promise<string | null> {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -220,7 +218,7 @@ serve(async (req) => {
       });
     }
 
-    const { productImage, productName, category, style } = await req.json();
+    const { productImage, productName, category, style, features, brand } = await req.json();
 
     if (!productName) {
       return new Response(JSON.stringify({ error: "productName is required" }), {
@@ -228,40 +226,44 @@ serve(async (req) => {
       });
     }
 
-    console.log(`🎨 Generating image: "${productName}" | style: ${style || 'professional'} | engine: Gemini (FREE)`);
+    console.log(`🎨 Generating TEXT-FREE image: "${productName}" | style: ${style || 'professional'}`);
 
     const categoryKey = getCategoryKey(category || '');
     const designMatrix = CATEGORY_DESIGN_MATRIX[categoryKey];
     const isInfographic = style === 'professional' || style === 'infographic';
 
-    // Build targeted prompt based on style
+    // ALL images are generated WITHOUT text — text is added by frontend Canvas overlay
     let prompt: string;
 
     if (isInfographic) {
-      prompt = `You are an elite product photographer creating a PREMIUM MARKETPLACE INFOGRAPHIC CARD.
+      // For infographic style: beautiful background + product + NEGATIVE SPACE for text overlay
+      prompt = `You are an elite product photographer. Create a PREMIUM product photo for a marketplace listing.
 
 PRODUCT: "${productName}" (Category: ${category || 'General'})
 
-DESIGN REQUIREMENTS:
+CRITICAL RULES:
+1. DO NOT write ANY text, letters, words, labels, or watermarks on the image
+2. DO NOT add any typography, fonts, numbers, or characters
+3. The image must be PURELY visual — only the product and its background/environment
+
+VISUAL DESIGN:
 - Background: ${designMatrix.background}
 - Lighting: ${designMatrix.lighting}
-- Typography: ${designMatrix.infographicStyle}
-- Color scheme: ${designMatrix.colorScheme}
+- Color palette: ${designMatrix.colorScheme}
+- Composition: ${designMatrix.composition}
+- Product fills about 55-65% of the frame, centered
+- Leave generous EMPTY SPACE around the product edges (especially top, bottom, and sides) — this space will be used for text overlay later by code
+- The empty space should feel natural and aesthetically pleasing, not awkward
 
-IMAGE SPECIFICATIONS:
-1. Product rendered LARGE and photorealistic in center (65-75% of frame)
-2. 3-5 KEY FEATURES shown with elegant thin lines pointing to product parts
-3. Feature labels in RUSSIAN language (Cyrillic text), modern sans-serif font
-4. Each feature has a small flat icon matching the color scheme
-5. Bottom area: brand badge, quality/rating indicators
-6. Premium gradient background matching product category aesthetic
-7. VERTICAL 3:4 aspect ratio (1080x1440 pixels)
-8. Ultra high resolution, photorealistic, NO watermarks
-9. The product must look EXACTLY like a real "${productName}"
-10. Professional marketplace listing quality (Ozon/Wildberries level)
+TECHNICAL:
+- VERTICAL 3:4 aspect ratio (1080x1440 pixels)
+- Ultra high resolution, photorealistic
+- Pinterest/Behance trending quality
+- The product must look EXACTLY like a real "${productName}"
 
-Create this premium infographic product card image now.`;
+Generate this premium text-free product image now.`;
     } else {
+      // Clean product shots on neutral background
       const angleMap: Record<string, string> = {
         'minimalist': 'perfectly centered front view, symmetrical composition',
         'vibrant': '45-degree three-quarter angle showing depth and dimension',
@@ -269,53 +271,61 @@ Create this premium infographic product card image now.`;
       };
       const angle = angleMap[style] || 'professional studio angle';
 
-      prompt = `You are an elite product photographer creating a PREMIUM MARKETPLACE PRODUCT PHOTO.
+      prompt = `You are an elite product photographer. Create a CLEAN marketplace product photo.
 
 PRODUCT: "${productName}" (Category: ${category || 'General'})
 
-IMAGE SPECIFICATIONS:
-1. Camera angle: ${angle}
-2. Background: Clean, solid light gray (#EFEFEF) — NO patterns, NO props, NO text
-3. Lighting: ${designMatrix.lighting}, soft diffused studio fill, subtle reflection below
-4. Product fills 65-75% of frame — properly sized, not too small, not cropped
-5. NO text, NO labels, NO watermarks, NO human hands
-6. VERTICAL 3:4 aspect ratio (1080x1440 pixels)
-7. Ultra high resolution, every detail razor sharp
-8. The product must look EXACTLY like a real "${productName}" — accurate shape, color, proportions, brand details
-9. Quality level: Apple Store / Sephora product photography
-10. Clean, professional marketplace listing image
+CRITICAL RULES:
+1. DO NOT write ANY text, letters, words, labels, or watermarks
+2. PURELY visual — only the product
+3. Background: Clean, solid light gray (#EFEFEF) — NO patterns, NO props
 
-Create this premium product photo now.`;
+SPECIFICATIONS:
+- Camera angle: ${angle}
+- Lighting: ${designMatrix.lighting}, soft diffused studio fill, subtle reflection below
+- Product fills 65-75% of frame
+- NO text, NO labels, NO watermarks, NO human hands
+- VERTICAL 3:4 aspect ratio (1080x1440 pixels)
+- Ultra high resolution, razor sharp
+- Quality: Apple Store / Sephora product photography
+
+Generate this clean product photo now.`;
     }
 
-    // Add product reference image if available
     let generatedUrl: string | null = null;
 
     if (productImage) {
-      // With reference image — better accuracy
-      const refPrompt = `${prompt}\n\nCRITICAL: Use the attached product image as EXACT visual reference. The generated product must be 100% identical in shape, color, brand, and every detail. ONLY change the angle, background, and lighting as specified above. Do NOT add any text overlays unless this is an infographic style.`;
-      generatedUrl = await generateWithGemini(refPrompt, LOVABLE_API_KEY, productImage);
+      const refPrompt = `${prompt}\n\nCRITICAL: Use the attached product image as EXACT visual reference. Match shape, color, brand, proportions exactly. Only change angle, background, and lighting. ABSOLUTELY NO TEXT on the image.`;
+      generatedUrl = await generateTextFreeImage(refPrompt, LOVABLE_API_KEY, productImage);
     }
 
     if (!generatedUrl) {
-      // Without reference or retry without reference
-      generatedUrl = await generateWithGemini(prompt, LOVABLE_API_KEY);
+      generatedUrl = await generateTextFreeImage(prompt, LOVABLE_API_KEY);
     }
 
-    const images: Array<{ url: string; style: string }> = [];
+    const images: Array<{ url: string; style: string; isTextFree: boolean }> = [];
 
     if (generatedUrl) {
       const storedUrl = await uploadToStorage(generatedUrl, style || 'professional');
       if (storedUrl) {
-        images.push({ url: storedUrl, style: style || 'professional' });
+        images.push({ url: storedUrl, style: style || 'professional', isTextFree: true });
       }
     }
 
+    // Return overlay metadata for frontend Canvas rendering
     return new Response(JSON.stringify({
       success: images.length > 0,
       images,
-      engine: 'gemini-free',
+      engine: 'gemini-hybrid',
       cost: '$0.00',
+      // Pass design info for frontend overlay
+      overlayConfig: isInfographic ? {
+        categoryKey,
+        colorScheme: designMatrix.colorScheme,
+        features: features || [],
+        brand: brand || '',
+        productName,
+      } : null,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
