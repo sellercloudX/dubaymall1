@@ -400,7 +400,7 @@ serve(async (req) => {
     console.log(`Price conversion: ${rawPrice} (source) → ${priceRUB} RUB`);
 
     // ===== BUILD CORRECT WB v2 PAYLOAD =====
-    // Note: mediaFiles NOT included in upload - must be uploaded via /content/v3/media/save after card creation
+    // mediaFiles MUST be included in upload payload for WB to index the card
     const variant: any = {
       vendorCode,
       title: content.title,
@@ -419,7 +419,10 @@ serve(async (req) => {
         skus: barcode ? [barcode] : undefined,
       }],
     };
-    // Don't send brand field at all - empty string causes silent rejection
+    // Include images in initial payload - WB won't index without them
+    if (proxiedImages.length > 0) {
+      variant.mediaFiles = proxiedImages.slice(0, 10);
+    }
     
     const cardPayload = [{ subjectID: subject.subjectID, variants: [variant] }];
 
@@ -519,7 +522,7 @@ serve(async (req) => {
     }
     console.log(`No errors found for ${vendorCode} (${wbErrors.length} total errors in list)`);
 
-    // Try to find nmID and upload media via /content/v3/media/save
+    // Try to find nmID (images already sent in payload)
     let nmID: number | null = null;
     try {
       const listResp = await fetchWithRetry(`${WB_CONTENT_API}/content/v2/get/cards/list`, {
@@ -534,21 +537,8 @@ serve(async (req) => {
         if (found?.nmID) {
           nmID = found.nmID;
           console.log(`Found nmID: ${nmID}`);
-          
-          // Upload media separately
-          if (proxiedImages.length > 0) {
-            try {
-              const mediaResp = await fetchWithRetry(`${WB_CONTENT_API}/content/v3/media/save`, {
-                method: "POST",
-                headers: { Authorization: apiKey, "Content-Type": "application/json" },
-                body: JSON.stringify({ nmId: nmID, data: proxiedImages.slice(0, 10) }),
-              });
-              const mediaData = await mediaResp.json();
-              console.log(`Media upload (${proxiedImages.length} images):`, JSON.stringify(mediaData));
-            } catch (e) { console.warn("Media upload error:", e); }
-          }
         } else {
-          console.log(`nmID not found yet. ${cards.length} cards in list. Card still indexing.`);
+          console.log(`nmID not found yet. ${cards.length} cards in list. Card indexing (1-5 min).`);
         }
       }
     } catch (e) { console.warn("Cards list error:", e); }
