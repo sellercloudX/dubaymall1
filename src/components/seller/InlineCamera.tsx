@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Camera, X, SwitchCamera } from 'lucide-react';
 
@@ -73,8 +74,8 @@ export function InlineCamera({ onCapture, onClose }: InlineCameraProps) {
     onClose();
   };
 
-  return (
-    <div className="fixed inset-0 z-[9999] bg-black flex flex-col">
+  return createPortal(
+    <div className="fixed inset-0 bg-black flex flex-col" style={{ zIndex: 99999 }}>
       {/* Video fills screen */}
       <video
         ref={videoRef}
@@ -124,6 +125,7 @@ export function InlineCamera({ onCapture, onClose }: InlineCameraProps) {
         {/* Spacer for symmetry */}
         <div className="h-12 w-12" />
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
