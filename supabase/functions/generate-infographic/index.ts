@@ -189,7 +189,7 @@ Return JSON: {"prompt": "...", "negativePrompt": "..."}`;
   }
 }
 
-// Stage 2: Generate image with Fal.ai Flux Pro
+// Stage 2: Generate image with Fal.ai Flux Pro (SYNCHRONOUS endpoint)
 async function generateWithFlux(
   prompt: string,
   negativePrompt: string,
@@ -197,10 +197,13 @@ async function generateWithFlux(
   aspectRatio: string = "3:4"
 ): Promise<string | null> {
   try {
-    console.log("🎨 Fal.ai Flux Pro generating...");
+    console.log("🎨 Fal.ai Flux Pro generating (sync mode)...");
 
-    // Submit to queue
-    const submitResp = await fetch("https://queue.fal.run/fal-ai/flux-pro/v1.1-ultra", {
+    // Use synchronous endpoint (fal.run) — no polling needed
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 50_000); // 50s timeout
+
+    const resp = await fetch("https://fal.run/fal-ai/flux-pro/v1.1-ultra", {
       method: "POST",
       headers: {
         Authorization: `Key ${falKey}`,
@@ -216,72 +219,33 @@ async function generateWithFlux(
         safety_tolerance: "5",
         output_format: "jpeg",
       }),
+      signal: controller.signal,
     });
 
-    if (!submitResp.ok) {
-      const errText = await submitResp.text();
-      console.error(`Fal.ai submit error: ${submitResp.status} ${errText.substring(0, 200)}`);
+    clearTimeout(timeout);
+
+    if (!resp.ok) {
+      const errText = await resp.text();
+      console.error(`Fal.ai sync error: ${resp.status} ${errText.substring(0, 300)}`);
       return null;
     }
 
-    const submitData = await submitResp.json();
-    const requestId = submitData.request_id;
+    const data = await resp.json();
+    const imageUrl = data.images?.[0]?.url;
 
-    // If synchronous response came back directly
-    if (submitData.images?.[0]?.url) {
-      console.log("✅ Fal.ai returned sync result");
-      return submitData.images[0].url;
+    if (imageUrl) {
+      console.log("✅ Fal.ai Flux Pro image generated successfully");
+      return imageUrl;
     }
 
-    if (!requestId) {
-      console.error("No request_id from Fal.ai");
-      return null;
-    }
-
-    // Poll for result (max 120 seconds)
-    const maxWait = 120_000;
-    const pollInterval = 3_000;
-    const startTime = Date.now();
-
-    while (Date.now() - startTime < maxWait) {
-      await new Promise(r => setTimeout(r, pollInterval));
-
-      const statusResp = await fetch(
-        `https://queue.fal.run/fal-ai/flux-pro/v1.1-ultra/requests/${requestId}/status`,
-        { headers: { Authorization: `Key ${falKey}` } }
-      );
-
-      if (!statusResp.ok) continue;
-
-      const statusData = await statusResp.json();
-
-      if (statusData.status === "COMPLETED") {
-        // Fetch result
-        const resultResp = await fetch(
-          `https://queue.fal.run/fal-ai/flux-pro/v1.1-ultra/requests/${requestId}`,
-          { headers: { Authorization: `Key ${falKey}` } }
-        );
-
-        if (resultResp.ok) {
-          const resultData = await resultResp.json();
-          const imageUrl = resultData.images?.[0]?.url;
-          if (imageUrl) {
-            console.log("✅ Fal.ai Flux Pro image generated");
-            return imageUrl;
-          }
-        }
-        break;
-      }
-
-      if (statusData.status === "FAILED") {
-        console.error("Fal.ai request failed:", statusData);
-        break;
-      }
-    }
-
+    console.error("Fal.ai: no image in response", JSON.stringify(data).substring(0, 200));
     return null;
-  } catch (e) {
-    console.error("Fal.ai Flux error:", e);
+  } catch (e: any) {
+    if (e.name === 'AbortError') {
+      console.error("Fal.ai timeout (50s exceeded)");
+    } else {
+      console.error("Fal.ai Flux error:", e);
+    }
     return null;
   }
 }
@@ -333,63 +297,58 @@ async function uploadUrlToStorage(imageUrl: string, productName: string, style: 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    if (!supabaseUrl || !serviceKey) return null;
-
-    // If it's a base64 data URL, handle differently
-    if (imageUrl.startsWith("data:")) {
-      const match = imageUrl.match(/^data:([^;]+);base64,(.+)$/);
-      if (!match) return null;
-      const contentType = match[1];
-      const base64Data = match[2];
-      const binaryString = atob(base64Data);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-      const ext = contentType.includes("png") ? "png" : "jpg";
-      const fileName = `infographics/${Date.now()}-${style}-${Math.random().toString(36).substring(7)}.${ext}`;
-
-      const uploadResp = await fetch(`${supabaseUrl}/storage/v1/object/product-images/${fileName}`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${serviceKey}`,
-          "Content-Type": contentType,
-          "x-upsert": "true",
-        },
-        body: bytes,
-      });
-
-      if (!uploadResp.ok) return null;
-      return `${supabaseUrl}/storage/v1/object/public/product-images/${fileName}`;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    const authKey = serviceKey || anonKey;
+    if (!supabaseUrl || !authKey) {
+      console.warn("No storage auth key available");
+      return imageUrl;
     }
 
-    // Download from URL and re-upload
-    const imgResp = await fetch(imageUrl);
-    if (!imgResp.ok) return imageUrl; // Return original URL if download fails
+    // Download from URL (or handle base64)
+    let imgBytes: Uint8Array;
+    let contentType = "image/jpeg";
 
-    const imgBytes = new Uint8Array(await imgResp.arrayBuffer());
-    const contentType = imgResp.headers.get("content-type") || "image/jpeg";
+    if (imageUrl.startsWith("data:")) {
+      const match = imageUrl.match(/^data:([^;]+);base64,(.+)$/);
+      if (!match) return imageUrl;
+      contentType = match[1];
+      const binaryString = atob(match[2]);
+      imgBytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        imgBytes[i] = binaryString.charCodeAt(i);
+      }
+    } else {
+      const imgResp = await fetch(imageUrl);
+      if (!imgResp.ok) return imageUrl;
+      imgBytes = new Uint8Array(await imgResp.arrayBuffer());
+      contentType = imgResp.headers.get("content-type") || "image/jpeg";
+    }
+
     const ext = contentType.includes("png") ? "png" : "jpg";
     const fileName = `infographics/${Date.now()}-${style}-${Math.random().toString(36).substring(7)}.${ext}`;
 
-    const uploadResp = await fetch(`${supabaseUrl}/storage/v1/object/product-images/${fileName}`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${serviceKey}`,
-        "Content-Type": contentType,
-        "x-upsert": "true",
-      },
-      body: imgBytes,
-    });
+    // Use createClient for storage upload
+    const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+    const supabase = createClient(supabaseUrl, authKey);
 
-    if (!uploadResp.ok) {
-      console.warn(`Storage upload failed: ${uploadResp.status}`);
-      return imageUrl; // Return Fal.ai URL as fallback
+    const { error } = await supabase.storage
+      .from("product-images")
+      .upload(fileName, imgBytes, {
+        contentType,
+        upsert: true,
+      });
+
+    if (error) {
+      console.warn(`Storage upload error: ${error.message}`);
+      return imageUrl;
     }
 
-    const publicUrl = `${supabaseUrl}/storage/v1/object/public/product-images/${fileName}`;
+    const { data: publicData } = supabase.storage
+      .from("product-images")
+      .getPublicUrl(fileName);
+
     console.log(`📦 Uploaded: ${fileName}`);
-    return publicUrl;
+    return publicData.publicUrl;
   } catch (e) {
     console.error("Upload error:", e);
     return imageUrl;
