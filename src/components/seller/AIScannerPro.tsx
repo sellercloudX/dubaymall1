@@ -116,7 +116,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
   const [isCalculating, setIsCalculating] = useState(false);
   const [isRealTariff, setIsRealTariff] = useState(false);
   const [generateInfographics, setGenerateInfographics] = useState(true);
-  const [infographicCount, setInfographicCount] = useState(6);
+  const [infographicCount, setInfographicCount] = useState(4);
   
   // Background processing state
   const [backgroundTasks, setBackgroundTasks] = useState<BackgroundTask[]>([]);
@@ -436,7 +436,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
         }
 
         // Styles: 1st = infographic, rest = angle shots on #efefef
-        const styles = ['professional', 'minimalist', 'vibrant', 'luxury', 'tech'];
+        const styles = ['professional', 'minimalist', 'vibrant', 'luxury'];
 
         // Parallel infographic generation (3 at a time) with Pinterest-enhanced prompts
         const batchSize = 3;
