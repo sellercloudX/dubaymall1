@@ -37,6 +37,54 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
   'salomatlik': ['медицин', 'здоров', 'лекарств', 'витамин'],
 };
 
+// Latin Uzbek → Cyrillic transliteration for MXIK DB search
+const LATIN_TO_CYRILLIC: Record<string, string> = {
+  "o'": 'ў', "g'": 'ғ', 'sh': 'ш', 'ch': 'ч', 'ng': 'нг', 'yo': 'ё', 'yu': 'ю', 'ya': 'я', 'ts': 'ц',
+  'a': 'а', 'b': 'б', 'v': 'в', 'g': 'г', 'd': 'д', 'e': 'е', 'j': 'ж', 'z': 'з', 'i': 'и',
+  'y': 'й', 'k': 'к', 'l': 'л', 'm': 'м', 'n': 'н', 'o': 'о', 'p': 'п', 'r': 'р', 's': 'с',
+  't': 'т', 'u': 'у', 'f': 'ф', 'x': 'х', 'q': 'қ', 'h': 'ҳ',
+};
+
+function latinToCyrillic(text: string): string {
+  let result = '';
+  let i = 0;
+  const lower = text.toLowerCase();
+  while (i < lower.length) {
+    // Check 2-char combos first
+    if (i + 1 < lower.length) {
+      const two = lower.substring(i, i + 2);
+      if (LATIN_TO_CYRILLIC[two]) { result += LATIN_TO_CYRILLIC[two]; i += 2; continue; }
+    }
+    const one = lower[i];
+    result += LATIN_TO_CYRILLIC[one] || one;
+    i++;
+  }
+  return result;
+}
+
+// Common product type translations Latin Uzbek → Russian for better MXIK search
+const PRODUCT_TYPE_TRANSLATIONS: Record<string, string[]> = {
+  'sumka': ['сумк', 'портфел', 'чехол'],
+  'sayohat': ['дорожн', 'путешеств', 'багаж'],
+  'chamadan': ['чемодан', 'багаж'],
+  'telefon': ['телефон', 'смартфон'],
+  'krem': ['крем', 'косметик'],
+  'krossovka': ['кроссовк', 'обувь', 'спорт'],
+  'poyabzal': ['обувь', 'ботинк'],
+  'ko\'ylak': ['рубашк', 'одежд'],
+  'shim': ['брюк', 'штан', 'одежд'],
+  'soat': ['часы', 'наручн'],
+  'ko\'zoynak': ['очки', 'оптик'],
+  'qalam': ['ручк', 'канцеляр'],
+  'dori': ['лекарств', 'медицин', 'фармацевт'],
+  'sabun': ['мыло', 'гигиен'],
+  'shampun': ['шампун', 'волос'],
+  'atir': ['парфюм', 'духи', 'аромат'],
+  'idish': ['посуд', 'тарелк', 'кухон'],
+  'o\'yinchoq': ['игрушк', 'детск'],
+  'kitob': ['книг', 'литератур'],
+};
+
 // ===== STEP 1: Search local mxik_codes database =====
 async function searchLocalDB(
   supabase: any,
@@ -62,11 +110,28 @@ async function searchLocalDB(
   
   // Extract meaningful words from product name
   const cleanName = productName
-    .replace(/[^a-zA-Zа-яА-ЯёЁўқғҳ\s'-]/g, ' ')
+    .replace(/[^a-zA-Zа-яА-ЯёЁўқғҳ\s''-]/g, ' ')
     .replace(/\b(для|с|и|в|на|от|из|к|по|без|до|за|не|ни|же|или|но|а|то|это|the|a|an|of|for|with|uchun|va|bilan|dan|ga|ning|ml|мл|г|g|шт|pcs)\b/gi, '')
     .trim();
   
   const words = cleanName.split(/\s+/).filter(w => w.length > 2);
+  
+  // Add Latin→Cyrillic translations of product name words for better DB matching
+  for (const word of words.slice(0, 6)) {
+    const wordLower = word.toLowerCase();
+    // Check direct product type translations first
+    for (const [latinKey, cyrillicValues] of Object.entries(PRODUCT_TYPE_TRANSLATIONS)) {
+      if (wordLower.includes(latinKey) || latinKey.includes(wordLower)) {
+        searchTerms.push(...cyrillicValues);
+      }
+    }
+    // Also transliterate the word to Cyrillic
+    const cyrillicWord = latinToCyrillic(wordLower);
+    if (cyrillicWord !== wordLower && cyrillicWord.length > 2) {
+      searchTerms.push(cyrillicWord);
+    }
+  }
+  
   searchTerms.push(...words.slice(0, 6));
 
   // Deduplicate
