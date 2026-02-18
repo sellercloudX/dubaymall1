@@ -777,6 +777,231 @@ async function applyFixes(
   };
 }
 
+// ===== WILDBERRIES AUDIT HANDLER =====
+const WB_CONTENT_API = "https://content-api.wildberries.ru";
+
+async function wbFetchCards(apiKey: string): Promise<any[]> {
+  const headers = { Authorization: apiKey, "Content-Type": "application/json" };
+  const allCards: any[] = [];
+  let cursor = { limit: 100, updatedAt: "", nmID: 0 };
+  let page = 0;
+  
+  do {
+    const body: any = { cursor, filter: { withPhoto: -1 } };
+    const resp = await fetchWithRetry(`${WB_CONTENT_API}/content/v2/get/cards/list`, {
+      method: "POST", headers, body: JSON.stringify(body),
+    });
+    if (!resp.ok) { const t = await resp.text(); console.error(`WB cards list error: ${resp.status} ${t.substring(0, 200)}`); break; }
+    const data = await resp.json();
+    const cards = data.cards || data.data?.cards || [];
+    if (cards.length === 0) break;
+    allCards.push(...cards);
+    const lastCard = cards[cards.length - 1];
+    cursor = { limit: 100, updatedAt: lastCard.updatedAt || "", nmID: lastCard.nmID || 0 };
+    page++;
+    if (cards.length < 100) break;
+    await sleep(300);
+  } while (page < 50);
+
+  console.log(`WB: fetched ${allCards.length} cards`);
+  return allCards;
+}
+
+function analyzeWbCard(card: any): QualityIssue | null {
+  const issues: QualityIssue['issues'] = [];
+  const vendorCode = card.vendorCode || '';
+  const title = card.title || '';
+  const description = card.description || '';
+  const photos = card.photos || card.mediaFiles || [];
+  const characteristics = card.characteristics || [];
+  const sizes = card.sizes || [];
+
+  if (!title || title.length < 5) {
+    issues.push({ type: 'missing_content', severity: 'error', field: 'title', message: 'Nom yo\'q yoki juda qisqa', currentValue: title || '(bo\'sh)', suggestedFix: 'SEO-optimallashtirilgan nom yaratish (60+ belgi)' });
+  } else if (title.length < 60) {
+    issues.push({ type: 'low_quality', severity: 'warning', field: 'title', message: `Nom qisqa (${title.length} belgi), 60+ tavsiya`, currentValue: title, suggestedFix: 'Nomga brend, model, xususiyatlarni qo\'shish' });
+  }
+
+  if (!description || description.length < 10) {
+    issues.push({ type: 'missing_content', severity: 'error', field: 'description', message: 'Tavsif yo\'q', currentValue: '(bo\'sh)', suggestedFix: '1000+ belgili batafsil tavsif yaratish' });
+  } else if (description.length < 300) {
+    issues.push({ type: 'low_quality', severity: 'warning', field: 'description', message: `Tavsif qisqa (${description.length} belgi)`, currentValue: `${description.length} belgi`, suggestedFix: 'Tavsifni boyitish' });
+  }
+
+  if (photos.length === 0) {
+    issues.push({ type: 'missing_content', severity: 'error', field: 'photos', message: 'Rasmlar yo\'q', currentValue: '0', suggestedFix: 'Kamida 3 ta sifatli rasm qo\'shish' });
+  } else if (photos.length < 3) {
+    issues.push({ type: 'low_quality', severity: 'warning', field: 'photos', message: `Faqat ${photos.length} ta rasm (3+ tavsiya)`, currentValue: `${photos.length}`, suggestedFix: 'Qo\'shimcha rasmlar qo\'shish' });
+  }
+
+  const filledCharcs = characteristics.filter((c: any) => {
+    const vals = Object.values(c);
+    return vals.some(v => v !== null && v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0));
+  });
+  if (filledCharcs.length < 3) {
+    issues.push({ type: 'missing_content', severity: 'warning', field: 'characteristics', message: `Faqat ${filledCharcs.length} ta xususiyat to'ldirilgan`, currentValue: `${filledCharcs.length}`, suggestedFix: 'Barcha xususiyatlarni to\'ldirish sifatni oshiradi' });
+  }
+
+  const video = card.video || card.videos || [];
+  if ((!Array.isArray(video) || video.length === 0) && photos.length >= 3) {
+    issues.push({ type: 'rich_content', severity: 'info', field: 'video', message: 'Video kontent yo\'q', currentValue: '0', suggestedFix: 'Video qo\'shish konversiyani 30% oshiradi' });
+  }
+
+  const hasBarcodes = sizes.some((s: any) => s.skus?.length > 0 || s.barcode);
+  if (!hasBarcodes) {
+    issues.push({ type: 'missing_content', severity: 'warning', field: 'barcode', message: 'Shtrix-kod yo\'q', currentValue: '(bo\'sh)', suggestedFix: 'EAN-13 shtrix-kod qo\'shish' });
+  }
+
+  if (issues.length === 0) return null;
+
+  const errorCount = issues.filter(i => i.severity === 'error').length;
+  const warningCount = issues.filter(i => i.severity === 'warning').length;
+  const qualityScore = Math.max(10, 100 - (errorCount * 15) - (warningCount * 5));
+
+  return {
+    offerId: vendorCode || String(card.nmID || ''),
+    productName: title || vendorCode || `nmID: ${card.nmID}`,
+    marketplace: 'wildberries',
+    qualityScore,
+    issues,
+    fixable: issues.some(i => i.severity === 'error' || i.severity === 'warning'),
+    category: card.subjectName || '',
+    categoryId: card.subjectID || 0,
+    currentData: { name: title, description, vendor: card.brand, photos, characteristics, sizes, nmID: card.nmID, vendorCode },
+  };
+}
+
+async function wbAutoFix(apiKey: string, vendorCode: string): Promise<any> {
+  const headers = { Authorization: apiKey, "Content-Type": "application/json" };
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) throw new Error("AI xizmati sozlanmagan");
+
+  const resp = await fetchWithRetry(`${WB_CONTENT_API}/content/v2/get/cards/list`, {
+    method: "POST", headers,
+    body: JSON.stringify({ cursor: { limit: 100, updatedAt: "", nmID: 0 }, filter: { withPhoto: -1, textSearch: vendorCode } }),
+  });
+  if (!resp.ok) throw new Error(`WB cards fetch error: ${resp.status}`);
+  const data = await resp.json();
+  const cards = data.cards || data.data?.cards || [];
+  const card = cards.find((c: any) => c.vendorCode === vendorCode || String(c.nmID) === vendorCode);
+  if (!card) throw new Error(`Kartochka topilmadi: ${vendorCode}`);
+
+  const issue = analyzeWbCard(card);
+  if (!issue || issue.qualityScore >= 90) return { success: true, message: "Kartochka sifati yaxshi ✅" };
+
+  const subjectID = card.subjectID;
+  let charcs: any[] = [];
+  if (subjectID) {
+    const chResp = await fetchWithRetry(`${WB_CONTENT_API}/content/v2/object/charcs/${subjectID}`, { headers });
+    if (chResp.ok) { const chData = await chResp.json(); charcs = chData.data || []; }
+  }
+
+  const issuesList = issue.issues.filter(i => i.severity !== 'info').map(i => `- [${i.severity}] ${i.field}: ${i.message}`).join('\n');
+  const charcsList = charcs.slice(0, 30).map((c: any) => {
+    const dict = c.dictionary?.length ? ` [${c.dictionary.slice(0, 8).map((d: any) => d.value || d.title || d).join(', ')}]` : '';
+    const req = c.required ? ' [REQUIRED]' : '';
+    return `- "${c.name}" (charcID: ${c.charcID}, type: ${c.type || 'string'})${req}${dict}`;
+  }).join('\n');
+
+  const prompt = `Fix this Wildberries product card. Return JSON.
+PRODUCT:
+- Title: "${card.title || ''}"
+- Description: "${(card.description || '').substring(0, 500)}"
+- Brand: "${card.brand || ''}"
+- Subject: "${card.subjectName || ''}" (ID: ${subjectID})
+- Photos: ${(card.photos || []).length}
+- Characteristics: ${(card.characteristics || []).length}
+ISSUES:
+${issuesList}
+CHARACTERISTICS:
+${charcsList || '(none)'}
+Return JSON: {"title": "new 60+ char title or null", "description": "new 1000+ char description or null", "characteristics": [{"<name>": "<value>"}], "summary": "brief"}`;
+
+  const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "google/gemini-2.5-flash", temperature: 0.15,
+      messages: [
+        { role: "system", content: "Wildberries kartochka sifat ekspertisan. Faqat JSON javob ber." },
+        { role: "user", content: prompt },
+      ],
+    }),
+  });
+  if (!aiResp.ok) throw new Error(`AI xatolik: ${aiResp.status}`);
+  const aiData = await aiResp.json();
+  const aiContent = aiData.choices?.[0]?.message?.content || '';
+  const jsonMatch = aiContent.match(/```(?:json)?\s*([\s\S]*?)```/) || aiContent.match(/(\{[\s\S]*\})/);
+  if (!jsonMatch) throw new Error("AI javobini tahlil qilib bo'lmadi");
+
+  const fixes = JSON.parse(jsonMatch[1] || jsonMatch[0]);
+  const results: string[] = [];
+
+  const nmID = card.nmID;
+  if (nmID) {
+    const updatePayload: any = { nmID, vendorCode: card.vendorCode };
+    if (fixes.title && fixes.title.length >= 60) updatePayload.title = fixes.title;
+    if (fixes.description && fixes.description.length >= 300) updatePayload.description = fixes.description;
+    if (fixes.characteristics?.length > 0) {
+      const validNames = new Set(charcs.map((c: any) => c.name));
+      updatePayload.characteristics = fixes.characteristics.filter((item: any) => validNames.has(Object.keys(item)[0]));
+    }
+
+    if (updatePayload.title || updatePayload.description || updatePayload.characteristics?.length) {
+      const updateResp = await fetchWithRetry(`${WB_CONTENT_API}/content/v2/cards/update`, {
+        method: "POST", headers, body: JSON.stringify([updatePayload]),
+      });
+      if (updateResp.ok) {
+        const updateData = await updateResp.json();
+        if (!updateData.error) {
+          if (updatePayload.title) results.push('✅ Nom yangilandi');
+          if (updatePayload.description) results.push('✅ Tavsif yangilandi');
+          if (updatePayload.characteristics?.length) results.push(`✅ ${updatePayload.characteristics.length} ta xususiyat yangilandi`);
+        } else {
+          results.push(`⚠️ WB: ${updateData.errorText || 'Xatolik'}`);
+        }
+      } else {
+        results.push(`❌ Yangilash xatosi: ${updateResp.status}`);
+      }
+    }
+  }
+
+  return { success: results.some(r => r.startsWith('✅')), message: results.join('\n') || 'Tuzatish kerak bo\'lgan narsa yo\'q', fixes };
+}
+
+async function handleWildberriesAudit(action: string, apiKey: string, offerId?: string, offerIds?: string[]): Promise<Response> {
+  switch (action) {
+    case 'audit': {
+      const cards = await wbFetchCards(apiKey);
+      if (cards.length === 0) {
+        return new Response(JSON.stringify({ success: true, data: [], summary: { total: 0, critical: 0, warning: 0, avgScore: 100, fixable: 0 } }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const issues: QualityIssue[] = [];
+      for (const card of cards) {
+        if (offerIds?.length && !offerIds.includes(card.vendorCode) && !offerIds.includes(String(card.nmID))) continue;
+        const issue = analyzeWbCard(card);
+        if (issue) issues.push(issue);
+      }
+      issues.sort((a, b) => a.qualityScore - b.qualityScore);
+      const summary = {
+        total: issues.length,
+        critical: issues.filter(i => i.issues.some(ii => ii.severity === 'error')).length,
+        warning: issues.filter(i => i.issues.some(ii => ii.severity === 'warning') && !i.issues.some(ii => ii.severity === 'error')).length,
+        avgScore: issues.length > 0 ? Math.round(issues.reduce((s, i) => s + i.qualityScore, 0) / issues.length) : 100,
+        fixable: issues.filter(i => i.fixable).length,
+      };
+      return new Response(JSON.stringify({ success: true, data: issues, summary }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    case 'auto-fix': {
+      if (!offerId) throw new Error("offerId kerak");
+      const result = await wbAutoFix(apiKey, offerId);
+      return new Response(JSON.stringify({ success: true, data: result }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    default:
+      throw new Error(`Noma'lum action: ${action}`);
+  }
+}
+
 // ===== MAIN HANDLER =====
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -799,16 +1024,6 @@ serve(async (req) => {
 
     console.log(`Audit action: ${action}, marketplace: ${mp}, user: ${user.id}`);
 
-    if (mp !== 'yandex') {
-      return new Response(JSON.stringify({
-        success: false,
-        error: `Kartochka sifat auditi hozircha faqat Yandex Market uchun ishlaydi.`,
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     // Get marketplace connection
     const { data: connections } = await supabase
       .from("marketplace_connections")
@@ -830,7 +1045,23 @@ serve(async (req) => {
         credentials = typeof decrypted === 'string' ? JSON.parse(decrypted) : decrypted;
       }
     }
+
+    // ===== WILDBERRIES AUDIT =====
+    if (mp === 'wildberries') {
+      const wbApiKey = credentials.apiKey || credentials.api_key || '';
+      if (!wbApiKey) throw new Error("Wildberries API kaliti topilmadi");
+      
+      return await handleWildberriesAudit(action, wbApiKey, offerId, offerIds);
+    }
     
+    // ===== YANDEX AUDIT =====
+    if (mp !== 'yandex') {
+      return new Response(JSON.stringify({
+        success: false,
+        error: `${mp} uchun audit hozircha qo'llab-quvvatlanmaydi. Yandex yoki Wildberries tanlang.`,
+      }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     const { apiKey, businessId } = await getBusinessId(credentials);
 
     switch (action) {
@@ -871,7 +1102,6 @@ serve(async (req) => {
         for (let round = 0; round < maxRetries; round++) {
           console.log(`=== Fix round ${round + 1} for ${targetId} ===`);
 
-          // OPTIMIZATION: Only fetch the target offer, not ALL offers
           const offers = await fetchAllOffers(apiKey, businessId, [targetId]);
           const cardQuality = await fetchCardQuality(apiKey, businessId, [targetId]);
           const issues = analyzeOffers(offers, cardQuality, [targetId]);
@@ -888,49 +1118,32 @@ serve(async (req) => {
           }
 
           const issue = issues[0];
+          if (issue.qualityScore >= 90 && round > 0) { console.log(`Score >= 90, stopping.`); break; }
 
-          if (issue.qualityScore >= 90 && round > 0) {
-            console.log(`Score ${issue.qualityScore} >= 90, stopping.`);
-            break;
-          }
-
-          // Fetch REAL category parameters from Yandex
           const categoryParams = await fetchCategoryParameters(apiKey, issue.categoryId || 0, businessId);
-
-          // Lookup MXIK code
           const mxikCode = await lookupMxikCode(supabase, issue.productName, issue.category || '', authHeader);
 
-          // Generate AI fixes with strict validation
           let aiResult: any;
           try {
             aiResult = await generateAIFixes(issue, categoryParams, mxikCode);
             if (aiResult.error) throw new Error(aiResult.error);
           } catch (e: any) {
-            console.error(`AI fix generation failed for ${targetId}:`, e.message);
             totalFixes.push(`❌ AI xatosi: ${e.message}`);
             lastResult = { success: false, message: e.message };
             break;
           }
 
-          // Apply fixes via API
           const result = await applyFixes(apiKey, businessId, targetId, aiResult, issue.currentData);
           lastResult = { ...result, issue: { ...issue, currentData: undefined }, fixes: aiResult };
           totalFixes.push(`Bosqich ${round + 1}: ${result.message}`);
 
           if (round < maxRetries - 1 && issue.qualityScore < 90) {
-            console.log(`Score ${issue.qualityScore} < 90, waiting 3s before retry...`);
             await sleep(3000);
-          } else {
-            break;
-          }
+          } else { break; }
         }
 
         return new Response(JSON.stringify({
-          success: true,
-          data: {
-            ...lastResult,
-            message: totalFixes.join('\n'),
-          },
+          success: true, data: { ...lastResult, message: totalFixes.join('\n') },
         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
