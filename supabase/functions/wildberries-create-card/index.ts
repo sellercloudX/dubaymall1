@@ -366,9 +366,17 @@ serve(async (req) => {
     // Generate vendorCode
     const vendorCode = generateVendorCode(product.name);
 
+    // ===== CURRENCY CONVERSION: UZS → RUB =====
+    // Yandex prices are in UZS, WB needs RUB
+    // Approximate rate: 1 RUB ≈ 140 UZS (updated periodically)
+    const UZS_TO_RUB_RATE = 140;
+    const rawPrice = Math.round(product.price || 0);
+    const priceRUB = rawPrice > 10000 
+      ? Math.round(rawPrice / UZS_TO_RUB_RATE) // UZS → RUB conversion
+      : rawPrice; // Already in RUB or small enough
+    console.log(`Price conversion: ${rawPrice} (source) → ${priceRUB} RUB`);
+
     // ===== BUILD CORRECT WB v2 PAYLOAD =====
-    // Official docs: Array of {subjectID, variants: [{vendorCode, title, description, brand, characteristics: [{id, value}], sizes: [{techSize, price, skus}], mediaFiles}]}
-    const price = Math.round(product.price || 0);
     const cardPayload = [{
       subjectID: subject.subjectID,
       variants: [{
@@ -386,14 +394,14 @@ serve(async (req) => {
         sizes: [{
           techSize: "0",
           wbSize: "",
-          price: price > 0 ? price : undefined,
+          price: priceRUB > 0 ? priceRUB : undefined,
           skus: barcode ? [barcode] : undefined,
         }],
         mediaFiles: proxiedImages.slice(0, 10),
       }],
     }];
 
-    console.log(`Sending to WB API: subjectID=${subject.subjectID}, charcs=${filledCharcs.length}, images=${proxiedImages.length}, price=${price}`);
+    console.log(`Sending to WB API: subjectID=${subject.subjectID}, charcs=${filledCharcs.length}, images=${proxiedImages.length}, price=${priceRUB} RUB`);
     console.log(`Payload sample:`, JSON.stringify(cardPayload[0].variants[0].characteristics?.slice(0, 3)));
 
     // Create card via Content API v2
@@ -474,16 +482,20 @@ serve(async (req) => {
     console.log(`✅ Card created: ${vendorCode}, subject: ${subject.subjectName}`);
 
     // Wait for WB to process the card, then fetch nmID
+    // WB needs significant time to index new cards
     let nmID = 0;
-    await sleep(5000);
-    for (let attempt = 0; attempt < 3; attempt++) {
+    console.log(`Waiting for WB to index card ${vendorCode}...`);
+    await sleep(8000); // Initial wait - WB needs time to process
+    
+    for (let attempt = 0; attempt < 5; attempt++) {
       try {
+        // Try listing recent cards and searching by vendorCode
         const listResp = await fetchWithRetry(`${WB_CONTENT_API}/content/v2/get/cards/list`, {
           method: "POST",
           headers: { Authorization: apiKey, "Content-Type": "application/json" },
           body: JSON.stringify({
             settings: {
-              cursor: { limit: 10 },
+              cursor: { limit: 100 },
               filter: { textSearch: vendorCode, withPhoto: -1 },
             },
           }),
@@ -494,17 +506,29 @@ serve(async (req) => {
           const found = cards.find((c: any) => c.vendorCode === vendorCode);
           if (found?.nmID) {
             nmID = found.nmID;
-            console.log(`Found nmID: ${nmID} for ${vendorCode}`);
+            console.log(`✅ Found nmID: ${nmID} for ${vendorCode} (attempt ${attempt + 1})`);
             break;
           }
+          // Also try partial match
+          const partial = cards.find((c: any) => (c.vendorCode || '').includes('SCX-'));
+          if (partial?.nmID && !found) {
+            console.log(`Partial match found: ${partial.vendorCode} → nmID ${partial.nmID}`);
+          }
         }
-      } catch (e) { console.warn(`Cards list attempt ${attempt} error:`, e); }
-      if (attempt < 2) await sleep(3000);
+      } catch (e) { console.warn(`Cards list attempt ${attempt + 1} error:`, e); }
+      
+      if (attempt < 4) {
+        const waitTime = 5000 + (attempt * 3000); // 5s, 8s, 11s, 14s
+        console.log(`nmID not found yet, waiting ${waitTime/1000}s (attempt ${attempt + 1}/5)...`);
+        await sleep(waitTime);
+      }
     }
 
     // Upload media files separately after card creation
     if (proxiedImages.length > 0 && nmID > 0) {
+      await sleep(2000);
       try {
+        // WB v3 media save expects: {vendorCode, data: ["url1", "url2"]}
         const mediaResp = await fetchWithRetry(`${WB_CONTENT_API}/content/v3/media/save`, {
           method: "POST",
           headers: { Authorization: apiKey, "Content-Type": "application/json" },
@@ -518,7 +542,8 @@ serve(async (req) => {
         } else {
           const mediaErr = await mediaResp.text();
           console.warn(`Media upload ${mediaResp.status}: ${mediaErr}`);
-          // Fallback: try uploading one by one
+          // Fallback: upload one by one
+          let uploaded = 0;
           for (const imgUrl of proxiedImages.slice(0, 5)) {
             try {
               const singleResp = await fetchWithRetry(`${WB_CONTENT_API}/content/v3/media/save`, {
@@ -526,51 +551,44 @@ serve(async (req) => {
                 headers: { Authorization: apiKey, "Content-Type": "application/json" },
                 body: JSON.stringify({ vendorCode, data: [imgUrl] }),
               });
-              if (singleResp.ok) console.log(`✅ Single image uploaded`);
-              else await singleResp.text();
+              if (singleResp.ok) { uploaded++; }
+              else { const e = await singleResp.text(); console.warn(`Single media ${singleResp.status}: ${e}`); }
             } catch (e) { /* skip */ }
             await sleep(500);
           }
+          if (uploaded > 0) console.log(`✅ Uploaded ${uploaded} images individually`);
         }
       } catch (e) { console.warn(`Media upload error: ${e}`); }
-    } else if (proxiedImages.length > 0) {
-      console.warn(`Skipping media upload: nmID not found yet`);
+    } else if (proxiedImages.length > 0 && nmID === 0) {
+      console.warn(`⚠️ nmID not found after 5 attempts. Media not uploaded. Card will appear without images.`);
+      console.warn(`Try refreshing WB cards list in a few minutes - WB indexing can take 1-5 min.`);
     }
 
     // Set price via Prices API with real nmID
-    if (price > 0 && nmID > 0) {
+    if (priceRUB > 0 && nmID > 0) {
       await sleep(2000);
       try {
         const priceResp = await fetchWithRetry(`${WB_PRICES_API}/api/v2/upload/task`, {
           method: "POST",
           headers: { Authorization: apiKey, "Content-Type": "application/json" },
-          body: JSON.stringify({ data: [{ nmID, price, discount: 0 }] }),
+          body: JSON.stringify({ data: [{ nmID, price: priceRUB, discount: 0 }] }),
         });
         if (priceResp.ok) {
-          console.log(`✅ Price set: ${price} for nmID ${nmID}`);
+          console.log(`✅ Price set: ${priceRUB} RUB for nmID ${nmID}`);
         } else {
           const priceErr = await priceResp.text();
           console.warn(`Price set failed: ${priceResp.status} - ${priceErr}`);
-          // Fallback: try size-based pricing
-          try {
-            const sizePriceResp = await fetchWithRetry(`${WB_PRICES_API}/api/v2/upload/task/size`, {
-              method: "POST",
-              headers: { Authorization: apiKey, "Content-Type": "application/json" },
-              body: JSON.stringify({ data: [{ nmID, sizeID: 0, price }] }),
-            });
-            if (sizePriceResp.ok) console.log(`✅ Size price set: ${price}`);
-            else console.warn(`Size price also failed: ${sizePriceResp.status}`);
-          } catch (e) { /* skip */ }
         }
       } catch (e) { console.warn(`Price set error: ${e}`); }
-    } else if (price > 0) {
-      console.warn(`Skipping price set: nmID not found. Card may need manual price setting.`);
+    } else if (priceRUB > 0 && nmID === 0) {
+      console.warn(`⚠️ Price not set: nmID not found. Price ${priceRUB} RUB needs manual setting.`);
     }
 
     return new Response(JSON.stringify({
       success: true, vendorCode, name: content.title,
       subjectID: subject.subjectID, subjectName: subject.subjectName,
-      nmID, price, images: proxiedImages.length,
+      nmID, price: priceRUB, priceOriginal: rawPrice, currency: 'RUB',
+      images: proxiedImages.length,
       characteristics: filledCharcs.length, barcode,
       wbResponse: wbData,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
