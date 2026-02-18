@@ -15,7 +15,7 @@ import {
   Calculator, Store, Wand2, FileText, Image as ImageLucide, Zap, Hash,
   Clock, CheckCircle, AlertCircle
 } from 'lucide-react';
-import { InlineCamera } from './InlineCamera';
+import { InlineCamera, requestCameraStream } from './InlineCamera';
 import { renderInfographicOverlay, renderCleanImage } from '@/lib/infographicOverlay';
 
 // Safe image component with fallback - no innerHTML
@@ -105,6 +105,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [currentStep, setCurrentStep] = useState<Step>('capture');
   const [showInlineCamera, setShowInlineCamera] = useState(false);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [analyzedProduct, setAnalyzedProduct] = useState<AnalyzedProduct | null>(null);
   const [webProducts, setWebProducts] = useState<WebProduct[]>([]);
@@ -766,14 +767,19 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Inline Camera */}
-            {showInlineCamera && (
+             {showInlineCamera && cameraStream && (
               <InlineCamera
+                initialStream={cameraStream}
                 onCapture={(base64) => {
                   setShowInlineCamera(false);
+                  setCameraStream(null);
                   setCapturedImage(base64);
                   analyzeImage(base64);
                 }}
-                onClose={() => setShowInlineCamera(false)}
+                onClose={() => {
+                  setShowInlineCamera(false);
+                  setCameraStream(null);
+                }}
               />
             )}
 
@@ -783,7 +789,16 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
                 <Button
                   size="lg"
                   className="h-24 flex flex-col items-center justify-center gap-2"
-                  onClick={() => setShowInlineCamera(true)}
+                   onClick={async () => {
+                     try {
+                       const stream = await requestCameraStream();
+                       setCameraStream(stream);
+                       setShowInlineCamera(true);
+                     } catch (err) {
+                       console.error('Camera access error:', err);
+                       toast.error('Kameraga ruxsat berilmadi');
+                     }
+                   }}
                 >
                   <Camera className="h-8 w-8" />
                   <span className="text-sm">Kameradan</span>
