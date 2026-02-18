@@ -205,10 +205,10 @@ export default function SellerCloudMobile() {
   return (
     <div className="min-h-screen bg-background pb-32 overflow-x-hidden safe-area-bottom">
       <MobileSellerCloudHeader connectedCount={connectedMarketplaces.length} onRefresh={refetch} isLoading={connectionsLoading} />
-      <main className="pt-14">
+      <main className="pt-[calc(3.5rem+env(safe-area-inset-top,0px))]">
         <PullToRefresh onRefresh={async () => { await refetch(); toast.success("Ma'lumotlar yangilandi"); }}>
         {isMoreActive && (
-          <div className="flex gap-2 px-3 py-2.5 overflow-x-auto no-scrollbar border-b bg-background/95 backdrop-blur-sm sticky top-14 z-40">
+          <div className="flex gap-2 px-3 py-2.5 overflow-x-auto no-scrollbar border-b bg-background/95 backdrop-blur-sm sticky top-[calc(3.5rem+env(safe-area-inset-top,0px))] z-40">
             {moreSubTabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
