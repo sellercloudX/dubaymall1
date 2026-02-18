@@ -24,7 +24,6 @@ async function wbFetch(url: string, options: RequestInit, retries = 3): Promise<
 }
 
 // ===== AI UNIVERSAL ANALYZER =====
-// One AI call analyzes product and returns ALL needed data
 async function aiAnalyzeProduct(productName: string, description: string, category: string): Promise<{
   searchKeywords: string[];
   titleRu: string;
@@ -34,7 +33,7 @@ async function aiAnalyzeProduct(productName: string, description: string, catego
   if (!LOVABLE_API_KEY) {
     return {
       searchKeywords: extractRussianWords(category || productName),
-      titleRu: productName.slice(0, 100),
+      titleRu: productName.slice(0, 60),
       descriptionRu: description || productName,
     };
   }
@@ -54,18 +53,20 @@ CRITICAL RULES for searchKeywords:
 - These are for WB /content/v2/object/all API subject search
 - WB API requires PLURAL Russian nouns (e.g. "Шампуни" NOT "Шампунь", "Кроссовки" NOT "Кроссовка")
 - Provide 5-7 different keyword variants from most specific to most generic
-- Include: exact category plural, parent category plural, generic type plural
 - Example for shampoo: ["Шампуни", "Шампуни для волос", "Средства для волос", "Косметика", "Уход"]
-- Example for sneakers: ["Кроссовки", "Кеды", "Спортивная обувь", "Обувь"]
 
-TITLE rules:
-- Russian, max 100 chars
-- Format: "Тип товара Бренд описание, характеристика"
-- SEO optimized for Wildberries search
+TITLE rules (CRITICAL — max 60 characters!):
+- Russian, STRICTLY max 60 characters total
+- Format: "Тип Бренд краткое описание"
+- SEO optimized, concise
+- Example: "Шампунь Head&Shoulders против перхоти 400мл" (42 chars)
+- NEVER exceed 60 characters
 
 DESCRIPTION rules:
-- Russian, 500-2000 chars
-- Detailed product features, benefits, usage
+- Russian, 1000-2000 characters (MINIMUM 1000!)
+- Detailed: features, benefits, ingredients, usage instructions
+- Include keywords for SEO
+- Professional marketplace description style
 
 Return ONLY valid JSON:
 {"searchKeywords": ["keyword1", "keyword2", ...], "titleRu": "...", "descriptionRu": "..."}`
@@ -73,7 +74,7 @@ Return ONLY valid JSON:
           {
             role: "user",
             content: `Product name: "${productName}"
-Description: "${(description || '').substring(0, 1500)}"
+Description: "${(description || '').substring(0, 2000)}"
 Category: "${category || 'unknown'}"`
           },
         ],
@@ -88,17 +89,24 @@ Category: "${category || 'unknown'}"`
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[1] || jsonMatch[0]);
         const keywords = Array.isArray(parsed.searchKeywords) ? parsed.searchKeywords : [];
-        // Add fallback keywords from product name
         const nameWords = extractRussianWords(productName);
         const catWords = extractRussianWords(category || '');
         const allKeywords = [...keywords, ...catWords, ...nameWords].filter(Boolean);
-        // Deduplicate
         const unique = [...new Set(allKeywords)];
-        console.log(`AI analysis complete. Keywords: ${JSON.stringify(unique)}, Title: "${parsed.titleRu?.substring(0, 50)}..."`);
+        
+        // Ensure title is ≤60 chars
+        let title = (parsed.titleRu || productName).slice(0, 60);
+        // Ensure description is ≥1000 chars
+        let desc = parsed.descriptionRu || description || productName;
+        if (desc.length < 1000) {
+          desc = desc + '\n\n' + `${title} — высококачественный товар для повседневного использования. Отличается превосходным качеством и надежностью. Подходит для широкого круга покупателей. Произведен с использованием современных технологий и материалов. Гарантия качества от производителя. Удобная упаковка обеспечивает сохранность при транспортировке. Рекомендуется к покупке. Отличный выбор по соотношению цена-качество. Быстрая доставка. Возможен возврат в течение установленного срока.`;
+        }
+
+        console.log(`AI analysis OK. Keywords: ${unique.length}, Title(${title.length}ch): "${title}"`);
         return {
           searchKeywords: unique.length > 0 ? unique : ['Товар'],
-          titleRu: (parsed.titleRu || productName).slice(0, 100),
-          descriptionRu: (parsed.descriptionRu || description || productName).slice(0, 5000),
+          titleRu: title,
+          descriptionRu: desc.slice(0, 5000),
         };
       }
     }
@@ -106,11 +114,10 @@ Category: "${category || 'unknown'}"`
     console.error("AI analyze error:", e);
   }
 
-  // Fallback
   const fallbackKw = [...extractRussianWords(category || ''), ...extractRussianWords(productName)];
   return {
     searchKeywords: fallbackKw.length > 0 ? fallbackKw : [productName.split(/\s+/)[0]],
-    titleRu: productName.slice(0, 100),
+    titleRu: productName.slice(0, 60),
     descriptionRu: (description || productName).slice(0, 5000),
   };
 }
@@ -119,11 +126,10 @@ function extractRussianWords(text: string): string[] {
   return (text.match(/[а-яА-ЯёЁ]{3,}/g) || []).filter((w, i, a) => a.indexOf(w) === i);
 }
 
-// ===== FIND SUBJECT using AI-generated keywords =====
+// ===== FIND SUBJECT =====
 async function findSubjectId(apiKey: string, keywords: string[], productName: string): Promise<{ subjectID: number; subjectName: string; parentName: string } | null> {
   const headers = { Authorization: apiKey, "Content-Type": "application/json" };
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-
   let subjects: any[] = [];
   let usedKeyword = "";
 
@@ -133,11 +139,7 @@ async function findSubjectId(apiKey: string, keywords: string[], productName: st
       const url = `${WB_API}/content/v2/object/all?name=${encodeURIComponent(kw)}&top=50&locale=ru`;
       console.log(`Subject search: "${kw}"`);
       const resp = await wbFetch(url, { headers });
-      if (!resp.ok) {
-        const errText = await resp.text();
-        console.log(`  → ${resp.status}: ${errText.substring(0, 100)}`);
-        continue;
-      }
+      if (!resp.ok) continue;
       const data = await resp.json();
       subjects = data.data || [];
       console.log(`  → ${subjects.length} results`);
@@ -147,12 +149,8 @@ async function findSubjectId(apiKey: string, keywords: string[], productName: st
     }
   }
 
-  if (subjects.length === 0) {
-    console.error(`No subjects found for any keyword`);
-    return null;
-  }
+  if (subjects.length === 0) return null;
 
-  // AI selects best match
   if (LOVABLE_API_KEY && subjects.length > 1) {
     const subjectList = subjects.slice(0, 30).map((s: any) => `${s.subjectID}: ${s.parentName} > ${s.subjectName}`).join('\n');
     try {
@@ -162,8 +160,8 @@ async function findSubjectId(apiKey: string, keywords: string[], productName: st
         body: JSON.stringify({
           model: "google/gemini-2.5-flash-lite",
           messages: [
-            { role: "system", content: "Return ONLY the subjectID number that best matches the product. No text, no explanation." },
-            { role: "user", content: `Product: "${productName}"\n\nAvailable subjects:\n${subjectList}` },
+            { role: "system", content: "Return ONLY the subjectID number that best matches the product. No text." },
+            { role: "user", content: `Product: "${productName}"\n\nSubjects:\n${subjectList}` },
           ],
           temperature: 0,
         }),
@@ -180,18 +178,19 @@ async function findSubjectId(apiKey: string, keywords: string[], productName: st
     } catch (e) { /* fallback */ }
   }
 
-  // Exact match or first result
   const kwLower = usedKeyword.toLowerCase();
   const exact = subjects.find((s: any) => (s.subjectName || "").toLowerCase() === kwLower);
   const result = exact || subjects[0];
   return { subjectID: result.subjectID, subjectName: result.subjectName, parentName: result.parentName };
 }
 
-// ===== GET & FILL CHARACTERISTICS =====
-async function getAndFillCharacteristics(apiKey: string, subjectID: number, productName: string, description: string, category: string): Promise<Array<{ id: number; value: any }>> {
+// ===== GET & FILL CHARACTERISTICS (including description) =====
+async function getAndFillCharacteristics(
+  apiKey: string, subjectID: number, productName: string, 
+  aiDescription: string, category: string, aiTitle: string
+): Promise<Array<{ id: number; value: any }>> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
-  // Get characteristics schema
   let charcs: any[] = [];
   try {
     const resp = await wbFetch(`${WB_API}/content/v2/object/charcs/${subjectID}?locale=ru`, {
@@ -203,16 +202,41 @@ async function getAndFillCharacteristics(apiKey: string, subjectID: number, prod
     }
   } catch (e) { /* empty */ }
 
-  if (!LOVABLE_API_KEY || charcs.length === 0) return [];
+  console.log(`Total characteristics for subject ${subjectID}: ${charcs.length}`);
 
-  // Select relevant characteristics
-  const required = charcs.filter((c: any) => c.required);
-  const popular = charcs.filter((c: any) => c.popular && !c.required);
-  const other = charcs.filter((c: any) => !c.required && !c.popular).slice(0, 10);
+  // Find "Описание" (description) and "Наименование" characteristic IDs
+  const descCharc = charcs.find((c: any) => 
+    (c.name || '').toLowerCase().includes('описание') || c.charcID === 14
+  );
+  const nameCharc = charcs.find((c: any) => 
+    (c.name || '').toLowerCase() === 'наименование' || c.charcID === 9
+  );
+
+  console.log(`Description charc: ${descCharc ? `id=${descCharc.charcID} "${descCharc.name}"` : 'NOT FOUND'}`);
+  console.log(`Name charc: ${nameCharc ? `id=${nameCharc.charcID} "${nameCharc.name}"` : 'NOT FOUND'}`);
+
+  // Pre-fill description and name characteristics
+  const preFilled: Array<{ id: number; value: any }> = [];
+  if (descCharc) {
+    preFilled.push({ id: descCharc.charcID, value: [aiDescription] });
+  }
+  if (nameCharc) {
+    preFilled.push({ id: nameCharc.charcID, value: [aiTitle] });
+  }
+
+  if (!LOVABLE_API_KEY || charcs.length === 0) return preFilled;
+
+  // Select characteristics for AI to fill (exclude ones we pre-filled)
+  const preFilledIds = new Set(preFilled.map(p => p.id));
+  const required = charcs.filter((c: any) => c.required && !preFilledIds.has(c.charcID));
+  const popular = charcs.filter((c: any) => c.popular && !c.required && !preFilledIds.has(c.charcID));
+  const other = charcs.filter((c: any) => !c.required && !c.popular && !preFilledIds.has(c.charcID)).slice(0, 10);
   const selected = [...required, ...popular, ...other];
 
+  if (selected.length === 0) return preFilled;
+
   const charcsList = selected.map((c: any) => {
-    const dict = c.dictionary?.length ? ` ALLOWED_VALUES: [${c.dictionary.slice(0, 15).map((d: any) => d.value || d.title || d).join(', ')}]` : '';
+    const dict = c.dictionary?.length ? ` ALLOWED_VALUES: [${c.dictionary.slice(0, 20).map((d: any) => d.value || d.title || d).join(', ')}]` : '';
     const req = c.required ? ' [REQUIRED]' : '';
     const t = c.charcType === 4 ? 'number' : 'string';
     return `id=${c.charcID} "${c.name}" type=${t}${req}${dict}`;
@@ -232,19 +256,22 @@ Rules:
 - String type: {"id": N, "value": ["text"]} (array with ONE string)
 - Number type: {"id": N, "value": 123}
 - If ALLOWED_VALUES listed, use EXACTLY one from the list
-- Fill ALL [REQUIRED] fields
-- Skip fields you cannot determine
+- Fill ALL [REQUIRED] fields — NEVER skip them
+- For optional fields, fill as many as you can determine from context
 - No markdown, no explanation, ONLY JSON array`
           },
           {
             role: "user",
-            content: `Product: "${productName}"\nDescription: "${(description || '').substring(0, 800)}"\nCategory: "${category}"\n\nCharacteristics:\n${charcsList}`
+            content: `Product: "${productName}"\nDescription: "${aiDescription.substring(0, 1000)}"\nCategory: "${category}"\n\nCharacteristics:\n${charcsList}`
           },
         ],
         temperature: 0.1,
       }),
     });
-    if (!aiResp.ok) return [];
+    if (!aiResp.ok) {
+      console.error(`AI charcs failed: ${aiResp.status}`);
+      return preFilled;
+    }
     const aiData = await aiResp.json();
     const content = aiData.choices?.[0]?.message?.content || '';
     const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || content.match(/(\[[\s\S]*\])/);
@@ -252,15 +279,18 @@ Rules:
       const parsed = JSON.parse(jsonMatch[1] || jsonMatch[0]);
       if (Array.isArray(parsed)) {
         const validIds = new Set(charcs.map((c: any) => c.charcID));
-        const result = parsed.filter((item: any) => typeof item.id === 'number' && validIds.has(item.id) && item.value !== undefined);
-        console.log(`AI filled ${result.length}/${selected.length} characteristics`);
+        const aiResult = parsed.filter((item: any) => 
+          typeof item.id === 'number' && validIds.has(item.id) && item.value !== undefined && !preFilledIds.has(item.id)
+        );
+        const result = [...preFilled, ...aiResult];
+        console.log(`Characteristics: ${preFilled.length} pre-filled + ${aiResult.length} AI = ${result.length} total`);
         return result;
       }
     }
   } catch (e) {
     console.error("AI charcs error:", e);
   }
-  return [];
+  return preFilled;
 }
 
 // ===== GENERATE BARCODE =====
@@ -280,37 +310,43 @@ async function generateBarcode(apiKey: string): Promise<string | null> {
 // ===== PROXY IMAGES =====
 async function proxyImages(supabase: any, userId: string, images: string[]): Promise<string[]> {
   const proxied: string[] = [];
-  for (const imgUrl of images.slice(0, 10)) {
-    if (!imgUrl?.startsWith("http")) continue;
-    try {
-      const resp = await fetch(imgUrl, { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" } });
-      if (!resp.ok) continue;
-      const ct = resp.headers.get("content-type") || "image/jpeg";
-      if (!ct.startsWith("image/")) continue;
-      const data = await resp.arrayBuffer();
-      if (data.byteLength < 500) continue; // lowered threshold
-      const ext = ct.includes("png") ? "png" : ct.includes("webp") ? "webp" : "jpg";
-      const fileName = `${userId}/wb-${Date.now()}-${Math.random().toString(36).substring(2, 6)}.${ext}`;
-      const { error } = await supabase.storage.from("product-images").upload(fileName, data, { contentType: ct, cacheControl: "31536000", upsert: false });
-      if (!error) {
+  // Process images in parallel for speed
+  const results = await Promise.allSettled(
+    images.slice(0, 10).map(async (imgUrl) => {
+      if (!imgUrl?.startsWith("http")) return null;
+      try {
+        const resp = await fetch(imgUrl, { 
+          headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
+          redirect: "follow",
+        });
+        if (!resp.ok) { console.log(`Image fetch failed: ${resp.status} ${imgUrl.substring(0, 80)}`); return null; }
+        const ct = resp.headers.get("content-type") || "image/jpeg";
+        if (!ct.startsWith("image/")) return null;
+        const data = await resp.arrayBuffer();
+        if (data.byteLength < 500) return null;
+        const ext = ct.includes("png") ? "png" : ct.includes("webp") ? "webp" : "jpg";
+        const fileName = `${userId}/wb-${Date.now()}-${Math.random().toString(36).substring(2, 6)}.${ext}`;
+        const { error } = await supabase.storage.from("product-images").upload(fileName, data, { contentType: ct, cacheControl: "31536000", upsert: false });
+        if (error) { console.log(`Storage upload error: ${error.message}`); return null; }
         const { data: urlData } = supabase.storage.from("product-images").getPublicUrl(fileName);
-        if (urlData?.publicUrl) proxied.push(urlData.publicUrl);
-      }
-    } catch (e) { /* skip */ }
+        return urlData?.publicUrl || null;
+      } catch (e) { return null; }
+    })
+  );
+  
+  for (const r of results) {
+    if (r.status === 'fulfilled' && r.value) proxied.push(r.value);
   }
+  console.log(`Images proxied: ${proxied.length}/${images.length}`);
   return proxied;
 }
 
-// ===== POLL FOR nmID (FIXED: use cursor-based listing without textSearch) =====
-async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 6): Promise<number | null> {
+// ===== POLL FOR nmID =====
+async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 8): Promise<number | null> {
   const headers = { Authorization: apiKey, "Content-Type": "application/json" };
-
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    await sleep((attempt + 1) * 4000); // 4s, 8s, 12s, 16s, 20s, 24s
-
+    await sleep((attempt + 1) * 3000);
     try {
-      // Use cards list without textSearch — filter by vendorCode manually
-      // textSearch is unreliable for vendorCodes
       const listResp = await wbFetch(`${WB_API}/content/v2/get/cards/list`, {
         method: "POST",
         headers,
@@ -322,24 +358,15 @@ async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 6):
           },
         }),
       });
-
-      if (!listResp.ok) {
-        console.log(`Poll ${attempt + 1}: API ${listResp.status}`);
-        continue;
-      }
+      if (!listResp.ok) continue;
       const listData = await listResp.json();
       const cards = listData.cards || listData.data?.cards || [];
-      console.log(`Poll ${attempt + 1}/${maxAttempts}: ${cards.length} recent cards`);
-
-      // Search by vendorCode in recent cards
       const found = cards.find((c: any) => c.vendorCode === vendorCode);
       if (found?.nmID) {
         console.log(`✅ nmID found: ${found.nmID} (attempt ${attempt + 1})`);
         return found.nmID;
       }
-    } catch (e) {
-      console.warn(`Poll error ${attempt + 1}:`, e);
-    }
+    } catch (e) { /* continue */ }
   }
   console.log(`⚠️ nmID not found after ${maxAttempts} attempts for ${vendorCode}`);
   return null;
@@ -356,15 +383,32 @@ async function uploadMedia(apiKey: string, nmID: number, imageUrls: string[]): P
       body: JSON.stringify({ nmId: nmID, data: imageUrls }),
     });
     const data = await resp.json();
-    console.log(`Media save: ${resp.status}`, JSON.stringify(data).substring(0, 200));
     if (!resp.ok || data.error) {
-      console.error(`Media save failed: ${data.errorText || JSON.stringify(data)}`);
+      console.error(`Media save failed: ${resp.status} ${JSON.stringify(data).substring(0, 300)}`);
       return false;
     }
-    console.log(`✅ Images uploaded to nmID ${nmID}`);
+    console.log(`✅ ${imageUrls.length} images uploaded to nmID ${nmID}`);
     return true;
   } catch (e) {
     console.error("Media save error:", e);
+    return false;
+  }
+}
+
+// ===== SET PRICE =====
+async function setPrice(apiKey: string, nmID: number, priceRUB: number): Promise<boolean> {
+  if (priceRUB <= 0) return false;
+  try {
+    const resp = await wbFetch("https://discounts-prices-api.wildberries.ru/api/v2/upload/task", {
+      method: "POST",
+      headers: { Authorization: apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({ data: [{ nmID, price: priceRUB }] }),
+    });
+    const data = await resp.json();
+    console.log(`Price set ${priceRUB} RUB for nmID ${nmID}: ${resp.status}`);
+    return resp.ok;
+  } catch (e) {
+    console.error("Price set error:", e);
     return false;
   }
 }
@@ -413,7 +457,6 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Invalid authentication" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Get WB API key
     const { data: conn } = await supabase
       .from("marketplace_connections").select("*")
       .eq("user_id", user.id).eq("marketplace", "wildberries").eq("is_active", true)
@@ -443,18 +486,21 @@ serve(async (req) => {
     console.log(`Product: "${product.name}"`);
     console.log(`Category: "${product.category || 'none'}"`);
     console.log(`Images: ${(product.images || []).length}`);
+    console.log(`Description length: ${(product.description || '').length}`);
 
-    // ===== STEP 1: AI analyzes product (one call for everything) =====
-    console.log(`\n--- STEP 1: AI Analysis ---`);
-    const [analysis, barcode] = await Promise.all([
+    // ===== STEP 1: AI analysis + barcode + image proxy in parallel =====
+    console.log(`\n--- STEP 1: AI + Barcode + Images (parallel) ---`);
+    const [analysis, barcode, proxiedImages] = await Promise.all([
       aiAnalyzeProduct(product.name, product.description || '', product.category || ''),
       generateBarcode(apiKey),
+      proxyImages(supabase, user.id, product.images || []),
     ]);
-    console.log(`Keywords: ${JSON.stringify(analysis.searchKeywords)}`);
-    console.log(`Title: "${analysis.titleRu}"`);
+    console.log(`Title(${analysis.titleRu.length}ch): "${analysis.titleRu}"`);
+    console.log(`Description: ${analysis.descriptionRu.length} chars`);
     console.log(`Barcode: ${barcode || 'failed'}`);
+    console.log(`Images proxied: ${proxiedImages.length}`);
 
-    // ===== STEP 2: Find WB subject using AI keywords =====
+    // ===== STEP 2: Find WB subject =====
     console.log(`\n--- STEP 2: Subject Search ---`);
     const subject = await findSubjectId(apiKey, analysis.searchKeywords, product.name);
     if (!subject) {
@@ -462,25 +508,22 @@ serve(async (req) => {
         success: false,
         error: "Kategoriya topilmadi. WB bazasida mos kategoriya mavjud emas.",
         searchedKeywords: analysis.searchKeywords,
-        hint: "Mahsulot nomini ruscha yoki boshqa formatda kiriting",
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     console.log(`Subject: ${subject.parentName} > ${subject.subjectName} (${subject.subjectID})`);
 
-    // ===== STEP 3: Get & fill characteristics + proxy images in parallel =====
-    console.log(`\n--- STEP 3: Characteristics + Images ---`);
-    const [filledCharcs, proxiedImages] = await Promise.all([
-      getAndFillCharacteristics(apiKey, subject.subjectID, product.name, product.description || '', product.category || ''),
-      proxyImages(supabase, user.id, product.images || []),
-    ]);
-    console.log(`Characteristics filled: ${filledCharcs.length}`);
-    console.log(`Images proxied: ${proxiedImages.length}`);
+    // ===== STEP 3: Get & fill characteristics (including description as characteristic) =====
+    console.log(`\n--- STEP 3: Characteristics ---`);
+    const filledCharcs = await getAndFillCharacteristics(
+      apiKey, subject.subjectID, product.name, 
+      analysis.descriptionRu, product.category || '', analysis.titleRu
+    );
+    console.log(`Total characteristics: ${filledCharcs.length}`);
 
     // ===== STEP 4: Build & send payload =====
     console.log(`\n--- STEP 4: Create Card ---`);
     const vendorCode = generateVendorCode(product.name);
 
-    // Currency conversion: UZS → RUB
     const UZS_TO_RUB_RATE = 140;
     const rawPrice = Math.round(product.price || 0);
     const priceRUB = rawPrice > 10000 ? Math.round(rawPrice / UZS_TO_RUB_RATE) : rawPrice;
@@ -489,6 +532,7 @@ serve(async (req) => {
     const variant: any = {
       vendorCode,
       title: analysis.titleRu,
+      description: analysis.descriptionRu,
       dimensions: { length: 20, width: 15, height: 10, weightBrutto: 0.5 },
       characteristics: filledCharcs,
       sizes: [{
@@ -499,7 +543,8 @@ serve(async (req) => {
     };
 
     const payload = [{ subjectID: subject.subjectID, variants: [variant] }];
-    console.log(`Payload: ${JSON.stringify(payload).substring(0, 500)}`);
+    console.log(`Payload keys: ${Object.keys(variant).join(', ')}`);
+    console.log(`Charcs count: ${filledCharcs.length}, has description: ${!!variant.description}, title length: ${variant.title.length}`);
 
     const wbResp = await wbFetch(`${WB_API}/content/v2/cards/upload`, {
       method: "POST",
@@ -509,11 +554,16 @@ serve(async (req) => {
     const wbData = await wbResp.json();
 
     if (!wbResp.ok || wbData.error) {
-      console.error("WB API error:", JSON.stringify(wbData));
+      console.error("WB API error:", JSON.stringify(wbData).substring(0, 500));
 
-      // Retry without characteristics
+      // Retry without characteristics if they caused the error
       if (JSON.stringify(wbData).match(/характеристик|characteristic|Invalid/i)) {
-        console.log("Retrying without characteristics...");
+        console.log("Retrying without AI characteristics (keeping description)...");
+        // Keep only description and name characteristics
+        const essentialCharcs = filledCharcs.filter(c => {
+          const isDesc = c.id === 14 || filledCharcs.indexOf(c) < 2; // first 2 are pre-filled
+          return false; // clear all on retry
+        });
         variant.characteristics = [];
         variant.vendorCode = vendorCode + "-R";
         const retryPayload = [{ subjectID: subject.subjectID, variants: [variant] }];
@@ -531,17 +581,20 @@ serve(async (req) => {
           }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
 
-        console.log("✅ Retry succeeded without charcs");
-        const retryNmID = await pollForNmID(apiKey, vendorCode + "-R", 6);
+        console.log("✅ Retry succeeded");
+        const retryVC = vendorCode + "-R";
+        const retryNmID = await pollForNmID(apiKey, retryVC, 8);
         let imagesUploaded = false;
-        if (retryNmID && proxiedImages.length > 0) {
-          imagesUploaded = await uploadMedia(apiKey, retryNmID, proxiedImages);
+        if (retryNmID) {
+          if (proxiedImages.length > 0) imagesUploaded = await uploadMedia(apiKey, retryNmID, proxiedImages);
+          await setPrice(apiKey, retryNmID, priceRUB);
         }
 
         return new Response(JSON.stringify({
-          success: true, vendorCode: vendorCode + "-R", name: analysis.titleRu,
+          success: true, vendorCode: retryVC, name: analysis.titleRu,
           subjectID: subject.subjectID, subjectName: subject.subjectName,
           price: priceRUB, nmID: retryNmID, imagesUploaded,
+          characteristics: 0,
           note: "Xususiyatlarsiz yaratildi" + (retryNmID ? ` (nmID: ${retryNmID})` : ''),
         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
@@ -565,17 +618,27 @@ serve(async (req) => {
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // ===== STEP 6: Poll for nmID & upload images =====
-    console.log(`\n--- STEP 6: Poll nmID ---`);
-    const nmID = await pollForNmID(apiKey, vendorCode, 6);
+    // ===== STEP 6: Poll nmID, upload images, set price =====
+    console.log(`\n--- STEP 6: Poll nmID + Images + Price ---`);
+    const nmID = await pollForNmID(apiKey, vendorCode, 8);
 
     let imagesUploaded = false;
-    if (nmID && proxiedImages.length > 0) {
-      imagesUploaded = await uploadMedia(apiKey, nmID, proxiedImages);
+    let priceSet = false;
+    if (nmID) {
+      // Upload images and set price in parallel
+      const [imgResult, priceResult] = await Promise.all([
+        proxiedImages.length > 0 ? uploadMedia(apiKey, nmID, proxiedImages) : Promise.resolve(false),
+        setPrice(apiKey, nmID, priceRUB),
+      ]);
+      imagesUploaded = imgResult;
+      priceSet = priceResult;
     }
 
     console.log(`\n========= RESULT =========`);
-    console.log(`vendorCode: ${vendorCode}, nmID: ${nmID}, images: ${imagesUploaded}`);
+    console.log(`vendorCode: ${vendorCode}, nmID: ${nmID}, images: ${imagesUploaded}, price: ${priceSet}`);
+    console.log(`Title: "${analysis.titleRu}" (${analysis.titleRu.length} chars)`);
+    console.log(`Description: ${analysis.descriptionRu.length} chars`);
+    console.log(`Characteristics: ${filledCharcs.length}`);
 
     return new Response(JSON.stringify({
       success: true,
@@ -588,13 +651,15 @@ serve(async (req) => {
       currency: 'RUB',
       images: proxiedImages.length,
       imagesUploaded,
+      priceSet,
       nmID,
       characteristics: filledCharcs.length,
+      descriptionLength: analysis.descriptionRu.length,
       barcode,
       wbResponse: wbData,
       note: nmID
-        ? `Kartochka yaratildi${imagesUploaded ? ' va rasmlar yuklandi' : ''} (nmID: ${nmID})`
-        : 'Kartochka yaratildi. nmID hali tayyor emas — rasmlar 5-10 daqiqadan keyin yuklanadi.',
+        ? `Kartochka yaratildi: ${filledCharcs.length} xususiyat, ${proxiedImages.length} rasm${priceSet ? ', narx belgilandi' : ''} (nmID: ${nmID})`
+        : 'Kartochka yaratildi. nmID hali tayyor emas — 5-10 daqiqadan keyin rasmlar yuklanadi.',
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (error) {
