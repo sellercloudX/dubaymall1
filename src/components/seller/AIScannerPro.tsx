@@ -16,6 +16,7 @@ import {
   Clock, CheckCircle, AlertCircle
 } from 'lucide-react';
 import { InlineCamera } from './InlineCamera';
+import { renderInfographicOverlay, renderCleanImage } from '@/lib/infographicOverlay';
 
 // Safe image component with fallback - no innerHTML
 function ProductImageWithFallback({ src, alt }: { src?: string; alt: string }) {
@@ -408,60 +409,71 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
       }
       updateTaskProgress(3, 'completed');
 
-      // Step 5: Pinterest design search + Infographic generation
+      // Step 5: HYBRID Image Generation — Gemini (text-free) + Canvas (text overlay)
       const generatedInfos: string[] = [];
       const bestImageForInfographic = imageUrl || productImage;
       
       if (shouldGenerateInfographics && bestImageForInfographic) {
         updateTaskProgress(4, 'running');
-        
-        // First: fetch Pinterest design inspiration for this category
-        let pinterestDesignPrompts: any[] = [];
-        try {
-          console.log('📌 Fetching Pinterest design inspiration...');
-          const { data: pinterestData } = await supabase.functions.invoke('pinterest-design-search', {
-            body: {
-              category: analyzed?.category || '',
-              productName: normalizedProductName,
-              count: infoCount,
-            },
-          });
-          
-          if (pinterestData?.success && pinterestData?.enhancedPrompts?.length > 0) {
-            pinterestDesignPrompts = pinterestData.enhancedPrompts;
-            console.log(`✅ Pinterest: ${pinterestDesignPrompts.length} design prompts received`);
-          }
-        } catch (e) {
-          console.warn('Pinterest search failed, using standard prompts:', e);
-        }
 
-        // Styles: 1st = infographic, rest = angle shots on #efefef
+        // Styles: 1st = professional (infographic overlay), rest = clean angle shots
         const styles = ['professional', 'minimalist', 'vibrant', 'luxury'];
+        const productFeatures = analyzed?.features || [];
 
-        // Parallel infographic generation (3 at a time) with Pinterest-enhanced prompts
-        const batchSize = 3;
-        for (let batch = 0; batch < Math.ceil(Math.min(infoCount, 6) / batchSize); batch++) {
+        // Generate images in batches (2 at a time to avoid rate limits)
+        const batchSize = 2;
+        for (let batch = 0; batch < Math.ceil(Math.min(infoCount, 4) / batchSize); batch++) {
           const promises = [];
-          for (let i = batch * batchSize; i < Math.min((batch + 1) * batchSize, infoCount, 6); i++) {
+          for (let i = batch * batchSize; i < Math.min((batch + 1) * batchSize, infoCount, 4); i++) {
+            const currentStyle = styles[i % styles.length];
             promises.push(
               supabase.functions.invoke('generate-infographic', {
                 body: {
                   productImage: bestImageForInfographic,
                   productName: normalizedProductName,
                   category: analyzed?.category,
-                  style: styles[i % styles.length],
-                  count: 1,
-                  usePinterestDesigns: pinterestDesignPrompts.length > 0,
-                  pinterestDesignPrompts: pinterestDesignPrompts.length > 0 
-                    ? pinterestDesignPrompts.slice(i, i + 1) 
-                    : undefined,
+                  style: currentStyle,
+                  features: productFeatures,
+                  brand: analyzed?.brand,
                 },
-              }).then(({ data: infoData, error: infoError }) => {
-                if (!infoError && infoData?.images?.length > 0) {
-                  return infoData.images[0].url;
+              }).then(async ({ data: infoData, error: infoError }) => {
+                if (infoError || !infoData?.images?.[0]?.url) return null;
+                
+                const textFreeUrl = infoData.images[0].url;
+                
+                // For 'professional' style: apply Canvas infographic overlay
+                if (currentStyle === 'professional' && infoData.images[0].isTextFree) {
+                  try {
+                    const overlayDataUrl = await renderInfographicOverlay(textFreeUrl, {
+                      productName: normalizedProductName,
+                      features: productFeatures.slice(0, 5),
+                      brand: analyzed?.brand,
+                      price: pricingData.sellingPrice,
+                      badge: 'YANGI',
+                      categoryKey: infoData.overlayConfig?.categoryKey,
+                    });
+                    
+                    // Upload the composited infographic to storage
+                    const uploadedUrl = await uploadImageToStorage(overlayDataUrl);
+                    return uploadedUrl || textFreeUrl;
+                  } catch (overlayErr) {
+                    console.warn('Overlay failed, using text-free image:', overlayErr);
+                    return textFreeUrl;
+                  }
                 }
+                
+                // For other styles: ensure 1080x1440 via Canvas resize
+                try {
+                  const cleanDataUrl = await renderCleanImage(textFreeUrl);
+                  const uploadedUrl = await uploadImageToStorage(cleanDataUrl);
+                  return uploadedUrl || textFreeUrl;
+                } catch {
+                  return textFreeUrl;
+                }
+              }).catch((err) => {
+                console.warn(`Image gen ${i} failed:`, err);
                 return null;
-              }).catch(() => null)
+              })
             );
           }
           const results = await Promise.all(promises);
@@ -557,8 +569,8 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
         { name: 'Rasm tahlili', status: 'pending', model: 'GPT-4o Vision', icon: <Camera className="h-4 w-4" /> },
         { name: 'SEO kontent', status: 'pending', model: 'Yandex AI', icon: <Search className="h-4 w-4" /> },
         { name: 'Tavsif yaratish', status: 'pending', model: 'Yandex AI', icon: <FileText className="h-4 w-4" /> },
-        { name: 'MXIK aniqlash', status: 'pending', model: 'Gemini + AI', icon: <Hash className="h-4 w-4" /> },
-        { name: 'Pinterest + Infografika', status: 'pending', model: 'Firecrawl + Gemini', icon: <ImageLucide className="h-4 w-4" /> },
+        { name: 'MXIK aniqlash', status: 'pending', model: 'Gemini + DB', icon: <Hash className="h-4 w-4" /> },
+        { name: 'Rasm + Infografika', status: 'pending', model: 'Gemini + Canvas', icon: <ImageLucide className="h-4 w-4" /> },
         { name: 'Kartochka yaratish', status: 'pending', model: 'Yandex API', icon: <Store className="h-4 w-4" /> },
       ],
       generatedImages: [],
