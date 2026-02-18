@@ -39,10 +39,12 @@ const ORDER_STATUSES = [
   { value: 'CANCELLED', label: 'Bekor' },
 ];
 
-const formatPrice = (price?: number) => {
+const formatPrice = (price?: number, marketplace?: string) => {
   if (!price) return '—';
-  if (price >= 1000000) return (price / 1000000).toFixed(1) + ' mln';
-  return new Intl.NumberFormat('uz-UZ').format(price) + ' so\'m';
+  const isRub = marketplace === 'wildberries';
+  const currency = isRub ? ' ₽' : ' so\'m';
+  if (!isRub && price >= 1000000) return (price / 1000000).toFixed(1) + ' mln';
+  return new Intl.NumberFormat(isRub ? 'ru-RU' : 'uz-UZ').format(Math.round(price)) + currency;
 };
 
 const formatDate = (dateStr: string) => {
@@ -93,7 +95,10 @@ const getFirstProductName = (order: MarketplaceOrder): string => {
 const OrderRow = memo(({ order, onClick, store, marketplace }: { order: MarketplaceOrder; onClick: (o: MarketplaceOrder) => void; store: MarketplaceDataStore; marketplace: string }) => {
   const productName = getFirstProductName(order);
   const itemCount = order.items?.length || 0;
-  const totalPrice = order.itemsTotalUZS || order.itemsTotal || order.totalUZS || order.total || 0;
+  const isRub = marketplace === 'wildberries';
+  const totalPrice = isRub 
+    ? (order.total || order.itemsTotal || 0)
+    : (order.itemsTotalUZS || order.itemsTotal || order.totalUZS || order.total || 0);
   
   // Get product image: first from order item photo, then from store products
   const firstItem = order.items?.[0];
@@ -135,7 +140,7 @@ const OrderRow = memo(({ order, onClick, store, marketplace }: { order: Marketpl
             </div>
           ) : <div className="flex-1" />}
           <div className="flex items-center gap-2 shrink-0">
-            <span className="font-bold text-primary text-sm">{formatPrice(totalPrice)}</span>
+            <span className="font-bold text-primary text-sm">{formatPrice(totalPrice, marketplace)}</span>
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
           </div>
         </div>
@@ -268,7 +273,7 @@ export function MobileOrders({ connectedMarketplaces, store }: MobileOrdersProps
                         <div className="text-sm font-medium line-clamp-2">{item.offerName}</div>
                         <div className="text-xs text-muted-foreground">× {item.count}</div>
                       </div>
-                      <div className="font-medium text-right">{formatPrice(item.priceUZS || item.price)}</div>
+                      <div className="font-medium text-right">{formatPrice(item.priceUZS || item.price, selectedMp)}</div>
                     </div>
                   ))}
                 </div>
@@ -276,15 +281,15 @@ export function MobileOrders({ connectedMarketplaces, store }: MobileOrdersProps
               <div className="border-t pt-4 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Mahsulotlar:</span>
-                  <span>{formatPrice(selectedOrder.itemsTotalUZS || selectedOrder.itemsTotal)}</span>
+                  <span>{formatPrice(selectedOrder.itemsTotalUZS || selectedOrder.itemsTotal, selectedMp)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Yetkazish:</span>
-                  <span>{formatPrice(selectedOrder.deliveryTotalUZS || selectedOrder.deliveryTotal)}</span>
+                  <span>{formatPrice(selectedOrder.deliveryTotalUZS || selectedOrder.deliveryTotal, selectedMp)}</span>
                 </div>
                 <div className="flex justify-between font-bold">
                   <span>Jami:</span>
-                  <span className="text-primary">{formatPrice(selectedOrder.totalUZS || selectedOrder.total)}</span>
+                  <span className="text-primary">{formatPrice(selectedOrder.totalUZS || selectedOrder.total, selectedMp)}</span>
                 </div>
               </div>
             </div>

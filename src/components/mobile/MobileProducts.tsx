@@ -131,7 +131,7 @@ export function MobileProducts({ connectedMarketplaces, store }: MobileProductsP
           <p>Mahsulotlar topilmadi</p>
         </div>
       ) : (
-        <VirtualProductList products={productsWithKeys} />
+        <VirtualProductList products={productsWithKeys} marketplace={selectedMp} />
       )}
     </div>
   );
