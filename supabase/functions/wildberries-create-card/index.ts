@@ -58,24 +58,47 @@ async function findSubjectId(apiKey: string, productName: string, category?: str
   }
   console.log(`Subject search keyword: "${searchKeyword}"`);
 
-  const searchVariants = [searchKeyword];
+  // Build multiple search variants for better matching
+  const searchVariants: string[] = [searchKeyword];
   const firstWord = searchKeyword.split(/[-\s]/)[0];
   if (firstWord && firstWord !== searchKeyword && firstWord.length >= 3) searchVariants.push(firstWord);
+  // Add category words as fallback
+  if (category) {
+    const catWords = category.match(/[а-яА-ЯёЁ]{3,}/g) || [];
+    for (const cw of catWords) {
+      if (!searchVariants.includes(cw)) searchVariants.push(cw);
+    }
+  }
+  // Add all Russian words from product name as last resort
+  const nameWords = productName.match(/[а-яА-ЯёЁ]{3,}/g) || [];
+  for (const nw of nameWords) {
+    if (!searchVariants.includes(nw) && searchVariants.length < 8) searchVariants.push(nw);
+  }
+
+  console.log(`Search variants: ${JSON.stringify(searchVariants)}`);
 
   let subjects: any[] = [];
   let usedKeyword = searchKeyword;
   try {
     for (const kw of searchVariants) {
-      const resp = await fetchWithRetry(
-        `${WB_CONTENT_API}/content/v2/object/all?name=${encodeURIComponent(kw)}&top=50&locale=ru`,
-        { headers }
-      );
-      if (!resp.ok) continue;
+      const url = `${WB_CONTENT_API}/content/v2/object/all?name=${encodeURIComponent(kw)}&top=50&locale=ru`;
+      console.log(`Trying subject search: "${kw}"`);
+      const resp = await fetchWithRetry(url, { headers });
+      if (!resp.ok) {
+        console.log(`Subject API returned ${resp.status} for "${kw}"`);
+        const errText = await resp.text();
+        console.log(`Response: ${errText.substring(0, 200)}`);
+        continue;
+      }
       const data = await resp.json();
       subjects = data.data || [];
-      if (subjects.length > 0) { usedKeyword = kw; console.log(`Found ${subjects.length} subjects with: "${kw}"`); break; }
+      console.log(`"${kw}" → ${subjects.length} subjects found`);
+      if (subjects.length > 0) { usedKeyword = kw; break; }
     }
-    if (subjects.length === 0) return null;
+    if (subjects.length === 0) {
+      console.error(`No subjects found for any variant: ${JSON.stringify(searchVariants)}`);
+      return null;
+    }
 
     if (LOVABLE_API_KEY && subjects.length > 1) {
       const subjectList = subjects.slice(0, 30).map((s: any) => `${s.subjectID}: ${s.parentName} > ${s.subjectName}`).join('\n');
