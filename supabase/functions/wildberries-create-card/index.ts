@@ -485,41 +485,50 @@ serve(async (req) => {
     // WB needs significant time to index new cards
     let nmID = 0;
     console.log(`Waiting for WB to index card ${vendorCode}...`);
-    await sleep(8000); // Initial wait - WB needs time to process
+    await sleep(10000); // Initial 10s wait - WB needs time to process
     
-    for (let attempt = 0; attempt < 5; attempt++) {
+    for (let attempt = 0; attempt < 6; attempt++) {
       try {
-        // Try listing recent cards and searching by vendorCode
+        // Strategy 1: Fetch ALL recent cards without textSearch filter (more reliable)
         const listResp = await fetchWithRetry(`${WB_CONTENT_API}/content/v2/get/cards/list`, {
           method: "POST",
           headers: { Authorization: apiKey, "Content-Type": "application/json" },
           body: JSON.stringify({
             settings: {
               cursor: { limit: 100 },
-              filter: { textSearch: vendorCode, withPhoto: -1 },
+              filter: { withPhoto: -1 },
             },
           }),
         });
         if (listResp.ok) {
           const listData = await listResp.json();
           const cards = listData.cards || listData.data?.cards || [];
+          console.log(`Cards list returned ${cards.length} cards (attempt ${attempt + 1})`);
+          
+          // Find by exact vendorCode match
           const found = cards.find((c: any) => c.vendorCode === vendorCode);
           if (found?.nmID) {
             nmID = found.nmID;
             console.log(`✅ Found nmID: ${nmID} for ${vendorCode} (attempt ${attempt + 1})`);
             break;
           }
-          // Also try partial match
-          const partial = cards.find((c: any) => (c.vendorCode || '').includes('SCX-'));
-          if (partial?.nmID && !found) {
-            console.log(`Partial match found: ${partial.vendorCode} → nmID ${partial.nmID}`);
+          
+          // Strategy 2: Try finding by most recently created SCX- card
+          const scxCards = cards
+            .filter((c: any) => (c.vendorCode || '').startsWith('SCX-'))
+            .sort((a: any, b: any) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+          if (scxCards.length > 0) {
+            console.log(`Latest SCX cards: ${scxCards.slice(0, 3).map((c: any) => `${c.vendorCode}(${c.nmID})`).join(', ')}`);
           }
+        } else {
+          const errText = await listResp.text();
+          console.warn(`Cards list ${listResp.status}: ${errText}`);
         }
       } catch (e) { console.warn(`Cards list attempt ${attempt + 1} error:`, e); }
       
-      if (attempt < 4) {
-        const waitTime = 5000 + (attempt * 3000); // 5s, 8s, 11s, 14s
-        console.log(`nmID not found yet, waiting ${waitTime/1000}s (attempt ${attempt + 1}/5)...`);
+      if (attempt < 5) {
+        const waitTime = 8000 + (attempt * 4000); // 8s, 12s, 16s, 20s, 24s
+        console.log(`nmID not found yet, waiting ${waitTime/1000}s (attempt ${attempt + 1}/6)...`);
         await sleep(waitTime);
       }
     }
