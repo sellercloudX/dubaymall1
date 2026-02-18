@@ -399,12 +399,13 @@ serve(async (req) => {
       : rawPrice; // Already in RUB or small enough
     console.log(`Price conversion: ${rawPrice} (source) → ${priceRUB} RUB`);
 
-    // ===== BUILD CORRECT WB v2 PAYLOAD =====
-    // mediaFiles MUST be included in upload payload for WB to index the card
+    // ===== BUILD WB v2 PAYLOAD =====
+    // CRITICAL: WB v2 /cards/upload ONLY accepts these variant fields:
+    // vendorCode, title, characteristics, sizes, mediaFiles, dimensions
+    // "description" is NOT allowed here — causes silent rejection!
     const variant: any = {
       vendorCode,
       title: content.title,
-      description: stripHtml(content.desc),
       dimensions: {
         length: 20,
         width: 15,
@@ -414,7 +415,6 @@ serve(async (req) => {
       characteristics: filledCharcs,
       sizes: [{
         techSize: "0",
-        wbSize: "",
         price: priceRUB > 0 ? priceRUB : undefined,
         skus: barcode ? [barcode] : undefined,
       }],
@@ -461,15 +461,18 @@ serve(async (req) => {
       // Retry without characteristics if they cause issues
       if (JSON.stringify(wbData).includes("характеристик") || JSON.stringify(wbData).includes("characteristic") || JSON.stringify(wbData).includes("Invalid")) {
         console.log("Retrying with minimal payload...");
+        const minimalVariant: any = {
+          vendorCode: vendorCode + "-R",
+          title: content.title,
+          characteristics: [],
+          sizes: [{ techSize: "0", price: priceRUB > 0 ? priceRUB : undefined, skus: barcode ? [barcode] : undefined }],
+        };
+        if (proxiedImages.length > 0) {
+          minimalVariant.mediaFiles = proxiedImages.slice(0, 10);
+        }
         const minimalPayload = [{
           subjectID: subject.subjectID,
-          variants: [{
-            vendorCode: vendorCode + "-R",
-            title: content.title,
-            description: stripHtml(content.desc),
-            characteristics: [],
-            sizes: [{ techSize: "0", wbSize: "", price: priceRUB > 0 ? priceRUB : undefined, skus: barcode ? [barcode] : undefined }],
-          }],
+          variants: [minimalVariant],
         }];
 
         const retryResp = await fetchWithRetry(`${WB_CONTENT_API}/content/v2/cards/upload`, {
