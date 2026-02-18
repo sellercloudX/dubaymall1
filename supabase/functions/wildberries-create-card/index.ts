@@ -473,48 +473,104 @@ serve(async (req) => {
 
     console.log(`✅ Card created: ${vendorCode}, subject: ${subject.subjectName}`);
 
-    // Upload media files separately after card creation (more reliable)
-    if (proxiedImages.length > 0) {
-      await sleep(3000); // Wait for card to sync
+    // Wait for WB to process the card, then fetch nmID
+    let nmID = 0;
+    await sleep(5000);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const listResp = await fetchWithRetry(`${WB_CONTENT_API}/content/v2/get/cards/list`, {
+          method: "POST",
+          headers: { Authorization: apiKey, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            settings: {
+              cursor: { limit: 10 },
+              filter: { textSearch: vendorCode, withPhoto: -1 },
+            },
+          }),
+        });
+        if (listResp.ok) {
+          const listData = await listResp.json();
+          const cards = listData.cards || listData.data?.cards || [];
+          const found = cards.find((c: any) => c.vendorCode === vendorCode);
+          if (found?.nmID) {
+            nmID = found.nmID;
+            console.log(`Found nmID: ${nmID} for ${vendorCode}`);
+            break;
+          }
+        }
+      } catch (e) { console.warn(`Cards list attempt ${attempt} error:`, e); }
+      if (attempt < 2) await sleep(3000);
+    }
+
+    // Upload media files separately after card creation
+    if (proxiedImages.length > 0 && nmID > 0) {
       try {
         const mediaResp = await fetchWithRetry(`${WB_CONTENT_API}/content/v3/media/save`, {
           method: "POST",
           headers: { Authorization: apiKey, "Content-Type": "application/json" },
           body: JSON.stringify({
             vendorCode,
-            data: proxiedImages.map(url => url),
+            data: proxiedImages.slice(0, 10),
           }),
         });
         if (mediaResp.ok) {
           console.log(`✅ Media uploaded: ${proxiedImages.length} files`);
         } else {
-          console.warn(`Media upload status: ${mediaResp.status}`);
+          const mediaErr = await mediaResp.text();
+          console.warn(`Media upload ${mediaResp.status}: ${mediaErr}`);
+          // Fallback: try uploading one by one
+          for (const imgUrl of proxiedImages.slice(0, 5)) {
+            try {
+              const singleResp = await fetchWithRetry(`${WB_CONTENT_API}/content/v3/media/save`, {
+                method: "POST",
+                headers: { Authorization: apiKey, "Content-Type": "application/json" },
+                body: JSON.stringify({ vendorCode, data: [imgUrl] }),
+              });
+              if (singleResp.ok) console.log(`✅ Single image uploaded`);
+              else await singleResp.text();
+            } catch (e) { /* skip */ }
+            await sleep(500);
+          }
         }
       } catch (e) { console.warn(`Media upload error: ${e}`); }
+    } else if (proxiedImages.length > 0) {
+      console.warn(`Skipping media upload: nmID not found yet`);
     }
 
-    // Set price via separate Prices API if not set via sizes
-    if (price > 0) {
+    // Set price via Prices API with real nmID
+    if (price > 0 && nmID > 0) {
       await sleep(2000);
       try {
         const priceResp = await fetchWithRetry(`${WB_PRICES_API}/api/v2/upload/task`, {
           method: "POST",
           headers: { Authorization: apiKey, "Content-Type": "application/json" },
-          body: JSON.stringify({ data: [{ nmID: 0, vendorCode, price }] }),
+          body: JSON.stringify({ data: [{ nmID, price, discount: 0 }] }),
         });
         if (priceResp.ok) {
-          console.log(`✅ Price set: ${price}`);
+          console.log(`✅ Price set: ${price} for nmID ${nmID}`);
         } else {
           const priceErr = await priceResp.text();
           console.warn(`Price set failed: ${priceResp.status} - ${priceErr}`);
+          // Fallback: try size-based pricing
+          try {
+            const sizePriceResp = await fetchWithRetry(`${WB_PRICES_API}/api/v2/upload/task/size`, {
+              method: "POST",
+              headers: { Authorization: apiKey, "Content-Type": "application/json" },
+              body: JSON.stringify({ data: [{ nmID, sizeID: 0, price }] }),
+            });
+            if (sizePriceResp.ok) console.log(`✅ Size price set: ${price}`);
+            else console.warn(`Size price also failed: ${sizePriceResp.status}`);
+          } catch (e) { /* skip */ }
         }
       } catch (e) { console.warn(`Price set error: ${e}`); }
+    } else if (price > 0) {
+      console.warn(`Skipping price set: nmID not found. Card may need manual price setting.`);
     }
 
     return new Response(JSON.stringify({
       success: true, vendorCode, name: content.title,
       subjectID: subject.subjectID, subjectName: subject.subjectName,
-      price, images: proxiedImages.length,
+      nmID, price, images: proxiedImages.length,
       characteristics: filledCharcs.length, barcode,
       wbResponse: wbData,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
