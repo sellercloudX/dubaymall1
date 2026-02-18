@@ -61,15 +61,38 @@ async function findSubjectId(apiKey: string, productName: string, category?: str
 
   console.log(`Subject search keyword: "${searchKeyword}"`);
 
-  // Search WB subjects
+  // Search WB subjects with fallback
+  const searchVariants = [searchKeyword];
+  // Add first word as fallback (e.g. "Фен-стайлер" → "Фен")
+  const firstWord = searchKeyword.split(/[-\s]/)[0];
+  if (firstWord && firstWord !== searchKeyword && firstWord.length >= 3) {
+    searchVariants.push(firstWord);
+  }
+  // Also try category directly
+  if (category) {
+    const catWords = category.match(/[а-яА-ЯёЁ]{3,}/g) || [];
+    if (catWords[0] && !searchVariants.includes(catWords[0])) {
+      searchVariants.push(catWords[0]);
+    }
+  }
+
+  let subjects: any[] = [];
+  let usedKeyword = searchKeyword;
   try {
-    const resp = await fetchWithRetry(
-      `${WB_CONTENT_API}/content/v2/object/all?name=${encodeURIComponent(searchKeyword)}&top=50&locale=ru`,
-      { headers }
-    );
-    if (!resp.ok) return null;
-    const data = await resp.json();
-    const subjects = data.data || [];
+    for (const kw of searchVariants) {
+      const resp = await fetchWithRetry(
+        `${WB_CONTENT_API}/content/v2/object/all?name=${encodeURIComponent(kw)}&top=50&locale=ru`,
+        { headers }
+      );
+      if (!resp.ok) continue;
+      const data = await resp.json();
+      subjects = data.data || [];
+      if (subjects.length > 0) {
+        usedKeyword = kw;
+        console.log(`Found ${subjects.length} subjects with keyword: "${kw}"`);
+        break;
+      }
+    }
     if (subjects.length === 0) return null;
 
     // Use AI to pick the best match
@@ -102,7 +125,7 @@ async function findSubjectId(apiKey: string, productName: string, category?: str
     }
 
     // Fallback: best keyword match
-    const kwLower = searchKeyword.toLowerCase();
+    const kwLower = usedKeyword.toLowerCase();
     const exact = subjects.find((s: any) => (s.subjectName || "").toLowerCase() === kwLower);
     if (exact) return { subjectID: exact.subjectID, subjectName: exact.subjectName, parentName: exact.parentName };
 
@@ -444,7 +467,7 @@ serve(async (req) => {
             sizes: [{
               techSize: "0",
               wbSize: "",
-              price: price > 0 ? price : undefined,
+              price: priceRUB > 0 ? priceRUB : undefined,
               skus: barcode ? [barcode] : undefined,
             }],
             mediaFiles: proxiedImages.slice(0, 10),
