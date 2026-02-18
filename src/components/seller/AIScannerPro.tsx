@@ -507,6 +507,8 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
             mxikCode: mxikResult?.mxik_code,
             mxikName: mxikResult?.mxik_name,
           },
+          // If infographics were already generated, skip image generation in card creator
+          skipImageGeneration: generatedInfos.length >= 2,
           pricing: {
             costPrice: pricingData.costPrice,
             recommendedPrice: pricingData.sellingPrice,

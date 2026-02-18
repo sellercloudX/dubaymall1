@@ -6,16 +6,17 @@ const corsHeaders = {
 };
 
 /**
- * Multi-stage product image pipeline:
- * Stage 1: Gemini analyzes product → category-specific design params
- * Stage 2: Fal.ai Flux Pro generates high-quality marketplace images
+ * Product image generation pipeline using FREE Lovable AI (Gemini).
+ * NO Fal.ai costs — all images generated via Lovable AI gateway.
  * 
  * Image types:
- * - "infographic": Professional product card with features/text
- * - "angle": Clean product photo on #efefef background
+ * - "professional": Infographic card with features/specs overlay
+ * - "minimalist/vibrant/luxury": Clean product angles on #efefef background
+ * 
+ * Output: 1080x1440 (3:4) vertical marketplace images
  */
 
-// Category → Design Matrix (from PDF spec)
+// Category → Design Matrix
 const CATEGORY_DESIGN_MATRIX: Record<string, {
   background: string;
   lighting: string;
@@ -29,7 +30,7 @@ const CATEGORY_DESIGN_MATRIX: Record<string, {
     colorScheme: 'soft pinks, cream whites, gold metallic',
   },
   'parfyumeriya': {
-    background: 'marble surface with soft silk curtains, sunlight shadows, 8k professional photography',
+    background: 'marble surface with soft silk curtains, sunlight shadows',
     lighting: 'soft glow, golden hour backlight, premium feel',
     infographicStyle: 'elegant thin fonts, gold/silver accents, Sephora-style',
     colorScheme: 'gold, white, deep navy or burgundy',
@@ -70,6 +71,12 @@ const CATEGORY_DESIGN_MATRIX: Record<string, {
     infographicStyle: 'organic handwritten-style fonts, natural icons',
     colorScheme: 'warm earth tones, vibrant food colors, green freshness',
   },
+  'aksessuarlar': {
+    background: 'clean gradient surface, lifestyle composition, travel vibes',
+    lighting: 'bright natural daylight, soft studio fill',
+    infographicStyle: 'modern clean fonts, minimal icons, lifestyle brand feel',
+    colorScheme: 'earthy tones, warm grays, subtle accent colors',
+  },
   'default': {
     background: 'clean gradient surface, subtle professional texture',
     lighting: 'soft studio lighting, professional product photography',
@@ -88,176 +95,17 @@ function getCategoryKey(category: string): string {
   if (cat.includes('sport') || cat.includes('fitnes')) return 'sport';
   if (cat.includes('bola') || cat.includes('o\'yinchoq')) return 'bolalar';
   if (cat.includes('oziq') || cat.includes('ichimlik') || cat.includes('shirinlik')) return 'oziq-ovqat';
+  if (cat.includes('aksessuar') || cat.includes('sumka') || cat.includes('chamad') || cat.includes('bag')) return 'aksessuarlar';
   return 'default';
 }
 
-// Stage 1: Use Gemini to create a detailed design brief
-async function createDesignBrief(
-  productName: string,
-  category: string,
-  style: string,
-  designMatrix: typeof CATEGORY_DESIGN_MATRIX[string],
-  lovableKey: string
-): Promise<{ prompt: string; negativePrompt: string } | null> {
-  try {
-    const isInfographic = style === 'professional' || style === 'infographic';
-
-    const systemPrompt = `You are a WORLD-CLASS marketplace product photographer and graphic designer. 
-You create prompts for AI image generation that produce PREMIUM, photorealistic product images.
-Your prompts ALWAYS result in images that look like they belong on Apple Store, Sephora, or Nike's website.
-Output ONLY a JSON object with "prompt" and "negativePrompt" fields.`;
-
-    let userPrompt: string;
-
-    if (isInfographic) {
-      userPrompt = `Create an AI image generation prompt for a PREMIUM e-commerce infographic card for "${productName}" (category: ${category}).
-
-Design Matrix:
-- Background: ${designMatrix.background}
-- Lighting: ${designMatrix.lighting}  
-- Typography style: ${designMatrix.infographicStyle}
-- Color scheme: ${designMatrix.colorScheme}
-
-REQUIREMENTS for the prompt:
-1. Product rendered LARGE and photorealistic in center (65-75% of frame)
-2. 3-5 KEY FEATURES shown with elegant thin lines pointing to product parts
-3. Feature labels in RUSSIAN language (Cyrillic), modern sans-serif font
-4. Each feature has a small flat icon matching color scheme
-5. Bottom: certification badge, rating stars, brand area
-6. Premium gradient background matching product aesthetic
-7. 1080x1440 vertical aspect ratio
-8. Ultra high resolution, no watermarks, no stock photo feel
-9. The product must look EXACTLY like a real "${productName}"
-
-Return JSON: {"prompt": "...", "negativePrompt": "..."}`;
-    } else {
-      const angleMap: Record<string, string> = {
-        'minimalist': 'front view, perfectly centered, symmetrical',
-        'vibrant': '45-degree three-quarter view showing depth and texture',
-        'luxury': 'close-up detail shot showing material quality and craftsmanship',
-      };
-      const angle = angleMap[style] || 'slightly angled professional studio view';
-
-      userPrompt = `Create an AI image generation prompt for a PREMIUM product photograph of "${productName}" (category: ${category}).
-
-Design Matrix:
-- Lighting: ${designMatrix.lighting}
-
-REQUIREMENTS for the prompt:
-1. Camera angle: ${angle}
-2. Clean, solid #EFEFEF (light gray) background — NO patterns, NO text, NO props
-3. Soft diffused studio lighting, subtle reflection below product
-4. Product fills 65-75% of frame — not too small, not cropped
-5. NO text, NO labels, NO watermarks, NO hands
-6. Match quality of Apple Store or Sephora product images
-7. 1080x1440 vertical aspect ratio
-8. Ultra high resolution, every detail sharp
-9. The product must look EXACTLY like a real "${productName}" — accurate shape, proportions, color
-
-Return JSON: {"prompt": "...", "negativePrompt": "..."}`;
-    }
-
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${lovableKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      console.error(`Gemini design brief error: ${response.status}`);
-      return null;
-    }
-
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content || '';
-    const match = content.match(/\{[\s\S]*\}/);
-    if (!match) return null;
-
-    return JSON.parse(match[0]);
-  } catch (e) {
-    console.error("Design brief error:", e);
-    return null;
-  }
-}
-
-// Stage 2: Generate image with Fal.ai Flux Pro (SYNCHRONOUS endpoint)
-async function generateWithFlux(
-  prompt: string,
-  negativePrompt: string,
-  falKey: string,
-  aspectRatio: string = "3:4"
-): Promise<string | null> {
-  try {
-    console.log("🎨 Fal.ai Flux Pro generating (sync mode)...");
-
-    // Use synchronous endpoint (fal.run) — no polling needed
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 50_000); // 50s timeout
-
-    const resp = await fetch("https://fal.run/fal-ai/flux-pro/v1.1-ultra", {
-      method: "POST",
-      headers: {
-        Authorization: `Key ${falKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        prompt,
-        negative_prompt: negativePrompt,
-        image_size: aspectRatio === "3:4"
-          ? { width: 1080, height: 1440 }
-          : { width: 1024, height: 1024 },
-        num_images: 1,
-        safety_tolerance: "5",
-        output_format: "jpeg",
-      }),
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeout);
-
-    if (!resp.ok) {
-      const errText = await resp.text();
-      console.error(`Fal.ai sync error: ${resp.status} ${errText.substring(0, 300)}`);
-      return null;
-    }
-
-    const data = await resp.json();
-    const imageUrl = data.images?.[0]?.url;
-
-    if (imageUrl) {
-      console.log("✅ Fal.ai Flux Pro image generated successfully");
-      return imageUrl;
-    }
-
-    console.error("Fal.ai: no image in response", JSON.stringify(data).substring(0, 200));
-    return null;
-  } catch (e: any) {
-    if (e.name === 'AbortError') {
-      console.error("Fal.ai timeout (50s exceeded)");
-    } else {
-      console.error("Fal.ai Flux error:", e);
-    }
-    return null;
-  }
-}
-
-// Fallback: Gemini image generation (if Fal.ai fails)
+// Generate image using FREE Lovable AI (Gemini image generation)
 async function generateWithGemini(
   prompt: string,
   lovableKey: string,
   productImage?: string
 ): Promise<string | null> {
   try {
-    console.log("⚡ Fallback: Gemini image generation...");
     const messages: any[] = [{
       role: "user",
       content: productImage
@@ -281,66 +129,65 @@ async function generateWithGemini(
       }),
     });
 
-    if (!response.ok) return null;
+    if (!response.ok) {
+      console.error(`Gemini image gen error: ${response.status}`);
+      return null;
+    }
 
     const data = await response.json();
     const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    if (imageUrl) {
+      console.log("✅ Gemini image generated (FREE)");
+    }
     return imageUrl || null;
   } catch (e) {
-    console.error("Gemini fallback error:", e);
+    console.error("Gemini image error:", e);
     return null;
   }
 }
 
-// Upload image from URL to Supabase storage
-async function uploadUrlToStorage(imageUrl: string, productName: string, style: string): Promise<string | null> {
+// Upload image to Supabase storage
+async function uploadToStorage(imageData: string, style: string): Promise<string | null> {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
-    const authKey = serviceKey || anonKey;
-    if (!supabaseUrl || !authKey) {
-      console.warn("No storage auth key available");
-      return imageUrl;
-    }
+    const authKey = serviceKey || Deno.env.get("SUPABASE_ANON_KEY");
+    if (!supabaseUrl || !authKey) return imageData;
 
-    // Download from URL (or handle base64)
     let imgBytes: Uint8Array;
-    let contentType = "image/jpeg";
+    let contentType = "image/png";
 
-    if (imageUrl.startsWith("data:")) {
-      const match = imageUrl.match(/^data:([^;]+);base64,(.+)$/);
-      if (!match) return imageUrl;
+    if (imageData.startsWith("data:")) {
+      const match = imageData.match(/^data:([^;]+);base64,(.+)$/);
+      if (!match) return imageData;
       contentType = match[1];
       const binaryString = atob(match[2]);
       imgBytes = new Uint8Array(binaryString.length);
       for (let i = 0; i < binaryString.length; i++) {
         imgBytes[i] = binaryString.charCodeAt(i);
       }
-    } else {
-      const imgResp = await fetch(imageUrl);
-      if (!imgResp.ok) return imageUrl;
+    } else if (imageData.startsWith("http")) {
+      const imgResp = await fetch(imageData);
+      if (!imgResp.ok) return imageData;
       imgBytes = new Uint8Array(await imgResp.arrayBuffer());
       contentType = imgResp.headers.get("content-type") || "image/jpeg";
+    } else {
+      return imageData;
     }
 
     const ext = contentType.includes("png") ? "png" : "jpg";
     const fileName = `infographics/${Date.now()}-${style}-${Math.random().toString(36).substring(7)}.${ext}`;
 
-    // Use createClient for storage upload
     const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
     const supabase = createClient(supabaseUrl, authKey);
 
     const { error } = await supabase.storage
       .from("product-images")
-      .upload(fileName, imgBytes, {
-        contentType,
-        upsert: true,
-      });
+      .upload(fileName, imgBytes, { contentType, upsert: true });
 
     if (error) {
       console.warn(`Storage upload error: ${error.message}`);
-      return imageUrl;
+      return imageData;
     }
 
     const { data: publicData } = supabase.storage
@@ -351,7 +198,7 @@ async function uploadUrlToStorage(imageUrl: string, productName: string, style: 
     return publicData.publicUrl;
   } catch (e) {
     console.error("Upload error:", e);
-    return imageUrl;
+    return imageData;
   }
 }
 
@@ -367,15 +214,13 @@ serve(async (req) => {
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    const FAL_API_KEY = Deno.env.get("FAL_API_KEY");
-
     if (!LOVABLE_API_KEY) {
       return new Response(JSON.stringify({ error: "AI service not configured" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const { productImage, productName, category, style, count = 1 } = await req.json();
+    const { productImage, productName, category, style } = await req.json();
 
     if (!productName) {
       return new Response(JSON.stringify({ error: "productName is required" }), {
@@ -383,37 +228,84 @@ serve(async (req) => {
       });
     }
 
-    console.log(`🎨 Pipeline for: "${productName}" | style: ${style || 'auto'} | engine: ${FAL_API_KEY ? 'Fal.ai Flux Pro' : 'Gemini fallback'}`);
+    console.log(`🎨 Generating image: "${productName}" | style: ${style || 'professional'} | engine: Gemini (FREE)`);
 
-    const images: Array<{ url: string; style: string }> = [];
     const categoryKey = getCategoryKey(category || '');
     const designMatrix = CATEGORY_DESIGN_MATRIX[categoryKey];
+    const isInfographic = style === 'professional' || style === 'infographic';
 
-    // Stage 1: Create design brief with Gemini
-    const designBrief = await createDesignBrief(
-      productName, category || '', style || 'professional', designMatrix, LOVABLE_API_KEY
-    );
+    // Build targeted prompt based on style
+    let prompt: string;
 
-    let prompt = designBrief?.prompt || `Professional marketplace product photo of "${productName}", ${designMatrix.background}, ${designMatrix.lighting}, ultra high resolution, 1080x1440`;
-    let negativePrompt = designBrief?.negativePrompt || "blurry, low quality, watermark, text errors, distorted, amateur, stock photo feel, ugly, deformed";
+    if (isInfographic) {
+      prompt = `You are an elite product photographer creating a PREMIUM MARKETPLACE INFOGRAPHIC CARD.
 
-    console.log(`📝 Prompt (${prompt.length} chars): ${prompt.substring(0, 100)}...`);
+PRODUCT: "${productName}" (Category: ${category || 'General'})
 
-    // Stage 2: Generate with Fal.ai Flux Pro (primary) or Gemini (fallback)
+DESIGN REQUIREMENTS:
+- Background: ${designMatrix.background}
+- Lighting: ${designMatrix.lighting}
+- Typography: ${designMatrix.infographicStyle}
+- Color scheme: ${designMatrix.colorScheme}
+
+IMAGE SPECIFICATIONS:
+1. Product rendered LARGE and photorealistic in center (65-75% of frame)
+2. 3-5 KEY FEATURES shown with elegant thin lines pointing to product parts
+3. Feature labels in RUSSIAN language (Cyrillic text), modern sans-serif font
+4. Each feature has a small flat icon matching the color scheme
+5. Bottom area: brand badge, quality/rating indicators
+6. Premium gradient background matching product category aesthetic
+7. VERTICAL 3:4 aspect ratio (1080x1440 pixels)
+8. Ultra high resolution, photorealistic, NO watermarks
+9. The product must look EXACTLY like a real "${productName}"
+10. Professional marketplace listing quality (Ozon/Wildberries level)
+
+Create this premium infographic product card image now.`;
+    } else {
+      const angleMap: Record<string, string> = {
+        'minimalist': 'perfectly centered front view, symmetrical composition',
+        'vibrant': '45-degree three-quarter angle showing depth and dimension',
+        'luxury': 'artistic close-up highlighting material texture and craftsmanship',
+      };
+      const angle = angleMap[style] || 'professional studio angle';
+
+      prompt = `You are an elite product photographer creating a PREMIUM MARKETPLACE PRODUCT PHOTO.
+
+PRODUCT: "${productName}" (Category: ${category || 'General'})
+
+IMAGE SPECIFICATIONS:
+1. Camera angle: ${angle}
+2. Background: Clean, solid light gray (#EFEFEF) — NO patterns, NO props, NO text
+3. Lighting: ${designMatrix.lighting}, soft diffused studio fill, subtle reflection below
+4. Product fills 65-75% of frame — properly sized, not too small, not cropped
+5. NO text, NO labels, NO watermarks, NO human hands
+6. VERTICAL 3:4 aspect ratio (1080x1440 pixels)
+7. Ultra high resolution, every detail razor sharp
+8. The product must look EXACTLY like a real "${productName}" — accurate shape, color, proportions, brand details
+9. Quality level: Apple Store / Sephora product photography
+10. Clean, professional marketplace listing image
+
+Create this premium product photo now.`;
+    }
+
+    // Add product reference image if available
     let generatedUrl: string | null = null;
 
-    if (FAL_API_KEY) {
-      generatedUrl = await generateWithFlux(prompt, negativePrompt, FAL_API_KEY, "3:4");
+    if (productImage) {
+      // With reference image — better accuracy
+      const refPrompt = `${prompt}\n\nCRITICAL: Use the attached product image as EXACT visual reference. The generated product must be 100% identical in shape, color, brand, and every detail. ONLY change the angle, background, and lighting as specified above. Do NOT add any text overlays unless this is an infographic style.`;
+      generatedUrl = await generateWithGemini(refPrompt, LOVABLE_API_KEY, productImage);
     }
 
-    if (!generatedUrl && LOVABLE_API_KEY) {
-      // Fallback to Gemini
-      generatedUrl = await generateWithGemini(prompt, LOVABLE_API_KEY, productImage);
+    if (!generatedUrl) {
+      // Without reference or retry without reference
+      generatedUrl = await generateWithGemini(prompt, LOVABLE_API_KEY);
     }
+
+    const images: Array<{ url: string; style: string }> = [];
 
     if (generatedUrl) {
-      // Upload to our storage for permanence
-      const storedUrl = await uploadUrlToStorage(generatedUrl, productName, style || 'professional');
+      const storedUrl = await uploadToStorage(generatedUrl, style || 'professional');
       if (storedUrl) {
         images.push({ url: storedUrl, style: style || 'professional' });
       }
@@ -422,7 +314,8 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       success: images.length > 0,
       images,
-      engine: FAL_API_KEY ? 'flux-pro' : 'gemini-fallback',
+      engine: 'gemini-free',
+      cost: '$0.00',
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
