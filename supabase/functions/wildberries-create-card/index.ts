@@ -481,125 +481,20 @@ serve(async (req) => {
 
     console.log(`✅ Card created: ${vendorCode}, subject: ${subject.subjectName}`);
 
-    // Wait for WB to process the card, then fetch nmID
-    // WB needs significant time to index new cards
-    let nmID = 0;
-    console.log(`Waiting for WB to index card ${vendorCode}...`);
-    await sleep(10000); // Initial 10s wait - WB needs time to process
-    
-    for (let attempt = 0; attempt < 6; attempt++) {
-      try {
-        // Strategy 1: Fetch ALL recent cards without textSearch filter (more reliable)
-        const listResp = await fetchWithRetry(`${WB_CONTENT_API}/content/v2/get/cards/list`, {
-          method: "POST",
-          headers: { Authorization: apiKey, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            settings: {
-              cursor: { limit: 100 },
-              filter: { withPhoto: -1 },
-            },
-          }),
-        });
-        if (listResp.ok) {
-          const listData = await listResp.json();
-          const cards = listData.cards || listData.data?.cards || [];
-          console.log(`Cards list returned ${cards.length} cards (attempt ${attempt + 1})`);
-          
-          // Find by exact vendorCode match
-          const found = cards.find((c: any) => c.vendorCode === vendorCode);
-          if (found?.nmID) {
-            nmID = found.nmID;
-            console.log(`✅ Found nmID: ${nmID} for ${vendorCode} (attempt ${attempt + 1})`);
-            break;
-          }
-          
-          // Strategy 2: Try finding by most recently created SCX- card
-          const scxCards = cards
-            .filter((c: any) => (c.vendorCode || '').startsWith('SCX-'))
-            .sort((a: any, b: any) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-          if (scxCards.length > 0) {
-            console.log(`Latest SCX cards: ${scxCards.slice(0, 3).map((c: any) => `${c.vendorCode}(${c.nmID})`).join(', ')}`);
-          }
-        } else {
-          const errText = await listResp.text();
-          console.warn(`Cards list ${listResp.status}: ${errText}`);
-        }
-      } catch (e) { console.warn(`Cards list attempt ${attempt + 1} error:`, e); }
-      
-      if (attempt < 5) {
-        const waitTime = 8000 + (attempt * 4000); // 8s, 12s, 16s, 20s, 24s
-        console.log(`nmID not found yet, waiting ${waitTime/1000}s (attempt ${attempt + 1}/6)...`);
-        await sleep(waitTime);
-      }
-    }
-
-    // Upload media files separately after card creation
-    if (proxiedImages.length > 0 && nmID > 0) {
-      await sleep(2000);
-      try {
-        // WB v3 media save expects: {vendorCode, data: ["url1", "url2"]}
-        const mediaResp = await fetchWithRetry(`${WB_CONTENT_API}/content/v3/media/save`, {
-          method: "POST",
-          headers: { Authorization: apiKey, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            vendorCode,
-            data: proxiedImages.slice(0, 10),
-          }),
-        });
-        if (mediaResp.ok) {
-          console.log(`✅ Media uploaded: ${proxiedImages.length} files`);
-        } else {
-          const mediaErr = await mediaResp.text();
-          console.warn(`Media upload ${mediaResp.status}: ${mediaErr}`);
-          // Fallback: upload one by one
-          let uploaded = 0;
-          for (const imgUrl of proxiedImages.slice(0, 5)) {
-            try {
-              const singleResp = await fetchWithRetry(`${WB_CONTENT_API}/content/v3/media/save`, {
-                method: "POST",
-                headers: { Authorization: apiKey, "Content-Type": "application/json" },
-                body: JSON.stringify({ vendorCode, data: [imgUrl] }),
-              });
-              if (singleResp.ok) { uploaded++; }
-              else { const e = await singleResp.text(); console.warn(`Single media ${singleResp.status}: ${e}`); }
-            } catch (e) { /* skip */ }
-            await sleep(500);
-          }
-          if (uploaded > 0) console.log(`✅ Uploaded ${uploaded} images individually`);
-        }
-      } catch (e) { console.warn(`Media upload error: ${e}`); }
-    } else if (proxiedImages.length > 0 && nmID === 0) {
-      console.warn(`⚠️ nmID not found after 5 attempts. Media not uploaded. Card will appear without images.`);
-      console.warn(`Try refreshing WB cards list in a few minutes - WB indexing can take 1-5 min.`);
-    }
-
-    // Set price via Prices API with real nmID
-    if (priceRUB > 0 && nmID > 0) {
-      await sleep(2000);
-      try {
-        const priceResp = await fetchWithRetry(`${WB_PRICES_API}/api/v2/upload/task`, {
-          method: "POST",
-          headers: { Authorization: apiKey, "Content-Type": "application/json" },
-          body: JSON.stringify({ data: [{ nmID, price: priceRUB, discount: 0 }] }),
-        });
-        if (priceResp.ok) {
-          console.log(`✅ Price set: ${priceRUB} RUB for nmID ${nmID}`);
-        } else {
-          const priceErr = await priceResp.text();
-          console.warn(`Price set failed: ${priceResp.status} - ${priceErr}`);
-        }
-      } catch (e) { console.warn(`Price set error: ${e}`); }
-    } else if (priceRUB > 0 && nmID === 0) {
-      console.warn(`⚠️ Price not set: nmID not found. Price ${priceRUB} RUB needs manual setting.`);
-    }
+    // Card is created with mediaFiles and price already in payload.
+    // WB indexes cards asynchronously (1-5 min), so we return immediately.
+    // No need to poll for nmID — images are attached via mediaFiles field,
+    // and price is set via sizes[].price during creation.
+    console.log(`✅ Done! Card will appear on WB in 1-5 minutes after indexing.`);
 
     return new Response(JSON.stringify({
       success: true, vendorCode, name: content.title,
       subjectID: subject.subjectID, subjectName: subject.subjectName,
-      nmID, price: priceRUB, priceOriginal: rawPrice, currency: 'RUB',
+      price: priceRUB, priceOriginal: rawPrice, currency: 'RUB',
       images: proxiedImages.length,
       characteristics: filledCharcs.length, barcode,
       wbResponse: wbData,
+      note: 'Kartochka yaratildi. WB indekslashi 1-5 daqiqa olishi mumkin.',
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (error) {
