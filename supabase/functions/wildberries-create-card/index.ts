@@ -400,32 +400,31 @@ serve(async (req) => {
     console.log(`Price conversion: ${rawPrice} (source) → ${priceRUB} RUB`);
 
     // ===== BUILD CORRECT WB v2 PAYLOAD =====
-    const cardPayload = [{
-      subjectID: subject.subjectID,
-      variants: [{
-        vendorCode,
-        title: content.title,
-        description: stripHtml(content.desc),
-        brand: "",
-        dimensions: {
-          length: 20,
-          width: 15,
-          height: 10,
-          weightBrutto: 0.5,
-        },
-        characteristics: filledCharcs,
-        sizes: [{
-          techSize: "0",
-          wbSize: "",
-          price: priceRUB > 0 ? priceRUB : undefined,
-          skus: barcode ? [barcode] : undefined,
-        }],
-        mediaFiles: proxiedImages.slice(0, 10),
+    // Note: mediaFiles NOT included in upload - must be uploaded via /content/v3/media/save after card creation
+    const variant: any = {
+      vendorCode,
+      title: content.title,
+      description: stripHtml(content.desc),
+      dimensions: {
+        length: 20,
+        width: 15,
+        height: 10,
+        weightBrutto: 0.5,
+      },
+      characteristics: filledCharcs,
+      sizes: [{
+        techSize: "0",
+        wbSize: "",
+        price: priceRUB > 0 ? priceRUB : undefined,
+        skus: barcode ? [barcode] : undefined,
       }],
-    }];
+    };
+    // Don't send brand field at all - empty string causes silent rejection
+    
+    const cardPayload = [{ subjectID: subject.subjectID, variants: [variant] }];
 
     console.log(`Sending to WB API: subjectID=${subject.subjectID}, charcs=${filledCharcs.length}, images=${proxiedImages.length}, price=${priceRUB} RUB`);
-    console.log(`Payload sample:`, JSON.stringify(cardPayload[0].variants[0].characteristics?.slice(0, 3)));
+    console.log(`Full payload:`, JSON.stringify(cardPayload).substring(0, 500));
 
     // Create card via Content API v2
     const wbResp = await fetchWithRetry(`${WB_CONTENT_API}/content/v2/cards/upload`, {
@@ -436,22 +435,25 @@ serve(async (req) => {
 
     const wbData = await wbResp.json();
 
-    if (!wbResp.ok || wbData.error) {
-      console.error("WB API error:", JSON.stringify(wbData));
-
-      // Check for error list to get details
-      await sleep(1000);
+    // Helper: check WB error list (GET endpoint)
+    async function checkWbErrors(): Promise<any[]> {
       try {
         const errResp = await fetchWithRetry(`${WB_CONTENT_API}/content/v2/cards/error/list`, {
-          method: "POST",
-          headers: { Authorization: apiKey, "Content-Type": "application/json" },
-          body: JSON.stringify({}),
+          headers: { Authorization: apiKey },
         });
         if (errResp.ok) {
           const errData = await errResp.json();
-          console.log("WB error list:", JSON.stringify(errData.data?.slice(0, 3)));
+          return errData.data || [];
         }
       } catch (e) { /* ignore */ }
+      return [];
+    }
+
+    if (!wbResp.ok || wbData.error) {
+      console.error("WB API error:", JSON.stringify(wbData));
+      await sleep(1000);
+      const wbErrors = await checkWbErrors();
+      console.log("WB error list:", JSON.stringify(wbErrors.slice(0, 5)));
 
       // Retry without characteristics if they cause issues
       if (JSON.stringify(wbData).includes("характеристик") || JSON.stringify(wbData).includes("characteristic") || JSON.stringify(wbData).includes("Invalid")) {
@@ -462,15 +464,8 @@ serve(async (req) => {
             vendorCode: vendorCode + "-R",
             title: content.title,
             description: stripHtml(content.desc),
-            brand: "",
             characteristics: [],
-            sizes: [{
-              techSize: "0",
-              wbSize: "",
-              price: priceRUB > 0 ? priceRUB : undefined,
-              skus: barcode ? [barcode] : undefined,
-            }],
-            mediaFiles: proxiedImages.slice(0, 10),
+            sizes: [{ techSize: "0", wbSize: "", price: priceRUB > 0 ? priceRUB : undefined, skus: barcode ? [barcode] : undefined }],
           }],
         }];
 
@@ -484,40 +479,90 @@ serve(async (req) => {
         if (!retryResp.ok || retryData.error) {
           return new Response(JSON.stringify({
             success: false, error: retryData?.errorText || "WB API xatosi",
-            wbResponse: retryData, originalError: wbData,
+            wbResponse: retryData, originalError: wbData, wbErrors,
           }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
 
-        console.log(`✅ Card created (minimal): ${vendorCode}-R, subject: ${subject.subjectName}`);
         return new Response(JSON.stringify({
           success: true, vendorCode: vendorCode + "-R", name: content.title,
           subjectID: subject.subjectID, subjectName: subject.subjectName,
-          price, images: proxiedImages.length, characteristics: 0,
-          wbResponse: retryData, note: "Xususiyatlarsiz yaratildi, qo'lda to'ldiring",
+          priceRUB, characteristics: 0, wbResponse: retryData,
+          note: "Xususiyatlarsiz yaratildi, qo'lda to'ldiring",
         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
       return new Response(JSON.stringify({
-        success: false, error: wbData?.errorText || "WB API xatosi", wbResponse: wbData,
+        success: false, error: wbData?.errorText || "WB API xatosi", wbResponse: wbData, wbErrors,
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    console.log(`✅ Card created: ${vendorCode}, subject: ${subject.subjectName}`);
+    console.log(`✅ WB accepted card: ${vendorCode}, response: ${JSON.stringify(wbData)}`);
 
-    // Card is created with mediaFiles and price already in payload.
-    // WB indexes cards asynchronously (1-5 min), so we return immediately.
-    // No need to poll for nmID — images are attached via mediaFiles field,
-    // and price is set via sizes[].price during creation.
-    console.log(`✅ Done! Card will appear on WB in 1-5 minutes after indexing.`);
+    // Wait and check for silent rejections
+    await sleep(3000);
+    const wbErrors = await checkWbErrors();
+    const ourErrors = wbErrors.filter((e: any) => 
+      e.vendorCode === vendorCode || 
+      (JSON.stringify(e).includes(vendorCode))
+    );
+    
+    if (ourErrors.length > 0) {
+      const errorMsg = ourErrors.map((e: any) => 
+        (e.errors || []).join(', ') || e.errorText || JSON.stringify(e)
+      ).join('; ');
+      console.error(`❌ WB silently rejected card: ${errorMsg}`);
+      return new Response(JSON.stringify({
+        success: false,
+        error: `WB kartochkani rad etdi: ${errorMsg}`,
+        wbErrors: ourErrors, vendorCode,
+      }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    console.log(`No errors found for ${vendorCode} (${wbErrors.length} total errors in list)`);
+
+    // Try to find nmID and upload media via /content/v3/media/save
+    let nmID: number | null = null;
+    try {
+      const listResp = await fetchWithRetry(`${WB_CONTENT_API}/content/v2/get/cards/list`, {
+        method: "POST",
+        headers: { Authorization: apiKey, "Content-Type": "application/json" },
+        body: JSON.stringify({ settings: { cursor: { limit: 100 }, filter: { withPhoto: -1 } } }),
+      });
+      if (listResp.ok) {
+        const listData = await listResp.json();
+        const cards = listData.cards || listData.data?.cards || [];
+        const found = cards.find((c: any) => c.vendorCode === vendorCode);
+        if (found?.nmID) {
+          nmID = found.nmID;
+          console.log(`Found nmID: ${nmID}`);
+          
+          // Upload media separately
+          if (proxiedImages.length > 0) {
+            try {
+              const mediaResp = await fetchWithRetry(`${WB_CONTENT_API}/content/v3/media/save`, {
+                method: "POST",
+                headers: { Authorization: apiKey, "Content-Type": "application/json" },
+                body: JSON.stringify({ nmId: nmID, data: proxiedImages.slice(0, 10) }),
+              });
+              const mediaData = await mediaResp.json();
+              console.log(`Media upload (${proxiedImages.length} images):`, JSON.stringify(mediaData));
+            } catch (e) { console.warn("Media upload error:", e); }
+          }
+        } else {
+          console.log(`nmID not found yet. ${cards.length} cards in list. Card still indexing.`);
+        }
+      }
+    } catch (e) { console.warn("Cards list error:", e); }
 
     return new Response(JSON.stringify({
       success: true, vendorCode, name: content.title,
       subjectID: subject.subjectID, subjectName: subject.subjectName,
       price: priceRUB, priceOriginal: rawPrice, currency: 'RUB',
-      images: proxiedImages.length,
+      images: proxiedImages.length, nmID,
       characteristics: filledCharcs.length, barcode,
       wbResponse: wbData,
-      note: 'Kartochka yaratildi. WB indekslashi 1-5 daqiqa olishi mumkin.',
+      note: nmID 
+        ? `Kartochka yaratildi va rasmlar yuklandi (nmID: ${nmID})` 
+        : 'Kartochka yaratildi. Rasmlar WB indekslashdan keyin qo\'shiladi (1-5 daqiqa).',
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (error) {
