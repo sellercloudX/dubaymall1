@@ -6,12 +6,13 @@ import { Camera, X, SwitchCamera } from 'lucide-react';
 interface InlineCameraProps {
   onCapture: (base64: string) => void;
   onClose: () => void;
+  initialStream: MediaStream;
 }
 
-export function InlineCamera({ onCapture, onClose }: InlineCameraProps) {
+export function InlineCamera({ onCapture, onClose, initialStream }: InlineCameraProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [stream, setStream] = useState<MediaStream>(initialStream);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [isReady, setIsReady] = useState(false);
 
@@ -19,31 +20,15 @@ export function InlineCamera({ onCapture, onClose }: InlineCameraProps) {
     (s || stream)?.getTracks().forEach(t => t.stop());
   }, [stream]);
 
-  const startCamera = useCallback(async (facing: 'environment' | 'user') => {
-    try {
-      if (stream) stopStream(stream);
-      const s = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: facing, width: { ideal: 1920 }, height: { ideal: 1080 } }
-      });
-      setStream(s);
-      if (videoRef.current) {
-        videoRef.current.srcObject = s;
-        videoRef.current.onloadedmetadata = () => setIsReady(true);
-      }
-    } catch (err) {
-      console.error('Camera error:', err);
-      onClose();
-    }
-  }, []);
-
-  // Start camera on mount, cleanup on unmount
+  // Attach initial stream to video on mount
   useEffect(() => {
-    startCamera(facingMode);
-    // Lock body scroll
+    if (videoRef.current && initialStream) {
+      videoRef.current.srcObject = initialStream;
+      videoRef.current.onloadedmetadata = () => setIsReady(true);
+    }
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = '';
-      // Stop all tracks on unmount
       if (videoRef.current?.srcObject) {
         (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
       }
@@ -54,7 +39,19 @@ export function InlineCamera({ onCapture, onClose }: InlineCameraProps) {
     const newFacing = facingMode === 'environment' ? 'user' : 'environment';
     setFacingMode(newFacing);
     setIsReady(false);
-    await startCamera(newFacing);
+    try {
+      stopStream(stream);
+      const s = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: newFacing, width: { ideal: 1920 }, height: { ideal: 1080 } }
+      });
+      setStream(s);
+      if (videoRef.current) {
+        videoRef.current.srcObject = s;
+        videoRef.current.onloadedmetadata = () => setIsReady(true);
+      }
+    } catch (err) {
+      console.error('Camera switch error:', err);
+    }
   };
 
   const capture = () => {
@@ -76,7 +73,6 @@ export function InlineCamera({ onCapture, onClose }: InlineCameraProps) {
 
   return createPortal(
     <div className="fixed inset-0 bg-black flex flex-col" style={{ zIndex: 99999 }}>
-      {/* Video fills screen */}
       <video
         ref={videoRef}
         autoPlay
@@ -86,7 +82,6 @@ export function InlineCamera({ onCapture, onClose }: InlineCameraProps) {
       />
       <canvas ref={canvasRef} className="hidden" />
 
-      {/* Top bar - close button */}
       <div className="absolute top-0 left-0 right-0 flex justify-end p-4" style={{ paddingTop: 'calc(env(safe-area-inset-top, 12px) + 12px)' }}>
         <Button
           size="icon"
@@ -98,12 +93,10 @@ export function InlineCamera({ onCapture, onClose }: InlineCameraProps) {
         </Button>
       </div>
 
-      {/* Bottom controls */}
       <div
         className="absolute bottom-0 left-0 right-0 flex items-center justify-center gap-6 pb-6"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 20px) + 24px)' }}
       >
-        {/* Switch camera */}
         <Button
           size="icon"
           variant="secondary"
@@ -113,7 +106,6 @@ export function InlineCamera({ onCapture, onClose }: InlineCameraProps) {
           <SwitchCamera className="h-5 w-5" />
         </Button>
 
-        {/* Capture button */}
         <button
           onClick={capture}
           disabled={!isReady}
@@ -122,10 +114,19 @@ export function InlineCamera({ onCapture, onClose }: InlineCameraProps) {
           <div className="h-[60px] w-[60px] rounded-full bg-white" />
         </button>
 
-        {/* Spacer for symmetry */}
         <div className="h-12 w-12" />
       </div>
     </div>,
     document.body
   );
+}
+
+/**
+ * Helper: call this directly inside an onClick handler to get the stream,
+ * then pass it to <InlineCamera initialStream={stream} />.
+ */
+export async function requestCameraStream(facing: 'environment' | 'user' = 'environment'): Promise<MediaStream> {
+  return navigator.mediaDevices.getUserMedia({
+    video: { facingMode: facing, width: { ideal: 1920 }, height: { ideal: 1080 } }
+  });
 }
