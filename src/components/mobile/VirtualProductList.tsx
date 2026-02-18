@@ -18,15 +18,19 @@
    uniqueKey?: string;
  }
  
- interface VirtualProductListProps {
-   products: Product[];
-   onProductClick?: (product: Product) => void;
- }
+interface VirtualProductListProps {
+  products: Product[];
+  marketplace?: string;
+  onProductClick?: (product: Product) => void;
+}
  
- const formatPrice = (price?: number) => {
-   if (!price) return '—';
-   return new Intl.NumberFormat('uz-UZ').format(price) + ' so\'m';
- };
+const formatPrice = (price?: number, marketplace?: string) => {
+  if (!price) return '—';
+  const isRub = marketplace === 'wildberries';
+  const currency = isRub ? ' ₽' : ' so\'m';
+  if (!isRub && price >= 1000000) return (price / 1000000).toFixed(1) + ' mln';
+  return new Intl.NumberFormat(isRub ? 'ru-RU' : 'uz-UZ').format(Math.round(price)) + currency;
+};
  
  const getStockBadge = (fbo?: number, fbs?: number) => {
    const total = (fbo || 0) + (fbs || 0);
@@ -36,7 +40,7 @@
  };
  
  // Memoized product row to prevent unnecessary re-renders
- const ProductRow = memo(({ product, onClick }: { product: Product; onClick?: (p: Product) => void }) => (
+ const ProductRow = memo(({ product, onClick, marketplace }: { product: Product; onClick?: (p: Product) => void; marketplace?: string }) => (
    <Card 
     className="overflow-hidden cursor-pointer hover:bg-accent/50 transition-colors"
      onClick={() => onClick?.(product)}
@@ -68,7 +72,7 @@
            </div>
            <div className="flex items-center justify-between gap-2">
             <span className="font-bold text-primary text-sm">
-               {formatPrice(product.price)}
+               {formatPrice(product.price, marketplace)}
              </span>
             <div className="flex items-center gap-1.5">
               {product.stockFBO !== undefined && product.stockFBO > 0 && (
@@ -88,7 +92,7 @@
  
  ProductRow.displayName = 'ProductRow';
  
- export function VirtualProductList({ products, onProductClick }: VirtualProductListProps) {
+ export function VirtualProductList({ products, marketplace, onProductClick }: VirtualProductListProps) {
    const parentRef = useRef<HTMLDivElement>(null);
  
    const virtualizer = useVirtualizer({
@@ -126,7 +130,7 @@
               paddingBottom: '12px',
                }}
              >
-               <ProductRow product={product} onClick={onProductClick} />
+               <ProductRow product={product} onClick={onProductClick} marketplace={marketplace} />
              </div>
            );
          })}
