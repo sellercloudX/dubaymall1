@@ -373,7 +373,7 @@ function ImageAnalysisTab({ selectedPartnerId, scanResults }: any) {
         r.products.map((p: ProductIssue) => ({
           offerId: p.offerId, nmID: p.nmID, name: p.name,
           marketplace: r.marketplace, category: p.category, imageCount: p.imageCount,
-          referenceImageUrl: (p as any).images?.[0] || '',
+          referenceImageUrl: (p as any).pictures?.[0] || (p as any).images?.[0] || '',
         }))
       );
       // Client-side analysis — no server call needed
