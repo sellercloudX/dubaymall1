@@ -394,7 +394,7 @@ Requirements:
 }
 
 // =====================================================
-// STEP 4: Hero Product Image — Pure Professional Photography (NO text/badges)
+// STEP 4: Hero Infographic Image — Pinterest-style with text overlays
 // =====================================================
 async function generateHeroImage(
   imageUrl: string,
@@ -402,7 +402,7 @@ async function generateHeroImage(
   categoryStyle: typeof CATEGORY_STYLES.default,
   apiKey: string,
 ): Promise<string | null> {
-  console.log("🎨 STEP 4: Hero Product Image (Professional Photography)...");
+  console.log("🎨 STEP 4: Hero INFOGRAPHIC Image (Pinterest-style)...");
 
   const imageBytes = await downloadImage(imageUrl);
   if (!imageBytes) {
@@ -411,50 +411,72 @@ async function generateHeroImage(
   }
 
   const category = detection?.category || '';
+  const productName = sanitizeStopWords(detection?.product_name || detection?.productName || 'Product');
+  const brand = detection?.brand || '';
+  const keyFeatures = (detection?.key_features || detection?.features || []).slice(0, 4);
   const positioning = detection?.positioning || 'mid-range';
 
-  const heroPrompt = `You are a world-class commercial product photographer. Transform this product photo into a PREMIUM e-commerce hero image.
+  // Build feature badges text
+  const featureBadgesText = keyFeatures.length > 0 
+    ? keyFeatures.map((f: string, i: number) => `• ${sanitizeStopWords(f)}`).join('\n')
+    : '';
+
+  const heroPrompt = `You are a world-class marketplace INFOGRAPHIC designer. Create a PINTEREST-STYLE product infographic card from this product photo.
 
 FORMAT: 1080x1440 vertical (3:4 portrait).
 
-PHOTOGRAPHY DIRECTION:
+DESIGN DIRECTION:
 - Style: ${categoryStyle.visual_style}
-- Background: ${categoryStyle.background_style}
+- Background: ${categoryStyle.background_style}  
 - Color palette: ${categoryStyle.color_palette}
 
-CRITICAL RULES — READ CAREFULLY:
+THIS IS AN INFOGRAPHIC — IT MUST HAVE TEXT AND DESIGN ELEMENTS:
 
-1. PRODUCT PRESERVATION: The product from the reference photo must be placed into the scene EXACTLY as-is — same shape, same colors, same labels, same brand logos, same packaging. Do NOT redraw, reinterpret, simplify, or alter the product in ANY way. It must look like a real photograph of the SAME physical product.
+1. PRODUCT PRESERVATION: The product from the reference photo must be placed into the scene EXACTLY as-is — same shape, same colors, same labels, same brand logos, same packaging. Do NOT redraw or alter the product.
 
-2. BACKGROUND: Create a rich, layered, category-appropriate styled background:
+2. BACKGROUND: Create a rich, styled, category-appropriate background:
    ${categoryStyle.prompt_addition}
 
-3. ABSOLUTELY NO TEXT: Do NOT add ANY text, typography, labels, badges, watermarks, titles, descriptions, feature callouts, or any written content. The image must be PURELY VISUAL — a clean product photograph with styled background. ZERO text characters anywhere.
+3. PRODUCT NAME (REQUIRED): Display the product name prominently at the TOP or BOTTOM of the image:
+   "${productName}"
+   - Use large, bold, elegant typography
+   - Font must be clean and professional (NOT handwritten/script)
+   - White or light text on dark areas, dark text on light areas for contrast
+   ${brand ? `- Brand name "${brand}" should appear smaller above or below the product name` : ''}
 
-4. ABSOLUTELY NO ICONS/EMOJIS: No emoji icons, no graphic badges, no info-graphic elements, no arrows, no callout bubbles. PURE photography only.
+4. FEATURE BADGES (REQUIRED): Add 3-4 rounded pill-shaped feature badges around the product:
+${featureBadgesText || '   - Show key product characteristics as short text badges'}
+   - Each badge: rounded rectangle with semi-transparent background
+   - Clean sans-serif font, readable at thumbnail size
+   - Arranged around the product (not overlapping it)
+   - Use thin connecting lines or arrows from badges to relevant product areas
 
-5. LIGHTING: Professional studio-quality lighting appropriate for ${category}:
-   - Perfume/Beauty: Dramatic side-lighting with soft bokeh highlights
-   - Electronics: Sharp edge-lighting with blue/white rim light
-   - Fashion: Warm natural window-light feel
-   - Household/Food: Bright, clean, high-key lighting
+5. DECORATIVE DESIGN ELEMENTS:
+   - Subtle geometric frames, thin border lines, or corner accents
+   - Category-appropriate decorative elements (flowers for beauty, tech patterns for electronics)
+   - Gradient overlays for text readability areas
+   - Professional color-coordinated design system
 
-6. COMPOSITION: Product centered or slightly off-center (rule of thirds). Generous negative space. The product should occupy 40-60% of the frame. Soft natural shadow underneath.
+6. LIGHTING & COMPOSITION:
+   - Professional studio lighting appropriate for ${category}
+   - Product occupies 35-50% of frame — leaving space for text and badges
+   - Product centered or slightly offset to allow text placement
 
-7. DEPTH & ATMOSPHERE: Add subtle atmospheric elements appropriate to category:
-   - Bokeh light particles, soft reflections, gentle gradients
-   - Decorative elements (flowers, water drops, fabric) where category-appropriate
-   - Depth-of-field effect: product sharp, background elements softly blurred
+7. QUALITY: This must look like a TOP-SELLING marketplace product card — the kind that gets 10x more clicks. Think Wildberries/Ozon TOP seller infographic level. Professional, clean, information-rich but NOT cluttered.
 
-8. QUALITY STANDARD: This must look like it was shot by a professional photographer for a major brand campaign. Think Dior, Apple, Samsung, Zara product photography level. NOT a Photoshop montage, NOT a collage, NOT an infographic.
+CRITICAL TEXT ACCURACY:
+- Every letter and word must be EXACTLY as specified above
+- Do NOT invent, modify, or add any text that is not specified
+- All text must be clearly readable, even at small thumbnail sizes
+- NO spelling errors, NO random characters
 
 BANNED:
-- Any text, numbers, letters, words in any language
-- Flat solid color backgrounds
-- Clip-art, cartoon elements, graphic design elements
-- Distorted or AI-looking artifacts
-- Multiple products (show only the ONE product from reference)
-- Busy/cluttered compositions`;
+- Flat solid color backgrounds (must be rich/styled)
+- Clip-art or cartoon elements
+- Distorted product appearance
+- Unreadable or blurry text
+- More than 5 text elements total
+- Busy/cluttered compositions that hide the product`;
 
   const formData = new FormData();
   formData.append("image", new Blob([imageBytes], { type: "image/png" }), "product.png");
