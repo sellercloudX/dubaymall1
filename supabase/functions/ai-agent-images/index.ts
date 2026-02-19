@@ -394,113 +394,72 @@ Requirements:
 }
 
 // =====================================================
-// STEP 4: Category-Based Marketplace Card (OpenAI gpt-image-1)
+// STEP 4: Hero Product Image — Pure Professional Photography (NO text/badges)
 // =====================================================
-async function generateMarketplaceCard(
+async function generateHeroImage(
   imageUrl: string,
   detection: any,
   categoryStyle: typeof CATEGORY_STYLES.default,
   apiKey: string,
-  variationSeed: number = 0
 ): Promise<string | null> {
-  console.log("🎨 STEP 4: Category-Based Marketplace Card Generation...");
+  console.log("🎨 STEP 4: Hero Product Image (Professional Photography)...");
 
   const imageBytes = await downloadImage(imageUrl);
   if (!imageBytes) {
-    console.error("Failed to download image for card generation");
+    console.error("Failed to download image for hero generation");
     return null;
   }
 
-  const productName = sanitizeStopWords(detection?.product_name || 'Product');
-  const rawFeatures = detection?.key_features?.slice(0, 5)?.join(', ') || 'Yuqori sifat, Tez yetkazib berish';
-  const cleanFeatures = sanitizeStopWords(rawFeatures);
   const category = detection?.category || '';
   const positioning = detection?.positioning || 'mid-range';
 
-  // Anti-repetition: vary layout based on seed
-  const layoutVariations = [
-    "Product on the LEFT side (40%), feature badges floating on the RIGHT (60%). Large headline at TOP-LEFT. Volume/price badge at BOTTOM-RIGHT.",
-    "Product CENTERED (50%), feature badges arranged in a curved arc AROUND the product. Decorative elements fill corners. Brand badge at TOP-LEFT.",
-    "Product at RIGHT side (45%), large bold headline and stacked feature badges on LEFT. Category-specific decorative border.",
-    "Product BOTTOM-CENTER (50%), dramatic headline at TOP spanning full width. Feature badges as horizontal strip in MIDDLE section.",
-    "Product at LEFT-CENTER with dramatic 15° tilt, feature list as vertical stack on RIGHT with icons. Circular volume badge at BOTTOM-LEFT.",
-    "Split composition: TOP 40% is bold headline + decorative bg, BOTTOM 60% is product + feature badges arranged around it.",
-  ];
-  const layoutHint = layoutVariations[variationSeed % layoutVariations.length];
+  const heroPrompt = `You are a world-class commercial product photographer. Transform this product photo into a PREMIUM e-commerce hero image.
 
-  // Badge text — NO stop words, neutral descriptors only
-  const badgeText = positioning === 'premium' ? '⭐ TANLOV' : '📦 YANGI';
+FORMAT: 1080x1440 vertical (3:4 portrait).
 
-  const cardPrompt = `You are an elite commercial graphic designer creating a HIGH-CONVERTING Pinterest/Behance-level marketplace product infographic.
+PHOTOGRAPHY DIRECTION:
+- Style: ${categoryStyle.visual_style}
+- Background: ${categoryStyle.background_style}
+- Color palette: ${categoryStyle.color_palette}
 
-FORMAT: 1080x1440 vertical (3:4 portrait ratio).
+CRITICAL RULES — READ CAREFULLY:
 
-═══════════════════════════════════
-PRODUCT INTELLIGENCE
-═══════════════════════════════════
-Product: ${productName}
-Category: ${category}
-Positioning: ${positioning}
-Key features: ${cleanFeatures}
-Badge: ${badgeText}
+1. PRODUCT PRESERVATION: The product from the reference photo must be placed into the scene EXACTLY as-is — same shape, same colors, same labels, same brand logos, same packaging. Do NOT redraw, reinterpret, simplify, or alter the product in ANY way. It must look like a real photograph of the SAME physical product.
 
-═══════════════════════════════════
-VISUAL DIRECTION (CATEGORY-SPECIFIC)
-═══════════════════════════════════
-Style: ${categoryStyle.visual_style}
-Background: ${categoryStyle.background_style}  
-Palette: ${categoryStyle.color_palette}
+2. BACKGROUND: Create a rich, layered, category-appropriate styled background:
+   ${categoryStyle.prompt_addition}
 
-${categoryStyle.prompt_addition}
+3. ABSOLUTELY NO TEXT: Do NOT add ANY text, typography, labels, badges, watermarks, titles, descriptions, feature callouts, or any written content. The image must be PURELY VISUAL — a clean product photograph with styled background. ZERO text characters anywhere.
 
-═══════════════════════════════════
-LAYOUT COMPOSITION
-═══════════════════════════════════
-${layoutHint}
+4. ABSOLUTELY NO ICONS/EMOJIS: No emoji icons, no graphic badges, no info-graphic elements, no arrows, no callout bubbles. PURE photography only.
 
-═══════════════════════════════════
-MANDATORY DESIGN RULES
-═══════════════════════════════════
-1. PRODUCT INTEGRITY: The product from the reference photo must remain 100% PIXEL-PERFECT — same shape, colors, labels, brand logos, packaging. DO NOT modify, redraw, or reinterpret the product.
+5. LIGHTING: Professional studio-quality lighting appropriate for ${category}:
+   - Perfume/Beauty: Dramatic side-lighting with soft bokeh highlights
+   - Electronics: Sharp edge-lighting with blue/white rim light
+   - Fashion: Warm natural window-light feel
+   - Household/Food: Bright, clean, high-key lighting
 
-2. BACKGROUND: Rich, layered, category-themed background (NEVER plain white, NEVER flat solid color). Use gradients, bokeh, decorative elements (flowers, particles, textures) as shown in category rules above.
+6. COMPOSITION: Product centered or slightly off-center (rule of thirds). Generous negative space. The product should occupy 40-60% of the frame. Soft natural shadow underneath.
 
-3. FEATURE BADGES (3-5 pieces): 
-   - Rounded pill/oval shaped with frosted glass or solid colored background
-   - Each badge has a small icon + short text in RUSSIAN (2-4 words max)
-   - Examples: "💧 Стойкий аромат", "📦 30 мл", "🎁 Подарочная упаковка"
-   - Badges float around the product with soft shadow
-   - Text must be PERFECTLY READABLE, no distortion
+7. DEPTH & ATMOSPHERE: Add subtle atmospheric elements appropriate to category:
+   - Bokeh light particles, soft reflections, gentle gradients
+   - Decorative elements (flowers, water drops, fabric) where category-appropriate
+   - Depth-of-field effect: product sharp, background elements softly blurred
 
-4. HEADLINE: Large bold text in RUSSIAN at top or prominent position. Describes the product type (e.g. "Парфюмерная вода", "Смартфон", "Крем для лица"). NOT the brand name.
+8. QUALITY STANDARD: This must look like it was shot by a professional photographer for a major brand campaign. Think Dior, Apple, Samsung, Zara product photography level. NOT a Photoshop montage, NOT a collage, NOT an infographic.
 
-5. TYPOGRAPHY: All text must be sharp, professional, properly kerned. Use maximum 2 font families. NO AI-garbled text, NO random characters, NO misspelled words.
-
-6. VOLUME/SIZE BADGE: Circular badge showing key spec (volume in мл, size, weight) with decorative circular text border.
-
-7. COMPOSITION: Strong visual hierarchy — eye flows from headline → product → features → volume badge. Professional spacing, nothing cramped.
-
-8. LIGHTING: Dramatic, category-appropriate (moody for perfume, bright for household, warm for food).
-
-9. COMMERCIAL QUALITY: This must be indistinguishable from a real design agency output. Think Pinterest top pins, Behance featured projects, Wildberries bestseller cards.
-
-═══════════════════════════════════
-BANNED ELEMENTS (NEVER INCLUDE)
-═══════════════════════════════════
-- Words: "лучший", "топ", "хит продаж", "оригинал", "качественный", "скидка", "акция", "бесплатно", "№1", "идеальный", "уникальный", "эксклюзив", "super", "mega", "best", "top seller", "number one", "популярный", "машхур", "mashxur", "famous"
-- Generic white/plain backgrounds
-- Distorted or AI-garbled text
-- Watermarks or logos not on the original product  
-- Clip-art or cartoon-style icons
-- More than 5 feature badges
-- Cyrillic text errors or mixed alphabets in same badge
-
-VARIATION SEED: #${variationSeed} — Create a UNIQUE design, not a template copy.`;
+BANNED:
+- Any text, numbers, letters, words in any language
+- Flat solid color backgrounds
+- Clip-art, cartoon elements, graphic design elements
+- Distorted or AI-looking artifacts
+- Multiple products (show only the ONE product from reference)
+- Busy/cluttered compositions`;
 
   const formData = new FormData();
   formData.append("image", new Blob([imageBytes], { type: "image/png" }), "product.png");
   formData.append("model", "gpt-image-1");
-  formData.append("prompt", cardPrompt);
+  formData.append("prompt", heroPrompt);
   formData.append("size", "1024x1536");
   formData.append("quality", "high");
 
@@ -512,136 +471,79 @@ VARIATION SEED: #${variationSeed} — Create a UNIQUE design, not a template cop
 
   if (!resp.ok) {
     const errText = await resp.text();
-    console.error(`Card generation failed (${resp.status}): ${errText.substring(0, 300)}`);
+    console.error(`Hero image failed (${resp.status}): ${errText.substring(0, 300)}`);
     return null;
   }
 
   const data = await resp.json();
   const b64 = data.data?.[0]?.b64_json;
-  if (b64) { console.log("✅ STEP 4 Done: Marketplace card generated"); return `data:image/png;base64,${b64}`; }
+  if (b64) { console.log("✅ STEP 4 Done: Hero image generated"); return `data:image/png;base64,${b64}`; }
   const url = data.data?.[0]?.url;
-  if (url) { console.log("✅ STEP 4 Done: Card generated (URL)"); return url; }
+  if (url) { console.log("✅ STEP 4 Done: Hero image (URL)"); return url; }
   return null;
 }
 
 // =====================================================
-// STEP 4b: Supplementary Images (Features, Angles, Use-cases)
+// STEP 4b: Lifestyle/Context Image — Product in Real Environment
 // =====================================================
-const SUPPLEMENTARY_PROMPTS: { role: string; promptFn: (det: any, catStyle: typeof CATEGORY_STYLES.default) => string }[] = [
-  {
-    role: "feature_highlight",
-    promptFn: (det, catStyle) => {
-      const productName = sanitizeStopWords(det?.product_name || 'Product');
-      const feats = (det?.key_features || []).slice(0, 4).map((f: string) => sanitizeStopWords(f));
-      return `Create a FEATURE HIGHLIGHT infographic for "${productName}".
-
-FORMAT: 1080x1440 vertical (3:4 portrait ratio).
-
-This is image #2 in a product gallery — it FOCUSES on key features and specifications.
-
-DESIGN:
-- Background: ${catStyle.background_style}
-- Style: ${catStyle.visual_style}
-- The product should be shown at 30-40% size, positioned to one side
-- The remaining 60% should be filled with LARGE, clear feature call-outs
-- Each feature gets its own section with:
-  • A relevant icon (emoji or simple graphic)
-  • Feature name in RUSSIAN (bold, 2-3 words)
-  • Short explanation (1 line, smaller text)
-- Features to highlight: ${feats.join(', ')}
-- Use connecting lines or arrows from features to relevant product parts
-- Professional infographic layout like on Pinterest top pins
-
-RULES:
-- Product must remain PIXEL-PERFECT from reference photo
-- ALL text in RUSSIAN, perfectly readable, no AI-garbled characters
-- NO stop words: "лучший", "топ", "хит", "популярный", "оригинал", "скидка"
-- NO plain white background
-- Commercial design agency quality`;
-    }
-  },
-  {
-    role: "angle_closeup",
-    promptFn: (det, catStyle) => {
-      const productName = sanitizeStopWords(det?.product_name || 'Product');
-      return `Create a CLOSE-UP / DETAIL VIEW infographic for "${productName}".
-
-FORMAT: 1080x1440 vertical (3:4 portrait ratio).
-
-This is image #3 — it shows the product from a DIFFERENT ANGLE or ZOOMED IN on key details.
-
-DESIGN:
-- Background: ${catStyle.background_style}
-- Style: ${catStyle.visual_style}
-- Show the product LARGER than usual (60-70% of frame)
-- Slight creative angle: 20-30° rotation, or perspective view
-- Add 2-3 ZOOM BUBBLES highlighting key details (texture, material, label, buttons etc.)
-- Each zoom bubble has a thin elegant border and a short RUSSIAN label
-- Subtle depth-of-field effect — sharp product, slightly blurred background elements
-- Professional product photography feel
-
-RULES:
-- Product must remain PIXEL-PERFECT from reference photo
-- ALL text in RUSSIAN, perfectly readable
-- NO stop words: "лучший", "топ", "хит", "популярный", "оригинал", "скидка"
-- NO plain white background
-- Magazine editorial quality`;
-    }
-  },
-  {
-    role: "lifestyle_usecase",
-    promptFn: (det, catStyle) => {
-      const productName = sanitizeStopWords(det?.product_name || 'Product');
-      const audience = det?.target_audience || 'general consumer';
-      return `Create a LIFESTYLE / USE-CASE scene for "${productName}".
-
-FORMAT: 1080x1440 vertical (3:4 portrait ratio).
-
-This is image #4 — it shows HOW the product is USED in real life.
-
-DESIGN:
-- The product should be shown in a realistic usage context/environment
-- Target audience: ${audience}
-- Background: A contextual lifestyle scene (NOT studio background). Examples:
-  • Perfume → elegant vanity table, evening setting
-  • Electronics → modern desk setup, hands holding device
-  • Beauty → bathroom shelf, skincare routine scene
-  • Food → kitchen counter, dining table
-  • Fashion → styled outfit flat-lay
-- The product is the HERO but surrounded by lifestyle props
-- Add 1-2 minimal text overlays in RUSSIAN: product category name and one key benefit
-- Warm, inviting, aspirational mood — like a lifestyle brand Instagram post
-- Soft natural lighting
-
-RULES:
-- Product must remain PIXEL-PERFECT from reference photo
-- ALL text in RUSSIAN, perfectly readable
-- NO stop words: "лучший", "топ", "хит", "популярный", "оригинал", "скидка"
-- Commercial lifestyle photography quality
-- The scene should feel REAL, not AI-generated`;
-    }
-  },
-];
-
-async function generateSupplementaryImage(
+async function generateLifestyleImage(
   imageUrl: string,
   detection: any,
   categoryStyle: typeof CATEGORY_STYLES.default,
   apiKey: string,
-  promptIndex: number
 ): Promise<string | null> {
-  const suppPrompt = SUPPLEMENTARY_PROMPTS[promptIndex % SUPPLEMENTARY_PROMPTS.length];
-  console.log(`🖼 STEP 4.${promptIndex + 1}: Generating ${suppPrompt.role} image...`);
+  console.log("🖼 STEP 4b: Lifestyle Context Image...");
 
   const imageBytes = await downloadImage(imageUrl);
   if (!imageBytes) return null;
 
-  const prompt = suppPrompt.promptFn(detection, categoryStyle);
+  const category = detection?.category || '';
+  const audience = detection?.target_audience || 'general consumer';
+
+  const lifestylePrompt = `You are a lifestyle product photographer creating an aspirational scene showing this product in its natural environment.
+
+FORMAT: 1080x1440 vertical (3:4 portrait).
+
+SCENE DIRECTION:
+Create a realistic lifestyle scene where this product is shown in USE or in its natural context:
+- Perfume/Beauty → elegant vanity table, bathroom marble shelf, morning routine scene with soft golden light
+- Electronics → modern minimalist desk, hands holding the device, tech-lifestyle flat-lay
+- Fashion → styled outfit flat-lay on linen, hanging on wooden hanger with accessories
+- Household → bright kitchen counter, organized shelf, clean laundry scene
+- Food → rustic wooden table, ingredient scatter, warm kitchen atmosphere
+- Kids → playful colorful room, child's hands reaching for product
+- Sport → gym bag, outdoor trail, workout mat setup
+
+Target audience: ${audience}
+Category: ${category}
+
+CRITICAL RULES:
+
+1. PRODUCT PRESERVATION: The product must appear EXACTLY as in the reference photo — same physical product, same packaging, same labels. Place it naturally within the scene.
+
+2. ABSOLUTELY NO TEXT: Zero text, zero typography, zero badges, zero labels, zero watermarks. Pure visual photography only.
+
+3. ABSOLUTELY NO ICONS/GRAPHICS: No emoji, no infographic elements, no design overlays. Pure photography.
+
+4. LIFESTYLE REALISM: The scene should feel like a real photograph taken for an Instagram lifestyle brand, NOT like a Photoshop composite. Natural lighting, realistic shadows, coherent perspective.
+
+5. PROPS & CONTEXT: Surround the product with 3-5 relevant lifestyle props that enhance the scene without overwhelming the product. Product remains the clear hero (occupying 30-50% of frame).
+
+6. MOOD: Warm, inviting, aspirational — makes the viewer want to own this product. Think Pinterest lifestyle board aesthetic.
+
+7. LIGHTING: Natural, warm, soft — golden hour or soft window light feel. No harsh studio lights.
+
+BANNED:
+- Any text or typography
+- Studio white backgrounds
+- Isolated product with no context
+- AI-looking artifacts or distortions
+- Busy cluttered scenes`;
 
   const formData = new FormData();
   formData.append("image", new Blob([imageBytes], { type: "image/png" }), "product.png");
   formData.append("model", "gpt-image-1");
-  formData.append("prompt", prompt);
+  formData.append("prompt", lifestylePrompt);
   formData.append("size", "1024x1536");
   formData.append("quality", "high");
 
@@ -653,15 +555,15 @@ async function generateSupplementaryImage(
 
   if (!resp.ok) {
     const errText = await resp.text();
-    console.error(`${suppPrompt.role} generation failed (${resp.status}): ${errText.substring(0, 200)}`);
+    console.error(`Lifestyle image failed (${resp.status}): ${errText.substring(0, 200)}`);
     return null;
   }
 
   const data = await resp.json();
   const b64 = data.data?.[0]?.b64_json;
-  if (b64) { console.log(`✅ ${suppPrompt.role} generated`); return `data:image/png;base64,${b64}`; }
+  if (b64) { console.log("✅ Lifestyle image generated"); return `data:image/png;base64,${b64}`; }
   const url = data.data?.[0]?.url;
-  if (url) { console.log(`✅ ${suppPrompt.role} generated (URL)`); return url; }
+  if (url) { console.log("✅ Lifestyle image (URL)"); return url; }
   return null;
 }
 
@@ -975,110 +877,66 @@ serve(async (req) => {
       const categoryStyle = getCategoryStyle(detectedCategory);
       console.log(`📦 Category: ${detectedCategory} → Style: ${categoryStyle.visual_style}`);
 
-      // ── STEP 2: Image Quality Scan ──
-      const qualityScan = await scanImageQuality(sourceImageUrl, OPENAI_API_KEY);
-      pipelineResult.qualityScan = qualityScan;
-      pipelineResult.steps.push({ step: 2, name: "Quality Scan", status: `Score: ${qualityScan.compliance_score}` });
-
-      // ── STEP 3: Auto Fix (if score < 85) ──
+      // ── Skip Steps 2-3 (Quality Scan + Auto Fix) ──
+      // Hero/Lifestyle generation already creates professional backgrounds
+      // Skipping saves ~60s timeout budget for actual image generation
       let workingImageUrl = sourceImageUrl;
-      if (qualityScan.fix_required || qualityScan.compliance_score < 85) {
-        console.log(`⚠️ Score ${qualityScan.compliance_score} < 85 → Auto fixing...`);
-        const fixedImage = await autoFixImage(sourceImageUrl, qualityScan.issues || [], OPENAI_API_KEY);
-        if (fixedImage) {
-          // Upload fixed image to storage
-          const fixedUrl = await uploadToStorage(supabase, fixedImage, partnerId, `${offerId || 'fix'}-fixed`);
-          if (fixedUrl) {
-            workingImageUrl = fixedUrl;
-            pipelineResult.steps.push({ step: 3, name: "Auto Fix", status: "✅ Fixed" });
-          } else {
-            pipelineResult.steps.push({ step: 3, name: "Auto Fix", status: "⚠️ Upload failed" });
-          }
-        } else {
-          pipelineResult.steps.push({ step: 3, name: "Auto Fix", status: "⚠️ Fix failed, using original" });
-        }
-      } else {
-        pipelineResult.steps.push({ step: 3, name: "Auto Fix", status: "⏭ Not needed (score ≥ 85)" });
-      }
+      pipelineResult.steps.push({ step: 2, name: "Quality Scan", status: "⏭ Skipped (hero gen handles quality)" });
+      pipelineResult.steps.push({ step: 3, name: "Auto Fix", status: "⏭ Skipped" });
 
       // Upload clean product image
       const cleanImageUrl = await uploadToStorage(supabase, workingImageUrl, partnerId, offerId || 'product');
       pipelineResult.imageUrl = cleanImageUrl;
 
-      // ── STEP 4: Generate 4 Images (1 Hero + 3 Supplementary) ──
-      const variationSeed = Math.floor(Math.random() * 100);
+      // ── STEP 4: Generate 2 Professional Images (Hero + Lifestyle) ──
+      // Only 2 images to stay within edge function timeout (~100s budget)
       
-      // 4.1: Main Hero Card (best quality, primary position)
-      console.log("🎨 STEP 4.0: Generating HERO card (main image)...");
-      let heroCardImage = await generateMarketplaceCard(
-        workingImageUrl, detection, categoryStyle, OPENAI_API_KEY, variationSeed
+      // 4a: Hero — Professional product photography with styled background (NO text)
+      let heroImage = await generateHeroImage(
+        workingImageUrl, detection, categoryStyle, OPENAI_API_KEY
       );
 
-      let heroCardUrl: string | null = null;
+      let heroUrl: string | null = null;
       let qcResult: any = null;
 
-      if (heroCardImage) {
-        heroCardUrl = await uploadToStorage(supabase, heroCardImage, partnerId, `${offerId || 'card'}-hero`);
-        pipelineResult.steps.push({ step: "4.0", name: "Hero Card", status: "✅" });
+      if (heroImage) {
+        heroUrl = await uploadToStorage(supabase, heroImage, partnerId, `${offerId || 'card'}-hero`);
+        pipelineResult.steps.push({ step: "4a", name: "Hero Image", status: "✅" });
 
         // ── STEP 5: Quality Control on hero ──
-        if (heroCardUrl) {
-          qcResult = await qualityControl(heroCardUrl, OPENAI_API_KEY);
+        if (heroUrl) {
+          qcResult = await qualityControl(heroUrl, OPENAI_API_KEY);
           pipelineResult.qualityControl = qcResult;
           pipelineResult.steps.push({ step: 5, name: "Quality Control", status: `Score: ${qcResult.overall_score}` });
-
-          // Auto improvement (1 retry if score < 70)
-          if (qcResult.overall_score < 70 && qcResult.improvements?.length) {
-            console.log(`🔄 Score ${qcResult.overall_score} < 70 → Auto improvement...`);
-            const improvedCard = await generateMarketplaceCard(
-              workingImageUrl, detection, categoryStyle, OPENAI_API_KEY, variationSeed + 1
-            );
-            if (improvedCard) {
-              const improvedUrl = await uploadToStorage(supabase, improvedCard, partnerId, `${offerId || 'card'}-hero-v2`);
-              if (improvedUrl) {
-                const newQc = await qualityControl(improvedUrl, OPENAI_API_KEY);
-                if (newQc.overall_score > (qcResult.overall_score || 0)) {
-                  heroCardUrl = improvedUrl;
-                  qcResult = newQc;
-                  pipelineResult.qualityControl = newQc;
-                }
-              }
-            }
-            pipelineResult.steps.push({ step: "5b", name: "Auto Improvement", status: `Final: ${qcResult.overall_score}` });
-          }
         }
       } else {
-        pipelineResult.steps.push({ step: "4.0", name: "Hero Card", status: "❌ Failed" });
+        pipelineResult.steps.push({ step: "4a", name: "Hero Image", status: "❌ Failed" });
       }
 
-      pipelineResult.cardUrl = heroCardUrl;
+      pipelineResult.cardUrl = heroUrl;
 
-      // 4.1-4.3: Generate 3 supplementary images (feature, angle, use-case)
+      // 4b: Lifestyle — Product in real-life context (NO text)
       const supplementaryUrls: string[] = [];
-      for (let i = 0; i < 3; i++) {
-        const suppImage = await generateSupplementaryImage(
-          workingImageUrl, detection, categoryStyle, OPENAI_API_KEY, i
-        );
-        if (suppImage) {
-          const suppUrl = await uploadToStorage(supabase, suppImage, partnerId, `${offerId || 'card'}-supp-${i + 1}`);
-          if (suppUrl) {
-            supplementaryUrls.push(suppUrl);
-            pipelineResult.steps.push({ step: `4.${i + 1}`, name: SUPPLEMENTARY_PROMPTS[i].role, status: "✅" });
-          } else {
-            pipelineResult.steps.push({ step: `4.${i + 1}`, name: SUPPLEMENTARY_PROMPTS[i].role, status: "⚠️ Upload failed" });
-          }
-        } else {
-          pipelineResult.steps.push({ step: `4.${i + 1}`, name: SUPPLEMENTARY_PROMPTS[i].role, status: "❌ Failed" });
+      const lifestyleImage = await generateLifestyleImage(
+        workingImageUrl, detection, categoryStyle, OPENAI_API_KEY
+      );
+      if (lifestyleImage) {
+        const lifestyleUrl = await uploadToStorage(supabase, lifestyleImage, partnerId, `${offerId || 'card'}-lifestyle`);
+        if (lifestyleUrl) {
+          supplementaryUrls.push(lifestyleUrl);
+          pipelineResult.steps.push({ step: "4b", name: "Lifestyle Image", status: "✅" });
         }
+      } else {
+        pipelineResult.steps.push({ step: "4b", name: "Lifestyle Image", status: "❌ Failed" });
       }
 
       pipelineResult.supplementaryImages = supplementaryUrls;
-      console.log(`✅ Generated ${1 + supplementaryUrls.length} total images (1 hero + ${supplementaryUrls.length} supplementary)`);
+      console.log(`✅ Generated ${(heroUrl ? 1 : 0) + supplementaryUrls.length} total images`);
 
       // ── STEP 6: Upload ALL images to Marketplace ──
       // Collect all generated image URLs in order: hero first, then supplementary
       const allGeneratedImages: string[] = [];
-      if (heroCardUrl) allGeneratedImages.push(heroCardUrl);
+      if (heroUrl) allGeneratedImages.push(heroUrl);
       allGeneratedImages.push(...supplementaryUrls);
 
       let mpResult: { success: boolean; message: string } = { success: false, message: 'Marketplace aniqlanmadi' };
@@ -1123,8 +981,8 @@ serve(async (req) => {
       return new Response(JSON.stringify({
         success: true,
         imageUrl: cleanImageUrl,
-        cardUrl: heroCardUrl,
-        infographicUrl: heroCardUrl,
+        cardUrl: heroUrl,
+        infographicUrl: heroUrl,
         supplementaryImages: supplementaryUrls,
         totalImages: allGeneratedImages.length,
         qualityScore: qcResult?.overall_score || null,
