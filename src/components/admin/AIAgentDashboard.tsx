@@ -393,7 +393,18 @@ function ImageAnalysisTab({ selectedPartnerId, scanResults }: any) {
     setGeneratingFor(product.offerId);
     try {
       const { data, error } = await supabase.functions.invoke('ai-agent-images', {
-        body: { action: 'generate-and-upload', partnerId: selectedPartnerId, productName: product.name, category: product.category || '', offerId: product.offerId, nmID: product.nmID, marketplace: product.marketplace },
+        body: { 
+          action: 'generate-and-upload', 
+          partnerId: selectedPartnerId, 
+          productName: product.name, 
+          category: product.category || '', 
+          offerId: product.offerId, 
+          nmID: product.nmID, 
+          marketplace: product.marketplace,
+          referenceImageUrl: product.pictures?.[0] || undefined,
+          generateInfographic: true,
+          features: product.issues || [],
+        },
       });
       if (error) throw error;
       if (data?.success) {

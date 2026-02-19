@@ -188,6 +188,7 @@ async function scanYandexProducts(credentials: any): Promise<any> {
       hasDescription: (offer.description?.length || 0) >= 1000, hasVendor: !!offer.vendor,
       hasBarcodes: (offer.barcodes?.length || 0) > 0, hasDimensions: !!offer.weightDimensions,
       apiErrors: quality?.errors?.length || 0, apiWarnings: quality?.warnings?.length || 0,
+      pictures: offer.pictures || [],
     };
   });
 
@@ -300,12 +301,21 @@ async function scanWildberriesProducts(credentials: any): Promise<any> {
     const warningCount = issueDetails.filter(i => i.type === 'warning').length;
     const score = Math.max(5, 100 - (criticalCount * 20) - (warningCount * 8));
 
+    // Extract photo URLs for WB
+    const photoUrls = photos.map((p: any) => {
+      if (typeof p === 'string') return p;
+      if (p?.big) return p.big;
+      if (p?.c246x328) return p.c246x328;
+      return p?.tm || '';
+    }).filter(Boolean);
+
     return {
       offerId: card.vendorCode || card.nmID?.toString() || '', nmID: card.nmID, subjectID: card.subjectID,
       name: title || card.vendorCode || '', category: card.subjectName || '',
       score, issueCount: issues.length, issues, issueDetails,
       imageCount: photos.length, descriptionLength: description.length,
       hasDescription: description.length >= 1000, hasVendor: !!card.brand, asyncErrors: asyncErrors.length,
+      pictures: photoUrls,
     };
   });
 
@@ -505,12 +515,23 @@ async function scanUzumProducts(credentials: any, supabase: any, userId: string)
     const warningCount = issueDetails.filter(i => i.type === 'warning').length;
     const score = Math.max(5, 100 - (criticalCount * 20) - (warningCount * 8));
 
+    // Extract Uzum photo URLs
+    const pictureUrls = (Array.isArray(item.pictures) ? item.pictures : []).map((p: any) => {
+      if (typeof p === 'string') return p;
+      if (p?.photo) {
+        const sizes = Object.keys(p.photo).sort((a, b) => Number(b) - Number(a));
+        return sizes.length > 0 ? p.photo[sizes[0]]?.high || p.photo[sizes[0]] : '';
+      }
+      return p?.url || p?.high || '';
+    }).filter(Boolean);
+
     return {
       offerId: item.offerId, productId: item.productId,
       name: title || item.offerId, category: item.category,
       score, issueCount: issues.length, issues, issueDetails,
       imageCount: imgCount, descriptionLength: desc.length,
       hasDescription: desc.length >= 500, hasVendor: true,
+      pictures: pictureUrls,
     };
   });
 
