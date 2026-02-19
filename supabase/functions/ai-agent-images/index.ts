@@ -33,18 +33,22 @@ async function generateProductImage(productName: string, category: string, refer
   try {
     console.log(`Generating image for: "${productName}" (${category}), ref: ${referenceImageUrl ? 'YES' : 'NO'}`);
 
-    // If we have a reference image, use image editing to create a better version
+    // Use higher quality model for better results
+    const model = "google/gemini-3-pro-image-preview";
+
     if (referenceImageUrl) {
-      const editPrompt = `Create a professional e-commerce product photo based on this exact product. 
-Requirements:
-- Keep the SAME product, same shape, same design, same colors
-- Place it on a clean white or light gradient background
-- Professional studio lighting, high resolution, sharp focus
-- Product centered, large, with generous negative space around all edges for text overlays
-- Aspect ratio 3:4 portrait orientation
-- Remove any existing text, watermarks, logos, labels from the background
-- Photorealistic commercial marketplace quality
-- Do NOT change the product itself - only improve the photo quality and background`;
+      // CRITICAL: The prompt must be extremely strict about keeping the EXACT same product
+      const editPrompt = `IMPORTANT: You MUST recreate THIS EXACT product shown in the reference image.
+
+Rules:
+1. The product in your output MUST be IDENTICAL to the input — same bottle shape, same label, same colors, same packaging, same brand text, same logo placement
+2. Do NOT invent a new product. Do NOT change the bottle shape. Do NOT remove or change any labels/text on the product
+3. Only improve: lighting (professional studio), background (clean white/light gradient), sharpness, and composition
+4. Place the product centered with generous negative space around all edges
+5. Portrait orientation 3:4, photorealistic, commercial marketplace quality
+6. If there is packaging/box shown with the product, include it in the same arrangement
+
+Product name for context only (do NOT use this to redesign the product): "${productName}"`;
 
       const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
@@ -53,12 +57,12 @@ Requirements:
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash-image",
+          model,
           messages: [{
             role: "user",
             content: [
-              { type: "text", text: editPrompt },
-              { type: "image_url", image_url: { url: referenceImageUrl } }
+              { type: "image_url", image_url: { url: referenceImageUrl } },
+              { type: "text", text: editPrompt }
             ]
           }],
           modalities: ["image", "text"],
@@ -69,23 +73,18 @@ Requirements:
         const data = await resp.json();
         const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
         if (imageUrl) {
-          console.log(`Image generated from reference. Type: ${imageUrl.startsWith('data:') ? 'base64' : 'URL'}`);
+          console.log(`Image generated from reference (${model}). Type: ${imageUrl.startsWith('data:') ? 'base64' : 'URL'}`);
           return imageUrl;
         }
       }
-      console.log('Reference image generation failed, falling back to text-only generation');
+      const errText = await resp.text();
+      console.log(`Reference image generation failed (${resp.status}): ${errText.substring(0, 200)}, falling back to text-only`);
     }
 
-    // Fallback: text-only generation
+    // Fallback: text-only generation (only when NO reference image exists)
     const prompt = `Generate a professional e-commerce product photo of "${productName}" (category: ${category}). 
-Requirements:
-- Clean white or light gradient background
-- Product centered, large, with negative space around edges for infographic overlays
-- Professional studio lighting, high resolution, sharp focus
-- Aspect ratio 3:4 (portrait), 1080x1440 pixels
-- No text, no watermarks, no logos, no labels
-- Commercial marketplace quality (Yandex Market / Wildberries standard)
-- Photorealistic product photography style`;
+Clean white background, product centered with negative space, professional studio lighting.
+Portrait 3:4 aspect ratio, 1080x1440, no text/watermarks, photorealistic marketplace quality.`;
 
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -94,15 +93,14 @@ Requirements:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image",
+        model,
         messages: [{ role: "user", content: prompt }],
         modalities: ["image", "text"],
       }),
     });
 
     if (!resp.ok) {
-      const errText = await resp.text();
-      console.error(`Image generation failed: ${resp.status} - ${errText.substring(0, 300)}`);
+      console.error(`Image generation failed: ${resp.status}`);
       return null;
     }
 
@@ -127,28 +125,26 @@ async function generateInfographicImage(productName: string, category: string, r
   if (!LOVABLE_API_KEY) return null;
 
   try {
-    const featureText = features?.length ? features.slice(0, 5).join(', ') : '';
+    const featureText = features?.length ? features.slice(0, 5).join(', ') : 'Premium quality, Fast delivery, Best price';
     
-    const content: any[] = [
-      { type: "text", text: `Create a professional e-commerce INFOGRAPHIC product image for "${productName}" (${category}).
+    const content: any[] = [];
 
-Requirements:
-- The product should be the MAIN FOCUS, large and centered
-- Add professional sales-boosting design elements:
-  * A colored banner/badge at top with product category or key benefit
-  * 2-3 key feature icons/callouts around the product (use simple icons + short text)
-  * A quality/premium feel with gradients or subtle patterns
-  * Clean, modern typography
-- Features to highlight: ${featureText || 'Premium quality, Fast delivery, Best price'}
-- Use Russian or neutral icons for text elements
-- Professional marketplace listing style (like top sellers on Wildberries/Ozon)
-- Aspect ratio 3:4 portrait, 1080x1440 pixels
-- Make it look like a TOP-SELLING product listing photo` }
-    ];
-
+    // Put image FIRST so the model sees the product before the instructions
     if (referenceImageUrl) {
       content.push({ type: "image_url", image_url: { url: referenceImageUrl } });
     }
+
+    content.push({ type: "text", text: `Create a professional INFOGRAPHIC for THIS EXACT product (do not change the product).
+
+Rules:
+1. Keep the EXACT same product from the reference image — same shape, colors, labels, branding
+2. Add professional sales-boosting overlay elements AROUND the product (not covering it):
+   - A colored banner/badge at top with key benefit
+   - 2-3 feature icons with short text callouts
+   - Modern gradient or subtle pattern background
+3. Features to highlight: ${featureText}
+4. Portrait 3:4, 1080x1440, marketplace listing style
+5. Make it look like a TOP-SELLING product card` });
 
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -157,7 +153,7 @@ Requirements:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image",
+        model: "google/gemini-3-pro-image-preview",
         messages: [{ role: "user", content }],
         modalities: ["image", "text"],
       }),
