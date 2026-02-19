@@ -26,11 +26,6 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3)
 }
 
 // ===== NARX FORMULASI =====
-// OptimalPrice = (CostPrice + Logistics) / (1 - (CommissionPercent + TaxPercent + MarginPercent))
-// CommissionPercent = REAL API dan olingan komissiya (FEE + PAYMENT_TRANSFER)
-// Logistics = REAL API dan olingan logistika (delivery + sorting)
-// TaxPercent = 4% (O'zbekiston aylanma solig'i)
-// MarginPercent = foydalanuvchi belgilagan marja (default 12%)
 function calculateOptimalPrice(
   costPrice: number,
   commissionPercent: number,
@@ -42,17 +37,14 @@ function calculateOptimalPrice(
     return { minPrice: 0, recommendedPrice: 0, maxPrice: 0, marginPercent: 0 };
   }
 
-  // Formula: SellingPrice = (CostPrice + Logistics) / (1 - (Commission% + Tax% + Margin%))
-  const minDenom = 1 - (commissionPercent + taxPercent + 3) / 100; // 3% minimal marja
+  const minDenom = 1 - (commissionPercent + taxPercent + 3) / 100;
   const recDenom = 1 - (commissionPercent + taxPercent + targetMarginPercent) / 100;
   const maxDenom = 1 - (commissionPercent + taxPercent + targetMarginPercent + 5) / 100;
 
-  // Safety: don't divide by near-zero
   const minPrice = minDenom > 0.05 ? Math.ceil((costPrice + logisticsCost) / minDenom) : 0;
   const recommendedPrice = recDenom > 0.05 ? Math.ceil((costPrice + logisticsCost) / recDenom) : 0;
   const maxPrice = maxDenom > 0.05 ? Math.ceil((costPrice + logisticsCost) / maxDenom) : 0;
   
-  // Haqiqiy marja tekshiruvi
   const actualMargin = recommendedPrice > 0 
     ? ((recommendedPrice - costPrice - logisticsCost - (recommendedPrice * (commissionPercent + taxPercent) / 100)) / recommendedPrice) * 100 
     : 0;
@@ -91,7 +83,6 @@ async function fetchYandexRealTariffs(
   
   if (products.length === 0) return tariffMap;
 
-  // Batch into groups of 200
   for (let i = 0; i < products.length; i += 200) {
     const batch = products.slice(i, i + 200);
     const offersForCalc = batch.map(o => ({
@@ -149,8 +140,6 @@ async function fetchYandexRealTariffs(
             logisticsCost: Math.round(logisticsCost),
           });
         });
-      } else {
-        console.error(`Tariff API error: ${resp.status}`);
       }
     } catch (e) {
       console.error('Tariff calculation error:', e);
@@ -169,7 +158,6 @@ async function fetchYandexPrices(credentials: any): Promise<any[]> {
   const businessId = await resolveBusinessId(credentials, headers);
   if (!businessId) return [];
 
-  // Fetch all offer mappings
   let allMappings: any[] = [];
   let nextPageToken: string | undefined;
   for (let page = 0; page < 50; page++) {
@@ -189,7 +177,6 @@ async function fetchYandexPrices(credentials: any): Promise<any[]> {
 
   console.log(`Yandex: fetched ${allMappings.length} mappings, fetching real tariffs...`);
 
-  // Prepare products for tariff calculation
   const productsForTariff = allMappings.map((entry: any) => {
     const offer = entry.offer || {};
     const mapping = entry.mapping || {};
@@ -200,7 +187,6 @@ async function fetchYandexPrices(credentials: any): Promise<any[]> {
     };
   }).filter(p => p.price > 0);
 
-  // Fetch REAL tariffs from Yandex API
   const realTariffs = campaignId 
     ? await fetchYandexRealTariffs(campaignId, headers, productsForTariff)
     : new Map();
@@ -213,18 +199,16 @@ async function fetchYandexPrices(credentials: any): Promise<any[]> {
     const offerId = offer.offerId || '';
     const price = offer.basicPrice?.value || offer.price || 0;
     
-    // Use REAL tariff data if available, fallback to conservative estimate
     const realTariff = realTariffs.get(offerId);
-    const commissionPercent = realTariff?.commissionPercent || 25; // Conservative fallback
-    const logisticsCost = realTariff?.logisticsCost || 6000; // Conservative fallback
+    const commissionPercent = realTariff?.commissionPercent || 25;
+    const logisticsCost = realTariff?.logisticsCost || 6000;
     
-    // Get first image URL
     const pictures = offer.pictures || [];
     const imageUrl = pictures.length > 0 ? pictures[0] : null;
     
     return {
       offerId,
-      sku: offerId, // Yandex offerId = SKU
+      sku: offerId,
       name: offer.name || '',
       price,
       currency: offer.basicPrice?.currencyId || 'UZS',
@@ -261,7 +245,6 @@ async function fetchWBPrices(credentials: any): Promise<any[]> {
     await sleep(300);
   }
 
-  // Get prices - paginate
   let priceMap = new Map<number, any>();
   try {
     let offset = 0;
@@ -301,8 +284,8 @@ async function fetchWBPrices(credentials: any): Promise<any[]> {
       currency: 'RUB',
       category: card.subjectName || '',
       marketplace: 'wildberries',
-      commissionPercent: 15, // WB average ~15%
-      logisticsCost: 50, // ~50 RUB logistics
+      commissionPercent: 15,
+      logisticsCost: 50,
       imageUrl,
     };
   });
@@ -444,10 +427,9 @@ serve(async (req) => {
 
           for (const p of products) {
             const costPrice = costMap.get(`${p.marketplace}-${p.offerId}`) || 0;
-            const commissionPercent = p.commissionPercent || 25; // Real tariff or conservative fallback
+            const commissionPercent = p.commissionPercent || 25;
             const logisticsCost = p.logisticsCost || 6000;
             
-            // Haqiqiy marja: (Price - Cost - Logistics - Commission - Tax) / Price * 100
             let actualMargin: number | null = null;
             if (costPrice > 0 && p.price > 0) {
               const commission = p.price * commissionPercent / 100;
@@ -456,25 +438,18 @@ serve(async (req) => {
               actualMargin = Math.round((netProfit / p.price) * 100);
             }
 
-            // Optimal narx
             const optimal = calculateOptimalPrice(costPrice, commissionPercent, logisticsCost, userTargetMargin);
             
-            const isPriceHigh = costPrice > 0 && p.price > optimal.recommendedPrice * 1.03;
-            const isPriceLow = costPrice > 0 && p.price < optimal.recommendedPrice * 0.97;
-            const isPriceRisky = costPrice > 0 && (actualMargin !== null && actualMargin < 5);
-
-            // priceAction: tavsiya narxdan ±3% toleransiya bilan solishtirish
+            // priceAction: tavsiya narxga nisbatan qat'iy solishtirish
             let priceAction = 'ok';
             if (costPrice <= 0) {
               priceAction = 'no_cost';
-            } else if (p.price < optimal.minPrice) {
-              priceAction = 'increase'; // zarar — minimal narxdan past
             } else if (p.price < optimal.recommendedPrice * 0.97) {
-              priceAction = 'increase'; // maqsadli marjadan past
-            } else if (p.price > optimal.maxPrice) {
-              priceAction = 'decrease'; // juda baland
+              // Joriy narx tavsiya narxdan 3%+ past = ko'tarish kerak
+              priceAction = 'increase';
             } else if (p.price > optimal.recommendedPrice * 1.05) {
-              priceAction = 'decrease'; // tavsiyadan ancha yuqori
+              // Joriy narx tavsiya narxdan 5%+ yuqori = tushirish kerak
+              priceAction = 'decrease';
             }
 
             allProducts.push({
@@ -487,9 +462,9 @@ serve(async (req) => {
               minPrice: optimal.minPrice,
               maxPrice: optimal.maxPrice,
               optimalMargin: optimal.marginPercent,
-              isPriceHigh,
-              isPriceLow,
-              isPriceRisky,
+              isPriceHigh: priceAction === 'decrease',
+              isPriceLow: priceAction === 'increase',
+              isPriceRisky: costPrice > 0 && (actualMargin !== null && actualMargin < 5),
               sku: p.sku || p.offerId,
               imageUrl: p.imageUrl || null,
               priceAction,
@@ -523,12 +498,12 @@ serve(async (req) => {
     if (action === 'recommend') {
       const { products } = body;
       const recommendations: any[] = [];
+      const userMargin = targetMargin || 12;
 
-      for (const product of (products || []).slice(0, 50)) {
+      for (const product of (products || []).slice(0, 100)) {
         const costPrice = costMap.get(`${product.marketplace}-${product.offerId}`) || product.costPrice || 0;
         const commissionPercent = product.commissionPercent || 25;
         const logisticsCost = product.logisticsCost || 6000;
-        const userMargin = targetMargin || 12;
 
         if (costPrice <= 0) {
           recommendations.push({
@@ -542,18 +517,19 @@ serve(async (req) => {
 
         const optimal = calculateOptimalPrice(costPrice, commissionPercent, logisticsCost, userMargin);
         
+        // Same logic as scan: ±3-5% tolerance
         let priceAction: string;
         let reasoning: string;
         
-        if (product.price < optimal.minPrice) {
+        if (product.price < optimal.recommendedPrice * 0.97) {
           priceAction = 'increase';
-          reasoning = `Joriy narx (${product.price.toLocaleString()}) minimal narxdan (${optimal.minPrice.toLocaleString()}) past. Zarar! Narxni ${optimal.recommendedPrice.toLocaleString()} ga ko'taring. [Tannarx: ${costPrice.toLocaleString()}, Komissiya: ${commissionPercent}%, Logistika: ${logisticsCost.toLocaleString()}, Soliq: 4%]`;
-        } else if (product.price > optimal.maxPrice) {
+          reasoning = `Joriy narx (${product.price.toLocaleString()}) tavsiya narxdan (${optimal.recommendedPrice.toLocaleString()}) past — ${userMargin}% marja uchun ko'tarish kerak. [Tannarx: ${costPrice.toLocaleString()}, Komissiya: ${commissionPercent}%, Logistika: ${logisticsCost.toLocaleString()}, Soliq: 4%]`;
+        } else if (product.price > optimal.recommendedPrice * 1.05) {
           priceAction = 'decrease';
-          reasoning = `Joriy narx (${product.price.toLocaleString()}) juda baland — sotuv tushadi! Raqobatbardosh narx: ${optimal.recommendedPrice.toLocaleString()}. [Marja: ${optimal.marginPercent}%]`;
+          reasoning = `Joriy narx (${product.price.toLocaleString()}) tavsiya narxdan (${optimal.recommendedPrice.toLocaleString()}) ancha yuqori — sotuv tushishi mumkin. Raqobatbardosh narx: ${optimal.recommendedPrice.toLocaleString()}. [Marja: ${optimal.marginPercent}%]`;
         } else {
           priceAction = 'keep';
-          reasoning = `Narx optimal (${optimal.minPrice.toLocaleString()}-${optimal.maxPrice.toLocaleString()}). Marja: ${optimal.marginPercent}%.`;
+          reasoning = `Narx optimal diapazonda (${optimal.minPrice.toLocaleString()}-${optimal.maxPrice.toLocaleString()}). Marja: ${optimal.marginPercent}%.`;
         }
 
         recommendations.push({
@@ -587,14 +563,11 @@ serve(async (req) => {
       let failed = 0;
       const results: any[] = [];
 
-      // Process ALL updates — no slice limit
-      // Group by marketplace for efficient credential fetching
       const credCache = new Map<string, any>();
       
       for (let i = 0; i < priceUpdates.length; i++) {
         const update = priceUpdates[i];
         try {
-          // Cache credentials per marketplace
           if (!credCache.has(update.marketplace)) {
             const creds = await getCredsForMarketplace(update.marketplace);
             credCache.set(update.marketplace, creds);
@@ -613,14 +586,13 @@ serve(async (req) => {
           } else if (update.marketplace === 'wildberries' && update.nmID) {
             result = await applyWBPrice(creds, update.nmID, update.newPrice);
           } else {
-            result = { success: false, message: `${update.marketplace} qo'llab-quvvatlanmaydi` };
+            result = { success: false, message: `${update.marketplace} qo'llab-quvvatlanmaydi yoki nmID yo'q` };
           }
 
           results.push({ offerId: update.offerId, ...result });
           if (result.success) applied++;
           else failed++;
 
-          // Rate limit: 300ms between requests (faster but safe)
           if (i < priceUpdates.length - 1) await sleep(300);
         } catch (e) {
           console.error(`Apply price error for ${update.offerId}:`, e);

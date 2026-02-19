@@ -65,45 +65,44 @@ TANLANGAN HAMKOR:
 - Ism: ${profile?.full_name || 'Noma\'lum'}
 - Telefon: ${profile?.phone || '—'}
 - Obuna: ${sub?.plan_type || 'yo\'q'} (${sub?.is_active ? 'Faol' : 'Nofaol'})
-- Marketplace ulanishlar: ${connections.map(c => `${c.marketplace} (${c.products_count} mahsulot, ${c.orders_count} buyurtma)`).join(', ') || 'yo\'q'}
-- Tannarx kiritilgan: ${costPrices.length} ta mahsulot
+- Marketplace: ${connections.map(c => `${c.marketplace} (${c.products_count} mahsulot, ${c.orders_count} buyurtma)`).join(', ') || 'yo\'q'}
+- Tannarx: ${costPrices.length} ta mahsulot
 `;
     }
 
-    // Previous scan context
     let scanContext = '';
     if (context?.scanResults) {
-      const results = context.scanResults;
-      scanContext = `\nOXIRGI SKAN NATIJALARI:\n`;
-      for (const r of results) {
-        scanContext += `- ${r.marketplace}: ${r.totalProducts} mahsulot, o'rtacha ball ${r.avgScore}, ${r.criticalCount} kritik, ${r.warningCount} ogohlantirish\n`;
+      scanContext = `\nSKAN NATIJALARI:\n`;
+      for (const r of context.scanResults) {
+        scanContext += `- ${r.marketplace}: ${r.totalProducts} mahsulot, o'rtacha ${r.avgScore} ball, ${r.criticalCount} kritik\n`;
       }
     }
     if (context?.priceData) {
-      scanContext += `\nNARX MA'LUMOTLARI:\n- Jami: ${context.priceData.summary?.totalProducts}, O'rtacha marja: ${context.priceData.summary?.avgMargin}%, Xavfli: ${context.priceData.summary?.riskyCount}\n`;
+      scanContext += `\nNARX: Jami ${context.priceData.summary?.totalProducts}, O'rtacha marja ${context.priceData.summary?.avgMargin}%, Xavfli ${context.priceData.summary?.riskyCount}\n`;
     }
 
-    const systemPrompt = `Sen SellerCloudX AI Agent assistantisan. Admin bilan gaplashasan va marketplace hamkorlarini boshqarishda yordam berasan.
+    const systemPrompt = `Sen SellerCloudX AI yordamchisisan. Admin bilan marketplace boshqaruvida ishlaysan.
 
-IMKONIYATLARING:
-1. Kartochka audit — mahsulot kartochkalarini skanerlash va muammolarni aniqlash
-2. Kartochka tuzatish — AI yordamida nom, tavsif, parametrlarni yaxshilash va API orqali marketplace'ga yuborish
-3. Rasm tahlili — rasm sifatini baholash (0-100 ball)
-4. Rasm generatsiya — AI orqali professional 1080x1440 rasm yaratish va marketplace'ga yuklash (yangi rasm 1-chi o'ringa)
-5. Narx optimallashtirish — tannarx + harajatlar + 10-15% marja asosida optimal narx hisoblash
-6. Narx qo'llash — marketplace API orqali narxlarni yangilash
+SEN QILA OLASAN:
+1. Kartochka audit — sifat balini oshirish bo'yicha aniq maslahatlar
+2. Narx optimallashtirish — tannarx + real tariflar asosida hisoblash
+3. Rasm tahlili va generatsiyasi
+4. Moliyaviy tahlil (PnL, marja, zarar)
+5. Raqobatchilar tahlili
 
-NARX FORMULASI (muhim!):
-OptimalNarx = (Tannarx + Logistika) / (1 - (Komissiya% + Soliq4% + MaqsadliMarja%))
-- Joriy narxga nisbatan marja qo'shish XATO!
-- Tannarx asosida absolyut hisoblash TO'G'RI
-- Narxni juda ko'tarish = sotuv tushadi (raqobatchilar past narxda)
-- Narxni juda tushirish = zarar
+NARX FORMULASI:
+OptimalNarx = (Tannarx + Logistika) / (1 - (Komissiya% + Soliq4% + Marja%))
+
+QOIDALAR:
+- Aniq raqamlar va foydali maslahat ber
+- Har safar bir xil javob berma — kontekstga qarab o'zgarib tur
+- Agar audit ma'lumotlari bo'lsa, ularga asoslanib gapir
+- Qisqa, lo'nda, amaliy javoblar ber
+- O'zbek tilida javob ber
+- Markdown formatdan foydalan (sarlavhalar, ro'yxatlar, qalin matn)
 
 ${partnerContext}
-${scanContext}
-
-Javobni o'zbek tilida ber. Aniq, qisqa va amaliy bo'l. Agar admin biror amal bajarishni so'rasa, qanday qadamlar kerakligini tushuntir.`;
+${scanContext}`;
 
     const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -112,13 +111,14 @@ Javobni o'zbek tilida ber. Aniq, qisqa va amaliy bo'l. Agar admin biror amal baj
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-flash-lite",
         messages: [
           { role: "system", content: systemPrompt },
-          ...(context?.chatHistory || []),
+          ...(context?.chatHistory || []).slice(-8),
           { role: "user", content: message },
         ],
-        temperature: 0.3,
+        temperature: 0.5,
+        max_tokens: 1500,
       }),
     });
 
