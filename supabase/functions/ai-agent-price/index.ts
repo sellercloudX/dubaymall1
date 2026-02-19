@@ -587,9 +587,20 @@ serve(async (req) => {
       let failed = 0;
       const results: any[] = [];
 
-      for (const update of priceUpdates.slice(0, 50)) {
+      // Process ALL updates — no slice limit
+      // Group by marketplace for efficient credential fetching
+      const credCache = new Map<string, any>();
+      
+      for (let i = 0; i < priceUpdates.length; i++) {
+        const update = priceUpdates[i];
         try {
-          const creds = await getCredsForMarketplace(update.marketplace);
+          // Cache credentials per marketplace
+          if (!credCache.has(update.marketplace)) {
+            const creds = await getCredsForMarketplace(update.marketplace);
+            credCache.set(update.marketplace, creds);
+          }
+          const creds = credCache.get(update.marketplace);
+          
           if (!creds) {
             results.push({ offerId: update.offerId, success: false, message: 'Credentials topilmadi' });
             failed++;
@@ -609,7 +620,8 @@ serve(async (req) => {
           if (result.success) applied++;
           else failed++;
 
-          await sleep(500);
+          // Rate limit: 300ms between requests (faster but safe)
+          if (i < priceUpdates.length - 1) await sleep(300);
         } catch (e) {
           console.error(`Apply price error for ${update.offerId}:`, e);
           results.push({ offerId: update.offerId, success: false, message: (e as any).message || 'Xatolik' });
@@ -617,7 +629,7 @@ serve(async (req) => {
         }
       }
 
-      return new Response(JSON.stringify({ success: true, applied, failed, results }), {
+      return new Response(JSON.stringify({ success: true, applied, failed, total: priceUpdates.length, results }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
