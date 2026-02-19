@@ -1088,7 +1088,7 @@ serve(async (req) => {
     }
 
     // ===== SCANNER PIPELINE: scanner-generate =====
-    // Same quality as generate-and-upload but for seller users (no marketplace upload)
+    // IDENTICAL quality to generate-and-upload — same 6-step pipeline for seller users
     if (action === 'scanner-generate') {
       if (!referenceImageUrl) {
         return new Response(JSON.stringify({ error: 'referenceImageUrl kerak' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -1096,35 +1096,77 @@ serve(async (req) => {
 
       const userId = user.id;
       console.log(`📸 Scanner pipeline for user ${userId}`);
+      console.log(`📸 productName: ${productName}, category: ${category}, features: ${JSON.stringify(features)}`);
 
-      // Step 1: Detect category
-      const detection = await detectProductCategory(referenceImageUrl, OPENAI_API_KEY);
+      // Step 1: Detect category with GPT-4o Vision
+      let detection = await detectProductCategory(referenceImageUrl, OPENAI_API_KEY);
+      
+      // CRITICAL: Merge frontend-analyzed data into detection for better accuracy
+      // Frontend analyze-product-image already identified the product — use that data as enhancement
+      if (detection) {
+        // Use frontend productName if detection gave generic name
+        if (productName && (!detection.product_name || detection.product_name === 'Product')) {
+          detection.product_name = productName;
+        }
+        // Merge frontend features with detected features for richer infographic badges
+        if (features?.length > 0) {
+          const detectedFeatures = detection.key_features || [];
+          const mergedFeatures = [...new Set([...detectedFeatures, ...features])].slice(0, 5);
+          detection.key_features = mergedFeatures;
+        }
+        // Use frontend category as fallback
+        if (category && !detection.category) {
+          detection.category = category;
+        }
+      } else {
+        // Detection failed entirely — build from frontend data
+        detection = {
+          product_name: productName || 'Product',
+          category: category || '',
+          key_features: features || [],
+          positioning: 'mid-range',
+          target_audience: 'general consumer',
+        };
+      }
+
       const detectedCategory = detection?.category || category || '';
       const categoryStyle = getCategoryStyle(detectedCategory);
+      console.log(`📦 Scanner category: ${detectedCategory} → Style: ${categoryStyle.visual_style}`);
 
-      // Step 2: Generate Hero Infographic
+      // Step 2: Generate Hero Infographic (Pinterest-style with text overlays)
+      console.log("🎨 Scanner: Generating Hero Infographic...");
       const heroImage = await generateHeroImage(referenceImageUrl, detection, categoryStyle, OPENAI_API_KEY);
       let heroUrl: string | null = null;
       if (heroImage) {
         heroUrl = await uploadToStorage(supabase, heroImage, userId, `scanner-hero-${Date.now()}`);
+        console.log("✅ Scanner Hero Infographic uploaded");
+      } else {
+        console.error("❌ Scanner Hero Infographic failed");
       }
 
       // Step 3: Generate 3 Lifestyle angles in PARALLEL
+      console.log("🔄 Scanner: Generating 3 lifestyle angles in PARALLEL...");
       const anglePromises = LIFESTYLE_ANGLES.map((angle) => {
         return generateLifestyleAngle(referenceImageUrl, detection, angle, OPENAI_API_KEY)
           .then(async (img) => {
             if (img) {
-              return await uploadToStorage(supabase, img, userId, `scanner-${angle.role}-${Date.now()}`);
+              const url = await uploadToStorage(supabase, img, userId, `scanner-${angle.role}-${Date.now()}`);
+              console.log(`✅ Scanner ${angle.label} uploaded`);
+              return url;
             }
+            console.error(`❌ Scanner ${angle.label} failed`);
             return null;
           })
-          .catch(() => null);
+          .catch((e) => {
+            console.error(`❌ Scanner ${angle.label} error:`, e.message);
+            return null;
+          });
       });
 
       const angleUrls = (await Promise.all(anglePromises)).filter(Boolean) as string[];
 
       const allImages = [...(heroUrl ? [heroUrl] : []), ...angleUrls];
-      console.log(`✅ Scanner generated ${allImages.length} images`);
+      console.log(`✅ Scanner pipeline complete: ${allImages.length}/4 images generated`);
 
       return new Response(JSON.stringify({
         success: true,
