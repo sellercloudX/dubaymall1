@@ -12,9 +12,10 @@ import { AdminsManagement } from '@/components/admin/AdminsManagement';
 import { StartupMetrics } from '@/components/admin/StartupMetrics';
 import { PlatformExpenses } from '@/components/admin/PlatformExpenses';
 import { PartnerAnalytics } from '@/components/admin/PartnerAnalytics';
+import { AIAgentDashboard } from '@/components/admin/AIAgentDashboard';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
-import { Shield, Users, BarChart3, Wallet, Crown, UserCheck, Settings, Zap, TrendingUp, UsersRound } from 'lucide-react';
+import { Shield, Users, BarChart3, Wallet, Crown, UserCheck, Settings, Zap, TrendingUp, UsersRound, Bot } from 'lucide-react';
 
 export default function AdminDashboard() {
   const { user, loading } = useAuth();
@@ -114,6 +115,11 @@ export default function AdminDashboard() {
                 <Settings className="h-3.5 w-3.5" />Adminlar
               </TabsTrigger>
             )}
+            {isSuperAdmin && (
+              <TabsTrigger value="ai-agent" className="gap-1.5 text-xs">
+                <Bot className="h-3.5 w-3.5" />AI Agent
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="metrics">
@@ -153,6 +159,10 @@ export default function AdminDashboard() {
 
           <TabsContent value="admins">
             <AdminsManagement />
+          </TabsContent>
+
+          <TabsContent value="ai-agent">
+            <AIAgentDashboard />
           </TabsContent>
         </Tabs>
       </div>
