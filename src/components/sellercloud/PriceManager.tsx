@@ -55,20 +55,21 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
         const costPrice = getCostPrice(marketplace, product.offerId);
         const tariff = getTariffForProduct(tariffMap, product.offerId, price, marketplace);
         
-        // Min price calculation: use COST PRICE as base for tariff estimation
-        // to avoid circular dependency (price -> tariff -> minPrice -> price)
-        // Formula: minPrice = costPrice / (1 - tariffPercent - taxPercent - marginPercent)
+        // Min price formula: Price = (CostPrice + Logistics) / (1 - Commission% - Tax% - Margin%)
+        // Commission% = only marketplace fee (NOT logistics)
+        // Logistics = absolute cost added to cost price
         let calculatedMinPrice = 0;
         if (costPrice !== null && costPrice > 0) {
-          // Get tariff percent from real data or estimate
-          const tariffPercent = tariff.isReal && price > 0
-            ? tariff.totalFee / price  // real tariff as fraction of price
+          // Separate commission (%) from logistics (absolute)
+          const commissionPercent = tariff.isReal && price > 0
+            ? tariff.commission / price  // commission as fraction of price
             : 0.15; // fallback 15%
+          const logisticsCost = tariff.isReal ? tariff.logistics : 3000; // absolute logistics
           const taxPercent = 0.04;
           const marginPercent = minProfit / 100;
-          const denominator = 1 - tariffPercent - taxPercent - marginPercent;
-          if (denominator > 0.05) { // safety: don't divide by near-zero
-            calculatedMinPrice = Math.ceil(costPrice / denominator);
+          const denominator = 1 - commissionPercent - taxPercent - marginPercent;
+          if (denominator > 0.05) {
+            calculatedMinPrice = Math.ceil((costPrice + logisticsCost) / denominator);
           }
         }
 

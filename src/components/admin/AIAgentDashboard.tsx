@@ -812,26 +812,45 @@ export function AIAgentDashboard() {
   const { data: partners } = useQuery({
     queryKey: ['ai-agent-partners'],
     queryFn: async () => {
-      const { data: connections } = await supabase
-        .from('marketplace_connections')
-        .select('user_id, marketplace, is_active')
-        .eq('is_active', true);
-      if (!connections?.length) return [];
+      // Fetch ALL marketplace connections (paginate to avoid 1000 row limit)
+      let allConnections: any[] = [];
+      let from = 0;
+      const pageSize = 500;
+      while (true) {
+        const { data: batch } = await supabase
+          .from('marketplace_connections')
+          .select('user_id, marketplace, is_active')
+          .eq('is_active', true)
+          .range(from, from + pageSize - 1);
+        if (!batch?.length) break;
+        allConnections.push(...batch);
+        if (batch.length < pageSize) break;
+        from += pageSize;
+      }
+
+      if (allConnections.length === 0) return [];
 
       const connMap = new Map<string, string[]>();
-      for (const c of connections) {
+      for (const c of allConnections) {
         if (!connMap.has(c.user_id)) connMap.set(c.user_id, []);
         if (!connMap.get(c.user_id)!.includes(c.marketplace)) connMap.get(c.user_id)!.push(c.marketplace);
       }
 
       const userIds = Array.from(connMap.keys());
-      const [profilesRes, subsRes] = await Promise.all([
-        supabase.from('profiles').select('user_id, full_name, phone').in('user_id', userIds),
-        supabase.from('sellercloud_subscriptions').select('user_id, is_active, plan_type').in('user_id', userIds),
-      ]);
-
-      const profileMap = Object.fromEntries((profilesRes.data || []).map(p => [p.user_id, p]));
-      const subMap = Object.fromEntries((subsRes.data || []).map(s => [s.user_id, s]));
+      
+      // Paginate profile fetches too (in case > 1000 users)
+      const profileMap: Record<string, any> = {};
+      const subMap: Record<string, any> = {};
+      
+      for (let i = 0; i < userIds.length; i += 500) {
+        const batch = userIds.slice(i, i + 500);
+        const [profilesRes, subsRes] = await Promise.all([
+          supabase.from('profiles').select('user_id, full_name, phone').in('user_id', batch),
+          supabase.from('sellercloud_subscriptions').select('user_id, is_active, plan_type').in('user_id', batch),
+        ]);
+        for (const p of (profilesRes.data || [])) profileMap[p.user_id] = p;
+        for (const s of (subsRes.data || [])) subMap[s.user_id] = s;
+      }
 
       return userIds.map(uid => ({
         userId: uid,
