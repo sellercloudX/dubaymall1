@@ -33,27 +33,22 @@ async function generateProductImage(productName: string, category: string, refer
   try {
     console.log(`Generating image for: "${productName}" (${category}), ref: ${referenceImageUrl ? 'YES' : 'NO'}`);
 
-    const model = "google/gemini-3-pro-image-preview";
+    const model = "openai/gpt-5";
 
     if (referenceImageUrl) {
-      // Send the image TWICE for maximum context retention + ultra-strict prompt
-      const editPrompt = `Look at this product photo carefully. This is the ONLY product that must appear in your output.
+      const editPrompt = `You are a professional product photographer and photo editor.
 
-YOUR TASK: Take this EXACT product and place it on a clean white studio background.
+Look at this product photo. Take the EXACT same product (same shape, same colors, same labels, same brand, same everything) and create a professional e-commerce photo:
 
-STRICT RULES:
-- The output must contain the SAME PHYSICAL OBJECT from the input photo
-- Same bottle/box shape, same colors, same labels, same text, same cap, same everything
-- Do NOT generate a different product even if you know what "${productName}" looks like
-- Do NOT add any text, watermarks, or labels that aren't already on the product
-- ONLY change the background to pure white/light gray
-- Add professional studio lighting (soft shadows, even illumination)
-- Center the product with negative space on all sides
-- Output: portrait 3:4 ratio, high resolution, e-commerce quality
+1. Keep the product EXACTLY as it is - do not change anything about the product itself
+2. Place it on a clean white/light studio background
+3. Add professional studio lighting with soft shadows
+4. Center the product, portrait orientation (3:4 ratio)
+5. High resolution, marketplace quality (1080x1440)
+6. No text, no watermarks, no added elements
 
-Think of this as: cut out the product from the photo → paste onto white background → add studio lighting. Nothing else.`;
+The product name is "${productName}" (category: ${category}) - this is for context only, do NOT reimagine the product.`;
 
-      // Send image twice to reinforce visual context
       const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -68,7 +63,6 @@ Think of this as: cut out the product from the photo → paste onto white backgr
               content: [
                 { type: "image_url", image_url: { url: referenceImageUrl } },
                 { type: "text", text: editPrompt },
-                { type: "image_url", image_url: { url: referenceImageUrl } },
               ]
             }
           ],
@@ -85,13 +79,12 @@ Think of this as: cut out the product from the photo → paste onto white backgr
         }
       }
       const errText = await resp.text();
-      console.log(`Reference image generation failed (${resp.status}): ${errText.substring(0, 200)}, falling back to text-only`);
+      console.log(`Reference image generation failed (${resp.status}): ${errText.substring(0, 300)}, falling back to text-only`);
     }
 
-    // Fallback: text-only generation (only when NO reference image exists)
+    // Fallback: text-only generation
     const prompt = `Generate a professional e-commerce product photo of "${productName}" (category: ${category}). 
-Clean white background, product centered with negative space, professional studio lighting.
-Portrait 3:4 aspect ratio, 1080x1440, no text/watermarks, photorealistic marketplace quality.`;
+Clean white background, product centered, professional studio lighting, portrait 3:4, 1080x1440, no text/watermarks, photorealistic.`;
 
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -140,20 +133,20 @@ async function generateInfographicImage(productName: string, category: string, r
       content.push({ type: "image_url", image_url: { url: referenceImageUrl } });
     }
 
-    content.push({ type: "text", text: `Look at the product photo above. Keep this EXACT product unchanged — same shape, colors, labels, cap.
+    content.push({ type: "text", text: `You are a professional marketplace infographic designer (Pinterest/Behance level).
 
-Create a sales-boosting INFOGRAPHIC layout:
-1. Keep the product EXACTLY as shown in the photo — do NOT redraw it
-2. Add a stylish gradient/pattern background behind the product
-3. Add 2-3 small badges or icons AROUND the product highlighting: ${featureText}
-4. Add a banner at top or bottom with a selling point
-5. Portrait 3:4, 1080x1440, marketplace style
-6. Product must be the visual center` });
+Look at this product photo. Create a SALES-BOOSTING INFOGRAPHIC for marketplace listing:
 
-    // Send image again after text for reinforcement
-    if (referenceImageUrl) {
-      content.push({ type: "image_url", image_url: { url: referenceImageUrl } });
-    }
+RULES:
+1. Keep the EXACT same product from the photo - do not change or reimagine it
+2. Add a premium stylish background (gradient, pattern, or themed)
+3. Add 2-4 feature badges/icons around the product highlighting: ${featureText}
+4. Add a catchy headline at top and selling point banner at bottom
+5. Text should be in Uzbek or Russian language
+6. Portrait 3:4 ratio (1080x1440), marketplace-ready quality
+7. Make it look like a professional Pinterest marketplace design
+8. Product "${productName}" (${category}) must be the visual center
+9. Use bold typography, contrast colors, professional layout` });
 
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -162,13 +155,16 @@ Create a sales-boosting INFOGRAPHIC layout:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-pro-image-preview",
+        model: "openai/gpt-5",
         messages: [{ role: "user", content }],
         modalities: ["image", "text"],
       }),
     });
 
-    if (!resp.ok) return null;
+    if (!resp.ok) {
+      console.error(`Infographic generation failed: ${resp.status}`);
+      return null;
+    }
 
     const data = await resp.json();
     return data.choices?.[0]?.message?.images?.[0]?.image_url?.url || null;
