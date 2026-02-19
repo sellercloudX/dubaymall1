@@ -691,11 +691,11 @@ serve(async (req) => {
           pipelineResult.qualityControl = qcResult;
           pipelineResult.steps.push({ step: 5, name: "Quality Control", status: `Score: ${qcResult.overall_score}` });
 
-          // ── Auto improvement loop (max 2 retries) ──
-          if (qcResult.overall_score < 85 && qcResult.improvements?.length) {
-            console.log(`🔄 Score ${qcResult.overall_score} < 85 → Auto improvement loop...`);
-            for (let retry = 0; retry < 2; retry++) {
-              console.log(`🔄 Retry ${retry + 1}/2...`);
+          // ── Auto improvement loop (max 1 retry to avoid timeout) ──
+          if (qcResult.overall_score < 70 && qcResult.improvements?.length) {
+            console.log(`🔄 Score ${qcResult.overall_score} < 70 → Auto improvement loop...`);
+            for (let retry = 0; retry < 1; retry++) {
+              console.log(`🔄 Retry ${retry + 1}/1...`);
               const improvedCard = await generateMarketplaceCard(
                 workingImageUrl, detection, categoryStyle, OPENAI_API_KEY, variationSeed + retry + 1
               );
@@ -709,7 +709,7 @@ serve(async (req) => {
                     pipelineResult.qualityControl = newQc;
                     console.log(`✅ Improved: ${newQc.overall_score}`);
                   }
-                  if (newQc.overall_score >= 85) {
+                  if (newQc.overall_score >= 70) {
                     console.log("✅ Quality threshold met!");
                     break;
                   }
