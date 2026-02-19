@@ -83,3 +83,12 @@ verify_jwt = false
 
 [functions.fetch-wildberries-data]
 verify_jwt = false
+
+[functions.ai-agent-scan]
+verify_jwt = false
+
+[functions.ai-agent-fix]
+verify_jwt = false
+
+[functions.audit-marketplace-cards]
+verify_jwt = false
