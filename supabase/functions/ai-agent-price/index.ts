@@ -459,9 +459,23 @@ serve(async (req) => {
             // Optimal narx
             const optimal = calculateOptimalPrice(costPrice, commissionPercent, logisticsCost, userTargetMargin);
             
-            const isPriceHigh = costPrice > 0 && p.price > optimal.maxPrice;
-            const isPriceLow = costPrice > 0 && p.price < optimal.minPrice;
+            const isPriceHigh = costPrice > 0 && p.price > optimal.recommendedPrice * 1.03;
+            const isPriceLow = costPrice > 0 && p.price < optimal.recommendedPrice * 0.97;
             const isPriceRisky = costPrice > 0 && (actualMargin !== null && actualMargin < 5);
+
+            // priceAction: tavsiya narxdan ±3% toleransiya bilan solishtirish
+            let priceAction = 'ok';
+            if (costPrice <= 0) {
+              priceAction = 'no_cost';
+            } else if (p.price < optimal.minPrice) {
+              priceAction = 'increase'; // zarar — minimal narxdan past
+            } else if (p.price < optimal.recommendedPrice * 0.97) {
+              priceAction = 'increase'; // maqsadli marjadan past
+            } else if (p.price > optimal.maxPrice) {
+              priceAction = 'decrease'; // juda baland
+            } else if (p.price > optimal.recommendedPrice * 1.05) {
+              priceAction = 'decrease'; // tavsiyadan ancha yuqori
+            }
 
             allProducts.push({
               ...p,
@@ -478,10 +492,7 @@ serve(async (req) => {
               isPriceRisky,
               sku: p.sku || p.offerId,
               imageUrl: p.imageUrl || null,
-              priceAction: costPrice <= 0 ? 'no_cost' 
-                : p.price < optimal.minPrice ? 'increase' 
-                : p.price > optimal.maxPrice ? 'decrease' 
-                : 'ok',
+              priceAction,
             });
           }
         } catch (e) {
