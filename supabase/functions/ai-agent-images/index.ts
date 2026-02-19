@@ -26,7 +26,29 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3)
 }
 
 // =====================================================
-// CATEGORY STYLE MAP — determines design direction
+// STOP WORDS — taqiqlangan sub'ektiv/reklama so'zlari
+// =====================================================
+const STOP_WORDS = [
+  'eng yaxshi', 'лучший', 'best', 'arzon', 'дешёвый', 'cheap',
+  'chegirma', 'скидка', 'discount', 'aksiya', 'акция', 'sale',
+  'top', 'hit', 'хит', 'original', 'оригинал', 'sifatli', 'качественный',
+  'quality', 'premium quality', 'super', 'mega', 'exclusive', 'эксклюзив',
+  'number 1', '№1', '#1', 'guaranteed', 'гарантированно', 'kafolat',
+  'free', 'бесплатно', 'bepul', 'wow', 'amazing', 'perfect',
+  'идеальный', 'mukammal', 'unique', 'уникальный', 'noyob',
+];
+
+function sanitizeStopWords(text: string): string {
+  let result = text;
+  for (const word of STOP_WORDS) {
+    const regex = new RegExp(`\\b${word}\\b`, 'gi');
+    result = result.replace(regex, '').replace(/\s{2,}/g, ' ').trim();
+  }
+  return result;
+}
+
+// =====================================================
+// CATEGORY STYLE MAP — Pinterest-level design direction
 // =====================================================
 const CATEGORY_STYLES: Record<string, {
   visual_style: string;
@@ -35,67 +57,139 @@ const CATEGORY_STYLES: Record<string, {
   prompt_addition: string;
 }> = {
   perfume: {
-    visual_style: "Luxury cosmetic advertising",
-    background_style: "Elegant gradient with gold accents",
-    color_palette: "Deep gold, rose gold, champagne, warm bronze",
-    prompt_addition: "Soft glow lighting. Elegant gradient background. Gold accents. Premium minimal typography. Close-up focus. Romantic atmosphere. Luxury feel.",
+    visual_style: "Luxury perfume editorial photography — Dior Sauvage / Chanel campaign level",
+    background_style: "Deep moody gradient (navy-to-charcoal or dark blue-to-black) with bokeh light particles, glass reflections, and decorative flowers (white peonies, jasmine, orchids) arranged artistically",
+    color_palette: "Deep navy, midnight blue, champagne gold, pearl white, matte black",
+    prompt_addition: `PERFUME-SPECIFIC PINTEREST RULES:
+- Background: Rich moody dark blue/navy gradient with soft bokeh particles and decorative white/pastel flowers
+- Lighting: Dramatic side-lighting with glass reflections and lens flare accents
+- Product placement: Bottle prominently displayed with cap visible, slight 15° angle
+- Typography: Elegant serif font for product name (large), sans-serif for feature badges
+- Feature badges: Rounded pill-shaped badges with frosted glass effect (e.g. "Стойкий аромат", "Длинный шлейф", "48 часов стойкость")  
+- Volume badge: Circle badge at bottom with volume (e.g. "50 мл", "100 мл") with rotating text border
+- Decorative elements: Scattered flower petals, water droplets on glass surface, golden sparkle accents
+- Mood: Sensual, sophisticated, magazine-cover quality
+- NO plain backgrounds, NO flat colors, NO generic templates`,
   },
   beauty: {
-    visual_style: "Premium beauty advertising",
-    background_style: "Soft pastel gradient with shimmer",
-    color_palette: "Rose pink, pearl white, soft gold, lavender",
-    prompt_addition: "Soft diffused lighting. Pastel gradient background. Shimmer effects. Beauty-focused aesthetic. Elegant composition.",
+    visual_style: "High-end beauty campaign — Clinique / La Roche-Posay editorial",
+    background_style: "Soft luminous pastel gradient (blush pink-to-cream or lavender-to-white) with shimmer particles and soft petal accents",
+    color_palette: "Blush pink, pearl white, soft gold, lavender, cream",
+    prompt_addition: `BEAUTY-SPECIFIC PINTEREST RULES:
+- Background: Soft dreamy pastel gradient with light shimmer/glitter particles
+- Lighting: Soft beauty lighting — even, flattering, no harsh shadows
+- Product: Center-focused with soft reflection underneath, pristine clean look
+- Typography: Modern elegant sans-serif, feminine styling
+- Feature badges: Soft rounded badges with glass-morphism effect on pastel backgrounds
+- Decorative: Rose petals, water drops, pearl accents, soft fabric drapes
+- Mood: Clean, fresh, luxurious self-care
+- NO harsh contrasts, NO dark backgrounds, NO masculine elements`,
   },
   electronics: {
-    visual_style: "Modern technology advertising",
-    background_style: "Clean tech gradient or dark minimalist",
-    color_palette: "Deep blue, metallic silver, electric blue, charcoal",
-    prompt_addition: "Modern technology advertising style. Clean white or tech gradient background. Functional feature highlights. Minimalist composition. Blue or metallic accents. Precise typography.",
+    visual_style: "Modern tech product launch — Apple / Samsung campaign style",
+    background_style: "Dark gradient (charcoal-to-black or deep blue-to-dark) with subtle tech grid lines and blue glow accents",
+    color_palette: "Deep charcoal, electric blue, silver metallic, pure white accent",
+    prompt_addition: `ELECTRONICS-SPECIFIC PINTEREST RULES:
+- Background: Dark sleek gradient with subtle geometric grid or circuit pattern
+- Lighting: Dramatic edge-lighting highlighting product contours, blue/white rim light
+- Product: Hero shot with slight perspective angle, floating shadow effect
+- Typography: Bold modern sans-serif (tech feel), specs in clean monospace
+- Feature badges: Sharp-cornered badges with neon/electric blue glow borders
+- Spec highlights: Key specs in large bold numbers (e.g. "4K", "120Hz", "5000 mAh")
+- Mood: Cutting-edge, innovative, powerful
+- NO pastel colors, NO floral elements, NO romantic styling`,
   },
   fashion: {
-    visual_style: "Lifestyle fashion advertising",
-    background_style: "Trendy lifestyle backdrop",
-    color_palette: "Neutral tones, warm beige, soft contrast",
-    prompt_addition: "Lifestyle fashion advertising style. Modern trendy composition. Soft natural lighting. Dynamic layout. Instagram-ready aesthetic.",
+    visual_style: "Lifestyle fashion editorial — Zara / H&M lookbook",
+    background_style: "Warm neutral gradient (beige-to-cream or sand-to-ivory) with fabric texture hints",
+    color_palette: "Warm beige, sand, ivory, soft caramel, muted olive",
+    prompt_addition: `FASHION-SPECIFIC PINTEREST RULES:
+- Background: Warm neutral tones with subtle fabric/linen texture
+- Lighting: Natural soft window-light feel, warm color temperature
+- Product: Lifestyle presentation (laid flat or styled on minimal surface)
+- Typography: Trendy mix of serif headline + clean sans-serif details
+- Feature badges: Minimalist rounded rectangles with warm neutral tones
+- Fabric/material call-outs: "100% хлопок", "Натуральная кожа" in elegant styling
+- Mood: Effortless chic, Instagram-worthy, modern lifestyle
+- NO neon colors, NO tech elements, NO dark moody backgrounds`,
   },
   household: {
-    visual_style: "Fresh clean advertising",
-    background_style: "Bright clean background with freshness cues",
-    color_palette: "Fresh blue, clean white, bright green, sky blue",
-    prompt_addition: "Fresh bright background. Clean hygiene atmosphere. Water splash or freshness visual cues. High brightness commercial look.",
+    visual_style: "Fresh clean lifestyle — Method / Mrs. Meyer's campaign",
+    background_style: "Bright clean gradient (white-to-light blue or mint-to-white) with water splash or freshness cues",
+    color_palette: "Fresh mint, clean white, sky blue, bright green, ocean teal",
+    prompt_addition: `HOUSEHOLD-SPECIFIC PINTEREST RULES:
+- Background: Bright airy gradient with water droplets or bubble accents
+- Lighting: High-key bright lighting, ultra clean feel
+- Product: Clean product shot with water splash or freshness visual
+- Typography: Clean rounded sans-serif, friendly and trustworthy
+- Feature badges: Round or oval badges with fresh blue/green tones
+- Trust indicators: "Безопасно для детей", "Экологичный" with leaf/water icons
+- Mood: Fresh, trustworthy, family-safe
+- NO dark tones, NO luxury styling, NO complex compositions`,
   },
   food: {
-    visual_style: "Appetizing food advertising",
-    background_style: "Warm rustic or clean white",
-    color_palette: "Warm orange, natural green, appetizing red, golden brown",
-    prompt_addition: "Appetizing food photography style. Warm inviting lighting. Natural textures. Fresh ingredient feel. Mouth-watering presentation.",
+    visual_style: "Appetizing food photography — Whole Foods / premium packaging",
+    background_style: "Warm natural backdrop (rustic wood, marble surface, or warm gradient) with ingredient scatter",
+    color_palette: "Warm amber, natural green, rich brown, appetizing red, golden honey",
+    prompt_addition: `FOOD-SPECIFIC PINTEREST RULES:
+- Background: Warm rustic surface (wood, marble, stone) or warm gradient with ingredient scatter
+- Lighting: Warm golden-hour style lighting, appetizing glow
+- Product: Slightly angled, packaging clearly visible, some ingredients scattered artistically
+- Typography: Warm rounded font, handwritten accent text
+- Feature badges: Organic-shaped badges with natural tones (kraft paper look)
+- Call-outs: "Натуральный состав", "Без ГМО" with leaf/wheat icons
+- Mood: Mouth-watering, natural, wholesome
+- NO cold blue tones, NO tech aesthetics, NO sterile look`,
   },
   kids: {
-    visual_style: "Playful colorful advertising",
-    background_style: "Bright colorful fun background",
-    color_palette: "Bright yellow, sky blue, candy pink, grass green",
-    prompt_addition: "Playful colorful style. Fun energetic composition. Bright cheerful lighting. Child-friendly aesthetic. Safe and happy atmosphere.",
+    visual_style: "Playful colorful — Fisher-Price / LEGO campaign energy",
+    background_style: "Bright playful gradient with confetti, stars, or balloon accents",
+    color_palette: "Sunny yellow, sky blue, candy pink, grass green, bright orange",
+    prompt_addition: `KIDS-SPECIFIC PINTEREST RULES:
+- Background: Bright cheerful multi-color gradient with playful elements (stars, confetti, clouds)
+- Lighting: Bright even lighting, happy and energetic
+- Product: Fun angle, playful composition, surrounded by colorful accents
+- Typography: Rounded bubbly font, playful and readable
+- Feature badges: Fun-shaped badges (star, cloud, circle) with bright fills
+- Safety call-outs: "Безопасно для детей", "От 3+ лет" with child-friendly icons
+- Mood: Fun, safe, exciting, parent-approved
+- NO dark colors, NO serious styling, NO minimalism`,
   },
   sport: {
-    visual_style: "Dynamic active advertising",
-    background_style: "Energetic gradient with motion effects",
-    color_palette: "Energy red, dynamic orange, power black, electric green",
-    prompt_addition: "Dynamic active style. Energetic composition. Bold contrasts. Motion-inspired design. Athletic powerful feel.",
+    visual_style: "Dynamic fitness advertising — Nike / Under Armour energy",
+    background_style: "Bold energetic gradient (dark-to-vibrant) with motion blur and energy lines",
+    color_palette: "Power black, energy red, electric green, dynamic orange, metallic silver",
+    prompt_addition: `SPORT-SPECIFIC PINTEREST RULES:
+- Background: Bold dark-to-vibrant gradient with speed lines or energy particles
+- Lighting: Dramatic high-contrast, strong rim light
+- Product: Dynamic angle suggesting motion, powerful composition
+- Typography: Ultra-bold condensed sans-serif, high-impact
+- Feature badges: Sharp angular badges with bold colors
+- Performance specs: "Дышащий материал", "Ультра лёгкий" with dynamic styling
+- Mood: Powerful, motivating, performance-driven
+- NO soft pastels, NO romantic elements, NO delicate styling`,
   },
   default: {
-    visual_style: "Professional commercial advertising",
-    background_style: "Clean gradient or studio white",
+    visual_style: "Professional marketplace advertising — clean commercial",
+    background_style: "Clean gradient (light gray-to-white or subtle blue-to-white) with professional studio feel",
     color_palette: "Professional blue, clean white, subtle gray, accent gold",
-    prompt_addition: "Professional commercial style. Clean modern composition. Studio-quality lighting. High-end marketplace aesthetic.",
+    prompt_addition: `DEFAULT PROFESSIONAL RULES:
+- Background: Clean studio gradient, professional and versatile
+- Lighting: Even professional studio lighting
+- Product: Clean centered composition with soft shadow
+- Typography: Modern clean sans-serif
+- Feature badges: Rounded rectangle badges with professional colors
+- Mood: Trustworthy, professional, marketplace-ready
+- NO overly creative backgrounds, NO category-specific themes`,
   },
 };
 
 function getCategoryStyle(category: string): typeof CATEGORY_STYLES.default {
   const cat = (category || '').toLowerCase();
-  if (cat.includes('parfum') || cat.includes('perfum') || cat.includes('atir') || cat.includes('духи') || cat.includes('парфюм')) return CATEGORY_STYLES.perfume;
-  if (cat.includes('kosmet') || cat.includes('beauty') || cat.includes('косметик') || cat.includes('go\'zal')) return CATEGORY_STYLES.beauty;
-  if (cat.includes('elektr') || cat.includes('techni') || cat.includes('gadget') || cat.includes('электрон') || cat.includes('texnik')) return CATEGORY_STYLES.electronics;
-  if (cat.includes('kiyim') || cat.includes('fashion') || cat.includes('одежд') || cat.includes('мода') || cat.includes('обувь') || cat.includes('poyabzal')) return CATEGORY_STYLES.fashion;
+  if (cat.includes('parfum') || cat.includes('perfum') || cat.includes('atir') || cat.includes('духи') || cat.includes('парфюм') || cat.includes('fragrance') || cat.includes('eau de')) return CATEGORY_STYLES.perfume;
+  if (cat.includes('kosmet') || cat.includes('beauty') || cat.includes('косметик') || cat.includes('go\'zal') || cat.includes('крем') || cat.includes('уход')) return CATEGORY_STYLES.beauty;
+  if (cat.includes('elektr') || cat.includes('techni') || cat.includes('gadget') || cat.includes('электрон') || cat.includes('texnik') || cat.includes('телефон') || cat.includes('наушник')) return CATEGORY_STYLES.electronics;
+  if (cat.includes('kiyim') || cat.includes('fashion') || cat.includes('одежд') || cat.includes('мода') || cat.includes('обувь') || cat.includes('poyabzal') || cat.includes('сумк')) return CATEGORY_STYLES.fashion;
   if (cat.includes('tozala') || cat.includes('household') || cat.includes('бытов') || cat.includes('чист') || cat.includes('uy')) return CATEGORY_STYLES.household;
   if (cat.includes('oziq') || cat.includes('food') || cat.includes('еда') || cat.includes('продукт') || cat.includes('ovqat')) return CATEGORY_STYLES.food;
   if (cat.includes('bolalar') || cat.includes('kids') || cat.includes('детск') || cat.includes('игруш') || cat.includes('o\'yinchoq')) return CATEGORY_STYLES.kids;
@@ -315,55 +409,91 @@ async function generateMarketplaceCard(
     return null;
   }
 
-  const productName = detection?.product_name || 'Premium Product';
-  const features = detection?.key_features?.slice(0, 5)?.join(', ') || 'Yuqori sifat, Tez yetkazib berish, Eng yaxshi narx';
+  const productName = sanitizeStopWords(detection?.product_name || 'Product');
+  const rawFeatures = detection?.key_features?.slice(0, 5)?.join(', ') || 'Yuqori sifat, Tez yetkazib berish';
+  const cleanFeatures = sanitizeStopWords(rawFeatures);
   const category = detection?.category || '';
   const positioning = detection?.positioning || 'mid-range';
 
   // Anti-repetition: vary layout based on seed
   const layoutVariations = [
-    "Product on the LEFT side (40%), design elements on the RIGHT (60%). Headline at TOP.",
-    "Product CENTERED (50%), features arranged as floating cards AROUND it. Badge at TOP-LEFT.",
-    "Product at BOTTOM-CENTER (45%), large headline and features at TOP portion.",
-    "Product on the RIGHT side (40%), selling points stacked on the LEFT. Banner at BOTTOM.",
+    "Product on the LEFT side (40%), feature badges floating on the RIGHT (60%). Large headline at TOP-LEFT. Volume/price badge at BOTTOM-RIGHT.",
+    "Product CENTERED (50%), feature badges arranged in a curved arc AROUND the product. Decorative elements fill corners. Brand badge at TOP-LEFT.",
+    "Product at RIGHT side (45%), large bold headline and stacked feature badges on LEFT. Category-specific decorative border.",
+    "Product BOTTOM-CENTER (50%), dramatic headline at TOP spanning full width. Feature badges as horizontal strip in MIDDLE section.",
+    "Product at LEFT-CENTER with dramatic 15° tilt, feature list as vertical stack on RIGHT with icons. Circular volume badge at BOTTOM-LEFT.",
+    "Split composition: TOP 40% is bold headline + decorative bg, BOTTOM 60% is product + feature badges arranged around it.",
   ];
   const layoutHint = layoutVariations[variationSeed % layoutVariations.length];
 
-  const cardPrompt = `Create a HIGH-CONVERTING Pinterest-style marketplace product card.
+  // Badge text — NO stop words
+  const badgeText = positioning === 'premium' ? '⭐ TANLOV' : '🔥 MASHHUR';
 
-Resolution: 1080x1440 vertical (portrait).
+  const cardPrompt = `You are an elite commercial graphic designer creating a HIGH-CONVERTING Pinterest/Behance-level marketplace product infographic.
 
-Product category: ${category}
-Advertising style: ${categoryStyle.visual_style}
-Background style: ${categoryStyle.background_style}
-Color palette: ${categoryStyle.color_palette}
-Market positioning: ${positioning}
+FORMAT: 1080x1440 vertical (3:4 portrait ratio).
 
-Product name: ${productName}
-Key benefits: ${features}
-Highlight badge: ${positioning === 'premium' ? '⭐ PREMIUM' : '🔥 TOP SELLER'}
+═══════════════════════════════════
+PRODUCT INTELLIGENCE
+═══════════════════════════════════
+Product: ${productName}
+Category: ${category}
+Positioning: ${positioning}
+Key features: ${cleanFeatures}
+Badge: ${badgeText}
 
-CATEGORY-SPECIFIC STYLE:
+═══════════════════════════════════
+VISUAL DIRECTION (CATEGORY-SPECIFIC)
+═══════════════════════════════════
+Style: ${categoryStyle.visual_style}
+Background: ${categoryStyle.background_style}  
+Palette: ${categoryStyle.color_palette}
+
 ${categoryStyle.prompt_addition}
 
-LAYOUT: ${layoutHint}
+═══════════════════════════════════
+LAYOUT COMPOSITION
+═══════════════════════════════════
+${layoutHint}
 
-DESIGN RULES:
-- Modern clean layout with strong visual hierarchy
-- Product DOMINANT and clearly visible (40-55% of frame)
-- The product from the reference photo must remain 100% PIXEL-PERFECT UNCHANGED
-- 3-5 benefit icons/badges with short text in RUSSIAN or UZBEK
-- Large bold headline in RUSSIAN or UZBEK (selling the product emotionally)
-- Premium commercial lighting with realistic soft shadow
-- ${categoryStyle.background_style} — NOT plain white
-- No AI artifacts, no distorted text, no random typography
-- Marketplace compliant (Uzum, Yandex, Wildberries)
-- High CTR advertising quality
-- This must look like a REAL commercial advertisement from a professional design agency
-- DO NOT reuse common generic backgrounds
-- Make this design UNIQUE for this specific product
+═══════════════════════════════════
+MANDATORY DESIGN RULES
+═══════════════════════════════════
+1. PRODUCT INTEGRITY: The product from the reference photo must remain 100% PIXEL-PERFECT — same shape, colors, labels, brand logos, packaging. DO NOT modify, redraw, or reinterpret the product.
 
-ANTI-REPETITION: Variation seed #${variationSeed}. Do not create a generic template. Adapt EVERYTHING to this specific product and category.`;
+2. BACKGROUND: Rich, layered, category-themed background (NEVER plain white, NEVER flat solid color). Use gradients, bokeh, decorative elements (flowers, particles, textures) as shown in category rules above.
+
+3. FEATURE BADGES (3-5 pieces): 
+   - Rounded pill/oval shaped with frosted glass or solid colored background
+   - Each badge has a small icon + short text in RUSSIAN (2-4 words max)
+   - Examples: "💧 Стойкий аромат", "📦 30 мл", "🎁 Подарочная упаковка"
+   - Badges float around the product with soft shadow
+   - Text must be PERFECTLY READABLE, no distortion
+
+4. HEADLINE: Large bold text in RUSSIAN at top or prominent position. Describes the product type (e.g. "Парфюмерная вода", "Смартфон", "Крем для лица"). NOT the brand name.
+
+5. TYPOGRAPHY: All text must be sharp, professional, properly kerned. Use maximum 2 font families. NO AI-garbled text, NO random characters, NO misspelled words.
+
+6. VOLUME/SIZE BADGE: Circular badge showing key spec (volume in мл, size, weight) with decorative circular text border.
+
+7. COMPOSITION: Strong visual hierarchy — eye flows from headline → product → features → volume badge. Professional spacing, nothing cramped.
+
+8. LIGHTING: Dramatic, category-appropriate (moody for perfume, bright for household, warm for food).
+
+9. COMMERCIAL QUALITY: This must be indistinguishable from a real design agency output. Think Pinterest top pins, Behance featured projects, Wildberries bestseller cards.
+
+═══════════════════════════════════
+BANNED ELEMENTS (NEVER INCLUDE)
+═══════════════════════════════════
+- Words: "лучший", "топ", "хит продаж", "оригинал", "качественный", "скидка", "акция", "бесплатно", "№1", "идеальный", "уникальный", "эксклюзив", "super", "mega", "best", "top seller", "number one"
+- Generic white/plain backgrounds
+- Distorted or AI-garbled text
+- Watermarks or logos not on the original product  
+- Clip-art or cartoon-style icons
+- More than 5 feature badges
+- Cyrillic text errors or mixed alphabets in same badge
+
+VARIATION SEED: #${variationSeed} — Create a UNIQUE design, not a template copy.`;
 
   const formData = new FormData();
   formData.append("image", new Blob([imageBytes], { type: "image/png" }), "product.png");
