@@ -749,11 +749,8 @@ serve(async (req) => {
           }
 
           if (marketplace === 'yandex') {
+            // Upload ONLY the generated card as main image — don't re-upload the original
             mpResult = await uploadToYandex(creds, offerId, uploadImageUrl);
-            // Also upload clean product image if card was uploaded
-            if (cleanImageUrl && cardUrl && cleanImageUrl !== cardUrl) {
-              await uploadToYandex(creds, offerId, cleanImageUrl);
-            }
           } else if (marketplace === 'wildberries' && nmID) {
             mpResult = await uploadToWildberries(creds, nmID, uploadImageUrl);
           }
