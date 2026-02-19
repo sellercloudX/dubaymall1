@@ -25,8 +25,90 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3)
   return fetch(url, options);
 }
 
-// ===== Generate image via Gemini image model (text-to-image) =====
-async function generateWithGeminiImage(prompt: string, apiKey: string): Promise<string | null> {
+// ===== OpenAI GPT-image-1: reference-based editing =====
+async function editWithOpenAI(referenceImageUrl: string, editPrompt: string, apiKey: string): Promise<string | null> {
+  try {
+    console.log("Calling OpenAI gpt-image-1 with reference image...");
+    
+    const resp = await fetchWithRetry("https://api.openai.com/v1/images/edits", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "gpt-image-1",
+        image: [{ type: "url", url: referenceImageUrl }],
+        prompt: editPrompt,
+        size: "1024x1536",
+        quality: "high",
+      }),
+    });
+
+    if (!resp.ok) {
+      const errText = await resp.text();
+      console.error(`OpenAI edit failed (${resp.status}): ${errText.substring(0, 500)}`);
+      return null;
+    }
+
+    const data = await resp.json();
+    const b64 = data.data?.[0]?.b64_json;
+    if (b64) return `data:image/png;base64,${b64}`;
+    
+    const url = data.data?.[0]?.url;
+    if (url) return url;
+    
+    console.error("No image in OpenAI response");
+    return null;
+  } catch (e) {
+    console.error("OpenAI edit error:", e);
+    return null;
+  }
+}
+
+// ===== OpenAI DALL-E 3: text-to-image =====
+async function generateWithOpenAI(prompt: string, apiKey: string): Promise<string | null> {
+  try {
+    console.log("Calling OpenAI DALL-E 3 text-to-image...");
+    
+    const resp = await fetchWithRetry("https://api.openai.com/v1/images/generations", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "dall-e-3",
+        prompt: prompt,
+        n: 1,
+        size: "1024x1792",
+        quality: "hd",
+        response_format: "b64_json",
+      }),
+    });
+
+    if (!resp.ok) {
+      const errText = await resp.text();
+      console.error(`DALL-E 3 generation failed (${resp.status}): ${errText.substring(0, 500)}`);
+      return null;
+    }
+
+    const data = await resp.json();
+    const b64 = data.data?.[0]?.b64_json;
+    if (b64) return `data:image/png;base64,${b64}`;
+    
+    const url = data.data?.[0]?.url;
+    if (url) return url;
+    
+    return null;
+  } catch (e) {
+    console.error("DALL-E 3 error:", e);
+    return null;
+  }
+}
+
+// ===== Fallback: Gemini image model =====
+async function generateWithGemini(prompt: string, apiKey: string): Promise<string | null> {
   try {
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -41,143 +123,110 @@ async function generateWithGeminiImage(prompt: string, apiKey: string): Promise<
       }),
     });
 
-    if (!resp.ok) {
-      const errText = await resp.text();
-      console.error(`Gemini image generation failed (${resp.status}): ${errText.substring(0, 300)}`);
-      return null;
-    }
-
+    if (!resp.ok) return null;
     const data = await resp.json();
     return data.choices?.[0]?.message?.images?.[0]?.image_url?.url || null;
   } catch (e) {
-    console.error("Gemini image error:", e);
+    console.error("Gemini fallback error:", e);
     return null;
   }
 }
 
-// ===== Edit image via Gemini (reference-based, keeps product identity) =====
-async function editWithGemini(referenceImageUrl: string, editPrompt: string, apiKey: string): Promise<string | null> {
-  try {
-    const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-pro-image-preview",
-        messages: [{
-          role: "user",
-          content: [
-            { type: "image_url", image_url: { url: referenceImageUrl } },
-            { type: "text", text: editPrompt },
-            { type: "image_url", image_url: { url: referenceImageUrl } },
-          ]
-        }],
-        modalities: ["image", "text"],
-      }),
-    });
-
-    if (!resp.ok) {
-      const errText = await resp.text();
-      console.error(`Gemini edit failed (${resp.status}): ${errText.substring(0, 300)}`);
-      return null;
-    }
-
-    const data = await resp.json();
-    return data.choices?.[0]?.message?.images?.[0]?.image_url?.url || null;
-  } catch (e) {
-    console.error("Gemini edit error:", e);
-    return null;
-  }
-}
-
-// ===== Generate product image using REFERENCE IMAGE (existing product photo) =====
+// ===== Generate product image =====
 async function generateProductImage(productName: string, category: string, referenceImageUrl?: string): Promise<string | null> {
+  const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) return null;
 
-  try {
-    console.log(`Generating image for: "${productName}" (${category}), ref: ${referenceImageUrl ? 'YES' : 'NO'}`);
+  console.log(`Generating image for: "${productName}" (${category}), ref: ${referenceImageUrl ? 'YES' : 'NO'}, OpenAI: ${OPENAI_API_KEY ? 'YES' : 'NO'}`);
 
-    if (referenceImageUrl) {
-      // Use Gemini for reference-based editing (keeps product identity)
-      const editPrompt = `You are a PHOTO EDITOR. Take this EXACT product and place it on a clean white studio background.
+  // Method 1: OpenAI with reference image
+  if (OPENAI_API_KEY && referenceImageUrl) {
+    const editPrompt = `Take this EXACT product photo and place it on a clean, pure white studio background. 
+Keep the product PIXEL-PERFECT: same shape, colors, labels, cap, brand text - change NOTHING about the product itself.
+Add professional studio lighting with soft natural shadows. Center the product. Portrait orientation.
+Do NOT add any text, watermarks, badges or extra elements.`;
 
-STRICT RULES:
-- Keep the product PIXEL-PERFECT: same shape, colors, labels, cap, brand, text
-- ONLY change the background to pure white/light gray
-- Add professional studio lighting with soft shadows
-- Center the product, portrait 3:4 ratio
-- Do NOT reimagine or redraw the product
-- No added text, watermarks, or elements`;
-
-      const result = await editWithGemini(referenceImageUrl, editPrompt, LOVABLE_API_KEY);
-      if (result) {
-        console.log("Image generated from reference via Gemini edit");
-        return result;
-      }
-      console.log("Gemini edit failed, falling back to DALL-E text generation");
-    }
-
-    // Fallback: DALL-E text-only generation
-    const prompt = `Professional e-commerce product photo of "${productName}" (category: ${category}). 
-Clean white background, product centered with negative space around it, professional studio lighting, soft shadows.
-Portrait orientation 3:4 aspect ratio, photorealistic, high resolution marketplace quality.
-No text, no watermarks, no labels on the image.`;
-
-    const result = await generateWithGeminiImage(prompt, LOVABLE_API_KEY);
+    const result = await editWithOpenAI(referenceImageUrl, editPrompt, OPENAI_API_KEY);
     if (result) {
-      console.log("Image generated via Gemini flash-image");
+      console.log("✅ Product image generated via OpenAI gpt-image-1");
       return result;
     }
-
-    console.error("All image generation methods failed");
-    return null;
-  } catch (e) {
-    console.error("Image generation error:", e);
-    return null;
   }
+
+  // Method 2: OpenAI DALL-E 3 text-to-image
+  if (OPENAI_API_KEY) {
+    const prompt = `Professional e-commerce product photo of "${productName}" (category: ${category}). 
+Clean white background, product centered, professional studio lighting, soft shadows.
+Portrait orientation 3:4, photorealistic, high resolution. No text or watermarks.`;
+
+    const result = await generateWithOpenAI(prompt, OPENAI_API_KEY);
+    if (result) {
+      console.log("✅ Product image generated via DALL-E 3");
+      return result;
+    }
+  }
+
+  // Method 3: Gemini fallback
+  if (LOVABLE_API_KEY) {
+    const prompt = `Professional e-commerce product photo of "${productName}" (${category}). Clean white background, centered, studio lighting. No text. Portrait 3:4.`;
+    const result = await generateWithGemini(prompt, LOVABLE_API_KEY);
+    if (result) {
+      console.log("✅ Product image generated via Gemini fallback");
+      return result;
+    }
+  }
+
+  console.error("❌ All image generation methods failed");
+  return null;
 }
 
-// ===== Generate INFOGRAPHIC image with sales-boosting overlays =====
+// ===== Generate INFOGRAPHIC image =====
 async function generateInfographicImage(productName: string, category: string, referenceImageUrl?: string, features?: string[]): Promise<string | null> {
+  const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) return null;
 
-  try {
-    const featureText = features?.length ? features.slice(0, 5).join(', ') : 'Premium sifat, Tez yetkazib berish, Eng yaxshi narx';
+  const featureText = features?.length ? features.slice(0, 5).join(', ') : 'Premium sifat, Tez yetkazib berish, Eng yaxshi narx';
 
-    if (referenceImageUrl) {
-      // Use Gemini for reference-based infographic (keeps product identity)
-      const infographicPrompt = `You are a professional marketplace infographic designer (Pinterest/Behance level).
+  // Method 1: OpenAI with reference
+  if (OPENAI_API_KEY && referenceImageUrl) {
+    const infographicPrompt = `Create a professional MARKETPLACE INFOGRAPHIC for selling this product online.
 
-Look at this product photo carefully. Create a SALES-BOOSTING INFOGRAPHIC:
+DESIGN RULES (Pinterest/Behance quality):
+1. Keep the EXACT same product from this photo - do NOT change the product appearance at all
+2. Add a premium stylish gradient background (soft pastels or elegant dark tones)
+3. Add 2-4 feature icons/badges around the product highlighting: ${featureText}
+4. Add a catchy sales headline at the top in RUSSIAN or UZBEK language
+5. Add a selling point banner at the bottom
+6. Product "${productName}" must be the visual center and largest element
+7. Use bold, modern typography with high contrast
+8. Portrait orientation, marketplace-ready design
+9. Make it look like a top-selling product listing on Wildberries or Ozon`;
 
-1. Keep the EXACT same product from the photo - do NOT redraw or change it
-2. Add a premium stylish gradient/pattern background behind the product
-3. Add 2-4 feature badges/icons around the product: ${featureText}
-4. Add a catchy headline at top and selling point banner at bottom
-5. Text in Russian or Uzbek language
-6. Portrait 3:4 ratio (1080x1440), marketplace-ready
-7. Product "${productName}" must be the visual center
-8. Bold typography, contrast colors, professional layout`;
-
-      const result = await editWithGemini(referenceImageUrl, infographicPrompt, LOVABLE_API_KEY);
-      if (result) return result;
+    const result = await editWithOpenAI(referenceImageUrl, infographicPrompt, OPENAI_API_KEY);
+    if (result) {
+      console.log("✅ Infographic generated via OpenAI");
+      return result;
     }
-
-    // Fallback: DALL-E text-only infographic
-    const prompt = `Professional marketplace infographic for "${productName}" (${category}).
-Premium gradient background, product centered, 2-4 feature badges around it highlighting: ${featureText}.
-Catchy headline at top, selling point banner at bottom. Text in Russian language.
-Portrait 3:4 ratio, Pinterest/Behance quality marketplace design. Bold typography, contrast colors.`;
-
-    return await generateWithGeminiImage(prompt, LOVABLE_API_KEY);
-  } catch (e) {
-    console.error("Infographic generation error:", e);
-    return null;
   }
+
+  // Method 2: DALL-E text-only
+  if (OPENAI_API_KEY) {
+    const prompt = `Professional marketplace product infographic for "${productName}" (${category}).
+Premium gradient background, product centered, 2-4 feature badges: ${featureText}.
+Catchy headline in Russian at top, selling banner at bottom.
+Portrait 3:4, Pinterest/Behance quality, bold typography, modern marketplace design.`;
+
+    const result = await generateWithOpenAI(prompt, OPENAI_API_KEY);
+    if (result) return result;
+  }
+
+  // Method 3: Gemini fallback
+  if (LOVABLE_API_KEY) {
+    const prompt = `Marketplace infographic: "${productName}" (${category}). Gradient background, feature badges: ${featureText}. Russian text. Portrait 3:4. Professional.`;
+    return await generateWithGemini(prompt, LOVABLE_API_KEY);
+  }
+
+  return null;
 }
 
 // ===== Upload to Supabase Storage =====
@@ -311,10 +360,10 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: 'productName va partnerId kerak' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
-      // Step 1: Generate product-specific image using reference
+      // Step 1: Generate product image
       const imageSource = await generateProductImage(productName, category || '', referenceImageUrl);
       if (!imageSource) {
-        return new Response(JSON.stringify({ success: false, error: 'Rasm yaratib bo\'lmadi' }), {
+        return new Response(JSON.stringify({ success: false, error: 'Rasm yaratib bo\'lmadi. Barcha usullar xato berdi.' }), {
           status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
@@ -327,7 +376,7 @@ serve(async (req) => {
         });
       }
 
-      // Step 2.5: Also generate infographic if requested
+      // Step 2.5: Generate infographic
       let infographicUrl: string | null = null;
       if (body.generateInfographic) {
         const infographicSource = await generateInfographicImage(productName, category || '', referenceImageUrl, features);
@@ -360,10 +409,7 @@ serve(async (req) => {
 
           if (marketplace === 'yandex') {
             mpResult = await uploadToYandex(creds, offerId, publicUrl);
-            // Also upload infographic if available
-            if (infographicUrl) {
-              await uploadToYandex(creds, offerId, infographicUrl);
-            }
+            if (infographicUrl) await uploadToYandex(creds, offerId, infographicUrl);
           } else if (marketplace === 'wildberries' && nmID) {
             mpResult = await uploadToWildberries(creds, nmID, publicUrl);
           }
