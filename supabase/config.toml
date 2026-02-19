@@ -92,3 +92,9 @@ verify_jwt = false
 
 [functions.audit-marketplace-cards]
 verify_jwt = false
+
+[functions.ai-agent-images]
+verify_jwt = false
+
+[functions.ai-agent-price]
+verify_jwt = false
