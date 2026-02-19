@@ -408,8 +408,16 @@ function ImageAnalysisTab({ selectedPartnerId, scanResults }: any) {
       });
       if (error) throw error;
       if (data?.success) {
-        toast.success(`✅ ${product.name} — rasm yaratildi va 1-chi o'ringa qo'yildi`);
-        setImageResults(prev => prev.map(r => r.offerId === product.offerId ? { ...r, generatedImage: data.imageUrl, avgScore: 85, needsReplacement: false } : r));
+        const qScore = data.qualityScore || data.pipeline?.qualityControl?.overall_score || '?';
+        const detectedCat = data.detection?.category || '';
+        toast.success(`✅ ${product.name} — AI Pipeline: sifat ${qScore}/100, kategoriya: ${detectedCat}`);
+        setImageResults(prev => prev.map(r => r.offerId === product.offerId ? { 
+          ...r, 
+          generatedImage: data.cardUrl || data.imageUrl, 
+          avgScore: typeof qScore === 'number' ? qScore : 85, 
+          needsReplacement: false,
+          pipelineData: data.pipeline,
+        } : r));
       } else toast.error(data?.error || 'Xato');
     } catch (e: any) { toast.error(e.message); }
     finally { setGeneratingFor(null); }
