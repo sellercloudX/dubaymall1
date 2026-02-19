@@ -890,18 +890,30 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Invalid auth' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const { data: adminPerm } = await supabase
-      .from('admin_permissions')
-      .select('is_super_admin, can_manage_users')
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (!adminPerm?.is_super_admin && !adminPerm?.can_manage_users) {
-      return new Response(JSON.stringify({ error: "Admin ruxsati yo'q" }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-
     const body = await req.json();
     const { action, partnerId, productName, category, offerId, nmID, marketplace, referenceImageUrl, features } = body;
+
+    // Role check: 'scanner-generate' allows seller role, others require admin
+    if (action === 'scanner-generate') {
+      const { data: roles } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id);
+      const hasAccess = roles?.some(r => r.role === 'seller' || r.role === 'admin');
+      if (!hasAccess) {
+        return new Response(JSON.stringify({ error: "Seller ruxsati yo'q" }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+    } else {
+      const { data: adminPerm } = await supabase
+        .from('admin_permissions')
+        .select('is_super_admin, can_manage_users')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (!adminPerm?.is_super_admin && !adminPerm?.can_manage_users) {
+        return new Response(JSON.stringify({ error: "Admin ruxsati yo'q" }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+    }
 
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     if (!OPENAI_API_KEY) {
@@ -1075,7 +1087,56 @@ serve(async (req) => {
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    return new Response(JSON.stringify({ error: "action kerak: 'generate-and-upload'" }), {
+    // ===== SCANNER PIPELINE: scanner-generate =====
+    // Same quality as generate-and-upload but for seller users (no marketplace upload)
+    if (action === 'scanner-generate') {
+      if (!referenceImageUrl) {
+        return new Response(JSON.stringify({ error: 'referenceImageUrl kerak' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      const userId = user.id;
+      console.log(`📸 Scanner pipeline for user ${userId}`);
+
+      // Step 1: Detect category
+      const detection = await detectProductCategory(referenceImageUrl, OPENAI_API_KEY);
+      const detectedCategory = detection?.category || category || '';
+      const categoryStyle = getCategoryStyle(detectedCategory);
+
+      // Step 2: Generate Hero Infographic
+      const heroImage = await generateHeroImage(referenceImageUrl, detection, categoryStyle, OPENAI_API_KEY);
+      let heroUrl: string | null = null;
+      if (heroImage) {
+        heroUrl = await uploadToStorage(supabase, heroImage, userId, `scanner-hero-${Date.now()}`);
+      }
+
+      // Step 3: Generate 3 Lifestyle angles in PARALLEL
+      const anglePromises = LIFESTYLE_ANGLES.map((angle) => {
+        return generateLifestyleAngle(referenceImageUrl, detection, angle, OPENAI_API_KEY)
+          .then(async (img) => {
+            if (img) {
+              return await uploadToStorage(supabase, img, userId, `scanner-${angle.role}-${Date.now()}`);
+            }
+            return null;
+          })
+          .catch(() => null);
+      });
+
+      const angleUrls = (await Promise.all(anglePromises)).filter(Boolean) as string[];
+
+      const allImages = [...(heroUrl ? [heroUrl] : []), ...angleUrls];
+      console.log(`✅ Scanner generated ${allImages.length} images`);
+
+      return new Response(JSON.stringify({
+        success: true,
+        images: allImages,
+        heroUrl,
+        lifestyleUrls: angleUrls,
+        totalImages: allImages.length,
+        detection,
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    return new Response(JSON.stringify({ error: "action kerak: 'generate-and-upload' yoki 'scanner-generate'" }), {
       status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (e) {
