@@ -33,7 +33,6 @@ async function scanYandexProducts(credentials: any): Promise<any> {
   if (!apiKey) throw new Error("Yandex API key topilmadi");
   const headers = { "Api-Key": apiKey, "Content-Type": "application/json" };
 
-  // Resolve businessId
   if (!businessId && campaignId) {
     const resp = await fetchWithRetry(`https://api.partner.market.yandex.ru/campaigns/${campaignId}`, { headers });
     if (resp.ok) { const d = await resp.json(); businessId = d.campaign?.business?.id; }
@@ -44,7 +43,6 @@ async function scanYandexProducts(credentials: any): Promise<any> {
   }
   if (!businessId) throw new Error("Business ID topilmadi");
 
-  // Fetch ALL offers with pagination (deduplicated)
   let allMappings: any[] = [];
   const seenOfferIds = new Set<string>();
   let nextPageToken: string | undefined;
@@ -115,14 +113,12 @@ async function scanYandexProducts(credentials: any): Promise<any> {
     } catch (e) { console.error('Quality fetch error:', e); }
   }
 
-  // Deep analysis
   const products = offers.map((offer: any) => {
     const quality = qualityMap.get(offer.offerId);
     const issues: string[] = [];
     const issueDetails: any[] = [];
     let score = quality?.score ?? -1;
 
-    // Title analysis
     if (!offer.name || offer.name.length < 40) {
       issues.push('Nom juda qisqa');
       issueDetails.push({ type: 'critical', field: 'name', msg: `Nom ${offer.name?.length || 0} belgi (min 60)` });
@@ -131,7 +127,6 @@ async function scanYandexProducts(credentials: any): Promise<any> {
       issueDetails.push({ type: 'warning', field: 'name', msg: `Nom ${offer.name.length} belgi` });
     }
 
-    // Description
     if (!offer.description || offer.description.length < 300) {
       issues.push('Tavsif yo\'q/juda qisqa');
       issueDetails.push({ type: 'critical', field: 'description', msg: `Tavsif ${offer.description?.length || 0} belgi (min 1000)` });
@@ -140,7 +135,6 @@ async function scanYandexProducts(credentials: any): Promise<any> {
       issueDetails.push({ type: 'warning', field: 'description', msg: `Tavsif ${offer.description.length} belgi` });
     }
 
-    // Images
     const imgCount = offer.pictures?.length || 0;
     if (imgCount === 0) {
       issues.push('Rasmlar yo\'q');
@@ -150,25 +144,21 @@ async function scanYandexProducts(credentials: any): Promise<any> {
       issueDetails.push({ type: 'warning', field: 'images', msg: `${imgCount} ta rasm (min 3)` });
     }
 
-    // Brand
     if (!offer.vendor) {
       issues.push('Brend yo\'q');
       issueDetails.push({ type: 'warning', field: 'vendor', msg: 'Brend ko\'rsatilmagan' });
     }
 
-    // Barcode
     if (!offer.barcodes?.length) {
       issues.push('Shtrix-kod yo\'q');
       issueDetails.push({ type: 'warning', field: 'barcode', msg: 'Shtrix-kod kiritilmagan' });
     }
 
-    // Dimensions
     if (!offer.weightDimensions) {
       issues.push('O\'lchamlar yo\'q');
       issueDetails.push({ type: 'warning', field: 'dimensions', msg: 'Og\'irlik/o\'lcham kiritilmagan' });
     }
 
-    // API-reported errors
     if (quality?.errors?.length > 0) {
       for (const e of quality.errors) {
         issues.push(e.message || `Xatolik: ${e.code || 'unknown'}`);
@@ -185,7 +175,6 @@ async function scanYandexProducts(credentials: any): Promise<any> {
       issues.push(`${quality.recommendations.length} ta tavsiya`);
     }
 
-    // Fallback scoring
     if (score < 0) {
       const criticalCount = issueDetails.filter(i => i.type === 'critical').length;
       const warningCount = issueDetails.filter(i => i.type === 'warning').length;
@@ -193,27 +182,17 @@ async function scanYandexProducts(credentials: any): Promise<any> {
     }
 
     return {
-      offerId: offer.offerId,
-      name: offer.name || offer.offerId,
-      category: offer.category,
-      score: Math.round(score),
-      issueCount: issues.length,
-      issues,
-      issueDetails,
-      imageCount: imgCount,
-      descriptionLength: offer.description?.length || 0,
-      hasDescription: (offer.description?.length || 0) >= 1000,
-      hasVendor: !!offer.vendor,
-      hasBarcodes: (offer.barcodes?.length || 0) > 0,
-      hasDimensions: !!offer.weightDimensions,
-      apiErrors: quality?.errors?.length || 0,
-      apiWarnings: quality?.warnings?.length || 0,
+      offerId: offer.offerId, name: offer.name || offer.offerId, category: offer.category,
+      score: Math.round(score), issueCount: issues.length, issues, issueDetails,
+      imageCount: imgCount, descriptionLength: offer.description?.length || 0,
+      hasDescription: (offer.description?.length || 0) >= 1000, hasVendor: !!offer.vendor,
+      hasBarcodes: (offer.barcodes?.length || 0) > 0, hasDimensions: !!offer.weightDimensions,
+      apiErrors: quality?.errors?.length || 0, apiWarnings: quality?.warnings?.length || 0,
     };
   });
 
   return {
-    marketplace: 'yandex',
-    totalProducts: products.length,
+    marketplace: 'yandex', totalProducts: products.length,
     avgScore: products.length > 0 ? Math.round(products.reduce((s: number, p: any) => s + p.score, 0) / products.length) : 0,
     criticalCount: products.filter((p: any) => p.score < 50).length,
     warningCount: products.filter((p: any) => p.score >= 50 && p.score < 80).length,
@@ -222,13 +201,12 @@ async function scanYandexProducts(credentials: any): Promise<any> {
   };
 }
 
-// ===== WILDBERRIES: Deep scan with error list =====
+// ===== WILDBERRIES: Deep scan =====
 async function scanWildberriesProducts(credentials: any): Promise<any> {
   const apiKey = credentials.apiKey || credentials.api_key || credentials.token;
   if (!apiKey) throw new Error("WB API key topilmadi");
   const headers = { Authorization: apiKey, "Content-Type": "application/json" };
 
-  // Fetch all cards with pagination (deduplicated)
   let allCards: any[] = [];
   const seenNmIDs = new Set<number>();
   let cursor: any = { limit: 100 };
@@ -252,7 +230,6 @@ async function scanWildberriesProducts(credentials: any): Promise<any> {
     await sleep(300);
   }
 
-  // Fetch async error list
   let errorMap = new Map<number, string[]>();
   try {
     const errResp = await fetchWithRetry(
@@ -279,7 +256,6 @@ async function scanWildberriesProducts(credentials: any): Promise<any> {
     const photos = card.photos || card.mediaFiles || [];
     const asyncErrors = errorMap.get(card.nmID) || [];
 
-    // Title
     if (!title || title.length < 20) {
       issues.push('Nom juda qisqa');
       issueDetails.push({ type: 'critical', field: 'name', msg: `Nom ${title.length} belgi` });
@@ -288,7 +264,6 @@ async function scanWildberriesProducts(credentials: any): Promise<any> {
       issueDetails.push({ type: 'warning', field: 'name', msg: `Nom ${title.length} belgi (max 60)` });
     }
 
-    // Description
     if (!description || description.length < 300) {
       issues.push('Tavsif yo\'q/juda qisqa');
       issueDetails.push({ type: 'critical', field: 'description', msg: `Tavsif ${description.length} belgi (min 1000)` });
@@ -297,7 +272,6 @@ async function scanWildberriesProducts(credentials: any): Promise<any> {
       issueDetails.push({ type: 'warning', field: 'description', msg: `Tavsif ${description.length} belgi` });
     }
 
-    // Photos
     if (photos.length === 0) {
       issues.push('Rasmlar yo\'q');
       issueDetails.push({ type: 'critical', field: 'images', msg: 'Hech qanday rasm yo\'q' });
@@ -306,20 +280,17 @@ async function scanWildberriesProducts(credentials: any): Promise<any> {
       issueDetails.push({ type: 'warning', field: 'images', msg: `${photos.length} ta rasm (min 3)` });
     }
 
-    // Brand
     if (!card.brand) {
       issues.push('Brend yo\'q');
       issueDetails.push({ type: 'warning', field: 'vendor', msg: 'Brend belgilanmagan' });
     }
 
-    // Characteristics
     const charcs = card.characteristics || [];
     if (charcs.length < 3) {
       issues.push('Kam xususiyatlar');
       issueDetails.push({ type: 'warning', field: 'characteristics', msg: `${charcs.length} ta xususiyat (min 3)` });
     }
 
-    // Async errors from WB
     for (const errMsg of asyncErrors) {
       issues.push(`WB xato: ${errMsg.substring(0, 50)}`);
       issueDetails.push({ type: 'critical', field: 'async_error', msg: errMsg });
@@ -330,26 +301,155 @@ async function scanWildberriesProducts(credentials: any): Promise<any> {
     const score = Math.max(5, 100 - (criticalCount * 20) - (warningCount * 8));
 
     return {
-      offerId: card.vendorCode || card.nmID?.toString() || '',
-      nmID: card.nmID,
-      subjectID: card.subjectID,
-      name: title || card.vendorCode || '',
-      category: card.subjectName || '',
-      score,
-      issueCount: issues.length,
-      issues,
-      issueDetails,
-      imageCount: photos.length,
-      descriptionLength: description.length,
-      hasDescription: description.length >= 1000,
-      hasVendor: !!card.brand,
-      asyncErrors: asyncErrors.length,
+      offerId: card.vendorCode || card.nmID?.toString() || '', nmID: card.nmID, subjectID: card.subjectID,
+      name: title || card.vendorCode || '', category: card.subjectName || '',
+      score, issueCount: issues.length, issues, issueDetails,
+      imageCount: photos.length, descriptionLength: description.length,
+      hasDescription: description.length >= 1000, hasVendor: !!card.brand, asyncErrors: asyncErrors.length,
     };
   });
 
   return {
-    marketplace: 'wildberries',
-    totalProducts: products.length,
+    marketplace: 'wildberries', totalProducts: products.length,
+    avgScore: products.length > 0 ? Math.round(products.reduce((s: number, p: any) => s + p.score, 0) / products.length) : 0,
+    criticalCount: products.filter((p: any) => p.score < 50).length,
+    warningCount: products.filter((p: any) => p.score >= 50 && p.score < 80).length,
+    goodCount: products.filter((p: any) => p.score >= 80).length,
+    products: products.sort((a: any, b: any) => a.score - b.score),
+  };
+}
+
+// ===== UZUM MARKET: Deep scan =====
+async function scanUzumProducts(credentials: any, supabase: any, userId: string): Promise<any> {
+  const apiKey = credentials.apiKey || credentials.api_key || credentials.token;
+  if (!apiKey) throw new Error("Uzum API key topilmadi");
+  const baseUrl = "https://api-seller.uzum.uz/api/seller-openapi";
+  const headers: Record<string, string> = { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" };
+
+  // Discover shopId
+  let shopId: string | null = credentials.sellerId || null;
+  try {
+    const shopsResp = await fetchWithRetry(`${baseUrl}/v1/shops`, { headers });
+    if (shopsResp.ok) {
+      const shopsData = await shopsResp.json();
+      const shops = Array.isArray(shopsData) ? shopsData : (shopsData.payload || shopsData.data || []);
+      const shopList = Array.isArray(shops) ? shops : [shops];
+      if (shopList.length > 0) {
+        const first = shopList[0];
+        shopId = String(first.shopId || first.id || shopId);
+      }
+    }
+  } catch (e) { console.error('Uzum shops discovery:', e); }
+
+  if (!shopId) throw new Error("Uzum shopId topilmadi");
+
+  // Fetch products with pagination
+  const seenIds = new Set<string>();
+  const allProducts: any[] = [];
+  
+  for (let page = 0; page < 50; page++) {
+    try {
+      const params = new URLSearchParams({ size: '100', pageNumber: String(page) });
+      const resp = await fetchWithRetry(`${baseUrl}/v1/product/shop/${shopId}?${params}`, { headers });
+      if (!resp.ok) {
+        if (resp.status === 403) break;
+        break;
+      }
+      const data = await resp.json();
+      const items = Array.isArray(data) ? data : (data.payload || data.productCards || data.data || data.content || []);
+      const list = Array.isArray(items) ? items : [];
+      if (list.length === 0) break;
+
+      for (const item of list) {
+        const skus = item.skuList || item.skus || [];
+        const firstSku = skus[0] || {};
+        const productId = String(item.productId || item.id || firstSku.skuId || '');
+        const offerId = firstSku.skuTitle || firstSku.barCode || firstSku.barcode || productId;
+        
+        if (!offerId || seenIds.has(offerId)) continue;
+        seenIds.add(offerId);
+
+        const title = item.title || item.name || '';
+        const description = item.description || '';
+        const photos = item.photos || item.photoList || [];
+        const characteristics = item.characteristics || item.attributes || [];
+
+        allProducts.push({
+          offerId,
+          productId,
+          name: title,
+          description,
+          pictures: photos,
+          characteristics,
+          category: item.categoryTitle || item.category?.title || '',
+          price: firstSku.purchasePrice || firstSku.fullPrice || item.price || 0,
+        });
+      }
+
+      await sleep(500); // Uzum rate limit
+    } catch (e) {
+      console.error(`Uzum page ${page} error:`, e);
+      break;
+    }
+  }
+
+  // Analyze quality
+  const products = allProducts.map(item => {
+    const issues: string[] = [];
+    const issueDetails: any[] = [];
+    const title = item.name || '';
+    const desc = item.description || '';
+    const imgCount = Array.isArray(item.pictures) ? item.pictures.length : 0;
+
+    // Title
+    if (!title || title.length < 20) {
+      issues.push('Nom juda qisqa');
+      issueDetails.push({ type: 'critical', field: 'name', msg: `Nom ${title.length} belgi (min 40)` });
+    } else if (title.length < 40) {
+      issues.push('Nom qisqa (<40)');
+      issueDetails.push({ type: 'warning', field: 'name', msg: `Nom ${title.length} belgi` });
+    }
+
+    // Description
+    if (!desc || desc.length < 100) {
+      issues.push('Tavsif yo\'q/juda qisqa');
+      issueDetails.push({ type: 'critical', field: 'description', msg: `Tavsif ${desc.length} belgi (min 500)` });
+    } else if (desc.length < 500) {
+      issues.push('Tavsif qisqa (<500)');
+      issueDetails.push({ type: 'warning', field: 'description', msg: `Tavsif ${desc.length} belgi` });
+    }
+
+    // Images
+    if (imgCount === 0) {
+      issues.push('Rasmlar yo\'q');
+      issueDetails.push({ type: 'critical', field: 'images', msg: 'Hech qanday rasm yo\'q' });
+    } else if (imgCount < 3) {
+      issues.push(`Kam rasm (${imgCount}/3)`);
+      issueDetails.push({ type: 'warning', field: 'images', msg: `${imgCount} ta rasm (min 3)` });
+    }
+
+    // Characteristics
+    const charcCount = Array.isArray(item.characteristics) ? item.characteristics.length : 0;
+    if (charcCount < 3) {
+      issues.push('Kam xususiyatlar');
+      issueDetails.push({ type: 'warning', field: 'characteristics', msg: `${charcCount} ta xususiyat (min 3)` });
+    }
+
+    const criticalCount = issueDetails.filter(i => i.type === 'critical').length;
+    const warningCount = issueDetails.filter(i => i.type === 'warning').length;
+    const score = Math.max(5, 100 - (criticalCount * 20) - (warningCount * 8));
+
+    return {
+      offerId: item.offerId, productId: item.productId,
+      name: title || item.offerId, category: item.category,
+      score, issueCount: issues.length, issues, issueDetails,
+      imageCount: imgCount, descriptionLength: desc.length,
+      hasDescription: desc.length >= 500, hasVendor: true,
+    };
+  });
+
+  return {
+    marketplace: 'uzum', totalProducts: products.length,
     avgScore: products.length > 0 ? Math.round(products.reduce((s: number, p: any) => s + p.score, 0) / products.length) : 0,
     criticalCount: products.filter((p: any) => p.score < 50).length,
     warningCount: products.filter((p: any) => p.score >= 50 && p.score < 80).length,
@@ -425,10 +525,12 @@ serve(async (req) => {
           results.push(await scanYandexProducts(creds));
         } else if (conn.marketplace === 'wildberries') {
           results.push(await scanWildberriesProducts(creds));
+        } else if (conn.marketplace === 'uzum') {
+          results.push(await scanUzumProducts(creds, supabase, partnerId));
         }
       } catch (e) {
         console.error(`Scan error for ${conn.marketplace}:`, e);
-        results.push({ marketplace: conn.marketplace, error: e.message, totalProducts: 0, avgScore: 0, criticalCount: 0, warningCount: 0, goodCount: 0, products: [] });
+        results.push({ marketplace: conn.marketplace, error: (e as any).message, totalProducts: 0, avgScore: 0, criticalCount: 0, warningCount: 0, goodCount: 0, products: [] });
       }
     }
 
@@ -437,7 +539,7 @@ serve(async (req) => {
     });
   } catch (e) {
     console.error('AI Agent scan error:', e);
-    return new Response(JSON.stringify({ error: e.message || 'Server xatosi' }), {
+    return new Response(JSON.stringify({ error: (e as any).message || 'Server xatosi' }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
