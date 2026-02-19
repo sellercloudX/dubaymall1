@@ -964,6 +964,78 @@ Return JSON: {"title": "new 60+ char title or null", "description": "new 1000+ c
         results.push(`❌ Yangilash xatosi: ${updateResp.status}`);
       }
     }
+
+    // Generate and upload image if photos < 3
+    const photos = card.photos || card.mediaFiles || [];
+    if (photos.length < 3) {
+      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+      if (LOVABLE_API_KEY) {
+        try {
+          // Use existing photo as reference if available
+          const refUrl = photos.length > 0 ? (typeof photos[0] === 'string' ? photos[0] : photos[0]?.big || photos[0]?.tm || '') : null;
+          const content: any[] = [
+            { type: "text", text: `Create a professional e-commerce product photo of "${card.title || card.vendorCode}". Clean white background, product centered, studio lighting, 3:4 aspect ratio, no text/watermarks, photorealistic.` }
+          ];
+          if (refUrl && refUrl.startsWith('http')) {
+            content.push({ type: "image_url", image_url: { url: refUrl } });
+            content[0].text = `Create a professional e-commerce photo based on this exact product. Keep the SAME product. Clean white background, centered, studio lighting, 3:4 aspect, no text/watermarks.`;
+          }
+
+          const imgResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              model: "google/gemini-2.5-flash-image",
+              messages: [{ role: "user", content }],
+              modalities: ["image", "text"],
+            }),
+          });
+
+          if (imgResp.ok) {
+            const imgData = await imgResp.json();
+            const genUrl = imgData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+            if (genUrl) {
+              // Upload to storage
+              let bytes: Uint8Array;
+              if (genUrl.startsWith('data:')) {
+                const b64 = genUrl.replace(/^data:image\/\w+;base64,/, '');
+                bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+              } else {
+                const dl = await fetch(genUrl);
+                bytes = new Uint8Array(await dl.arrayBuffer());
+              }
+
+              const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+              const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+              const storageClient = createClient(supabaseUrl, supabaseKey);
+              
+              const fileName = `ai-audit/${vendorCode}-${Date.now()}.png`;
+              const { error: uploadErr } = await storageClient.storage
+                .from('product-images')
+                .upload(fileName, bytes, { contentType: 'image/png', upsert: true });
+              
+              if (!uploadErr) {
+                const { data: pubData } = storageClient.storage.from('product-images').getPublicUrl(fileName);
+                if (pubData?.publicUrl) {
+                  const mediaResp = await fetchWithRetry(
+                    `https://content-api.wildberries.ru/content/v3/media/save`,
+                    { method: 'POST', headers, body: JSON.stringify({ nmId: nmID, data: [pubData.publicUrl] }) }
+                  );
+                  if (mediaResp.ok) {
+                    results.push('✅ AI rasm yaratildi va yuklandi');
+                  } else {
+                    results.push('⚠️ Rasm yaratildi, WB yuklash xatosi');
+                  }
+                }
+              }
+            }
+          }
+        } catch (imgErr) {
+          console.error('WB audit image gen error:', imgErr);
+          results.push('⚠️ Rasm generatsiya xatosi');
+        }
+      }
+    }
   }
 
   return { success: results.some(r => r.startsWith('✅')), message: results.join('\n') || 'Tuzatish kerak bo\'lgan narsa yo\'q', fixes };

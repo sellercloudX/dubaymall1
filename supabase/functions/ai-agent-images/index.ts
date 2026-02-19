@@ -25,14 +25,58 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3)
   return fetch(url, options);
 }
 
-// ===== Generate product image using Gemini Image (Nano Banana) =====
-async function generateProductImage(productName: string, category: string): Promise<string | null> {
+// ===== Generate product image using REFERENCE IMAGE (existing product photo) =====
+async function generateProductImage(productName: string, category: string, referenceImageUrl?: string): Promise<string | null> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!LOVABLE_API_KEY) return null;
 
   try {
-    console.log(`Generating image for: "${productName}" (${category})`);
-    
+    console.log(`Generating image for: "${productName}" (${category}), ref: ${referenceImageUrl ? 'YES' : 'NO'}`);
+
+    // If we have a reference image, use image editing to create a better version
+    if (referenceImageUrl) {
+      const editPrompt = `Create a professional e-commerce product photo based on this exact product. 
+Requirements:
+- Keep the SAME product, same shape, same design, same colors
+- Place it on a clean white or light gradient background
+- Professional studio lighting, high resolution, sharp focus
+- Product centered, large, with generous negative space around all edges for text overlays
+- Aspect ratio 3:4 portrait orientation
+- Remove any existing text, watermarks, logos, labels from the background
+- Photorealistic commercial marketplace quality
+- Do NOT change the product itself - only improve the photo quality and background`;
+
+      const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash-image",
+          messages: [{
+            role: "user",
+            content: [
+              { type: "text", text: editPrompt },
+              { type: "image_url", image_url: { url: referenceImageUrl } }
+            ]
+          }],
+          modalities: ["image", "text"],
+        }),
+      });
+
+      if (resp.ok) {
+        const data = await resp.json();
+        const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+        if (imageUrl) {
+          console.log(`Image generated from reference. Type: ${imageUrl.startsWith('data:') ? 'base64' : 'URL'}`);
+          return imageUrl;
+        }
+      }
+      console.log('Reference image generation failed, falling back to text-only generation');
+    }
+
+    // Fallback: text-only generation
     const prompt = `Generate a professional e-commerce product photo of "${productName}" (category: ${category}). 
 Requirements:
 - Clean white or light gradient background
@@ -59,22 +103,17 @@ Requirements:
     if (!resp.ok) {
       const errText = await resp.text();
       console.error(`Image generation failed: ${resp.status} - ${errText.substring(0, 300)}`);
-      if (resp.status === 429) throw new Error("AI rate limit");
-      if (resp.status === 402) throw new Error("AI kredit tugadi");
       return null;
     }
 
     const data = await resp.json();
-    const images = data.choices?.[0]?.message?.images;
-    if (images && images.length > 0) {
-      const imageUrl = images[0]?.image_url?.url;
-      if (imageUrl) {
-        console.log(`Image generated via Gemini. Type: ${imageUrl.startsWith('data:') ? 'base64' : 'URL'}`);
-        return imageUrl;
-      }
+    const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    if (imageUrl) {
+      console.log(`Image generated via text prompt. Type: ${imageUrl.startsWith('data:') ? 'base64' : 'URL'}`);
+      return imageUrl;
     }
 
-    console.error("No image in response:", JSON.stringify(data).substring(0, 500));
+    console.error("No image in response");
     return null;
   } catch (e) {
     console.error("Image generation error:", e);
@@ -82,12 +121,35 @@ Requirements:
   }
 }
 
-// ===== Analyze image quality with Gemini Vision =====
-async function analyzeImageQuality(imageUrl: string, productName: string): Promise<{ score: number; issues: string[]; suggestions: string[] }> {
+// ===== Generate INFOGRAPHIC image with sales-boosting overlays =====
+async function generateInfographicImage(productName: string, category: string, referenceImageUrl?: string, features?: string[]): Promise<string | null> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) return { score: 50, issues: ["AI tahlil mavjud emas"], suggestions: [] };
+  if (!LOVABLE_API_KEY) return null;
 
   try {
+    const featureText = features?.length ? features.slice(0, 5).join(', ') : '';
+    
+    const content: any[] = [
+      { type: "text", text: `Create a professional e-commerce INFOGRAPHIC product image for "${productName}" (${category}).
+
+Requirements:
+- The product should be the MAIN FOCUS, large and centered
+- Add professional sales-boosting design elements:
+  * A colored banner/badge at top with product category or key benefit
+  * 2-3 key feature icons/callouts around the product (use simple icons + short text)
+  * A quality/premium feel with gradients or subtle patterns
+  * Clean, modern typography
+- Features to highlight: ${featureText || 'Premium quality, Fast delivery, Best price'}
+- Use Russian or neutral icons for text elements
+- Professional marketplace listing style (like top sellers on Wildberries/Ozon)
+- Aspect ratio 3:4 portrait, 1080x1440 pixels
+- Make it look like a TOP-SELLING product listing photo` }
+    ];
+
+    if (referenceImageUrl) {
+      content.push({ type: "image_url", image_url: { url: referenceImageUrl } });
+    }
+
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -95,32 +157,19 @@ async function analyzeImageQuality(imageUrl: string, productName: string): Promi
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: "Sen marketplace rasm sifat ekspertisan. FAQAT JSON javob ber." },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: `Marketplace mahsulot rasmi sifatini baholagin. Mahsulot: "${productName}". Baholash: fon tozaligi, yoritish, aniqliq, kompozitsiya, professional ko'rinish. FAQAT JSON: {"score": 75, "issues": ["muammo1"], "suggestions": ["tavsiya1"]}` },
-              { type: "image_url", image_url: { url: imageUrl } }
-            ]
-          }
-        ],
-        temperature: 0.1,
+        model: "google/gemini-2.5-flash-image",
+        messages: [{ role: "user", content }],
+        modalities: ["image", "text"],
       }),
     });
 
-    if (!resp.ok) return { score: 50, issues: ["Tahlil qilib bo'lmadi"], suggestions: [] };
+    if (!resp.ok) return null;
 
     const data = await resp.json();
-    const content = data.choices?.[0]?.message?.content || '';
-    const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || content.match(/(\{[\s\S]*\})/);
-    if (!jsonMatch) return { score: 50, issues: ["Javob tahlil qilib bo'lmadi"], suggestions: [] };
-
-    return JSON.parse(jsonMatch[1] || jsonMatch[0]);
+    return data.choices?.[0]?.message?.images?.[0]?.image_url?.url || null;
   } catch (e) {
-    console.error("Image analysis error:", e);
-    return { score: 50, issues: ["Tahlil xatosi"], suggestions: [] };
+    console.error("Infographic generation error:", e);
+    return null;
   }
 }
 
@@ -155,7 +204,7 @@ async function uploadToStorage(supabase: any, imageSource: string, partnerId: st
   }
 }
 
-// ===== Upload to Yandex Market - NEW IMAGE FIRST =====
+// ===== Upload to Yandex Market =====
 async function uploadToYandex(credentials: any, offerId: string, newImageUrl: string): Promise<{ success: boolean; message: string }> {
   const apiKey = credentials.apiKey || credentials.api_key;
   const campaignId = credentials.campaignId || credentials.campaign_id;
@@ -172,7 +221,6 @@ async function uploadToYandex(credentials: any, offerId: string, newImageUrl: st
   }
   if (!businessId) return { success: false, message: 'Business ID topilmadi' };
 
-  // Get existing pictures
   const getResp = await fetchWithRetry(
     `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-mappings`,
     { method: 'POST', headers, body: JSON.stringify({ offerIds: [offerId] }) }
@@ -184,9 +232,7 @@ async function uploadToYandex(credentials: any, offerId: string, newImageUrl: st
     existingPictures = getData.result?.offerMappings?.[0]?.offer?.pictures || [];
   }
 
-  // NEW IMAGE FIRST, then existing ones
   const allPictures = [newImageUrl, ...existingPictures];
-
   const resp = await fetchWithRetry(
     `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-mappings/update`,
     { method: 'POST', headers, body: JSON.stringify({ offerMappings: [{ offer: { offerId, pictures: allPictures } }] }) }
@@ -200,13 +246,12 @@ async function uploadToYandex(credentials: any, offerId: string, newImageUrl: st
   return { success: true, message: `Yangi rasm 1-chi o'ringa qo'yildi (jami ${allPictures.length} ta)` };
 }
 
-// ===== Upload to Wildberries - NEW IMAGE FIRST =====
+// ===== Upload to Wildberries =====
 async function uploadToWildberries(credentials: any, nmID: number, newImageUrl: string): Promise<{ success: boolean; message: string }> {
   const apiKey = credentials.apiKey || credentials.api_key || credentials.token;
   const headers = { Authorization: apiKey, "Content-Type": "application/json" };
   if (!nmID) return { success: false, message: 'nmID topilmadi' };
 
-  // WB media/save - data array first element = main image
   const resp = await fetchWithRetry(
     `https://content-api.wildberries.ru/content/v3/media/save`,
     { method: 'POST', headers, body: JSON.stringify({ nmId: nmID, data: [newImageUrl] }) }
@@ -251,54 +296,7 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const { action, partnerId, productName, category, offerId, nmID, marketplace } = body;
-
-    // ===== ANALYZE =====
-    if (action === 'analyze') {
-      const { products } = body;
-      if (!products?.length) {
-        return new Response(JSON.stringify({ error: 'products kerak' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-      }
-
-      const results: any[] = [];
-      for (const p of products.slice(0, 20)) {
-        if (p.imageUrl || (p.pictures && p.pictures.length > 0)) {
-          const imgUrl = p.imageUrl || p.pictures[0];
-          try {
-            const analysis = await analyzeImageQuality(imgUrl, p.name || '');
-            results.push({
-              offerId: p.offerId, nmID: p.nmID, name: p.name,
-              marketplace: p.marketplace, category: p.category,
-              imageCount: p.imageCount || p.pictures?.length || 0,
-              avgScore: analysis.score,
-              issues: analysis.issues, suggestions: analysis.suggestions,
-              needsReplacement: analysis.score < 50 || (p.imageCount || 0) < 1,
-            });
-          } catch (e) {
-            results.push({
-              ...p,
-              avgScore: p.imageCount >= 3 ? 60 : p.imageCount >= 1 ? 30 : 0,
-              issues: p.imageCount < 3 ? [`Kam rasm (${p.imageCount}/3)`] : [],
-              suggestions: [], needsReplacement: (p.imageCount || 0) < 3,
-            });
-          }
-          await sleep(500);
-        } else {
-          results.push({
-            offerId: p.offerId, nmID: p.nmID, name: p.name,
-            marketplace: p.marketplace, category: p.category,
-            imageCount: 0, avgScore: 0,
-            issues: ['Rasmlar yo\'q'],
-            suggestions: ['Professional rasm qo\'shing'],
-            needsReplacement: true,
-          });
-        }
-      }
-
-      return new Response(JSON.stringify({ success: true, results }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    const { action, partnerId, productName, category, offerId, nmID, marketplace, referenceImageUrl, features } = body;
 
     // ===== GENERATE-AND-UPLOAD =====
     if (action === 'generate-and-upload') {
@@ -306,8 +304,8 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: 'productName va partnerId kerak' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
-      // Step 1: Generate image
-      const imageSource = await generateProductImage(productName, category || '');
+      // Step 1: Generate product-specific image using reference
+      const imageSource = await generateProductImage(productName, category || '', referenceImageUrl);
       if (!imageSource) {
         return new Response(JSON.stringify({ success: false, error: 'Rasm yaratib bo\'lmadi' }), {
           status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -322,7 +320,16 @@ serve(async (req) => {
         });
       }
 
-      // Step 3: Upload to marketplace - NEW IMAGE FIRST
+      // Step 2.5: Also generate infographic if requested
+      let infographicUrl: string | null = null;
+      if (body.generateInfographic) {
+        const infographicSource = await generateInfographicImage(productName, category || '', referenceImageUrl, features);
+        if (infographicSource) {
+          infographicUrl = await uploadToStorage(supabase, infographicSource, partnerId, `${offerId || 'unknown'}-infographic`);
+        }
+      }
+
+      // Step 3: Upload to marketplace
       let mpResult: { success: boolean; message: string } = { success: false, message: 'Marketplace aniqlanmadi' };
       
       if (marketplace && offerId) {
@@ -346,6 +353,10 @@ serve(async (req) => {
 
           if (marketplace === 'yandex') {
             mpResult = await uploadToYandex(creds, offerId, publicUrl);
+            // Also upload infographic if available
+            if (infographicUrl) {
+              await uploadToYandex(creds, offerId, infographicUrl);
+            }
           } else if (marketplace === 'wildberries' && nmID) {
             mpResult = await uploadToWildberries(creds, nmID, publicUrl);
           }
@@ -353,12 +364,13 @@ serve(async (req) => {
       }
 
       return new Response(JSON.stringify({
-        success: true, imageUrl: publicUrl, marketplaceUpload: mpResult,
+        success: true, imageUrl: publicUrl, infographicUrl,
+        marketplaceUpload: mpResult,
         message: mpResult.success ? `✅ Rasm yaratildi va 1-chi o'ringa qo'yildi` : `⚠️ Rasm yaratildi. MP: ${mpResult.message}`,
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    return new Response(JSON.stringify({ error: 'action kerak: analyze | generate-and-upload' }), {
+    return new Response(JSON.stringify({ error: 'action kerak: generate-and-upload' }), {
       status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (e) {

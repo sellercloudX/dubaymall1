@@ -326,72 +326,138 @@ async function scanUzumProducts(credentials: any, supabase: any, userId: string)
   const baseUrl = "https://api-seller.uzum.uz/api/seller-openapi";
   const headers: Record<string, string> = { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" };
 
-  // Discover shopId
-  let shopId: string | null = credentials.sellerId || null;
+  // Discover shopId from credentials or API
+  let shopId: string | null = credentials.sellerId || credentials.shopId || null;
+  const allShopIds: string[] = [];
+
   try {
+    console.log(`[UZUM SCAN] Discovering shops...`);
     const shopsResp = await fetchWithRetry(`${baseUrl}/v1/shops`, { headers });
     if (shopsResp.ok) {
       const shopsData = await shopsResp.json();
-      const shops = Array.isArray(shopsData) ? shopsData : (shopsData.payload || shopsData.data || []);
+      console.log(`[UZUM SCAN] Shops response keys: ${Object.keys(shopsData || {}).join(', ')}`);
+      const shops = Array.isArray(shopsData) ? shopsData : (shopsData.payload || shopsData.data || shopsData.shopList || []);
       const shopList = Array.isArray(shops) ? shops : [shops];
-      if (shopList.length > 0) {
-        const first = shopList[0];
-        shopId = String(first.shopId || first.id || shopId);
+      for (const s of shopList) {
+        const sid = String(s.shopId || s.id || '');
+        if (sid) allShopIds.push(sid);
       }
+      if (allShopIds.length > 0 && !shopId) shopId = allShopIds[0];
+      console.log(`[UZUM SCAN] Found ${allShopIds.length} shops: ${allShopIds.join(', ')}`);
+    } else {
+      console.error(`[UZUM SCAN] Shops API ${shopsResp.status}: ${(await shopsResp.text()).substring(0, 200)}`);
     }
-  } catch (e) { console.error('Uzum shops discovery:', e); }
+  } catch (e) { console.error('[UZUM SCAN] Shops discovery error:', e); }
 
   if (!shopId) throw new Error("Uzum shopId topilmadi");
 
-  // Fetch products with pagination
+  // Fetch products from all shops with multiple API endpoint fallbacks
   const seenIds = new Set<string>();
   const allProducts: any[] = [];
+  const shopsToScan = allShopIds.length > 0 ? allShopIds : [shopId];
   
-  for (let page = 0; page < 50; page++) {
-    try {
-      const params = new URLSearchParams({ size: '100', pageNumber: String(page) });
-      const resp = await fetchWithRetry(`${baseUrl}/v1/product/shop/${shopId}?${params}`, { headers });
-      if (!resp.ok) {
-        if (resp.status === 403) break;
-        break;
+  for (const currentShopId of shopsToScan) {
+    console.log(`[UZUM SCAN] Scanning shop ${currentShopId}...`);
+    let shopSuccess = false;
+
+    // Try multiple API endpoints
+    const endpoints = [
+      (page: number) => `${baseUrl}/v1/product/shop/${currentShopId}?size=100&pageNumber=${page}`,
+      (page: number) => `${baseUrl}/v2/product?shopId=${currentShopId}&size=100&page=${page}`,
+      (page: number) => `${baseUrl}/v1/product-card?shopId=${currentShopId}&size=100&page=${page}`,
+    ];
+
+    for (const makeUrl of endpoints) {
+      if (shopSuccess) break;
+      
+      for (let page = 0; page < 50; page++) {
+        try {
+          const url = makeUrl(page);
+          const resp = await fetchWithRetry(url, { headers });
+          
+          if (!resp.ok) {
+            const errText = await resp.text();
+            console.error(`[UZUM SCAN] ${url} => ${resp.status}: ${errText.substring(0, 150)}`);
+            if (resp.status === 403 || resp.status === 401) break;
+            if (resp.status === 404) break; // endpoint not found, try next
+            break;
+          }
+          
+          shopSuccess = true;
+          const data = await resp.json();
+          
+          // Parse response - Uzum uses various response structures
+          let items: any[] = [];
+          if (Array.isArray(data)) {
+            items = data;
+          } else {
+            items = data.payload || data.productCards || data.data || data.content || data.productList || data.items || [];
+            if (!Array.isArray(items)) {
+              // Maybe it's paginated with totalElements
+              if (data.payload?.productCards) items = data.payload.productCards;
+              else if (data.payload?.content) items = data.payload.content;
+              else items = [];
+            }
+          }
+          
+          console.log(`[UZUM SCAN] Shop ${currentShopId} page ${page}: ${items.length} items`);
+          if (items.length === 0) break;
+
+          for (const item of items) {
+            const skus = item.skuList || item.skus || [];
+            const firstSku = skus[0] || {};
+            const productId = String(item.productId || item.id || item.cardId || firstSku.skuId || '');
+            const offerId = firstSku.skuTitle || firstSku.barCode || firstSku.barcode || productId;
+            
+            if (!offerId || seenIds.has(offerId)) continue;
+            seenIds.add(offerId);
+
+            const title = item.title || item.name || item.productName || '';
+            const description = item.description || '';
+            
+            // Extract photos from various structures
+            let photos: any[] = [];
+            if (item.photos) photos = item.photos;
+            else if (item.photoList) photos = item.photoList;
+            else if (item.photo?.photo) {
+              // Nested photo structure
+              const photoObj = item.photo.photo;
+              const sizes = Object.keys(photoObj).sort((a, b) => Number(b) - Number(a));
+              if (sizes.length > 0) {
+                const bigSize = photoObj[sizes[0]];
+                if (bigSize?.high) photos = [bigSize.high];
+              }
+            }
+            
+            const characteristics = item.characteristics || item.attributes || item.charList || [];
+
+            allProducts.push({
+              offerId,
+              productId,
+              name: title,
+              description,
+              pictures: photos,
+              characteristics,
+              category: item.categoryTitle || item.category?.title || item.categoryName || '',
+              price: firstSku.purchasePrice || firstSku.fullPrice || item.price || 0,
+            });
+          }
+
+          await sleep(500);
+        } catch (e) {
+          console.error(`[UZUM SCAN] Shop ${currentShopId} page error:`, e);
+          break;
+        }
       }
-      const data = await resp.json();
-      const items = Array.isArray(data) ? data : (data.payload || data.productCards || data.data || data.content || []);
-      const list = Array.isArray(items) ? items : [];
-      if (list.length === 0) break;
-
-      for (const item of list) {
-        const skus = item.skuList || item.skus || [];
-        const firstSku = skus[0] || {};
-        const productId = String(item.productId || item.id || firstSku.skuId || '');
-        const offerId = firstSku.skuTitle || firstSku.barCode || firstSku.barcode || productId;
-        
-        if (!offerId || seenIds.has(offerId)) continue;
-        seenIds.add(offerId);
-
-        const title = item.title || item.name || '';
-        const description = item.description || '';
-        const photos = item.photos || item.photoList || [];
-        const characteristics = item.characteristics || item.attributes || [];
-
-        allProducts.push({
-          offerId,
-          productId,
-          name: title,
-          description,
-          pictures: photos,
-          characteristics,
-          category: item.categoryTitle || item.category?.title || '',
-          price: firstSku.purchasePrice || firstSku.fullPrice || item.price || 0,
-        });
-      }
-
-      await sleep(500); // Uzum rate limit
-    } catch (e) {
-      console.error(`Uzum page ${page} error:`, e);
-      break;
     }
+    
+    if (!shopSuccess) {
+      console.warn(`[UZUM SCAN] Could not fetch products from shop ${currentShopId}`);
+    }
+    await sleep(300);
   }
+
+  console.log(`[UZUM SCAN] Total unique products: ${allProducts.length}`);
 
   // Analyze quality
   const products = allProducts.map(item => {
