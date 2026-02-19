@@ -33,22 +33,22 @@ async function generateProductImage(productName: string, category: string, refer
   try {
     console.log(`Generating image for: "${productName}" (${category}), ref: ${referenceImageUrl ? 'YES' : 'NO'}`);
 
-    // Use higher quality model for better results
     const model = "google/gemini-3-pro-image-preview";
 
     if (referenceImageUrl) {
-      // CRITICAL: The prompt must be extremely strict about keeping the EXACT same product
-      const editPrompt = `IMPORTANT: You MUST recreate THIS EXACT product shown in the reference image.
+      // PHOTO EDITING ONLY — zero creative freedom
+      const editPrompt = `You are a PHOTO EDITOR, not a designer. Your ONLY job is to edit the BACKGROUND of this photo.
 
-Rules:
-1. The product in your output MUST be IDENTICAL to the input — same bottle shape, same label, same colors, same packaging, same brand text, same logo placement
-2. Do NOT invent a new product. Do NOT change the bottle shape. Do NOT remove or change any labels/text on the product
-3. Only improve: lighting (professional studio), background (clean white/light gradient), sharpness, and composition
-4. Place the product centered with generous negative space around all edges
-5. Portrait orientation 3:4, photorealistic, commercial marketplace quality
-6. If there is packaging/box shown with the product, include it in the same arrangement
+ABSOLUTE RULES:
+- DO NOT create, draw, generate, or imagine ANY product. The product already exists in the image.
+- DO NOT change ANYTHING about the product: not the shape, not the color, not the label, not the text, not the cap, not the material, NOTHING.
+- KEEP the product PIXEL-PERFECT as it appears. Think of it as cutting out the product and pasting it onto a new background.
+- ONLY CHANGE: Remove the current background and replace with a clean, pure white or very light gray studio background.
+- Add soft, even studio lighting that makes the product look professional.
+- Center the product vertically and horizontally with generous empty space (negative space) on all sides.
+- Output: portrait 3:4 ratio, photorealistic, e-commerce marketplace quality.
 
-Product name for context only (do NOT use this to redesign the product): "${productName}"`;
+The product name "${productName}" is for reference ONLY — do NOT use it to imagine what the product looks like. The image IS the product.`;
 
       const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
@@ -134,17 +134,15 @@ async function generateInfographicImage(productName: string, category: string, r
       content.push({ type: "image_url", image_url: { url: referenceImageUrl } });
     }
 
-    content.push({ type: "text", text: `Create a professional INFOGRAPHIC for THIS EXACT product (do not change the product).
+    content.push({ type: "text", text: `You are a PHOTO EDITOR. The product in the reference image must remain UNTOUCHED — same shape, color, label, cap, everything.
 
-Rules:
-1. Keep the EXACT same product from the reference image — same shape, colors, labels, branding
-2. Add professional sales-boosting overlay elements AROUND the product (not covering it):
-   - A colored banner/badge at top with key benefit
-   - 2-3 feature icons with short text callouts
-   - Modern gradient or subtle pattern background
-3. Features to highlight: ${featureText}
-4. Portrait 3:4, 1080x1440, marketplace listing style
-5. Make it look like a TOP-SELLING product card` });
+Your task: Create a sales-boosting INFOGRAPHIC layout AROUND the product:
+1. DO NOT modify, redraw, or reimagine the product. Keep it exactly as-is from the photo.
+2. Add a stylish background (gradient, pattern, or themed color).
+3. Add 2-3 small icons or badges AROUND the product (not covering it) highlighting: ${featureText}
+4. Add a banner/ribbon at the top or bottom with a key selling point.
+5. Portrait 3:4, 1080x1440, marketplace listing style.
+6. The product must remain the visual center and be clearly recognizable.` });
 
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
