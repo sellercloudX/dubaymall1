@@ -16,7 +16,7 @@ import {
   Clock, CheckCircle, AlertCircle
 } from 'lucide-react';
 import { InlineCamera, requestCameraStream } from './InlineCamera';
-import { renderInfographicOverlay, renderCleanImage } from '@/lib/infographicOverlay';
+// Image pipeline is now handled by ai-agent-images edge function
 
 // Safe image component with fallback - no innerHTML
 function ProductImageWithFallback({ src, alt }: { src?: string; alt: string }) {
@@ -410,88 +410,38 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
       }
       updateTaskProgress(3, 'completed');
 
-      // Step 5: HYBRID Image Generation — Gemini (text-free) + Canvas (text overlay)
+      // Step 5: AI Agent Image Pipeline — Hero Infographic + 3 Lifestyle angles (OpenAI gpt-image-1)
       const generatedInfos: string[] = [];
       const bestImageForInfographic = imageUrl || productImage;
       
       if (shouldGenerateInfographics && bestImageForInfographic) {
         updateTaskProgress(4, 'running');
 
-        // Styles: 1st = professional (infographic overlay), rest = clean angle shots
-        const styles = ['professional', 'minimalist', 'vibrant', 'luxury'];
-        const productFeatures = analyzed?.features || [];
+        try {
+          const { data: imgData, error: imgError } = await supabase.functions.invoke('ai-agent-images', {
+            body: {
+              action: 'scanner-generate',
+              referenceImageUrl: bestImageForInfographic,
+              productName: normalizedProductName,
+              category: analyzed?.category || '',
+              features: analyzed?.features || [],
+            },
+          });
 
-        // Generate images in batches (2 at a time to avoid rate limits)
-        const batchSize = 2;
-        for (let batch = 0; batch < Math.ceil(Math.min(infoCount, 4) / batchSize); batch++) {
-          const promises = [];
-          for (let i = batch * batchSize; i < Math.min((batch + 1) * batchSize, infoCount, 4); i++) {
-            const currentStyle = styles[i % styles.length];
-            promises.push(
-              supabase.functions.invoke('generate-infographic', {
-                body: {
-                  productImage: bestImageForInfographic,
-                  productName: normalizedProductName,
-                  category: analyzed?.category,
-                  style: currentStyle,
-                  features: productFeatures,
-                  brand: analyzed?.brand,
-                },
-              }).then(async ({ data: infoData, error: infoError }) => {
-                if (infoError || !infoData?.images?.[0]?.url) return null;
-                
-                const textFreeUrl = infoData.images[0].url;
-                
-                // For 'professional' style: apply Canvas infographic overlay
-                if (currentStyle === 'professional' && infoData.images[0].isTextFree) {
-                  try {
-                    const overlayDataUrl = await renderInfographicOverlay(textFreeUrl, {
-                      productName: normalizedProductName,
-                      features: productFeatures.slice(0, 5),
-                      brand: analyzed?.brand,
-                      price: pricingData.sellingPrice,
-                      badge: 'YANGI',
-                      categoryKey: infoData.overlayConfig?.categoryKey,
-                    });
-                    
-                    // Upload the composited infographic to storage
-                    const uploadedUrl = await uploadImageToStorage(overlayDataUrl);
-                    return uploadedUrl || textFreeUrl;
-                  } catch (overlayErr) {
-                    console.warn('Overlay failed, using text-free image:', overlayErr);
-                    return textFreeUrl;
-                  }
-                }
-                
-                // For other styles: ensure 1080x1440 via Canvas resize
-                try {
-                  const cleanDataUrl = await renderCleanImage(textFreeUrl);
-                  const uploadedUrl = await uploadImageToStorage(cleanDataUrl);
-                  return uploadedUrl || textFreeUrl;
-                } catch {
-                  return textFreeUrl;
-                }
-              }).catch((err) => {
-                console.warn(`Image gen ${i} failed:`, err);
-                return null;
-              })
-            );
+          if (!imgError && imgData?.success && imgData.images?.length > 0) {
+            generatedInfos.push(...imgData.images);
+            imagesToUpload.push(...imgData.images);
+            setBackgroundTasks(prev => prev.map(task => 
+              task.id === taskId ? { ...task, generatedImages: [...imgData.images] } : task
+            ));
+            console.log(`✅ AI Agent pipeline: ${imgData.totalImages} ta rasm yaratildi`);
+            updateTaskProgress(4, 'completed');
+          } else {
+            console.warn('AI Agent images failed:', imgError?.message || imgData?.error);
+            updateTaskProgress(4, 'failed');
           }
-          const results = await Promise.all(promises);
-          for (const url of results) {
-            if (url) {
-              generatedInfos.push(url);
-              setBackgroundTasks(prev => prev.map(task => 
-                task.id === taskId ? { ...task, generatedImages: [...generatedInfos] } : task
-              ));
-            }
-          }
-        }
-
-        if (generatedInfos.length > 0) {
-          imagesToUpload.push(...generatedInfos);
-          updateTaskProgress(4, 'completed');
-        } else {
+        } catch (imgErr) {
+          console.error('AI Agent images error:', imgErr);
           updateTaskProgress(4, 'failed');
         }
       } else {
@@ -571,7 +521,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
         { name: 'SEO kontent', status: 'pending', model: 'Yandex AI', icon: <Search className="h-4 w-4" /> },
         { name: 'Tavsif yaratish', status: 'pending', model: 'Yandex AI', icon: <FileText className="h-4 w-4" /> },
         { name: 'MXIK aniqlash', status: 'pending', model: 'Gemini + DB', icon: <Hash className="h-4 w-4" /> },
-        { name: 'Rasm + Infografika', status: 'pending', model: 'Gemini + Canvas', icon: <ImageLucide className="h-4 w-4" /> },
+        { name: 'Rasm + Infografika', status: 'pending', model: 'OpenAI gpt-image-1', icon: <ImageLucide className="h-4 w-4" /> },
         { name: 'Kartochka yaratish', status: 'pending', model: 'Yandex API', icon: <Store className="h-4 w-4" /> },
       ],
       generatedImages: [],
