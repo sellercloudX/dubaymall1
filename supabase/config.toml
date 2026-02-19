@@ -98,3 +98,6 @@ verify_jwt = false
 
 [functions.ai-agent-price]
 verify_jwt = false
+
+[functions.ai-agent-chat]
+verify_jwt = false

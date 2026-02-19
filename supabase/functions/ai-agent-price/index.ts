@@ -25,51 +25,39 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3)
   return fetch(url, options);
 }
 
-// AI price recommendation
-async function getAIPriceRecommendation(product: any): Promise<any> {
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) return null;
-
-  try {
-    const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash-lite",
-        messages: [
-          { role: "system", content: "Sen marketplace narx optimallashtirish ekspertisan. FAQAT JSON javob ber." },
-          { role: "user", content: `Mahsulot: "${product.name}"
-Kategoriya: ${product.category || 'Noma\'lum'}
-Hozirgi narx: ${product.price} ${product.currency || 'UZS'}
-Tannarx: ${product.costPrice || 'Noma\'lum'}
-
-Optimal narx tavsiya qil. Maqsad: marja kamida 20% bo'lishi. FAQAT JSON:
-{
-  "recommendedPrice": 150000,
-  "minPrice": 120000,
-  "maxPrice": 200000,
-  "reasoning": "qisqa sabab",
-  "marginPercent": 25,
-  "priceAction": "increase|decrease|keep"
-}` },
-        ],
-        temperature: 0.1,
-      }),
-    });
-
-    if (!resp.ok) return null;
-    const data = await resp.json();
-    const content = data.choices?.[0]?.message?.content || '';
-    const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || content.match(/(\{[\s\S]*\})/);
-    if (!jsonMatch) return null;
-    return JSON.parse(jsonMatch[1] || jsonMatch[0]);
-  } catch (e) {
-    console.error("AI price recommendation error:", e);
-    return null;
+// ===== NARX FORMULASI =====
+// MinPrice = CostPrice / (1 - (Commission% + Tax% + TargetMargin%))
+// Tax = 4% (O'zbekiston aylanma solig'i)
+// TargetMargin = 10-15% (foydalanuvchi belgilagan yoki default)
+function calculateOptimalPrice(
+  costPrice: number,
+  commissionPercent: number,
+  logisticsCost: number,
+  targetMarginPercent: number = 12,
+  taxPercent: number = 4
+): { minPrice: number; recommendedPrice: number; maxPrice: number; marginPercent: number } {
+  if (!costPrice || costPrice <= 0) {
+    return { minPrice: 0, recommendedPrice: 0, maxPrice: 0, marginPercent: 0 };
   }
+
+  const totalDeductionPercent = (commissionPercent + taxPercent + targetMarginPercent) / 100;
+  
+  // Formula: SellingPrice = (CostPrice + Logistics) / (1 - totalDeduction%)
+  const minPrice = Math.ceil((costPrice + logisticsCost) / (1 - (commissionPercent + taxPercent + 5) / 100)); // 5% minimal marja
+  const recommendedPrice = Math.ceil((costPrice + logisticsCost) / (1 - totalDeductionPercent));
+  const maxPrice = Math.ceil((costPrice + logisticsCost) / (1 - (commissionPercent + taxPercent + targetMarginPercent + 5) / 100));
+  
+  // Haqiqiy marja tekshiruvi
+  const actualMargin = recommendedPrice > 0 
+    ? ((recommendedPrice - costPrice - logisticsCost - (recommendedPrice * (commissionPercent + taxPercent) / 100)) / recommendedPrice) * 100 
+    : 0;
+
+  return {
+    minPrice,
+    recommendedPrice,
+    maxPrice,
+    marginPercent: Math.round(actualMargin * 10) / 10,
+  };
 }
 
 // Fetch Yandex prices
@@ -89,9 +77,19 @@ async function fetchYandexPrices(credentials: any): Promise<any[]> {
   }
   if (!businessId) return [];
 
+  // Fetch tariffs for commission rates
+  let tariffMap = new Map<number, { commission: number; logistics: number }>();
+  try {
+    const tariffResp = await fetchWithRetry(
+      `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-cards`,
+      { method: 'POST', headers, body: JSON.stringify({ offerIds: [], withRecommendations: false }) }
+    );
+    // We'll get tariffs per-product below
+  } catch (e) { console.error("Tariff fetch error:", e); }
+
   let allMappings: any[] = [];
   let nextPageToken: string | undefined;
-  for (let page = 0; page < 10; page++) {
+  for (let page = 0; page < 20; page++) {
     const body: any = {};
     if (nextPageToken) body.page_token = nextPageToken;
     const resp = await fetchWithRetry(
@@ -106,16 +104,49 @@ async function fetchYandexPrices(credentials: any): Promise<any[]> {
     await sleep(300);
   }
 
+  // Fetch tariffs per category
+  const categoryTariffs = new Map<number, number>();
+  const uniqueCategoryIds = [...new Set(allMappings.map(m => m.mapping?.marketCategoryId).filter(Boolean))];
+  
+  for (let i = 0; i < uniqueCategoryIds.length; i += 10) {
+    const batch = uniqueCategoryIds.slice(i, i + 10);
+    for (const catId of batch) {
+      try {
+        const tResp = await fetchWithRetry(
+          `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-mappings`,
+          { method: 'POST', headers, body: JSON.stringify({ filter: { categoryIds: [catId] }, limit: 1 }) }
+        );
+        if (tResp.ok) {
+          const tData = await tResp.json();
+          const mapping = tData.result?.offerMappings?.[0]?.mapping;
+          if (mapping) {
+            // Get commission from parameters if available
+            const params = mapping.parameters || [];
+            const feeParam = params.find((p: any) => p.name === 'FEE' || p.name === 'PAYMENT_TRANSFER');
+            if (feeParam) categoryTariffs.set(catId, feeParam.value || 10);
+          }
+        }
+      } catch (e) { /* skip */ }
+    }
+    await sleep(200);
+  }
+
   return allMappings.map((entry: any) => {
     const offer = entry.offer || {};
     const mapping = entry.mapping || {};
+    const catId = mapping.marketCategoryId || 0;
+    const commission = categoryTariffs.get(catId) || 10; // Default 10% if unknown
+    
     return {
       offerId: offer.offerId || '',
       name: offer.name || '',
       price: offer.basicPrice?.value || offer.price || 0,
-      currency: offer.basicPrice?.currencyId || 'RUR',
+      currency: offer.basicPrice?.currencyId || 'UZS',
       category: mapping.marketCategoryName || '',
+      categoryId: catId,
       marketplace: 'yandex',
+      commissionPercent: commission,
+      logisticsCost: 4000, // Default Yandex logistics ~4000 UZS
     };
   });
 }
@@ -173,6 +204,8 @@ async function fetchWBPrices(credentials: any): Promise<any[]> {
       currency: 'RUB',
       category: card.subjectName || '',
       marketplace: 'wildberries',
+      commissionPercent: 15, // WB average ~15%
+      logisticsCost: 50, // ~50 RUB logistics
     };
   });
 }
@@ -199,10 +232,7 @@ async function applyYandexPrice(credentials: any, offerId: string, newPrice: num
     {
       method: 'POST', headers,
       body: JSON.stringify({
-        offers: [{
-          offerId,
-          price: { value: newPrice, currencyId: 'RUR' }
-        }]
+        offers: [{ offerId, price: { value: newPrice, currencyId: 'RUR' } }]
       })
     }
   );
@@ -212,7 +242,7 @@ async function applyYandexPrice(credentials: any, offerId: string, newPrice: num
     return { success: false, message: `Yandex: ${resp.status} - ${errText.substring(0, 200)}` };
   }
 
-  return { success: true, message: `Yandex narx yangilandi: ${newPrice} RUR` };
+  return { success: true, message: `Yandex narx yangilandi: ${newPrice} UZS` };
 }
 
 // ===== Apply prices to WB =====
@@ -226,12 +256,7 @@ async function applyWBPrice(credentials: any, nmID: number, newPrice: number): P
     `https://discounts-prices-api.wildberries.ru/api/v2/upload/task`,
     {
       method: 'POST', headers,
-      body: JSON.stringify({
-        data: [{
-          nmID,
-          price: newPrice,
-        }]
-      })
+      body: JSON.stringify({ data: [{ nmID, price: newPrice }] })
     }
   );
 
@@ -273,13 +298,12 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const { partnerId, action } = body;
+    const { partnerId, action, targetMargin } = body;
 
     if (!partnerId) {
       return new Response(JSON.stringify({ error: 'partnerId kerak' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Get marketplace connections
     const { data: connections } = await supabase
       .from('marketplace_connections')
       .select('*')
@@ -301,7 +325,6 @@ serve(async (req) => {
       costMap.set(`${cp.marketplace}-${cp.offer_id}`, cp.cost_price);
     }
 
-    // Helper: get creds for a marketplace
     async function getCredsForMarketplace(mp: string): Promise<any> {
       const conn = connections!.find(c => c.marketplace === mp);
       if (!conn) return null;
@@ -315,6 +338,7 @@ serve(async (req) => {
     // ===== SCAN =====
     if (action === 'scan') {
       const allProducts: any[] = [];
+      const userTargetMargin = targetMargin || 12; // Default 12%
 
       for (const conn of connections) {
         try {
@@ -332,13 +356,43 @@ serve(async (req) => {
 
           for (const p of products) {
             const costPrice = costMap.get(`${p.marketplace}-${p.offerId}`) || 0;
-            const margin = costPrice > 0 && p.price > 0 ? Math.round(((p.price - costPrice) / p.price) * 100) : null;
+            const commissionPercent = p.commissionPercent || 10;
+            const logisticsCost = p.logisticsCost || 0;
+            
+            // Haqiqiy marja hisoblash: (Price - Cost - Logistics - Commission - Tax) / Price * 100
+            let actualMargin: number | null = null;
+            if (costPrice > 0 && p.price > 0) {
+              const commission = p.price * commissionPercent / 100;
+              const tax = p.price * 4 / 100; // 4% tax
+              const netProfit = p.price - costPrice - logisticsCost - commission - tax;
+              actualMargin = Math.round((netProfit / p.price) * 100);
+            }
+
+            // Optimal narx hisoblash
+            const optimal = calculateOptimalPrice(costPrice, commissionPercent, logisticsCost, userTargetMargin);
+            
+            // Narx holati
+            const isPriceHigh = costPrice > 0 && p.price > optimal.maxPrice; // Narx juda baland - sotuv tushadi
+            const isPriceLow = costPrice > 0 && p.price < optimal.minPrice; // Narx past - zarar
+            const isPriceRisky = costPrice > 0 && (actualMargin !== null && actualMargin < 5);
+
             allProducts.push({
               ...p,
               costPrice,
-              margin,
-              isPriceRisky: margin !== null && margin < 15,
-              isPriceLow: margin !== null && margin < 5,
+              margin: actualMargin,
+              commissionPercent,
+              logisticsCost,
+              optimalPrice: optimal.recommendedPrice,
+              minPrice: optimal.minPrice,
+              maxPrice: optimal.maxPrice,
+              optimalMargin: optimal.marginPercent,
+              isPriceHigh, // Sotuv tushishi mumkin
+              isPriceLow,  // Zarar
+              isPriceRisky,
+              priceAction: costPrice <= 0 ? 'no_cost' 
+                : p.price < optimal.minPrice ? 'increase' 
+                : p.price > optimal.maxPrice ? 'decrease' 
+                : 'ok',
             });
           }
         } catch (e) {
@@ -356,9 +410,11 @@ serve(async (req) => {
           totalProducts: allProducts.length,
           withCostPrice: withCost.length,
           avgMargin,
-          riskyCount: allProducts.filter(p => p.isPriceRisky).length,
+          riskyCount: allProducts.filter(p => p.isPriceLow || p.isPriceRisky).length,
+          highPriceCount: allProducts.filter(p => p.isPriceHigh).length,
           lowMarginCount: allProducts.filter(p => p.isPriceLow).length,
           noCostPrice: allProducts.length - withCost.length,
+          needsAdjustment: allProducts.filter(p => p.priceAction !== 'ok' && p.priceAction !== 'no_cost').length,
         },
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
@@ -368,9 +424,48 @@ serve(async (req) => {
       const { products } = body;
       const recommendations: any[] = [];
 
-      for (const product of (products || []).slice(0, 10)) {
+      for (const product of (products || []).slice(0, 30)) {
         const costPrice = costMap.get(`${product.marketplace}-${product.offerId}`) || product.costPrice || 0;
-        const rec = await getAIPriceRecommendation({ ...product, costPrice });
+        const commissionPercent = product.commissionPercent || 10;
+        const logisticsCost = product.logisticsCost || 0;
+        const userMargin = targetMargin || 12;
+
+        if (costPrice <= 0) {
+          recommendations.push({
+            offerId: product.offerId,
+            name: product.name,
+            currentPrice: product.price,
+            marketplace: product.marketplace,
+            nmID: product.nmID,
+            costPrice: 0,
+            recommendation: {
+              recommendedPrice: 0,
+              minPrice: 0,
+              maxPrice: 0,
+              reasoning: 'Tannarx kiritilmagan',
+              marginPercent: 0,
+              priceAction: 'no_cost',
+            },
+          });
+          continue;
+        }
+
+        const optimal = calculateOptimalPrice(costPrice, commissionPercent, logisticsCost, userMargin);
+        
+        let priceAction: string;
+        let reasoning: string;
+        
+        if (product.price < optimal.minPrice) {
+          priceAction = 'increase';
+          reasoning = `Joriy narx (${product.price}) minimal narxdan (${optimal.minPrice}) past. Zarar qilmoqdasiz. Narxni ${optimal.recommendedPrice} ga ko'taring.`;
+        } else if (product.price > optimal.maxPrice) {
+          priceAction = 'decrease';
+          reasoning = `Joriy narx (${product.price}) juda baland. Raqobatchilar past narxda sotmoqda. Narxni ${optimal.recommendedPrice} ga tushiring - sotuv oshadi.`;
+        } else {
+          priceAction = 'keep';
+          reasoning = `Narx optimal diapazon ichida (${optimal.minPrice}-${optimal.maxPrice}). Marja ${optimal.marginPercent}%.`;
+        }
+
         recommendations.push({
           offerId: product.offerId,
           name: product.name,
@@ -378,9 +473,19 @@ serve(async (req) => {
           marketplace: product.marketplace,
           nmID: product.nmID,
           costPrice,
-          recommendation: rec,
+          recommendation: {
+            recommendedPrice: optimal.recommendedPrice,
+            minPrice: optimal.minPrice,
+            maxPrice: optimal.maxPrice,
+            reasoning,
+            marginPercent: optimal.marginPercent,
+            priceAction,
+            commissionPercent,
+            logisticsCost,
+            taxPercent: 4,
+            targetMargin: userMargin,
+          },
         });
-        await sleep(300);
       }
 
       return new Response(JSON.stringify({ success: true, recommendations }), {
@@ -423,20 +528,17 @@ serve(async (req) => {
           if (result.success) applied++;
           else failed++;
 
-          await sleep(500); // Rate limit protection
+          await sleep(500);
         } catch (e) {
           console.error(`Apply price error for ${update.offerId}:`, e);
-          results.push({ offerId: update.offerId, success: false, message: e.message || 'Xatolik' });
+          results.push({ offerId: update.offerId, success: false, message: (e as any).message || 'Xatolik' });
           failed++;
         }
       }
 
-      return new Response(JSON.stringify({
-        success: true,
-        applied,
-        failed,
-        results,
-      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ success: true, applied, failed, results }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     return new Response(JSON.stringify({ error: 'action kerak (scan | recommend | apply)' }), {
@@ -444,7 +546,7 @@ serve(async (req) => {
     });
   } catch (e) {
     console.error('AI Agent price error:', e);
-    return new Response(JSON.stringify({ error: e.message || 'Server xatosi' }), {
+    return new Response(JSON.stringify({ error: (e as any).message || 'Server xatosi' }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
