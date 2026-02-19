@@ -25,40 +25,64 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3)
   return fetch(url, options);
 }
 
-// ===== OpenAI GPT-image-1: reference-based editing =====
+// ===== Download image as bytes =====
+async function downloadImage(url: string): Promise<Uint8Array | null> {
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) return null;
+    return new Uint8Array(await resp.arrayBuffer());
+  } catch (e) {
+    console.error("Download image error:", e);
+    return null;
+  }
+}
+
+// ===== OpenAI gpt-image-1: reference-based editing via multipart/form-data =====
 async function editWithOpenAI(referenceImageUrl: string, editPrompt: string, apiKey: string): Promise<string | null> {
   try {
-    console.log("Calling OpenAI gpt-image-1 with reference image...");
-    
+    console.log("Downloading reference image for OpenAI edit...");
+    const imageBytes = await downloadImage(referenceImageUrl);
+    if (!imageBytes) {
+      console.error("Failed to download reference image");
+      return null;
+    }
+
+    console.log(`Reference image downloaded: ${imageBytes.length} bytes. Calling OpenAI gpt-image-1...`);
+
+    // Build multipart/form-data
+    const formData = new FormData();
+    const blob = new Blob([imageBytes], { type: "image/png" });
+    formData.append("image", blob, "product.png");
+    formData.append("model", "gpt-image-1");
+    formData.append("prompt", editPrompt);
+    formData.append("size", "1024x1536");
+    formData.append("quality", "high");
+
     const resp = await fetchWithRetry("https://api.openai.com/v1/images/edits", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
+        // No Content-Type - browser/runtime sets it with boundary for FormData
       },
-      body: JSON.stringify({
-        model: "gpt-image-1",
-        image: [{ type: "url", url: referenceImageUrl }],
-        prompt: editPrompt,
-        size: "1024x1536",
-        quality: "high",
-      }),
+      body: formData,
     });
 
     if (!resp.ok) {
       const errText = await resp.text();
-      console.error(`OpenAI edit failed (${resp.status}): ${errText.substring(0, 500)}`);
+      console.error(`OpenAI gpt-image-1 edit failed (${resp.status}): ${errText.substring(0, 500)}`);
       return null;
     }
 
     const data = await resp.json();
+    console.log("OpenAI edit response keys:", Object.keys(data));
+    
     const b64 = data.data?.[0]?.b64_json;
     if (b64) return `data:image/png;base64,${b64}`;
     
     const url = data.data?.[0]?.url;
     if (url) return url;
     
-    console.error("No image in OpenAI response");
+    console.error("No image in OpenAI edit response:", JSON.stringify(data).substring(0, 300));
     return null;
   } catch (e) {
     console.error("OpenAI edit error:", e);
@@ -67,7 +91,7 @@ async function editWithOpenAI(referenceImageUrl: string, editPrompt: string, api
 }
 
 // ===== OpenAI DALL-E 3: text-to-image =====
-async function generateWithOpenAI(prompt: string, apiKey: string): Promise<string | null> {
+async function generateWithDallE3(prompt: string, apiKey: string): Promise<string | null> {
   try {
     console.log("Calling OpenAI DALL-E 3 text-to-image...");
     
@@ -89,17 +113,15 @@ async function generateWithOpenAI(prompt: string, apiKey: string): Promise<strin
 
     if (!resp.ok) {
       const errText = await resp.text();
-      console.error(`DALL-E 3 generation failed (${resp.status}): ${errText.substring(0, 500)}`);
+      console.error(`DALL-E 3 failed (${resp.status}): ${errText.substring(0, 500)}`);
       return null;
     }
 
     const data = await resp.json();
     const b64 = data.data?.[0]?.b64_json;
     if (b64) return `data:image/png;base64,${b64}`;
-    
     const url = data.data?.[0]?.url;
     if (url) return url;
-    
     return null;
   } catch (e) {
     console.error("DALL-E 3 error:", e);
@@ -107,40 +129,22 @@ async function generateWithOpenAI(prompt: string, apiKey: string): Promise<strin
   }
 }
 
-// ===== Fallback: Gemini image model =====
-async function generateWithGemini(prompt: string, apiKey: string): Promise<string | null> {
-  try {
-    const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image",
-        messages: [{ role: "user", content: prompt }],
-        modalities: ["image", "text"],
-      }),
-    });
-
-    if (!resp.ok) return null;
-    const data = await resp.json();
-    return data.choices?.[0]?.message?.images?.[0]?.image_url?.url || null;
-  } catch (e) {
-    console.error("Gemini fallback error:", e);
-    return null;
-  }
-}
-
-// ===== Generate product image =====
+// ===== Generate product image (OpenAI only) =====
 async function generateProductImage(productName: string, category: string, referenceImageUrl?: string): Promise<string | null> {
   const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  
+  console.log(`=== PRODUCT IMAGE ===`);
+  console.log(`Product: "${productName}" (${category})`);
+  console.log(`Reference: ${referenceImageUrl ? 'YES - ' + referenceImageUrl.substring(0, 80) : 'NO'}`);
+  console.log(`OpenAI Key: ${OPENAI_API_KEY ? 'YES (' + OPENAI_API_KEY.substring(0, 8) + '...)' : 'NO'}`);
 
-  console.log(`Generating image for: "${productName}" (${category}), ref: ${referenceImageUrl ? 'YES' : 'NO'}, OpenAI: ${OPENAI_API_KEY ? 'YES' : 'NO'}`);
+  if (!OPENAI_API_KEY) {
+    console.error("❌ OPENAI_API_KEY topilmadi!");
+    return null;
+  }
 
-  // Method 1: OpenAI with reference image
-  if (OPENAI_API_KEY && referenceImageUrl) {
+  // Method 1: gpt-image-1 with reference image
+  if (referenceImageUrl) {
     const editPrompt = `Take this EXACT product photo and place it on a clean, pure white studio background. 
 Keep the product PIXEL-PERFECT: same shape, colors, labels, cap, brand text - change NOTHING about the product itself.
 Add professional studio lighting with soft natural shadows. Center the product. Portrait orientation.
@@ -148,47 +152,40 @@ Do NOT add any text, watermarks, badges or extra elements.`;
 
     const result = await editWithOpenAI(referenceImageUrl, editPrompt, OPENAI_API_KEY);
     if (result) {
-      console.log("✅ Product image generated via OpenAI gpt-image-1");
+      console.log("✅ Product image via OpenAI gpt-image-1 (reference edit)");
       return result;
     }
+    console.log("⚠️ gpt-image-1 edit failed, falling back to DALL-E 3...");
   }
 
-  // Method 2: OpenAI DALL-E 3 text-to-image
-  if (OPENAI_API_KEY) {
-    const prompt = `Professional e-commerce product photo of "${productName}" (category: ${category}). 
+  // Method 2: DALL-E 3 text-to-image
+  const prompt = `Professional e-commerce product photo of "${productName}" (category: ${category}). 
 Clean white background, product centered, professional studio lighting, soft shadows.
 Portrait orientation 3:4, photorealistic, high resolution. No text or watermarks.`;
 
-    const result = await generateWithOpenAI(prompt, OPENAI_API_KEY);
-    if (result) {
-      console.log("✅ Product image generated via DALL-E 3");
-      return result;
-    }
+  const result = await generateWithDallE3(prompt, OPENAI_API_KEY);
+  if (result) {
+    console.log("✅ Product image via DALL-E 3");
+    return result;
   }
 
-  // Method 3: Gemini fallback
-  if (LOVABLE_API_KEY) {
-    const prompt = `Professional e-commerce product photo of "${productName}" (${category}). Clean white background, centered, studio lighting. No text. Portrait 3:4.`;
-    const result = await generateWithGemini(prompt, LOVABLE_API_KEY);
-    if (result) {
-      console.log("✅ Product image generated via Gemini fallback");
-      return result;
-    }
-  }
-
-  console.error("❌ All image generation methods failed");
+  console.error("❌ All OpenAI image methods failed");
   return null;
 }
 
-// ===== Generate INFOGRAPHIC image =====
+// ===== Generate INFOGRAPHIC image (OpenAI only) =====
 async function generateInfographicImage(productName: string, category: string, referenceImageUrl?: string, features?: string[]): Promise<string | null> {
   const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!OPENAI_API_KEY) return null;
 
   const featureText = features?.length ? features.slice(0, 5).join(', ') : 'Premium sifat, Tez yetkazib berish, Eng yaxshi narx';
 
-  // Method 1: OpenAI with reference
-  if (OPENAI_API_KEY && referenceImageUrl) {
+  console.log(`=== INFOGRAPHIC ===`);
+  console.log(`Product: "${productName}", Features: ${featureText}`);
+  console.log(`Reference: ${referenceImageUrl ? 'YES' : 'NO'}`);
+
+  // Method 1: gpt-image-1 with reference
+  if (referenceImageUrl) {
     const infographicPrompt = `Create a professional MARKETPLACE INFOGRAPHIC for selling this product online.
 
 DESIGN RULES (Pinterest/Behance quality):
@@ -204,26 +201,22 @@ DESIGN RULES (Pinterest/Behance quality):
 
     const result = await editWithOpenAI(referenceImageUrl, infographicPrompt, OPENAI_API_KEY);
     if (result) {
-      console.log("✅ Infographic generated via OpenAI");
+      console.log("✅ Infographic via OpenAI gpt-image-1 (reference)");
       return result;
     }
   }
 
-  // Method 2: DALL-E text-only
-  if (OPENAI_API_KEY) {
-    const prompt = `Professional marketplace product infographic for "${productName}" (${category}).
+  // Method 2: DALL-E 3 text-only infographic
+  const prompt = `Professional marketplace product infographic for "${productName}" (${category}).
 Premium gradient background, product centered, 2-4 feature badges: ${featureText}.
 Catchy headline in Russian at top, selling banner at bottom.
-Portrait 3:4, Pinterest/Behance quality, bold typography, modern marketplace design.`;
+Portrait 3:4, Pinterest/Behance quality, bold typography, modern marketplace design.
+No real brand logos. High resolution.`;
 
-    const result = await generateWithOpenAI(prompt, OPENAI_API_KEY);
-    if (result) return result;
-  }
-
-  // Method 3: Gemini fallback
-  if (LOVABLE_API_KEY) {
-    const prompt = `Marketplace infographic: "${productName}" (${category}). Gradient background, feature badges: ${featureText}. Russian text. Portrait 3:4. Professional.`;
-    return await generateWithGemini(prompt, LOVABLE_API_KEY);
+  const result = await generateWithDallE3(prompt, OPENAI_API_KEY);
+  if (result) {
+    console.log("✅ Infographic via DALL-E 3");
+    return result;
   }
 
   return null;
@@ -245,6 +238,7 @@ async function uploadToStorage(supabase: any, imageSource: string, partnerId: st
       bytes = Uint8Array.from(atob(imageSource), c => c.charCodeAt(0));
     }
 
+    console.log(`Uploading ${bytes.length} bytes to storage...`);
     const fileName = `ai-agent/${partnerId}/${productId}-${Date.now()}.png`;
     const { error } = await supabase.storage
       .from('product-images')
@@ -253,6 +247,7 @@ async function uploadToStorage(supabase: any, imageSource: string, partnerId: st
     if (error) { console.error("Storage upload error:", error); return null; }
 
     const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(fileName);
+    console.log("✅ Uploaded to storage:", urlData?.publicUrl?.substring(0, 80));
     return urlData?.publicUrl || null;
   } catch (e) {
     console.error("Upload error:", e);
@@ -354,6 +349,10 @@ serve(async (req) => {
     const body = await req.json();
     const { action, partnerId, productName, category, offerId, nmID, marketplace, referenceImageUrl, features } = body;
 
+    console.log(`=== AI AGENT IMAGES ===`);
+    console.log(`Action: ${action}, Partner: ${partnerId}, Product: ${productName}`);
+    console.log(`Reference URL: ${referenceImageUrl ? referenceImageUrl.substring(0, 100) + '...' : 'NONE'}`);
+
     // ===== GENERATE-AND-UPLOAD =====
     if (action === 'generate-and-upload') {
       if (!productName || !partnerId) {
@@ -363,7 +362,7 @@ serve(async (req) => {
       // Step 1: Generate product image
       const imageSource = await generateProductImage(productName, category || '', referenceImageUrl);
       if (!imageSource) {
-        return new Response(JSON.stringify({ success: false, error: 'Rasm yaratib bo\'lmadi. Barcha usullar xato berdi.' }), {
+        return new Response(JSON.stringify({ success: false, error: 'Rasm yaratib bo\'lmadi. OpenAI API xato berdi. Loglarni tekshiring.' }), {
           status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
