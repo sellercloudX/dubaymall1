@@ -25,7 +25,7 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3)
   return fetch(url, options);
 }
 
-// AI-powered price recommendation
+// AI price recommendation
 async function getAIPriceRecommendation(product: any): Promise<any> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!LOVABLE_API_KEY) return null;
@@ -45,9 +45,8 @@ async function getAIPriceRecommendation(product: any): Promise<any> {
 Kategoriya: ${product.category || 'Noma\'lum'}
 Hozirgi narx: ${product.price} ${product.currency || 'UZS'}
 Tannarx: ${product.costPrice || 'Noma\'lum'}
-Raqobatchilar narxi: ${product.competitorPrices?.join(', ') || 'Ma\'lumot yo\'q'}
 
-Optimal narx tavsiya qil. FAQAT JSON:
+Optimal narx tavsiya qil. Maqsad: marja kamida 20% bo'lishi. FAQAT JSON:
 {
   "recommendedPrice": 150000,
   "minPrice": 120000,
@@ -73,7 +72,7 @@ Optimal narx tavsiya qil. FAQAT JSON:
   }
 }
 
-// Fetch Yandex product prices and competitor info
+// Fetch Yandex prices
 async function fetchYandexPrices(credentials: any): Promise<any[]> {
   const apiKey = credentials.apiKey || credentials.api_key;
   const campaignId = credentials.campaignId || credentials.campaign_id;
@@ -90,10 +89,9 @@ async function fetchYandexPrices(credentials: any): Promise<any[]> {
   }
   if (!businessId) return [];
 
-  // Fetch offers with prices
   let allMappings: any[] = [];
   let nextPageToken: string | undefined;
-  for (let page = 0; page < 5; page++) {
+  for (let page = 0; page < 10; page++) {
     const body: any = {};
     if (nextPageToken) body.page_token = nextPageToken;
     const resp = await fetchWithRetry(
@@ -122,14 +120,14 @@ async function fetchYandexPrices(credentials: any): Promise<any[]> {
   });
 }
 
-// Fetch WB product prices
+// Fetch WB prices
 async function fetchWBPrices(credentials: any): Promise<any[]> {
   const apiKey = credentials.apiKey || credentials.api_key || credentials.token;
   const headers = { Authorization: apiKey, "Content-Type": "application/json" };
 
   let allCards: any[] = [];
   let cursor: any = { limit: 100 };
-  for (let page = 0; page < 10; page++) {
+  for (let page = 0; page < 20; page++) {
     const resp = await fetchWithRetry(
       `https://content-api.wildberries.ru/content/v2/get/cards/list`,
       { method: 'POST', headers, body: JSON.stringify({ settings: { cursor, filter: { withPhoto: -1 } } }) }
@@ -145,26 +143,23 @@ async function fetchWBPrices(credentials: any): Promise<any[]> {
   }
 
   // Get prices
-  const nmIDs = allCards.map(c => c.nmID).filter(Boolean);
   let priceMap = new Map<number, any>();
-  if (nmIDs.length > 0) {
-    try {
-      const priceResp = await fetchWithRetry(
-        `https://discounts-prices-api.wildberries.ru/api/v2/list/goods/filter?limit=1000`,
-        { method: 'GET', headers }
-      );
-      if (priceResp.ok) {
-        const priceData = await priceResp.json();
-        for (const item of (priceData.data?.listGoods || [])) {
-          priceMap.set(item.nmID, {
-            price: item.sizes?.[0]?.price || 0,
-            discount: item.discount || 0,
-            salePrice: item.sizes?.[0]?.discountedPrice || 0,
-          });
-        }
+  try {
+    const priceResp = await fetchWithRetry(
+      `https://discounts-prices-api.wildberries.ru/api/v2/list/goods/filter?limit=1000`,
+      { method: 'GET', headers }
+    );
+    if (priceResp.ok) {
+      const priceData = await priceResp.json();
+      for (const item of (priceData.data?.listGoods || [])) {
+        priceMap.set(item.nmID, {
+          price: item.sizes?.[0]?.price || 0,
+          discount: item.discount || 0,
+          salePrice: item.sizes?.[0]?.discountedPrice || 0,
+        });
       }
-    } catch (e) { console.error("WB prices fetch error:", e); }
-  }
+    }
+  } catch (e) { console.error("WB prices fetch error:", e); }
 
   return allCards.map(card => {
     const prices = priceMap.get(card.nmID) || {};
@@ -180,6 +175,72 @@ async function fetchWBPrices(credentials: any): Promise<any[]> {
       marketplace: 'wildberries',
     };
   });
+}
+
+// ===== Apply prices to Yandex =====
+async function applyYandexPrice(credentials: any, offerId: string, newPrice: number): Promise<{ success: boolean; message: string }> {
+  const apiKey = credentials.apiKey || credentials.api_key;
+  const campaignId = credentials.campaignId || credentials.campaign_id;
+  let businessId = credentials.businessId || credentials.business_id;
+  const headers = { "Api-Key": apiKey, "Content-Type": "application/json" };
+
+  if (!businessId && campaignId) {
+    const resp = await fetchWithRetry(`https://api.partner.market.yandex.ru/campaigns/${campaignId}`, { headers });
+    if (resp.ok) { const d = await resp.json(); businessId = d.campaign?.business?.id; }
+  }
+  if (!businessId) {
+    const resp = await fetchWithRetry(`https://api.partner.market.yandex.ru/businesses`, { headers });
+    if (resp.ok) { const d = await resp.json(); businessId = d.businesses?.[0]?.id; }
+  }
+  if (!businessId) return { success: false, message: 'Business ID topilmadi' };
+
+  const resp = await fetchWithRetry(
+    `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-prices/updates`,
+    {
+      method: 'POST', headers,
+      body: JSON.stringify({
+        offers: [{
+          offerId,
+          price: { value: newPrice, currencyId: 'RUR' }
+        }]
+      })
+    }
+  );
+
+  if (!resp.ok) {
+    const errText = await resp.text();
+    return { success: false, message: `Yandex: ${resp.status} - ${errText.substring(0, 200)}` };
+  }
+
+  return { success: true, message: `Yandex narx yangilandi: ${newPrice} RUR` };
+}
+
+// ===== Apply prices to WB =====
+async function applyWBPrice(credentials: any, nmID: number, newPrice: number): Promise<{ success: boolean; message: string }> {
+  const apiKey = credentials.apiKey || credentials.api_key || credentials.token;
+  const headers = { Authorization: apiKey, "Content-Type": "application/json" };
+
+  if (!nmID) return { success: false, message: 'nmID topilmadi' };
+
+  const resp = await fetchWithRetry(
+    `https://discounts-prices-api.wildberries.ru/api/v2/upload/task`,
+    {
+      method: 'POST', headers,
+      body: JSON.stringify({
+        data: [{
+          nmID,
+          price: newPrice,
+        }]
+      })
+    }
+  );
+
+  if (!resp.ok) {
+    const errText = await resp.text();
+    return { success: false, message: `WB: ${resp.status} - ${errText.substring(0, 200)}` };
+  }
+
+  return { success: true, message: `WB narx yangilandi: ${newPrice} RUB` };
 }
 
 serve(async (req) => {
@@ -229,7 +290,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Ulanish topilmadi' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Get cost prices from DB
+    // Get cost prices
     const { data: costPrices } = await supabase
       .from('marketplace_cost_prices')
       .select('*')
@@ -240,6 +301,18 @@ serve(async (req) => {
       costMap.set(`${cp.marketplace}-${cp.offer_id}`, cp.cost_price);
     }
 
+    // Helper: get creds for a marketplace
+    async function getCredsForMarketplace(mp: string): Promise<any> {
+      const conn = connections!.find(c => c.marketplace === mp);
+      if (!conn) return null;
+      if (conn.encrypted_credentials) {
+        const { data: decrypted } = await supabase.rpc('decrypt_credentials', { p_encrypted: conn.encrypted_credentials });
+        return typeof decrypted === 'string' ? JSON.parse(decrypted) : decrypted;
+      }
+      return conn.credentials || {};
+    }
+
+    // ===== SCAN =====
     if (action === 'scan') {
       const allProducts: any[] = [];
 
@@ -257,7 +330,6 @@ serve(async (req) => {
           if (conn.marketplace === 'yandex') products = await fetchYandexPrices(creds);
           else if (conn.marketplace === 'wildberries') products = await fetchWBPrices(creds);
 
-          // Enrich with cost prices and calculate margins
           for (const p of products) {
             const costPrice = costMap.get(`${p.marketplace}-${p.offerId}`) || 0;
             const margin = costPrice > 0 && p.price > 0 ? Math.round(((p.price - costPrice) / p.price) * 100) : null;
@@ -274,11 +346,8 @@ serve(async (req) => {
         }
       }
 
-      // Summary stats
       const withCost = allProducts.filter(p => p.costPrice > 0);
       const avgMargin = withCost.length > 0 ? Math.round(withCost.reduce((s, p) => s + (p.margin || 0), 0) / withCost.length) : 0;
-      const riskyCount = allProducts.filter(p => p.isPriceRisky).length;
-      const lowCount = allProducts.filter(p => p.isPriceLow).length;
 
       return new Response(JSON.stringify({
         success: true,
@@ -287,15 +356,15 @@ serve(async (req) => {
           totalProducts: allProducts.length,
           withCostPrice: withCost.length,
           avgMargin,
-          riskyCount,
-          lowMarginCount: lowCount,
+          riskyCount: allProducts.filter(p => p.isPriceRisky).length,
+          lowMarginCount: allProducts.filter(p => p.isPriceLow).length,
           noCostPrice: allProducts.length - withCost.length,
         },
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
+    // ===== RECOMMEND =====
     if (action === 'recommend') {
-      // AI price recommendation for specific products
       const { products } = body;
       const recommendations: any[] = [];
 
@@ -306,6 +375,8 @@ serve(async (req) => {
           offerId: product.offerId,
           name: product.name,
           currentPrice: product.price,
+          marketplace: product.marketplace,
+          nmID: product.nmID,
           costPrice,
           recommendation: rec,
         });
@@ -317,7 +388,58 @@ serve(async (req) => {
       });
     }
 
-    return new Response(JSON.stringify({ error: 'action kerak (scan | recommend)' }), {
+    // ===== APPLY PRICES =====
+    if (action === 'apply') {
+      const { priceUpdates } = body;
+      if (!priceUpdates?.length) {
+        return new Response(JSON.stringify({ error: 'priceUpdates kerak' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      let applied = 0;
+      let failed = 0;
+      const results: any[] = [];
+
+      for (const update of priceUpdates.slice(0, 30)) {
+        try {
+          const creds = await getCredsForMarketplace(update.marketplace);
+          if (!creds) {
+            results.push({ offerId: update.offerId, success: false, message: 'Credentials topilmadi' });
+            failed++;
+            continue;
+          }
+
+          let result;
+          if (update.marketplace === 'yandex') {
+            result = await applyYandexPrice(creds, update.offerId, update.newPrice);
+          } else if (update.marketplace === 'wildberries' && update.nmID) {
+            result = await applyWBPrice(creds, update.nmID, update.newPrice);
+          } else {
+            result = { success: false, message: `${update.marketplace} qo'llab-quvvatlanmaydi` };
+          }
+
+          results.push({ offerId: update.offerId, ...result });
+          if (result.success) applied++;
+          else failed++;
+
+          await sleep(500); // Rate limit protection
+        } catch (e) {
+          console.error(`Apply price error for ${update.offerId}:`, e);
+          results.push({ offerId: update.offerId, success: false, message: e.message || 'Xatolik' });
+          failed++;
+        }
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        applied,
+        failed,
+        results,
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    return new Response(JSON.stringify({ error: 'action kerak (scan | recommend | apply)' }), {
       status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (e) {

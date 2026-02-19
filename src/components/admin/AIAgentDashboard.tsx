@@ -61,6 +61,7 @@ interface FixResult {
 
 interface PriceProduct {
   offerId: string;
+  nmID?: number;
   name: string;
   price: number;
   costPrice: number;
@@ -433,34 +434,34 @@ function ImageAnalysisTab({ selectedPartnerId, scanResults }: any) {
   const [imageResults, setImageResults] = useState<any[]>([]);
   const [generatingFor, setGeneratingFor] = useState<string | null>(null);
 
-  const analyzeMutation = useMutation({
+    const analyzeMutation = useMutation({
     mutationFn: async () => {
-      // Get products with images from scan
-      const allProducts = scanResults.flatMap((r: ScanResult) => 
-        r.products.filter((p: ProductIssue) => p.imageCount > 0).slice(0, 5).map((p: ProductIssue) => ({
-          offerId: p.offerId,
-          name: p.name,
-          images: [], // We'd need actual URLs - for now analyze based on count
-        }))
-      );
-      
-      if (allProducts.length === 0) {
+      if (scanResults.length === 0) {
         toast.error('Avval kartochka skanerlashni bajaring');
-        throw new Error('No products');
+        throw new Error('No scan results');
       }
 
-      // Analyze low-image products
-      const results = scanResults.flatMap((r: ScanResult) =>
+      // Analyze ALL products from scan, use real AI analysis for those with images
+      const allProducts = scanResults.flatMap((r: ScanResult) =>
         r.products.map((p: ProductIssue) => ({
           offerId: p.offerId,
+          nmID: p.nmID,
+          subjectID: p.subjectID,
           name: p.name,
           marketplace: r.marketplace,
+          category: p.category,
           imageCount: p.imageCount,
-          avgScore: p.imageCount >= 5 ? 85 : p.imageCount >= 3 ? 65 : p.imageCount >= 1 ? 40 : 0,
-          needsReplacement: p.imageCount < 3,
-          issues: p.imageCount === 0 ? ['Rasmlar yo\'q'] : p.imageCount < 3 ? ['Kam rasm'] : [],
+          descriptionLength: p.descriptionLength,
         }))
       );
+
+      // Products needing images vs OK
+      const results = allProducts.map(p => ({
+        ...p,
+        avgScore: p.imageCount >= 5 ? 85 : p.imageCount >= 3 ? 65 : p.imageCount >= 1 ? 40 : 0,
+        needsReplacement: p.imageCount < 3,
+        issues: p.imageCount === 0 ? ['Rasmlar yo\'q'] : p.imageCount < 3 ? [`Kam rasm (${p.imageCount}/3)`] : [],
+      }));
 
       return results;
     },
@@ -475,15 +476,24 @@ function ImageAnalysisTab({ selectedPartnerId, scanResults }: any) {
   const generateImage = async (product: any) => {
     setGeneratingFor(product.offerId);
     try {
+      // Step 1: Generate image via AI
       const { data, error } = await supabase.functions.invoke('ai-agent-images', {
-        body: { action: 'generate', partnerId: selectedPartnerId, productName: product.name, category: product.category || '', offerId: product.offerId },
+        body: { 
+          action: 'generate-and-upload', 
+          partnerId: selectedPartnerId, 
+          productName: product.name, 
+          category: product.category || '', 
+          offerId: product.offerId,
+          nmID: product.nmID,
+          marketplace: product.marketplace,
+        },
       });
       if (error) throw error;
-      if (data?.imageUrl) {
-        toast.success(`Rasm yaratildi: ${product.name}`);
-        setImageResults(prev => prev.map(r => r.offerId === product.offerId ? { ...r, generatedImage: data.imageUrl, avgScore: 85 } : r));
+      if (data?.success) {
+        toast.success(`Rasm yaratildi va marketplace'ga yuklandi: ${product.name}`);
+        setImageResults(prev => prev.map(r => r.offerId === product.offerId ? { ...r, generatedImage: data.imageUrl, avgScore: 85, needsReplacement: false } : r));
       } else {
-        toast.error('Rasm yaratib bo\'lmadi');
+        toast.error(data?.error || 'Rasm yaratib bo\'lmadi');
       }
     } catch (e: any) {
       toast.error(`Xato: ${e.message}`);
@@ -614,9 +624,34 @@ function PriceOptimizationTab({ selectedPartnerId }: any) {
     onError: (err: any) => toast.error(`Tavsiya xatosi: ${err.message}`),
   });
 
+  const applyPricesMutation = useMutation({
+    mutationFn: async () => {
+      const toApply = recommendations
+        .filter((r: any) => r.recommendation?.priceAction !== 'keep' && r.recommendation?.recommendedPrice)
+        .map((r: any) => ({
+          offerId: r.offerId,
+          marketplace: priceData?.products.find((p: PriceProduct) => p.offerId === r.offerId)?.marketplace || 'yandex',
+          newPrice: r.recommendation.recommendedPrice,
+          nmID: priceData?.products.find((p: PriceProduct) => p.offerId === r.offerId)?.nmID,
+        }));
+      if (toApply.length === 0) { toast.info('O\'zgartirish kerak emas'); throw new Error('Nothing to apply'); }
+      const { data, error } = await supabase.functions.invoke('ai-agent-price', {
+        body: { partnerId: selectedPartnerId, action: 'apply', priceUpdates: toApply },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      toast.success(`${data?.applied || 0} ta narx yangilandi, ${data?.failed || 0} ta xato`);
+      priceScanMutation.mutate(); // Refresh
+      setRecommendations([]);
+    },
+    onError: (err: any) => toast.error(`Narx qo'llash xatosi: ${err.message}`),
+  });
+
   return (
     <div className="space-y-4">
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
         <Button onClick={() => priceScanMutation.mutate()} disabled={!selectedPartnerId || priceScanMutation.isPending} className="gap-2">
           {priceScanMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <DollarSign className="h-4 w-4" />}
           Narxlarni skanerlash
@@ -628,6 +663,12 @@ function PriceOptimizationTab({ selectedPartnerId }: any) {
           }} disabled={recommendMutation.isPending} className="gap-2">
             {recommendMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
             AI narx tavsiyasi ({priceData.summary.riskyCount})
+          </Button>
+        )}
+        {recommendations.length > 0 && (
+          <Button variant="destructive" onClick={() => applyPricesMutation.mutate()} disabled={applyPricesMutation.isPending} className="gap-2">
+            {applyPricesMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
+            Narxlarni qo'llash ({recommendations.filter((r: any) => r.recommendation?.priceAction !== 'keep').length})
           </Button>
         )}
       </div>
@@ -889,29 +930,40 @@ export function AIAgentDashboard() {
   const { data: partners } = useQuery({
     queryKey: ['ai-agent-partners'],
     queryFn: async () => {
-      const { data: subs } = await supabase
-        .from('sellercloud_subscriptions')
-        .select('user_id, is_active, plan_type')
+      // Fetch ALL marketplace connections (not just active subscribers)
+      const { data: connections } = await supabase
+        .from('marketplace_connections')
+        .select('user_id, marketplace, is_active')
         .eq('is_active', true);
-      if (!subs?.length) return [];
+      if (!connections?.length) return [];
 
-      const userIds = subs.map(s => s.user_id);
-      const { data: profiles } = await supabase.from('profiles').select('user_id, full_name, phone').in('user_id', userIds);
-      const { data: connections } = await supabase.from('marketplace_connections').select('user_id, marketplace, is_active').in('user_id', userIds).eq('is_active', true);
-
-      const profileMap = Object.fromEntries((profiles || []).map(p => [p.user_id, p]));
+      // Group by user
       const connMap = new Map<string, string[]>();
-      for (const c of connections || []) {
+      for (const c of connections) {
         if (!connMap.has(c.user_id)) connMap.set(c.user_id, []);
-        connMap.get(c.user_id)!.push(c.marketplace);
+        if (!connMap.get(c.user_id)!.includes(c.marketplace)) {
+          connMap.get(c.user_id)!.push(c.marketplace);
+        }
       }
 
-      return subs.filter(s => connMap.has(s.user_id)).map(s => ({
-        userId: s.user_id,
-        name: profileMap[s.user_id]?.full_name || 'Noma\'lum',
-        phone: profileMap[s.user_id]?.phone || '',
-        plan: s.plan_type,
-        marketplaces: connMap.get(s.user_id) || [],
+      const userIds = Array.from(connMap.keys());
+
+      // Fetch profiles and subscriptions in parallel
+      const [profilesRes, subsRes] = await Promise.all([
+        supabase.from('profiles').select('user_id, full_name, phone').in('user_id', userIds),
+        supabase.from('sellercloud_subscriptions').select('user_id, is_active, plan_type').in('user_id', userIds),
+      ]);
+
+      const profileMap = Object.fromEntries((profilesRes.data || []).map(p => [p.user_id, p]));
+      const subMap = Object.fromEntries((subsRes.data || []).map(s => [s.user_id, s]));
+
+      return userIds.map(uid => ({
+        userId: uid,
+        name: profileMap[uid]?.full_name || 'Noma\'lum',
+        phone: profileMap[uid]?.phone || '',
+        plan: subMap[uid]?.plan_type || 'free',
+        isActive: subMap[uid]?.is_active || false,
+        marketplaces: connMap.get(uid) || [],
       }));
     },
   });
