@@ -8,6 +8,9 @@ const corsHeaders = {
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
+// UZS/RUB exchange rate (approximate, updated periodically)
+const UZS_PER_RUB = 140;
+
 async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3): Promise<Response> {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
@@ -200,8 +203,13 @@ async function fetchYandexPrices(credentials: any): Promise<any[]> {
     const price = offer.basicPrice?.value || offer.price || 0;
     
     const realTariff = realTariffs.get(offerId);
-    const commissionPercent = realTariff?.commissionPercent || 25;
-    const logisticsCost = realTariff?.logisticsCost || 6000;
+    const commissionPercent = realTariff?.commissionPercent || 15;
+    // Yandex tariff API returns logistics in RUB — convert to UZS for UZ sellers
+    const rawLogistics = realTariff?.logisticsCost || 0;
+    const currency = offer.basicPrice?.currencyId || 'UZS';
+    const logisticsCost = currency === 'UZS' && rawLogistics > 0 && rawLogistics < 5000
+      ? Math.round(rawLogistics * UZS_PER_RUB)
+      : rawLogistics || 6000;
     
     const pictures = offer.pictures || [];
     const imageUrl = pictures.length > 0 ? pictures[0] : null;
@@ -211,7 +219,7 @@ async function fetchYandexPrices(credentials: any): Promise<any[]> {
       sku: offerId,
       name: offer.name || '',
       price,
-      currency: offer.basicPrice?.currencyId || 'UZS',
+      currency,
       category: mapping.marketCategoryName || '',
       categoryId: mapping.marketCategoryId || 0,
       marketplace: 'yandex',
@@ -292,18 +300,21 @@ async function fetchWBPrices(credentials: any): Promise<any[]> {
 }
 
 // ===== Apply prices to Yandex =====
-async function applyYandexPrice(credentials: any, offerId: string, newPrice: number): Promise<{ success: boolean; message: string }> {
+async function applyYandexPrice(credentials: any, offerId: string, newPrice: number, currency: string = 'UZS'): Promise<{ success: boolean; message: string }> {
   const apiKey = credentials.apiKey || credentials.api_key;
   const headers: Record<string, string> = { "Api-Key": apiKey, "Content-Type": "application/json" };
   const businessId = await resolveBusinessId(credentials, headers);
   if (!businessId) return { success: false, message: 'Business ID topilmadi' };
+
+  // Yandex UZ sellers use UZS, RU sellers use RUR
+  const currencyId = currency === 'RUB' ? 'RUR' : currency || 'UZS';
 
   const resp = await fetchWithRetry(
     `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-prices/updates`,
     {
       method: 'POST', headers,
       body: JSON.stringify({
-        offers: [{ offerId, price: { value: newPrice, currencyId: 'UZS' } }]
+        offers: [{ offerId, price: { value: Math.round(newPrice), currencyId } }]
       })
     }
   );
@@ -313,7 +324,7 @@ async function applyYandexPrice(credentials: any, offerId: string, newPrice: num
     return { success: false, message: `Yandex: ${resp.status} - ${errText.substring(0, 200)}` };
   }
 
-  return { success: true, message: `Yandex narx yangilandi: ${newPrice} UZS` };
+  return { success: true, message: `Yandex narx yangilandi: ${Math.round(newPrice)} ${currencyId}` };
 }
 
 // ===== Apply prices to WB =====
@@ -323,11 +334,14 @@ async function applyWBPrice(credentials: any, nmID: number, newPrice: number): P
 
   if (!nmID) return { success: false, message: 'nmID topilmadi' };
 
+  // WB price must be integer RUB
+  const priceRub = Math.round(newPrice);
+
   const resp = await fetchWithRetry(
     `https://discounts-prices-api.wildberries.ru/api/v2/upload/task`,
     {
       method: 'POST', headers,
-      body: JSON.stringify({ data: [{ nmID, price: newPrice }] })
+      body: JSON.stringify({ data: [{ nmID, price: priceRub }] })
     }
   );
 
@@ -336,7 +350,7 @@ async function applyWBPrice(credentials: any, nmID: number, newPrice: number): P
     return { success: false, message: `WB: ${resp.status} - ${errText.substring(0, 200)}` };
   }
 
-  return { success: true, message: `WB narx yangilandi: ${newPrice} RUB` };
+  return { success: true, message: `WB narx yangilandi: ${priceRub} RUB` };
 }
 
 serve(async (req) => {
@@ -426,9 +440,15 @@ serve(async (req) => {
           else if (conn.marketplace === 'wildberries') products = await fetchWBPrices(creds);
 
           for (const p of products) {
-            const costPrice = costMap.get(`${p.marketplace}-${p.offerId}`) || 0;
-            const commissionPercent = p.commissionPercent || 25;
-            const logisticsCost = p.logisticsCost || 6000;
+            let costPrice = costMap.get(`${p.marketplace}-${p.offerId}`) || 0;
+            
+            // WB works in RUB, cost prices stored in UZS — convert
+            if (p.marketplace === 'wildberries' && costPrice > 0 && p.currency === 'RUB') {
+              costPrice = Math.round(costPrice / UZS_PER_RUB);
+            }
+            
+            const commissionPercent = p.commissionPercent || (p.marketplace === 'wildberries' ? 15 : 15);
+            const logisticsCost = p.logisticsCost || (p.marketplace === 'wildberries' ? 50 : 6000);
             
             let actualMargin: number | null = null;
             if (costPrice > 0 && p.price > 0) {
@@ -501,9 +521,15 @@ serve(async (req) => {
       const userMargin = targetMargin || 12;
 
       for (const product of (products || []).slice(0, 100)) {
-        const costPrice = costMap.get(`${product.marketplace}-${product.offerId}`) || product.costPrice || 0;
-        const commissionPercent = product.commissionPercent || 25;
-        const logisticsCost = product.logisticsCost || 6000;
+        let costPrice = costMap.get(`${product.marketplace}-${product.offerId}`) || product.costPrice || 0;
+        
+        // WB: convert UZS cost to RUB
+        if (product.marketplace === 'wildberries' && costPrice > 0 && costPrice > 1000) {
+          costPrice = Math.round(costPrice / UZS_PER_RUB);
+        }
+        
+        const commissionPercent = product.commissionPercent || 15;
+        const logisticsCost = product.logisticsCost || (product.marketplace === 'wildberries' ? 50 : 6000);
 
         if (costPrice <= 0) {
           recommendations.push({
@@ -582,7 +608,7 @@ serve(async (req) => {
 
           let result;
           if (update.marketplace === 'yandex') {
-            result = await applyYandexPrice(creds, update.offerId, update.newPrice);
+            result = await applyYandexPrice(creds, update.offerId, update.newPrice, update.currency || 'UZS');
           } else if (update.marketplace === 'wildberries' && update.nmID) {
             result = await applyWBPrice(creds, update.nmID, update.newPrice);
           } else {
