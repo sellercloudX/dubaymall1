@@ -484,66 +484,115 @@ BANNED:
 }
 
 // =====================================================
-// STEP 4b: Lifestyle/Context Image — Product in Real Environment
+// LIFESTYLE IMAGES — 3 different angles/perspectives
 // =====================================================
-async function generateLifestyleImage(
+const LIFESTYLE_ANGLES = [
+  {
+    role: "closeup_detail",
+    label: "Close-up Detail",
+    getPrompt: (category: string, audience: string) => `You are a macro product photographer. Create an EXTREME CLOSE-UP detail shot of this product.
+
+FORMAT: 1080x1440 vertical (3:4 portrait).
+
+ANGLE: Very close macro shot — filling 80-90% of frame. Show:
+- Material texture (fabric weave, metal finish, glass clarity, plastic grain)
+- Label/brand text on packaging (sharp and readable)
+- Fine craftsmanship details (stitching, embossing, engraving)
+- Surface finish (matte, glossy, brushed, frosted)
+
+LIGHTING: Raking side-light to reveal texture. Shallow depth of field — only the focused detail area is sharp, rest has beautiful bokeh blur.
+
+BACKGROUND: The product itself IS the background at this zoom level. Soft out-of-focus product areas create natural backdrop.
+
+MOOD: Premium quality feel — "you can see the quality". Like a luxury brand detail shot.
+
+CRITICAL RULES:
+1. PRODUCT PRESERVATION: Must be the EXACT same product from reference — same colors, labels, branding.
+2. ABSOLUTELY NO TEXT overlaid on the image. No badges, watermarks, icons, typography.
+3. NO graphics, arrows, callout bubbles. Pure macro photography only.
+4. Must feel like a real macro photo, NOT AI-generated or composite.`
+  },
+  {
+    role: "three_quarter_angle",
+    label: "3/4 Angle View",
+    getPrompt: (category: string, audience: string) => `You are a commercial product photographer. Create a DYNAMIC THREE-QUARTER ANGLE shot of this product.
+
+FORMAT: 1080x1440 vertical (3:4 portrait).
+
+ANGLE: 45-degree three-quarter perspective showing:
+- Front face AND one side simultaneously
+- Product depth and three-dimensionality
+- Volume and proportions clearly visible
+- Slight top-down tilt (15-20°) for added dimension
+
+BACKGROUND: Clean, category-appropriate gradient:
+- Perfume/Beauty → soft warm gradient (champagne to cream)
+- Electronics → cool dark gradient (charcoal to deep blue)
+- Fashion → neutral warm (sand to ivory)
+- Other → light professional gradient (white to soft gray)
+
+LIGHTING: Professional 3-point studio setup — key light from upper-left, fill from right, rim light from behind creating a beautiful edge glow. Soft shadow falling to the right.
+
+COMPOSITION: Product at 45° angle, occupying 60-70% of frame, positioned slightly left of center (rule of thirds). Clean negative space on right side.
+
+CRITICAL RULES:
+1. PRODUCT PRESERVATION: EXACT same product — same shape, colors, labels, branding. No alterations.
+2. ABSOLUTELY NO TEXT, badges, watermarks, icons, typography, or any graphic elements.
+3. Pure photography. Must look like a real studio photo, not a render or composite.
+4. Product must look three-dimensional and tangible.`
+  },
+  {
+    role: "lifestyle_context",
+    label: "Lifestyle Usage",
+    getPrompt: (category: string, audience: string) => `You are a lifestyle editorial photographer. Create an ASPIRATIONAL LIFESTYLE scene showing this product in natural use.
+
+FORMAT: 1080x1440 vertical (3:4 portrait).
+
+SCENE by category:
+- Perfume/Beauty → marble vanity table with morning golden light, mirror reflection, fresh flowers nearby
+- Electronics → modern minimalist desk setup, hands interacting with device, coffee cup nearby
+- Fashion → styled on bed with linen sheets, or draped on wooden chair with accessories
+- Household → bright Scandinavian kitchen counter, organized shelf, fresh plants nearby
+- Food → rustic farmhouse table, scattered fresh ingredients, warm kitchen atmosphere
+- Kids → bright playful room, soft carpet, colorful toys scattered naturally
+- Sport → gym locker room bench, water bottle, towel, post-workout vibe
+- Default → lifestyle flat-lay on clean white marble with 3-4 complementary props
+
+Target audience: ${audience}
+Category: ${category}
+
+CAMERA: Slightly above (30° top-down for flat-lay) OR eye-level for scene shots. Warm natural window light.
+
+COMPOSITION: Product is the hero (30-45% of frame) but surrounded by 3-5 lifestyle props that tell a story. The viewer should WANT this lifestyle.
+
+CRITICAL RULES:
+1. PRODUCT PRESERVATION: The EXACT same product placed naturally in the scene. Same packaging, labels, colors.
+2. ABSOLUTELY NO TEXT, badges, watermarks, icons, or graphic elements. Pure photography.
+3. Must feel like a real lifestyle Instagram photo, NOT a Photoshop composite.
+4. Natural, warm lighting. Realistic shadows and reflections.
+5. Props should complement, not compete with the product.`
+  },
+];
+
+async function generateLifestyleAngle(
   imageUrl: string,
   detection: any,
-  categoryStyle: typeof CATEGORY_STYLES.default,
+  angleConfig: typeof LIFESTYLE_ANGLES[0],
   apiKey: string,
 ): Promise<string | null> {
-  console.log("🖼 STEP 4b: Lifestyle Context Image...");
+  console.log(`🖼 Generating: ${angleConfig.label}...`);
 
   const imageBytes = await downloadImage(imageUrl);
   if (!imageBytes) return null;
 
   const category = detection?.category || '';
   const audience = detection?.target_audience || 'general consumer';
-
-  const lifestylePrompt = `You are a lifestyle product photographer creating an aspirational scene showing this product in its natural environment.
-
-FORMAT: 1080x1440 vertical (3:4 portrait).
-
-SCENE DIRECTION:
-Create a realistic lifestyle scene where this product is shown in USE or in its natural context:
-- Perfume/Beauty → elegant vanity table, bathroom marble shelf, morning routine scene with soft golden light
-- Electronics → modern minimalist desk, hands holding the device, tech-lifestyle flat-lay
-- Fashion → styled outfit flat-lay on linen, hanging on wooden hanger with accessories
-- Household → bright kitchen counter, organized shelf, clean laundry scene
-- Food → rustic wooden table, ingredient scatter, warm kitchen atmosphere
-- Kids → playful colorful room, child's hands reaching for product
-- Sport → gym bag, outdoor trail, workout mat setup
-
-Target audience: ${audience}
-Category: ${category}
-
-CRITICAL RULES:
-
-1. PRODUCT PRESERVATION: The product must appear EXACTLY as in the reference photo — same physical product, same packaging, same labels. Place it naturally within the scene.
-
-2. ABSOLUTELY NO TEXT: Zero text, zero typography, zero badges, zero labels, zero watermarks. Pure visual photography only.
-
-3. ABSOLUTELY NO ICONS/GRAPHICS: No emoji, no infographic elements, no design overlays. Pure photography.
-
-4. LIFESTYLE REALISM: The scene should feel like a real photograph taken for an Instagram lifestyle brand, NOT like a Photoshop composite. Natural lighting, realistic shadows, coherent perspective.
-
-5. PROPS & CONTEXT: Surround the product with 3-5 relevant lifestyle props that enhance the scene without overwhelming the product. Product remains the clear hero (occupying 30-50% of frame).
-
-6. MOOD: Warm, inviting, aspirational — makes the viewer want to own this product. Think Pinterest lifestyle board aesthetic.
-
-7. LIGHTING: Natural, warm, soft — golden hour or soft window light feel. No harsh studio lights.
-
-BANNED:
-- Any text or typography
-- Studio white backgrounds
-- Isolated product with no context
-- AI-looking artifacts or distortions
-- Busy cluttered scenes`;
+  const prompt = angleConfig.getPrompt(category, audience);
 
   const formData = new FormData();
   formData.append("image", new Blob([imageBytes], { type: "image/png" }), "product.png");
   formData.append("model", "gpt-image-1");
-  formData.append("prompt", lifestylePrompt);
+  formData.append("prompt", prompt);
   formData.append("size", "1024x1536");
   formData.append("quality", "high");
 
@@ -555,15 +604,15 @@ BANNED:
 
   if (!resp.ok) {
     const errText = await resp.text();
-    console.error(`Lifestyle image failed (${resp.status}): ${errText.substring(0, 200)}`);
+    console.error(`${angleConfig.label} failed (${resp.status}): ${errText.substring(0, 200)}`);
     return null;
   }
 
   const data = await resp.json();
   const b64 = data.data?.[0]?.b64_json;
-  if (b64) { console.log("✅ Lifestyle image generated"); return `data:image/png;base64,${b64}`; }
+  if (b64) { console.log(`✅ ${angleConfig.label} generated`); return `data:image/png;base64,${b64}`; }
   const url = data.data?.[0]?.url;
-  if (url) { console.log("✅ Lifestyle image (URL)"); return url; }
+  if (url) { console.log(`✅ ${angleConfig.label} (URL)`); return url; }
   return null;
 }
 
@@ -879,62 +928,67 @@ serve(async (req) => {
 
       // ── Skip Steps 2-3 (Quality Scan + Auto Fix) ──
       // Hero/Lifestyle generation already creates professional backgrounds
-      // Skipping saves ~60s timeout budget for actual image generation
       let workingImageUrl = sourceImageUrl;
-      pipelineResult.steps.push({ step: 2, name: "Quality Scan", status: "⏭ Skipped (hero gen handles quality)" });
+      pipelineResult.steps.push({ step: 2, name: "Quality Scan", status: "⏭ Skipped" });
       pipelineResult.steps.push({ step: 3, name: "Auto Fix", status: "⏭ Skipped" });
 
       // Upload clean product image
       const cleanImageUrl = await uploadToStorage(supabase, workingImageUrl, partnerId, offerId || 'product');
       pipelineResult.imageUrl = cleanImageUrl;
 
-      // ── STEP 4: Generate 2 Professional Images (Hero + Lifestyle) ──
-      // Only 2 images to stay within edge function timeout (~100s budget)
+      // ── STEP 4: Generate 4 Professional Images ──
+      // Image 1: Infographic Hero (styled background, negative space for text overlay)
+      // Images 2-4: 3 different angle lifestyle shots
       
-      // 4a: Hero — Professional product photography with styled background (NO text)
+      console.log("🎨 STEP 4: Generating 4 images (1 infographic + 3 lifestyle angles)...");
+
+      // 4a: Infographic Hero — Professional product photography with styled background
       let heroImage = await generateHeroImage(
         workingImageUrl, detection, categoryStyle, OPENAI_API_KEY
       );
 
       let heroUrl: string | null = null;
-      let qcResult: any = null;
-
       if (heroImage) {
         heroUrl = await uploadToStorage(supabase, heroImage, partnerId, `${offerId || 'card'}-hero`);
-        pipelineResult.steps.push({ step: "4a", name: "Hero Image", status: "✅" });
-
-        // ── STEP 5: Quality Control on hero ──
-        if (heroUrl) {
-          qcResult = await qualityControl(heroUrl, OPENAI_API_KEY);
-          pipelineResult.qualityControl = qcResult;
-          pipelineResult.steps.push({ step: 5, name: "Quality Control", status: `Score: ${qcResult.overall_score}` });
-        }
+        pipelineResult.steps.push({ step: "4a", name: "Infographic Hero", status: "✅" });
       } else {
-        pipelineResult.steps.push({ step: "4a", name: "Hero Image", status: "❌ Failed" });
+        pipelineResult.steps.push({ step: "4a", name: "Infographic Hero", status: "❌ Failed" });
       }
 
       pipelineResult.cardUrl = heroUrl;
 
-      // 4b: Lifestyle — Product in real-life context (NO text)
+      // 4b-4d: 3 Lifestyle images from different angles
       const supplementaryUrls: string[] = [];
-      const lifestyleImage = await generateLifestyleImage(
-        workingImageUrl, detection, categoryStyle, OPENAI_API_KEY
-      );
-      if (lifestyleImage) {
-        const lifestyleUrl = await uploadToStorage(supabase, lifestyleImage, partnerId, `${offerId || 'card'}-lifestyle`);
-        if (lifestyleUrl) {
-          supplementaryUrls.push(lifestyleUrl);
-          pipelineResult.steps.push({ step: "4b", name: "Lifestyle Image", status: "✅" });
+      
+      for (let i = 0; i < LIFESTYLE_ANGLES.length; i++) {
+        const angle = LIFESTYLE_ANGLES[i];
+        const stepLabel = `4${String.fromCharCode(98 + i)}`; // 4b, 4c, 4d
+        
+        const angleImage = await generateLifestyleAngle(
+          workingImageUrl, detection, angle, OPENAI_API_KEY
+        );
+        
+        if (angleImage) {
+          const angleUrl = await uploadToStorage(supabase, angleImage, partnerId, `${offerId || 'card'}-${angle.role}`);
+          if (angleUrl) {
+            supplementaryUrls.push(angleUrl);
+            pipelineResult.steps.push({ step: stepLabel, name: angle.label, status: "✅" });
+          } else {
+            pipelineResult.steps.push({ step: stepLabel, name: angle.label, status: "⚠️ Upload failed" });
+          }
+        } else {
+          pipelineResult.steps.push({ step: stepLabel, name: angle.label, status: "❌ Failed" });
         }
-      } else {
-        pipelineResult.steps.push({ step: "4b", name: "Lifestyle Image", status: "❌ Failed" });
       }
 
       pipelineResult.supplementaryImages = supplementaryUrls;
-      console.log(`✅ Generated ${(heroUrl ? 1 : 0) + supplementaryUrls.length} total images`);
+      const totalGenerated = (heroUrl ? 1 : 0) + supplementaryUrls.length;
+      console.log(`✅ Generated ${totalGenerated} total images (target: 4)`);
+
+      // ── Skip Step 5 (Quality Control) to save timeout budget for 4 images ──
+      pipelineResult.steps.push({ step: 5, name: "Quality Control", status: "⏭ Skipped (4-image mode)" });
 
       // ── STEP 6: Upload ALL images to Marketplace ──
-      // Collect all generated image URLs in order: hero first, then supplementary
       const allGeneratedImages: string[] = [];
       if (heroUrl) allGeneratedImages.push(heroUrl);
       allGeneratedImages.push(...supplementaryUrls);
@@ -961,10 +1015,8 @@ serve(async (req) => {
           }
 
           if (marketplace === 'yandex') {
-            // Upload all images at once — hero first, then supplementary
             mpResult = await uploadAllToYandex(creds, offerId, allGeneratedImages);
           } else if (marketplace === 'wildberries' && nmID) {
-            // Upload all images to WB
             mpResult = await uploadAllToWildberries(creds, nmID, allGeneratedImages);
           }
         }
@@ -974,7 +1026,7 @@ serve(async (req) => {
       pipelineResult.steps.push({ step: 6, name: "Marketplace Upload", status: mpResult.success ? "✅" : "⚠️" });
 
       console.log(`\n${'='.repeat(60)}`);
-      console.log(`🏁 PIPELINE COMPLETE — ${allGeneratedImages.length} images`);
+      console.log(`🏁 PIPELINE COMPLETE — ${totalGenerated} images`);
       pipelineResult.steps.forEach((s: any) => console.log(`  Step ${s.step}: ${s.name} → ${s.status}`));
       console.log(`${'='.repeat(60)}\n`);
 
@@ -984,14 +1036,14 @@ serve(async (req) => {
         cardUrl: heroUrl,
         infographicUrl: heroUrl,
         supplementaryImages: supplementaryUrls,
-        totalImages: allGeneratedImages.length,
-        qualityScore: qcResult?.overall_score || null,
+        totalImages: totalGenerated,
+        qualityScore: null,
         detection,
         pipeline: pipelineResult,
         marketplaceUpload: mpResult,
         message: mpResult.success
-          ? `✅ ${allGeneratedImages.length} ta rasm yaratildi (sifat: ${qcResult?.overall_score || '?'}/100) va marketplace'ga yuklandi`
-          : `⚠️ ${allGeneratedImages.length} ta rasm yaratildi (sifat: ${qcResult?.overall_score || '?'}/100). MP: ${mpResult.message}`,
+          ? `✅ ${totalGenerated} ta rasm yaratildi va marketplace'ga yuklandi`
+          : `⚠️ ${totalGenerated} ta rasm yaratildi. MP: ${mpResult.message}`,
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
