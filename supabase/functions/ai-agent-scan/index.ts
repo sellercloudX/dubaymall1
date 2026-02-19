@@ -44,10 +44,11 @@ async function scanYandexProducts(credentials: any): Promise<any> {
   }
   if (!businessId) throw new Error("Business ID topilmadi");
 
-  // Fetch ALL offers with pagination
+  // Fetch ALL offers with pagination (deduplicated)
   let allMappings: any[] = [];
+  const seenOfferIds = new Set<string>();
   let nextPageToken: string | undefined;
-  for (let page = 0; page < 10; page++) {
+  for (let page = 0; page < 50; page++) {
     const body: any = {};
     if (nextPageToken) body.page_token = nextPageToken;
     const resp = await fetchWithRetry(
@@ -56,7 +57,14 @@ async function scanYandexProducts(credentials: any): Promise<any> {
     );
     if (!resp.ok) break;
     const data = await resp.json();
-    allMappings.push(...(data.result?.offerMappings || []));
+    const mappings = data.result?.offerMappings || [];
+    for (const m of mappings) {
+      const oid = m.offer?.offerId;
+      if (oid && !seenOfferIds.has(oid)) {
+        seenOfferIds.add(oid);
+        allMappings.push(m);
+      }
+    }
     nextPageToken = data.result?.paging?.nextPageToken;
     if (!nextPageToken) break;
     await sleep(300);
@@ -220,10 +228,11 @@ async function scanWildberriesProducts(credentials: any): Promise<any> {
   if (!apiKey) throw new Error("WB API key topilmadi");
   const headers = { Authorization: apiKey, "Content-Type": "application/json" };
 
-  // Fetch all cards with pagination
+  // Fetch all cards with pagination (deduplicated)
   let allCards: any[] = [];
+  const seenNmIDs = new Set<number>();
   let cursor: any = { limit: 100 };
-  for (let page = 0; page < 20; page++) {
+  for (let page = 0; page < 50; page++) {
     const listResp = await fetchWithRetry(
       `https://content-api.wildberries.ru/content/v2/get/cards/list`,
       { method: 'POST', headers, body: JSON.stringify({ settings: { cursor, filter: { withPhoto: -1 } } }) }
@@ -231,7 +240,12 @@ async function scanWildberriesProducts(credentials: any): Promise<any> {
     if (!listResp.ok) break;
     const listData = await listResp.json();
     const cards = listData.cards || [];
-    allCards.push(...cards);
+    for (const card of cards) {
+      if (card.nmID && !seenNmIDs.has(card.nmID)) {
+        seenNmIDs.add(card.nmID);
+        allCards.push(card);
+      }
+    }
     if (cards.length < 100) break;
     const lastCard = cards[cards.length - 1];
     cursor = { limit: 100, updatedAt: lastCard.updatedAt, nmID: lastCard.nmID };

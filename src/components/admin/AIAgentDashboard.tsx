@@ -530,11 +530,15 @@ function PriceOptimizationTab({ selectedPartnerId }: any) {
         if (selectedPriceProducts.size > 0) return selectedPriceProducts.has(r.offerId);
         return true;
       });
-      const toApply = selectedRecs.map(r => ({
-        offerId: r.offerId, marketplace: r.marketplace,
-        newPrice: r.recommendation.recommendedPrice,
-        nmID: priceData?.products.find((p: PriceProduct) => p.offerId === r.offerId)?.nmID,
-      }));
+      const toApply = selectedRecs.map(r => {
+        const product = priceData?.products.find((p: PriceProduct) => p.offerId === r.offerId);
+        return {
+          offerId: r.offerId, marketplace: r.marketplace,
+          newPrice: r.recommendation.recommendedPrice,
+          nmID: product?.nmID,
+          currency: product?.currency || (r.marketplace === 'wildberries' ? 'RUB' : 'UZS'),
+        };
+      });
       if (toApply.length === 0) throw new Error('O\'zgartirish kerak emas');
       
       // Send in batches of 30 to avoid timeout
