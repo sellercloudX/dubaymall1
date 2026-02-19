@@ -401,7 +401,7 @@ function ImageAnalysisTab({ selectedPartnerId, scanResults }: any) {
           offerId: product.offerId, 
           nmID: product.nmID, 
           marketplace: product.marketplace,
-          referenceImageUrl: product.pictures?.[0] || undefined,
+          referenceImageUrl: product.referenceImageUrl || product.pictures?.[0] || undefined,
           generateInfographic: true,
           features: product.issues || [],
         },
