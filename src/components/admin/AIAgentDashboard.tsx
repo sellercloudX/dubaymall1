@@ -373,20 +373,17 @@ function ImageAnalysisTab({ selectedPartnerId, scanResults }: any) {
         r.products.map((p: ProductIssue) => ({
           offerId: p.offerId, nmID: p.nmID, name: p.name,
           marketplace: r.marketplace, category: p.category, imageCount: p.imageCount,
+          referenceImageUrl: (p as any).images?.[0] || '',
         }))
       );
-      const { data, error } = await supabase.functions.invoke('ai-agent-images', {
-        body: { action: 'analyze', products: allProducts.slice(0, 20) },
-      });
-      if (error) throw error;
-      const aiResults = data?.results || [];
-      const aiIds = new Set(aiResults.map((r: any) => r.offerId));
-      const remaining = allProducts.filter(p => !aiIds.has(p.offerId)).map(p => ({
-        ...p, avgScore: p.imageCount >= 3 ? 65 : p.imageCount >= 1 ? 30 : 0,
-        needsReplacement: p.imageCount < 1 || p.imageCount < 3,
-        issues: p.imageCount === 0 ? ['Rasmlar yo\'q'] : p.imageCount < 3 ? [`Kam rasm`] : [],
+      // Client-side analysis — no server call needed
+      const results = allProducts.map(p => ({
+        ...p,
+        avgScore: p.imageCount >= 5 ? 85 : p.imageCount >= 3 ? 65 : p.imageCount >= 1 ? 30 : 0,
+        needsReplacement: p.imageCount < 3,
+        issues: p.imageCount === 0 ? ['Rasmlar yo\'q'] : p.imageCount < 3 ? [`Kam rasm (${p.imageCount}/3)`] : [],
       }));
-      return [...aiResults, ...remaining];
+      return results;
     },
     onSuccess: (results) => { setImageResults(results); toast.success(`${results.length} ta tahlil qilindi`); },
     onError: (err: any) => toast.error(err.message),
