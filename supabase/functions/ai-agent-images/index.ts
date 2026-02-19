@@ -36,6 +36,8 @@ const STOP_WORDS = [
   'number 1', '№1', '#1', 'guaranteed', 'гарантированно', 'kafolat',
   'free', 'бесплатно', 'bepul', 'wow', 'amazing', 'perfect',
   'идеальный', 'mukammal', 'unique', 'уникальный', 'noyob',
+  'mashxur', 'mashhur', 'машхур', 'популярный', 'popular', 'famous',
+  'top seller', 'top product', 'bestseller', 'бестселлер', 'хит продаж',
 ];
 
 function sanitizeStopWords(text: string): string {
@@ -426,8 +428,8 @@ async function generateMarketplaceCard(
   ];
   const layoutHint = layoutVariations[variationSeed % layoutVariations.length];
 
-  // Badge text — NO stop words
-  const badgeText = positioning === 'premium' ? '⭐ TANLOV' : '🔥 MASHHUR';
+  // Badge text — NO stop words, neutral descriptors only
+  const badgeText = positioning === 'premium' ? '⭐ TANLOV' : '📦 YANGI';
 
   const cardPrompt = `You are an elite commercial graphic designer creating a HIGH-CONVERTING Pinterest/Behance-level marketplace product infographic.
 
@@ -485,7 +487,7 @@ MANDATORY DESIGN RULES
 ═══════════════════════════════════
 BANNED ELEMENTS (NEVER INCLUDE)
 ═══════════════════════════════════
-- Words: "лучший", "топ", "хит продаж", "оригинал", "качественный", "скидка", "акция", "бесплатно", "№1", "идеальный", "уникальный", "эксклюзив", "super", "mega", "best", "top seller", "number one"
+- Words: "лучший", "топ", "хит продаж", "оригинал", "качественный", "скидка", "акция", "бесплатно", "№1", "идеальный", "уникальный", "эксклюзив", "super", "mega", "best", "top seller", "number one", "популярный", "машхур", "mashxur", "famous"
 - Generic white/plain backgrounds
 - Distorted or AI-garbled text
 - Watermarks or logos not on the original product  
@@ -519,6 +521,147 @@ VARIATION SEED: #${variationSeed} — Create a UNIQUE design, not a template cop
   if (b64) { console.log("✅ STEP 4 Done: Marketplace card generated"); return `data:image/png;base64,${b64}`; }
   const url = data.data?.[0]?.url;
   if (url) { console.log("✅ STEP 4 Done: Card generated (URL)"); return url; }
+  return null;
+}
+
+// =====================================================
+// STEP 4b: Supplementary Images (Features, Angles, Use-cases)
+// =====================================================
+const SUPPLEMENTARY_PROMPTS: { role: string; promptFn: (det: any, catStyle: typeof CATEGORY_STYLES.default) => string }[] = [
+  {
+    role: "feature_highlight",
+    promptFn: (det, catStyle) => {
+      const productName = sanitizeStopWords(det?.product_name || 'Product');
+      const feats = (det?.key_features || []).slice(0, 4).map((f: string) => sanitizeStopWords(f));
+      return `Create a FEATURE HIGHLIGHT infographic for "${productName}".
+
+FORMAT: 1080x1440 vertical (3:4 portrait ratio).
+
+This is image #2 in a product gallery — it FOCUSES on key features and specifications.
+
+DESIGN:
+- Background: ${catStyle.background_style}
+- Style: ${catStyle.visual_style}
+- The product should be shown at 30-40% size, positioned to one side
+- The remaining 60% should be filled with LARGE, clear feature call-outs
+- Each feature gets its own section with:
+  • A relevant icon (emoji or simple graphic)
+  • Feature name in RUSSIAN (bold, 2-3 words)
+  • Short explanation (1 line, smaller text)
+- Features to highlight: ${feats.join(', ')}
+- Use connecting lines or arrows from features to relevant product parts
+- Professional infographic layout like on Pinterest top pins
+
+RULES:
+- Product must remain PIXEL-PERFECT from reference photo
+- ALL text in RUSSIAN, perfectly readable, no AI-garbled characters
+- NO stop words: "лучший", "топ", "хит", "популярный", "оригинал", "скидка"
+- NO plain white background
+- Commercial design agency quality`;
+    }
+  },
+  {
+    role: "angle_closeup",
+    promptFn: (det, catStyle) => {
+      const productName = sanitizeStopWords(det?.product_name || 'Product');
+      return `Create a CLOSE-UP / DETAIL VIEW infographic for "${productName}".
+
+FORMAT: 1080x1440 vertical (3:4 portrait ratio).
+
+This is image #3 — it shows the product from a DIFFERENT ANGLE or ZOOMED IN on key details.
+
+DESIGN:
+- Background: ${catStyle.background_style}
+- Style: ${catStyle.visual_style}
+- Show the product LARGER than usual (60-70% of frame)
+- Slight creative angle: 20-30° rotation, or perspective view
+- Add 2-3 ZOOM BUBBLES highlighting key details (texture, material, label, buttons etc.)
+- Each zoom bubble has a thin elegant border and a short RUSSIAN label
+- Subtle depth-of-field effect — sharp product, slightly blurred background elements
+- Professional product photography feel
+
+RULES:
+- Product must remain PIXEL-PERFECT from reference photo
+- ALL text in RUSSIAN, perfectly readable
+- NO stop words: "лучший", "топ", "хит", "популярный", "оригинал", "скидка"
+- NO plain white background
+- Magazine editorial quality`;
+    }
+  },
+  {
+    role: "lifestyle_usecase",
+    promptFn: (det, catStyle) => {
+      const productName = sanitizeStopWords(det?.product_name || 'Product');
+      const audience = det?.target_audience || 'general consumer';
+      return `Create a LIFESTYLE / USE-CASE scene for "${productName}".
+
+FORMAT: 1080x1440 vertical (3:4 portrait ratio).
+
+This is image #4 — it shows HOW the product is USED in real life.
+
+DESIGN:
+- The product should be shown in a realistic usage context/environment
+- Target audience: ${audience}
+- Background: A contextual lifestyle scene (NOT studio background). Examples:
+  • Perfume → elegant vanity table, evening setting
+  • Electronics → modern desk setup, hands holding device
+  • Beauty → bathroom shelf, skincare routine scene
+  • Food → kitchen counter, dining table
+  • Fashion → styled outfit flat-lay
+- The product is the HERO but surrounded by lifestyle props
+- Add 1-2 minimal text overlays in RUSSIAN: product category name and one key benefit
+- Warm, inviting, aspirational mood — like a lifestyle brand Instagram post
+- Soft natural lighting
+
+RULES:
+- Product must remain PIXEL-PERFECT from reference photo
+- ALL text in RUSSIAN, perfectly readable
+- NO stop words: "лучший", "топ", "хит", "популярный", "оригинал", "скидка"
+- Commercial lifestyle photography quality
+- The scene should feel REAL, not AI-generated`;
+    }
+  },
+];
+
+async function generateSupplementaryImage(
+  imageUrl: string,
+  detection: any,
+  categoryStyle: typeof CATEGORY_STYLES.default,
+  apiKey: string,
+  promptIndex: number
+): Promise<string | null> {
+  const suppPrompt = SUPPLEMENTARY_PROMPTS[promptIndex % SUPPLEMENTARY_PROMPTS.length];
+  console.log(`🖼 STEP 4.${promptIndex + 1}: Generating ${suppPrompt.role} image...`);
+
+  const imageBytes = await downloadImage(imageUrl);
+  if (!imageBytes) return null;
+
+  const prompt = suppPrompt.promptFn(detection, categoryStyle);
+
+  const formData = new FormData();
+  formData.append("image", new Blob([imageBytes], { type: "image/png" }), "product.png");
+  formData.append("model", "gpt-image-1");
+  formData.append("prompt", prompt);
+  formData.append("size", "1024x1536");
+  formData.append("quality", "high");
+
+  const resp = await fetchWithRetry("https://api.openai.com/v1/images/edits", {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${apiKey}` },
+    body: formData,
+  });
+
+  if (!resp.ok) {
+    const errText = await resp.text();
+    console.error(`${suppPrompt.role} generation failed (${resp.status}): ${errText.substring(0, 200)}`);
+    return null;
+  }
+
+  const data = await resp.json();
+  const b64 = data.data?.[0]?.b64_json;
+  if (b64) { console.log(`✅ ${suppPrompt.role} generated`); return `data:image/png;base64,${b64}`; }
+  const url = data.data?.[0]?.url;
+  if (url) { console.log(`✅ ${suppPrompt.role} generated (URL)`); return url; }
   return null;
 }
 
@@ -692,6 +835,66 @@ async function uploadToWildberries(credentials: any, nmID: number, newImageUrl: 
   return { success: true, message: "Yangi rasm 1-chi o'ringa yuklandi" };
 }
 
+// ===== Multi-image marketplace upload helpers =====
+async function uploadAllToYandex(credentials: any, offerId: string, newImageUrls: string[]): Promise<{ success: boolean; message: string }> {
+  const apiKey = credentials.apiKey || credentials.api_key;
+  const campaignId = credentials.campaignId || credentials.campaign_id;
+  let businessId = credentials.businessId || credentials.business_id;
+  const headers = { "Api-Key": apiKey, "Content-Type": "application/json" };
+
+  if (!businessId && campaignId) {
+    const resp = await fetchWithRetry(`https://api.partner.market.yandex.ru/campaigns/${campaignId}`, { headers });
+    if (resp.ok) { const d = await resp.json(); businessId = d.campaign?.business?.id; }
+  }
+  if (!businessId) {
+    const resp = await fetchWithRetry(`https://api.partner.market.yandex.ru/businesses`, { headers });
+    if (resp.ok) { const d = await resp.json(); businessId = d.businesses?.[0]?.id; }
+  }
+  if (!businessId) return { success: false, message: 'Business ID topilmadi' };
+
+  // Get existing pictures
+  const getResp = await fetchWithRetry(
+    `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-mappings`,
+    { method: 'POST', headers, body: JSON.stringify({ offerIds: [offerId] }) }
+  );
+
+  let existingPictures: string[] = [];
+  if (getResp.ok) {
+    const getData = await getResp.json();
+    existingPictures = getData.result?.offerMappings?.[0]?.offer?.pictures || [];
+  }
+
+  // New images first, then existing (ensures hero is #1)
+  const allPictures = [...newImageUrls, ...existingPictures];
+  const resp = await fetchWithRetry(
+    `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-mappings/update`,
+    { method: 'POST', headers, body: JSON.stringify({ offerMappings: [{ offer: { offerId, pictures: allPictures } }] }) }
+  );
+
+  if (!resp.ok) {
+    const errText = await resp.text();
+    return { success: false, message: `Yandex: ${resp.status} - ${errText.substring(0, 200)}` };
+  }
+  return { success: true, message: `${newImageUrls.length} ta yangi rasm yuklandi (jami ${allPictures.length} ta)` };
+}
+
+async function uploadAllToWildberries(credentials: any, nmID: number, newImageUrls: string[]): Promise<{ success: boolean; message: string }> {
+  const apiKey = credentials.apiKey || credentials.api_key || credentials.token;
+  const headers = { Authorization: apiKey, "Content-Type": "application/json" };
+  if (!nmID) return { success: false, message: 'nmID topilmadi' };
+
+  const resp = await fetchWithRetry(
+    `https://content-api.wildberries.ru/content/v3/media/save`,
+    { method: 'POST', headers, body: JSON.stringify({ nmId: nmID, data: newImageUrls }) }
+  );
+
+  if (!resp.ok) {
+    const errText = await resp.text();
+    return { success: false, message: `WB: ${resp.status} - ${errText.substring(0, 200)}` };
+  }
+  return { success: true, message: `${newImageUrls.length} ta rasm yuklandi` };
+}
+
 // =====================================================
 // MAIN SERVE
 // =====================================================
@@ -802,47 +1005,42 @@ serve(async (req) => {
       const cleanImageUrl = await uploadToStorage(supabase, workingImageUrl, partnerId, offerId || 'product');
       pipelineResult.imageUrl = cleanImageUrl;
 
-      // ── STEP 4: Category-Based Marketplace Card ──
+      // ── STEP 4: Generate 4 Images (1 Hero + 3 Supplementary) ──
       const variationSeed = Math.floor(Math.random() * 100);
-      let cardImage = await generateMarketplaceCard(
+      
+      // 4.1: Main Hero Card (best quality, primary position)
+      console.log("🎨 STEP 4.0: Generating HERO card (main image)...");
+      let heroCardImage = await generateMarketplaceCard(
         workingImageUrl, detection, categoryStyle, OPENAI_API_KEY, variationSeed
       );
 
-      let cardUrl: string | null = null;
+      let heroCardUrl: string | null = null;
       let qcResult: any = null;
 
-      if (cardImage) {
-        cardUrl = await uploadToStorage(supabase, cardImage, partnerId, `${offerId || 'card'}-card`);
-        pipelineResult.steps.push({ step: 4, name: "Card Generation", status: "✅" });
+      if (heroCardImage) {
+        heroCardUrl = await uploadToStorage(supabase, heroCardImage, partnerId, `${offerId || 'card'}-hero`);
+        pipelineResult.steps.push({ step: "4.0", name: "Hero Card", status: "✅" });
 
-        // ── STEP 5: Quality Control ──
-        if (cardUrl) {
-          qcResult = await qualityControl(cardUrl, OPENAI_API_KEY);
+        // ── STEP 5: Quality Control on hero ──
+        if (heroCardUrl) {
+          qcResult = await qualityControl(heroCardUrl, OPENAI_API_KEY);
           pipelineResult.qualityControl = qcResult;
           pipelineResult.steps.push({ step: 5, name: "Quality Control", status: `Score: ${qcResult.overall_score}` });
 
-          // ── Auto improvement loop (max 1 retry to avoid timeout) ──
+          // Auto improvement (1 retry if score < 70)
           if (qcResult.overall_score < 70 && qcResult.improvements?.length) {
-            console.log(`🔄 Score ${qcResult.overall_score} < 70 → Auto improvement loop...`);
-            for (let retry = 0; retry < 1; retry++) {
-              console.log(`🔄 Retry ${retry + 1}/1...`);
-              const improvedCard = await generateMarketplaceCard(
-                workingImageUrl, detection, categoryStyle, OPENAI_API_KEY, variationSeed + retry + 1
-              );
-              if (improvedCard) {
-                const improvedUrl = await uploadToStorage(supabase, improvedCard, partnerId, `${offerId || 'card'}-card-v${retry + 2}`);
-                if (improvedUrl) {
-                  const newQc = await qualityControl(improvedUrl, OPENAI_API_KEY);
-                  if (newQc.overall_score > (qcResult.overall_score || 0)) {
-                    cardUrl = improvedUrl;
-                    qcResult = newQc;
-                    pipelineResult.qualityControl = newQc;
-                    console.log(`✅ Improved: ${newQc.overall_score}`);
-                  }
-                  if (newQc.overall_score >= 70) {
-                    console.log("✅ Quality threshold met!");
-                    break;
-                  }
+            console.log(`🔄 Score ${qcResult.overall_score} < 70 → Auto improvement...`);
+            const improvedCard = await generateMarketplaceCard(
+              workingImageUrl, detection, categoryStyle, OPENAI_API_KEY, variationSeed + 1
+            );
+            if (improvedCard) {
+              const improvedUrl = await uploadToStorage(supabase, improvedCard, partnerId, `${offerId || 'card'}-hero-v2`);
+              if (improvedUrl) {
+                const newQc = await qualityControl(improvedUrl, OPENAI_API_KEY);
+                if (newQc.overall_score > (qcResult.overall_score || 0)) {
+                  heroCardUrl = improvedUrl;
+                  qcResult = newQc;
+                  pipelineResult.qualityControl = newQc;
                 }
               }
             }
@@ -850,16 +1048,42 @@ serve(async (req) => {
           }
         }
       } else {
-        pipelineResult.steps.push({ step: 4, name: "Card Generation", status: "❌ Failed" });
+        pipelineResult.steps.push({ step: "4.0", name: "Hero Card", status: "❌ Failed" });
       }
 
-      pipelineResult.cardUrl = cardUrl;
+      pipelineResult.cardUrl = heroCardUrl;
 
-      // ── STEP 6: Upload to Marketplace ──
+      // 4.1-4.3: Generate 3 supplementary images (feature, angle, use-case)
+      const supplementaryUrls: string[] = [];
+      for (let i = 0; i < 3; i++) {
+        const suppImage = await generateSupplementaryImage(
+          workingImageUrl, detection, categoryStyle, OPENAI_API_KEY, i
+        );
+        if (suppImage) {
+          const suppUrl = await uploadToStorage(supabase, suppImage, partnerId, `${offerId || 'card'}-supp-${i + 1}`);
+          if (suppUrl) {
+            supplementaryUrls.push(suppUrl);
+            pipelineResult.steps.push({ step: `4.${i + 1}`, name: SUPPLEMENTARY_PROMPTS[i].role, status: "✅" });
+          } else {
+            pipelineResult.steps.push({ step: `4.${i + 1}`, name: SUPPLEMENTARY_PROMPTS[i].role, status: "⚠️ Upload failed" });
+          }
+        } else {
+          pipelineResult.steps.push({ step: `4.${i + 1}`, name: SUPPLEMENTARY_PROMPTS[i].role, status: "❌ Failed" });
+        }
+      }
+
+      pipelineResult.supplementaryImages = supplementaryUrls;
+      console.log(`✅ Generated ${1 + supplementaryUrls.length} total images (1 hero + ${supplementaryUrls.length} supplementary)`);
+
+      // ── STEP 6: Upload ALL images to Marketplace ──
+      // Collect all generated image URLs in order: hero first, then supplementary
+      const allGeneratedImages: string[] = [];
+      if (heroCardUrl) allGeneratedImages.push(heroCardUrl);
+      allGeneratedImages.push(...supplementaryUrls);
+
       let mpResult: { success: boolean; message: string } = { success: false, message: 'Marketplace aniqlanmadi' };
 
-      const uploadImageUrl = cardUrl || cleanImageUrl;
-      if (marketplace && offerId && uploadImageUrl) {
+      if (marketplace && offerId && allGeneratedImages.length > 0) {
         const { data: conns } = await supabase
           .from('marketplace_connections')
           .select('*')
@@ -879,10 +1103,11 @@ serve(async (req) => {
           }
 
           if (marketplace === 'yandex') {
-            // Upload ONLY the generated card as main image — don't re-upload the original
-            mpResult = await uploadToYandex(creds, offerId, uploadImageUrl);
+            // Upload all images at once — hero first, then supplementary
+            mpResult = await uploadAllToYandex(creds, offerId, allGeneratedImages);
           } else if (marketplace === 'wildberries' && nmID) {
-            mpResult = await uploadToWildberries(creds, nmID, uploadImageUrl);
+            // Upload all images to WB
+            mpResult = await uploadAllToWildberries(creds, nmID, allGeneratedImages);
           }
         }
       }
@@ -891,22 +1116,24 @@ serve(async (req) => {
       pipelineResult.steps.push({ step: 6, name: "Marketplace Upload", status: mpResult.success ? "✅" : "⚠️" });
 
       console.log(`\n${'='.repeat(60)}`);
-      console.log(`🏁 PIPELINE COMPLETE`);
+      console.log(`🏁 PIPELINE COMPLETE — ${allGeneratedImages.length} images`);
       pipelineResult.steps.forEach((s: any) => console.log(`  Step ${s.step}: ${s.name} → ${s.status}`));
       console.log(`${'='.repeat(60)}\n`);
 
       return new Response(JSON.stringify({
         success: true,
         imageUrl: cleanImageUrl,
-        cardUrl,
-        infographicUrl: cardUrl, // backward compatibility
+        cardUrl: heroCardUrl,
+        infographicUrl: heroCardUrl,
+        supplementaryImages: supplementaryUrls,
+        totalImages: allGeneratedImages.length,
         qualityScore: qcResult?.overall_score || null,
         detection,
         pipeline: pipelineResult,
         marketplaceUpload: mpResult,
         message: mpResult.success
-          ? `✅ AI pipeline: kartochka yaratildi (sifat: ${qcResult?.overall_score || '?'}/100) va marketplace'ga yuklandi`
-          : `⚠️ Kartochka yaratildi (sifat: ${qcResult?.overall_score || '?'}/100). MP: ${mpResult.message}`,
+          ? `✅ ${allGeneratedImages.length} ta rasm yaratildi (sifat: ${qcResult?.overall_score || '?'}/100) va marketplace'ga yuklandi`
+          : `⚠️ ${allGeneratedImages.length} ta rasm yaratildi (sifat: ${qcResult?.overall_score || '?'}/100). MP: ${mpResult.message}`,
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
