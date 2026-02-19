@@ -524,7 +524,6 @@ function PriceOptimizationTab({ selectedPartnerId }: any) {
 
   const applyPricesMutation = useMutation({
     mutationFn: async () => {
-      // Apply only selected recommendations, or all if none selected
       const selectedRecs = recommendations.filter(r => {
         if (r.recommendation?.priceAction === 'keep' || r.recommendation?.priceAction === 'no_cost' || !r.recommendation?.recommendedPrice) return false;
         if (selectedPriceProducts.size > 0) return selectedPriceProducts.has(r.offerId);
@@ -536,20 +535,36 @@ function PriceOptimizationTab({ selectedPartnerId }: any) {
         nmID: priceData?.products.find((p: PriceProduct) => p.offerId === r.offerId)?.nmID,
       }));
       if (toApply.length === 0) throw new Error('O\'zgartirish kerak emas');
+      
+      // Send in batches of 30 to avoid timeout
+      const BATCH_SIZE = 30;
+      let totalApplied = 0, totalFailed = 0;
+      const allResults: any[] = [];
+      
       setApplyProgress({ current: 0, total: toApply.length });
-      const { data, error } = await supabase.functions.invoke('ai-agent-price', {
-        body: { partnerId: selectedPartnerId, action: 'apply', priceUpdates: toApply },
-      });
-      if (error) throw error;
+      
+      for (let i = 0; i < toApply.length; i += BATCH_SIZE) {
+        const batch = toApply.slice(i, i + BATCH_SIZE);
+        const { data, error } = await supabase.functions.invoke('ai-agent-price', {
+          body: { partnerId: selectedPartnerId, action: 'apply', priceUpdates: batch },
+        });
+        if (error) throw error;
+        totalApplied += data?.applied || 0;
+        totalFailed += data?.failed || 0;
+        if (data?.results) allResults.push(...data.results);
+        setApplyProgress({ current: Math.min(i + BATCH_SIZE, toApply.length), total: toApply.length });
+      }
+      
       setApplyProgress(null);
-      return data;
+      return { applied: totalApplied, failed: totalFailed, results: allResults };
     },
     onSuccess: (data) => {
       toast.success(`${data?.applied || 0} ta marketplace'da yangilandi, ${data?.failed || 0} ta xato`);
       if (data?.results) {
         const failed = data.results.filter((r: any) => !r.success);
         if (failed.length > 0) {
-          failed.forEach((f: any) => toast.error(`${f.offerId}: ${f.message}`));
+          failed.slice(0, 5).forEach((f: any) => toast.error(`${f.offerId}: ${f.message}`));
+          if (failed.length > 5) toast.error(`...va yana ${failed.length - 5} ta xato`);
         }
       }
       priceScanMutation.mutate();
