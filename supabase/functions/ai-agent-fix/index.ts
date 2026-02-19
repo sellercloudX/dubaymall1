@@ -138,40 +138,79 @@ FAQAT JSON javob ber (boshqa hech narsa yozma):
   return fix;
 }
 
-// ===== Generate and upload image =====
+// ===== Generate and upload image using REFERENCE =====
 async function generateAndUploadImage(supabase: any, partnerId: string, product: any, marketplace: string, credentials: any): Promise<{ success: boolean; message: string }> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!LOVABLE_API_KEY) return { success: false, message: 'AI key yo\'q' };
 
   try {
-    console.log(`Generating image for: "${product.name}"`);
+    // Find existing reference image from the product
+    const existingImages = product.pictures || [];
+    const referenceUrl = existingImages.find((p: string) => p && p.startsWith('http')) || null;
+    console.log(`Generating image for: "${product.name}", ref: ${referenceUrl ? 'YES' : 'NO'}`);
     
-    const prompt = `Generate a professional e-commerce product photo of "${product.name}" (category: ${product.category || ''}). 
+    let imageUrl: string | null = null;
+
+    // Use reference image if available for product-specific generation
+    if (referenceUrl) {
+      const editPrompt = `Create a professional e-commerce product photo based on this exact product.
 Requirements:
+- Keep the SAME product, same shape, same design, same colors
 - Clean white or light gradient background
-- Product centered, large, with negative space around edges
 - Professional studio lighting, high resolution, sharp focus
-- Aspect ratio 3:4, 1080x1440 pixels
-- No text, no watermarks, no logos
-- Photorealistic product photography style`;
+- Product centered, large, with negative space around edges for text overlays
+- Aspect ratio 3:4, portrait orientation, 1080x1440 pixels
+- Remove any existing text, watermarks, logos from background
+- Photorealistic commercial marketplace quality`;
 
-    const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image",
-        messages: [{ role: "user", content: prompt }],
-        modalities: ["image", "text"],
-      }),
-    });
+      const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash-image",
+          messages: [{
+            role: "user",
+            content: [
+              { type: "text", text: editPrompt },
+              { type: "image_url", image_url: { url: referenceUrl } }
+            ]
+          }],
+          modalities: ["image", "text"],
+        }),
+      });
 
-    if (!resp.ok) return { success: false, message: `Rasm yaratish: ${resp.status}` };
+      if (resp.ok) {
+        const data = await resp.json();
+        imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url || null;
+      }
+    }
 
-    const data = await resp.json();
-    const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    // Fallback: text-only generation
+    if (!imageUrl) {
+      const prompt = `Generate a professional e-commerce product photo of "${product.name}" (category: ${product.category || ''}). 
+Clean white background, product centered, large, studio lighting, sharp focus, 3:4 aspect ratio, no text, no watermarks, photorealistic.`;
+
+      const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash-image",
+          messages: [{ role: "user", content: prompt }],
+          modalities: ["image", "text"],
+        }),
+      });
+
+      if (!resp.ok) return { success: false, message: `Rasm yaratish: ${resp.status}` };
+      const data = await resp.json();
+      imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url || null;
+    }
+
     if (!imageUrl) return { success: false, message: 'Rasm generatsiya qilinmadi' };
 
     // Upload to storage
@@ -202,7 +241,6 @@ Requirements:
       const businessId = await resolveBusinessId(credentials, headers);
       if (!businessId) return { success: false, message: 'Business ID topilmadi' };
 
-      // Get existing pictures
       const getResp = await fetchWithRetry(
         `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-mappings`,
         { method: 'POST', headers: { ...headers }, body: JSON.stringify({ offerIds: [product.offerId] }) }
