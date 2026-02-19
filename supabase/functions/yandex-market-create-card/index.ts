@@ -506,6 +506,12 @@ QOIDALAR:
    *** JUDA MUHIM: HAR BIR ${allParams.length} ta parametrni to'ldir! ***
    *** BO'SH QOLDIRMA! Bilmasang — mahsulotga mos taxminiy qiymat yoz! ***
    *** Har bir parametr uchun FAQAT value YOKI valueId ber, ikkalasini emas! ***
+   
+   ⚠️⚠️⚠️ BITTA VARIANT QOIDASI ⚠️⚠️⚠️:
+   - Har bir parametr uchun FAQAT BITTA qiymat ber!
+   - Masalan rang uchun FAQAT bitta rang: "белый" yoki "черный" — ikkalasini berma!
+   - O'lcham uchun FAQAT bitta o'lcham: "M" yoki "42" — bir nechtasini berma!
+   - Bu BITTA VARIANT kartochkasi — variantlar kerak emas!
 11. warranty: "1 год" yoki "2 года"
 12. weightDimensions — REAL o'lchamlar:
    - Kosmetika/parfyum: weight=0.05-0.3kg, 5x5x10 ~ 10x10x15 sm
@@ -658,12 +664,21 @@ function buildOffer(
     console.log(`🖼️ ${offer.pictures.length} images added`);
   }
 
-  // Parameters — filter out picker/URL params and sanitize values
+  // Parameters — filter out picker/URL params, ensure SINGLE VALUES only (no multi-variant!)
   const BLOCKED_PARAM_IDS = [40164890]; // Known picker URL params
   if (ai?.parameterValues?.length) {
+    // Track seen parameterIds to ensure ONLY ONE value per parameter (single variant!)
+    const seenParamIds = new Set<number>();
     offer.parameterValues = ai.parameterValues
       .filter((p: any) => p.parameterId && (p.value !== undefined || p.valueId !== undefined))
       .filter((p: any) => !BLOCKED_PARAM_IDS.includes(Number(p.parameterId)))
+      .filter((p: any) => {
+        // CRITICAL: Only keep FIRST value for each parameter — prevents multi-variant creation
+        const pid = Number(p.parameterId);
+        if (seenParamIds.has(pid)) return false;
+        seenParamIds.add(pid);
+        return true;
+      })
       .map((p: any) => {
         const pv: any = { parameterId: Number(p.parameterId) };
         if (p.valueId !== undefined && p.valueId !== null) {
@@ -683,7 +698,7 @@ function buildOffer(
         if (p.unitId) pv.unitId = String(p.unitId);
         return pv;
       });
-    console.log(`📊 ${offer.parameterValues.length} params (filtered & sanitized)`);
+    console.log(`📊 ${offer.parameterValues.length} params (filtered, single-variant, sanitized)`);
   }
 
   // Shelf life (Yaroqlilik muddati) — required for cosmetics, food, etc.
@@ -780,17 +795,17 @@ serve(async (req) => {
         const sku = generateSKU(product.name);
         const barcode = product.barcode || generateEAN13();
 
-        // ═══ STEP 1: Get source image for AI reference (NOT for card!) ═══
+        // ═══ STEP 1: Get source image for AI reference ONLY (NOT for card!) ═══
         const rawImgs: string[] = [];
         if (product.images?.length) rawImgs.push(...product.images);
         if (product.image && !rawImgs.includes(product.image)) rawImgs.unshift(product.image);
         
-        // Proxy source images to storage (for AI reference only)
+        // Proxy source images to storage (for AI reference ONLY — these are camera/gallery photos)
         const sourceImages = await proxyImagesToStorage(supabase, user.id, rawImgs, SUPABASE_URL);
-        const sourceImg = sourceImages[0] || null; // First image = AI reference
+        const sourceImg = sourceImages[0] || null; // First image = AI reference ONLY
         
         // CRITICAL: Don't use raw camera/gallery images on card!
-        // Always generate fresh professional images using AI
+        // Only AI-generated professional images will be used on the actual card
         let images: string[] = [];
         
         // Cost optimization: skip image generation if cloning (reuse existing images)
@@ -887,9 +902,10 @@ serve(async (req) => {
           images = sourceImages;
         }
         
-        // If no images generated, fall back to source (better than nothing)
+        // If no images generated, fall back to source ONLY as last resort
+        // Prefer no images over raw camera photos on marketplace cards
         if (images.length === 0 && sourceImages.length > 0) {
-          console.warn("⚠️ No images generated, falling back to source images");
+          console.warn("⚠️ No AI images generated, using source as fallback (not ideal)");
           images = sourceImages;
         }
         console.log(`🖼️ Total ${images.length} professional images ready`);

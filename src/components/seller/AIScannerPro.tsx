@@ -364,23 +364,21 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
       // Mahsulot nomini normallashtirish (lotin harflarga)
       const normalizedProductName = normalizeProductName(product.title);
 
-      // Rasmni storage'ga yuklash (card creator o'zi professional rasmlar yaratadi)
-      let imageUrl: string | undefined;
-      const imagesToUpload: string[] = [];
+      // Rasmni FAQAT AI reference sifatida ishlatish — kartochkaga qo'yish emas!
+      // AI-generated professional rasmlar kartochkaga qo'yiladi
+      let referenceImageUrl: string | undefined;
 
-      // Kamera yoki web rasmni yuklash
+      // Kamera yoki web rasmni reference sifatida yuklash
       const sourceImage = productImage || product.image || null;
       
       if (sourceImage) {
         if (sourceImage.startsWith('data:')) {
           const uploadedUrl = await uploadImageToStorage(sourceImage);
           if (uploadedUrl) {
-            imageUrl = uploadedUrl;
-            imagesToUpload.push(uploadedUrl);
+            referenceImageUrl = uploadedUrl;
           }
         } else if (sourceImage.startsWith('http')) {
-          imageUrl = sourceImage;
-          imagesToUpload.push(sourceImage);
+          referenceImageUrl = sourceImage;
         }
       }
 
@@ -412,7 +410,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
 
       // Step 5: AI Agent Image Pipeline — Hero Infographic + 3 Lifestyle angles (OpenAI gpt-image-1)
       const generatedInfos: string[] = [];
-      const bestImageForInfographic = imageUrl || productImage;
+      const bestImageForInfographic = referenceImageUrl || productImage;
       
       if (shouldGenerateInfographics && bestImageForInfographic) {
         updateTaskProgress(4, 'running');
@@ -430,7 +428,6 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
 
           if (!imgError && imgData?.success && imgData.images?.length > 0) {
             generatedInfos.push(...imgData.images);
-            imagesToUpload.push(...imgData.images);
             setBackgroundTasks(prev => prev.map(task => 
               task.id === taskId ? { ...task, generatedImages: [...imgData.images] } : task
             ));
@@ -449,7 +446,11 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
       }
 
       // Step 6: Create Yandex card — pass ALL data, let card creator do full AI optimization
+      // CRITICAL: Only pass AI-generated images, NOT camera/gallery source images
       updateTaskProgress(5, 'running');
+      
+      // Use only AI-generated images for the card; reference image is for AI only
+      const cardImages = generatedInfos.length > 0 ? generatedInfos : (referenceImageUrl ? [referenceImageUrl] : []);
       
       const { data: cardResult, error } = await supabase.functions.invoke('yandex-market-create-card', {
         body: {
@@ -463,8 +464,8 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
             brand: analyzed?.brand,
             price: pricingData.sellingPrice,
             costPrice: pricingData.costPrice,
-            image: imageUrl,
-            images: imagesToUpload,
+            image: referenceImageUrl,
+            images: cardImages,
             sourceUrl: product.url,
             specifications: analyzed?.specifications,
             mxikCode: mxikResult?.mxik_code,
