@@ -25,12 +25,11 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3)
   return fetch(url, options);
 }
 
-// ===== YANDEX: Scan partner's products =====
+// ===== YANDEX: Deep scan =====
 async function scanYandexProducts(credentials: any): Promise<any> {
   const apiKey = credentials.apiKey || credentials.api_key;
   const campaignId = credentials.campaignId || credentials.campaign_id;
   let businessId = credentials.businessId || credentials.business_id;
-
   if (!apiKey) throw new Error("Yandex API key topilmadi");
   const headers = { "Api-Key": apiKey, "Content-Type": "application/json" };
 
@@ -45,16 +44,25 @@ async function scanYandexProducts(credentials: any): Promise<any> {
   }
   if (!businessId) throw new Error("Business ID topilmadi");
 
-  // Fetch offers (first 200)
-  const offersResp = await fetchWithRetry(
-    `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-mappings?limit=200`,
-    { method: 'POST', headers, body: '{}' }
-  );
-  if (!offersResp.ok) throw new Error(`Offers fetch error: ${offersResp.status}`);
-  const offersData = await offersResp.json();
-  const mappings = offersData.result?.offerMappings || [];
+  // Fetch ALL offers with pagination
+  let allMappings: any[] = [];
+  let nextPageToken: string | undefined;
+  for (let page = 0; page < 10; page++) {
+    const body: any = {};
+    if (nextPageToken) body.page_token = nextPageToken;
+    const resp = await fetchWithRetry(
+      `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-mappings?limit=200`,
+      { method: 'POST', headers, body: JSON.stringify(body) }
+    );
+    if (!resp.ok) break;
+    const data = await resp.json();
+    allMappings.push(...(data.result?.offerMappings || []));
+    nextPageToken = data.result?.paging?.nextPageToken;
+    if (!nextPageToken) break;
+    await sleep(300);
+  }
 
-  const offers = mappings.map((entry: any) => {
+  const offers = allMappings.map((entry: any) => {
     const offer = entry.offer || {};
     const mapping = entry.mapping || {};
     return {
@@ -72,47 +80,108 @@ async function scanYandexProducts(credentials: any): Promise<any> {
     };
   });
 
-  // Fetch quality scores
+  // Fetch quality scores in batches of 200
   const offerIds = offers.map((o: any) => o.offerId).filter(Boolean);
-  let qualityMap = new Map<string, any>();
+  const qualityMap = new Map<string, any>();
   
-  if (offerIds.length > 0) {
-    const qualResp = await fetchWithRetry(
-      `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-cards`,
-      { method: 'POST', headers, body: JSON.stringify({ offerIds: offerIds.slice(0, 200), withRecommendations: true }) }
-    );
-    if (qualResp.ok) {
-      const qualData = await qualResp.json();
-      for (const card of (qualData.result?.offerCards || [])) {
-        const rating = typeof card.contentRating === 'number' ? card.contentRating : card.contentRating?.rating ?? null;
-        qualityMap.set(card.offerId, {
-          score: rating,
-          errors: card.errors?.length || 0,
-          warnings: card.warnings?.length || 0,
-          recommendations: card.recommendations?.length || 0,
-        });
+  for (let i = 0; i < offerIds.length; i += 200) {
+    const batch = offerIds.slice(i, i + 200);
+    try {
+      const qualResp = await fetchWithRetry(
+        `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-cards`,
+        { method: 'POST', headers, body: JSON.stringify({ offerIds: batch, withRecommendations: true }) }
+      );
+      if (qualResp.ok) {
+        const qualData = await qualResp.json();
+        for (const card of (qualData.result?.offerCards || [])) {
+          const rating = typeof card.contentRating === 'number' ? card.contentRating : card.contentRating?.rating ?? null;
+          qualityMap.set(card.offerId, {
+            score: rating,
+            errors: card.errors || [],
+            warnings: card.warnings || [],
+            recommendations: card.recommendations || [],
+          });
+        }
       }
-    }
+      if (i + 200 < offerIds.length) await sleep(300);
+    } catch (e) { console.error('Quality fetch error:', e); }
   }
 
-  // Analyze each product
+  // Deep analysis
   const products = offers.map((offer: any) => {
     const quality = qualityMap.get(offer.offerId);
     const issues: string[] = [];
+    const issueDetails: any[] = [];
     let score = quality?.score ?? -1;
 
-    if (!offer.name || offer.name.length < 60) issues.push('Nom qisqa (<60 belgi)');
-    if (!offer.description || offer.description.length < 1000) issues.push('Tavsif qisqa (<1000 belgi)');
-    if ((offer.pictures?.length || 0) < 3) issues.push(`Kam rasm (${offer.pictures?.length || 0}/3)`);
-    if (!offer.vendor) issues.push('Brend yo\'q');
-    if (!offer.barcodes?.length) issues.push('Shtrix-kod yo\'q');
-    if (!offer.weightDimensions) issues.push('O\'lchamlar yo\'q');
-    if (quality?.errors > 0) issues.push(`${quality.errors} ta xatolik`);
-    if (quality?.warnings > 0) issues.push(`${quality.warnings} ta ogohlantirish`);
-    if (quality?.recommendations > 0) issues.push(`${quality.recommendations} ta tavsiya`);
+    // Title analysis
+    if (!offer.name || offer.name.length < 40) {
+      issues.push('Nom juda qisqa');
+      issueDetails.push({ type: 'critical', field: 'name', msg: `Nom ${offer.name?.length || 0} belgi (min 60)` });
+    } else if (offer.name.length < 60) {
+      issues.push('Nom qisqa (<60)');
+      issueDetails.push({ type: 'warning', field: 'name', msg: `Nom ${offer.name.length} belgi` });
+    }
 
+    // Description
+    if (!offer.description || offer.description.length < 300) {
+      issues.push('Tavsif yo\'q/juda qisqa');
+      issueDetails.push({ type: 'critical', field: 'description', msg: `Tavsif ${offer.description?.length || 0} belgi (min 1000)` });
+    } else if (offer.description.length < 1000) {
+      issues.push('Tavsif qisqa (<1000)');
+      issueDetails.push({ type: 'warning', field: 'description', msg: `Tavsif ${offer.description.length} belgi` });
+    }
+
+    // Images
+    const imgCount = offer.pictures?.length || 0;
+    if (imgCount === 0) {
+      issues.push('Rasmlar yo\'q');
+      issueDetails.push({ type: 'critical', field: 'images', msg: 'Hech qanday rasm yo\'q' });
+    } else if (imgCount < 3) {
+      issues.push(`Kam rasm (${imgCount}/3)`);
+      issueDetails.push({ type: 'warning', field: 'images', msg: `${imgCount} ta rasm (min 3)` });
+    }
+
+    // Brand
+    if (!offer.vendor) {
+      issues.push('Brend yo\'q');
+      issueDetails.push({ type: 'warning', field: 'vendor', msg: 'Brend ko\'rsatilmagan' });
+    }
+
+    // Barcode
+    if (!offer.barcodes?.length) {
+      issues.push('Shtrix-kod yo\'q');
+      issueDetails.push({ type: 'warning', field: 'barcode', msg: 'Shtrix-kod kiritilmagan' });
+    }
+
+    // Dimensions
+    if (!offer.weightDimensions) {
+      issues.push('O\'lchamlar yo\'q');
+      issueDetails.push({ type: 'warning', field: 'dimensions', msg: 'Og\'irlik/o\'lcham kiritilmagan' });
+    }
+
+    // API-reported errors
+    if (quality?.errors?.length > 0) {
+      for (const e of quality.errors) {
+        issues.push(e.message || `Xatolik: ${e.code || 'unknown'}`);
+        issueDetails.push({ type: 'critical', field: 'api', msg: e.message || e.code });
+      }
+    }
+    if (quality?.warnings?.length > 0) {
+      for (const w of quality.warnings) {
+        issueDetails.push({ type: 'warning', field: 'api', msg: w.message || w.code });
+      }
+      if (quality.warnings.length > 0) issues.push(`${quality.warnings.length} ta ogohlantirish`);
+    }
+    if (quality?.recommendations?.length > 0) {
+      issues.push(`${quality.recommendations.length} ta tavsiya`);
+    }
+
+    // Fallback scoring
     if (score < 0) {
-      score = Math.max(10, 100 - (issues.filter(i => i.includes('xatolik') || i.includes('yo\'q') || i.includes('qisqa')).length * 15));
+      const criticalCount = issueDetails.filter(i => i.type === 'critical').length;
+      const warningCount = issueDetails.filter(i => i.type === 'warning').length;
+      score = Math.max(5, 100 - (criticalCount * 20) - (warningCount * 8));
     }
 
     return {
@@ -122,9 +191,15 @@ async function scanYandexProducts(credentials: any): Promise<any> {
       score: Math.round(score),
       issueCount: issues.length,
       issues,
-      imageCount: offer.pictures?.length || 0,
+      issueDetails,
+      imageCount: imgCount,
+      descriptionLength: offer.description?.length || 0,
       hasDescription: (offer.description?.length || 0) >= 1000,
       hasVendor: !!offer.vendor,
+      hasBarcodes: (offer.barcodes?.length || 0) > 0,
+      hasDimensions: !!offer.weightDimensions,
+      apiErrors: quality?.errors?.length || 0,
+      apiWarnings: quality?.warnings?.length || 0,
     };
   });
 
@@ -139,50 +214,122 @@ async function scanYandexProducts(credentials: any): Promise<any> {
   };
 }
 
-// ===== WILDBERRIES: Scan partner's products =====
+// ===== WILDBERRIES: Deep scan with error list =====
 async function scanWildberriesProducts(credentials: any): Promise<any> {
   const apiKey = credentials.apiKey || credentials.api_key || credentials.token;
   if (!apiKey) throw new Error("WB API key topilmadi");
-
   const headers = { Authorization: apiKey, "Content-Type": "application/json" };
 
-  // Fetch cards
-  const listResp = await fetchWithRetry(
-    `https://content-api.wildberries.ru/content/v2/get/cards/list`,
-    { method: 'POST', headers, body: JSON.stringify({ settings: { cursor: { limit: 100 }, filter: { withPhoto: -1 } } }) }
-  );
-  if (!listResp.ok) throw new Error(`WB cards fetch error: ${listResp.status}`);
-  const listData = await listResp.json();
-  const cards = listData.cards || [];
+  // Fetch all cards with pagination
+  let allCards: any[] = [];
+  let cursor: any = { limit: 100 };
+  for (let page = 0; page < 20; page++) {
+    const listResp = await fetchWithRetry(
+      `https://content-api.wildberries.ru/content/v2/get/cards/list`,
+      { method: 'POST', headers, body: JSON.stringify({ settings: { cursor, filter: { withPhoto: -1 } } }) }
+    );
+    if (!listResp.ok) break;
+    const listData = await listResp.json();
+    const cards = listData.cards || [];
+    allCards.push(...cards);
+    if (cards.length < 100) break;
+    const lastCard = cards[cards.length - 1];
+    cursor = { limit: 100, updatedAt: lastCard.updatedAt, nmID: lastCard.nmID };
+    await sleep(300);
+  }
 
-  const products = cards.map((card: any) => {
+  // Fetch async error list
+  let errorMap = new Map<number, string[]>();
+  try {
+    const errResp = await fetchWithRetry(
+      `https://content-api.wildberries.ru/content/v2/cards/error/list`,
+      { method: 'GET', headers }
+    );
+    if (errResp.ok) {
+      const errData = await errResp.json();
+      for (const err of (errData.data || errData.errors || [])) {
+        const nmID = err.nmID || err.nmId;
+        if (nmID) {
+          if (!errorMap.has(nmID)) errorMap.set(nmID, []);
+          errorMap.get(nmID)!.push(err.message || err.error || 'Noma\'lum xatolik');
+        }
+      }
+    }
+  } catch (e) { console.error('WB error list fetch:', e); }
+
+  const products = allCards.map((card: any) => {
     const issues: string[] = [];
+    const issueDetails: any[] = [];
     const title = card.title || '';
     const description = card.description || '';
     const photos = card.photos || card.mediaFiles || [];
+    const asyncErrors = errorMap.get(card.nmID) || [];
 
-    if (!title || title.length < 30) issues.push('Nom qisqa');
-    if (!description || description.length < 500) issues.push('Tavsif qisqa');
-    if (photos.length < 3) issues.push(`Kam rasm (${photos.length}/3)`);
-    if (!card.brand) issues.push('Brend yo\'q');
+    // Title
+    if (!title || title.length < 20) {
+      issues.push('Nom juda qisqa');
+      issueDetails.push({ type: 'critical', field: 'name', msg: `Nom ${title.length} belgi` });
+    } else if (title.length > 60) {
+      issues.push('Nom uzun (>60)');
+      issueDetails.push({ type: 'warning', field: 'name', msg: `Nom ${title.length} belgi (max 60)` });
+    }
 
-    // Check characteristics
+    // Description
+    if (!description || description.length < 300) {
+      issues.push('Tavsif yo\'q/juda qisqa');
+      issueDetails.push({ type: 'critical', field: 'description', msg: `Tavsif ${description.length} belgi (min 1000)` });
+    } else if (description.length < 1000) {
+      issues.push('Tavsif qisqa (<1000)');
+      issueDetails.push({ type: 'warning', field: 'description', msg: `Tavsif ${description.length} belgi` });
+    }
+
+    // Photos
+    if (photos.length === 0) {
+      issues.push('Rasmlar yo\'q');
+      issueDetails.push({ type: 'critical', field: 'images', msg: 'Hech qanday rasm yo\'q' });
+    } else if (photos.length < 3) {
+      issues.push(`Kam rasm (${photos.length}/3)`);
+      issueDetails.push({ type: 'warning', field: 'images', msg: `${photos.length} ta rasm (min 3)` });
+    }
+
+    // Brand
+    if (!card.brand) {
+      issues.push('Brend yo\'q');
+      issueDetails.push({ type: 'warning', field: 'vendor', msg: 'Brend belgilanmagan' });
+    }
+
+    // Characteristics
     const charcs = card.characteristics || [];
-    if (charcs.length < 3) issues.push('Kam xususiyatlar');
+    if (charcs.length < 3) {
+      issues.push('Kam xususiyatlar');
+      issueDetails.push({ type: 'warning', field: 'characteristics', msg: `${charcs.length} ta xususiyat (min 3)` });
+    }
 
-    const score = Math.max(10, 100 - (issues.length * 15));
+    // Async errors from WB
+    for (const errMsg of asyncErrors) {
+      issues.push(`WB xato: ${errMsg.substring(0, 50)}`);
+      issueDetails.push({ type: 'critical', field: 'async_error', msg: errMsg });
+    }
+
+    const criticalCount = issueDetails.filter(i => i.type === 'critical').length;
+    const warningCount = issueDetails.filter(i => i.type === 'warning').length;
+    const score = Math.max(5, 100 - (criticalCount * 20) - (warningCount * 8));
 
     return {
       offerId: card.vendorCode || card.nmID?.toString() || '',
       nmID: card.nmID,
+      subjectID: card.subjectID,
       name: title || card.vendorCode || '',
       category: card.subjectName || '',
       score,
       issueCount: issues.length,
       issues,
+      issueDetails,
       imageCount: photos.length,
-      hasDescription: description.length >= 500,
+      descriptionLength: description.length,
+      hasDescription: description.length >= 1000,
       hasVendor: !!card.brand,
+      asyncErrors: asyncErrors.length,
     };
   });
 
@@ -201,7 +348,6 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
-    // Auth check - admin only
     const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -217,7 +363,6 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Invalid auth' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Check admin permission
     const { data: adminPerm } = await supabase
       .from('admin_permissions')
       .select('is_super_admin, can_manage_users')
@@ -235,7 +380,6 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'partnerId kerak' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Get partner's marketplace connections
     const { data: connections, error: connError } = await supabase
       .from('marketplace_connections')
       .select('*')
@@ -250,14 +394,11 @@ serve(async (req) => {
 
     for (const conn of connections) {
       if (marketplace && conn.marketplace !== marketplace) continue;
-
       try {
-        // Decrypt credentials
         let creds: any;
         if (conn.encrypted_credentials) {
           const { data: decrypted, error: decErr } = await supabase.rpc('decrypt_credentials', { p_encrypted: conn.encrypted_credentials });
           if (decErr || !decrypted) {
-            console.error(`Decrypt error for ${conn.marketplace}:`, decErr);
             results.push({ marketplace: conn.marketplace, error: 'API kalitlarni deshifrlash xatosi', totalProducts: 0, products: [] });
             continue;
           }
@@ -267,15 +408,13 @@ serve(async (req) => {
         }
 
         if (conn.marketplace === 'yandex') {
-          const result = await scanYandexProducts(creds);
-          results.push(result);
+          results.push(await scanYandexProducts(creds));
         } else if (conn.marketplace === 'wildberries') {
-          const result = await scanWildberriesProducts(creds);
-          results.push(result);
+          results.push(await scanWildberriesProducts(creds));
         }
       } catch (e) {
         console.error(`Scan error for ${conn.marketplace}:`, e);
-        results.push({ marketplace: conn.marketplace, error: e.message, totalProducts: 0, products: [] });
+        results.push({ marketplace: conn.marketplace, error: e.message, totalProducts: 0, avgScore: 0, criticalCount: 0, warningCount: 0, goodCount: 0, products: [] });
       }
     }
 
