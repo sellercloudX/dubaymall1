@@ -241,7 +241,7 @@ function CardAuditTab({ selectedPartnerId, scanResults, setScanResults }: any) {
             <CardHeader>
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <CardTitle className="flex items-center gap-2 text-lg">
-                  {result.marketplace === 'yandex' ? '🟡 Yandex Market' : '🟣 Wildberries'}
+                  {result.marketplace === 'yandex' ? '🟡 Yandex Market' : result.marketplace === 'uzum' ? '🟢 Uzum Market' : '🟣 Wildberries'}
                   <Badge variant="outline">{result.totalProducts} ta</Badge>
                 </CardTitle>
                 <div className="flex gap-2 flex-wrap">
