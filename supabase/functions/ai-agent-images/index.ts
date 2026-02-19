@@ -36,20 +36,24 @@ async function generateProductImage(productName: string, category: string, refer
     const model = "google/gemini-3-pro-image-preview";
 
     if (referenceImageUrl) {
-      // PHOTO EDITING ONLY — zero creative freedom
-      const editPrompt = `You are a PHOTO EDITOR, not a designer. Your ONLY job is to edit the BACKGROUND of this photo.
+      // Send the image TWICE for maximum context retention + ultra-strict prompt
+      const editPrompt = `Look at this product photo carefully. This is the ONLY product that must appear in your output.
 
-ABSOLUTE RULES:
-- DO NOT create, draw, generate, or imagine ANY product. The product already exists in the image.
-- DO NOT change ANYTHING about the product: not the shape, not the color, not the label, not the text, not the cap, not the material, NOTHING.
-- KEEP the product PIXEL-PERFECT as it appears. Think of it as cutting out the product and pasting it onto a new background.
-- ONLY CHANGE: Remove the current background and replace with a clean, pure white or very light gray studio background.
-- Add soft, even studio lighting that makes the product look professional.
-- Center the product vertically and horizontally with generous empty space (negative space) on all sides.
-- Output: portrait 3:4 ratio, photorealistic, e-commerce marketplace quality.
+YOUR TASK: Take this EXACT product and place it on a clean white studio background.
 
-The product name "${productName}" is for reference ONLY — do NOT use it to imagine what the product looks like. The image IS the product.`;
+STRICT RULES:
+- The output must contain the SAME PHYSICAL OBJECT from the input photo
+- Same bottle/box shape, same colors, same labels, same text, same cap, same everything
+- Do NOT generate a different product even if you know what "${productName}" looks like
+- Do NOT add any text, watermarks, or labels that aren't already on the product
+- ONLY change the background to pure white/light gray
+- Add professional studio lighting (soft shadows, even illumination)
+- Center the product with negative space on all sides
+- Output: portrait 3:4 ratio, high resolution, e-commerce quality
 
+Think of this as: cut out the product from the photo → paste onto white background → add studio lighting. Nothing else.`;
+
+      // Send image twice to reinforce visual context
       const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -58,13 +62,16 @@ The product name "${productName}" is for reference ONLY — do NOT use it to ima
         },
         body: JSON.stringify({
           model,
-          messages: [{
-            role: "user",
-            content: [
-              { type: "image_url", image_url: { url: referenceImageUrl } },
-              { type: "text", text: editPrompt }
-            ]
-          }],
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "image_url", image_url: { url: referenceImageUrl } },
+                { type: "text", text: editPrompt },
+                { type: "image_url", image_url: { url: referenceImageUrl } },
+              ]
+            }
+          ],
           modalities: ["image", "text"],
         }),
       });
@@ -129,20 +136,24 @@ async function generateInfographicImage(productName: string, category: string, r
     
     const content: any[] = [];
 
-    // Put image FIRST so the model sees the product before the instructions
     if (referenceImageUrl) {
       content.push({ type: "image_url", image_url: { url: referenceImageUrl } });
     }
 
-    content.push({ type: "text", text: `You are a PHOTO EDITOR. The product in the reference image must remain UNTOUCHED — same shape, color, label, cap, everything.
+    content.push({ type: "text", text: `Look at the product photo above. Keep this EXACT product unchanged — same shape, colors, labels, cap.
 
-Your task: Create a sales-boosting INFOGRAPHIC layout AROUND the product:
-1. DO NOT modify, redraw, or reimagine the product. Keep it exactly as-is from the photo.
-2. Add a stylish background (gradient, pattern, or themed color).
-3. Add 2-3 small icons or badges AROUND the product (not covering it) highlighting: ${featureText}
-4. Add a banner/ribbon at the top or bottom with a key selling point.
-5. Portrait 3:4, 1080x1440, marketplace listing style.
-6. The product must remain the visual center and be clearly recognizable.` });
+Create a sales-boosting INFOGRAPHIC layout:
+1. Keep the product EXACTLY as shown in the photo — do NOT redraw it
+2. Add a stylish gradient/pattern background behind the product
+3. Add 2-3 small badges or icons AROUND the product highlighting: ${featureText}
+4. Add a banner at top or bottom with a selling point
+5. Portrait 3:4, 1080x1440, marketplace style
+6. Product must be the visual center` });
+
+    // Send image again after text for reinforcement
+    if (referenceImageUrl) {
+      content.push({ type: "image_url", image_url: { url: referenceImageUrl } });
+    }
 
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
