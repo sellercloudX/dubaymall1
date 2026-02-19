@@ -441,7 +441,7 @@ function ImageAnalysisTab({ selectedPartnerId, scanResults }: any) {
         throw new Error('No scan results');
       }
 
-      // Analyze ALL products from scan, use real AI analysis for those with images
+      // Prepare products for AI analysis
       const allProducts = scanResults.flatMap((r: ScanResult) =>
         r.products.map((p: ProductIssue) => ({
           offerId: p.offerId,
@@ -455,15 +455,29 @@ function ImageAnalysisTab({ selectedPartnerId, scanResults }: any) {
         }))
       );
 
-      // Products needing images vs OK
-      const results = allProducts.map(p => ({
-        ...p,
-        avgScore: p.imageCount >= 5 ? 85 : p.imageCount >= 3 ? 65 : p.imageCount >= 1 ? 40 : 0,
-        needsReplacement: p.imageCount < 3,
-        issues: p.imageCount === 0 ? ['Rasmlar yo\'q'] : p.imageCount < 3 ? [`Kam rasm (${p.imageCount}/3)`] : [],
-      }));
+      // Call real AI analysis edge function
+      const { data, error } = await supabase.functions.invoke('ai-agent-images', {
+        body: { action: 'analyze', products: allProducts.slice(0, 20) },
+      });
 
-      return results;
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      // Merge AI results with remaining products (basic analysis)
+      const aiResults = data?.results || [];
+      const aiOfferIds = new Set(aiResults.map((r: any) => r.offerId));
+      
+      const remaining = allProducts
+        .filter(p => !aiOfferIds.has(p.offerId))
+        .map(p => ({
+          ...p,
+          avgScore: p.imageCount >= 5 ? 85 : p.imageCount >= 3 ? 65 : p.imageCount >= 1 ? 40 : 0,
+          needsReplacement: p.imageCount < 3,
+          issues: p.imageCount === 0 ? ['Rasmlar yo\'q'] : p.imageCount < 3 ? [`Kam rasm (${p.imageCount}/3)`] : [],
+          suggestions: [],
+        }));
+
+      return [...aiResults, ...remaining];
     },
     onSuccess: (results) => {
       setImageResults(results);

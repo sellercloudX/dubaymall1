@@ -25,10 +25,63 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3)
   return fetch(url, options);
 }
 
-// Generate product image using Gemini
+// ===== Generate product image using image generation endpoint =====
 async function generateProductImage(productName: string, category: string): Promise<string | null> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) return null;
+  if (!LOVABLE_API_KEY) {
+    console.error("LOVABLE_API_KEY not configured");
+    return null;
+  }
+
+  try {
+    console.log(`Generating image for: "${productName}" (${category})`);
+    
+    const prompt = `Professional e-commerce product photography of "${productName}" (category: ${category}). Clean white background, professional studio lighting, high resolution, sharp focus. Product centered, commercial quality. No text, no watermarks, no logos.`;
+
+    const resp = await fetch("https://ai.gateway.lovable.dev/v1/images/generations", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "dall-e-3",
+        prompt,
+        n: 1,
+        size: "1024x1024",
+        quality: "hd",
+      }),
+    });
+
+    if (!resp.ok) {
+      const errText = await resp.text();
+      console.error(`Image generation failed: ${resp.status} - ${errText.substring(0, 300)}`);
+      
+      if (resp.status === 429) throw new Error("AI rate limit. Keyinroq urinib ko'ring.");
+      if (resp.status === 402) throw new Error("AI kredit tugadi.");
+      return null;
+    }
+
+    const data = await resp.json();
+    const imageUrl = data.data?.[0]?.url || data.data?.[0]?.b64_json;
+    
+    if (!imageUrl) {
+      console.error("No image URL in response:", JSON.stringify(data).substring(0, 500));
+      return null;
+    }
+
+    console.log(`Image generated successfully. URL type: ${imageUrl.startsWith('http') ? 'URL' : 'base64'}`);
+    return imageUrl;
+  } catch (e) {
+    console.error("Image generation error:", e);
+    return null;
+  }
+}
+
+// ===== Analyze image quality with Gemini Vision =====
+async function analyzeImageQuality(imageUrl: string, productName: string): Promise<{ score: number; issues: string[]; suggestions: string[] }> {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) return { score: 50, issues: ["AI tahlil mavjud emas"], suggestions: [] };
 
   try {
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -38,34 +91,62 @@ async function generateProductImage(productName: string, category: string): Prom
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image",
-        messages: [{
-          role: "user",
-          content: `Professional e-commerce product photo of "${productName}" (category: ${category}). Clean white background, studio lighting, high resolution, no text or watermarks. Product centered, sharp focus, commercial quality. 3:4 aspect ratio.`
-        }],
-        modalities: ["image", "text"],
+        model: "google/gemini-2.5-flash",
+        messages: [
+          {
+            role: "system",
+            content: "Sen marketplace rasm sifat ekspertisan. Rasmni 0-100 ball bilan baholagin. FAQAT JSON javob ber."
+          },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: `Marketplace mahsulot rasmi sifatini baholagin. Mahsulot: "${productName}". Baholash mezonlari: fon tozaligi (oq fon yaxshi), yoritilganlik, aniqliq (focus), kompozitsiya, professional ko'rinish. FAQAT JSON: {"score": 75, "issues": ["muammo1"], "suggestions": ["tavsiya1"]}` },
+              { type: "image_url", image_url: { url: imageUrl } }
+            ]
+          }
+        ],
+        temperature: 0.1,
       }),
     });
 
     if (!resp.ok) {
-      console.error("Image gen failed:", resp.status);
-      return null;
+      console.error(`Image analysis failed: ${resp.status}`);
+      return { score: 50, issues: ["Tahlil qilib bo'lmadi"], suggestions: [] };
     }
+
     const data = await resp.json();
-    return data.choices?.[0]?.message?.images?.[0]?.image_url?.url || null;
+    const content = data.choices?.[0]?.message?.content || '';
+    const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || content.match(/(\{[\s\S]*\})/);
+    if (!jsonMatch) return { score: 50, issues: ["Javob tahlil qilib bo'lmadi"], suggestions: [] };
+
+    return JSON.parse(jsonMatch[1] || jsonMatch[0]);
   } catch (e) {
-    console.error("Image generation error:", e);
-    return null;
+    console.error("Image analysis error:", e);
+    return { score: 50, issues: ["Tahlil xatosi"], suggestions: [] };
   }
 }
 
-// Upload base64 to Supabase Storage
-async function uploadToStorage(supabase: any, base64Data: string, partnerId: string, productId: string): Promise<string | null> {
+// ===== Upload image URL to Supabase Storage (download first if needed) =====
+async function uploadToStorage(supabase: any, imageSource: string, partnerId: string, productId: string): Promise<string | null> {
   try {
-    const base64Content = base64Data.replace(/^data:image\/\w+;base64,/, '');
-    const bytes = Uint8Array.from(atob(base64Content), c => c.charCodeAt(0));
-    const fileName = `ai-agent/${partnerId}/${productId}-${Date.now()}.png`;
+    let bytes: Uint8Array;
+    
+    if (imageSource.startsWith('http')) {
+      // Download from URL
+      const resp = await fetch(imageSource);
+      if (!resp.ok) { console.error("Failed to download image:", resp.status); return null; }
+      const arrayBuf = await resp.arrayBuffer();
+      bytes = new Uint8Array(arrayBuf);
+    } else if (imageSource.startsWith('data:')) {
+      // Base64 data URI
+      const base64Content = imageSource.replace(/^data:image\/\w+;base64,/, '');
+      bytes = Uint8Array.from(atob(base64Content), c => c.charCodeAt(0));
+    } else {
+      // Raw base64
+      bytes = Uint8Array.from(atob(imageSource), c => c.charCodeAt(0));
+    }
 
+    const fileName = `ai-agent/${partnerId}/${productId}-${Date.now()}.png`;
     const { error } = await supabase.storage
       .from('product-images')
       .upload(fileName, bytes, { contentType: 'image/png', upsert: true });
@@ -73,6 +154,7 @@ async function uploadToStorage(supabase: any, base64Data: string, partnerId: str
     if (error) { console.error("Storage upload error:", error); return null; }
 
     const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(fileName);
+    console.log(`Uploaded to storage: ${urlData?.publicUrl}`);
     return urlData?.publicUrl || null;
   } catch (e) {
     console.error("Upload error:", e);
@@ -80,7 +162,7 @@ async function uploadToStorage(supabase: any, base64Data: string, partnerId: str
   }
 }
 
-// Upload image to Yandex Market
+// ===== Upload to Yandex Market =====
 async function uploadToYandex(credentials: any, offerId: string, imageUrl: string): Promise<{ success: boolean; message: string }> {
   const apiKey = credentials.apiKey || credentials.api_key;
   const campaignId = credentials.campaignId || credentials.campaign_id;
@@ -97,7 +179,7 @@ async function uploadToYandex(credentials: any, offerId: string, imageUrl: strin
   }
   if (!businessId) return { success: false, message: 'Business ID topilmadi' };
 
-  // Get existing pictures, append new one
+  // Get existing pictures
   const getResp = await fetchWithRetry(
     `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-mappings`,
     { method: 'POST', headers, body: JSON.stringify({ offerIds: [offerId] }) }
@@ -122,17 +204,16 @@ async function uploadToYandex(credentials: any, offerId: string, imageUrl: strin
     return { success: false, message: `Yandex: ${resp.status} - ${errText.substring(0, 200)}` };
   }
 
-  return { success: true, message: `Rasm Yandex Market'ga yuklandi (jami ${allPictures.length} ta)` };
+  return { success: true, message: `Rasm Yandex'ga yuklandi (jami ${allPictures.length} ta)` };
 }
 
-// Upload image to Wildberries
+// ===== Upload to Wildberries =====
 async function uploadToWildberries(credentials: any, nmID: number, imageUrl: string): Promise<{ success: boolean; message: string }> {
   const apiKey = credentials.apiKey || credentials.api_key || credentials.token;
   const headers = { Authorization: apiKey, "Content-Type": "application/json" };
 
   if (!nmID) return { success: false, message: 'nmID topilmadi' };
 
-  // WB v3 media save
   const resp = await fetchWithRetry(
     `https://content-api.wildberries.ru/content/v3/media/save`,
     { method: 'POST', headers, body: JSON.stringify({ nmId: nmID, data: [imageUrl] }) }
@@ -143,9 +224,10 @@ async function uploadToWildberries(credentials: any, nmID: number, imageUrl: str
     return { success: false, message: `WB: ${resp.status} - ${errText.substring(0, 200)}` };
   }
 
-  return { success: true, message: 'Rasm Wildberries\'ga yuklandi' };
+  return { success: true, message: 'Rasm WB\'ga yuklandi' };
 }
 
+// ===== MAIN HANDLER =====
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
@@ -176,9 +258,74 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const { action, partnerId, productName, category, offerId, nmID, marketplace } = body;
+    const { action, partnerId, productName, category, offerId, nmID, marketplace, imageUrl: existingImageUrl } = body;
 
-    // ===== Generate + Upload to marketplace =====
+    console.log(`AI Agent Images: action=${action}, partner=${partnerId}, product=${productName}`);
+
+    // ===== ANALYZE: Real AI image quality analysis =====
+    if (action === 'analyze') {
+      const { products } = body;
+      if (!products?.length) {
+        return new Response(JSON.stringify({ error: 'products kerak' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      console.log(`Analyzing ${products.length} products...`);
+      const results: any[] = [];
+
+      for (const p of products.slice(0, 20)) {
+        // If product has images, analyze first one with AI
+        if (p.imageUrl || (p.pictures && p.pictures.length > 0)) {
+          const imgUrl = p.imageUrl || p.pictures[0];
+          try {
+            const analysis = await analyzeImageQuality(imgUrl, p.name || '');
+            results.push({
+              offerId: p.offerId,
+              nmID: p.nmID,
+              name: p.name,
+              marketplace: p.marketplace,
+              category: p.category,
+              imageCount: p.imageCount || p.pictures?.length || 0,
+              avgScore: analysis.score,
+              issues: analysis.issues,
+              suggestions: analysis.suggestions,
+              needsReplacement: analysis.score < 50 || (p.imageCount || 0) < 3,
+            });
+          } catch (e) {
+            console.error(`Analysis error for ${p.offerId}:`, e);
+            results.push({
+              ...p,
+              avgScore: p.imageCount >= 3 ? 60 : p.imageCount >= 1 ? 30 : 0,
+              issues: p.imageCount < 3 ? [`Kam rasm (${p.imageCount}/3)`] : [],
+              suggestions: [],
+              needsReplacement: (p.imageCount || 0) < 3,
+            });
+          }
+          await sleep(500); // Rate limit
+        } else {
+          // No images at all
+          results.push({
+            offerId: p.offerId,
+            nmID: p.nmID,
+            name: p.name,
+            marketplace: p.marketplace,
+            category: p.category,
+            imageCount: 0,
+            avgScore: 0,
+            issues: ['Rasmlar yo\'q'],
+            suggestions: ['Professional mahsulot rasmi qo\'shing'],
+            needsReplacement: true,
+          });
+        }
+      }
+
+      return new Response(JSON.stringify({ success: true, results }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // ===== GENERATE-AND-UPLOAD: Full pipeline =====
     if (action === 'generate-and-upload') {
       if (!productName || !partnerId) {
         return new Response(JSON.stringify({ error: 'productName va partnerId kerak' }), {
@@ -186,31 +333,28 @@ serve(async (req) => {
         });
       }
 
-      console.log(`Generating image for: ${productName} (${marketplace})`);
+      console.log(`=== FULL PIPELINE: Generate + Upload for "${productName}" ===`);
 
       // Step 1: Generate image
-      const base64Image = await generateProductImage(productName, category || '');
-      if (!base64Image) {
-        return new Response(JSON.stringify({ success: false, error: 'Rasm yaratib bo\'lmadi' }), {
+      const imageSource = await generateProductImage(productName, category || '');
+      if (!imageSource) {
+        return new Response(JSON.stringify({ success: false, error: 'Rasm yaratib bo\'lmadi. AI xizmati javob bermadi.' }), {
           status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
       // Step 2: Upload to Supabase storage
-      const publicUrl = await uploadToStorage(supabase, base64Image, partnerId, offerId || 'unknown');
+      const publicUrl = await uploadToStorage(supabase, imageSource, partnerId, offerId || 'unknown');
       if (!publicUrl) {
-        return new Response(JSON.stringify({ success: false, error: 'Rasmni saqlash xatosi' }), {
+        return new Response(JSON.stringify({ success: false, error: 'Rasmni storage\'ga saqlash xatosi' }), {
           status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      console.log(`Image uploaded to storage: ${publicUrl}`);
-
       // Step 3: Upload to marketplace
-      let mpResult = { success: false, message: 'Marketplace aniqlanmadi' };
+      let mpResult: { success: boolean; message: string } = { success: false, message: 'Marketplace aniqlanmadi' };
       
-      if (marketplace) {
-        // Get credentials
+      if (marketplace && offerId) {
         const { data: connections } = await supabase
           .from('marketplace_connections')
           .select('*')
@@ -234,66 +378,52 @@ serve(async (req) => {
           } else if (marketplace === 'wildberries' && nmID) {
             mpResult = await uploadToWildberries(creds, nmID, publicUrl);
           }
+        } else {
+          mpResult = { success: false, message: `${marketplace} ulanishi topilmadi` };
         }
       }
 
-      console.log(`Marketplace upload result:`, mpResult);
+      console.log(`Pipeline complete. Storage: ${publicUrl}, MP: ${mpResult.success}`);
 
       return new Response(JSON.stringify({
         success: true,
         imageUrl: publicUrl,
         marketplaceUpload: mpResult,
         message: mpResult.success 
-          ? `Rasm yaratildi va ${marketplace}'ga yuklandi` 
-          : `Rasm yaratildi (storage). Marketplace: ${mpResult.message}`,
+          ? `✅ Rasm yaratildi va ${marketplace}'ga yuklandi` 
+          : `⚠️ Rasm yaratildi (storage saqlandi). Marketplace: ${mpResult.message}`,
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // ===== Legacy: Generate only =====
+    // ===== GENERATE: Just generate, don't upload to marketplace =====
     if (action === 'generate') {
-      if (!productName || !partnerId) {
-        return new Response(JSON.stringify({ error: 'productName va partnerId kerak' }), {
+      if (!productName) {
+        return new Response(JSON.stringify({ error: 'productName kerak' }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      const base64Image = await generateProductImage(productName, category || '');
-      if (!base64Image) {
-        return new Response(JSON.stringify({ error: 'Rasm yaratib bo\'lmadi' }), {
-          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      const imageSource = await generateProductImage(productName, category || '');
+      if (!imageSource) {
+        return new Response(JSON.stringify({ success: false, error: 'Rasm yaratib bo\'lmadi' }), {
+          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      const publicUrl = await uploadToStorage(supabase, base64Image, partnerId, offerId || 'unknown');
+      const publicUrl = await uploadToStorage(supabase, imageSource, partnerId || 'unknown', offerId || 'unknown');
 
       return new Response(JSON.stringify({
         success: true,
-        imageUrl: publicUrl,
-        message: 'Rasm yaratildi va saqlandi'
+        imageUrl: publicUrl || imageSource,
+        message: 'Rasm yaratildi'
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // ===== Analyze (legacy) =====
-    if (action === 'analyze') {
-      const results = (body.products || []).slice(0, 10).map((p: any) => ({
-        offerId: p.offerId,
-        name: p.name,
-        imageCount: (p.images || p.pictures || []).length,
-        avgScore: (p.images || p.pictures || []).length >= 3 ? 75 : 30,
-        needsReplacement: (p.images || p.pictures || []).length < 3,
-        issues: (p.images || p.pictures || []).length < 3 ? ['Kam rasm'] : [],
-      }));
-
-      return new Response(JSON.stringify({ success: true, results }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    return new Response(JSON.stringify({ error: 'action kerak (generate-and-upload | generate | analyze)' }), {
+    return new Response(JSON.stringify({ error: 'action kerak: analyze | generate-and-upload | generate' }), {
       status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (e) {
