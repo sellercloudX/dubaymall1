@@ -25,9 +25,446 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3)
   return fetch(url, options);
 }
 
-// ===== Download image as bytes =====
+// =====================================================
+// CATEGORY STYLE MAP — determines design direction
+// =====================================================
+const CATEGORY_STYLES: Record<string, {
+  visual_style: string;
+  background_style: string;
+  color_palette: string;
+  prompt_addition: string;
+}> = {
+  perfume: {
+    visual_style: "Luxury cosmetic advertising",
+    background_style: "Elegant gradient with gold accents",
+    color_palette: "Deep gold, rose gold, champagne, warm bronze",
+    prompt_addition: "Soft glow lighting. Elegant gradient background. Gold accents. Premium minimal typography. Close-up focus. Romantic atmosphere. Luxury feel.",
+  },
+  beauty: {
+    visual_style: "Premium beauty advertising",
+    background_style: "Soft pastel gradient with shimmer",
+    color_palette: "Rose pink, pearl white, soft gold, lavender",
+    prompt_addition: "Soft diffused lighting. Pastel gradient background. Shimmer effects. Beauty-focused aesthetic. Elegant composition.",
+  },
+  electronics: {
+    visual_style: "Modern technology advertising",
+    background_style: "Clean tech gradient or dark minimalist",
+    color_palette: "Deep blue, metallic silver, electric blue, charcoal",
+    prompt_addition: "Modern technology advertising style. Clean white or tech gradient background. Functional feature highlights. Minimalist composition. Blue or metallic accents. Precise typography.",
+  },
+  fashion: {
+    visual_style: "Lifestyle fashion advertising",
+    background_style: "Trendy lifestyle backdrop",
+    color_palette: "Neutral tones, warm beige, soft contrast",
+    prompt_addition: "Lifestyle fashion advertising style. Modern trendy composition. Soft natural lighting. Dynamic layout. Instagram-ready aesthetic.",
+  },
+  household: {
+    visual_style: "Fresh clean advertising",
+    background_style: "Bright clean background with freshness cues",
+    color_palette: "Fresh blue, clean white, bright green, sky blue",
+    prompt_addition: "Fresh bright background. Clean hygiene atmosphere. Water splash or freshness visual cues. High brightness commercial look.",
+  },
+  food: {
+    visual_style: "Appetizing food advertising",
+    background_style: "Warm rustic or clean white",
+    color_palette: "Warm orange, natural green, appetizing red, golden brown",
+    prompt_addition: "Appetizing food photography style. Warm inviting lighting. Natural textures. Fresh ingredient feel. Mouth-watering presentation.",
+  },
+  kids: {
+    visual_style: "Playful colorful advertising",
+    background_style: "Bright colorful fun background",
+    color_palette: "Bright yellow, sky blue, candy pink, grass green",
+    prompt_addition: "Playful colorful style. Fun energetic composition. Bright cheerful lighting. Child-friendly aesthetic. Safe and happy atmosphere.",
+  },
+  sport: {
+    visual_style: "Dynamic active advertising",
+    background_style: "Energetic gradient with motion effects",
+    color_palette: "Energy red, dynamic orange, power black, electric green",
+    prompt_addition: "Dynamic active style. Energetic composition. Bold contrasts. Motion-inspired design. Athletic powerful feel.",
+  },
+  default: {
+    visual_style: "Professional commercial advertising",
+    background_style: "Clean gradient or studio white",
+    color_palette: "Professional blue, clean white, subtle gray, accent gold",
+    prompt_addition: "Professional commercial style. Clean modern composition. Studio-quality lighting. High-end marketplace aesthetic.",
+  },
+};
+
+function getCategoryStyle(category: string): typeof CATEGORY_STYLES.default {
+  const cat = (category || '').toLowerCase();
+  if (cat.includes('parfum') || cat.includes('perfum') || cat.includes('atir') || cat.includes('духи') || cat.includes('парфюм')) return CATEGORY_STYLES.perfume;
+  if (cat.includes('kosmet') || cat.includes('beauty') || cat.includes('косметик') || cat.includes('go\'zal')) return CATEGORY_STYLES.beauty;
+  if (cat.includes('elektr') || cat.includes('techni') || cat.includes('gadget') || cat.includes('электрон') || cat.includes('texnik')) return CATEGORY_STYLES.electronics;
+  if (cat.includes('kiyim') || cat.includes('fashion') || cat.includes('одежд') || cat.includes('мода') || cat.includes('обувь') || cat.includes('poyabzal')) return CATEGORY_STYLES.fashion;
+  if (cat.includes('tozala') || cat.includes('household') || cat.includes('бытов') || cat.includes('чист') || cat.includes('uy')) return CATEGORY_STYLES.household;
+  if (cat.includes('oziq') || cat.includes('food') || cat.includes('еда') || cat.includes('продукт') || cat.includes('ovqat')) return CATEGORY_STYLES.food;
+  if (cat.includes('bolalar') || cat.includes('kids') || cat.includes('детск') || cat.includes('игруш') || cat.includes('o\'yinchoq')) return CATEGORY_STYLES.kids;
+  if (cat.includes('sport') || cat.includes('спорт') || cat.includes('fitness') || cat.includes('fitnes')) return CATEGORY_STYLES.sport;
+  return CATEGORY_STYLES.default;
+}
+
+// =====================================================
+// STEP 1: Product + Category Detection (GPT-4o Vision)
+// =====================================================
+async function detectProductCategory(imageUrl: string, apiKey: string): Promise<any> {
+  console.log("🔍 STEP 1: Product & Category Detection (GPT-4o Vision)...");
+
+  let imageContent: any;
+  if (imageUrl.startsWith('data:')) {
+    imageContent = { type: "image_url", image_url: { url: imageUrl, detail: "high" } };
+  } else {
+    imageContent = { type: "image_url", image_url: { url: imageUrl, detail: "high" } };
+  }
+
+  const resp = await fetchWithRetry("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "gpt-4o",
+      messages: [{
+        role: "user",
+        content: [
+          { type: "text", text: `You are a professional e-commerce visual classifier.
+
+Analyze this product image and determine:
+1. Main product category
+2. Sub-category
+3. Target audience
+4. Market positioning (budget / mid-range / premium)
+5. Recommended advertising style
+6. Recommended background style
+7. Recommended color palette
+8. Product name (best guess in Russian/Uzbek)
+9. Key selling features (3-5 items)
+
+Return ONLY valid JSON:
+{
+  "category": "",
+  "sub_category": "",
+  "target_audience": "",
+  "positioning": "",
+  "visual_style": "",
+  "background_style": "",
+  "color_palette": "",
+  "product_name": "",
+  "key_features": []
+}` },
+          imageContent
+        ]
+      }],
+      max_tokens: 500,
+      temperature: 0.3,
+    }),
+  });
+
+  if (!resp.ok) {
+    console.error(`GPT-4o Vision detection failed: ${resp.status}`);
+    return null;
+  }
+
+  const data = await resp.json();
+  const content = data.choices?.[0]?.message?.content || '';
+  try {
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const result = JSON.parse(jsonMatch[0]);
+      console.log(`✅ STEP 1 Done: category="${result.category}", positioning="${result.positioning}"`);
+      return result;
+    }
+  } catch (e) {
+    console.error("JSON parse error in detection:", e);
+  }
+  return null;
+}
+
+// =====================================================
+// STEP 2: Image Quality Scan (GPT-4o Vision)
+// =====================================================
+async function scanImageQuality(imageUrl: string, apiKey: string): Promise<any> {
+  console.log("🔎 STEP 2: Image Quality Scan (GPT-4o Vision)...");
+
+  const resp = await fetchWithRetry("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "gpt-4o",
+      messages: [{
+        role: "user",
+        content: [
+          { type: "text", text: `Analyze this product image for marketplace compliance.
+
+Check:
+- Background quality (clean, professional?)
+- Lighting (even, no harsh shadows?)
+- Sharpness (crisp details?)
+- Object centering (product centered?)
+- Shadow quality (natural, soft?)
+- Brand visibility (labels readable?)
+- Commercial readiness (marketplace-ready?)
+
+Return ONLY valid JSON:
+{
+  "background": "good/poor/acceptable",
+  "lighting": "good/poor/acceptable",
+  "sharpness": "good/poor/acceptable",
+  "composition": "good/poor/acceptable",
+  "issues": ["list of specific issues"],
+  "compliance_score": 0-100,
+  "fix_required": true/false
+}` },
+          { type: "image_url", image_url: { url: imageUrl, detail: "high" } }
+        ]
+      }],
+      max_tokens: 400,
+      temperature: 0.2,
+    }),
+  });
+
+  if (!resp.ok) {
+    console.error(`Quality scan failed: ${resp.status}`);
+    return { compliance_score: 50, fix_required: true, issues: ["Scan failed"] };
+  }
+
+  const data = await resp.json();
+  const content = data.choices?.[0]?.message?.content || '';
+  try {
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const result = JSON.parse(jsonMatch[0]);
+      console.log(`✅ STEP 2 Done: score=${result.compliance_score}, fix_required=${result.fix_required}`);
+      return result;
+    }
+  } catch (e) {
+    console.error("JSON parse error in quality scan:", e);
+  }
+  return { compliance_score: 50, fix_required: true, issues: ["Parse error"] };
+}
+
+// =====================================================
+// STEP 3: Auto Image Fix (OpenAI gpt-image-1)
+// =====================================================
+async function autoFixImage(imageUrl: string, issues: string[], apiKey: string): Promise<string | null> {
+  console.log("🔧 STEP 3: Auto Image Fix (OpenAI gpt-image-1)...");
+  console.log(`Issues to fix: ${issues.join(', ')}`);
+
+  const imageBytes = await downloadImage(imageUrl);
+  if (!imageBytes) {
+    console.error("Failed to download image for fixing");
+    return null;
+  }
+
+  const fixPrompt = `Transform this product photo into a professional marketplace-ready image.
+
+Fix these specific issues: ${issues.join('; ')}
+
+Requirements:
+- Clean white or category-appropriate background
+- Improve sharpness and clarity
+- Fix lighting to be even and professional
+- Center the product perfectly
+- Add soft realistic shadow underneath
+- Maintain real proportions — do NOT distort the product
+- The product itself must remain PIXEL-PERFECT UNCHANGED (same shape, colors, labels, brand text, packaging)
+- Commercial studio quality result
+- No artificial or AI-generated look
+- No text, watermarks, or decorative elements added
+- Resolution: 1080x1440 portrait orientation`;
+
+  const formData = new FormData();
+  formData.append("image", new Blob([imageBytes], { type: "image/png" }), "product.png");
+  formData.append("model", "gpt-image-1");
+  formData.append("prompt", fixPrompt);
+  formData.append("size", "1024x1536");
+  formData.append("quality", "high");
+
+  const resp = await fetchWithRetry("https://api.openai.com/v1/images/edits", {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${apiKey}` },
+    body: formData,
+  });
+
+  if (!resp.ok) {
+    const errText = await resp.text();
+    console.error(`Auto fix failed (${resp.status}): ${errText.substring(0, 300)}`);
+    return null;
+  }
+
+  const data = await resp.json();
+  const b64 = data.data?.[0]?.b64_json;
+  if (b64) { console.log("✅ STEP 3 Done: Image fixed"); return `data:image/png;base64,${b64}`; }
+  const url = data.data?.[0]?.url;
+  if (url) { console.log("✅ STEP 3 Done: Image fixed (URL)"); return url; }
+  return null;
+}
+
+// =====================================================
+// STEP 4: Category-Based Marketplace Card (OpenAI gpt-image-1)
+// =====================================================
+async function generateMarketplaceCard(
+  imageUrl: string,
+  detection: any,
+  categoryStyle: typeof CATEGORY_STYLES.default,
+  apiKey: string,
+  variationSeed: number = 0
+): Promise<string | null> {
+  console.log("🎨 STEP 4: Category-Based Marketplace Card Generation...");
+
+  const imageBytes = await downloadImage(imageUrl);
+  if (!imageBytes) {
+    console.error("Failed to download image for card generation");
+    return null;
+  }
+
+  const productName = detection?.product_name || 'Premium Product';
+  const features = detection?.key_features?.slice(0, 5)?.join(', ') || 'Yuqori sifat, Tez yetkazib berish, Eng yaxshi narx';
+  const category = detection?.category || '';
+  const positioning = detection?.positioning || 'mid-range';
+
+  // Anti-repetition: vary layout based on seed
+  const layoutVariations = [
+    "Product on the LEFT side (40%), design elements on the RIGHT (60%). Headline at TOP.",
+    "Product CENTERED (50%), features arranged as floating cards AROUND it. Badge at TOP-LEFT.",
+    "Product at BOTTOM-CENTER (45%), large headline and features at TOP portion.",
+    "Product on the RIGHT side (40%), selling points stacked on the LEFT. Banner at BOTTOM.",
+  ];
+  const layoutHint = layoutVariations[variationSeed % layoutVariations.length];
+
+  const cardPrompt = `Create a HIGH-CONVERTING Pinterest-style marketplace product card.
+
+Resolution: 1080x1440 vertical (portrait).
+
+Product category: ${category}
+Advertising style: ${categoryStyle.visual_style}
+Background style: ${categoryStyle.background_style}
+Color palette: ${categoryStyle.color_palette}
+Market positioning: ${positioning}
+
+Product name: ${productName}
+Key benefits: ${features}
+Highlight badge: ${positioning === 'premium' ? '⭐ PREMIUM' : '🔥 TOP SELLER'}
+
+CATEGORY-SPECIFIC STYLE:
+${categoryStyle.prompt_addition}
+
+LAYOUT: ${layoutHint}
+
+DESIGN RULES:
+- Modern clean layout with strong visual hierarchy
+- Product DOMINANT and clearly visible (40-55% of frame)
+- The product from the reference photo must remain 100% PIXEL-PERFECT UNCHANGED
+- 3-5 benefit icons/badges with short text in RUSSIAN or UZBEK
+- Large bold headline in RUSSIAN or UZBEK (selling the product emotionally)
+- Premium commercial lighting with realistic soft shadow
+- ${categoryStyle.background_style} — NOT plain white
+- No AI artifacts, no distorted text, no random typography
+- Marketplace compliant (Uzum, Yandex, Wildberries)
+- High CTR advertising quality
+- This must look like a REAL commercial advertisement from a professional design agency
+- DO NOT reuse common generic backgrounds
+- Make this design UNIQUE for this specific product
+
+ANTI-REPETITION: Variation seed #${variationSeed}. Do not create a generic template. Adapt EVERYTHING to this specific product and category.`;
+
+  const formData = new FormData();
+  formData.append("image", new Blob([imageBytes], { type: "image/png" }), "product.png");
+  formData.append("model", "gpt-image-1");
+  formData.append("prompt", cardPrompt);
+  formData.append("size", "1024x1536");
+  formData.append("quality", "high");
+
+  const resp = await fetchWithRetry("https://api.openai.com/v1/images/edits", {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${apiKey}` },
+    body: formData,
+  });
+
+  if (!resp.ok) {
+    const errText = await resp.text();
+    console.error(`Card generation failed (${resp.status}): ${errText.substring(0, 300)}`);
+    return null;
+  }
+
+  const data = await resp.json();
+  const b64 = data.data?.[0]?.b64_json;
+  if (b64) { console.log("✅ STEP 4 Done: Marketplace card generated"); return `data:image/png;base64,${b64}`; }
+  const url = data.data?.[0]?.url;
+  if (url) { console.log("✅ STEP 4 Done: Card generated (URL)"); return url; }
+  return null;
+}
+
+// =====================================================
+// STEP 5: AI Quality Control (GPT-4o)
+// =====================================================
+async function qualityControl(imageUrl: string, apiKey: string): Promise<any> {
+  console.log("🏆 STEP 5: AI Quality Control (GPT-4o)...");
+
+  const resp = await fetchWithRetry("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "gpt-4o",
+      messages: [{
+        role: "user",
+        content: [
+          { type: "text", text: `You are a senior marketplace conversion and compliance expert.
+
+Evaluate this marketplace product card image.
+
+Score each (0-100):
+- design_quality: Overall visual design
+- visual_hierarchy: Layout clarity and information flow
+- conversion_strength: How likely to generate clicks/sales
+- marketplace_compliance: Meets Uzum/Yandex/WB standards
+
+If any score below 85, provide EXACT improvement instructions.
+
+Return ONLY valid JSON:
+{
+  "design_quality": 0-100,
+  "visual_hierarchy": 0-100,
+  "conversion_strength": 0-100,
+  "marketplace_compliance": 0-100,
+  "overall_score": 0-100,
+  "improvements": ["specific improvement 1", "specific improvement 2"],
+  "pass": true/false
+}` },
+          { type: "image_url", image_url: { url: imageUrl, detail: "high" } }
+        ]
+      }],
+      max_tokens: 400,
+      temperature: 0.2,
+    }),
+  });
+
+  if (!resp.ok) {
+    console.error(`Quality control failed: ${resp.status}`);
+    return { overall_score: 70, pass: false, improvements: ["QC scan failed"] };
+  }
+
+  const data = await resp.json();
+  const content = data.choices?.[0]?.message?.content || '';
+  try {
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const result = JSON.parse(jsonMatch[0]);
+      console.log(`✅ STEP 5 Done: overall=${result.overall_score}, pass=${result.pass}`);
+      return result;
+    }
+  } catch (e) {
+    console.error("JSON parse in QC:", e);
+  }
+  return { overall_score: 70, pass: false, improvements: ["Parse error"] };
+}
+
+// =====================================================
+// HELPERS
+// =====================================================
 async function downloadImage(url: string): Promise<Uint8Array | null> {
   try {
+    if (url.startsWith('data:')) {
+      const base64Content = url.replace(/^data:image\/\w+;base64,/, '');
+      return Uint8Array.from(atob(base64Content), c => c.charCodeAt(0));
+    }
     const resp = await fetch(url);
     if (!resp.ok) return null;
     return new Uint8Array(await resp.arrayBuffer());
@@ -37,206 +474,9 @@ async function downloadImage(url: string): Promise<Uint8Array | null> {
   }
 }
 
-// ===== OpenAI gpt-image-1: reference-based editing via multipart/form-data =====
-async function editWithOpenAI(referenceImageUrl: string, editPrompt: string, apiKey: string): Promise<string | null> {
-  try {
-    console.log("Downloading reference image for OpenAI edit...");
-    const imageBytes = await downloadImage(referenceImageUrl);
-    if (!imageBytes) {
-      console.error("Failed to download reference image");
-      return null;
-    }
-
-    console.log(`Reference image downloaded: ${imageBytes.length} bytes. Calling OpenAI gpt-image-1...`);
-
-    // Build multipart/form-data
-    const formData = new FormData();
-    const blob = new Blob([imageBytes], { type: "image/png" });
-    formData.append("image", blob, "product.png");
-    formData.append("model", "gpt-image-1");
-    formData.append("prompt", editPrompt);
-    formData.append("size", "1024x1536");
-    formData.append("quality", "high");
-
-    const resp = await fetchWithRetry("https://api.openai.com/v1/images/edits", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        // No Content-Type - browser/runtime sets it with boundary for FormData
-      },
-      body: formData,
-    });
-
-    if (!resp.ok) {
-      const errText = await resp.text();
-      console.error(`OpenAI gpt-image-1 edit failed (${resp.status}): ${errText.substring(0, 500)}`);
-      return null;
-    }
-
-    const data = await resp.json();
-    console.log("OpenAI edit response keys:", Object.keys(data));
-    
-    const b64 = data.data?.[0]?.b64_json;
-    if (b64) return `data:image/png;base64,${b64}`;
-    
-    const url = data.data?.[0]?.url;
-    if (url) return url;
-    
-    console.error("No image in OpenAI edit response:", JSON.stringify(data).substring(0, 300));
-    return null;
-  } catch (e) {
-    console.error("OpenAI edit error:", e);
-    return null;
-  }
-}
-
-// ===== OpenAI DALL-E 3: text-to-image =====
-async function generateWithDallE3(prompt: string, apiKey: string): Promise<string | null> {
-  try {
-    console.log("Calling OpenAI DALL-E 3 text-to-image...");
-    
-    const resp = await fetchWithRetry("https://api.openai.com/v1/images/generations", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "dall-e-3",
-        prompt: prompt,
-        n: 1,
-        size: "1024x1792",
-        quality: "hd",
-        response_format: "b64_json",
-      }),
-    });
-
-    if (!resp.ok) {
-      const errText = await resp.text();
-      console.error(`DALL-E 3 failed (${resp.status}): ${errText.substring(0, 500)}`);
-      return null;
-    }
-
-    const data = await resp.json();
-    const b64 = data.data?.[0]?.b64_json;
-    if (b64) return `data:image/png;base64,${b64}`;
-    const url = data.data?.[0]?.url;
-    if (url) return url;
-    return null;
-  } catch (e) {
-    console.error("DALL-E 3 error:", e);
-    return null;
-  }
-}
-
-// ===== Generate product image (OpenAI only) =====
-async function generateProductImage(productName: string, category: string, referenceImageUrl?: string): Promise<string | null> {
-  const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-  
-  console.log(`=== PRODUCT IMAGE ===`);
-  console.log(`Product: "${productName}" (${category})`);
-  console.log(`Reference: ${referenceImageUrl ? 'YES - ' + referenceImageUrl.substring(0, 80) : 'NO'}`);
-  console.log(`OpenAI Key: ${OPENAI_API_KEY ? 'YES (' + OPENAI_API_KEY.substring(0, 8) + '...)' : 'NO'}`);
-
-  if (!OPENAI_API_KEY) {
-    console.error("❌ OPENAI_API_KEY topilmadi!");
-    return null;
-  }
-
-  // Method 1: gpt-image-1 with reference image
-  if (referenceImageUrl) {
-    const editPrompt = `Take this EXACT product photo and place it on a clean, pure white studio background. 
-Keep the product PIXEL-PERFECT: same shape, colors, labels, cap, brand text - change NOTHING about the product itself.
-Add professional studio lighting with soft natural shadows. Center the product. Portrait orientation.
-Do NOT add any text, watermarks, badges or extra elements.`;
-
-    const result = await editWithOpenAI(referenceImageUrl, editPrompt, OPENAI_API_KEY);
-    if (result) {
-      console.log("✅ Product image via OpenAI gpt-image-1 (reference edit)");
-      return result;
-    }
-    console.log("⚠️ gpt-image-1 edit failed, falling back to DALL-E 3...");
-  }
-
-  // Method 2: DALL-E 3 text-to-image
-  const prompt = `Professional e-commerce product photo of "${productName}" (category: ${category}). 
-Clean white background, product centered, professional studio lighting, soft shadows.
-Portrait orientation 3:4, photorealistic, high resolution. No text or watermarks.`;
-
-  const result = await generateWithDallE3(prompt, OPENAI_API_KEY);
-  if (result) {
-    console.log("✅ Product image via DALL-E 3");
-    return result;
-  }
-
-  console.error("❌ All OpenAI image methods failed");
-  return null;
-}
-
-// ===== Generate INFOGRAPHIC image (OpenAI only) =====
-async function generateInfographicImage(productName: string, category: string, referenceImageUrl?: string, features?: string[]): Promise<string | null> {
-  const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-  if (!OPENAI_API_KEY) return null;
-
-  const featureText = features?.length ? features.slice(0, 5).join(', ') : 'Premium sifat, Tez yetkazib berish, Eng yaxshi narx';
-
-  console.log(`=== INFOGRAPHIC ===`);
-  console.log(`Product: "${productName}", Features: ${featureText}`);
-  console.log(`Reference: ${referenceImageUrl ? 'YES' : 'NO'}`);
-
-  // Method 1: gpt-image-1 with reference
-  if (referenceImageUrl) {
-    const infographicPrompt = `Create a STUNNING MARKETPLACE INFOGRAPHIC that will SELL this product. This must look like a TOP-SELLING product listing.
-
-ABSOLUTE RULES:
-1. The EXACT product from this photo must remain 100% UNCHANGED — same shape, colors, labels, cap, packaging, brand text. PIXEL-PERFECT preservation.
-2. Place the product LARGE and CENTERED (50-60% of frame) with its original packaging/box visible if present.
-
-INFOGRAPHIC DESIGN (Premium Marketplace Style):
-- Background: Rich, eye-catching gradient (dark gold/bronze tones with sparkle effects, or deep elegant colors matching the product category)
-- TOP: Bold catchy SELLING HEADLINE in UZBEK or RUSSIAN language (large, white/gold text with shadow). Example: "AYOLLARNI JALB QILISH UCHUN!" or "ПРЕМИУМ КАЧЕСТВО!"
-- RIGHT SIDE: 2-4 feature badges/cards with icons highlighting: ${featureText}
-  Each badge should have: an emoji/icon + bold title + 1-line description in Uzbek/Russian
-- BOTTOM: A selling banner with urgency text like "O'ZIGA JALB ETSIN!" or "ЛУЧШАЯ ЦЕНА!"
-- Add subtle sparkle/glow effects around the product for premium feel
-- Typography: Bold, modern, high-contrast, easy to read on mobile
-- Product "${productName}" must be the hero — everything else supports it
-
-TECHNICAL: Portrait orientation, 1024x1536, marketplace-ready, mobile-optimized.
-Make it look like the #1 bestseller listing on Wildberries/Ozon/Uzum Market.`;
-
-
-    const result = await editWithOpenAI(referenceImageUrl, infographicPrompt, OPENAI_API_KEY);
-    if (result) {
-      console.log("✅ Infographic via OpenAI gpt-image-1 (reference)");
-      return result;
-    }
-  }
-
-  // Method 2: DALL-E 3 text-only infographic
-  const prompt = `Create a STUNNING marketplace product infographic for "${productName}" (${category}).
-Design: Rich gradient background with sparkle/glow effects. Product centered and large (50-60% of frame).
-TOP: Bold catchy headline in RUSSIAN or UZBEK — selling the product emotionally.
-RIGHT: 2-4 feature badges with icons: ${featureText}. Each badge has icon + title + description.
-BOTTOM: Urgency selling banner.
-Style: Bold modern typography, high contrast, mobile-optimized, portrait 3:4.
-Quality: Must look like #1 bestseller on Wildberries/Ozon marketplace. Premium, eye-catching, trustworthy.
-No real brand logos. High resolution 1024x1792.`;
-
-  const result = await generateWithDallE3(prompt, OPENAI_API_KEY);
-  if (result) {
-    console.log("✅ Infographic via DALL-E 3");
-    return result;
-  }
-
-  return null;
-}
-
-// ===== Upload to Supabase Storage =====
 async function uploadToStorage(supabase: any, imageSource: string, partnerId: string, productId: string): Promise<string | null> {
   try {
     let bytes: Uint8Array;
-    
     if (imageSource.startsWith('http')) {
       const resp = await fetch(imageSource);
       if (!resp.ok) return null;
@@ -248,7 +488,6 @@ async function uploadToStorage(supabase: any, imageSource: string, partnerId: st
       bytes = Uint8Array.from(atob(imageSource), c => c.charCodeAt(0));
     }
 
-    console.log(`Uploading ${bytes.length} bytes to storage...`);
     const fileName = `ai-agent/${partnerId}/${productId}-${Date.now()}.png`;
     const { error } = await supabase.storage
       .from('product-images')
@@ -257,7 +496,7 @@ async function uploadToStorage(supabase: any, imageSource: string, partnerId: st
     if (error) { console.error("Storage upload error:", error); return null; }
 
     const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(fileName);
-    console.log("✅ Uploaded to storage:", urlData?.publicUrl?.substring(0, 80));
+    console.log("✅ Uploaded:", urlData?.publicUrl?.substring(0, 80));
     return urlData?.publicUrl || null;
   } catch (e) {
     console.error("Upload error:", e);
@@ -265,7 +504,7 @@ async function uploadToStorage(supabase: any, imageSource: string, partnerId: st
   }
 }
 
-// ===== Upload to Yandex Market =====
+// ===== Marketplace upload helpers =====
 async function uploadToYandex(credentials: any, offerId: string, newImageUrl: string): Promise<{ success: boolean; message: string }> {
   const apiKey = credentials.apiKey || credentials.api_key;
   const campaignId = credentials.campaignId || credentials.campaign_id;
@@ -286,7 +525,7 @@ async function uploadToYandex(credentials: any, offerId: string, newImageUrl: st
     `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-mappings`,
     { method: 'POST', headers, body: JSON.stringify({ offerIds: [offerId] }) }
   );
-  
+
   let existingPictures: string[] = [];
   if (getResp.ok) {
     const getData = await getResp.json();
@@ -303,11 +542,9 @@ async function uploadToYandex(credentials: any, offerId: string, newImageUrl: st
     const errText = await resp.text();
     return { success: false, message: `Yandex: ${resp.status} - ${errText.substring(0, 200)}` };
   }
-
   return { success: true, message: `Yangi rasm 1-chi o'ringa qo'yildi (jami ${allPictures.length} ta)` };
 }
 
-// ===== Upload to Wildberries =====
 async function uploadToWildberries(credentials: any, nmID: number, newImageUrl: string): Promise<{ success: boolean; message: string }> {
   const apiKey = credentials.apiKey || credentials.api_key || credentials.token;
   const headers = { Authorization: apiKey, "Content-Type": "application/json" };
@@ -322,11 +559,12 @@ async function uploadToWildberries(credentials: any, nmID: number, newImageUrl: 
     const errText = await resp.text();
     return { success: false, message: `WB: ${resp.status} - ${errText.substring(0, 200)}` };
   }
-
-  return { success: true, message: 'Yangi rasm 1-chi o\'ringa yuklandi' };
+  return { success: true, message: "Yangi rasm 1-chi o'ringa yuklandi" };
 }
 
-// ===== MAIN =====
+// =====================================================
+// MAIN SERVE
+// =====================================================
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
@@ -353,51 +591,145 @@ serve(async (req) => {
       .maybeSingle();
 
     if (!adminPerm?.is_super_admin && !adminPerm?.can_manage_users) {
-      return new Response(JSON.stringify({ error: 'Admin ruxsati yo\'q' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ error: "Admin ruxsati yo'q" }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     const body = await req.json();
     const { action, partnerId, productName, category, offerId, nmID, marketplace, referenceImageUrl, features } = body;
 
-    console.log(`=== AI AGENT IMAGES ===`);
-    console.log(`Action: ${action}, Partner: ${partnerId}, Product: ${productName}`);
-    console.log(`Reference URL: ${referenceImageUrl ? referenceImageUrl.substring(0, 100) + '...' : 'NONE'}`);
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    if (!OPENAI_API_KEY) {
+      return new Response(JSON.stringify({ error: 'OPENAI_API_KEY sozlanmagan' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
 
-    // ===== GENERATE-AND-UPLOAD =====
+    console.log(`\n${'='.repeat(60)}`);
+    console.log(`🚀 SELLERCLOUDX AI IMAGE INTELLIGENCE SYSTEM`);
+    console.log(`Action: ${action}, Product: ${productName}`);
+    console.log(`Reference: ${referenceImageUrl ? 'YES' : 'NO'}`);
+    console.log(`${'='.repeat(60)}`);
+
+    // ===== FULL PIPELINE: generate-and-upload =====
     if (action === 'generate-and-upload') {
-      if (!productName || !partnerId) {
-        return new Response(JSON.stringify({ error: 'productName va partnerId kerak' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      if (!partnerId) {
+        return new Response(JSON.stringify({ error: 'partnerId kerak' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
-      // Step 1: Generate product image
-      const imageSource = await generateProductImage(productName, category || '', referenceImageUrl);
-      if (!imageSource) {
-        return new Response(JSON.stringify({ success: false, error: 'Rasm yaratib bo\'lmadi. OpenAI API xato berdi. Loglarni tekshiring.' }), {
-          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+      const pipelineResult: any = {
+        steps: [],
+        detection: null,
+        qualityScan: null,
+        qualityControl: null,
+        imageUrl: null,
+        cardUrl: null,
+        marketplaceUpload: null,
+      };
+
+      // Determine source image
+      let sourceImageUrl = referenceImageUrl;
+      if (!sourceImageUrl) {
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: 'referenceImageUrl (mahsulot rasmi) kerak. Rasm topilmadi.' 
+        }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
-      // Step 2: Upload to storage
-      const publicUrl = await uploadToStorage(supabase, imageSource, partnerId, offerId || 'unknown');
-      if (!publicUrl) {
-        return new Response(JSON.stringify({ success: false, error: 'Storage saqlash xatosi' }), {
-          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
+      // ── STEP 1: Product + Category Detection ──
+      const detection = await detectProductCategory(sourceImageUrl, OPENAI_API_KEY);
+      pipelineResult.detection = detection;
+      pipelineResult.steps.push({ step: 1, name: "Product Detection", status: detection ? "✅" : "⚠️" });
 
-      // Step 2.5: Generate infographic
-      let infographicUrl: string | null = null;
-      if (body.generateInfographic) {
-        const infographicSource = await generateInfographicImage(productName, category || '', referenceImageUrl, features);
-        if (infographicSource) {
-          infographicUrl = await uploadToStorage(supabase, infographicSource, partnerId, `${offerId || 'unknown'}-infographic`);
+      const detectedCategory = detection?.category || category || '';
+      const categoryStyle = getCategoryStyle(detectedCategory);
+      console.log(`📦 Category: ${detectedCategory} → Style: ${categoryStyle.visual_style}`);
+
+      // ── STEP 2: Image Quality Scan ──
+      const qualityScan = await scanImageQuality(sourceImageUrl, OPENAI_API_KEY);
+      pipelineResult.qualityScan = qualityScan;
+      pipelineResult.steps.push({ step: 2, name: "Quality Scan", status: `Score: ${qualityScan.compliance_score}` });
+
+      // ── STEP 3: Auto Fix (if score < 85) ──
+      let workingImageUrl = sourceImageUrl;
+      if (qualityScan.fix_required || qualityScan.compliance_score < 85) {
+        console.log(`⚠️ Score ${qualityScan.compliance_score} < 85 → Auto fixing...`);
+        const fixedImage = await autoFixImage(sourceImageUrl, qualityScan.issues || [], OPENAI_API_KEY);
+        if (fixedImage) {
+          // Upload fixed image to storage
+          const fixedUrl = await uploadToStorage(supabase, fixedImage, partnerId, `${offerId || 'fix'}-fixed`);
+          if (fixedUrl) {
+            workingImageUrl = fixedUrl;
+            pipelineResult.steps.push({ step: 3, name: "Auto Fix", status: "✅ Fixed" });
+          } else {
+            pipelineResult.steps.push({ step: 3, name: "Auto Fix", status: "⚠️ Upload failed" });
+          }
+        } else {
+          pipelineResult.steps.push({ step: 3, name: "Auto Fix", status: "⚠️ Fix failed, using original" });
         }
+      } else {
+        pipelineResult.steps.push({ step: 3, name: "Auto Fix", status: "⏭ Not needed (score ≥ 85)" });
       }
 
-      // Step 3: Upload to marketplace
+      // Upload clean product image
+      const cleanImageUrl = await uploadToStorage(supabase, workingImageUrl, partnerId, offerId || 'product');
+      pipelineResult.imageUrl = cleanImageUrl;
+
+      // ── STEP 4: Category-Based Marketplace Card ──
+      const variationSeed = Math.floor(Math.random() * 100);
+      let cardImage = await generateMarketplaceCard(
+        workingImageUrl, detection, categoryStyle, OPENAI_API_KEY, variationSeed
+      );
+
+      let cardUrl: string | null = null;
+      let qcResult: any = null;
+
+      if (cardImage) {
+        cardUrl = await uploadToStorage(supabase, cardImage, partnerId, `${offerId || 'card'}-card`);
+        pipelineResult.steps.push({ step: 4, name: "Card Generation", status: "✅" });
+
+        // ── STEP 5: Quality Control ──
+        if (cardUrl) {
+          qcResult = await qualityControl(cardUrl, OPENAI_API_KEY);
+          pipelineResult.qualityControl = qcResult;
+          pipelineResult.steps.push({ step: 5, name: "Quality Control", status: `Score: ${qcResult.overall_score}` });
+
+          // ── Auto improvement loop (max 2 retries) ──
+          if (qcResult.overall_score < 85 && qcResult.improvements?.length) {
+            console.log(`🔄 Score ${qcResult.overall_score} < 85 → Auto improvement loop...`);
+            for (let retry = 0; retry < 2; retry++) {
+              console.log(`🔄 Retry ${retry + 1}/2...`);
+              const improvedCard = await generateMarketplaceCard(
+                workingImageUrl, detection, categoryStyle, OPENAI_API_KEY, variationSeed + retry + 1
+              );
+              if (improvedCard) {
+                const improvedUrl = await uploadToStorage(supabase, improvedCard, partnerId, `${offerId || 'card'}-card-v${retry + 2}`);
+                if (improvedUrl) {
+                  const newQc = await qualityControl(improvedUrl, OPENAI_API_KEY);
+                  if (newQc.overall_score > (qcResult.overall_score || 0)) {
+                    cardUrl = improvedUrl;
+                    qcResult = newQc;
+                    pipelineResult.qualityControl = newQc;
+                    console.log(`✅ Improved: ${newQc.overall_score}`);
+                  }
+                  if (newQc.overall_score >= 85) {
+                    console.log("✅ Quality threshold met!");
+                    break;
+                  }
+                }
+              }
+            }
+            pipelineResult.steps.push({ step: "5b", name: "Auto Improvement", status: `Final: ${qcResult.overall_score}` });
+          }
+        }
+      } else {
+        pipelineResult.steps.push({ step: 4, name: "Card Generation", status: "❌ Failed" });
+      }
+
+      pipelineResult.cardUrl = cardUrl;
+
+      // ── STEP 6: Upload to Marketplace ──
       let mpResult: { success: boolean; message: string } = { success: false, message: 'Marketplace aniqlanmadi' };
-      
-      if (marketplace && offerId) {
+
+      const uploadImageUrl = cardUrl || cleanImageUrl;
+      if (marketplace && offerId && uploadImageUrl) {
         const { data: conns } = await supabase
           .from('marketplace_connections')
           .select('*')
@@ -417,22 +749,41 @@ serve(async (req) => {
           }
 
           if (marketplace === 'yandex') {
-            mpResult = await uploadToYandex(creds, offerId, publicUrl);
-            if (infographicUrl) await uploadToYandex(creds, offerId, infographicUrl);
+            mpResult = await uploadToYandex(creds, offerId, uploadImageUrl);
+            // Also upload clean product image if card was uploaded
+            if (cleanImageUrl && cardUrl && cleanImageUrl !== cardUrl) {
+              await uploadToYandex(creds, offerId, cleanImageUrl);
+            }
           } else if (marketplace === 'wildberries' && nmID) {
-            mpResult = await uploadToWildberries(creds, nmID, publicUrl);
+            mpResult = await uploadToWildberries(creds, nmID, uploadImageUrl);
           }
         }
       }
 
+      pipelineResult.marketplaceUpload = mpResult;
+      pipelineResult.steps.push({ step: 6, name: "Marketplace Upload", status: mpResult.success ? "✅" : "⚠️" });
+
+      console.log(`\n${'='.repeat(60)}`);
+      console.log(`🏁 PIPELINE COMPLETE`);
+      pipelineResult.steps.forEach((s: any) => console.log(`  Step ${s.step}: ${s.name} → ${s.status}`));
+      console.log(`${'='.repeat(60)}\n`);
+
       return new Response(JSON.stringify({
-        success: true, imageUrl: publicUrl, infographicUrl,
+        success: true,
+        imageUrl: cleanImageUrl,
+        cardUrl,
+        infographicUrl: cardUrl, // backward compatibility
+        qualityScore: qcResult?.overall_score || null,
+        detection,
+        pipeline: pipelineResult,
         marketplaceUpload: mpResult,
-        message: mpResult.success ? `✅ Rasm yaratildi va 1-chi o'ringa qo'yildi` : `⚠️ Rasm yaratildi. MP: ${mpResult.message}`,
+        message: mpResult.success
+          ? `✅ AI pipeline: kartochka yaratildi (sifat: ${qcResult?.overall_score || '?'}/100) va marketplace'ga yuklandi`
+          : `⚠️ Kartochka yaratildi (sifat: ${qcResult?.overall_score || '?'}/100). MP: ${mpResult.message}`,
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    return new Response(JSON.stringify({ error: 'action kerak: generate-and-upload' }), {
+    return new Response(JSON.stringify({ error: "action kerak: 'generate-and-upload'" }), {
       status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (e) {
