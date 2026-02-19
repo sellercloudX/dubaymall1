@@ -957,28 +957,34 @@ serve(async (req) => {
 
       pipelineResult.cardUrl = heroUrl;
 
-      // 4b-4d: 3 Lifestyle images from different angles
+      // 4b-4d: 3 Lifestyle images from different angles — PARALLEL for speed
       const supplementaryUrls: string[] = [];
       
-      for (let i = 0; i < LIFESTYLE_ANGLES.length; i++) {
-        const angle = LIFESTYLE_ANGLES[i];
+      console.log("🔄 Generating 3 lifestyle angles in PARALLEL...");
+      const anglePromises = LIFESTYLE_ANGLES.map((angle, i) => {
         const stepLabel = `4${String.fromCharCode(98 + i)}`; // 4b, 4c, 4d
-        
-        const angleImage = await generateLifestyleAngle(
-          workingImageUrl, detection, angle, OPENAI_API_KEY
-        );
-        
-        if (angleImage) {
-          const angleUrl = await uploadToStorage(supabase, angleImage, partnerId, `${offerId || 'card'}-${angle.role}`);
-          if (angleUrl) {
-            supplementaryUrls.push(angleUrl);
-            pipelineResult.steps.push({ step: stepLabel, name: angle.label, status: "✅" });
-          } else {
-            pipelineResult.steps.push({ step: stepLabel, name: angle.label, status: "⚠️ Upload failed" });
-          }
-        } else {
-          pipelineResult.steps.push({ step: stepLabel, name: angle.label, status: "❌ Failed" });
-        }
+        return generateLifestyleAngle(workingImageUrl, detection, angle, OPENAI_API_KEY)
+          .then(async (angleImage) => {
+            if (angleImage) {
+              console.log(`✅ ${angle.label} generated`);
+              const angleUrl = await uploadToStorage(supabase, angleImage, partnerId, `${offerId || 'card'}-${angle.role}`);
+              if (angleUrl) {
+                return { stepLabel, name: angle.label, status: "✅", url: angleUrl };
+              }
+              return { stepLabel, name: angle.label, status: "⚠️ Upload failed", url: null };
+            }
+            return { stepLabel, name: angle.label, status: "❌ Failed", url: null };
+          })
+          .catch((e) => {
+            console.error(`❌ ${angle.label} error:`, e.message);
+            return { stepLabel, name: angle.label, status: "❌ Failed", url: null };
+          });
+      });
+      
+      const angleResults = await Promise.all(anglePromises);
+      for (const result of angleResults) {
+        pipelineResult.steps.push({ step: result.stepLabel, name: result.name, status: result.status });
+        if (result.url) supplementaryUrls.push(result.url);
       }
 
       pipelineResult.supplementaryImages = supplementaryUrls;
