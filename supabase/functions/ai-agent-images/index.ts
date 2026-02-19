@@ -25,6 +25,73 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3)
   return fetch(url, options);
 }
 
+// ===== Generate image via Gemini image model (text-to-image) =====
+async function generateWithGeminiImage(prompt: string, apiKey: string): Promise<string | null> {
+  try {
+    const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash-image",
+        messages: [{ role: "user", content: prompt }],
+        modalities: ["image", "text"],
+      }),
+    });
+
+    if (!resp.ok) {
+      const errText = await resp.text();
+      console.error(`Gemini image generation failed (${resp.status}): ${errText.substring(0, 300)}`);
+      return null;
+    }
+
+    const data = await resp.json();
+    return data.choices?.[0]?.message?.images?.[0]?.image_url?.url || null;
+  } catch (e) {
+    console.error("Gemini image error:", e);
+    return null;
+  }
+}
+
+// ===== Edit image via Gemini (reference-based, keeps product identity) =====
+async function editWithGemini(referenceImageUrl: string, editPrompt: string, apiKey: string): Promise<string | null> {
+  try {
+    const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-3-pro-image-preview",
+        messages: [{
+          role: "user",
+          content: [
+            { type: "image_url", image_url: { url: referenceImageUrl } },
+            { type: "text", text: editPrompt },
+            { type: "image_url", image_url: { url: referenceImageUrl } },
+          ]
+        }],
+        modalities: ["image", "text"],
+      }),
+    });
+
+    if (!resp.ok) {
+      const errText = await resp.text();
+      console.error(`Gemini edit failed (${resp.status}): ${errText.substring(0, 300)}`);
+      return null;
+    }
+
+    const data = await resp.json();
+    return data.choices?.[0]?.message?.images?.[0]?.image_url?.url || null;
+  } catch (e) {
+    console.error("Gemini edit error:", e);
+    return null;
+  }
+}
+
 // ===== Generate product image using REFERENCE IMAGE (existing product photo) =====
 async function generateProductImage(productName: string, category: string, referenceImageUrl?: string): Promise<string | null> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -33,85 +100,39 @@ async function generateProductImage(productName: string, category: string, refer
   try {
     console.log(`Generating image for: "${productName}" (${category}), ref: ${referenceImageUrl ? 'YES' : 'NO'}`);
 
-    const model = "openai/gpt-5";
-
     if (referenceImageUrl) {
-      const editPrompt = `You are a professional product photographer and photo editor.
+      // Use Gemini for reference-based editing (keeps product identity)
+      const editPrompt = `You are a PHOTO EDITOR. Take this EXACT product and place it on a clean white studio background.
 
-Look at this product photo. Take the EXACT same product (same shape, same colors, same labels, same brand, same everything) and create a professional e-commerce photo:
+STRICT RULES:
+- Keep the product PIXEL-PERFECT: same shape, colors, labels, cap, brand, text
+- ONLY change the background to pure white/light gray
+- Add professional studio lighting with soft shadows
+- Center the product, portrait 3:4 ratio
+- Do NOT reimagine or redraw the product
+- No added text, watermarks, or elements`;
 
-1. Keep the product EXACTLY as it is - do not change anything about the product itself
-2. Place it on a clean white/light studio background
-3. Add professional studio lighting with soft shadows
-4. Center the product, portrait orientation (3:4 ratio)
-5. High resolution, marketplace quality (1080x1440)
-6. No text, no watermarks, no added elements
-
-The product name is "${productName}" (category: ${category}) - this is for context only, do NOT reimagine the product.`;
-
-      const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model,
-          messages: [
-            {
-              role: "user",
-              content: [
-                { type: "image_url", image_url: { url: referenceImageUrl } },
-                { type: "text", text: editPrompt },
-              ]
-            }
-          ],
-          modalities: ["image", "text"],
-        }),
-      });
-
-      if (resp.ok) {
-        const data = await resp.json();
-        const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-        if (imageUrl) {
-          console.log(`Image generated from reference (${model}). Type: ${imageUrl.startsWith('data:') ? 'base64' : 'URL'}`);
-          return imageUrl;
-        }
+      const result = await editWithGemini(referenceImageUrl, editPrompt, LOVABLE_API_KEY);
+      if (result) {
+        console.log("Image generated from reference via Gemini edit");
+        return result;
       }
-      const errText = await resp.text();
-      console.log(`Reference image generation failed (${resp.status}): ${errText.substring(0, 300)}, falling back to text-only`);
+      console.log("Gemini edit failed, falling back to DALL-E text generation");
     }
 
-    // Fallback: text-only generation
-    const prompt = `Generate a professional e-commerce product photo of "${productName}" (category: ${category}). 
-Clean white background, product centered, professional studio lighting, portrait 3:4, 1080x1440, no text/watermarks, photorealistic.`;
+    // Fallback: DALL-E text-only generation
+    const prompt = `Professional e-commerce product photo of "${productName}" (category: ${category}). 
+Clean white background, product centered with negative space around it, professional studio lighting, soft shadows.
+Portrait orientation 3:4 aspect ratio, photorealistic, high resolution marketplace quality.
+No text, no watermarks, no labels on the image.`;
 
-    const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: "user", content: prompt }],
-        modalities: ["image", "text"],
-      }),
-    });
-
-    if (!resp.ok) {
-      console.error(`Image generation failed: ${resp.status}`);
-      return null;
+    const result = await generateWithGeminiImage(prompt, LOVABLE_API_KEY);
+    if (result) {
+      console.log("Image generated via Gemini flash-image");
+      return result;
     }
 
-    const data = await resp.json();
-    const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-    if (imageUrl) {
-      console.log(`Image generated via text prompt. Type: ${imageUrl.startsWith('data:') ? 'base64' : 'URL'}`);
-      return imageUrl;
-    }
-
-    console.error("No image in response");
+    console.error("All image generation methods failed");
     return null;
   } catch (e) {
     console.error("Image generation error:", e);
@@ -125,49 +146,34 @@ async function generateInfographicImage(productName: string, category: string, r
   if (!LOVABLE_API_KEY) return null;
 
   try {
-    const featureText = features?.length ? features.slice(0, 5).join(', ') : 'Premium quality, Fast delivery, Best price';
-    
-    const content: any[] = [];
+    const featureText = features?.length ? features.slice(0, 5).join(', ') : 'Premium sifat, Tez yetkazib berish, Eng yaxshi narx';
 
     if (referenceImageUrl) {
-      content.push({ type: "image_url", image_url: { url: referenceImageUrl } });
-    }
+      // Use Gemini for reference-based infographic (keeps product identity)
+      const infographicPrompt = `You are a professional marketplace infographic designer (Pinterest/Behance level).
 
-    content.push({ type: "text", text: `You are a professional marketplace infographic designer (Pinterest/Behance level).
+Look at this product photo carefully. Create a SALES-BOOSTING INFOGRAPHIC:
 
-Look at this product photo. Create a SALES-BOOSTING INFOGRAPHIC for marketplace listing:
-
-RULES:
-1. Keep the EXACT same product from the photo - do not change or reimagine it
-2. Add a premium stylish background (gradient, pattern, or themed)
-3. Add 2-4 feature badges/icons around the product highlighting: ${featureText}
+1. Keep the EXACT same product from the photo - do NOT redraw or change it
+2. Add a premium stylish gradient/pattern background behind the product
+3. Add 2-4 feature badges/icons around the product: ${featureText}
 4. Add a catchy headline at top and selling point banner at bottom
-5. Text should be in Uzbek or Russian language
-6. Portrait 3:4 ratio (1080x1440), marketplace-ready quality
-7. Make it look like a professional Pinterest marketplace design
-8. Product "${productName}" (${category}) must be the visual center
-9. Use bold typography, contrast colors, professional layout` });
+5. Text in Russian or Uzbek language
+6. Portrait 3:4 ratio (1080x1440), marketplace-ready
+7. Product "${productName}" must be the visual center
+8. Bold typography, contrast colors, professional layout`;
 
-    const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "openai/gpt-5",
-        messages: [{ role: "user", content }],
-        modalities: ["image", "text"],
-      }),
-    });
-
-    if (!resp.ok) {
-      console.error(`Infographic generation failed: ${resp.status}`);
-      return null;
+      const result = await editWithGemini(referenceImageUrl, infographicPrompt, LOVABLE_API_KEY);
+      if (result) return result;
     }
 
-    const data = await resp.json();
-    return data.choices?.[0]?.message?.images?.[0]?.image_url?.url || null;
+    // Fallback: DALL-E text-only infographic
+    const prompt = `Professional marketplace infographic for "${productName}" (${category}).
+Premium gradient background, product centered, 2-4 feature badges around it highlighting: ${featureText}.
+Catchy headline at top, selling point banner at bottom. Text in Russian language.
+Portrait 3:4 ratio, Pinterest/Behance quality marketplace design. Bold typography, contrast colors.`;
+
+    return await generateWithGeminiImage(prompt, LOVABLE_API_KEY);
   } catch (e) {
     console.error("Infographic generation error:", e);
     return null;
