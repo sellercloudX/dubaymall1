@@ -186,18 +186,25 @@ async function generateInfographicImage(productName: string, category: string, r
 
   // Method 1: gpt-image-1 with reference
   if (referenceImageUrl) {
-    const infographicPrompt = `Create a professional MARKETPLACE INFOGRAPHIC for selling this product online.
+    const infographicPrompt = `Create a STUNNING MARKETPLACE INFOGRAPHIC that will SELL this product. This must look like a TOP-SELLING product listing.
 
-DESIGN RULES (Pinterest/Behance quality):
-1. Keep the EXACT same product from this photo - do NOT change the product appearance at all
-2. Add a premium stylish gradient background (soft pastels or elegant dark tones)
-3. Add 2-4 feature icons/badges around the product highlighting: ${featureText}
-4. Add a catchy sales headline at the top in RUSSIAN or UZBEK language
-5. Add a selling point banner at the bottom
-6. Product "${productName}" must be the visual center and largest element
-7. Use bold, modern typography with high contrast
-8. Portrait orientation, marketplace-ready design
-9. Make it look like a top-selling product listing on Wildberries or Ozon`;
+ABSOLUTE RULES:
+1. The EXACT product from this photo must remain 100% UNCHANGED — same shape, colors, labels, cap, packaging, brand text. PIXEL-PERFECT preservation.
+2. Place the product LARGE and CENTERED (50-60% of frame) with its original packaging/box visible if present.
+
+INFOGRAPHIC DESIGN (Premium Marketplace Style):
+- Background: Rich, eye-catching gradient (dark gold/bronze tones with sparkle effects, or deep elegant colors matching the product category)
+- TOP: Bold catchy SELLING HEADLINE in UZBEK or RUSSIAN language (large, white/gold text with shadow). Example: "AYOLLARNI JALB QILISH UCHUN!" or "ПРЕМИУМ КАЧЕСТВО!"
+- RIGHT SIDE: 2-4 feature badges/cards with icons highlighting: ${featureText}
+  Each badge should have: an emoji/icon + bold title + 1-line description in Uzbek/Russian
+- BOTTOM: A selling banner with urgency text like "O'ZIGA JALB ETSIN!" or "ЛУЧШАЯ ЦЕНА!"
+- Add subtle sparkle/glow effects around the product for premium feel
+- Typography: Bold, modern, high-contrast, easy to read on mobile
+- Product "${productName}" must be the hero — everything else supports it
+
+TECHNICAL: Portrait orientation, 1024x1536, marketplace-ready, mobile-optimized.
+Make it look like the #1 bestseller listing on Wildberries/Ozon/Uzum Market.`;
+
 
     const result = await editWithOpenAI(referenceImageUrl, infographicPrompt, OPENAI_API_KEY);
     if (result) {
@@ -207,11 +214,14 @@ DESIGN RULES (Pinterest/Behance quality):
   }
 
   // Method 2: DALL-E 3 text-only infographic
-  const prompt = `Professional marketplace product infographic for "${productName}" (${category}).
-Premium gradient background, product centered, 2-4 feature badges: ${featureText}.
-Catchy headline in Russian at top, selling banner at bottom.
-Portrait 3:4, Pinterest/Behance quality, bold typography, modern marketplace design.
-No real brand logos. High resolution.`;
+  const prompt = `Create a STUNNING marketplace product infographic for "${productName}" (${category}).
+Design: Rich gradient background with sparkle/glow effects. Product centered and large (50-60% of frame).
+TOP: Bold catchy headline in RUSSIAN or UZBEK — selling the product emotionally.
+RIGHT: 2-4 feature badges with icons: ${featureText}. Each badge has icon + title + description.
+BOTTOM: Urgency selling banner.
+Style: Bold modern typography, high contrast, mobile-optimized, portrait 3:4.
+Quality: Must look like #1 bestseller on Wildberries/Ozon marketplace. Premium, eye-catching, trustworthy.
+No real brand logos. High resolution 1024x1792.`;
 
   const result = await generateWithDallE3(prompt, OPENAI_API_KEY);
   if (result) {
