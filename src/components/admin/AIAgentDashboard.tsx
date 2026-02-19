@@ -48,6 +48,7 @@ interface PriceProduct {
   optimalPrice?: number; minPrice?: number; maxPrice?: number;
   priceAction?: string; commissionPercent?: number; logisticsCost?: number;
   originalPrice?: number; discount?: number;
+  sku?: string; imageUrl?: string;
 }
 
 // ===== Helpers =====
@@ -495,6 +496,8 @@ function PriceOptimizationTab({ selectedPartnerId }: any) {
   const [priceData, setPriceData] = useState<{ products: PriceProduct[]; summary: any } | null>(null);
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [targetMargin, setTargetMargin] = useState(12);
+  const [selectedPriceProducts, setSelectedPriceProducts] = useState<Set<string>>(new Set());
+  const [applyProgress, setApplyProgress] = useState<{ current: number; total: number } | null>(null);
 
   const priceScanMutation = useMutation({
     mutationFn: async () => {
@@ -503,7 +506,7 @@ function PriceOptimizationTab({ selectedPartnerId }: any) {
       if (data?.error) throw new Error(data.error);
       return data;
     },
-    onSuccess: (data) => { setPriceData(data); setRecommendations([]); toast.success(`${data.products.length} ta narx tahlil qilindi`); },
+    onSuccess: (data) => { setPriceData(data); setRecommendations([]); setSelectedPriceProducts(new Set()); toast.success(`${data.products.length} ta narx tahlil qilindi`); },
     onError: (err: any) => toast.error(err.message),
   });
 
@@ -521,29 +524,49 @@ function PriceOptimizationTab({ selectedPartnerId }: any) {
 
   const applyPricesMutation = useMutation({
     mutationFn: async () => {
-      const toApply = recommendations
-        .filter(r => r.recommendation?.priceAction !== 'keep' && r.recommendation?.priceAction !== 'no_cost' && r.recommendation?.recommendedPrice)
-        .map(r => ({
-          offerId: r.offerId, marketplace: r.marketplace,
-          newPrice: r.recommendation.recommendedPrice,
-          nmID: priceData?.products.find(p => p.offerId === r.offerId)?.nmID,
-        }));
+      // Apply only selected recommendations, or all if none selected
+      const selectedRecs = recommendations.filter(r => {
+        if (r.recommendation?.priceAction === 'keep' || r.recommendation?.priceAction === 'no_cost' || !r.recommendation?.recommendedPrice) return false;
+        if (selectedPriceProducts.size > 0) return selectedPriceProducts.has(r.offerId);
+        return true;
+      });
+      const toApply = selectedRecs.map(r => ({
+        offerId: r.offerId, marketplace: r.marketplace,
+        newPrice: r.recommendation.recommendedPrice,
+        nmID: priceData?.products.find((p: PriceProduct) => p.offerId === r.offerId)?.nmID,
+      }));
       if (toApply.length === 0) throw new Error('O\'zgartirish kerak emas');
+      setApplyProgress({ current: 0, total: toApply.length });
       const { data, error } = await supabase.functions.invoke('ai-agent-price', {
         body: { partnerId: selectedPartnerId, action: 'apply', priceUpdates: toApply },
       });
       if (error) throw error;
+      setApplyProgress(null);
       return data;
     },
     onSuccess: (data) => {
-      toast.success(`${data?.applied || 0} ta yangilandi`);
+      toast.success(`${data?.applied || 0} ta marketplace'da yangilandi, ${data?.failed || 0} ta xato`);
+      if (data?.results) {
+        const failed = data.results.filter((r: any) => !r.success);
+        if (failed.length > 0) {
+          failed.forEach((f: any) => toast.error(`${f.offerId}: ${f.message}`));
+        }
+      }
       priceScanMutation.mutate();
       setRecommendations([]);
+      setSelectedPriceProducts(new Set());
     },
-    onError: (err: any) => toast.error(err.message),
+    onError: (err: any) => { setApplyProgress(null); toast.error(err.message); },
   });
 
+  const togglePriceProduct = (offerId: string) => {
+    setSelectedPriceProducts(prev => { const n = new Set(prev); n.has(offerId) ? n.delete(offerId) : n.add(offerId); return n; });
+  };
+
   const needsAdjust = priceData?.products.filter(p => p.priceAction === 'increase' || p.priceAction === 'decrease') || [];
+  const selectedForRecommend = selectedPriceProducts.size > 0
+    ? priceData?.products.filter(p => selectedPriceProducts.has(p.offerId) && p.costPrice > 0) || []
+    : needsAdjust;
 
   return (
     <div className="space-y-4">
@@ -556,19 +579,27 @@ function PriceOptimizationTab({ selectedPartnerId }: any) {
           {priceScanMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <DollarSign className="h-4 w-4" />}
           Skanerlash
         </Button>
-        {needsAdjust.length > 0 && (
-          <Button variant="outline" onClick={() => recommendMutation.mutate(needsAdjust.slice(0, 30))} disabled={recommendMutation.isPending} className="gap-2">
+        {selectedForRecommend.length > 0 && (
+          <Button variant="outline" onClick={() => recommendMutation.mutate(selectedForRecommend.slice(0, 50))} disabled={recommendMutation.isPending} className="gap-2">
             {recommendMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            Tavsiya ({needsAdjust.length})
+            Tavsiya ({selectedForRecommend.length})
           </Button>
         )}
         {recommendations.filter(r => r.recommendation?.priceAction !== 'keep' && r.recommendation?.priceAction !== 'no_cost').length > 0 && (
           <Button variant="destructive" onClick={() => applyPricesMutation.mutate()} disabled={applyPricesMutation.isPending} className="gap-2">
             {applyPricesMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
-            Narxlarni qo'llash
+            Marketplace'ga qo'llash ({selectedPriceProducts.size > 0 ? selectedPriceProducts.size : recommendations.filter(r => r.recommendation?.priceAction !== 'keep' && r.recommendation?.priceAction !== 'no_cost').length})
           </Button>
         )}
       </div>
+
+      {applyProgress && (
+        <Card className="border-primary/30"><CardContent className="py-4">
+          <div className="flex items-center gap-3 mb-2"><Loader2 className="h-5 w-5 animate-spin text-primary" /><span>Marketplace'ga narx yangilanmoqda...</span></div>
+          <Progress value={(applyProgress.current / applyProgress.total) * 100} className="h-3" />
+          <p className="text-sm text-muted-foreground mt-1">{applyProgress.current} / {applyProgress.total}</p>
+        </CardContent></Card>
+      )}
 
       {priceData && (
         <>
@@ -588,7 +619,9 @@ function PriceOptimizationTab({ selectedPartnerId }: any) {
                 <div className="space-y-2">
                   {recommendations.map((rec: any, i: number) => (
                     <div key={i} className="flex items-center gap-3 p-2 rounded bg-muted/30 text-sm">
-                      <span className="font-medium truncate flex-1">{rec.name}</span>
+                      <Checkbox checked={selectedPriceProducts.has(rec.offerId)} onCheckedChange={() => togglePriceProduct(rec.offerId)} />
+                      <span className="font-medium truncate flex-1" title={rec.name}>{rec.name}</span>
+                      <code className="text-[10px] text-muted-foreground">{rec.offerId}</code>
                       <span className="text-muted-foreground font-mono">{rec.currentPrice?.toLocaleString()}</span>
                       {rec.recommendation?.recommendedPrice ? <>
                         <span>→</span>
@@ -609,16 +642,42 @@ function PriceOptimizationTab({ selectedPartnerId }: any) {
 
           <Table>
             <TableHeader><TableRow>
-              <TableHead>Mahsulot</TableHead><TableHead>MP</TableHead>
-              <TableHead className="text-right">Joriy narx</TableHead><TableHead className="text-right">Tannarx</TableHead>
-              <TableHead className="text-right">Optimal</TableHead><TableHead className="text-right">Marja</TableHead>
+              <TableHead className="w-8"></TableHead>
+              <TableHead>Mahsulot</TableHead>
+              <TableHead>SKU</TableHead>
+              <TableHead>MP</TableHead>
+              <TableHead className="text-right">Komissiya</TableHead>
+              <TableHead className="text-right">Joriy narx</TableHead>
+              <TableHead className="text-right">Tannarx</TableHead>
+              <TableHead className="text-right">Optimal</TableHead>
+              <TableHead className="text-right">Marja</TableHead>
               <TableHead>Holat</TableHead>
             </TableRow></TableHeader>
             <TableBody>
               {priceData.products.map((p: PriceProduct) => (
-                <TableRow key={`${p.marketplace}-${p.offerId}`} className={p.isPriceLow ? 'bg-red-50/50 dark:bg-red-950/10' : p.isPriceHigh ? 'bg-orange-50/50 dark:bg-orange-950/10' : ''}>
-                  <TableCell className="font-medium max-w-[180px] truncate">{p.name}</TableCell>
+                <TableRow key={`${p.marketplace}-${p.offerId}`} className={`${p.isPriceLow ? 'bg-red-50/50 dark:bg-red-950/10' : p.isPriceHigh ? 'bg-orange-50/50 dark:bg-orange-950/10' : ''} ${selectedPriceProducts.has(p.offerId) ? 'ring-1 ring-primary/30' : ''}`}>
+                  <TableCell>
+                    <Checkbox checked={selectedPriceProducts.has(p.offerId)} onCheckedChange={() => togglePriceProduct(p.offerId)} disabled={p.costPrice <= 0} />
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2 max-w-[200px]">
+                      {p.imageUrl ? (
+                        <img src={p.imageUrl} alt="" className="w-8 h-8 rounded object-cover shrink-0" />
+                      ) : (
+                        <div className="w-8 h-8 rounded bg-muted flex items-center justify-center shrink-0">
+                          <Image className="h-3 w-3 text-muted-foreground" />
+                        </div>
+                      )}
+                      <span className="font-medium truncate" title={p.name}>{p.name}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell><code className="text-[10px] text-muted-foreground">{p.sku || p.offerId}</code></TableCell>
                   <TableCell><Badge variant="outline" className="text-[10px]">{p.marketplace === 'yandex' ? '🟡' : '🟣'}</Badge></TableCell>
+                  <TableCell className="text-right text-xs">
+                    {p.commissionPercent ? (
+                      <span className="font-mono">{p.commissionPercent}%</span>
+                    ) : '—'}
+                  </TableCell>
                   <TableCell className="text-right font-mono text-sm">{p.price?.toLocaleString()}</TableCell>
                   <TableCell className="text-right font-mono text-sm">{p.costPrice > 0 ? p.costPrice.toLocaleString() : '—'}</TableCell>
                   <TableCell className="text-right font-mono text-sm text-primary">{p.optimalPrice ? p.optimalPrice.toLocaleString() : '—'}</TableCell>
@@ -646,7 +705,7 @@ function PriceOptimizationTab({ selectedPartnerId }: any) {
         <DollarSign className="h-16 w-16 text-muted-foreground/50 mb-4" />
         <h3 className="text-lg font-semibold mb-1">Narx optimallashtirish</h3>
         <p className="text-muted-foreground text-center max-w-md text-sm">
-          Formula: OptimalNarx = (Tannarx + Logistika) / (1 - Komissiya% - Soliq4% - Marja%)
+          Real API komissiya + logistika asosida har bir mahsulot uchun alohida optimal narx
         </p>
       </CardContent></Card>}
     </div>

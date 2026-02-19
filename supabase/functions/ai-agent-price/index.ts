@@ -218,8 +218,13 @@ async function fetchYandexPrices(credentials: any): Promise<any[]> {
     const commissionPercent = realTariff?.commissionPercent || 25; // Conservative fallback
     const logisticsCost = realTariff?.logisticsCost || 6000; // Conservative fallback
     
+    // Get first image URL
+    const pictures = offer.pictures || [];
+    const imageUrl = pictures.length > 0 ? pictures[0] : null;
+    
     return {
       offerId,
+      sku: offerId, // Yandex offerId = SKU
       name: offer.name || '',
       price,
       currency: offer.basicPrice?.currencyId || 'UZS',
@@ -229,6 +234,7 @@ async function fetchYandexPrices(credentials: any): Promise<any[]> {
       commissionPercent,
       logisticsCost,
       hasRealTariff: !!realTariff,
+      imageUrl,
     };
   });
 }
@@ -282,8 +288,11 @@ async function fetchWBPrices(credentials: any): Promise<any[]> {
 
   return allCards.map(card => {
     const prices = priceMap.get(card.nmID) || {};
+    const photos = card.photos || card.mediaFiles || [];
+    const imageUrl = photos.length > 0 ? (photos[0]?.big || photos[0]?.c246x328 || photos[0]) : null;
     return {
       offerId: card.vendorCode || card.nmID?.toString() || '',
+      sku: card.vendorCode || card.nmID?.toString() || '',
       nmID: card.nmID,
       name: card.title || card.vendorCode || '',
       price: prices.salePrice || prices.price || 0,
@@ -294,6 +303,7 @@ async function fetchWBPrices(credentials: any): Promise<any[]> {
       marketplace: 'wildberries',
       commissionPercent: 15, // WB average ~15%
       logisticsCost: 50, // ~50 RUB logistics
+      imageUrl,
     };
   });
 }
@@ -310,7 +320,7 @@ async function applyYandexPrice(credentials: any, offerId: string, newPrice: num
     {
       method: 'POST', headers,
       body: JSON.stringify({
-        offers: [{ offerId, price: { value: newPrice, currencyId: 'RUR' } }]
+        offers: [{ offerId, price: { value: newPrice, currencyId: 'UZS' } }]
       })
     }
   );
@@ -466,6 +476,8 @@ serve(async (req) => {
               isPriceHigh,
               isPriceLow,
               isPriceRisky,
+              sku: p.sku || p.offerId,
+              imageUrl: p.imageUrl || null,
               priceAction: costPrice <= 0 ? 'no_cost' 
                 : p.price < optimal.minPrice ? 'increase' 
                 : p.price > optimal.maxPrice ? 'decrease' 
