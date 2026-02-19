@@ -25,35 +25,63 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3)
   return fetch(url, options);
 }
 
-// ===== AI: Generate fix for a product =====
-async function generateFix(product: any, marketplace: string): Promise<any> {
+// ===== AI: Generate fix with self-healing context =====
+async function generateFix(product: any, marketplace: string, previousAttempt?: any): Promise<any> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY sozlanmagan");
 
-  const prompt = `Sen ${marketplace === 'yandex' ? 'Yandex Market' : 'Wildberries'} kartochka sifat ekspertisan.
+  const mpName = marketplace === 'yandex' ? 'Yandex Market' : 'Wildberries';
+  
+  let retryContext = '';
+  if (previousAttempt) {
+    retryContext = `
+MUHIM: Oldingi urinish muvaffaqiyatsiz bo'ldi:
+- Xatolik: ${previousAttempt.error || 'Noma\'lum'}
+- Oldingi nom: "${previousAttempt.fix?.name || ''}"
+- Oldingi tavsif uzunligi: ${previousAttempt.fix?.description?.length || 0}
+
+Bu xatoni tuzat va boshqa yondashuv qo'lla. Masalan:
+- Agar nom xatosi bo'lsa, qat'iy ${marketplace === 'wildberries' ? '40-60' : '60-100'} belgi ichida yoz
+- Agar tavsif xatosi bo'lsa, aniq 1000-1500 belgi orasida yoz
+- Agar API xatosi bo'lsa, maxsus belgilarni olib tashla
+`;
+  }
+
+  const wbRules = marketplace === 'wildberries' ? `
+WB MAXSUS QOIDALAR:
+- NOM: Ruscha, QATIIY 40-60 belgi. Oshmasligi SHART!
+- TAVSIF: Ruscha, 1000-2000 belgi
+- Maxsus belgilar ishlatma: faqat harflar, raqamlar, probel, tire, vergul
+- Brend nomini nomga qo'shma
+` : `
+YANDEX MAXSUS QOIDALAR:
+- NOM: Ruscha, 60-100 belgi. Brend + Tur + Model + Asosiy xususiyat
+- TAVSIF: Ruscha, 1000-2000 belgi, SEO-optimallashtirilgan
+- name_uz: O'zbekcha lotin alifbosida nom
+`;
+
+  const prompt = `Sen ${mpName} kartochka sifat ekspertisan. MAQSAD: Sifat balini 90+ ga ko'tarish.
 
 MAHSULOT:
 - Nom: "${product.name}"
 - Kategoriya: ${product.category || 'Noma\'lum'}
+- Hozirgi ball: ${product.score || '?'}
 - Muammolar: ${product.issues?.join(', ') || 'yo\'q'}
-- Rasmlar soni: ${product.imageCount || 0}
-- Tavsif: ${product.hasDescription ? 'bor' : 'yo\'q/qisqa'}
+- Rasmlar: ${product.imageCount || 0} ta
+- Tavsif: ${product.descriptionLength || 0} belgi
 - Brend: ${product.hasVendor ? 'bor' : 'yo\'q'}
+- Async xatolar: ${product.asyncErrors || 0} ta
+${retryContext}
+${wbRules}
 
 VAZIFA: Sifat balini 90+ ga ko'tarish uchun tuzatishlar yarat.
 
-QOIDALAR:
-1. NOM: Ruscha, 60-100 belgi. Brend + Tur + Model + Asosiy xususiyat
-2. TAVSIF: Ruscha, 1000-2000 belgi. Batafsil, SEO-optimallashtirilgan
-3. Agar ma'lumot yetarli bo'lmasa, mahsulot nomidan taxmin qil
-4. name_uz: O'zbekcha lotin alifbosida nom
-
-FAQAT JSON javob ber:
+FAQAT JSON javob ber (boshqa hech narsa yozma):
 {
-  "name": "yangilangan nom (ruscha, 60-100 belgi)",
-  "name_uz": "o'zbekcha nom",
+  "name": "yangilangan nom (ruscha)",
+  "name_uz": "o'zbekcha nom (lotin)",
   "description": "batafsil tavsif (ruscha, 1000+ belgi)",
-  "vendor": "brend nomi (agar topilsa)",
+  "vendor": "brend nomi (agar topilsa yoki taxmin qil)",
   "summary": "qisqa xulosa nima tuzatildi"
 }`;
 
@@ -66,16 +94,16 @@ FAQAT JSON javob ber:
     body: JSON.stringify({
       model: "google/gemini-3-flash-preview",
       messages: [
-        { role: "system", content: "Sen marketplace kartochka sifat ekspertisan. Faqat JSON javob ber." },
+        { role: "system", content: "Sen marketplace kartochka sifat ekspertisan. FAQAT JSON javob ber, hech qanday qo'shimcha matn yo'q." },
         { role: "user", content: prompt },
       ],
-      temperature: 0.2,
+      temperature: previousAttempt ? 0.4 : 0.2,
     }),
   });
 
   if (!aiResp.ok) {
     if (aiResp.status === 429) throw new Error("AI rate limit. Keyinroq urinib ko'ring.");
-    if (aiResp.status === 402) throw new Error("AI kredit tugadi. Balansni to'ldiring.");
+    if (aiResp.status === 402) throw new Error("AI kredit tugadi.");
     throw new Error(`AI xatolik: ${aiResp.status}`);
   }
 
@@ -84,17 +112,30 @@ FAQAT JSON javob ber:
   const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || content.match(/(\{[\s\S]*\})/);
   if (!jsonMatch) throw new Error("AI javobini tahlil qilib bo'lmadi");
 
-  return JSON.parse(jsonMatch[1] || jsonMatch[0]);
+  const fix = JSON.parse(jsonMatch[1] || jsonMatch[0]);
+  
+  // Post-process validation
+  if (marketplace === 'wildberries' && fix.name && fix.name.length > 60) {
+    fix.name = fix.name.substring(0, 57) + '...';
+  }
+  if (marketplace === 'yandex' && fix.name && fix.name.length < 60) {
+    // Pad short names for Yandex
+    const category = product.category || '';
+    if (category && fix.name.length + category.length + 3 <= 100) {
+      fix.name = `${fix.name} — ${category}`;
+    }
+  }
+  
+  return fix;
 }
 
-// ===== YANDEX: Apply fix =====
-async function applyYandexFix(credentials: any, offerId: string, fix: any): Promise<{ success: boolean; message: string }> {
+// ===== YANDEX: Apply fix with verification =====
+async function applyYandexFix(credentials: any, offerId: string, fix: any): Promise<{ success: boolean; message: string; newScore?: number }> {
   const apiKey = credentials.apiKey || credentials.api_key;
   const campaignId = credentials.campaignId || credentials.campaign_id;
   let businessId = credentials.businessId || credentials.business_id;
   const headers = { "Api-Key": apiKey, "Content-Type": "application/json" };
 
-  // Resolve businessId
   if (!businessId && campaignId) {
     const resp = await fetchWithRetry(`https://api.partner.market.yandex.ru/campaigns/${campaignId}`, { headers });
     if (resp.ok) { const d = await resp.json(); businessId = d.campaign?.business?.id; }
@@ -105,6 +146,7 @@ async function applyYandexFix(credentials: any, offerId: string, fix: any): Prom
   }
   if (!businessId) throw new Error("Business ID topilmadi");
 
+  // Step 1: Update offer-mappings (name, description, vendor)
   const offerUpdate: any = { offerId };
   if (fix.name) offerUpdate.name = fix.name;
   if (fix.description) offerUpdate.description = fix.description;
@@ -117,36 +159,79 @@ async function applyYandexFix(credentials: any, offerId: string, fix: any): Prom
 
   if (!resp.ok) {
     const errText = await resp.text();
-    return { success: false, message: `Yandex API xatosi: ${resp.status} - ${errText.substring(0, 200)}` };
+    return { success: false, message: `Yandex API: ${resp.status} - ${errText.substring(0, 200)}` };
   }
 
   const respData = await resp.json();
   const errors = respData.results?.[0]?.errors || respData.result?.errors || [];
   if (errors.length > 0) {
-    return { success: false, message: `Yandex xatoliklar: ${errors.map((e: any) => e.message).join(', ')}` };
+    return { success: false, message: `Yandex: ${errors.map((e: any) => e.message).join(', ')}` };
   }
 
-  return { success: true, message: 'Yandex kartochka yangilandi' };
+  // Step 2: Verify score after update (delayed)
+  await sleep(2000);
+  let newScore: number | undefined;
+  try {
+    const verifyResp = await fetchWithRetry(
+      `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-cards`,
+      { method: 'POST', headers, body: JSON.stringify({ offerIds: [offerId], withRecommendations: true }) }
+    );
+    if (verifyResp.ok) {
+      const verifyData = await verifyResp.json();
+      const card = verifyData.result?.offerCards?.[0];
+      if (card) {
+        newScore = typeof card.contentRating === 'number' ? card.contentRating : card.contentRating?.rating ?? undefined;
+      }
+    }
+  } catch (e) { /* verification optional */ }
+
+  return { success: true, message: 'Yandex kartochka yangilandi', newScore };
 }
 
-// ===== WILDBERRIES: Apply fix =====
-async function applyWildberriesFix(credentials: any, product: any, fix: any): Promise<{ success: boolean; message: string }> {
+// ===== WILDBERRIES: Apply fix with dynamic characteristics =====
+async function applyWildberriesFix(credentials: any, product: any, fix: any): Promise<{ success: boolean; message: string; newScore?: number }> {
   const apiKey = credentials.apiKey || credentials.api_key || credentials.token;
   const headers = { Authorization: apiKey, "Content-Type": "application/json" };
   const nmID = product.nmID;
-
   if (!nmID) return { success: false, message: 'nmID topilmadi' };
 
-  // Update card via v2 API
-  const updatePayload: any = {
-    nmID,
-    vendorCode: product.offerId,
-  };
+  // Get subject characteristics to find correct IDs
+  let descCharcId: number | null = null;
+  let nameCharcId: number | null = null;
 
-  // Add title and description via characteristics
+  if (product.subjectID) {
+    try {
+      const charcResp = await fetchWithRetry(
+        `https://content-api.wildberries.ru/content/v2/object/charcs/${product.subjectID}`,
+        { headers }
+      );
+      if (charcResp.ok) {
+        const charcData = await charcResp.json();
+        const charcs = charcData.data || [];
+        for (const c of charcs) {
+          const name = (c.name || '').toLowerCase();
+          if (name.includes('описание') || name === 'описание товара' || name === 'description') {
+            descCharcId = c.charcID || c.id;
+          }
+          if (name.includes('наименование') || name === 'наименование товара' || name === 'name') {
+            nameCharcId = c.charcID || c.id;
+          }
+        }
+      }
+    } catch (e) { console.error('WB charcs fetch error:', e); }
+  }
+
+  const updatePayload: any = { nmID, vendorCode: product.offerId };
   const charcs: any[] = [];
-  if (fix.name) charcs.push({ id: 9, value: [fix.name] });
-  if (fix.description) charcs.push({ id: 14, value: [fix.description] });
+  
+  if (fix.name) {
+    const id = nameCharcId || 9;
+    charcs.push({ id, value: [fix.name] });
+  }
+  if (fix.description) {
+    const id = descCharcId || 14;
+    charcs.push({ id, value: [fix.description] });
+  }
   if (charcs.length > 0) updatePayload.characteristics = charcs;
 
   const resp = await fetchWithRetry(
@@ -156,7 +241,28 @@ async function applyWildberriesFix(credentials: any, product: any, fix: any): Pr
 
   if (!resp.ok) {
     const errText = await resp.text();
-    return { success: false, message: `WB API xatosi: ${resp.status} - ${errText.substring(0, 200)}` };
+    return { success: false, message: `WB API: ${resp.status} - ${errText.substring(0, 200)}` };
+  }
+
+  // Check for async errors after update
+  await sleep(3000);
+  let asyncError: string | null = null;
+  try {
+    const errResp = await fetchWithRetry(
+      `https://content-api.wildberries.ru/content/v2/cards/error/list`,
+      { method: 'GET', headers }
+    );
+    if (errResp.ok) {
+      const errData = await errResp.json();
+      const errors = (errData.data || errData.errors || []).filter((e: any) => (e.nmID || e.nmId) === nmID);
+      if (errors.length > 0) {
+        asyncError = errors.map((e: any) => e.message || e.error).join('; ');
+      }
+    }
+  } catch (e) { /* optional */ }
+
+  if (asyncError) {
+    return { success: false, message: `WB async xatolik: ${asyncError}` };
   }
 
   return { success: true, message: 'WB kartochka yangilandi' };
@@ -181,7 +287,6 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Invalid auth' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Admin check
     const { data: adminPerm } = await supabase
       .from('admin_permissions')
       .select('is_super_admin, can_manage_users')
@@ -193,13 +298,13 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const { partnerId, marketplace, products, action } = body;
+    const { partnerId, marketplace, products, maxRetries = 2 } = body;
 
     if (!partnerId || !marketplace || !products?.length) {
       return new Response(JSON.stringify({ error: 'partnerId, marketplace, products kerak' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Get partner credentials
+    // Get credentials
     const { data: connections } = await supabase
       .from('marketplace_connections')
       .select('*')
@@ -223,42 +328,69 @@ serve(async (req) => {
 
     const fixResults: any[] = [];
 
-    for (const product of products.slice(0, 10)) { // Max 10 products per request
-      try {
-        console.log(`Fixing ${product.offerId} on ${marketplace}...`);
-        
-        // Generate AI fix
-        const fix = await generateFix(product, marketplace);
-        console.log(`AI fix generated for ${product.offerId}: ${fix.summary}`);
+    for (const product of products.slice(0, 15)) {
+      let lastResult: any = null;
+      let lastFix: any = null;
+      let succeeded = false;
 
-        // Apply fix to marketplace
-        let applyResult;
-        if (marketplace === 'yandex') {
-          applyResult = await applyYandexFix(creds, product.offerId, fix);
-        } else if (marketplace === 'wildberries') {
-          applyResult = await applyWildberriesFix(creds, product, fix);
-        } else {
-          applyResult = { success: false, message: `${marketplace} qo'llab-quvvatlanmaydi` };
+      // Self-healing loop: try up to maxRetries+1 times
+      for (let round = 0; round <= maxRetries; round++) {
+        try {
+          console.log(`[Round ${round + 1}] Fixing ${product.offerId} on ${marketplace}...`);
+          
+          const previousAttempt = round > 0 ? { error: lastResult?.message, fix: lastFix } : undefined;
+          const fix = await generateFix(product, marketplace, previousAttempt);
+          lastFix = fix;
+          console.log(`AI fix (round ${round + 1}): ${fix.summary}`);
+
+          let applyResult;
+          if (marketplace === 'yandex') {
+            applyResult = await applyYandexFix(creds, product.offerId, fix);
+          } else if (marketplace === 'wildberries') {
+            applyResult = await applyWildberriesFix(creds, product, fix);
+          } else {
+            applyResult = { success: false, message: `${marketplace} qo'llab-quvvatlanmaydi` };
+          }
+
+          lastResult = applyResult;
+
+          if (applyResult.success) {
+            succeeded = true;
+            fixResults.push({
+              offerId: product.offerId,
+              name: product.name,
+              success: true,
+              message: applyResult.message,
+              rounds: round + 1,
+              newScore: applyResult.newScore,
+              fix: { name: fix.name, summary: fix.summary },
+            });
+            break;
+          }
+
+          // If failed and more retries available, continue loop (self-healing)
+          console.log(`Round ${round + 1} failed: ${applyResult.message}. ${round < maxRetries ? 'Retrying...' : 'Giving up.'}`);
+          await sleep(1000);
+
+        } catch (e) {
+          console.error(`Fix error round ${round + 1} for ${product.offerId}:`, e);
+          lastResult = { success: false, message: e.message || 'Xatolik' };
+          if (round >= maxRetries) break;
+          await sleep(1000);
         }
+      }
 
-        fixResults.push({
-          offerId: product.offerId,
-          name: product.name,
-          ...applyResult,
-          fix: { name: fix.name, summary: fix.summary },
-        });
-
-        // Rate limit protection
-        await sleep(500);
-      } catch (e) {
-        console.error(`Fix error for ${product.offerId}:`, e);
+      if (!succeeded) {
         fixResults.push({
           offerId: product.offerId,
           name: product.name,
           success: false,
-          message: e.message || 'Xatolik yuz berdi',
+          message: lastResult?.message || 'Barcha urinishlar muvaffaqiyatsiz',
+          rounds: maxRetries + 1,
         });
       }
+
+      await sleep(500);
     }
 
     const successCount = fixResults.filter(r => r.success).length;
