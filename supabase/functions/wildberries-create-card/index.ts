@@ -204,18 +204,20 @@ async function getAndFillCharacteristics(
 
   console.log(`Total characteristics for subject ${subjectID}: ${charcs.length}`);
 
-  // Find "Описание" (description) and "Наименование" characteristic IDs
-  const descCharc = charcs.find((c: any) => 
-    (c.name || '').toLowerCase().includes('описание') || c.charcID === 14
-  );
-  const nameCharc = charcs.find((c: any) => 
-    (c.name || '').toLowerCase() === 'наименование' || c.charcID === 9
-  );
+  // Find description and name characteristics by flexible name matching
+  const descCharc = charcs.find((c: any) => {
+    const name = (c.name || '').toLowerCase();
+    return name.includes('описание') || name.includes('description') || name === 'описание товара';
+  });
+  const nameCharc = charcs.find((c: any) => {
+    const name = (c.name || '').toLowerCase();
+    return name === 'наименование' || name === 'название' || name.includes('наименование');
+  });
 
-  console.log(`Description charc: ${descCharc ? `id=${descCharc.charcID} "${descCharc.name}"` : 'NOT FOUND'}`);
-  console.log(`Name charc: ${nameCharc ? `id=${nameCharc.charcID} "${nameCharc.name}"` : 'NOT FOUND'}`);
+  console.log(`Description charc: ${descCharc ? `id=${descCharc.charcID} "${descCharc.name}"` : 'NOT IN CHARCS (using top-level field)'}`);
+  console.log(`Name charc: ${nameCharc ? `id=${nameCharc.charcID} "${nameCharc.name}"` : 'NOT IN CHARCS (using top-level field)'}`);
 
-  // Pre-fill description and name characteristics
+  // Pre-fill description and name characteristics if they exist in this subject's charcs
   const preFilled: Array<{ id: number; value: any }> = [];
   if (descCharc) {
     preFilled.push({ id: descCharc.charcID, value: [aiDescription] });
@@ -223,6 +225,9 @@ async function getAndFillCharacteristics(
   if (nameCharc) {
     preFilled.push({ id: nameCharc.charcID, value: [aiTitle] });
   }
+  
+  // Log all available charcs for debugging
+  console.log(`Available charcs: ${charcs.slice(0, 10).map((c: any) => `${c.charcID}:"${c.name}"`).join(', ')}${charcs.length > 10 ? '...' : ''}`);
 
   if (!LOVABLE_API_KEY || charcs.length === 0) return preFilled;
 
@@ -342,10 +347,12 @@ async function proxyImages(supabase: any, userId: string, images: string[]): Pro
 }
 
 // ===== POLL FOR nmID =====
-async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 8): Promise<number | null> {
+async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 15): Promise<number | null> {
   const headers = { Authorization: apiKey, "Content-Type": "application/json" };
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    await sleep((attempt + 1) * 3000);
+    // Progressive delay: 3s, 5s, 5s, 5s, 8s, 8s...
+    const delay = attempt < 1 ? 3000 : attempt < 4 ? 5000 : 8000;
+    await sleep(delay);
     try {
       const listResp = await wbFetch(`${WB_API}/content/v2/get/cards/list`, {
         method: "POST",
@@ -368,7 +375,7 @@ async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 8):
       }
     } catch (e) { /* continue */ }
   }
-  console.log(`⚠️ nmID not found after ${maxAttempts} attempts for ${vendorCode}`);
+  console.log(`⚠️ nmID not found after ${maxAttempts} attempts (~90s) for ${vendorCode}`);
   return null;
 }
 
@@ -620,7 +627,7 @@ serve(async (req) => {
 
     // ===== STEP 6: Poll nmID, upload images, set price =====
     console.log(`\n--- STEP 6: Poll nmID + Images + Price ---`);
-    const nmID = await pollForNmID(apiKey, vendorCode, 8);
+    const nmID = await pollForNmID(apiKey, vendorCode, 15);
 
     let imagesUploaded = false;
     let priceSet = false;
