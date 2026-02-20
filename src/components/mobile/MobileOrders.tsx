@@ -190,7 +190,7 @@ export function MobileOrders({ connectedMarketplaces, store }: MobileOrdersProps
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-120px)]">
+    <div className="flex flex-col" style={{ height: 'calc(100vh - 3.5rem - env(safe-area-inset-top, 0px) - 5rem)' }}>
       <div className="sticky top-0 bg-background z-30 px-3 py-2 border-b space-y-2">
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-3 px-3 scrollbar-hide">
           {connectedMarketplaces.map(mp => (
