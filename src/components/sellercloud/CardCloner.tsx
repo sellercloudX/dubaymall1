@@ -128,8 +128,10 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
     try {
       const validImages = (product.pictures || []).filter(p => p && p.startsWith('http'));
       const costPrice = Math.round(product.price * 0.6);
+      const productDescription = product.description || product.name;
+      const productCategory = product.category || '';
       
-      console.log(`Cloning "${product.name}" to ${targetMp}, cost-optimized mode, images: ${validImages.length}`);
+      console.log(`Cloning "${product.name}" to ${targetMp}, images: ${validImages.length}, desc: ${productDescription.length}ch`);
       
       if (targetMp === 'yandex') {
         const { data, error } = await supabase.functions.invoke('yandex-market-create-card', {
@@ -137,11 +139,11 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
             shopId: 'sellercloud',
             product: {
               name: product.name,
-              description: product.description || product.name,
+              description: productDescription,
               price: product.price,
               costPrice,
               images: validImages,
-              category: product.category || '',
+              category: productCategory,
             },
             pricing: {
               costPrice,
@@ -152,7 +154,7 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
               recommendedPrice: product.price,
               netProfit: Math.round(product.price * 0.2),
             },
-            skipImageGeneration: true,
+            skipImageGeneration: validImages.length >= 4, // Only skip if we have enough images
             cloneMode: true,
           },
         });
@@ -174,13 +176,13 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
             shopId: 'sellercloud',
             product: {
               name: product.name,
-              description: product.description || product.name,
+              description: productDescription,
               price: product.price,
               costPrice,
               images: validImages,
-              category: product.category || '',
+              category: productCategory,
             },
-            skipImageGeneration: true,
+            skipImageGeneration: validImages.length >= 4,
             cloneMode: true,
           },
         });
@@ -201,11 +203,11 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
           body: {
             product: {
               name: product.name,
-              description: product.description || product.name,
+              description: productDescription,
               price: product.price,
               costPrice: costPrice,
               images: validImages,
-              category: product.category || '',
+              category: productCategory,
             },
             cloneMode: true,
           },
