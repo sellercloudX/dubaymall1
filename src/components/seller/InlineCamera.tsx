@@ -22,18 +22,25 @@ export function InlineCamera({ onCapture, onClose, initialStream }: InlineCamera
 
   // Attach initial stream to video on mount
   useEffect(() => {
-    if (videoRef.current && initialStream) {
-      videoRef.current.srcObject = initialStream;
-      videoRef.current.onloadedmetadata = () => setIsReady(true);
+    const video = videoRef.current;
+    if (video && initialStream) {
+      video.srcObject = initialStream;
+      video.onloadedmetadata = () => {
+        setIsReady(true);
+        video.play().catch(err => console.warn('Video autoplay blocked:', err));
+      };
+      // Also try playing immediately in case metadata already loaded
+      video.play().catch(() => {});
     }
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = '';
-      if (videoRef.current?.srcObject) {
-        (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
+      const v = videoRef.current;
+      if (v?.srcObject) {
+        (v.srcObject as MediaStream).getTracks().forEach(t => t.stop());
       }
     };
-  }, []);
+  }, [initialStream]);
 
   const handleSwitch = async () => {
     const newFacing = facingMode === 'environment' ? 'user' : 'environment';
@@ -48,6 +55,7 @@ export function InlineCamera({ onCapture, onClose, initialStream }: InlineCamera
       if (videoRef.current) {
         videoRef.current.srcObject = s;
         videoRef.current.onloadedmetadata = () => setIsReady(true);
+        videoRef.current.play().catch(() => {});
       }
     } catch (err) {
       console.error('Camera switch error:', err);
