@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMarketplaceConnections } from '@/hooks/useMarketplaceConnections';
@@ -56,7 +56,12 @@ const primaryTabIds: MobileTabType[] = ['marketplaces', 'analytics', 'scanner', 
 export default function SellerCloudMobile() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<MobileTabType>('analytics');
+  const [activeTab, setActiveTabRaw] = useState<MobileTabType>('analytics');
+  
+  const setActiveTab = useCallback((tab: MobileTabType) => {
+    setActiveTabRaw(tab);
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, []);
   
   const { 
     connections, 
@@ -203,7 +208,7 @@ export default function SellerCloudMobile() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-24 overflow-x-hidden safe-area-bottom">
+    <div className="min-h-screen bg-background pb-28 overflow-x-hidden safe-area-bottom">
       <MobileSellerCloudHeader connectedCount={connectedMarketplaces.length} onRefresh={refetch} isLoading={connectionsLoading} />
       {isMoreActive && (
         <div className="fixed left-0 right-0 z-40 flex gap-1.5 px-3 py-1.5 overflow-x-auto no-scrollbar border-b bg-background/95 backdrop-blur-sm" style={{ top: 'calc(3.5rem + env(safe-area-inset-top, 0px))' }}>
