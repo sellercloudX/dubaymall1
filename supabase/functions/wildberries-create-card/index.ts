@@ -334,7 +334,7 @@ async function proxyImages(supabase: any, userId: string, images: string[]): Pro
         if (error) { console.log(`Storage upload error: ${error.message} — keeping original URL`); return imgUrl; }
         const { data: urlData } = supabase.storage.from("product-images").getPublicUrl(fileName);
         return urlData?.publicUrl || imgUrl;
-      } catch (e) { return null; }
+      } catch (e) { console.log(`Image proxy exception — keeping original URL`); return imgUrl; }
     })
   );
 
@@ -639,7 +639,7 @@ serve(async (req) => {
 
     // ===== STEP 6: Poll nmID (8 attempts, ~40s max) =====
     console.log(`\n--- STEP 6: Poll nmID ---`);
-    const nmID = await pollForNmID(apiKey, vendorCode, 8);
+    const nmID = await pollForNmID(apiKey, vendorCode, 12);
 
     let imagesUploaded = proxiedImages.length > 0; // sent via mediaFiles
     let priceSet = false;
