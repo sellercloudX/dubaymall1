@@ -914,16 +914,10 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
                   />
                 </div>
               </div>
-              <div className="flex gap-2">
-                <Button onClick={calculatePricing} disabled={!costPrice} className="flex-1">
-                  <Calculator className="mr-2 h-4 w-4" />
-                  Narx hisoblash
-                </Button>
-                <Button variant="secondary" size="default" onClick={fetchRealTariffs} disabled={isCalculating}>
-                  {isCalculating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4 mr-1" />}
-                  API tarif
-                </Button>
-              </div>
+              <Button onClick={calculatePricing} disabled={!costPrice} className="w-full">
+                <Calculator className="mr-2 h-4 w-4" />
+                Narx hisoblash
+              </Button>
             </div>
 
             {/* Pricing Breakdown */}
@@ -993,54 +987,22 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
               </div>
             )}
 
-            {/* Infographic Options */}
+            {/* Create Card Button - directly after pricing */}
             {pricing && (
-              <div className="space-y-3 p-4 border rounded-lg bg-muted/50">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Wand2 className="h-4 w-4 text-primary" />
-                    <span className="font-medium">AI Infografikalar</span>
-                  </div>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={generateInfographics}
-                      onChange={(e) => setGenerateInfographics(e.target.checked)}
-                      className="rounded"
-                    />
-                    <span className="text-sm">Generatsiya</span>
-                  </label>
-                </div>
-                {generateInfographics && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">Soni:</span>
-                    <select
-                      value={infographicCount}
-                      onChange={(e) => setInfographicCount(Number(e.target.value))}
-                      className="text-sm border rounded px-2 py-1"
-                    >
-                      <option value={1}>1 ta</option>
-                      <option value={3}>3 ta</option>
-                      <option value={6}>6 ta</option>
-                    </select>
-                  </div>
-                )}
+              <div className="flex gap-3 pt-2 pb-8">
+                <Button variant="outline" onClick={() => setCurrentStep('capture')}>
+                  Orqaga
+                </Button>
+                <Button 
+                  onClick={startBackgroundCardCreation} 
+                  className="flex-1"
+                  size="lg"
+                >
+                  <Zap className="h-4 w-4 mr-2" />
+                  Kartochka yaratish
+                </Button>
               </div>
             )}
-
-            <div className="flex gap-3 pt-4 pb-8">
-              <Button variant="outline" onClick={() => setCurrentStep('capture')}>
-                Orqaga
-              </Button>
-              <Button 
-                onClick={startBackgroundCardCreation} 
-                disabled={!pricing}
-                size="default"
-              >
-                <Zap className="h-4 w-4 mr-2" />
-                Yaratish
-              </Button>
-            </div>
           </CardContent>
         </Card>
       )}

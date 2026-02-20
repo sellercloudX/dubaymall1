@@ -17,7 +17,7 @@ const marketplaces = [
   { src: ozonLogo, name: 'Ozon' },
 ];
 
-export function SplashScreen({ onComplete, duration = 3000 }: SplashScreenProps) {
+export function SplashScreen({ onComplete, duration = 1800 }: SplashScreenProps) {
   const [phase, setPhase] = useState<'logo' | 'marketplaces' | 'exit'>('logo');
   const [visibleLogos, setVisibleLogos] = useState(0);
 

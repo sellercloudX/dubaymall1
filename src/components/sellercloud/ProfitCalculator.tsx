@@ -132,18 +132,10 @@ export function ProfitCalculator({ commissionPercent = 4, categoryId }: ProfitCa
               />
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button size="sm" variant="outline" onClick={autoCalculatePrice} disabled={!costPrice} className="flex-1">
-              <Calculator className="h-3.5 w-3.5 mr-1" />
-              Narx hisoblash
-            </Button>
-            {categoryId && categoryId > 0 && (
-              <Button size="sm" variant="secondary" onClick={fetchRealTariffs} disabled={isLoadingTariff || !sellingPrice}>
-                {isLoadingTariff ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Zap className="h-3.5 w-3.5 mr-1" />}
-                API tarif
-              </Button>
-            )}
-          </div>
+          <Button size="sm" variant="outline" onClick={autoCalculatePrice} disabled={!costPrice} className="w-full">
+            <Calculator className="h-3.5 w-3.5 mr-1" />
+            Narx hisoblash
+          </Button>
           <div>
             <label className="text-xs font-medium mb-1 block">Sotish narxi (so'm)</label>
             <Input
