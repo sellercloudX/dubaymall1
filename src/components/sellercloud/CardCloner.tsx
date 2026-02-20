@@ -171,6 +171,7 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
       }
 
       if (targetMp === 'wildberries') {
+        // WB card creation involves nmID polling (~2-3 min), need extended timeout
         const { data, error } = await supabase.functions.invoke('wildberries-create-card', {
           body: {
             shopId: 'sellercloud',

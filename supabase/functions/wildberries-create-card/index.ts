@@ -341,11 +341,11 @@ async function proxyImages(supabase: any, userId: string, images: string[]): Pro
   return proxied;
 }
 
-// ===== POLL FOR nmID (progressive delay, 12 attempts ~84s) =====
-async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 12): Promise<number | null> {
+// ===== POLL FOR nmID (fast polling: 8 attempts, ~40s max) =====
+async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 8): Promise<number | null> {
   const headers = { Authorization: apiKey, "Content-Type": "application/json" };
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const delay = 3000 + attempt * 2000; // 3s, 5s, 7s, 9s...
+    const delay = 3000 + attempt * 1500; // 3s, 4.5s, 6s, 7.5s, 9s, 10.5s, 12s, 13.5s
     await sleep(delay);
     try {
       const listResp = await wbFetch(`${WB_API}/content/v2/get/cards/list`, {
@@ -353,7 +353,7 @@ async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 12)
         headers,
         body: JSON.stringify({
           settings: {
-            cursor: { limit: 100 },
+            cursor: { limit: 20 },
             filter: { withPhoto: -1 },
             sort: { sortColumn: "updatedAt", ascending: false },
           },
@@ -631,9 +631,9 @@ serve(async (req) => {
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // ===== STEP 6: Poll nmID (12 attempts, progressive delay ~84s max) =====
+    // ===== STEP 6: Poll nmID (8 attempts, ~40s max) =====
     console.log(`\n--- STEP 6: Poll nmID ---`);
-    const nmID = await pollForNmID(apiKey, vendorCode, 12);
+    const nmID = await pollForNmID(apiKey, vendorCode, 8);
 
     let imagesUploaded = proxiedImages.length > 0; // sent via mediaFiles
     let priceSet = false;
