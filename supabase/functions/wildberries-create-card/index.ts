@@ -347,11 +347,11 @@ async function proxyImages(supabase: any, userId: string, images: string[]): Pro
 }
 
 // ===== POLL FOR nmID =====
-async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 15): Promise<number | null> {
+async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 8): Promise<number | null> {
   const headers = { Authorization: apiKey, "Content-Type": "application/json" };
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    // Progressive delay: 3s, 5s, 5s, 5s, 8s, 8s...
-    const delay = attempt < 1 ? 3000 : attempt < 4 ? 5000 : 8000;
+    // Faster polling: 2s, 3s, 4s, 5s...
+    const delay = 2000 + attempt * 1000;
     await sleep(delay);
     try {
       const listResp = await wbFetch(`${WB_API}/content/v2/get/cards/list`, {
@@ -375,7 +375,7 @@ async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 15)
       }
     } catch (e) { /* continue */ }
   }
-  console.log(`⚠️ nmID not found after ${maxAttempts} attempts (~90s) for ${vendorCode}`);
+  console.log(`⚠️ nmID not found after ${maxAttempts} attempts for ${vendorCode}`);
   return null;
 }
 
@@ -549,6 +549,12 @@ serve(async (req) => {
       }],
     };
 
+    // Include images in initial payload so they don't depend on nmID polling
+    if (proxiedImages.length > 0) {
+      variant.mediaFiles = proxiedImages;
+      console.log(`📸 mediaFiles added to payload: ${proxiedImages.length} images`);
+    }
+
     const payload = [{ subjectID: subject.subjectID, variants: [variant] }];
     console.log(`Payload keys: ${Object.keys(variant).join(', ')}`);
     console.log(`Charcs count: ${filledCharcs.length}, has description: ${!!variant.description}, title length: ${variant.title.length}`);
@@ -625,19 +631,19 @@ serve(async (req) => {
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // ===== STEP 6: Poll nmID, upload images, set price =====
-    console.log(`\n--- STEP 6: Poll nmID + Images + Price ---`);
-    const nmID = await pollForNmID(apiKey, vendorCode, 15);
+    // ===== STEP 6: Poll nmID + set price (images already in mediaFiles) =====
+    console.log(`\n--- STEP 6: Poll nmID + Price ---`);
+    const nmID = await pollForNmID(apiKey, vendorCode, 8);
 
-    let imagesUploaded = false;
+    let imagesUploaded = proxiedImages.length > 0; // Already sent via mediaFiles
     let priceSet = false;
     if (nmID) {
-      // Upload images and set price in parallel
+      // Also upload via v3 media/save as backup (mediaFiles sometimes don't stick)
       const [imgResult, priceResult] = await Promise.all([
         proxiedImages.length > 0 ? uploadMedia(apiKey, nmID, proxiedImages) : Promise.resolve(false),
         setPrice(apiKey, nmID, priceRUB),
       ]);
-      imagesUploaded = imgResult;
+      if (imgResult) imagesUploaded = true;
       priceSet = priceResult;
     }
 
