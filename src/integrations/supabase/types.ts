@@ -2953,6 +2953,17 @@ export type Database = {
       increment_view_count: { Args: { product_id: string }; Returns: undefined }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       process_pending_payouts: { Args: never; Returns: number }
+      search_mxik_fuzzy: {
+        Args: { p_limit?: number; p_search_term: string }
+        Returns: {
+          code: string
+          group_name: string
+          name_ru: string
+          name_uz: string
+          relevance: number
+          vat_rate: number
+        }[]
+      }
       search_products_fuzzy: {
         Args: {
           category_filter?: string

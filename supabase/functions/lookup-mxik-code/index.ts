@@ -14,30 +14,116 @@ interface MxikDbRow {
   name_ru: string | null;
   group_name: string | null;
   vat_rate: number | null;
+  relevance?: number;
 }
 
-// Category keyword mapping for better MXIK search
-const CATEGORY_KEYWORDS: Record<string, string[]> = {
-  'elektronika': ['электрон', 'аппарат', 'прибор', 'устройств'],
-  'smartfonlar': ['телефон', 'смартфон', 'мобил', 'сотовый'],
-  'kompyuterlar': ['компьютер', 'ноутбук', 'монитор', 'клавиатура'],
-  'kosmetika': ['косметик', 'крем', 'помада', 'тушь', 'тени'],
-  'parfyumeriya': ['парфюм', 'духи', 'туалет', 'одеколон', 'аромат'],
-  'go\'zallik': ['косметик', 'красот', 'уход', 'гигиен'],
-  'soch parvarishi': ['шампунь', 'бальзам', 'маска', 'сочлар'],
-  'teri parvarishi': ['крем', 'лосьон', 'сыворотк', 'тоник'],
-  'kiyim-kechak': ['одежд', 'кийим', 'текстил', 'трикотаж'],
-  'oyoq kiyim': ['обувь', 'оёқ', 'кроссов', 'туфл', 'сапог'],
-  'sport': ['спорт', 'тренажер', 'фитнес'],
-  'oziq-ovqat': ['продукт', 'пищев', 'озиқ', 'овқат'],
-  'uy-ro\'zg\'or': ['бытов', 'домашн', 'маиший', 'посуд'],
-  'bolalar uchun': ['детск', 'болалар', 'игрушк'],
-  'avtomobil': ['автомобил', 'авто', 'машин', 'транспорт'],
-  'qurilish': ['строител', 'қурилиш', 'инструмент'],
-  'salomatlik': ['медицин', 'здоров', 'лекарств', 'витамин'],
+// ===== SYNONYM DICTIONARY =====
+// Maps common product names to actual terms found in MXIK database
+const SYNONYMS: Record<string, string[]> = {
+  // Electronics
+  'смартфон': ['сотовый телефон', 'мобильный', 'телефон'],
+  'smartphone': ['сотовый телефон', 'мобильный', 'телефон'],
+  'telefon': ['телефон', 'сотовый', 'мобильный'],
+  'smartfon': ['телефон', 'сотовый', 'мобильный'],
+  'iphone': ['сотовый телефон', 'мобильный', 'телефон'],
+  'samsung': ['сотовый телефон', 'мобильный', 'телефон'],
+  'xiaomi': ['сотовый телефон', 'мобильный', 'телефон'],
+  'ноутбук': ['портативный компьютер', 'ноутбук', 'компьютер'],
+  'noutbuk': ['ноутбук', 'компьютер', 'портативный'],
+  'планшет': ['планшетный компьютер', 'планшет', 'компьютер'],
+  'наушники': ['наушник', 'гарнитура', 'аудио'],
+  'наушник': ['наушник', 'гарнитура', 'аудио'],
+  'quloqchin': ['наушник', 'гарнитура'],
+  'power bank': ['зарядное устройство', 'аккумулятор', 'батарея'],
+  'zaryadka': ['зарядное устройство', 'адаптер'],
+  'televizor': ['телевизор', 'монитор'],
+  'monitor': ['монитор', 'дисплей', 'экран'],
+  
+  // Footwear
+  'кроссовки': ['спортивная обувь', 'обувь спортивная', 'кроссовок'],
+  'krossovka': ['спортивная обувь', 'обувь', 'кроссовок'],
+  'poyabzal': ['обувь', 'ботинок', 'туфля'],
+  'туфли': ['туфля', 'обувь', 'полуботинок'],
+  'ботинки': ['ботинок', 'обувь', 'полуботинок'],
+  'сапоги': ['сапог', 'обувь', 'ботинок'],
+  'кеды': ['спортивная обувь', 'обувь', 'кроссовок'],
+  'сандалии': ['сандалия', 'обувь летняя', 'обувь'],
+  'шлёпки': ['обувь', 'тапочка', 'шлёпанец'],
+  
+  // Clothing
+  'футболка': ['футболка', 'одежда трикотажная', 'майка'],
+  'рубашка': ['рубашка', 'одежда', 'сорочка'],
+  'ko\'ylak': ['рубашка', 'одежда', 'сорочка'],
+  'джинсы': ['брюки', 'джинсы', 'одежда'],
+  'shim': ['брюки', 'штаны', 'одежда'],
+  'куртка': ['куртка', 'одежда верхняя', 'пальто'],
+  'kurtka': ['куртка', 'одежда верхняя'],
+  'ko\'ylak': ['платье', 'одежда'],
+  'платье': ['платье', 'одежда', 'одежда женская'],
+  
+  // Cosmetics
+  'крем': ['крем', 'косметическое средство', 'косметика'],
+  'krem': ['крем', 'косметическое средство'],
+  'шампунь': ['шампунь', 'средство для волос', 'моющее'],
+  'shampun': ['шампунь', 'средство для волос'],
+  'помада': ['помада', 'косметика', 'косметическое средство'],
+  'духи': ['духи', 'парфюмерия', 'туалетная вода'],
+  'atir': ['духи', 'парфюмерия', 'туалетная вода'],
+  'parfyum': ['духи', 'парфюмерия', 'одеколон'],
+  
+  // Home
+  'пылесос': ['пылесос', 'бытовая техника', 'уборочная'],
+  'changyutgich': ['пылесос', 'бытовая техника'],
+  'холодильник': ['холодильник', 'бытовая техника', 'морозильник'],
+  'muzlatgich': ['холодильник', 'бытовая техника'],
+  'стиральная машина': ['стиральная машина', 'бытовая техника'],
+  'kir yuvish mashinasi': ['стиральная машина', 'бытовая техника'],
+  'утюг': ['утюг', 'бытовая техника', 'гладильный'],
+  'dazmol': ['утюг', 'бытовая техника'],
+  'чайник': ['чайник', 'электрочайник', 'бытовая техника'],
+  'сковорода': ['сковорода', 'посуда', 'кухонная'],
+  'кастрюля': ['кастрюля', 'посуда', 'кухонная'],
+  
+  // Food
+  'чай': ['чай', 'чайный'],
+  'кофе': ['кофе', 'кофейный'],
+  'шоколад': ['шоколад', 'кондитерское изделие'],
+  'мёд': ['мед', 'мёд натуральный'],
+  
+  // Kids
+  'игрушка': ['игрушка', 'детская', 'игрушечный'],
+  'o\'yinchoq': ['игрушка', 'детская'],
+  'подгузник': ['подгузник', 'памперс', 'детское'],
+  'taglik': ['подгузник', 'памперс'],
+  
+  // Bags
+  'сумка': ['сумка', 'портфель', 'чехол'],
+  'sumka': ['сумка', 'портфель', 'чехол'],
+  'рюкзак': ['рюкзак', 'сумка', 'портфель'],
+  'ryukzak': ['рюкзак', 'сумка'],
+  'чемодан': ['чемодан', 'багаж', 'дорожная сумка'],
+  'chamadan': ['чемодан', 'багаж'],
+  
+  // Auto
+  'автомобиль': ['автомобиль', 'машина', 'транспортное средство'],
+  'avtomobil': ['автомобиль', 'машина'],
+  'шина': ['шина', 'покрышка', 'автомобильная'],
+  
+  // Sports
+  'гантели': ['гантель', 'спортивный инвентарь', 'тренажер'],
+  'тренажер': ['тренажер', 'спортивный инвентарь'],
+  'мяч': ['мяч', 'спортивный'],
+  
+  // Other
+  'часы': ['часы', 'наручные часы', 'хронометр'],
+  'soat': ['часы', 'наручные часы'],
+  'очки': ['очки', 'оптика', 'солнцезащитные'],
+  'ko\'zoynak': ['очки', 'оптика'],
+  'книга': ['книга', 'литература', 'издание'],
+  'kitob': ['книга', 'литература'],
 };
 
-// Latin Uzbek → Cyrillic transliteration for MXIK DB search
+// Latin Uzbek → Cyrillic transliteration
 const LATIN_TO_CYRILLIC: Record<string, string> = {
   "o'": 'ў', "g'": 'ғ', 'sh': 'ш', 'ch': 'ч', 'ng': 'нг', 'yo': 'ё', 'yu': 'ю', 'ya': 'я', 'ts': 'ц',
   'a': 'а', 'b': 'б', 'v': 'в', 'g': 'г', 'd': 'д', 'e': 'е', 'j': 'ж', 'z': 'з', 'i': 'и',
@@ -50,7 +136,6 @@ function latinToCyrillic(text: string): string {
   let i = 0;
   const lower = text.toLowerCase();
   while (i < lower.length) {
-    // Check 2-char combos first
     if (i + 1 < lower.length) {
       const two = lower.substring(i, i + 2);
       if (LATIN_TO_CYRILLIC[two]) { result += LATIN_TO_CYRILLIC[two]; i += 2; continue; }
@@ -62,115 +147,98 @@ function latinToCyrillic(text: string): string {
   return result;
 }
 
-// Common product type translations Latin Uzbek → Russian for better MXIK search
-const PRODUCT_TYPE_TRANSLATIONS: Record<string, string[]> = {
-  'sumka': ['сумк', 'портфел', 'чехол'],
-  'sayohat': ['дорожн', 'путешеств', 'багаж'],
-  'chamadan': ['чемодан', 'багаж'],
-  'telefon': ['телефон', 'смартфон'],
-  'krem': ['крем', 'косметик'],
-  'krossovka': ['кроссовк', 'обувь', 'спорт'],
-  'poyabzal': ['обувь', 'ботинк'],
-  'ko\'ylak': ['рубашк', 'одежд'],
-  'shim': ['брюк', 'штан', 'одежд'],
-  'soat': ['часы', 'наручн'],
-  'ko\'zoynak': ['очки', 'оптик'],
-  'qalam': ['ручк', 'канцеляр'],
-  'dori': ['лекарств', 'медицин', 'фармацевт'],
-  'sabun': ['мыло', 'гигиен'],
-  'shampun': ['шампун', 'волос'],
-  'atir': ['парфюм', 'духи', 'аромат'],
-  'idish': ['посуд', 'тарелк', 'кухон'],
-  'o\'yinchoq': ['игрушк', 'детск'],
-  'kitob': ['книг', 'литератур'],
-};
+// Expand search term using synonyms
+function expandSearchTerms(productName: string, category?: string): string[] {
+  const terms: string[] = [];
+  const lowerName = productName.toLowerCase().trim();
+  const words = lowerName.split(/\s+/).filter(w => w.length > 2);
+  
+  // Check synonyms for full name and individual words
+  for (const [key, values] of Object.entries(SYNONYMS)) {
+    if (lowerName.includes(key) || key.includes(lowerName)) {
+      terms.push(...values);
+    }
+    for (const word of words) {
+      if (word === key || (word.length > 3 && (word.includes(key) || key.includes(word)))) {
+        terms.push(...values);
+      }
+    }
+  }
+  
+  // Also transliterate Latin words to Cyrillic and check synonyms
+  for (const word of words) {
+    if (/[a-z]/.test(word)) {
+      const cyrillic = latinToCyrillic(word);
+      if (cyrillic !== word && cyrillic.length > 2) {
+        terms.push(cyrillic);
+        // Check synonyms for transliterated word
+        for (const [key, values] of Object.entries(SYNONYMS)) {
+          if (cyrillic.includes(key) || key.includes(cyrillic)) {
+            terms.push(...values);
+          }
+        }
+      }
+    }
+  }
+  
+  // Category-based terms
+  if (category) {
+    const catLower = category.toLowerCase();
+    for (const [key, values] of Object.entries(SYNONYMS)) {
+      if (catLower.includes(key)) {
+        terms.push(...values);
+      }
+    }
+  }
+  
+  return [...new Set(terms)].filter(Boolean);
+}
 
-// ===== STEP 1: Search local mxik_codes database =====
+// Create a service_role client for MXIK DB queries (bypasses RLS for speed)
+function getMxikClient() {
+  return createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  );
+}
+
+// Fast ILIKE search (uses GIN indexes, much faster than trigram on 273K rows)
+async function ilikeSearch(db: any, term: string, limit = 10): Promise<MxikDbRow[]> {
+  if (term.length < 3) return [];
+  try {
+    const { data } = await db
+      .from('mxik_codes')
+      .select('code, name_uz, name_ru, group_name, vat_rate')
+      .or(`name_uz.ilike.%${term}%,name_ru.ilike.%${term}%,group_name.ilike.%${term}%`)
+      .eq('is_active', true)
+      .limit(limit);
+    return data || [];
+  } catch { return []; }
+}
+
+// ===== STEP 1: Search local DB with synonyms =====
 async function searchLocalDB(
-  supabase: any,
   productName: string,
   category?: string
 ): Promise<MxikDbRow[]> {
-  const results: MxikDbRow[] = [];
-
-  // Build search terms — prioritize category keywords for MXIK matching
-  const searchTerms: string[] = [];
+  const db = getMxikClient();
+  const synonymTerms = expandSearchTerms(productName, category).slice(0, 5);
   
-  // Add category-specific keywords first (best for MXIK matching)
-  if (category) {
-    const catLower = category.toLowerCase();
-    for (const [key, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
-      if (catLower.includes(key) || key.includes(catLower)) {
-        searchTerms.push(...keywords);
-        break;
-      }
-    }
-    searchTerms.push(category);
-  }
+  // Run all searches in parallel
+  const searches = [
+    ...synonymTerms.map(t => ilikeSearch(db, t, 10)),
+  ];
   
-  // Extract meaningful words from product name
-  const cleanName = productName
-    .replace(/[^a-zA-Zа-яА-ЯёЁўқғҳ\s''-]/g, ' ')
-    .replace(/\b(для|с|и|в|на|от|из|к|по|без|до|за|не|ни|же|или|но|а|то|это|the|a|an|of|for|with|uchun|va|bilan|dan|ga|ning|ml|мл|г|g|шт|pcs)\b/gi, '')
-    .trim();
-  
-  const words = cleanName.split(/\s+/).filter(w => w.length > 2);
-  
-  // Add Latin→Cyrillic translations of product name words for better DB matching
-  for (const word of words.slice(0, 6)) {
-    const wordLower = word.toLowerCase();
-    // Check direct product type translations first
-    for (const [latinKey, cyrillicValues] of Object.entries(PRODUCT_TYPE_TRANSLATIONS)) {
-      if (wordLower.includes(latinKey) || latinKey.includes(wordLower)) {
-        searchTerms.push(...cyrillicValues);
-      }
-    }
-    // Also transliterate the word to Cyrillic
-    const cyrillicWord = latinToCyrillic(wordLower);
-    if (cyrillicWord !== wordLower && cyrillicWord.length > 2) {
-      searchTerms.push(cyrillicWord);
-    }
-  }
-  
-  searchTerms.push(...words.slice(0, 6));
+  // Also search category
+  if (category) searches.push(ilikeSearch(db, category, 8));
 
-  // Deduplicate
-  const uniqueTerms = [...new Set(searchTerms)].filter(Boolean);
+  const results = (await Promise.all(searches)).flat();
 
-  // Try ILIKE search with each term
-  for (const term of uniqueTerms) {
-    if (term.length < 3) continue;
-    try {
-      const { data } = await supabase
-        .from('mxik_codes')
-        .select('code, name_uz, name_ru, group_name, vat_rate')
-        .or(`name_uz.ilike.%${term}%,name_ru.ilike.%${term}%,group_name.ilike.%${term}%`)
-        .eq('is_active', true)
-        .limit(15);
-      if (data?.length) results.push(...data);
-    } catch (e) {
-      console.log(`[MXIK DB] Search failed for "${term}"`);
-    }
-    if (results.length >= 30) break;
-  }
+  // Deduplicate by code
+  const byCode = new Map<string, MxikDbRow>();
+  for (const r of results) byCode.set(r.code, r);
 
-  // Full-text search fallback
-  if (results.length === 0 && words.length > 0) {
-    const searchQuery = words.slice(0, 3).join(' & ');
-    try {
-      const { data } = await supabase
-        .from('mxik_codes')
-        .select('code, name_uz, name_ru, group_name, vat_rate')
-        .textSearch('search_vector', searchQuery, { type: 'plain' })
-        .eq('is_active', true)
-        .limit(20);
-      if (data?.length) results.push(...data);
-    } catch (e) {
-      console.log('[MXIK DB] Full-text search failed');
-    }
-  }
-
-  const unique = Array.from(new Map(results.map(r => [r.code, r])).values());
+  const unique = Array.from(byCode.values()).slice(0, 25);
   console.log(`[MXIK DB] Found ${unique.length} results for: "${productName.substring(0, 50)}"`);
   return unique;
 }
@@ -181,13 +249,11 @@ async function searchTasnif(keyword: string, lang = 'ru'): Promise<any[]> {
     const url = `${TASNIF_API}/elasticsearch/search?search=${encodeURIComponent(keyword)}&size=15&page=0&lang=${lang}`;
     const controller = new AbortController();
     const tid = setTimeout(() => controller.abort(), 6000);
-
     const res = await fetch(url, {
       headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' },
       signal: controller.signal,
     });
     clearTimeout(tid);
-
     if (!res.ok) return [];
     const json = await res.json();
     return json?.data?.content || [];
@@ -214,10 +280,10 @@ async function aiSelectBestCode(
   const apiKey = Deno.env.get('LOVABLE_API_KEY');
   if (!apiKey) throw new Error('LOVABLE_API_KEY not configured');
 
-  const candidates: Array<{ code: string; name_uz: string; name_ru?: string; source: string }> = [];
+  const candidates: Array<{ code: string; name_uz: string; name_ru?: string; source: string; relevance?: number }> = [];
 
   for (const r of dbResults) {
-    candidates.push({ code: r.code, name_uz: r.name_uz, name_ru: r.name_ru || undefined, source: 'database' });
+    candidates.push({ code: r.code, name_uz: r.name_uz, name_ru: r.name_ru || undefined, source: 'database', relevance: r.relevance });
   }
 
   for (const t of tasnifResults) {
@@ -229,7 +295,6 @@ async function aiSelectBestCode(
   }
 
   if (candidates.length === 0) {
-    // AI fallback — generate likely code
     console.log('[MXIK] No candidates, using AI fallback');
     
     const fallbackResp = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -272,9 +337,11 @@ async function aiSelectBestCode(
     };
   }
 
-  const candidateList = candidates.slice(0, 30).map((c, i) =>
-    `${i + 1}. ${c.code} — ${c.name_uz}${c.name_ru ? ` (${c.name_ru})` : ''} [${c.source}]`
-  ).join('\n');
+  // Build candidate list for AI with relevance scores
+  const candidateList = candidates.slice(0, 30).map((c, i) => {
+    const relStr = c.relevance ? ` (relevance: ${(c.relevance * 100).toFixed(0)}%)` : '';
+    return `${i + 1}. ${c.code} — ${c.name_uz}${c.name_ru ? ` | ${c.name_ru}` : ''}${relStr} [${c.source}]`;
+  }).join('\n');
 
   const prompt = `Mahsulot: "${productName}"
 ${category ? `Kategoriya: "${category}"` : ''}
@@ -282,6 +349,7 @@ ${description ? `Tavsif: "${description}"` : ''}
 
 Quyidagi RO'YXATDAN eng mos MXIK kodini tanlang.
 MUHIM: Faqat shu ro'yxatdagi kodlardan birini tanlang! O'zingizdan kod to'qib chiqarmang!
+Relevance yuqori bo'lgan kodlarga ko'proq e'tibor bering.
 
 ${candidateList}
 
@@ -399,46 +467,26 @@ serve(async (req) => {
 
     console.log('[MXIK] Looking up:', productName, category ? `(${category})` : '');
 
-    // STEP 1: Search local database
-    const dbResults = await searchLocalDB(supabase, productName, category);
+    // STEP 1: Search local database with fuzzy RPC + synonyms
+    const dbResults = await searchLocalDB(productName, category);
 
-    // STEP 2: Search tasnif.soliq.uz API
-    const cleanName = productName
-      .replace(/[^a-zA-Zа-яА-ЯёЁ\s]/g, ' ')
-      .replace(/\b(для|с|и|в|на|от|из|к|по|без|до|за|не|ни|же|или|но|а|то|это)\b/gi, '')
-      .trim();
-    const words = cleanName.split(/\s+/).filter(w => w.length > 2);
-    
-    // Also add category keywords to tasnif search
-    const categoryTerms: string[] = [];
-    if (category) {
-      const catLower = category.toLowerCase();
-      for (const [key, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
-        if (catLower.includes(key) || key.includes(catLower)) {
-          categoryTerms.push(...keywords.slice(0, 2));
-          break;
-        }
-      }
-    }
-    
+    // STEP 2: Search tasnif.soliq.uz API (parallel with synonym expansion)
+    const synonymTerms = expandSearchTerms(productName, category);
     const searchTerms = [
-      ...categoryTerms,
       productName.slice(0, 50),
-      words.slice(0, 3).join(' '),
-      words.slice(0, 2).join(' '),
-      words[0] || '',
+      ...synonymTerms.slice(0, 3),
       category || '',
     ].filter(Boolean);
 
     const allTasnif: any[] = [];
     for (const term of searchTerms) {
-      if (!term) continue;
+      if (!term || term.length < 2) continue;
       const [ruRes, uzRes] = await Promise.all([
         searchTasnif(term, 'ru'),
         searchTasnif(term, 'uz'),
       ]);
       allTasnif.push(...ruRes, ...uzRes);
-      if (allTasnif.length >= 30) break; // Don't over-search
+      if (allTasnif.length >= 30) break;
     }
     const uniqueTasnif = Array.from(new Map(allTasnif.map(i => [i.mxikCode, i])).values());
 
