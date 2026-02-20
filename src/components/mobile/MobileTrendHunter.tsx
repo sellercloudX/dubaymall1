@@ -93,7 +93,7 @@
    };
  
    return (
-     <div className="flex flex-col h-[calc(100vh-120px)]">
+     <div className="flex flex-col" style={{ height: 'calc(100vh - 3.5rem - env(safe-area-inset-top, 0px) - 5rem)' }}>
        {/* Header */}
        <div className="sticky top-14 bg-background z-30 px-3 py-3 border-b">
          <div className="flex items-center justify-between mb-2">
