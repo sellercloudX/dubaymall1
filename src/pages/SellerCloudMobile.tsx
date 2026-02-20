@@ -205,24 +205,24 @@ export default function SellerCloudMobile() {
   return (
     <div className="min-h-screen bg-background pb-24 overflow-x-hidden safe-area-bottom">
       <MobileSellerCloudHeader connectedCount={connectedMarketplaces.length} onRefresh={refetch} isLoading={connectionsLoading} />
-      <main className="pt-[calc(3.5rem+env(safe-area-inset-top,0px))]">
+      {isMoreActive && (
+        <div className="fixed left-0 right-0 z-40 flex gap-1.5 px-3 py-1.5 overflow-x-auto no-scrollbar border-b bg-background/95 backdrop-blur-sm" style={{ top: 'calc(3.5rem + env(safe-area-inset-top, 0px))' }}>
+          {moreSubTabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                className={cn("flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-medium whitespace-nowrap transition-all duration-200 min-h-[30px]",
+                  isActive ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/80 active:scale-95")}>
+                <Icon className="h-3.5 w-3.5 shrink-0" />{tab.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <main className={cn("pt-[calc(3.5rem+env(safe-area-inset-top,0px))]", isMoreActive && "pt-[calc(6.5rem+env(safe-area-inset-top,0px))]")}>
         <PullToRefresh onRefresh={async () => { await refetch(); toast.success("Ma'lumotlar yangilandi"); }}>
-        {isMoreActive && (
-          <div className="flex gap-1.5 px-3 py-2 overflow-x-auto no-scrollbar border-b bg-background/95 backdrop-blur-sm sticky top-[calc(3.5rem+env(safe-area-inset-top,0px))] z-40">
-            {moreSubTabs.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
-              return (
-                <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                  className={cn("flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-medium whitespace-nowrap transition-all duration-200 min-h-[32px]",
-                    isActive ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/80 active:scale-95")}>
-                  <Icon className="h-3.5 w-3.5 shrink-0" />{tab.label}
-                </button>
-              );
-            })}
-          </div>
-        )}
-        <div className={cn("transition-all duration-200")}>
+        <div className="transition-all duration-200">
           {renderContent()}
         </div>
         </PullToRefresh>
