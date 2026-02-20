@@ -61,7 +61,7 @@ const SYNONYMS: Record<string, string[]> = {
   'ko\'ylak': ['платье', 'одежда'],
   'платье': ['платье', 'одежда', 'одежда женская'],
   
-  // Cosmetics
+  // Cosmetics & Beauty
   'крем': ['крем', 'косметическое средство', 'косметика'],
   'krem': ['крем', 'косметическое средство'],
   'шампунь': ['шампунь', 'средство для волос', 'моющее'],
@@ -70,6 +70,26 @@ const SYNONYMS: Record<string, string[]> = {
   'духи': ['духи', 'парфюмерия', 'туалетная вода'],
   'atir': ['духи', 'парфюмерия', 'туалетная вода'],
   'parfyum': ['духи', 'парфюмерия', 'одеколон'],
+  
+  // Depilation & Wax
+  'воскоплав': ['воскоплав', 'депиляция', 'воск', 'нагреватель воска', 'косметическое оборудование'],
+  'депиляция': ['депиляция', 'воскоплав', 'воск для депиляции', 'удаление волос', 'эпиляция'],
+  'эпиляция': ['эпиляция', 'депиляция', 'воскоплав', 'удаление волос'],
+  'воск': ['воск для депиляции', 'воскоплав', 'депиляция', 'косметический воск'],
+  'depilyatsiya': ['депиляция', 'воскоплав', 'воск', 'удаление волос'],
+  'voskoplav': ['воскоплав', 'депиляция', 'нагреватель воска'],
+  'qozoncha': ['воскоплав', 'нагреватель', 'кастрюля', 'посуда'],
+  'mum': ['воск', 'воскоплав', 'свеча'],
+  'epilyatsiya': ['эпиляция', 'депиляция', 'воскоплав'],
+  
+  // Hair styling
+  'фен': ['фен', 'фен для волос', 'сушилка для волос', 'бытовая техника'],
+  'плойка': ['плойка', 'щипцы для волос', 'стайлер', 'завивка'],
+  'утюжок': ['утюжок для волос', 'выпрямитель', 'стайлер'],
+  
+  // Manicure / Pedicure
+  'маникюр': ['маникюрный набор', 'маникюр', 'ногтевой сервис'],
+  'лак': ['лак для ногтей', 'маникюр', 'косметика'],
   
   // Home
   'пылесос': ['пылесос', 'бытовая техника', 'уборочная'],
@@ -348,8 +368,12 @@ ${category ? `Kategoriya: "${category}"` : ''}
 ${description ? `Tavsif: "${description}"` : ''}
 
 Quyidagi RO'YXATDAN eng mos MXIK kodini tanlang.
-MUHIM: Faqat shu ro'yxatdagi kodlardan birini tanlang! O'zingizdan kod to'qib chiqarmang!
-Relevance yuqori bo'lgan kodlarga ko'proq e'tibor bering.
+MUHIM QOIDALAR:
+1. Faqat shu ro'yxatdagi kodlardan birini tanlang! O'zingizdan kod to'qib chiqarmang!
+2. Mahsulot TURINI to'g'ri aniqlang! Masalan: "воскоплав" = depilatsiya jihozi, "apteka dori vositasi" EMAS!
+3. Kosmetika va go'zallik mahsulotlarini DORI-DARMON yoki FARMATSEVTIKA bilan adashtirmang!
+4. Mahsulot nomi va tavsifiga qarab aniq kategoriyani tanlang.
+5. "Лекарственный", "фармацевтический", "медицинский" so'zlari bor kodlarni FAQAT haqiqiy dori mahsulotlari uchun tanlang!
 
 ${candidateList}
 
@@ -370,7 +394,7 @@ JSON:
     body: JSON.stringify({
       model: 'google/gemini-2.5-flash',
       messages: [
-        { role: 'system', content: 'Sen MXIK kod mutaxassisizan. FAQAT berilgan ro\'yxatdagi kodlardan tanlaysan. Yangi kod to\'qib chiqarma. JSON formatda javob ber.' },
+        { role: 'system', content: 'Sen MXIK kod mutaxassisizan. FAQAT berilgan ro\'yxatdagi kodlardan tanlaysan. Yangi kod to\'qib chiqarma. MUHIM: Kosmetika/go\'zallik mahsulotlarini (krem, shampun, vosk, depilyatsiya, parfyum) HECH QACHON dori-darmon yoki farmatsevtika kategoriyasiga qo\'yma! Mahsulot turini ANIQ farqla! JSON formatda javob ber.' },
         { role: 'user', content: prompt },
       ],
       temperature: 0.1,
