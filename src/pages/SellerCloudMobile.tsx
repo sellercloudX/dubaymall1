@@ -227,7 +227,7 @@ export default function SellerCloudMobile() {
     <div className="min-h-screen bg-background pb-32 overflow-x-hidden safe-area-bottom">
       <MobileSellerCloudHeader connectedCount={connectedMarketplaces.length} onRefresh={refetch} isLoading={connectionsLoading} />
       {isMoreActive && (
-        <div className="fixed left-0 right-0 z-40 flex gap-1.5 px-3 py-1.5 overflow-x-auto no-scrollbar border-b bg-background/95 backdrop-blur-sm" style={{ top: 'calc(3.5rem + env(safe-area-inset-top, 0px))' }}>
+        <div className="fixed left-0 right-0 z-40 flex gap-1.5 px-3 py-1.5 overflow-x-auto no-scrollbar border-b bg-background/95 backdrop-blur-sm" style={{ top: 'calc(3rem + env(safe-area-inset-top, 0px))' }}>
           {moreSubTabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -241,7 +241,7 @@ export default function SellerCloudMobile() {
           })}
         </div>
       )}
-      <main style={{ paddingTop: isMoreActive ? 'calc(6rem + env(safe-area-inset-top, 0px))' : 'calc(3.5rem + env(safe-area-inset-top, 0px))' }}>
+      <main style={{ paddingTop: isMoreActive ? 'calc(5rem + env(safe-area-inset-top, 0px))' : 'calc(3rem + env(safe-area-inset-top, 0px))' }}>
         <PullToRefresh onRefresh={async () => { await refetch(); toast.success("Ma'lumotlar yangilandi"); }}>
         <Suspense fallback={<TabLoader />}>
           <div className="transition-none">
