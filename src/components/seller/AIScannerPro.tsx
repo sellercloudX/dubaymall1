@@ -570,17 +570,17 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
   const processingTasks = backgroundTasks.filter(t => t.status === 'processing').length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* Progress Header */}
       <Card>
-        <CardHeader className="pb-2">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div className="min-w-0">
-              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                <Sparkles className="h-5 w-5 text-primary shrink-0" />
+        <CardHeader className="py-3 px-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <CardTitle className="flex items-center gap-1.5 text-sm">
+                <Sparkles className="h-4 w-4 text-primary shrink-0" />
                 <span className="truncate">AI Scanner Pro</span>
               </CardTitle>
-              <CardDescription className="text-xs sm:text-sm truncate">
+              <CardDescription className="text-xs truncate mt-0.5">
                 Rasmdan mahsulot kartochkasini Yandex Market'ga yuklash
               </CardDescription>
             </div>
@@ -608,9 +608,9 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <Progress value={getProgress()} className="h-2" />
-          <div className="flex justify-between mt-2 text-[10px] sm:text-xs text-muted-foreground">
+        <CardContent className="px-4 pb-3 pt-0">
+          <Progress value={getProgress()} className="h-1.5" />
+          <div className="flex justify-between mt-1 text-[10px] text-muted-foreground">
             <span>Rasm</span>
             <span>Tahlil</span>
             <span>Narx</span>
@@ -707,16 +707,16 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
       {/* Step 1: Image Capture */}
       {currentStep === 'capture' && (
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Camera className="h-5 w-5" />
+          <CardHeader className="py-3 px-4">
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <Camera className="h-4 w-4" />
               Mahsulot rasmini oling
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-xs">
               Kamera orqali rasmga oling yoki galereyadan tanlang
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3 px-4 pb-4 pt-0">
             {/* Inline Camera */}
              {showInlineCamera && cameraStream && (
               <InlineCamera
@@ -739,7 +739,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
               <div className="grid grid-cols-2 gap-3">
                 <Button
                   size="lg"
-                  className="h-24 flex flex-col items-center justify-center gap-2"
+                  className="h-20 flex flex-col items-center justify-center gap-1.5"
                    onClick={async () => {
                      try {
                        const stream = await requestCameraStream();
@@ -758,7 +758,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
                 <Button
                   variant="outline"
                   size="lg"
-                  className="h-24 flex flex-col items-center justify-center gap-2"
+                  className="h-20 flex flex-col items-center justify-center gap-1.5"
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <ImageIcon className="h-8 w-8" />
@@ -777,7 +777,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
 
             {/* Tips for mobile users */}
             {!showInlineCamera && (
-              <div className="bg-muted/50 rounded-lg p-3">
+              <div className="bg-muted/50 rounded-lg p-2.5">
                 <p className="font-medium text-sm text-foreground mb-1">💡 Maslahat:</p>
                 <ul className="space-y-0.5 text-xs text-muted-foreground">
                   <li>• Yaxshi yoritilgan joyda rasmga oling</li>

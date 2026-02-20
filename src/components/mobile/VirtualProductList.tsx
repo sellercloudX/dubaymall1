@@ -45,9 +45,9 @@ const formatPrice = (price?: number, marketplace?: string) => {
     className="overflow-hidden cursor-pointer hover:bg-accent/50 transition-colors"
      onClick={() => onClick?.(product)}
    >
-    <CardContent className="p-2">
-       <div className="flex">
-        <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
+    <CardContent className="p-2.5">
+       <div className="flex gap-2.5">
+        <div className="w-14 h-14 bg-muted rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
            {product.pictures?.[0] ? (
              <img 
                src={product.pictures[0]} 
@@ -63,11 +63,11 @@ const formatPrice = (price?: number, marketplace?: string) => {
              <ImageIcon className="h-5 w-5 text-muted-foreground/50" />
            )}
          </div>
-        <div className="flex-1 pl-3 min-w-0">
-          <div className="font-medium text-sm line-clamp-2 mb-1 leading-tight">
+         <div className="flex-1 min-w-0">
+          <div className="font-medium text-[13px] line-clamp-2 mb-0.5 leading-tight">
              {product.name || 'Nomsiz'}
            </div>
-          <div className="text-xs text-muted-foreground mb-1.5 truncate">
+          <div className="text-[11px] text-muted-foreground mb-1 truncate">
              SKU: {product.shopSku || product.offerId}
            </div>
            <div className="flex items-center justify-between gap-2">
@@ -98,7 +98,7 @@ const formatPrice = (price?: number, marketplace?: string) => {
    const virtualizer = useVirtualizer({
      count: products.length,
      getScrollElement: () => parentRef.current,
-    estimateSize: () => 96, // Increased row height for better spacing
+    estimateSize: () => 88,
      overscan: 5, // Render 5 extra items above/below viewport
    });
  
@@ -127,7 +127,7 @@ const formatPrice = (price?: number, marketplace?: string) => {
                  width: '100%',
                  height: `${virtualItem.size}px`,
                  transform: `translateY(${virtualItem.start}px)`,
-              paddingBottom: '12px',
+              paddingBottom: '8px',
                }}
              >
                <ProductRow product={product} onClick={onProductClick} marketplace={marketplace} />

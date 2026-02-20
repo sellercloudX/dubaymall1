@@ -100,7 +100,7 @@ export function MobileAnalytics({ connections, connectedMarketplaces, store }: M
   }
 
   return (
-    <div className="p-4 space-y-4 overflow-x-hidden">
+    <div className="p-3 space-y-3 overflow-x-hidden">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="font-semibold">Analitika</h2>

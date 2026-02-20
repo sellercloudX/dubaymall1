@@ -72,13 +72,22 @@ export function InlineCamera({ onCapture, onClose, initialStream }: InlineCamera
   };
 
   return createPortal(
-    <div className="fixed inset-0 bg-black flex flex-col" style={{ zIndex: 99999 }}>
+    <div 
+      className="fixed inset-0 bg-black flex flex-col" 
+      style={{ 
+        zIndex: 99999,
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100dvh',
+      }}
+    >
       <video
         ref={videoRef}
         autoPlay
         playsInline
         muted
-        className="flex-1 w-full h-full object-cover"
+        className="absolute inset-0 w-full h-full object-cover"
       />
       <canvas ref={canvasRef} className="hidden" />
 

@@ -190,8 +190,8 @@ export function MobileOrders({ connectedMarketplaces, store }: MobileOrdersProps
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-140px)]">
-      <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top,0px))] bg-background z-30 px-3 py-3 border-b space-y-2.5">
+    <div className="flex flex-col h-[calc(100vh-120px)]">
+      <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top,0px))] bg-background z-30 px-3 py-2 border-b space-y-2">
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-3 px-3 scrollbar-hide">
           {connectedMarketplaces.map(mp => (
             <Button key={mp} variant={selectedMp === mp ? 'default' : 'outline'} size="sm"
