@@ -96,9 +96,14 @@ async function proxyImagesToStorage(
 
     try {
       const resp = await fetch(url, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; MarketBot/1.0)', 'Accept': 'image/*' },
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+          'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8',
+          'Referer': url.includes('yandex') ? 'https://market.yandex.ru/' : url.includes('uzum') ? 'https://uzum.uz/' : url.includes('wildberries') ? 'https://www.wildberries.ru/' : 'https://google.com/',
+        },
       });
-      if (!resp.ok) { console.warn(`⚠️ Download failed (${resp.status}): ${url.substring(0, 60)}`); continue; }
+      if (!resp.ok) { console.warn(`⚠️ Download failed (${resp.status}): ${url.substring(0, 80)}`); proxied.push(url); continue; }
 
       const ct = resp.headers.get('content-type') || 'image/jpeg';
       if (!ct.startsWith('image/')) continue;

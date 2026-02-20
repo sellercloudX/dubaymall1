@@ -316,10 +316,14 @@ async function proxyImages(supabase: any, userId: string, images: string[]): Pro
       if (!imgUrl?.startsWith("http")) return null;
       try {
         const resp = await fetch(imgUrl, {
-          headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+            "Referer": imgUrl.includes("yandex") ? "https://market.yandex.ru/" : imgUrl.includes("uzum") ? "https://uzum.uz/" : "https://www.wildberries.ru/",
+          },
           redirect: "follow",
         });
-        if (!resp.ok) { console.log(`Image fetch failed: ${resp.status} ${imgUrl.substring(0, 80)}`); return null; }
+        if (!resp.ok) { console.log(`Image fetch failed: ${resp.status} ${imgUrl.substring(0, 80)}`); return imgUrl; }
         const ct = resp.headers.get("content-type") || "image/jpeg";
         if (!ct.startsWith("image/")) return null;
         const data = await resp.arrayBuffer();
