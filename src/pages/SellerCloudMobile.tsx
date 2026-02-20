@@ -225,7 +225,7 @@ export default function SellerCloudMobile() {
           })}
         </div>
       )}
-      <main className={cn("pt-[calc(3.5rem+env(safe-area-inset-top,0px))]", isMoreActive && "pt-[calc(6.5rem+env(safe-area-inset-top,0px))]")}>
+      <main style={{ paddingTop: isMoreActive ? 'calc(6.5rem + env(safe-area-inset-top, 0px))' : 'calc(3.5rem + env(safe-area-inset-top, 0px))' }}>
         <PullToRefresh onRefresh={async () => { await refetch(); toast.success("Ma'lumotlar yangilandi"); }}>
         <div className="transition-all duration-200">
           {renderContent()}
