@@ -243,26 +243,36 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
     let success = 0;
     let failed = 0;
     let skipped = 0;
-    const total = selectedProducts.length * targetMarketplaces.length;
-    let processed = 0;
 
+    // Build all clone tasks
+    const tasks: { product: CloneableProduct; target: string }[] = [];
     for (const product of selectedProducts) {
       for (const target of targetMarketplaces) {
         if (isAlreadyCloned(product, target)) {
           skipped++;
-          processed++;
-          setCloneProgress(Math.round((processed / total) * 100));
-          continue;
+        } else {
+          tasks.push({ product, target });
         }
-
-        const ok = await cloneToMarketplace(product, target);
-        if (ok) success++;
-        else failed++;
-
-        processed++;
-        setCloneProgress(Math.round((processed / total) * 100));
-        await new Promise(resolve => setTimeout(resolve, 300));
       }
+    }
+
+    const total = tasks.length + skipped;
+    let processed = skipped;
+    setCloneProgress(total > 0 ? Math.round((processed / total) * 100) : 100);
+
+    // Process in parallel batches of 3
+    const BATCH_SIZE = 3;
+    for (let i = 0; i < tasks.length; i += BATCH_SIZE) {
+      const batch = tasks.slice(i, i + BATCH_SIZE);
+      const results = await Promise.allSettled(
+        batch.map(({ product, target }) => cloneToMarketplace(product, target))
+      );
+      for (const r of results) {
+        if (r.status === 'fulfilled' && r.value) success++;
+        else failed++;
+        processed++;
+      }
+      setCloneProgress(Math.round((processed / total) * 100));
     }
 
     setCloneResults({ success, failed, skipped });
