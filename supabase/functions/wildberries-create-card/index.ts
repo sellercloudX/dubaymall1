@@ -323,17 +323,17 @@ async function proxyImages(supabase: any, userId: string, images: string[]): Pro
           },
           redirect: "follow",
         });
-        if (!resp.ok) { console.log(`Image fetch failed: ${resp.status} ${imgUrl.substring(0, 80)}`); return imgUrl; }
+        if (!resp.ok) { console.log(`Image fetch failed: ${resp.status} — keeping original URL`); return imgUrl; }
         const ct = resp.headers.get("content-type") || "image/jpeg";
-        if (!ct.startsWith("image/")) return null;
+        if (!ct.startsWith("image/")) return imgUrl;
         const data = await resp.arrayBuffer();
-        if (data.byteLength < 500) return null;
+        if (data.byteLength < 500) return imgUrl;
         const ext = ct.includes("png") ? "png" : ct.includes("webp") ? "webp" : "jpg";
         const fileName = `${userId}/wb-${Date.now()}-${Math.random().toString(36).substring(2, 6)}.${ext}`;
         const { error } = await supabase.storage.from("product-images").upload(fileName, data, { contentType: ct, cacheControl: "31536000", upsert: false });
-        if (error) { console.log(`Storage upload error: ${error.message}`); return null; }
+        if (error) { console.log(`Storage upload error: ${error.message} — keeping original URL`); return imgUrl; }
         const { data: urlData } = supabase.storage.from("product-images").getPublicUrl(fileName);
-        return urlData?.publicUrl || null;
+        return urlData?.publicUrl || imgUrl;
       } catch (e) { return null; }
     })
   );
@@ -346,18 +346,19 @@ async function proxyImages(supabase: any, userId: string, images: string[]): Pro
 }
 
 // ===== POLL FOR nmID (fast polling: 8 attempts, ~40s max) =====
-async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 8): Promise<number | null> {
+async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 12): Promise<number | null> {
   const headers = { Authorization: apiKey, "Content-Type": "application/json" };
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const delay = 3000 + attempt * 1500; // 3s, 4.5s, 6s, 7.5s, 9s, 10.5s, 12s, 13.5s
+    const delay = 3000 + attempt * 2000; // 3s, 5s, 7s, 9s... up to ~27s per attempt
     await sleep(delay);
     try {
+      // Fetch 100 latest cards to reliably find our new card
       const listResp = await wbFetch(`${WB_API}/content/v2/get/cards/list`, {
         method: "POST",
         headers,
         body: JSON.stringify({
           settings: {
-            cursor: { limit: 20 },
+            cursor: { limit: 100 },
             filter: { withPhoto: -1 },
             sort: { sortColumn: "updatedAt", ascending: false },
           },
@@ -371,6 +372,7 @@ async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 8):
         console.log(`✅ nmID found: ${found.nmID} (attempt ${attempt + 1}/${maxAttempts})`);
         return found.nmID;
       }
+      console.log(`Polling attempt ${attempt + 1}: checked ${cards.length} cards, not found yet`);
     } catch (e) { /* continue */ }
   }
   console.log(`⚠️ nmID not found after ${maxAttempts} attempts for ${vendorCode}`);
