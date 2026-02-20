@@ -898,14 +898,70 @@ serve(async (req) => {
           const generatedImgs = await Promise.all(imgPromises);
           images = generatedImgs.filter(Boolean) as string[];
         } else if (body.skipImageGeneration) {
-          console.log(`💰 Cost optimization: reusing ${sourceImages.length} images for clone`);
-          images = sourceImages;
+          console.log(`💰 Clone mode: source has ${sourceImages.length} images`);
+          images = [...sourceImages];
+          
+          // If source has < 4 images, generate supplementary AI images to boost quality score
+          if (images.length < 4 && LOVABLE_KEY) {
+            const needed = 4 - images.length;
+            console.log(`🖼️ Generating ${needed} supplementary images for clone quality boost...`);
+            const supplementAngles = [
+              `LIFESTYLE photo of "${product.name}" in elegant real-world setting, warm natural lighting, aspirational composition. NO text, NO labels. Ultra-sharp 4K, 3:4 ratio.`,
+              `PREMIUM ANGLE photo of "${product.name}" at three-quarter perspective showing 3D depth, dramatic rim lighting, sophisticated composition. NO text. 4K quality, 3:4 ratio.`,
+              `DETAIL CLOSE-UP of "${product.name}" showing texture, material quality, branding. Product fills 85% frame, bright even lighting. NO text. 4K, 3:4 ratio.`,
+            ].slice(0, needed);
+            
+            const suppPromises = supplementAngles.map((angle, i) => (async () => {
+              try {
+                const refImg = sourceImages[0] || null;
+                const genBody: any = {
+                  model: "google/gemini-3-pro-image-preview",
+                  modalities: ["image", "text"],
+                  messages: [{
+                    role: "user",
+                    content: refImg ? [
+                      { type: "text", text: `Using this product as EXACT visual reference (same shape, color, brand), create: ${angle}\nCRITICAL: Product must look identical to reference. Only change angle/background/lighting.` },
+                      { type: "image_url", image_url: { url: refImg } }
+                    ] : angle
+                  }],
+                };
+                const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+                  method: "POST",
+                  headers: { Authorization: `Bearer ${LOVABLE_KEY}`, "Content-Type": "application/json" },
+                  body: JSON.stringify(genBody),
+                });
+                if (res.ok) {
+                  const data = await res.json();
+                  const imgData = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+                  if (imgData?.startsWith("data:image")) {
+                    const base64 = imgData.split(",")[1];
+                    const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+                    const fileName = `${user.id}/ym-supp-${Date.now()}-${i}.png`;
+                    const { error } = await supabase.storage.from('product-images').upload(fileName, bytes, {
+                      contentType: 'image/png', cacheControl: '31536000', upsert: false,
+                    });
+                    if (!error) {
+                      const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(fileName);
+                      if (urlData?.publicUrl) {
+                        console.log(`✅ Supplementary image ${i + 1} generated`);
+                        return urlData.publicUrl;
+                      }
+                    }
+                  }
+                }
+              } catch (e) { console.error(`Supp image ${i} error:`, e); }
+              return null;
+            })());
+            
+            const suppResults = await Promise.all(suppPromises);
+            images.push(...suppResults.filter(Boolean) as string[]);
+            console.log(`📸 Clone total: ${images.length} images (${sourceImages.length} source + ${images.length - sourceImages.length} AI)`);
+          }
         }
         
-        // If no images generated, fall back to source ONLY as last resort
-        // Prefer no images over raw camera photos on marketplace cards
+        // If no images at all, fall back to source
         if (images.length === 0 && sourceImages.length > 0) {
-          console.warn("⚠️ No AI images generated, using source as fallback (not ideal)");
+          console.warn("⚠️ No images, using source as fallback");
           images = sourceImages;
         }
         console.log(`🖼️ Total ${images.length} professional images ready`);
