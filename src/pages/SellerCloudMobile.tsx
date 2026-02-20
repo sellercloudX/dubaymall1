@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMarketplaceConnections } from '@/hooks/useMarketplaceConnections';
@@ -6,33 +6,49 @@ import { useSellerCloudSubscription } from '@/hooks/useSellerCloudSubscription';
 import { useMarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 import { MobileSellerCloudNav, type MobileTabType } from '@/components/mobile/MobileSellerCloudNav';
 import { MobileSellerCloudHeader } from '@/components/mobile/MobileSellerCloudHeader';
-import { MobileAnalytics } from '@/components/mobile/MobileAnalytics';
-import { MobileProducts } from '@/components/mobile/MobileProducts';
-import { MobileOrders } from '@/components/mobile/MobileOrders';
-
-import { AIScannerPro } from '@/components/seller/AIScannerPro';
 import { BackgroundTasksPanel } from '@/components/mobile/BackgroundTasksPanel';
-import { ABCAnalysis } from '@/components/sellercloud/ABCAnalysis';
-import { MinPriceProtection } from '@/components/sellercloud/MinPriceProtection';
-import { CardCloner } from '@/components/sellercloud/CardCloner';
-import { ProblematicProducts } from '@/components/sellercloud/ProblematicProducts';
-import { FinancialDashboard } from '@/components/sellercloud/FinancialDashboard';
-import { ProfitCalculator } from '@/components/sellercloud/ProfitCalculator';
-import { MarketplaceOAuth } from '@/components/sellercloud/MarketplaceOAuth';
-import { InventorySync } from '@/components/sellercloud/InventorySync';
-import { PriceManager } from '@/components/sellercloud/PriceManager';
-import { CardQualityAudit } from '@/components/sellercloud/CardQualityAudit';
-import { ReportsExport } from '@/components/sellercloud/ReportsExport';
-import { NotificationCenter } from '@/components/sellercloud/NotificationCenter';
-import { SubscriptionBilling } from '@/components/sellercloud/SubscriptionBilling';
-import { CostPriceManager } from '@/components/sellercloud/CostPriceManager';
-import { UzumCardHelper } from '@/components/sellercloud/UzumCardHelper';
 import { PullToRefresh } from '@/components/mobile/PullToRefresh';
-import { Loader2, Lock, TrendingUp, Calculator, DollarSign, BarChart3, Shield, Copy, AlertOctagon, ArrowDownUp, Tag, Upload, FileSpreadsheet, Bell, CreditCard, Coins, Sparkles } from 'lucide-react';
+import { Loader2, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { Skeleton } from '@/components/ui/skeleton';
+
+// Lazy load ALL tab content components for instant tab switching
+const MobileAnalytics = lazy(() => import('@/components/mobile/MobileAnalytics').then(m => ({ default: m.MobileAnalytics })));
+const MobileProducts = lazy(() => import('@/components/mobile/MobileProducts').then(m => ({ default: m.MobileProducts })));
+const MobileOrders = lazy(() => import('@/components/mobile/MobileOrders').then(m => ({ default: m.MobileOrders })));
+const AIScannerPro = lazy(() => import('@/components/seller/AIScannerPro').then(m => ({ default: m.AIScannerPro })));
+const MarketplaceOAuth = lazy(() => import('@/components/sellercloud/MarketplaceOAuth').then(m => ({ default: m.MarketplaceOAuth })));
+const ABCAnalysis = lazy(() => import('@/components/sellercloud/ABCAnalysis').then(m => ({ default: m.ABCAnalysis })));
+const MinPriceProtection = lazy(() => import('@/components/sellercloud/MinPriceProtection').then(m => ({ default: m.MinPriceProtection })));
+const CardCloner = lazy(() => import('@/components/sellercloud/CardCloner').then(m => ({ default: m.CardCloner })));
+const ProblematicProducts = lazy(() => import('@/components/sellercloud/ProblematicProducts').then(m => ({ default: m.ProblematicProducts })));
+const FinancialDashboard = lazy(() => import('@/components/sellercloud/FinancialDashboard').then(m => ({ default: m.FinancialDashboard })));
+const ProfitCalculator = lazy(() => import('@/components/sellercloud/ProfitCalculator').then(m => ({ default: m.ProfitCalculator })));
+const InventorySync = lazy(() => import('@/components/sellercloud/InventorySync').then(m => ({ default: m.InventorySync })));
+const PriceManager = lazy(() => import('@/components/sellercloud/PriceManager').then(m => ({ default: m.PriceManager })));
+const CardQualityAudit = lazy(() => import('@/components/sellercloud/CardQualityAudit').then(m => ({ default: m.CardQualityAudit })));
+const ReportsExport = lazy(() => import('@/components/sellercloud/ReportsExport').then(m => ({ default: m.ReportsExport })));
+const NotificationCenter = lazy(() => import('@/components/sellercloud/NotificationCenter').then(m => ({ default: m.NotificationCenter })));
+const SubscriptionBilling = lazy(() => import('@/components/sellercloud/SubscriptionBilling').then(m => ({ default: m.SubscriptionBilling })));
+const CostPriceManager = lazy(() => import('@/components/sellercloud/CostPriceManager').then(m => ({ default: m.CostPriceManager })));
+const UzumCardHelper = lazy(() => import('@/components/sellercloud/UzumCardHelper').then(m => ({ default: m.UzumCardHelper })));
+
+// Lightweight tab loading skeleton
+function TabLoader() {
+  return (
+    <div className="p-4 space-y-3">
+      <Skeleton className="h-8 w-48" />
+      <Skeleton className="h-32 w-full rounded-lg" />
+      <Skeleton className="h-24 w-full rounded-lg" />
+    </div>
+  );
+}
+
+// Icons for more sub-tabs (imported inline to avoid heavy lucide bundle at top)
+import { TrendingUp, Calculator, DollarSign, BarChart3, Shield, Copy, AlertOctagon, ArrowDownUp, Tag, Upload, FileSpreadsheet, Bell, CreditCard, Coins, Sparkles } from 'lucide-react';
 
 const moreSubTabs = [
   { id: 'quality-audit' as const, icon: Sparkles, label: 'Sifat auditi' },
@@ -217,7 +233,7 @@ export default function SellerCloudMobile() {
             const isActive = activeTab === tab.id;
             return (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                className={cn("flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-medium whitespace-nowrap transition-all duration-200 min-h-[30px]",
+                className={cn("flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-medium whitespace-nowrap transition-all duration-150 min-h-[30px]",
                   isActive ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/80 active:scale-95")}>
                 <Icon className="h-3.5 w-3.5 shrink-0" />{tab.label}
               </button>
@@ -227,9 +243,11 @@ export default function SellerCloudMobile() {
       )}
       <main style={{ paddingTop: isMoreActive ? 'calc(6rem + env(safe-area-inset-top, 0px))' : 'calc(3.5rem + env(safe-area-inset-top, 0px))' }}>
         <PullToRefresh onRefresh={async () => { await refetch(); toast.success("Ma'lumotlar yangilandi"); }}>
-        <div className="transition-all duration-200">
-          {renderContent()}
-        </div>
+        <Suspense fallback={<TabLoader />}>
+          <div className="transition-none">
+            {renderContent()}
+          </div>
+        </Suspense>
         </PullToRefresh>
       </main>
       <MobileSellerCloudNav activeTab={activeTab} onTabChange={setActiveTab} />
