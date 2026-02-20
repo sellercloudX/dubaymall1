@@ -898,65 +898,8 @@ serve(async (req) => {
           const generatedImgs = await Promise.all(imgPromises);
           images = generatedImgs.filter(Boolean) as string[];
         } else if (body.skipImageGeneration) {
-          console.log(`💰 Clone mode: source has ${sourceImages.length} images`);
+          console.log(`💰 Clone mode: using ${sourceImages.length} source images directly (no AI generation for speed)`);
           images = [...sourceImages];
-          
-          // If source has < 4 images, generate supplementary AI images to boost quality score
-          if (images.length < 4 && LOVABLE_KEY) {
-            const needed = 4 - images.length;
-            console.log(`🖼️ Generating ${needed} supplementary images for clone quality boost...`);
-            const supplementAngles = [
-              `LIFESTYLE photo of "${product.name}" in elegant real-world setting, warm natural lighting, aspirational composition. NO text, NO labels. Ultra-sharp 4K, 3:4 ratio.`,
-              `PREMIUM ANGLE photo of "${product.name}" at three-quarter perspective showing 3D depth, dramatic rim lighting, sophisticated composition. NO text. 4K quality, 3:4 ratio.`,
-              `DETAIL CLOSE-UP of "${product.name}" showing texture, material quality, branding. Product fills 85% frame, bright even lighting. NO text. 4K, 3:4 ratio.`,
-            ].slice(0, needed);
-            
-            const suppPromises = supplementAngles.map((angle, i) => (async () => {
-              try {
-                const refImg = sourceImages[0] || null;
-                const genBody: any = {
-                  model: "google/gemini-3-pro-image-preview",
-                  modalities: ["image", "text"],
-                  messages: [{
-                    role: "user",
-                    content: refImg ? [
-                      { type: "text", text: `Using this product as EXACT visual reference (same shape, color, brand), create: ${angle}\nCRITICAL: Product must look identical to reference. Only change angle/background/lighting.` },
-                      { type: "image_url", image_url: { url: refImg } }
-                    ] : angle
-                  }],
-                };
-                const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-                  method: "POST",
-                  headers: { Authorization: `Bearer ${LOVABLE_KEY}`, "Content-Type": "application/json" },
-                  body: JSON.stringify(genBody),
-                });
-                if (res.ok) {
-                  const data = await res.json();
-                  const imgData = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-                  if (imgData?.startsWith("data:image")) {
-                    const base64 = imgData.split(",")[1];
-                    const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
-                    const fileName = `${user.id}/ym-supp-${Date.now()}-${i}.png`;
-                    const { error } = await supabase.storage.from('product-images').upload(fileName, bytes, {
-                      contentType: 'image/png', cacheControl: '31536000', upsert: false,
-                    });
-                    if (!error) {
-                      const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(fileName);
-                      if (urlData?.publicUrl) {
-                        console.log(`✅ Supplementary image ${i + 1} generated`);
-                        return urlData.publicUrl;
-                      }
-                    }
-                  }
-                }
-              } catch (e) { console.error(`Supp image ${i} error:`, e); }
-              return null;
-            })());
-            
-            const suppResults = await Promise.all(suppPromises);
-            images.push(...suppResults.filter(Boolean) as string[]);
-            console.log(`📸 Clone total: ${images.length} images (${sourceImages.length} source + ${images.length - sourceImages.length} AI)`);
-          }
         }
         
         // If no images at all, fall back to source
@@ -1014,14 +957,13 @@ serve(async (req) => {
           uzSent = await sendUzbekContent(creds.apiKey, creds.businessId, sku, ai.name_uz, ai.description_uz);
         }
 
-        // ═══ STEP 7.5: Auto quality check ═══
+        // ═══ STEP 7.5: Auto quality check (SKIP in clone mode for speed) ═══
         let qualityCheck: any = null;
-        if (yResp.ok && LOVABLE_KEY) {
+        if (yResp.ok && LOVABLE_KEY && !body.cloneMode) {
           try {
             console.log("🔍 Running auto quality check...");
             await new Promise(r => setTimeout(r, 1000));
             
-            // Fetch the created offer to check quality
             const checkResp = await fetch(`${YANDEX_API}/businesses/${creds.businessId}/offer-mappings?offerIds=${encodeURIComponent(sku)}`, {
               method: "POST",
               headers: { "Api-Key": creds.apiKey, "Content-Type": "application/json" },
@@ -1045,85 +987,48 @@ serve(async (req) => {
               
               console.log(`📊 Quality: status=${cardStatus}, errors=${errors.length}, warnings=${warnings.length}`);
               
-              // Auto-fix errors by asking AI to correct and re-submitting
+              // Auto-fix errors
               if (errors.length > 0 && LOVABLE_KEY) {
                 console.log("🔧 Auto-fixing errors:", errors.slice(0, 5).map((e: any) => e.message || e.code));
                 try {
                   const errorMessages = errors.map((e: any) => e.message || e.code || JSON.stringify(e)).join("\n");
-                  const fixPrompt = `Yandex Market kartochkasida quyidagi xatolar topildi:
-${errorMessages}
-
-Joriy offer ma'lumotlari:
-- name: ${offer.name}
-- vendor: ${offer.vendor}
-- vendorCode: ${offer.vendorCode}
-- categoryId: ${leafCat.id} (${leafCat.name})
-- parameterValues count: ${offer.parameterValues?.length || 0}
-- shelfLife: ${JSON.stringify(offer.shelfLife)}
-- lifeTime: ${JSON.stringify(offer.lifeTime)}
-- weightDimensions: ${JSON.stringify(offer.weightDimensions)}
-
-Xatolarni tuzatish uchun qaysi maydonlarni o'zgartirish kerak? Javob FAQAT JSON:
-{"fixes": {"name": "yangi nom yoki null", "shelfLife": {"timePeriod": 36, "timeUnit": "MONTH"}, "lifeTime": {"timePeriod": 36, "timeUnit": "MONTH"}, "parameterValues": [{"parameterId": 123, "value": "qiymat"}], "vendor": "yangi vendor yoki null"}}
-Faqat tuzatish kerak bo'lgan maydonlarni ber. null = o'zgartirma.`;
-
+                  const fixPrompt = `Yandex Market kartochkasida quyidagi xatolar topildi:\n${errorMessages}\n\nJoriy offer:\n- name: ${offer.name}\n- vendor: ${offer.vendor}\n- categoryId: ${leafCat.id} (${leafCat.name})\n- shelfLife: ${JSON.stringify(offer.shelfLife)}\n- lifeTime: ${JSON.stringify(offer.lifeTime)}\n\nJavob FAQAT JSON:\n{"fixes": {"name": "yangi nom yoki null", "shelfLife": {"timePeriod": 36, "timeUnit": "MONTH"}, "lifeTime": {"timePeriod": 36, "timeUnit": "MONTH"}, "parameterValues": [{"parameterId": 123, "value": "qiymat"}], "vendor": "yangi vendor yoki null"}}`;
                   const fixResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
                     method: "POST",
                     headers: { Authorization: `Bearer ${LOVABLE_KEY}`, "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      model: "google/gemini-2.5-flash",
-                      messages: [{ role: "user", content: fixPrompt }],
-                      temperature: 0, max_tokens: 2000,
-                    }),
+                    body: JSON.stringify({ model: "google/gemini-2.5-flash", messages: [{ role: "user", content: fixPrompt }], temperature: 0, max_tokens: 2000 }),
                   });
-
                   if (fixResp.ok) {
                     const fixData = await fixResp.json();
                     const fixContent = fixData.choices?.[0]?.message?.content || "";
                     const fixMatch = fixContent.match(/\{[\s\S]*\}/);
                     if (fixMatch) {
                       const fixes = JSON.parse(fixMatch[0]).fixes || JSON.parse(fixMatch[0]);
-                      console.log("🔧 AI fixes:", Object.keys(fixes));
-                      
-                      // Apply fixes to offer
                       if (fixes.name && fixes.name !== "null") offer.name = fixes.name;
                       if (fixes.vendor && fixes.vendor !== "null") offer.vendor = fixes.vendor;
                       if (fixes.shelfLife) offer.shelfLife = fixes.shelfLife;
                       if (fixes.lifeTime) offer.lifeTime = fixes.lifeTime;
                       if (fixes.parameterValues?.length) {
-                        // Merge: replace existing or add new
                         const existingMap = new Map((offer.parameterValues || []).map((p: any) => [p.parameterId, p]));
-                        for (const fp of fixes.parameterValues) {
-                          existingMap.set(fp.parameterId, fp);
-                        }
+                        for (const fp of fixes.parameterValues) existingMap.set(fp.parameterId, fp);
                         offer.parameterValues = Array.from(existingMap.values());
                       }
-
-                      // Re-submit fixed offer
-                      console.log("📤 Re-submitting fixed offer...");
                       const fixedResp = await fetch(`${YANDEX_API}/businesses/${creds.businessId}/offer-mappings/update`, {
                         method: "POST",
                         headers: { "Api-Key": creds.apiKey, "Content-Type": "application/json" },
                         body: JSON.stringify({ offerMappings: [{ offer }] }),
                       });
-                      
-                      if (fixedResp.ok) {
-                        console.log("✅ Auto-fix submitted successfully");
-                        qualityCheck.autoFixed = true;
-                        qualityCheck.fixedFields = Object.keys(fixes).filter(k => fixes[k] !== null && fixes[k] !== "null");
-                      } else {
-                        console.warn("⚠️ Auto-fix re-submission failed:", fixedResp.status);
-                      }
+                      if (fixedResp.ok) { qualityCheck.autoFixed = true; qualityCheck.fixedFields = Object.keys(fixes).filter(k => fixes[k] !== null && fixes[k] !== "null"); }
                     }
                   }
-                } catch (fixErr) {
-                  console.warn("Auto-fix error:", fixErr);
-                }
+                } catch (fixErr) { console.warn("Auto-fix error:", fixErr); }
               }
             }
           } catch (e) {
             console.warn("Quality check failed:", e);
           }
+        } else if (body.cloneMode) {
+          console.log("⚡ Clone mode: quality check skipped for speed");
         }
 
         // ═══ STEP 8: Save locally ═══
