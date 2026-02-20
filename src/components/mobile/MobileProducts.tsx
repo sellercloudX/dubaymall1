@@ -79,7 +79,7 @@ export function MobileProducts({ connectedMarketplaces, store }: MobileProductsP
 
   return (
     <div className="flex flex-col h-[calc(100vh-120px)]">
-      <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top,0px))] bg-background z-30 px-3 py-2 border-b space-y-2">
+      <div className="sticky top-0 bg-background z-30 px-3 py-2 border-b space-y-2">
         <div className="flex items-center justify-between">
           <div>
             <span className="font-bold text-lg">{productsWithKeys.length}</span>
