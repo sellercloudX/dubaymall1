@@ -152,7 +152,7 @@ export default function SellerCloudMobile() {
             <p className="font-medium mb-1">Nima qilish kerak?</p>
             <ul className="text-xs text-muted-foreground space-y-1 text-left">
               <li>1. To'lov qiling — avtomatik aktivlashadi</li>
-              <li>2. Yoki admin bilan bog'laning</li>
+              <li>2. Yoki admin bilan bog'laning: <a href="https://t.me/sellercloudx_support" target="_blank" className="text-primary underline">@sellercloudx_support</a></li>
             </ul>
           </div>
           <div className="flex gap-2">

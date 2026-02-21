@@ -36,7 +36,7 @@ export function ActivationsManagement() {
       const userIds = data?.map(s => s.user_id) || [];
       const { data: profiles } = await supabase
         .from('profiles')
-        .select('user_id, full_name, phone')
+        .select('user_id, full_name, phone, city, region, address')
         .in('user_id', userIds);
       
       return data?.map(sub => ({
@@ -140,10 +140,12 @@ export function ActivationsManagement() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Foydalanuvchi</TableHead>
+                    <TableHead>Telefon</TableHead>
                     <TableHead>Tarif</TableHead>
                     <TableHead>Oylik to'lov</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Sana</TableHead>
+                    <TableHead>Amal</TableHead>
                     <TableHead>Amal</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -151,6 +153,11 @@ export function ActivationsManagement() {
                   {filteredCloud?.map((sub: any) => (
                     <TableRow key={sub.id}>
                       <TableCell className="font-medium">{sub.profile?.full_name || 'Noma\'lum'}</TableCell>
+                      <TableCell>
+                        {sub.profile?.phone ? (
+                          <a href={`tel:${sub.profile.phone}`} className="text-primary hover:underline text-sm">{sub.profile.phone}</a>
+                        ) : '—'}
+                      </TableCell>
                       <TableCell><Badge variant="secondary">{sub.plan_type?.toUpperCase()}</Badge></TableCell>
                       <TableCell>${sub.monthly_fee}</TableCell>
                       <TableCell>

@@ -228,7 +228,7 @@ export default function SellerCloudX() {
                 <h4 className="font-semibold text-destructive">Akkount cheklangan</h4>
                 <p className="text-sm text-muted-foreground mt-1">{accessStatus.message}</p>
                 {totalDebt > 0 && <p className="font-medium mt-2">Qarzdorlik: {new Intl.NumberFormat('uz-UZ').format(totalDebt)} so'm</p>}
-                <p className="text-xs text-muted-foreground mt-2">To'lov qiling — avtomatik aktivlashadi. Yoki admin bilan bog'laning.</p>
+                <p className="text-xs text-muted-foreground mt-2">To'lov qiling — avtomatik aktivlashadi. Yoki admin bilan bog'laning: <a href="https://t.me/sellercloudx_support" target="_blank" className="text-primary underline">@sellercloudx_support</a></p>
               </div>
               <Button variant="destructive" size="sm">To'lash</Button>
             </div>

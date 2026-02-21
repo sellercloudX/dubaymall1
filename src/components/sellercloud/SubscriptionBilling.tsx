@@ -335,11 +335,13 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </>
                   )}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-
+                 </Button>
+                 <p className="text-xs text-center text-muted-foreground">
+                   Muammo bormi? Telegram: <a href="https://t.me/sellercloudx_support" target="_blank" className="text-primary underline">@sellercloudx_support</a>
+                 </p>
+               </div>
+             </DialogContent>
+           </Dialog>
         </>
      );
    }
@@ -376,9 +378,10 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
               <div className="flex-1">
                 <h4 className="font-semibold text-destructive">Akkount bloklangan</h4>
                 <p className="text-sm text-muted-foreground mt-1">{accessStatus.message}</p>
-                {accessStatus.total_debt && accessStatus.total_debt > 0 && (
-                  <p className="font-medium mt-2">Qarzdorlik: {formatPrice(accessStatus.total_debt)}</p>
-                )}
+                 {accessStatus.total_debt && accessStatus.total_debt > 0 && (
+                   <p className="font-medium mt-2">Qarzdorlik: {formatPrice(accessStatus.total_debt)}</p>
+                 )}
+                 <p className="text-xs text-muted-foreground mt-2">Yordam kerakmi? Telegram: <a href="https://t.me/sellercloudx_support" target="_blank" className="text-primary underline">@sellercloudx_support</a></p>
               </div>
                <Button variant="destructive" size="sm" onClick={() => handleSubscriptionPayment(1)} disabled={isCreating}>
                   {isCreating ? 'Yuklanmoqda...' : 'Click orqali to\'lash'}
@@ -613,9 +616,10 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
               </div>
               <div className="text-right">
                 <div className="text-2xl font-bold text-destructive">{formatPrice(totalDebt)}</div>
-                <Button variant="destructive" size="sm" className="mt-2" onClick={() => handleSubscriptionPayment(1)} disabled={isCreating}>
-                  {isCreating ? 'Yuklanmoqda...' : 'Hozir to\'lash'}
-                </Button>
+                 <Button variant="destructive" size="sm" className="mt-2" onClick={() => handleSubscriptionPayment(1)} disabled={isCreating}>
+                   {isCreating ? 'Yuklanmoqda...' : 'Hozir to\'lash'}
+                 </Button>
+                 <p className="text-xs text-muted-foreground mt-2">Telegram: <a href="https://t.me/sellercloudx_support" target="_blank" className="text-primary underline">@sellercloudx_support</a></p>
               </div>
             </div>
           </CardContent>
