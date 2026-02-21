@@ -1,4 +1,4 @@
-const AFFILIATE_API_BASE = 'https://xewgwvsljdhjvxtmqeuy.supabase.co/functions/v1';
+import { supabase } from "@/integrations/supabase/client";
 
 interface ProcessPaymentParams {
   eventType: 'FIRST_PAYMENT' | 'RENEWAL';
@@ -38,20 +38,18 @@ export async function notifyAffiliatePayment(params: ProcessPaymentParams): Prom
       }
     }
 
-    const response = await fetch(`${AFFILIATE_API_BASE}/process-payment`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Webhook-Secret': import.meta.env.VITE_WEBHOOK_SECRET || '',
-      },
-      body: JSON.stringify(body),
+    const { data, error } = await supabase.functions.invoke('affiliate-webhook', {
+      body,
     });
 
-    const data = await response.json();
+    if (error) {
+      console.error('Affiliate webhook error:', error);
+      return { success: false, error: error.message };
+    }
+
     return data;
   } catch (err: any) {
     console.error('Affiliate webhook error:', err);
-    // Don't block payment flow if webhook fails
     return { success: false, error: err.message };
   }
 }
