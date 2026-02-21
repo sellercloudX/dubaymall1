@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { useSellerCloudSubscription } from '@/hooks/useSellerCloudSubscription';
+import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { 
@@ -14,6 +15,8 @@ import {
    Calendar, Receipt, DollarSign, TrendingUp, XCircle, FileText, ArrowRight
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { PromoCodeInput, type PromoValidation } from './PromoCodeInput';
+import { notifyAffiliatePayment } from '@/lib/affiliateWebhook';
 
 interface SubscriptionBillingProps {
   totalSalesVolume: number;
@@ -22,6 +25,7 @@ interface SubscriptionBillingProps {
 const USD_TO_UZS = 12800;
 
 export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingProps) {
+  const { user } = useAuth();
   const { 
     subscription, 
     billing, 
@@ -36,6 +40,7 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
    const [showPaymentModal, setShowPaymentModal] = useState(false);
    const [selectedPlan, setSelectedPlan] = useState<'pro' | 'enterprise'>('pro');
    const [termsAccepted, setTermsAccepted] = useState(false);
+   const [promoValidation, setPromoValidation] = useState<PromoValidation | null>(null);
 
   const formatPrice = (price: number, currency: 'uzs' | 'usd' = 'uzs') => {
     if (currency === 'usd') {
@@ -82,9 +87,21 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
    const handleSubscriptionPayment = async (months: number = 1) => {
      if (!subscription) return;
      
-     const monthlyFeeUZS = subscription.monthly_fee * USD_TO_UZS;
-     const discount = getDiscount(months);
-     const totalAmount = Math.round(monthlyFeeUZS * months * (1 - discount));
+     // Apply promo discount only for first month payment
+     const baseMonthlyUSD = subscription.monthly_fee;
+     const promoDiscount = (promoValidation && months === 1) ? (promoValidation.discount || 0) : 0;
+     const firstMonthUSD = baseMonthlyUSD - promoDiscount;
+     
+     let totalAmountUSD: number;
+     if (months === 1) {
+       totalAmountUSD = firstMonthUSD;
+     } else {
+       // For multi-month: first month with discount, rest full price
+       const discount = getDiscount(months);
+       totalAmountUSD = Math.round((firstMonthUSD + baseMonthlyUSD * (months - 1)) * (1 - discount));
+     }
+     
+     const totalAmount = Math.round(totalAmountUSD * USD_TO_UZS);
      
      setIsCreating(true);
      try {
@@ -94,6 +111,7 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
            subscriptionId: subscription.id,
            amount: totalAmount,
            months: months,
+           promoCode: promoValidation?.promo_id ? promoValidation : undefined,
            returnUrl: window.location.origin + '/seller-cloud-mobile?tab=billing'
          }
        });
@@ -103,6 +121,21 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
        if (data?.paymentUrl) {
          window.open(data.paymentUrl, '_blank');
          toast.success('Click to\'lov sahifasi ochildi. To\'lov yakunlangach aktivatsiya avtomatik bo\'ladi.');
+         
+         // Notify affiliate system about payment
+         if (user?.email) {
+           const isFirstPayment = !billing.some(b => b.status === 'paid');
+           notifyAffiliatePayment({
+             eventType: isFirstPayment ? 'FIRST_PAYMENT' : 'RENEWAL',
+             customerEmail: user.email,
+             customerName: user.user_metadata?.full_name || '',
+             customerPhone: user.user_metadata?.phone || '',
+             amount: totalAmountUSD,
+             currency: 'USD',
+             promoCode: promoValidation ? promoValidation.promo_id || '' : undefined,
+             providerPaymentId: data.orderId || `SCX-${Date.now()}`,
+           }).catch(err => console.warn('Affiliate webhook failed:', err));
+         }
        }
      } catch (error: any) {
        console.error('Payment error:', error);
@@ -401,20 +434,41 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
             </div>
            </div>
 
+            {/* Promo Code Input */}
+            <div className="mt-6 pt-4 border-t">
+              <PromoCodeInput
+                customerEmail={user?.email || ''}
+                onValidated={setPromoValidation}
+                disabled={isCreating}
+              />
+            </div>
+
             {/* Click Payment Options */}
-            <div className="mt-6 pt-4 border-t space-y-3">
+            <div className="mt-4 pt-4 border-t space-y-3">
               <p className="text-sm font-medium">Click orqali to'lash:</p>
               <div className="space-y-2">
                 {/* 1 month */}
-                <Button 
-                  variant="outline" 
-                  onClick={() => handleSubscriptionPayment(1)}
-                  disabled={isCreating}
-                  className="w-full justify-between h-auto py-3 px-4"
-                >
-                  <span className="text-sm font-medium">1 oy</span>
-                  <span className="font-bold text-sm">{formatPrice(monthlyFeeUZS)}</span>
-                </Button>
+                <div className="relative">
+                  {promoValidation && (
+                    <div className="absolute -top-2 right-3 z-10">
+                      <Badge className="bg-green-600 text-white text-[10px] px-1.5 py-0">-${promoValidation.discount}</Badge>
+                    </div>
+                  )}
+                  <Button 
+                    variant="outline" 
+                    onClick={() => handleSubscriptionPayment(1)}
+                    disabled={isCreating}
+                    className={`w-full justify-between h-auto py-3 px-4 ${promoValidation ? 'border-green-500/30' : ''}`}
+                  >
+                    <span className="text-sm font-medium">1 oy</span>
+                    <div className="flex items-center gap-2">
+                      {promoValidation && (
+                        <span className="text-xs text-foreground/60 line-through">{formatPrice(monthlyFeeUZS)}</span>
+                      )}
+                      <span className="font-bold text-sm">{formatPrice(promoValidation ? (subscription.monthly_fee - (promoValidation.discount || 0)) * USD_TO_UZS : monthlyFeeUZS)}</span>
+                    </div>
+                  </Button>
+                </div>
 
                 {/* 3 months - 10% discount */}
                 <div className="relative">
