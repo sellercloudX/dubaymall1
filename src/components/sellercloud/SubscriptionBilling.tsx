@@ -289,7 +289,56 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
                </Button>
              </div>
            </DialogContent>
-         </Dialog>
+          </Dialog>
+
+          {/* Payment Modal with Promo Code */}
+          <Dialog open={showPaymentModal} onOpenChange={setShowPaymentModal}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <CreditCard className="h-5 w-5" />
+                  To'lovni amalga oshirish
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="p-4 rounded-lg bg-muted/50">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Tarif:</span>
+                    <span className="font-medium">{selectedPlan === 'pro' ? 'Pro' : 'Enterprise'}</span>
+                  </div>
+                  <div className="flex justify-between items-center mt-1">
+                    <span className="text-sm text-muted-foreground">Oylik to'lov:</span>
+                    <span className="font-bold">${selectedPlan === 'pro' ? '499' : 'Individual'}</span>
+                  </div>
+                  {promoValidation && (
+                    <div className="flex justify-between items-center mt-1 text-green-600">
+                      <span className="text-sm">Promo chegirma:</span>
+                      <span className="font-bold">-${promoValidation.discount}</span>
+                    </div>
+                  )}
+                </div>
+
+                <PromoCodeInput
+                  customerEmail={user?.email || ''}
+                  onValidated={setPromoValidation}
+                  disabled={isCreating}
+                />
+
+                <Button 
+                  onClick={handleInitialPayment}
+                  className="w-full"
+                  disabled={isCreating || !subscription}
+                >
+                  {isCreating ? 'Yuklanmoqda...' : (
+                    <>
+                      Click orqali to'lash
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </>
+                  )}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
 
         </>
      );
