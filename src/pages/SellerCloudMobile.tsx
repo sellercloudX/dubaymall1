@@ -131,7 +131,8 @@ export default function SellerCloudMobile() {
         <Button size="lg" onClick={async () => {
           const result = await createSubscription('pro');
           if (result.success) {
-            toast.success('Obuna so\'rovi yuborildi! Admin tasdiqlashini kuting.');
+            toast.success('Obuna yaratildi! To\'lov sahifasiga o\'tyapsiz...');
+            setActiveTab('subscription' as MobileTabType);
           } else {
             toast.error(result.error || 'Xatolik yuz berdi');
           }
