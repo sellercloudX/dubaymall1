@@ -179,7 +179,7 @@ export default function SellerCloudX() {
                     toast.error(result.error || 'Xatolik yuz berdi');
                   }
                 }}>Obunani boshlash<ArrowRight className="ml-2 h-4 w-4" /></Button>
-                <p className="text-xs text-center text-muted-foreground">7 kunlik bepul sinov davri. Istalgan vaqtda bekor qilish mumkin.</p>
+                
               </CardContent>
             </Card>
             <div className="text-center mt-8">
