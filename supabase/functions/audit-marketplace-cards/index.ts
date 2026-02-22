@@ -891,9 +891,20 @@ async function wbAutoFix(apiKey: string, vendorCode: string): Promise<any> {
 
   const subjectID = card.subjectID;
   let charcs: any[] = [];
+  let descCharcId: number | null = null;
+  let nameCharcId: number | null = null;
   if (subjectID) {
     const chResp = await fetchWithRetry(`${WB_CONTENT_API}/content/v2/object/charcs/${subjectID}`, { headers });
-    if (chResp.ok) { const chData = await chResp.json(); charcs = chData.data || []; }
+    if (chResp.ok) {
+      const chData = await chResp.json();
+      charcs = chData.data || [];
+      // Find name and description charcIDs
+      for (const c of charcs) {
+        const name = (c.name || '').toLowerCase();
+        if (name.includes('описание')) descCharcId = c.charcID || c.id;
+        if (name.includes('наименование')) nameCharcId = c.charcID || c.id;
+      }
+    }
   }
 
   const issuesList = issue.issues.filter(i => i.severity !== 'info').map(i => `- [${i.severity}] ${i.field}: ${i.message}`).join('\n');
@@ -913,9 +924,13 @@ PRODUCT:
 - Characteristics: ${(card.characteristics || []).length}
 ISSUES:
 ${issuesList}
-CHARACTERISTICS:
+CHARACTERISTICS (use charcID for updates):
 ${charcsList || '(none)'}
-Return JSON: {"title": "new 60+ char title or null", "description": "new 1000+ char description or null", "characteristics": [{"<name>": "<value>"}], "summary": "brief"}`;
+RULES:
+- Title MUST be 40-60 chars in Russian. NEVER exceed 60!
+- Description MUST be 1000+ chars in Russian
+- Keep existing brand name
+Return JSON: {"title": "new 40-60 char title or null", "description": "new 1000+ char description or null", "vendor": "brand or null", "summary": "brief"}`;
 
   const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
@@ -939,30 +954,61 @@ Return JSON: {"title": "new 60+ char title or null", "description": "new 1000+ c
 
   const nmID = card.nmID;
   if (nmID) {
+    // Build update using characteristics format (charcID-based) — same as admin ai-agent-fix
     const updatePayload: any = { nmID, vendorCode: card.vendorCode };
-    if (fixes.title && fixes.title.length >= 60) updatePayload.title = fixes.title;
-    if (fixes.description && fixes.description.length >= 300) updatePayload.description = fixes.description;
-    if (fixes.characteristics?.length > 0) {
-      const validNames = new Set(charcs.map((c: any) => c.name));
-      updatePayload.characteristics = fixes.characteristics.filter((item: any) => validNames.has(Object.keys(item)[0]));
+    const updateCharcs: any[] = [];
+
+    // Title via characteristics (naименование charcID)
+    if (fixes.title && fixes.title.length >= 40 && fixes.title.length <= 60) {
+      updateCharcs.push({ id: nameCharcId || 9, value: [fixes.title] });
+    } else if (fixes.title && fixes.title.length > 60) {
+      // Truncate to 57 + ...
+      updateCharcs.push({ id: nameCharcId || 9, value: [fixes.title.substring(0, 57) + '...'] });
     }
 
-    if (updatePayload.title || updatePayload.description || updatePayload.characteristics?.length) {
+    // Description via characteristics (описание charcID)
+    if (fixes.description && fixes.description.length >= 300) {
+      updateCharcs.push({ id: descCharcId || 14, value: [fixes.description] });
+    }
+
+    if (updateCharcs.length > 0) {
+      updatePayload.characteristics = updateCharcs;
+    }
+
+    if (updateCharcs.length > 0) {
+      console.log(`WB fix: updating ${updateCharcs.length} characteristics for nmID ${nmID} (nameCharcId: ${nameCharcId}, descCharcId: ${descCharcId})`);
       const updateResp = await fetchWithRetry(`${WB_CONTENT_API}/content/v2/cards/update`, {
         method: "POST", headers, body: JSON.stringify([updatePayload]),
       });
       if (updateResp.ok) {
         const updateData = await updateResp.json();
         if (!updateData.error) {
-          if (updatePayload.title) results.push('✅ Nom yangilandi');
-          if (updatePayload.description) results.push('✅ Tavsif yangilandi');
-          if (updatePayload.characteristics?.length) results.push(`✅ ${updatePayload.characteristics.length} ta xususiyat yangilandi`);
+          if (fixes.title) results.push('✅ Nom yangilandi');
+          if (fixes.description) results.push('✅ Tavsif yangilandi');
         } else {
           results.push(`⚠️ WB: ${updateData.errorText || 'Xatolik'}`);
         }
       } else {
+        const errText = await updateResp.text();
+        console.error(`WB update error: ${updateResp.status} ${errText.substring(0, 200)}`);
         results.push(`❌ Yangilash xatosi: ${updateResp.status}`);
       }
+
+      // Check for async errors after update
+      await sleep(3000);
+      try {
+        const errResp = await fetchWithRetry(
+          `https://content-api.wildberries.ru/content/v2/cards/error/list`,
+          { method: 'GET', headers }
+        );
+        if (errResp.ok) {
+          const errData = await errResp.json();
+          const errors = (errData.data || errData.errors || []).filter((e: any) => (e.nmID || e.nmId) === nmID);
+          if (errors.length > 0) {
+            results.push(`⚠️ WB async xatolik: ${errors.map((e: any) => e.message || e.error).join('; ').substring(0, 200)}`);
+          }
+        }
+      } catch (e) { /* optional */ }
     }
 
     // Generate and upload image if photos < 3
