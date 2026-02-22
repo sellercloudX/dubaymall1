@@ -68,7 +68,7 @@ verify_jwt = false
 
 [functions.wildberries-create-card]
 verify_jwt = false
-wall_clock_timeout = 150
+wall_clock_timeout = 180
 
 [functions.prepare-uzum-card]
 verify_jwt = false
