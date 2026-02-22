@@ -405,78 +405,65 @@ async function proxyImages(supabase: any, userId: string, images: string[]): Pro
   return proxied;
 }
 
-// ===== POLL FOR nmID — use textSearch filter for reliable matching =====
-// Per official WB API docs: sort only has "ascending" (boolean), NO "sortColumn" field
-async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 12): Promise<number | null> {
+// ===== POLL FOR nmID — use Prices API (works with Content token, unlike cards/list which needs Promotion token) =====
+async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 15): Promise<number | null> {
   const headers = { Authorization: apiKey, "Content-Type": "application/json" };
   
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    await sleep(attempt === 0 ? 3000 : 4000);
+    // Wait progressively: 3s, 4s, 5s, 6s...
+    await sleep(attempt === 0 ? 3000 : 3000 + attempt * 1000);
     
+    // Strategy 1: Use Prices API /api/v2/list/goods/filter — works with Content/Prices token
     try {
-      // Official API format per docs: sort has only "ascending", filter has "textSearch" + "withPhoto"
-      const resp = await wbFetch(`${WB_API}/content/v2/get/cards/list`, {
+      const priceResp = await wbFetch("https://discounts-prices-api.wildberries.ru/api/v2/list/goods/filter", {
         method: "POST",
         headers,
-        body: JSON.stringify({
-          settings: {
-            cursor: { limit: 100 },
-            filter: { textSearch: vendorCode, withPhoto: -1 },
-            sort: { ascending: false },
-          },
-        }),
+        body: JSON.stringify({ vendorCodes: [vendorCode] }),
       });
       
-      if (resp.ok) {
-        const data = await resp.json();
-        const cards = data.cards || data.data?.cards || [];
-        
-        const found = cards.find((c: any) => c.vendorCode === vendorCode);
+      if (priceResp.ok) {
+        const priceData = await priceResp.json();
+        const goods = priceData.data?.listGoods || [];
+        const found = goods.find((g: any) => g.vendorCode === vendorCode);
         if (found?.nmID) {
-          console.log(`✅ nmID found: ${found.nmID} (attempt ${attempt + 1}, textSearch)`);
+          console.log(`✅ nmID found via Prices API: ${found.nmID} (attempt ${attempt + 1})`);
           return found.nmID;
         }
-        
-        // Partial match — vendorCode starts with our prefix
-        const partial = cards.find((c: any) => c.vendorCode?.startsWith(vendorCode.split('-').slice(0, 2).join('-')));
-        if (partial?.nmID) {
-          console.log(`✅ nmID found (partial match): ${partial.nmID} for ${partial.vendorCode} (attempt ${attempt + 1})`);
-          return partial.nmID;
-        }
-        
-        console.log(`Polling ${attempt + 1}/${maxAttempts}: ${cards.length} cards, vendorCode not found yet`);
+        console.log(`Prices API attempt ${attempt + 1}/${maxAttempts}: vendorCode not indexed yet`);
       } else {
-        const errText = await resp.text().catch(() => '');
-        console.log(`cards/list HTTP ${resp.status}: ${errText.substring(0, 200)}`);
-        
-        // If textSearch fails, try without it — get latest cards and search manually
-        if (attempt >= 2) {
-          console.log(`Fallback: fetching latest 100 cards without textSearch...`);
-          const fallbackResp = await wbFetch(`${WB_API}/content/v2/get/cards/list`, {
-            method: "POST",
-            headers,
-            body: JSON.stringify({
-              settings: {
-                cursor: { limit: 100 },
-                filter: { withPhoto: -1 },
-                sort: { ascending: false },
-              },
-            }),
-          });
-          if (fallbackResp.ok) {
-            const fallbackData = await fallbackResp.json();
-            const fallbackCards = fallbackData.cards || fallbackData.data?.cards || [];
-            const found = fallbackCards.find((c: any) => c.vendorCode === vendorCode);
-            if (found?.nmID) {
-              console.log(`✅ nmID found via fallback: ${found.nmID} (attempt ${attempt + 1})`);
-              return found.nmID;
-            }
-            console.log(`Fallback: ${fallbackCards.length} cards scanned, not found`);
-          }
-        }
+        const errText = await priceResp.text().catch(() => '');
+        console.log(`Prices API HTTP ${priceResp.status}: ${errText.substring(0, 200)}`);
       }
     } catch (e) {
-      console.log(`Polling attempt ${attempt + 1} error: ${e}`);
+      console.log(`Prices API attempt ${attempt + 1} error: ${e}`);
+    }
+    
+    // Strategy 2 (every 3rd attempt): Try cards/list as backup (may work if token has Promotion perms)
+    if (attempt % 3 === 2) {
+      try {
+        const cardResp = await wbFetch(`${WB_API}/content/v2/get/cards/list`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            settings: {
+              cursor: { limit: 100 },
+              filter: { textSearch: vendorCode, withPhoto: -1 },
+              sort: { ascending: false },
+            },
+          }),
+        });
+        if (cardResp.ok) {
+          const cardData = await cardResp.json();
+          const cards = cardData.cards || cardData.data?.cards || [];
+          const found = cards.find((c: any) => c.vendorCode === vendorCode);
+          if (found?.nmID) {
+            console.log(`✅ nmID found via cards/list: ${found.nmID} (attempt ${attempt + 1})`);
+            return found.nmID;
+          }
+        } else {
+          console.log(`cards/list HTTP ${cardResp.status} (backup, attempt ${attempt + 1})`);
+        }
+      } catch (e) { /* ignore backup failures */ }
     }
   }
   
@@ -547,42 +534,8 @@ async function updateCardDescription(apiKey: string, nmID: number, description: 
     }
 
     // Strategy 3: Find descCharcId from card's actual subject
-    console.log(`Finding descCharcId from card's subject...`);
-    const cardResp = await wbFetch(`${WB_API}/content/v2/get/cards/list`, {
-      method: "POST",
-      headers: { Authorization: apiKey, "Content-Type": "application/json" },
-      body: JSON.stringify({ settings: { cursor: { limit: 100 }, filter: { withPhoto: -1 }, sort: { ascending: false } } }),
-    });
-    if (cardResp.ok) {
-      const cardData = await cardResp.json();
-      const cards = cardData.cards || cardData.data?.cards || [];
-      const card = cards.find((c: any) => c.nmID === nmID);
-      if (card?.subjectID) {
-        const charcsResp = await wbFetch(`${WB_API}/content/v2/object/charcs/${card.subjectID}?locale=ru`, {
-          headers: { Authorization: apiKey, "Content-Type": "application/json" },
-        });
-        if (charcsResp.ok) {
-          const charcsData = await charcsResp.json();
-          const descCharc = (charcsData.data || []).find((c: any) => {
-            const name = (c.name || '').toLowerCase();
-            return name === 'описание' || name.includes('описание');
-          });
-          if (descCharc) {
-            const resp = await wbFetch(`${WB_API}/content/v2/cards/update`, {
-              method: "POST",
-              headers: { Authorization: apiKey, "Content-Type": "application/json" },
-              body: JSON.stringify([{ nmID, characteristics: [{ id: descCharc.charcID, value: [description.slice(0, 5000)] }] }]),
-            });
-            if (resp.ok) {
-              console.log(`✅ Description updated via discovered charcID ${descCharc.charcID}`);
-              return true;
-            }
-          } else {
-            console.log(`No description charc found for subject ${card.subjectID}`);
-          }
-        }
-      }
-    }
+    // Strategy 3 skipped — description already set via variant-level field in v2/cards/upload
+    console.log(`Description was set via variant-level field, skipping strategy 3`);
 
     console.warn(`⚠️ All description strategies failed for nmID ${nmID}`);
     return false;
