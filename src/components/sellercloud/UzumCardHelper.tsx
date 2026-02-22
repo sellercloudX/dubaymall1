@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { FileSpreadsheet, Search, Sparkles, Download, Package, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 
 interface UzumCardHelperProps {
@@ -189,8 +189,11 @@ export function UzumCardHelper({ connectedMarketplaces, store }: UzumCardHelperP
   };
 
   // Build XLSX matching Uzum template
-  const handleDownloadExcel = () => {
+  const handleDownloadExcel = async () => {
     if (generatedRows.length === 0) return;
+
+    const workbook = new ExcelJS.Workbook();
+    const ws = workbook.addWorksheet('Товары');
 
     // Header row matching Uzum template (columns A-AD)
     const headers = [
@@ -226,57 +229,49 @@ export function UzumCardHelper({ connectedMarketplaces, store }: UzumCardHelperP
       'Длина (мм)',                    // AD
     ];
 
-    const dataRows = generatedRows.map(({ product, data, mxik }, idx) => [
-      data.name_ru,                                        // A - Name RU
-      product.id,                                          // B - Seller ID
-      data.name_uz,                                        // C - Name UZ
-      `SKU-${idx + 1}`,                                    // D - SKU grouping
-      common.categoryName,                                 // E - Category name
-      common.categoryId,                                   // F - Category ID
-      data.brand || common.brand,                          // G - Brand
-      '',                                                  // H - Model
-      common.country,                                      // I - Country
-      data.full_description_ru,                            // J - Full description RU
-      data.full_description_uz,                            // K - Full description UZ
-      data.short_description_ru?.slice(0, 390),            // L - Short description RU (max 390)
-      data.short_description_uz?.slice(0, 390),            // M - Short description UZ (max 390)
-      '',                                                  // N - Composition RU
-      '',                                                  // O - Composition UZ
-      '',                                                  // P - Care instructions RU
-      '',                                                  // Q - Care instructions UZ
-      '',                                                  // R - Size chart RU
-      '',                                                  // S - Size chart UZ
-      (product.images || []).join('; '),                    // T - Photo URLs
-      '',                                                  // U - Barcode
-      mxik || common.ikpu,                                // V - IKPU (per-product or common)
-      '',                                                  // W - Color
-      '',                                                  // X - Size
-      product.price,                                       // Y - Sale price
-      product.price,                                       // Z - Original price
-      common.weight || '',                                 // AA - Weight (g)
-      common.height || '',                                 // AB - Height (mm)
-      common.width || '',                                  // AC - Width (mm)
-      common.length || '',                                 // AD - Length (mm)
-    ]);
-
-    const wsData = [headers, ...dataRows];
-    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    ws.addRow(headers);
 
     // Set column widths
-    ws['!cols'] = [
-      { wch: 40 }, { wch: 20 }, { wch: 40 }, { wch: 20 },
-      { wch: 30 }, { wch: 12 }, { wch: 20 }, { wch: 15 },
-      { wch: 20 }, { wch: 50 }, { wch: 50 }, { wch: 50 },
-      { wch: 50 }, { wch: 20 }, { wch: 20 }, { wch: 20 },
-      { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 50 },
-      { wch: 15 }, { wch: 20 }, { wch: 15 }, { wch: 15 },
-      { wch: 15 }, { wch: 15 }, { wch: 10 }, { wch: 12 },
-      { wch: 12 }, { wch: 12 },
-    ];
+    const colWidths = [40, 20, 40, 20, 30, 12, 20, 15, 20, 50, 50, 50, 50, 20, 20, 20, 20, 15, 15, 50, 15, 20, 15, 15, 15, 15, 10, 12, 12, 12];
+    colWidths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
 
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Товары');
-    XLSX.writeFile(wb, `uzum-products-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    generatedRows.forEach(({ product, data, mxik }, idx) => {
+      ws.addRow([
+        data.name_ru,                                        // A
+        product.id,                                          // B
+        data.name_uz,                                        // C
+        `SKU-${idx + 1}`,                                    // D
+        common.categoryName,                                 // E
+        common.categoryId,                                   // F
+        data.brand || common.brand,                          // G
+        '',                                                  // H
+        common.country,                                      // I
+        data.full_description_ru,                            // J
+        data.full_description_uz,                            // K
+        data.short_description_ru?.slice(0, 390),            // L
+        data.short_description_uz?.slice(0, 390),            // M
+        '', '', '', '', '', '',                              // N-S
+        (product.images || []).join('; '),                    // T
+        '',                                                  // U
+        mxik || common.ikpu,                                // V
+        '', '',                                              // W-X
+        product.price,                                       // Y
+        product.price,                                       // Z
+        common.weight || '',                                 // AA
+        common.height || '',                                 // AB
+        common.width || '',                                  // AC
+        common.length || '',                                 // AD
+      ]);
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `uzum-products-${new Date().toISOString().slice(0, 10)}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
     toast.success('Excel fayl yuklandi!');
   };
 

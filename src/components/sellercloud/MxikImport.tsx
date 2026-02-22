@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Upload, Database, CheckCircle, AlertCircle, FileSpreadsheet, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 interface ParsedMxikRecord {
   code: string;
@@ -61,11 +61,23 @@ function findColumnByContent(rows: any[][], startRow: number, test: (val: string
   return -1;
 }
 
-function parseExcelData(arrayBuffer: ArrayBuffer): ParsedMxikRecord[] {
-  const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-  const sheetName = workbook.SheetNames[0];
-  const sheet = workbook.Sheets[sheetName];
-  const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+async function parseExcelData(arrayBuffer: ArrayBuffer): Promise<ParsedMxikRecord[]> {
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(arrayBuffer);
+  const worksheet = workbook.worksheets[0];
+  if (!worksheet) throw new Error('Excel fayl bo\'sh');
+
+  // Convert ExcelJS worksheet to row arrays
+  const rows: any[][] = [];
+  worksheet.eachRow({ includeEmpty: false }, (row) => {
+    const values: any[] = [];
+    row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+      // Pad with empty strings for missing columns
+      while (values.length < colNumber - 1) values.push('');
+      values.push(cell.value != null ? String(cell.value) : '');
+    });
+    rows.push(values);
+  });
 
   if (rows.length < 2) throw new Error('Excel fayl bo\'sh');
 
@@ -219,7 +231,7 @@ export function MxikImport() {
       const arrayBuffer = await response.arrayBuffer();
       setProgress(30);
 
-      const records = parseExcelData(arrayBuffer);
+      const records = await parseExcelData(arrayBuffer);
       setProgress(40);
 
       if (records.length === 0) {
@@ -258,7 +270,7 @@ export function MxikImport() {
     try {
       const arrayBuffer = await file.arrayBuffer();
       setProgress(30);
-      const records = parseExcelData(arrayBuffer);
+      const records = await parseExcelData(arrayBuffer);
       setProgress(40);
 
       if (records.length === 0) {
