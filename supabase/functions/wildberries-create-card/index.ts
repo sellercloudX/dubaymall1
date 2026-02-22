@@ -237,14 +237,13 @@ async function getAndFillCharacteristics(
 
   const required = charcs.filter((c: any) => c.required && !preFilledIds.has(c.charcID));
   const popular = charcs.filter((c: any) => c.popular && !c.required && !preFilledIds.has(c.charcID));
-  const other = charcs.filter((c: any) => !c.required && !c.popular && !preFilledIds.has(c.charcID));
-  // Include ALL characteristics so no fields are left empty
+  const other = charcs.filter((c: any) => !c.required && !c.popular && !preFilledIds.has(c.charcID)).slice(0, 10);
   const selected = [...required, ...popular, ...other];
 
   if (selected.length === 0) return { charcs: preFilled, descCharcId, nameCharcId };
 
-    const charcsList = selected.map((c: any) => {
-    const dict = c.dictionary?.length ? ` ALLOWED_VALUES: [${c.dictionary.slice(0, 15).map((d: any) => d.value || d.title || d).join(', ')}]` : '';
+  const charcsList = selected.map((c: any) => {
+    const dict = c.dictionary?.length ? ` ALLOWED_VALUES: [${c.dictionary.slice(0, 8).map((d: any) => d.value || d.title || d).join(', ')}]` : '';
     const req = c.required ? ' [REQUIRED]' : '';
     const t = (c.charcType === 4 || c.charcType === 1) ? 'number' : 'string';
     return `id=${c.charcID} "${c.name}" type=${t}${req}${dict}`;
@@ -252,7 +251,7 @@ async function getAndFillCharacteristics(
 
   try {
     const charcController = new AbortController();
-    const charcTimeout = setTimeout(() => charcController.abort(), 25000);
+    const charcTimeout = setTimeout(() => charcController.abort(), 15000);
     console.log(`AI charcs request: ${selected.length} charcs for "${productName.slice(0, 40)}"`);
     const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -263,17 +262,13 @@ async function getAndFillCharacteristics(
         messages: [
           {
             role: "system",
-            content: `Fill ALL Wildberries product characteristics. Return ONLY a JSON array.
+            content: `Fill Wildberries product characteristics. Return ONLY a JSON array.
 Rules:
 - String type: {"id": N, "value": ["text"]} (array with ONE string)
 - Number type: {"id": N, "value": 123}
 - If ALLOWED_VALUES listed, use EXACTLY one from the list
 - Fill ALL [REQUIRED] fields — NEVER skip them
-- Fill ALL optional fields too — leave NOTHING empty! Guess intelligently from product name/category
-- For "ТН ВЭД код" (TN VED) — determine the correct customs code based on the product type (e.g. 3307200000 for deodorants, 6403 for shoes, 8517 for phones)
-- For weight, dimensions, volume — estimate realistic values based on product type
-- For "Страна производства" — use the most likely country (e.g. "Великобритания" for Old Spice)
-- For "Комплектация" — describe what's included (e.g. "Дезодорант - 1 шт")
+- For optional fields, fill as many as you can determine from context
 - No markdown, no explanation, ONLY JSON array`
           },
           {
@@ -307,8 +302,7 @@ Rules:
           // WB v2 API: values depend on charcType
           // charcType 4 or 1 = numeric → send as raw number
           // charcType 0 or other = string → send as ["value"] array
-          // If charc has a dictionary, it's ALWAYS a string type regardless of charcType
-          const isNumericCharc = !charc.dictionary?.length && (charc.charcType === 4 || charc.charcType === 1);
+          const isNumericCharc = charc.charcType === 4 || charc.charcType === 1;
           
           if (isNumericCharc) {
             // Numeric characteristic: extract number from any format
@@ -417,72 +411,58 @@ async function proxyImages(supabase: any, userId: string, images: string[]): Pro
 }
 
 // ===== POLL FOR nmID — use Prices API (works with Content token, unlike cards/list which needs Promotion token) =====
-async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 8): Promise<number | null> {
+async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 3): Promise<number | null> {
   const headers = { Authorization: apiKey, "Content-Type": "application/json" };
   
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    await sleep(attempt === 0 ? 3000 : 4000);
+    await sleep(attempt === 0 ? 2000 : 3000);
     
-    // Strategy 1: Use Prices API /api/v2/list/goods/filter — works with Content/Prices token
+    // Strategy 1: Try cards/list (works if token has correct permissions)
+    try {
+      const cardResp = await wbFetch(`${WB_API}/content/v2/get/cards/list`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          settings: {
+            cursor: { limit: 100 },
+            filter: { textSearch: vendorCode, withPhoto: -1 },
+            sort: { ascending: false },
+          },
+        }),
+      });
+      if (cardResp.ok) {
+        const cardData = await cardResp.json();
+        const cards = cardData.cards || cardData.data?.cards || [];
+        const found = cards.find((c: any) => c.vendorCode === vendorCode);
+        if (found?.nmID) {
+          console.log(`✅ nmID found via cards/list: ${found.nmID} (attempt ${attempt + 1})`);
+          return found.nmID;
+        }
+      } else {
+        console.log(`cards/list HTTP ${cardResp.status} (attempt ${attempt + 1})`);
+      }
+    } catch (e) { /* ignore */ }
+    
+    // Strategy 2: Try Prices API as backup
     try {
       const priceResp = await wbFetch("https://discounts-prices-api.wildberries.ru/api/v2/list/goods/filter", {
         method: "POST",
         headers,
-        body: JSON.stringify({ limit: 100, offset: 0, filterNmID: null }),
+        body: JSON.stringify({ vendorCodes: [vendorCode] }),
       });
-      
       if (priceResp.ok) {
         const priceData = await priceResp.json();
         const goods = priceData.data?.listGoods || [];
-        // Search through all goods for matching vendorCode
         const found = goods.find((g: any) => g.vendorCode === vendorCode);
         if (found?.nmID) {
           console.log(`✅ nmID found via Prices API: ${found.nmID} (attempt ${attempt + 1})`);
           return found.nmID;
         }
-        // Also try searching by checking sizes for our barcode
-        for (const g of goods) {
-          if (g.vendorCode === vendorCode && g.nmID) {
-            console.log(`✅ nmID found via Prices API (vendor match): ${g.nmID}`);
-            return g.nmID;
-          }
-        }
-        console.log(`Prices API attempt ${attempt + 1}/${maxAttempts}: ${goods.length} goods, vendorCode not found yet`);
       } else {
         const errText = await priceResp.text().catch(() => '');
         console.log(`Prices API HTTP ${priceResp.status}: ${errText.substring(0, 200)}`);
       }
-    } catch (e) {
-      console.log(`Prices API attempt ${attempt + 1} error: ${e}`);
-    }
-    
-    // Strategy 2 (every 3rd attempt): Try cards/list as backup (may work if token has Promotion perms)
-    if (attempt % 3 === 2) {
-      try {
-        const cardResp = await wbFetch(`${WB_API}/content/v2/get/cards/list`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            settings: {
-              cursor: { limit: 100 },
-              filter: { textSearch: vendorCode, withPhoto: -1 },
-              sort: { ascending: false },
-            },
-          }),
-        });
-        if (cardResp.ok) {
-          const cardData = await cardResp.json();
-          const cards = cardData.cards || cardData.data?.cards || [];
-          const found = cards.find((c: any) => c.vendorCode === vendorCode);
-          if (found?.nmID) {
-            console.log(`✅ nmID found via cards/list: ${found.nmID} (attempt ${attempt + 1})`);
-            return found.nmID;
-          }
-        } else {
-          console.log(`cards/list HTTP ${cardResp.status} (backup, attempt ${attempt + 1})`);
-        }
-      } catch (e) { /* ignore backup failures */ }
-    }
+    } catch (e) { /* ignore */ }
   }
   
   console.log(`⚠️ nmID not found after ${maxAttempts} attempts for ${vendorCode}`);
@@ -663,35 +643,17 @@ serve(async (req) => {
     console.log(`Images: ${(product.images || []).length}`);
     console.log(`Description length: ${(product.description || '').length}`);
 
-    // ===== STEP 1: AI + barcode + image proxy + MXIK lookup (parallel) =====
-    console.log(`\n--- STEP 1: AI + Barcode + Images + MXIK (parallel) ---`);
-    
-    // MXIK lookup function
-    const lookupMxik = async (): Promise<{ code: string; name: string; vat_rate: number } | null> => {
-      try {
-        const { data } = await supabase.rpc('search_mxik_fuzzy', {
-          p_search_term: product.category || product.name,
-          p_limit: 1
-        });
-        if (data?.[0]) {
-          console.log(`MXIK found: ${data[0].code} - ${data[0].name_ru || data[0].name_uz}`);
-          return { code: data[0].code, name: data[0].name_ru || data[0].name_uz, vat_rate: data[0].vat_rate || 12 };
-        }
-      } catch (e) { console.log('MXIK lookup failed:', e); }
-      return null;
-    };
-
-    const [analysis, barcode, proxiedImages, mxikResult] = await Promise.all([
+    // ===== STEP 1: AI + barcode + image proxy (parallel) =====
+    console.log(`\n--- STEP 1: AI + Barcode + Images (parallel) ---`);
+    const [analysis, barcode, proxiedImages] = await Promise.all([
       aiAnalyzeProduct(product.name, product.description || '', product.category || ''),
       generateBarcode(apiKey),
       proxyImages(supabase, user.id, product.images || []),
-      lookupMxik(),
     ]);
     console.log(`Title(${analysis.titleRu.length}ch): "${analysis.titleRu}"`);
     console.log(`Description: ${analysis.descriptionRu.length} chars`);
     console.log(`Barcode: ${barcode || 'failed'}`);
     console.log(`Images proxied: ${proxiedImages.length}`);
-    console.log(`MXIK: ${mxikResult ? `${mxikResult.code} (${mxikResult.name})` : 'not found'}`);
 
     // ===== STEP 2: Find WB subject =====
     console.log(`\n--- STEP 2: Subject Search ---`);
@@ -809,9 +771,9 @@ serve(async (req) => {
       console.warn(`⚠️ WB async warnings (non-fatal): ${errorMsg}`);
     }
 
-    // ===== STEP 6: nmID poll (max 8 attempts, ~35s) =====
-    console.log(`\n--- STEP 6: nmID poll ---`);
-    const nmID = await pollForNmID(apiKey, vendorCode, 8);
+    // ===== STEP 6: Quick nmID poll (max 3 attempts, ~12s) =====
+    console.log(`\n--- STEP 6: Quick nmID poll ---`);
+    const nmID = await pollForNmID(apiKey, vendorCode, 3);
 
     let imagesUploaded = false;
     let priceSet = priceRUB > 0;
@@ -850,10 +812,9 @@ serve(async (req) => {
       characteristics: filledCharcs.length,
       descriptionLength: analysis.descriptionRu.length,
       barcode,
-      mxik: mxikResult,
       wbResponse: wbData,
       note: nmID
-        ? `Kartochka to'liq yaratildi: ${proxiedImages.length} rasm, ${filledCharcs.length} xususiyat${descriptionSet ? ', tavsif' : ''}${priceSet ? ', narx' : ''}${mxikResult ? ', MXIK: ' + mxikResult.code : ''}`
+        ? `Kartochka to'liq yaratildi: ${proxiedImages.length} rasm, ${filledCharcs.length} xususiyat${descriptionSet ? ', tavsif' : ''}${priceSet ? ', narx' : ''}`
         : 'Kartochka yaratildi lekin nmID topilmadi — rasmlar yuklanmadi. WB indeksatsiyasi 5-10 daqiqa olishi mumkin.',
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
