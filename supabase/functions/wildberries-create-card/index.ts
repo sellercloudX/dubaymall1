@@ -444,20 +444,21 @@ async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 5):
       }
     } catch (e) { /* ignore */ }
     
-    // Strategy 2: Try Prices API as backup (correct format: limit+offset, then search in results)
+    // Strategy 2: Try Prices API as backup (GET method with query params)
     try {
-      const priceResp = await wbFetch("https://discounts-prices-api.wildberries.ru/api/v2/list/goods/filter", {
-        method: "POST",
+      const priceResp = await wbFetch(`https://discounts-prices-api.wildberries.ru/api/v2/list/goods/filter?limit=100&offset=0`, {
+        method: "GET",
         headers,
-        body: JSON.stringify({ limit: 100, offset: 0 }),
       });
       if (priceResp.ok) {
         const priceData = await priceResp.json();
         const goods = priceData.data?.listGoods || [];
-        const found = goods.find((g: any) => g.vendorCode === vendorCode || g.vendorCode?.includes(vendorCode.split('-')[1] || vendorCode));
+        const found = goods.find((g: any) => g.vendorCode === vendorCode);
         if (found?.nmID) {
           console.log(`✅ nmID found via Prices API: ${found.nmID} (attempt ${attempt + 1})`);
           return found.nmID;
+        } else {
+          console.log(`Prices API: ${goods.length} goods, vendorCode not found yet (attempt ${attempt + 1})`);
         }
       } else {
         const errText = await priceResp.text().catch(() => '');
@@ -772,9 +773,9 @@ serve(async (req) => {
       console.warn(`⚠️ WB async warnings (non-fatal): ${errorMsg}`);
     }
 
-    // ===== STEP 6: Quick nmID poll (max 3 attempts, ~12s) =====
+    // ===== STEP 6: Quick nmID poll (max 6 attempts, ~25s) =====
     console.log(`\n--- STEP 6: Quick nmID poll ---`);
-    const nmID = await pollForNmID(apiKey, vendorCode, 3);
+    const nmID = await pollForNmID(apiKey, vendorCode, 6);
 
     let imagesUploaded = false;
     let priceSet = priceRUB > 0;
