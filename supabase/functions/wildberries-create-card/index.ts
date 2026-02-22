@@ -702,12 +702,14 @@ serve(async (req) => {
       title: analysis.titleRu,
       description: cleanDescription.slice(0, 2000),
       dimensions: { length: 20, width: 15, height: 10, weightBrutto: 0.5 },
-      characteristics: filledCharcs, // Only non-title/description characteristics
+      characteristics: filledCharcs,
       sizes: [{
         techSize: "0",
         price: priceRUB > 0 ? priceRUB : undefined,
         skus: barcode ? [barcode] : undefined,
       }],
+      // Include images directly in payload so they're uploaded with card creation
+      mediaFiles: proxiedImages.length > 0 ? proxiedImages : undefined,
     };
     
     console.log(`Variant: title(${analysis.titleRu.length}ch), desc(${analysis.descriptionRu.length}ch), charcs=${filledCharcs.length}, price=${priceRUB}`);
