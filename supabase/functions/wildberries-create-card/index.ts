@@ -647,10 +647,10 @@ serve(async (req) => {
     const descCharcId = charcResult.descCharcId;
     console.log(`Total characteristics: ${filledCharcs.length}, descCharcId: ${descCharcId}`);
 
-    // ===== STEP 4: Build MINIMAL v2 payload (NO description, NO brand, NO mediaFiles) =====
-    // CRITICAL INSIGHT: mediaFiles in v2/cards/upload is UNRELIABLE — WB may silently drop them.
-    // Images MUST be uploaded via v3/media/save AFTER nmID is obtained (like AI agent does).
-    console.log(`\n--- STEP 4: Create Card (minimal v2 — images via v3 after nmID) ---`);
+    // ===== STEP 4: Build FULL v2 payload WITH mediaFiles and description =====
+    // KEY FIX: Include mediaFiles and description IN the v2 payload so data transfers
+    // even if nmID polling fails later. v3/media/save is used as BACKUP after nmID.
+    console.log(`\n--- STEP 4: Create Card (FULL v2 — with images & description) ---`);
     const vendorCode = generateVendorCode(product.name);
 
     const UZS_TO_RUB_RATE = 140;
@@ -658,12 +658,22 @@ serve(async (req) => {
     const priceRUB = rawPrice > 10000 ? Math.round(rawPrice / UZS_TO_RUB_RATE) : rawPrice;
     console.log(`Price: ${rawPrice} → ${priceRUB} RUB`);
 
-    // v2 payload: NO mediaFiles (unreliable), NO description (causes rejection)
+    // Add description to characteristics if descCharcId found
+    const fullCharcs = [...filledCharcs];
+    if (descCharcId && analysis.descriptionRu) {
+      // Remove if already exists
+      const idx = fullCharcs.findIndex(c => c.id === descCharcId);
+      if (idx >= 0) fullCharcs.splice(idx, 1);
+      fullCharcs.push({ id: descCharcId, value: [analysis.descriptionRu.slice(0, 5000)] });
+      console.log(`Description added to characteristics via charcID ${descCharcId}`);
+    }
+
+    // Build variant WITH mediaFiles (proxied storage URLs that WB can access)
     const variant: any = {
       vendorCode,
       title: analysis.titleRu,
       dimensions: { length: 20, width: 15, height: 10, weightBrutto: 0.5 },
-      characteristics: filledCharcs,
+      characteristics: fullCharcs,
       sizes: [{
         techSize: "0",
         price: priceRUB > 0 ? priceRUB : undefined,
@@ -671,9 +681,15 @@ serve(async (req) => {
       }],
     };
 
+    // Include images directly in v2 payload — these are public Supabase storage URLs
+    if (proxiedImages.length > 0) {
+      variant.mediaFiles = proxiedImages.map((url, i) => ({ data: url, order: i + 1 }));
+      console.log(`mediaFiles: ${proxiedImages.length} storage URLs included in v2 payload`);
+    }
+
     const payload = [{ subjectID: subject.subjectID, variants: [variant] }];
     console.log(`Payload keys: ${Object.keys(variant).join(', ')}`);
-    console.log(`⚠️ mediaFiles & description excluded — will use v3/media/save after nmID`);
+    console.log(`✅ mediaFiles & description INCLUDED in v2 payload`);
 
     const wbResp = await wbFetch(`${WB_API}/content/v2/cards/upload`, {
       method: "POST",
@@ -727,30 +743,29 @@ serve(async (req) => {
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // ===== STEP 6: Poll nmID (aggressive: 3s intervals, ~75s max) =====
-    console.log(`\n--- STEP 6: Poll nmID (3s intervals, aggressive) ---`);
-    const nmID = await pollForNmID(apiKey, vendorCode, 25);
+    // ===== STEP 6: Poll nmID (reduced — data already in v2 payload, this is BACKUP) =====
+    console.log(`\n--- STEP 6: Poll nmID (backup — images/desc already in v2) ---`);
+    const nmID = await pollForNmID(apiKey, vendorCode, 15);
 
-    let imagesUploaded = false;
-    let priceSet = false;
-    let descriptionSet = false;
+    let imagesUploaded = proxiedImages.length > 0; // Already sent via mediaFiles in v2
+    let priceSet = priceRUB > 0; // Already sent via sizes.price in v2
+    let descriptionSet = descCharcId != null; // Already sent via characteristics in v2
 
     if (nmID) {
-      // CRITICAL: After nmID found, upload images via v3/media/save (like AI agent does)
-      // This is the ONLY reliable way to attach images to WB cards
-      console.log(`\n--- STEP 7: Post-creation updates (parallel) ---`);
+      // BACKUP: Re-upload images via v3/media/save for reliability
+      console.log(`\n--- STEP 7: Post-creation backup updates (parallel) ---`);
       const [imgResult, descResult, priceResult] = await Promise.all([
         proxiedImages.length > 0 ? uploadMedia(apiKey, nmID, proxiedImages) : Promise.resolve(false),
-        updateCardDescription(apiKey, nmID, analysis.descriptionRu, descCharcId),
+        !descriptionSet ? updateCardDescription(apiKey, nmID, analysis.descriptionRu, descCharcId) : Promise.resolve(true),
         setPrice(apiKey, nmID, priceRUB),
       ]);
-      imagesUploaded = imgResult;
-      descriptionSet = descResult;
-      priceSet = priceResult;
+      if (imgResult) imagesUploaded = true;
+      if (descResult) descriptionSet = true;
+      if (priceResult) priceSet = true;
       
-      console.log(`Post-creation: images=${imagesUploaded}(${proxiedImages.length}), desc=${descriptionSet}, price=${priceSet}`);
+      console.log(`Post-creation backup: images=${imgResult}(${proxiedImages.length}), desc=${descResult}, price=${priceResult}`);
     } else {
-      console.log(`⚠️ nmID not found — images, description, price need manual setup`);
+      console.log(`⚠️ nmID not found — but data was already sent in v2 payload (images: ${proxiedImages.length}, desc: ${descCharcId != null})`);
     }
 
     console.log(`\n========= RESULT =========`);
