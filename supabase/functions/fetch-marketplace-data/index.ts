@@ -2714,7 +2714,7 @@ serve(async (req) => {
               }
               pricePayload.push({
                 nmID,
-                price: Math.round(o.price * 100), // to kopeks
+                price: Math.round(o.price), // WB v2 API expects price in rubles
                 discount: o.discount || 0,
               });
             }
