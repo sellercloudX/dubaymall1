@@ -294,29 +294,30 @@ Rules:
           const charc = charcMap.get(item.id);
           if (!charc) continue;
           
-          const isNumeric = charc.charcType === 4 || charc.charcType === 1;
-          
-          // Coerce/validate numeric types
-          if (isNumeric) {
-            let numVal: number;
-            if (typeof item.value === 'number') {
-              numVal = item.value;
-            } else if (Array.isArray(item.value) && item.value.length > 0) {
-              numVal = parseFloat(String(item.value[0]).replace(/[^\d.,]/g, '').replace(',', '.'));
-            } else {
-              numVal = parseFloat(String(item.value).replace(/[^\d.,]/g, '').replace(',', '.'));
-            }
-            if (isNaN(numVal)) {
-              console.log(`⚠️ Skipping charc ${item.id} "${charc.name}": cannot convert "${item.value}" to number`);
-              continue;
-            }
-            item.value = numVal;
+          // WB v2 API: values are ALWAYS string arrays ["value"] or numbers
+          // Only send as number if value is already numeric AND charcType is 4 (numeric)
+          if (typeof item.value === 'number') {
+            // Keep as number — WB accepts raw numbers for numeric fields
+            item.value = item.value;
+          } else if (Array.isArray(item.value)) {
+            // Already an array — ensure strings
+            item.value = item.value.map((v: any) => String(v)).filter((v: string) => v.length > 0);
+            if (item.value.length === 0) continue;
           } else {
-            // String type: must be array with one string
-            if (!Array.isArray(item.value)) {
-              item.value = [String(item.value)];
+            // Single string value — wrap in array
+            const strVal = String(item.value).trim();
+            if (!strVal) continue;
+            // If charcType is 4 (numeric) and value is purely numeric, send as number
+            if (charc.charcType === 4) {
+              const numVal = parseFloat(strVal.replace(/[^\d.,]/g, '').replace(',', '.'));
+              if (!isNaN(numVal)) {
+                item.value = numVal;
+              } else {
+                item.value = [strVal];
+              }
+            } else {
+              item.value = [strVal];
             }
-            if (item.value.length === 0 || !item.value[0]) continue;
           }
           
           // If characteristic has a dictionary, validate value against it
