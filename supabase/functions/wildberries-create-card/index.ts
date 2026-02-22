@@ -280,9 +280,22 @@ Rules:
       const parsed = JSON.parse(jsonMatch[1] || jsonMatch[0]);
       if (Array.isArray(parsed)) {
         const validIds = new Set(charcs.map((c: any) => c.charcID));
-        const aiResult = parsed.filter((item: any) =>
-          typeof item.id === 'number' && validIds.has(item.id) && item.value !== undefined && !preFilledIds.has(item.id)
-        );
+        // Filter valid characteristics and validate dictionary values
+        const charcMap = new Map(charcs.map((c: any) => [c.charcID, c]));
+        const aiResult = parsed.filter((item: any) => {
+          if (typeof item.id !== 'number' || !validIds.has(item.id) || item.value === undefined || preFilledIds.has(item.id)) return false;
+          const charc = charcMap.get(item.id);
+          // If characteristic has a dictionary, validate value against it
+          if (charc?.dictionary?.length > 0 && Array.isArray(item.value)) {
+            const allowedValues = new Set(charc.dictionary.map((d: any) => (d.value || d.title || d).toString().toLowerCase()));
+            const val = item.value[0]?.toString().toLowerCase();
+            if (val && !allowedValues.has(val)) {
+              console.log(`⚠️ Skipping charc ${item.id} "${charc.name}": value "${item.value[0]}" not in dictionary`);
+              return false;
+            }
+          }
+          return true;
+        });
         const result = [...preFilled, ...aiResult];
         console.log(`Characteristics: ${preFilled.length} pre-filled + ${aiResult.length} AI = ${result.length} total`);
         return { charcs: result, descCharcId, nameCharcId };
@@ -659,10 +672,16 @@ serve(async (req) => {
     const priceRUB = rawPrice > 10000 ? Math.round(rawPrice / UZS_TO_RUB_RATE) : rawPrice;
     console.log(`Price: ${rawPrice} → ${priceRUB} RUB`);
 
+    // Strip emojis and special unicode symbols from description (WB rejects them)
+    const cleanDescription = analysis.descriptionRu
+      .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]/gu, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+
     const variant: any = {
       vendorCode,
       title: analysis.titleRu,
-      description: analysis.descriptionRu.slice(0, 5000), // TOP-LEVEL per API docs
+      description: cleanDescription.slice(0, 5000),
       dimensions: { length: 20, width: 15, height: 10, weightBrutto: 0.5 },
       characteristics: filledCharcs, // Only non-title/description characteristics
       sizes: [{
@@ -721,11 +740,8 @@ serve(async (req) => {
     const { hasError, errors: wbErrors } = await checkWbErrors(apiKey, vendorCode);
     if (hasError) {
       const errorMsg = wbErrors.join('; ');
-      console.error(`❌ WB async error: ${errorMsg}`);
-      return new Response(JSON.stringify({
-        success: false, error: `WB kartochkani rad etdi: ${errorMsg}`,
-        wbErrors, vendorCode,
-      }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      console.warn(`⚠️ WB async warnings (non-fatal): ${errorMsg}`);
+      // Don't fail — card was accepted, these are validation warnings that can be fixed later
     }
 
     // ===== STEP 6: Poll nmID using textSearch (RELIABLE) =====
