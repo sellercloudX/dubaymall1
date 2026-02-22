@@ -245,7 +245,7 @@ async function getAndFillCharacteristics(
   const charcsList = selected.map((c: any) => {
     const dict = c.dictionary?.length ? ` ALLOWED_VALUES: [${c.dictionary.slice(0, 8).map((d: any) => d.value || d.title || d).join(', ')}]` : '';
     const req = c.required ? ' [REQUIRED]' : '';
-    const t = (c.charcType === 4 || c.charcType === 1) ? 'number' : 'string';
+    const t = c.charcType === 4 ? 'number' : 'string';
     return `id=${c.charcID} "${c.name}" type=${t}${req}${dict}`;
   }).join('\n');
 
