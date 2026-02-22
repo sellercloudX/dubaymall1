@@ -367,23 +367,22 @@ async function proxyImages(supabase: any, userId: string, images: string[]): Pro
   return proxied;
 }
 
-// ===== POLL FOR nmID — scan latest cards by updatedAt and match vendorCode =====
-async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 25): Promise<number | null> {
+// ===== POLL FOR nmID — use textSearch filter for reliable matching =====
+async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 10): Promise<number | null> {
   const headers = { Authorization: apiKey, "Content-Type": "application/json" };
   
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    // First attempt wait 2s, then 5s intervals
-    await sleep(attempt === 0 ? 2000 : 5000);
+    await sleep(attempt === 0 ? 3000 : 5000);
     
     try {
-      // Scan latest cards sorted by updatedAt DESC — new card should be near top
+      // Method 1: Use textSearch filter to find by vendorCode directly
       const resp = await wbFetch(`${WB_API}/content/v2/get/cards/list`, {
         method: "POST",
         headers,
         body: JSON.stringify({
           settings: {
-            cursor: { limit: 100 },
-            filter: { withPhoto: -1 },
+            cursor: { limit: 10 },
+            filter: { textSearch: vendorCode, withPhoto: -1 },
             sort: { sortColumn: "updatedAt", ascending: false },
           },
         }),
@@ -393,31 +392,43 @@ async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 25)
         const data = await resp.json();
         const cards = data.cards || data.data?.cards || [];
         
-        // Match by vendorCode (exact match)
         const found = cards.find((c: any) => c.vendorCode === vendorCode);
         if (found?.nmID) {
-          console.log(`✅ nmID found: ${found.nmID} (attempt ${attempt + 1})`);
+          console.log(`✅ nmID found: ${found.nmID} (attempt ${attempt + 1}, textSearch)`);
           return found.nmID;
         }
         
-        // Also check if vendorCode appears in any variant
-        for (const card of cards) {
-          if (card.sizes) {
-            for (const size of card.sizes) {
-              if (size.skus && card.vendorCode === vendorCode && card.nmID) {
-                console.log(`✅ nmID found via sizes: ${card.nmID} (attempt ${attempt + 1})`);
-                return card.nmID;
-              }
-            }
-          }
+        // Even partial match
+        if (cards.length > 0 && cards[0]?.nmID) {
+          console.log(`✅ nmID found (first match): ${cards[0].nmID} (attempt ${attempt + 1})`);
+          return cards[0].nmID;
         }
         
-        if (attempt % 4 === 0) {
-          console.log(`Polling attempt ${attempt + 1}/${maxAttempts}: ${cards.length} cards scanned, vendorCode "${vendorCode}" not found`);
-        }
+        console.log(`Polling ${attempt + 1}/${maxAttempts}: ${cards.length} cards, vendorCode not found yet`);
       } else {
-        const errBody = await resp.text().catch(() => '');
-        console.log(`Polling attempt ${attempt + 1}: HTTP ${resp.status} — ${errBody.slice(0, 200)}`);
+        // Method 2: If cards/list fails, try /content/v2/cards/filter endpoint
+        console.log(`cards/list HTTP ${resp.status}, trying cards/filter...`);
+        try {
+          const filterResp = await fetch(`${WB_API}/content/v2/cards/filter`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+              find: [{ column: "vendorCode", search: vendorCode }],
+              cursor: { limit: 10 },
+            }),
+          });
+          if (filterResp.ok) {
+            const filterData = await filterResp.json();
+            const filterCards = filterData.cards || filterData.data?.cards || [];
+            const found = filterCards.find((c: any) => c.vendorCode === vendorCode);
+            if (found?.nmID) {
+              console.log(`✅ nmID found via filter: ${found.nmID} (attempt ${attempt + 1})`);
+              return found.nmID;
+            }
+          } else {
+            console.log(`cards/filter also failed: HTTP ${filterResp.status}`);
+          }
+        } catch (_) { /* continue polling */ }
       }
     } catch (e) { /* continue */ }
   }
@@ -742,13 +753,25 @@ serve(async (req) => {
 
     console.log(`✅ WB accepted card: ${vendorCode}`);
 
-    // ===== STEP 5: Quick async error check =====
-    await sleep(1500);
+    // ===== STEP 5: Async error check (WB may reject card after accepting) =====
+    await sleep(2500);
     const { hasError, errors: wbErrors } = await checkWbErrors(apiKey, vendorCode);
     if (hasError) {
       const errorMsg = wbErrors.join('; ');
+      // Check if errors are critical (card rejected) vs warnings
+      const isCritical = wbErrors.some(e => 
+        /недопустим|запрещен|не найден|отклонен|rejected/i.test(e)
+      );
+      if (isCritical) {
+        console.error(`❌ WB rejected card: ${errorMsg}`);
+        return new Response(JSON.stringify({
+          success: false, 
+          error: `WB kartochkani rad etdi: ${errorMsg}`,
+          wbErrors,
+          vendorCode,
+        }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
       console.warn(`⚠️ WB async warnings (non-fatal): ${errorMsg}`);
-      // Don't fail — card was accepted, these are validation warnings that can be fixed later
     }
 
     // ===== STEP 6: Poll nmID using textSearch (RELIABLE) =====
