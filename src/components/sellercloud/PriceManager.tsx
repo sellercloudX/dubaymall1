@@ -118,25 +118,24 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
   const handleAutoPrice = () => {
     const newChanges: Record<string, number> = {};
     let noCostCount = 0;
-    let belowMinCount = 0;
+    let changedCount = 0;
     products.forEach(p => {
       if (p.costPrice === null || p.costPrice <= 0) {
         noCostCount++;
         return;
       }
-      if (p.minPrice > 0 && p.price < p.minPrice) {
+      if (p.minPrice > 0 && Math.round(p.price) !== Math.round(p.minPrice)) {
         newChanges[`${p.marketplace}-${p.id}`] = p.minPrice;
-        belowMinCount++;
+        changedCount++;
       }
     });
     setPriceChanges(prev => ({ ...prev, ...newChanges }));
-    const count = Object.keys(newChanges).length;
-    if (count > 0) {
-      toast.info(`${count} ta mahsulot narxi minimal foydaga moslanadi`);
-    } else if (noCostCount > 0 && belowMinCount === 0) {
+    if (changedCount > 0) {
+      toast.info(`${changedCount} ta mahsulot narxi ${minProfit}% foydaga moslanadi`);
+    } else if (noCostCount > 0) {
       toast.warning(`${noCostCount} ta mahsulotda tannarx kiritilmagan — avval tannarx kiriting`);
     } else {
-      toast.success('Barcha narxlar yetarli darajada');
+      toast.success('Barcha narxlar allaqachon mos');
     }
   };
 
