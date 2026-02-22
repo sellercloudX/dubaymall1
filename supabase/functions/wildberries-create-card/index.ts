@@ -681,6 +681,8 @@ serve(async (req) => {
     console.log(`Variant: title(${analysis.titleRu.length}ch), desc(${analysis.descriptionRu.length}ch), charcs=${filledCharcs.length}, price=${priceRUB}`);
 
 
+    const payload = [{ subjectID: subject.subjectID, variants: [variant] }];
+
     const wbResp = await wbFetch(`${WB_API}/content/v2/cards/upload`, {
       method: "POST",
       headers: { Authorization: apiKey, "Content-Type": "application/json" },
