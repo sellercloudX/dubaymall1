@@ -753,7 +753,7 @@ serve(async (req) => {
 
     // ===== STEP 6: Poll nmID using textSearch (RELIABLE) =====
     console.log(`\n--- STEP 6: Poll nmID (textSearch: "${vendorCode}") ---`);
-    const nmID = await pollForNmID(apiKey, vendorCode, 30);
+    const nmID = await pollForNmID(apiKey, vendorCode, 10);
 
     let imagesUploaded = false;
     let priceSet = priceRUB > 0; // Price was in v2 payload via sizes[].price
