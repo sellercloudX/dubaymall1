@@ -182,11 +182,11 @@ async function findSubjectId(apiKey: string, keywords: string[], productName: st
   return { subjectID: result.subjectID, subjectName: result.subjectName, parentName: result.parentName };
 }
 
-// ===== GET & FILL CHARACTERISTICS (excluding description — it goes via v3 update) =====
+// ===== GET & FILL CHARACTERISTICS (including description via charcID) =====
 async function getAndFillCharacteristics(
   apiKey: string, subjectID: number, productName: string,
-  category: string, aiTitle: string
-): Promise<Array<{ id: number; value: any }>> {
+  category: string, aiTitle: string, aiDescription: string
+): Promise<{ charcs: Array<{ id: number; value: any }>; descCharcId: number | null; nameCharcId: number | null }> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
   let charcs: any[] = [];
@@ -202,39 +202,43 @@ async function getAndFillCharacteristics(
 
   console.log(`Total characteristics for subject ${subjectID}: ${charcs.length}`);
 
-  // Find name characteristic only — description will be set via v3 after nmID
-  const nameCharc = charcs.find((c: any) => {
-    const name = (c.name || '').toLowerCase();
-    return name === 'наименование' || name === 'название' || name.includes('наименование');
-  });
+  // Find name and description characteristics dynamically (like AI agent audit does)
+  let nameCharcId: number | null = null;
+  let descCharcId: number | null = null;
 
-  console.log(`Name charc: ${nameCharc ? `id=${nameCharc.charcID} "${nameCharc.name}"` : 'NOT IN CHARCS (using top-level field)'}`);
+  for (const c of charcs) {
+    const name = (c.name || '').toLowerCase();
+    if (!nameCharcId && (name === 'наименование' || name === 'название' || name.includes('наименование'))) {
+      nameCharcId = c.charcID;
+    }
+    if (!descCharcId && (name === 'описание' || name.includes('описание'))) {
+      descCharcId = c.charcID;
+    }
+  }
+
+  console.log(`Name charc: ${nameCharcId ? `id=${nameCharcId}` : 'NOT FOUND'}`);
+  console.log(`Description charc: ${descCharcId ? `id=${descCharcId}` : 'NOT FOUND'}`);
 
   const preFilled: Array<{ id: number; value: any }> = [];
-  if (nameCharc) {
-    preFilled.push({ id: nameCharc.charcID, value: [aiTitle] });
+  if (nameCharcId) {
+    preFilled.push({ id: nameCharcId, value: [aiTitle] });
   }
 
   console.log(`Available charcs: ${charcs.slice(0, 10).map((c: any) => `${c.charcID}:"${c.name}"`).join(', ')}${charcs.length > 10 ? '...' : ''}`);
 
-  if (!LOVABLE_API_KEY || charcs.length === 0) return preFilled;
+  if (!LOVABLE_API_KEY || charcs.length === 0) return { charcs: preFilled, descCharcId, nameCharcId };
 
   const preFilledIds = new Set(preFilled.map(p => p.id));
-  // Exclude description-related charcs from AI fill — they cause silent rejection
+  // Exclude description from AI fill — we handle it separately via v2/cards/update with charcID
   const excluded = new Set<number>();
-  for (const c of charcs) {
-    const name = (c.name || '').toLowerCase();
-    if (name.includes('описание') || name.includes('description')) {
-      excluded.add(c.charcID);
-    }
-  }
+  if (descCharcId) excluded.add(descCharcId);
 
   const required = charcs.filter((c: any) => c.required && !preFilledIds.has(c.charcID) && !excluded.has(c.charcID));
   const popular = charcs.filter((c: any) => c.popular && !c.required && !preFilledIds.has(c.charcID) && !excluded.has(c.charcID));
   const other = charcs.filter((c: any) => !c.required && !c.popular && !preFilledIds.has(c.charcID) && !excluded.has(c.charcID)).slice(0, 10);
   const selected = [...required, ...popular, ...other];
 
-  if (selected.length === 0) return preFilled;
+  if (selected.length === 0) return { charcs: preFilled, descCharcId, nameCharcId };
 
   const charcsList = selected.map((c: any) => {
     const dict = c.dictionary?.length ? ` ALLOWED_VALUES: [${c.dictionary.slice(0, 20).map((d: any) => d.value || d.title || d).join(', ')}]` : '';
@@ -271,7 +275,7 @@ Rules:
     });
     if (!aiResp.ok) {
       console.error(`AI charcs failed: ${aiResp.status}`);
-      return preFilled;
+      return { charcs: preFilled, descCharcId, nameCharcId };
     }
     const aiData = await aiResp.json();
     const content = aiData.choices?.[0]?.message?.content || '';
@@ -285,13 +289,13 @@ Rules:
         );
         const result = [...preFilled, ...aiResult];
         console.log(`Characteristics: ${preFilled.length} pre-filled + ${aiResult.length} AI = ${result.length} total`);
-        return result;
+        return { charcs: result, descCharcId, nameCharcId };
       }
     }
   } catch (e) {
     console.error("AI charcs error:", e);
   }
-  return preFilled;
+  return { charcs: preFilled, descCharcId, nameCharcId };
 }
 
 // ===== GENERATE BARCODE =====
@@ -308,7 +312,7 @@ async function generateBarcode(apiKey: string): Promise<string | null> {
   } catch (e) { return null; }
 }
 
-// ===== PROXY IMAGES =====
+// ===== PROXY IMAGES (strict — only storage URLs, no marketplace fallback) =====
 async function proxyImages(supabase: any, userId: string, images: string[]): Promise<string[]> {
   const proxied: string[] = [];
   const results = await Promise.allSettled(
@@ -319,29 +323,32 @@ async function proxyImages(supabase: any, userId: string, images: string[]): Pro
           headers: {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
-            "Referer": imgUrl.includes("yandex") ? "https://market.yandex.ru/" : imgUrl.includes("uzum") ? "https://uzum.uz/" : "https://www.wildberries.ru/",
+            "Referer": imgUrl.includes("yandex") ? "https://market.yandex.ru/" :
+                       imgUrl.includes("uzum") ? "https://uzum.uz/" :
+                       imgUrl.includes("wildberries") ? "https://www.wildberries.ru/" :
+                       "https://www.google.com/",
           },
           redirect: "follow",
         });
-        if (!resp.ok) { console.log(`Image fetch failed: ${resp.status} — keeping original URL`); return imgUrl; }
+        if (!resp.ok) { console.log(`Image fetch failed: ${resp.status} for ${imgUrl.substring(0, 80)}`); return null; }
         const ct = resp.headers.get("content-type") || "image/jpeg";
-        if (!ct.startsWith("image/")) return imgUrl;
+        if (!ct.startsWith("image/")) { console.log(`Not an image: ${ct}`); return null; }
         const data = await resp.arrayBuffer();
-        if (data.byteLength < 500) return imgUrl;
+        if (data.byteLength < 500) { console.log(`Image too small: ${data.byteLength}b`); return null; }
         const ext = ct.includes("png") ? "png" : ct.includes("webp") ? "webp" : "jpg";
-        const fileName = `${userId}/wb-${Date.now()}-${Math.random().toString(36).substring(2, 6)}.${ext}`;
+        const fileName = `${userId}/wb-clone-${Date.now()}-${Math.random().toString(36).substring(2, 6)}.${ext}`;
         const { error } = await supabase.storage.from("product-images").upload(fileName, data, { contentType: ct, cacheControl: "31536000", upsert: false });
-        if (error) { console.log(`Storage upload error: ${error.message} — keeping original URL`); return imgUrl; }
+        if (error) { console.log(`Storage upload error: ${error.message}`); return null; }
         const { data: urlData } = supabase.storage.from("product-images").getPublicUrl(fileName);
-        return urlData?.publicUrl || imgUrl;
-      } catch (e) { console.log(`Image proxy exception — keeping original URL`); return imgUrl; }
+        return urlData?.publicUrl || null;
+      } catch (e) { console.log(`Image proxy exception: ${e}`); return null; }
     })
   );
 
   for (const r of results) {
     if (r.status === 'fulfilled' && r.value) proxied.push(r.value);
   }
-  console.log(`Images proxied: ${proxied.length}/${images.length}`);
+  console.log(`Images proxied: ${proxied.length}/${images.length} (strict mode — only storage URLs)`);
   return proxied;
 }
 
@@ -402,27 +409,76 @@ async function uploadMedia(apiKey: string, nmID: number, imageUrls: string[]): P
   }
 }
 
-// ===== UPDATE DESCRIPTION VIA v3 (after nmID is available) =====
-async function updateCardDescription(apiKey: string, nmID: number, description: string): Promise<boolean> {
+// ===== UPDATE DESCRIPTION VIA charcID (like AI agent audit does) =====
+async function updateCardDescription(apiKey: string, nmID: number, description: string, descCharcId: number | null): Promise<boolean> {
   try {
-    console.log(`Updating description for nmID ${nmID} (${description.length} chars)`);
-    const resp = await wbFetch(`${WB_API}/content/v2/cards/update`, {
-      method: "POST",
-      headers: { Authorization: apiKey, "Content-Type": "application/json" },
-      body: JSON.stringify([{
-        nmID,
-        description: description.slice(0, 5000),
-      }]),
-    });
-    const data = await resp.json();
-    if (!resp.ok || data.error) {
-      console.error(`Description update failed: ${resp.status} ${JSON.stringify(data).substring(0, 300)}`);
-      return false;
+    console.log(`Updating description for nmID ${nmID} (${description.length} chars, charcId=${descCharcId})`);
+    
+    // If we have the description characteristic ID, use it (correct WB approach)
+    if (descCharcId) {
+      const resp = await wbFetch(`${WB_API}/content/v2/cards/update`, {
+        method: "POST",
+        headers: { Authorization: apiKey, "Content-Type": "application/json" },
+        body: JSON.stringify([{
+          nmID,
+          characteristics: [{ id: descCharcId, value: [description.slice(0, 5000)] }],
+        }]),
+      });
+      const data = await resp.json();
+      if (!resp.ok || data.error) {
+        console.error(`Description update via charcID failed: ${resp.status} ${JSON.stringify(data).substring(0, 300)}`);
+        // Fallback: try top-level description field
+        return await updateCardDescriptionFallback(apiKey, nmID, description);
+      }
+      console.log(`✅ Description updated for nmID ${nmID} via charcID ${descCharcId}`);
+      return true;
     }
-    console.log(`✅ Description updated for nmID ${nmID}`);
-    return true;
+
+    // Fallback: dynamically find description charcID from the card itself
+    return await updateCardDescriptionFallback(apiKey, nmID, description);
   } catch (e) {
     console.error("Description update error:", e);
+    return false;
+  }
+}
+
+async function updateCardDescriptionFallback(apiKey: string, nmID: number, description: string): Promise<boolean> {
+  try {
+    // Try to get card details to find description charcID
+    const cardResp = await wbFetch(`${WB_API}/content/v2/get/cards/list`, {
+      method: "POST",
+      headers: { Authorization: apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({ settings: { cursor: { limit: 100 }, filter: { withPhoto: -1 }, sort: { sortColumn: "updatedAt", ascending: false } } }),
+    });
+    if (cardResp.ok) {
+      const cardData = await cardResp.json();
+      const cards = cardData.cards || cardData.data?.cards || [];
+      const card = cards.find((c: any) => c.nmID === nmID);
+      if (card?.subjectID) {
+        const charcsResp = await wbFetch(`${WB_API}/content/v2/object/charcs/${card.subjectID}?locale=ru`, {
+          headers: { Authorization: apiKey, "Content-Type": "application/json" },
+        });
+        if (charcsResp.ok) {
+          const charcsData = await charcsResp.json();
+          const descCharc = (charcsData.data || []).find((c: any) => (c.name || '').toLowerCase().includes('описание'));
+          if (descCharc) {
+            const resp = await wbFetch(`${WB_API}/content/v2/cards/update`, {
+              method: "POST",
+              headers: { Authorization: apiKey, "Content-Type": "application/json" },
+              body: JSON.stringify([{ nmID, characteristics: [{ id: descCharc.charcID, value: [description.slice(0, 5000)] }] }]),
+            });
+            if (resp.ok) {
+              console.log(`✅ Description updated via fallback charcID ${descCharc.charcID}`);
+              return true;
+            }
+          }
+        }
+      }
+    }
+    console.warn(`⚠️ Could not find description charcID for nmID ${nmID}`);
+    return false;
+  } catch (e) {
+    console.error("Description fallback error:", e);
     return false;
   }
 }
@@ -544,13 +600,15 @@ serve(async (req) => {
     }
     console.log(`Subject: ${subject.parentName} > ${subject.subjectName} (${subject.subjectID})`);
 
-    // ===== STEP 3: Get & fill characteristics (NO description — it causes silent rejection in v2) =====
+    // ===== STEP 3: Get & fill characteristics + find description charcID =====
     console.log(`\n--- STEP 3: Characteristics ---`);
-    const filledCharcs = await getAndFillCharacteristics(
+    const charcResult = await getAndFillCharacteristics(
       apiKey, subject.subjectID, product.name,
-      product.category || '', analysis.titleRu
+      product.category || '', analysis.titleRu, analysis.descriptionRu
     );
-    console.log(`Total characteristics: ${filledCharcs.length}`);
+    const filledCharcs = charcResult.charcs;
+    const descCharcId = charcResult.descCharcId;
+    console.log(`Total characteristics: ${filledCharcs.length}, descCharcId: ${descCharcId}`);
 
     // ===== STEP 4: Build MINIMAL v2 payload (NO description, NO brand) =====
     console.log(`\n--- STEP 4: Create Card (minimal v2 payload) ---`);
@@ -565,7 +623,6 @@ serve(async (req) => {
     const variant: any = {
       vendorCode,
       title: analysis.titleRu,
-      // NO description here — will be added via v2/cards/update after nmID
       dimensions: { length: 20, width: 15, height: 10, weightBrutto: 0.5 },
       characteristics: filledCharcs,
       sizes: [{
@@ -646,11 +703,11 @@ serve(async (req) => {
     let descriptionSet = false;
 
     if (nmID) {
-      // After nmID found: upload images (backup), set description, set price — all in parallel
+      // After nmID found: upload images (v3 backup), set description via charcID, set price — all in parallel
       console.log(`\n--- STEP 7: Post-creation updates (parallel) ---`);
       const [imgResult, descResult, priceResult] = await Promise.all([
         proxiedImages.length > 0 ? uploadMedia(apiKey, nmID, proxiedImages) : Promise.resolve(false),
-        updateCardDescription(apiKey, nmID, analysis.descriptionRu),
+        updateCardDescription(apiKey, nmID, analysis.descriptionRu, descCharcId),
         setPrice(apiKey, nmID, priceRUB),
       ]);
       if (imgResult) imagesUploaded = true;
@@ -664,7 +721,7 @@ serve(async (req) => {
     console.log(`vendorCode: ${vendorCode}, nmID: ${nmID || 'null'}, images: ${imagesUploaded}, price: ${priceSet}, description: ${descriptionSet}`);
     console.log(`Title: "${analysis.titleRu}" (${analysis.titleRu.length} chars)`);
     console.log(`Description: ${analysis.descriptionRu.length} chars`);
-    console.log(`Characteristics: ${filledCharcs.length}`);
+    console.log(`Characteristics: ${filledCharcs.length}, descCharcId: ${descCharcId}`);
 
     return new Response(JSON.stringify({
       success: true,
