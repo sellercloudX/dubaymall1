@@ -173,7 +173,19 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
           continue;
         }
 
-        toast.success(`${MARKETPLACE_NAMES[marketplace]}: ${offers.length} ta mahsulot narxi yangilandi`);
+        // Show quarantine warning if any
+        if (data?.quarantineWarning) {
+          toast.warning(data.quarantineWarning, { duration: 15000 });
+        } else if (data?.quarantineCount > 0) {
+          toast.warning(`${data.quarantineCount} ta mahsulot karantinga tushdi. WB seller kabinetidan tasdiqlang.`, { duration: 10000 });
+        }
+
+        // Show task status info
+        if (data?.taskStatus?.status === 5 || data?.taskStatus?.status === 6) {
+          toast.error(`${MARKETPLACE_NAMES[marketplace]}: Narxlar yuborildi, lekin xatolar bor. Karantin tekshiring.`, { duration: 10000 });
+        } else {
+          toast.success(`${MARKETPLACE_NAMES[marketplace]}: ${offers.length} ta mahsulot narxi yangilandi`);
+        }
       }
 
       setPriceChanges({});
