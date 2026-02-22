@@ -814,7 +814,10 @@ serve(async (req) => {
     const { hasError, errors: wbErrors } = await checkWbErrors(apiKey, vendorCode);
     if (hasError) {
       const errorMsg = wbErrors.join('; ');
-      const isCritical = wbErrors.some(e => 
+      // Color and "Особенности" errors are non-critical — WB still creates the card
+      const NON_CRITICAL_PATTERNS = /цвет|color|особенност|слишком много значений/i;
+      const criticalErrors = wbErrors.filter(e => !NON_CRITICAL_PATTERNS.test(e));
+      const isCritical = criticalErrors.length > 0 && criticalErrors.some(e => 
         /недопустим|запрещен|не найден|отклонен|rejected|неправильный тип|тип значения/i.test(e)
       );
       if (isCritical) {
