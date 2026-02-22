@@ -32,7 +32,7 @@ const getCurrencyLabelFull = (mp: string) => isRubMarketplace(mp) ? 'руб' : "
 
 export function CostPriceManager({ connectedMarketplaces, store }: CostPriceManagerProps) {
   const isMobile = useIsMobile();
-  const { getCostPrice, setCostPrice, bulkSetCostPrices, loading: costLoading } = useCostPrices();
+  const { getCostPrice, setCostPrice, bulkSetCostPrices, loading: costLoading, refetch } = useCostPrices();
   const [selectedMp, setSelectedMp] = useState(connectedMarketplaces[0] || '');
   const [search, setSearch] = useState('');
   const [editingPrices, setEditingPrices] = useState<Record<string, string>>({});
@@ -73,9 +73,8 @@ export function CostPriceManager({ connectedMarketplaces, store }: CostPriceMana
       if (error) throw error;
 
       if (data?.matches > 0) {
-        // Refresh cost prices cache
-        window.location.reload();
-        toast.success(`${data.matches} ta mahsulotga tannarx import qilindi (UZS → RUB)`);
+        await refetch();
+        toast.success(`${data.matches} ta mahsulotga tannarx import qilindi (${data.text_matches || 0} matn + ${data.ai_matches || 0} AI)`);
       } else {
         toast.warning('Mos mahsulotlar topilmadi');
       }
@@ -85,7 +84,7 @@ export function CostPriceManager({ connectedMarketplaces, store }: CostPriceMana
     } finally {
       setImporting(false);
     }
-  }, [connectedMarketplaces, store]);
+  }, [connectedMarketplaces, store, refetch]);
 
   const products = useMemo(() => {
     if (!selectedMp) return [];
