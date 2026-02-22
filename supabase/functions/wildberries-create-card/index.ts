@@ -237,13 +237,14 @@ async function getAndFillCharacteristics(
 
   const required = charcs.filter((c: any) => c.required && !preFilledIds.has(c.charcID));
   const popular = charcs.filter((c: any) => c.popular && !c.required && !preFilledIds.has(c.charcID));
-  const other = charcs.filter((c: any) => !c.required && !c.popular && !preFilledIds.has(c.charcID)).slice(0, 10);
+  const other = charcs.filter((c: any) => !c.required && !c.popular && !preFilledIds.has(c.charcID));
+  // Include ALL characteristics so no fields are left empty
   const selected = [...required, ...popular, ...other];
 
   if (selected.length === 0) return { charcs: preFilled, descCharcId, nameCharcId };
 
-  const charcsList = selected.map((c: any) => {
-    const dict = c.dictionary?.length ? ` ALLOWED_VALUES: [${c.dictionary.slice(0, 8).map((d: any) => d.value || d.title || d).join(', ')}]` : '';
+    const charcsList = selected.map((c: any) => {
+    const dict = c.dictionary?.length ? ` ALLOWED_VALUES: [${c.dictionary.slice(0, 15).map((d: any) => d.value || d.title || d).join(', ')}]` : '';
     const req = c.required ? ' [REQUIRED]' : '';
     const t = (c.charcType === 4 || c.charcType === 1) ? 'number' : 'string';
     return `id=${c.charcID} "${c.name}" type=${t}${req}${dict}`;
@@ -251,7 +252,7 @@ async function getAndFillCharacteristics(
 
   try {
     const charcController = new AbortController();
-    const charcTimeout = setTimeout(() => charcController.abort(), 15000);
+    const charcTimeout = setTimeout(() => charcController.abort(), 25000);
     console.log(`AI charcs request: ${selected.length} charcs for "${productName.slice(0, 40)}"`);
     const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -262,13 +263,17 @@ async function getAndFillCharacteristics(
         messages: [
           {
             role: "system",
-            content: `Fill Wildberries product characteristics. Return ONLY a JSON array.
+            content: `Fill ALL Wildberries product characteristics. Return ONLY a JSON array.
 Rules:
 - String type: {"id": N, "value": ["text"]} (array with ONE string)
 - Number type: {"id": N, "value": 123}
 - If ALLOWED_VALUES listed, use EXACTLY one from the list
 - Fill ALL [REQUIRED] fields — NEVER skip them
-- For optional fields, fill as many as you can determine from context
+- Fill ALL optional fields too — leave NOTHING empty! Guess intelligently from product name/category
+- For "ТН ВЭД код" (TN VED) — determine the correct customs code based on the product type (e.g. 3307200000 for deodorants, 6403 for shoes, 8517 for phones)
+- For weight, dimensions, volume — estimate realistic values based on product type
+- For "Страна производства" — use the most likely country (e.g. "Великобритания" for Old Spice)
+- For "Комплектация" — describe what's included (e.g. "Дезодорант - 1 шт")
 - No markdown, no explanation, ONLY JSON array`
           },
           {
@@ -649,17 +654,35 @@ serve(async (req) => {
     console.log(`Images: ${(product.images || []).length}`);
     console.log(`Description length: ${(product.description || '').length}`);
 
-    // ===== STEP 1: AI + barcode + image proxy (parallel) =====
-    console.log(`\n--- STEP 1: AI + Barcode + Images (parallel) ---`);
-    const [analysis, barcode, proxiedImages] = await Promise.all([
+    // ===== STEP 1: AI + barcode + image proxy + MXIK lookup (parallel) =====
+    console.log(`\n--- STEP 1: AI + Barcode + Images + MXIK (parallel) ---`);
+    
+    // MXIK lookup function
+    const lookupMxik = async (): Promise<{ code: string; name: string; vat_rate: number } | null> => {
+      try {
+        const { data } = await supabase.rpc('search_mxik_fuzzy', {
+          p_search_term: product.category || product.name,
+          p_limit: 1
+        });
+        if (data?.[0]) {
+          console.log(`MXIK found: ${data[0].code} - ${data[0].name_ru || data[0].name_uz}`);
+          return { code: data[0].code, name: data[0].name_ru || data[0].name_uz, vat_rate: data[0].vat_rate || 12 };
+        }
+      } catch (e) { console.log('MXIK lookup failed:', e); }
+      return null;
+    };
+
+    const [analysis, barcode, proxiedImages, mxikResult] = await Promise.all([
       aiAnalyzeProduct(product.name, product.description || '', product.category || ''),
       generateBarcode(apiKey),
       proxyImages(supabase, user.id, product.images || []),
+      lookupMxik(),
     ]);
     console.log(`Title(${analysis.titleRu.length}ch): "${analysis.titleRu}"`);
     console.log(`Description: ${analysis.descriptionRu.length} chars`);
     console.log(`Barcode: ${barcode || 'failed'}`);
     console.log(`Images proxied: ${proxiedImages.length}`);
+    console.log(`MXIK: ${mxikResult ? `${mxikResult.code} (${mxikResult.name})` : 'not found'}`);
 
     // ===== STEP 2: Find WB subject =====
     console.log(`\n--- STEP 2: Subject Search ---`);
@@ -818,9 +841,10 @@ serve(async (req) => {
       characteristics: filledCharcs.length,
       descriptionLength: analysis.descriptionRu.length,
       barcode,
+      mxik: mxikResult,
       wbResponse: wbData,
       note: nmID
-        ? `Kartochka to'liq yaratildi: ${proxiedImages.length} rasm, ${filledCharcs.length} xususiyat${descriptionSet ? ', tavsif' : ''}${priceSet ? ', narx' : ''}`
+        ? `Kartochka to'liq yaratildi: ${proxiedImages.length} rasm, ${filledCharcs.length} xususiyat${descriptionSet ? ', tavsif' : ''}${priceSet ? ', narx' : ''}${mxikResult ? ', MXIK: ' + mxikResult.code : ''}`
         : 'Kartochka yaratildi lekin nmID topilmadi — rasmlar yuklanmadi. WB indeksatsiyasi 5-10 daqiqa olishi mumkin.',
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
