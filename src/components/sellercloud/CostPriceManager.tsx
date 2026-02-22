@@ -61,36 +61,86 @@ export function CostPriceManager({ connectedMarketplaces, store }: CostPriceMana
       let matched = 0;
       let skipped = 0;
 
+      // Helper: normalize name for matching
+      const normalizeName = (name: string) => 
+        name.toLowerCase()
+          .replace(/[^a-zа-яёўқғҳ0-9\s]/gi, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+      
+      const getWords = (name: string) => 
+        normalizeName(name).split(' ').filter(w => w.length > 1);
+
+      // Pre-index Yandex products by normalized words for faster lookup
+      const yandexNormalized = yandexProducts.map(yp => ({
+        product: yp,
+        normalized: normalizeName(yp.name || ''),
+        words: new Set(getWords(yp.name || '')),
+      }));
+
       for (const wbProduct of wbProducts) {
-        // Try to find matching Yandex product by name similarity
-        const wbName = (wbProduct.name || '').toLowerCase().trim();
+        const wbName = wbProduct.name || '';
+        const wbNorm = normalizeName(wbName);
+        const wbWords = getWords(wbName);
         const wbSku = (wbProduct.shopSku || wbProduct.offerId || '').toLowerCase();
         
-        // First try exact offerId/shopSku match
+        // 1) Exact SKU match
         let yandexMatch = yandexProducts.find(yp => {
           const ySku = (yp.shopSku || yp.offerId || '').toLowerCase();
-          return ySku === wbSku;
+          return ySku && ySku === wbSku;
         });
         
-        // Then try name containment
-        if (!yandexMatch && wbName.length > 5) {
-          yandexMatch = yandexProducts.find(yp => {
-            const yName = (yp.name || '').toLowerCase().trim();
-            if (yName.length < 5) return false;
-            return yName.includes(wbName) || wbName.includes(yName);
-          });
+        // 2) Exact normalized name match
+        if (!yandexMatch && wbNorm.length > 3) {
+          const found = yandexNormalized.find(y => y.normalized === wbNorm);
+          if (found) yandexMatch = found.product;
         }
 
-        // Then try fuzzy word matching (60%+ overlap)
-        if (!yandexMatch && wbName.length > 5) {
-          const wbWords = new Set(wbName.split(/\s+/).filter(w => w.length > 2));
-          if (wbWords.size >= 3) {
-            yandexMatch = yandexProducts.find(yp => {
-              const yWords = new Set((yp.name || '').toLowerCase().split(/\s+/).filter(w => w.length > 2));
-              let matches = 0;
-              for (const w of wbWords) { if (yWords.has(w)) matches++; }
-              return matches / wbWords.size >= 0.6;
+        // 3) Name containment
+        if (!yandexMatch && wbNorm.length > 5) {
+          const found = yandexNormalized.find(y => {
+            if (y.normalized.length < 5) return false;
+            return y.normalized.includes(wbNorm) || wbNorm.includes(y.normalized);
+          });
+          if (found) yandexMatch = found.product;
+        }
+
+        // 4) Fuzzy word matching (40%+ overlap from BOTH sides)
+        if (!yandexMatch && wbWords.length >= 2) {
+          const wbSet = new Set(wbWords);
+          let bestScore = 0;
+          let bestMatch: typeof yandexNormalized[0] | null = null;
+          
+          for (const y of yandexNormalized) {
+            if (y.words.size < 2) continue;
+            let common = 0;
+            for (const w of wbSet) { if (y.words.has(w)) common++; }
+            // Score = average of both coverage ratios
+            const score = (common / wbSet.size + common / y.words.size) / 2;
+            if (score > bestScore && score >= 0.4) {
+              bestScore = score;
+              bestMatch = y;
+            }
+          }
+          if (bestMatch) yandexMatch = bestMatch.product;
+        }
+
+        // 5) Number-based matching (article numbers, sizes in name)
+        if (!yandexMatch && wbWords.length >= 1) {
+          const wbNums = wbWords.filter(w => /\d/.test(w));
+          if (wbNums.length >= 1) {
+            const found = yandexNormalized.find(y => {
+              const yNums = [...y.words].filter(w => /\d/.test(w));
+              if (yNums.length === 0) return false;
+              const commonNums = wbNums.filter(n => yNums.includes(n));
+              // All numeric parts match + at least one text word matches
+              if (commonNums.length === wbNums.length && commonNums.length === yNums.length) {
+                const wbText = wbWords.filter(w => !/\d/.test(w));
+                return wbText.some(w => y.words.has(w));
+              }
+              return false;
             });
+            if (found) yandexMatch = found.product;
           }
         }
 
