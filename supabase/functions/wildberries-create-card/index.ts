@@ -465,14 +465,14 @@ async function proxyImages(supabase: any, userId: string, images: string[]): Pro
   return proxied;
 }
 
-// ===== POLL FOR nmID — use Prices API (works with Content token, unlike cards/list which needs Promotion token) =====
-async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 5): Promise<number | null> {
+// ===== POLL FOR nmID — paginate Prices API + cards/list =====
+async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 12): Promise<number | null> {
   const headers = { Authorization: apiKey, "Content-Type": "application/json" };
   
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    await sleep(attempt === 0 ? 3000 : 4000);
+    await sleep(attempt === 0 ? 2000 : 3000);
     
-    // Strategy 1: Try cards/list (works if token has correct permissions)
+    // Strategy 1: cards/list with textSearch (every attempt)
     try {
       const cardResp = await wbFetch(`${WB_API}/content/v2/get/cards/list`, {
         method: "POST",
@@ -493,31 +493,41 @@ async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 5):
           console.log(`✅ nmID found via cards/list: ${found.nmID} (attempt ${attempt + 1})`);
           return found.nmID;
         }
-      } else {
-        console.log(`cards/list HTTP ${cardResp.status} (attempt ${attempt + 1})`);
       }
     } catch (e) { /* ignore */ }
     
-    // Strategy 2: Try Prices API as backup (GET method with query params)
+    // Strategy 2: Prices API with PAGINATION (scan all goods, not just first 100)
     try {
-      const priceResp = await wbFetch(`https://discounts-prices-api.wildberries.ru/api/v2/list/goods/filter?limit=100&offset=0`, {
-        method: "GET",
-        headers,
-      });
-      if (priceResp.ok) {
+      let offset = 0;
+      const limit = 1000; // WB allows up to 1000
+      let totalScanned = 0;
+      let found = false;
+      
+      while (true) {
+        const priceResp = await wbFetch(
+          `https://discounts-prices-api.wildberries.ru/api/v2/list/goods/filter?limit=${limit}&offset=${offset}`,
+          { method: "GET", headers }
+        );
+        if (!priceResp.ok) break;
+        
         const priceData = await priceResp.json();
         const goods = priceData.data?.listGoods || [];
-        const found = goods.find((g: any) => g.vendorCode === vendorCode);
-        if (found?.nmID) {
-          console.log(`✅ nmID found via Prices API: ${found.nmID} (attempt ${attempt + 1})`);
-          return found.nmID;
-        } else {
-          console.log(`Prices API: ${goods.length} goods, vendorCode not found yet (attempt ${attempt + 1})`);
+        totalScanned += goods.length;
+        
+        const match = goods.find((g: any) => g.vendorCode === vendorCode);
+        if (match?.nmID) {
+          console.log(`✅ nmID found via Prices API: ${match.nmID} (attempt ${attempt + 1}, offset ${offset})`);
+          return match.nmID;
         }
-      } else {
-        const errText = await priceResp.text().catch(() => '');
-        console.log(`Prices API HTTP ${priceResp.status}: ${errText.substring(0, 200)}`);
+        
+        // No more pages
+        if (goods.length < limit) break;
+        offset += limit;
+        // Safety: don't scan more than 5000 goods
+        if (offset >= 5000) break;
       }
+      
+      console.log(`Prices API: scanned ${totalScanned} goods, vendorCode not found (attempt ${attempt + 1})`);
     } catch (e) { /* ignore */ }
   }
   
