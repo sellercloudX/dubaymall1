@@ -288,20 +288,49 @@ Rules:
         const validIds = new Set(charcs.map((c: any) => c.charcID));
         // Filter valid characteristics and validate dictionary values
         const charcMap = new Map(charcs.map((c: any) => [c.charcID, c]));
-        const aiResult = parsed.filter((item: any) => {
-          if (typeof item.id !== 'number' || !validIds.has(item.id) || item.value === undefined || preFilledIds.has(item.id)) return false;
+        const aiResult: Array<{ id: number; value: any }> = [];
+        for (const item of parsed) {
+          if (typeof item.id !== 'number' || !validIds.has(item.id) || item.value === undefined || preFilledIds.has(item.id)) continue;
           const charc = charcMap.get(item.id);
+          if (!charc) continue;
+          
+          const isNumeric = charc.charcType === 4 || charc.charcType === 1;
+          
+          // Coerce/validate numeric types
+          if (isNumeric) {
+            let numVal: number;
+            if (typeof item.value === 'number') {
+              numVal = item.value;
+            } else if (Array.isArray(item.value) && item.value.length > 0) {
+              numVal = parseFloat(String(item.value[0]).replace(/[^\d.,]/g, '').replace(',', '.'));
+            } else {
+              numVal = parseFloat(String(item.value).replace(/[^\d.,]/g, '').replace(',', '.'));
+            }
+            if (isNaN(numVal)) {
+              console.log(`⚠️ Skipping charc ${item.id} "${charc.name}": cannot convert "${item.value}" to number`);
+              continue;
+            }
+            item.value = numVal;
+          } else {
+            // String type: must be array with one string
+            if (!Array.isArray(item.value)) {
+              item.value = [String(item.value)];
+            }
+            if (item.value.length === 0 || !item.value[0]) continue;
+          }
+          
           // If characteristic has a dictionary, validate value against it
           if (charc?.dictionary?.length > 0 && Array.isArray(item.value)) {
             const allowedValues = new Set(charc.dictionary.map((d: any) => (d.value || d.title || d).toString().toLowerCase()));
             const val = item.value[0]?.toString().toLowerCase();
             if (val && !allowedValues.has(val)) {
               console.log(`⚠️ Skipping charc ${item.id} "${charc.name}": value "${item.value[0]}" not in dictionary`);
-              return false;
+              continue;
             }
           }
-          return true;
-        });
+          
+          aiResult.push({ id: item.id, value: item.value });
+        }
         const result = [...preFilled, ...aiResult];
         console.log(`Characteristics: ${preFilled.length} pre-filled + ${aiResult.length} AI = ${result.length} total`);
         return { charcs: result, descCharcId, nameCharcId };
@@ -754,13 +783,13 @@ serve(async (req) => {
     console.log(`✅ WB accepted card: ${vendorCode}`);
 
     // ===== STEP 5: Async error check (WB may reject card after accepting) =====
-    await sleep(2500);
+    await sleep(4000); // Wait longer for WB async processing
     const { hasError, errors: wbErrors } = await checkWbErrors(apiKey, vendorCode);
     if (hasError) {
       const errorMsg = wbErrors.join('; ');
-      // Check if errors are critical (card rejected) vs warnings
+      // Check if errors are critical (card rejected) vs minor warnings
       const isCritical = wbErrors.some(e => 
-        /недопустим|запрещен|не найден|отклонен|rejected/i.test(e)
+        /недопустим|запрещен|не найден|отклонен|rejected|неправильный тип|тип значения/i.test(e)
       );
       if (isCritical) {
         console.error(`❌ WB rejected card: ${errorMsg}`);
