@@ -109,7 +109,7 @@ Category: "${category || 'unknown'}"`
         return {
           searchKeywords: unique.length > 0 ? unique : ['Товар'],
           titleRu: title,
-          descriptionRu: desc.slice(0, 5000),
+          descriptionRu: desc.slice(0, 2000),
         };
       }
     }
@@ -121,7 +121,7 @@ Category: "${category || 'unknown'}"`
   return {
     searchKeywords: fallbackKw.length > 0 ? fallbackKw : [productName.split(/\s+/)[0]],
     titleRu: productName.slice(0, 60),
-    descriptionRu: (description || productName).slice(0, 5000),
+    descriptionRu: (description || productName).slice(0, 2000),
   };
 }
 
@@ -700,7 +700,7 @@ serve(async (req) => {
     const variant: any = {
       vendorCode,
       title: analysis.titleRu,
-      description: cleanDescription.slice(0, 5000),
+      description: cleanDescription.slice(0, 2000),
       dimensions: { length: 20, width: 15, height: 10, weightBrutto: 0.5 },
       characteristics: filledCharcs, // Only non-title/description characteristics
       sizes: [{
