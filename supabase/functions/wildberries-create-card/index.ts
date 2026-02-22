@@ -465,14 +465,17 @@ async function proxyImages(supabase: any, userId: string, images: string[]): Pro
   return proxied;
 }
 
-// ===== POLL FOR nmID — paginate Prices API + cards/list =====
-async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 12): Promise<number | null> {
+// ===== POLL FOR nmID — aggressive multi-strategy polling =====
+async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 20): Promise<number | null> {
   const headers = { Authorization: apiKey, "Content-Type": "application/json" };
   
+  // Aggressive: fast initial checks, then slower
+  const delays = [1500, 1500, 2000, 2000, 3000, 3000, 3000, 4000, 4000, 5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000];
+  
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    await sleep(attempt === 0 ? 2000 : 3000);
+    await sleep(delays[attempt] || 5000);
     
-    // Strategy 1: cards/list with textSearch (every attempt)
+    // Strategy 1: cards/list with textSearch
     try {
       const cardResp = await wbFetch(`${WB_API}/content/v2/get/cards/list`, {
         method: "POST",
@@ -496,12 +499,11 @@ async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 12)
       }
     } catch (e) { /* ignore */ }
     
-    // Strategy 2: Prices API with PAGINATION (scan all goods, not just first 100)
+    // Strategy 2: Prices API with pagination
     try {
       let offset = 0;
-      const limit = 1000; // WB allows up to 1000
+      const limit = 1000;
       let totalScanned = 0;
-      let found = false;
       
       while (true) {
         const priceResp = await wbFetch(
@@ -516,18 +518,18 @@ async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 12)
         
         const match = goods.find((g: any) => g.vendorCode === vendorCode);
         if (match?.nmID) {
-          console.log(`✅ nmID found via Prices API: ${match.nmID} (attempt ${attempt + 1}, offset ${offset})`);
+          console.log(`✅ nmID found via Prices API: ${match.nmID} (attempt ${attempt + 1}, scanned ${totalScanned})`);
           return match.nmID;
         }
         
-        // No more pages
         if (goods.length < limit) break;
         offset += limit;
-        // Safety: don't scan more than 5000 goods
         if (offset >= 5000) break;
       }
       
-      console.log(`Prices API: scanned ${totalScanned} goods, vendorCode not found (attempt ${attempt + 1})`);
+      if (attempt % 5 === 4) {
+        console.log(`Prices API: scanned ${totalScanned} goods, not found (attempt ${attempt + 1})`);
+      }
     } catch (e) { /* ignore */ }
   }
   
@@ -535,27 +537,34 @@ async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 12)
   return null;
 }
 
-// ===== UPLOAD IMAGES VIA v3/media/save =====
+// ===== UPLOAD IMAGES VIA v3/media/save (with retry) =====
 async function uploadMedia(apiKey: string, nmID: number, imageUrls: string[]): Promise<boolean> {
   if (imageUrls.length === 0) return false;
-  try {
-    console.log(`Uploading ${imageUrls.length} images to nmID ${nmID} via v3/media/save`);
-    const resp = await wbFetch(`${WB_API}/content/v3/media/save`, {
-      method: "POST",
-      headers: { Authorization: apiKey, "Content-Type": "application/json" },
-      body: JSON.stringify({ nmId: nmID, data: imageUrls }),
-    });
-    const data = await resp.json();
-    if (!resp.ok || data.error) {
-      console.error(`Media save failed: ${resp.status} ${JSON.stringify(data).substring(0, 300)}`);
-      return false;
+  
+  for (let retry = 0; retry < 3; retry++) {
+    try {
+      if (retry > 0) {
+        console.log(`Retrying image upload (attempt ${retry + 1})...`);
+        await sleep(2000);
+      }
+      console.log(`Uploading ${imageUrls.length} images to nmID ${nmID} via v3/media/save`);
+      const resp = await wbFetch(`${WB_API}/content/v3/media/save`, {
+        method: "POST",
+        headers: { Authorization: apiKey, "Content-Type": "application/json" },
+        body: JSON.stringify({ nmId: nmID, data: imageUrls }),
+      });
+      const data = await resp.json();
+      if (!resp.ok || data.error) {
+        console.error(`Media save failed (attempt ${retry + 1}): ${resp.status} ${JSON.stringify(data).substring(0, 300)}`);
+        continue;
+      }
+      console.log(`✅ ${imageUrls.length} images uploaded to nmID ${nmID}`);
+      return true;
+    } catch (e) {
+      console.error(`Media save error (attempt ${retry + 1}):`, e);
     }
-    console.log(`✅ ${imageUrls.length} images uploaded to nmID ${nmID}`);
-    return true;
-  } catch (e) {
-    console.error("Media save error:", e);
-    return false;
   }
+  return false;
 }
 
 // ===== UPDATE DESCRIPTION =====
@@ -771,8 +780,8 @@ serve(async (req) => {
         price: priceRUB > 0 ? priceRUB : undefined,
         skus: barcode ? [barcode] : undefined,
       }],
-      // Include images directly in payload so they're uploaded with card creation
-      mediaFiles: proxiedImages.length > 0 ? proxiedImages : undefined,
+      // NOTE: mediaFiles is NOT supported in v2/cards/upload API
+      // Images are uploaded separately via v3/media/save after nmID is found
     };
     
     console.log(`Variant: title(${analysis.titleRu.length}ch), desc(${analysis.descriptionRu.length}ch), charcs=${filledCharcs.length}, price=${priceRUB}`);
@@ -842,16 +851,16 @@ serve(async (req) => {
       console.warn(`⚠️ WB async warnings (non-fatal): ${errorMsg}`);
     }
 
-    // ===== STEP 6: Quick nmID poll (max 10 attempts, ~45s) =====
-    console.log(`\n--- STEP 6: Quick nmID poll ---`);
-    const nmID = await pollForNmID(apiKey, vendorCode, 10);
+    // ===== STEP 6: Aggressive nmID poll (max 20 attempts, ~70s) =====
+    console.log(`\n--- STEP 6: nmID poll ---`);
+    const nmID = await pollForNmID(apiKey, vendorCode, 20);
 
     let imagesUploaded = false;
     let priceSet = priceRUB > 0;
     let descriptionSet = true;
 
     if (nmID) {
-      // Quick parallel: upload images + set price
+      // Upload images + set price in parallel
       console.log(`nmID found: ${nmID}, uploading images...`);
       const [imgResult, priceResult] = await Promise.all([
         proxiedImages.length > 0 ? uploadMedia(apiKey, nmID, proxiedImages) : Promise.resolve(false),
@@ -859,8 +868,15 @@ serve(async (req) => {
       ]);
       imagesUploaded = imgResult;
       if (priceResult) priceSet = true;
+      
+      // If images failed, try one more time after a short delay
+      if (!imagesUploaded && proxiedImages.length > 0) {
+        console.log(`⚠️ Images failed, final retry after 3s...`);
+        await sleep(3000);
+        imagesUploaded = await uploadMedia(apiKey, nmID, proxiedImages);
+      }
     } else {
-      console.log(`nmID not yet indexed — card created, images will appear after WB indexing (5-10 min)`);
+      console.log(`⚠️ nmID not indexed — rasmlar yuklanmadi`);
     }
 
     console.log(`\n========= RESULT =========`);
