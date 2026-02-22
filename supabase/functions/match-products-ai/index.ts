@@ -3,8 +3,31 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
+
+// Simple text normalization for matching
+function normalize(name: string): string {
+  return (name || '')
+    .toLowerCase()
+    .replace(/[«»"']/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Calculate word overlap score between two product names
+function wordOverlapScore(a: string, b: string): number {
+  const wordsA = new Set(normalize(a).split(' ').filter(w => w.length >= 3));
+  const wordsB = new Set(normalize(b).split(' ').filter(w => w.length >= 3));
+  if (wordsA.size === 0 || wordsB.size === 0) return 0;
+  
+  let overlap = 0;
+  for (const w of wordsA) {
+    if (wordsB.has(w)) overlap++;
+  }
+  
+  return overlap / Math.min(wordsA.size, wordsB.size);
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -21,7 +44,6 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Verify user
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) {
@@ -29,6 +51,7 @@ serve(async (req) => {
     }
 
     const { wbProducts, yandexProducts } = await req.json();
+    console.log(`Received ${wbProducts?.length} WB, ${yandexProducts?.length} Yandex products`);
 
     if (!wbProducts?.length || !yandexProducts?.length) {
       return new Response(JSON.stringify({ error: 'No products provided' }), { status: 400, headers: corsHeaders });
@@ -43,92 +66,143 @@ serve(async (req) => {
 
     const costMap = new Map<string, number>();
     (costPrices || []).forEach((cp: any) => costMap.set(cp.offer_id, cp.cost_price));
+    console.log(`Found ${costMap.size} Yandex cost prices`);
 
     // Filter Yandex products that have cost prices
     const yandexWithCost = yandexProducts.filter((yp: any) => costMap.has(yp.offerId));
+    console.log(`Yandex with cost prices: ${yandexWithCost.length}`);
 
     if (yandexWithCost.length === 0) {
-      return new Response(JSON.stringify({ matches: [], message: 'Yandex da tannarx kiritilgan mahsulotlar topilmadi' }), {
+      return new Response(JSON.stringify({ matches: 0, message: 'Yandex da tannarx kiritilgan mahsulotlar topilmadi' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    // Use Gemini to match products in batches
-    const BATCH_SIZE = 30;
-    const allMatches: { wbOfferId: string; yandexOfferId: string; costPriceUzs: number }[] = [];
+    // STEP 1: Fast text-based matching first (word overlap)
+    const textMatches: { wbOfferId: string; yandexOfferId: string; costPriceUzs: number }[] = [];
+    const unmatchedWb: any[] = [];
 
-    // Prepare simplified lists for AI
-    const yandexList = yandexWithCost.map((yp: any, i: number) => ({
-      idx: i,
-      name: (yp.name || '').substring(0, 100),
-      offerId: yp.offerId,
-    }));
+    for (const wp of wbProducts) {
+      let bestScore = 0;
+      let bestYandex: any = null;
 
-    for (let i = 0; i < wbProducts.length; i += BATCH_SIZE) {
-      const wbBatch = wbProducts.slice(i, i + BATCH_SIZE).map((wp: any, j: number) => ({
-        idx: j,
-        name: (wp.name || '').substring(0, 100),
-        offerId: wp.offerId,
-      }));
-
-      const prompt = `You are a product matching assistant. Match WB (Wildberries) products to Yandex Market products by name similarity. These are the SAME physical products sold on different marketplaces, but names may differ in language (Russian vs Uzbek), formatting, or detail level.
-
-WB Products:
-${wbBatch.map((w: any) => `${w.idx}. "${w.name}" (${w.offerId})`).join('\n')}
-
-Yandex Products:
-${yandexList.map((y: any) => `${y.idx}. "${y.name}" (${y.offerId})`).join('\n')}
-
-Return ONLY a JSON array of matches. Each match: {"wb": "wb_offerId", "yx": "yandex_offerId"}
-Only include confident matches (same physical product). No explanations, just JSON array.
-If no matches found, return []`;
-
-      try {
-        const apiKey = Deno.env.get('GOOGLE_AI_STUDIO_KEY');
-        if (!apiKey) throw new Error('No AI key');
-
-        const aiResponse = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: { temperature: 0.1, maxOutputTokens: 4096 },
-            }),
-          }
-        );
-
-        const aiData = await aiResponse.json();
-        const text = aiData?.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
-        
-        // Extract JSON array from response
-        const jsonMatch = text.match(/\[[\s\S]*?\]/);
-        if (jsonMatch) {
-          const matches = JSON.parse(jsonMatch[0]);
-          for (const m of matches) {
-            const costUzs = costMap.get(m.yx);
-            if (costUzs && costUzs > 0) {
-              allMatches.push({
-                wbOfferId: m.wb,
-                yandexOfferId: m.yx,
-                costPriceUzs: costUzs,
-              });
-            }
-          }
+      for (const yp of yandexWithCost) {
+        const score = wordOverlapScore(wp.name, yp.name);
+        if (score > bestScore) {
+          bestScore = score;
+          bestYandex = yp;
         }
-      } catch (aiErr) {
-        console.error('AI matching error for batch:', aiErr);
-        // Continue with next batch
       }
 
-      // Small delay between batches
-      if (i + BATCH_SIZE < wbProducts.length) {
-        await new Promise(r => setTimeout(r, 500));
+      // Threshold: at least 40% word overlap
+      if (bestScore >= 0.4 && bestYandex) {
+        const costUzs = costMap.get(bestYandex.offerId);
+        if (costUzs && costUzs > 0) {
+          textMatches.push({
+            wbOfferId: wp.offerId,
+            yandexOfferId: bestYandex.offerId,
+            costPriceUzs: costUzs,
+          });
+        }
+      } else {
+        unmatchedWb.push(wp);
       }
     }
 
-    // Now bulk insert WB cost prices (UZS → RUB)
+    console.log(`Text matching: ${textMatches.length} matches, ${unmatchedWb.length} unmatched`);
+
+    // STEP 2: Use AI for unmatched products (smaller batches with fewer yandex candidates)
+    const aiMatches: typeof textMatches = [];
+
+    if (unmatchedWb.length > 0 && yandexWithCost.length > 0) {
+      const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+      
+      if (LOVABLE_API_KEY) {
+        const AI_BATCH = 20;
+        
+        for (let i = 0; i < unmatchedWb.length; i += AI_BATCH) {
+          const wbBatch = unmatchedWb.slice(i, i + AI_BATCH);
+          
+          // For each WB batch, find top candidates from Yandex by partial word overlap
+          const candidateSet = new Set<string>();
+          for (const wp of wbBatch) {
+            const scored = yandexWithCost
+              .map((yp: any) => ({ yp, score: wordOverlapScore(wp.name, yp.name) }))
+              .filter((x: any) => x.score > 0.1)
+              .sort((a: any, b: any) => b.score - a.score)
+              .slice(0, 5);
+            for (const s of scored) candidateSet.add(s.yp.offerId);
+          }
+
+          const yxCandidates = yandexWithCost.filter((yp: any) => candidateSet.has(yp.offerId));
+          
+          if (yxCandidates.length === 0) continue;
+
+          const prompt = `Match WB products to Yandex products. Same physical product, different names/languages.
+
+WB:
+${wbBatch.map((w: any) => `- "${w.name}" [${w.offerId}]`).join('\n')}
+
+Yandex:
+${yxCandidates.map((y: any) => `- "${y.name}" [${y.offerId}]`).join('\n')}
+
+Return JSON array only: [{"wb":"offerId","yx":"offerId"}]
+Only confident matches. Empty array if none.`;
+
+          try {
+            const resp = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                model: 'google/gemini-2.5-flash-lite',
+                messages: [{ role: 'user', content: prompt }],
+                temperature: 0.1,
+              }),
+            });
+
+            if (!resp.ok) {
+              console.error(`AI error: ${resp.status}`);
+              continue;
+            }
+
+            const aiData = await resp.json();
+            const text = aiData?.choices?.[0]?.message?.content || '[]';
+            console.log(`AI batch ${i}: response length=${text.length}`);
+
+            const jsonMatch = text.match(/\[[\s\S]*?\]/);
+            if (jsonMatch) {
+              const matches = JSON.parse(jsonMatch[0]);
+              for (const m of matches) {
+                const costUzs = costMap.get(m.yx);
+                if (costUzs && costUzs > 0) {
+                  aiMatches.push({
+                    wbOfferId: m.wb,
+                    yandexOfferId: m.yx,
+                    costPriceUzs: costUzs,
+                  });
+                }
+              }
+            }
+          } catch (aiErr) {
+            console.error('AI batch error:', aiErr);
+          }
+
+          if (i + AI_BATCH < unmatchedWb.length) {
+            await new Promise(r => setTimeout(r, 300));
+          }
+        }
+      }
+    }
+
+    console.log(`AI matching: ${aiMatches.length} additional matches`);
+
+    const allMatches = [...textMatches, ...aiMatches];
+    console.log(`Total matches: ${allMatches.length}`);
+
+    // Bulk insert WB cost prices (UZS → RUB)
     const UZS_TO_RUB = 140;
     const insertEntries = allMatches.map(m => ({
       user_id: user.id,
@@ -139,19 +213,22 @@ If no matches found, return []`;
     }));
 
     if (insertEntries.length > 0) {
-      // Upsert in batches of 50
       for (let i = 0; i < insertEntries.length; i += 50) {
         const batch = insertEntries.slice(i, i + 50);
-        await supabase
+        const { error: upsertErr } = await supabase
           .from('marketplace_cost_prices')
           .upsert(batch, { onConflict: 'user_id,marketplace,offer_id' });
+        if (upsertErr) console.error('Upsert error:', upsertErr);
       }
+      console.log(`Inserted ${insertEntries.length} cost prices`);
     }
 
     return new Response(JSON.stringify({
       matches: allMatches.length,
       total_wb: wbProducts.length,
       total_yandex: yandexWithCost.length,
+      text_matches: textMatches.length,
+      ai_matches: aiMatches.length,
       entries: insertEntries.map(e => ({ offerId: e.offer_id, costRub: e.cost_price })),
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
