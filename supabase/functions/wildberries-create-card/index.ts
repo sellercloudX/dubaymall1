@@ -299,11 +299,12 @@ Rules:
           const charc = charcMap.get(item.id);
           if (!charc) continue;
           
-          // WB v2 API: values depend on charcType
-          // If charc has dictionary → ALWAYS string (even if charcType=1)
-          // charcType 4 or 1 WITHOUT dictionary = numeric → send as raw number
-          // charcType 0 or other = string → send as ["value"] array
-          const isNumericCharc = !charc.dictionary?.length && (charc.charcType === 4 || charc.charcType === 1);
+          // WB v2 API: ONLY charcType=4 is truly numeric
+          // Everything else (charcType 0, 1, etc.) must be string arrays ["value"]
+          // Known string charcs: Цвет, Состав, ТНВЭД, Упаковка, Страна, Комплектация, etc.
+          const KNOWN_STRING_CHARC_NAMES = ['цвет', 'состав', 'тнвэд', 'упаковка', 'страна', 'комплектация', 'застежк', 'фиксаци'];
+          const isKnownString = KNOWN_STRING_CHARC_NAMES.some(s => charc.name?.toLowerCase().includes(s));
+          const isNumericCharc = !isKnownString && charc.charcType === 4;
           
           if (isNumericCharc) {
             // Numeric characteristic: extract number from any format
