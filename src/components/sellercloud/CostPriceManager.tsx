@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,7 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from '@/components/ui/table';
-import { DollarSign, Save, Search, Package, CheckCircle2, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { DollarSign, Save, Search, Package, CheckCircle2, AlertCircle, ChevronLeft, ChevronRight, Download, Loader2 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useCostPrices } from '@/hooks/useCostPrices';
 import { toast } from 'sonner';
@@ -23,6 +23,12 @@ const MARKETPLACE_NAMES: Record<string, string> = {
   yandex: 'Yandex', uzum: 'Uzum', wildberries: 'WB', ozon: 'Ozon',
 };
 
+const UZS_TO_RUB = 140; // 1 RUB = 140 UZS
+
+const isRubMarketplace = (mp: string) => mp === 'wildberries';
+const getCurrencyLabel = (mp: string) => isRubMarketplace(mp) ? '₽' : "so'm";
+const getCurrencyLabelFull = (mp: string) => isRubMarketplace(mp) ? 'руб' : "so'm";
+
 export function CostPriceManager({ connectedMarketplaces, store }: CostPriceManagerProps) {
   const isMobile = useIsMobile();
   const { getCostPrice, setCostPrice, bulkSetCostPrices, loading: costLoading } = useCostPrices();
@@ -30,8 +36,94 @@ export function CostPriceManager({ connectedMarketplaces, store }: CostPriceMana
   const [search, setSearch] = useState('');
   const [editingPrices, setEditingPrices] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   const isLoading = store.isLoadingProducts || costLoading;
+
+  // Import cost prices from Yandex to WB (UZS → RUB)
+  const handleImportFromYandex = useCallback(async () => {
+    if (!connectedMarketplaces.includes('yandex')) {
+      toast.error('Yandex Market ulanmagan');
+      return;
+    }
+    setImporting(true);
+    try {
+      const yandexProducts = store.getProducts('yandex');
+      const wbProducts = store.getProducts('wildberries');
+      
+      if (yandexProducts.length === 0) {
+        toast.error('Yandex da mahsulotlar topilmadi');
+        return;
+      }
+
+      // Build a map of Yandex cost prices
+      const entries: { marketplace: string; offerId: string; costPrice: number }[] = [];
+      let matched = 0;
+      let skipped = 0;
+
+      for (const wbProduct of wbProducts) {
+        // Try to find matching Yandex product by name similarity
+        const wbName = (wbProduct.name || '').toLowerCase().trim();
+        const wbSku = (wbProduct.shopSku || wbProduct.offerId || '').toLowerCase();
+        
+        // First try exact offerId/shopSku match
+        let yandexMatch = yandexProducts.find(yp => {
+          const ySku = (yp.shopSku || yp.offerId || '').toLowerCase();
+          return ySku === wbSku;
+        });
+        
+        // Then try name containment
+        if (!yandexMatch && wbName.length > 5) {
+          yandexMatch = yandexProducts.find(yp => {
+            const yName = (yp.name || '').toLowerCase().trim();
+            if (yName.length < 5) return false;
+            return yName.includes(wbName) || wbName.includes(yName);
+          });
+        }
+
+        // Then try fuzzy word matching (60%+ overlap)
+        if (!yandexMatch && wbName.length > 5) {
+          const wbWords = new Set(wbName.split(/\s+/).filter(w => w.length > 2));
+          if (wbWords.size >= 3) {
+            yandexMatch = yandexProducts.find(yp => {
+              const yWords = new Set((yp.name || '').toLowerCase().split(/\s+/).filter(w => w.length > 2));
+              let matches = 0;
+              for (const w of wbWords) { if (yWords.has(w)) matches++; }
+              return matches / wbWords.size >= 0.6;
+            });
+          }
+        }
+
+        if (yandexMatch) {
+          const yandexCost = getCostPrice('yandex', yandexMatch.offerId);
+          if (yandexCost !== null && yandexCost > 0) {
+            // Convert UZS → RUB
+            const costInRub = Math.round(yandexCost / UZS_TO_RUB);
+            if (costInRub > 0) {
+              entries.push({ marketplace: 'wildberries', offerId: wbProduct.offerId, costPrice: costInRub });
+              matched++;
+            }
+          } else {
+            skipped++;
+          }
+        }
+      }
+
+      if (entries.length > 0) {
+        await bulkSetCostPrices(entries);
+        toast.success(`${matched} ta mahsulotga tannarx import qilindi (UZS → RUB)`);
+      } else if (skipped > 0) {
+        toast.warning(`Mos mahsulotlar topildi, lekin Yandex da tannarx kiritilmagan (${skipped} ta)`);
+      } else {
+        toast.warning('Mos mahsulotlar topilmadi — avval Yandex da tannarx kiriting');
+      }
+    } catch (err) {
+      console.error('Import error:', err);
+      toast.error('Import qilishda xatolik');
+    } finally {
+      setImporting(false);
+    }
+  }, [connectedMarketplaces, store, getCostPrice, bulkSetCostPrices]);
 
   const products = useMemo(() => {
     if (!selectedMp) return [];
@@ -93,7 +185,12 @@ export function CostPriceManager({ connectedMarketplaces, store }: CostPriceMana
 
   const changedCount = Object.keys(editingPrices).filter(k => editingPrices[k] && !isNaN(Number(editingPrices[k]))).length;
 
-  const formatPrice = (price: number) => new Intl.NumberFormat('uz-UZ').format(price);
+  const formatPrice = (price: number) => {
+    if (isRubMarketplace(selectedMp)) {
+      return new Intl.NumberFormat('ru-RU').format(price) + ' ₽';
+    }
+    return new Intl.NumberFormat('uz-UZ').format(price) + " so'm";
+  };
 
   if (connectedMarketplaces.length === 0) {
     return (
@@ -145,6 +242,12 @@ export function CostPriceManager({ connectedMarketplaces, store }: CostPriceMana
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Mahsulot qidirish..." value={search} onChange={e => setSearch(e.target.value)} className="pl-8 h-9 text-sm" />
           </div>
+          {selectedMp === 'wildberries' && connectedMarketplaces.includes('yandex') && (
+            <Button size="sm" variant="outline" onClick={handleImportFromYandex} disabled={importing} className="shrink-0 text-xs">
+              {importing ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Download className="h-3.5 w-3.5 mr-1" />}
+              Yandex dan import (₽)
+            </Button>
+          )}
           {changedCount > 0 && (
             <Button size="sm" onClick={handleSaveAll} disabled={saving} className="shrink-0">
               <Save className="h-4 w-4 mr-1" />
@@ -246,7 +349,7 @@ export function CostPriceManager({ connectedMarketplaces, store }: CostPriceMana
                     <TableHead className="min-w-[200px]">Mahsulot</TableHead>
                     <TableHead className="w-24">SKU</TableHead>
                     <TableHead className="w-32 text-right">Sotish narxi</TableHead>
-                    <TableHead className="w-40">Tannarx (so'm)</TableHead>
+                    <TableHead className="w-40">Tannarx ({getCurrencyLabelFull(selectedMp)})</TableHead>
                     <TableHead className="w-24 text-right">Marja</TableHead>
                     <TableHead className="w-16"></TableHead>
                   </TableRow>
