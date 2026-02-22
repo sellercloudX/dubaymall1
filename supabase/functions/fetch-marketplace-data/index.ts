@@ -2535,6 +2535,112 @@ serve(async (req) => {
           console.error("WB tariffs error:", e);
           result = { success: false, error: "Error fetching WB tariffs" };
         }
+      } else if (dataType === "update-stock") {
+        // Update stock via WB Marketplace API v3
+        // PUT /api/v3/stocks/{warehouseId}
+        try {
+          const { stocks, stockUpdates } = requestBody;
+          const updates = stocks || stockUpdates;
+          
+          if (!updates || updates.length === 0) {
+            result = { success: false, error: "No stock updates provided" };
+          } else {
+            // First get warehouses to find the right one
+            const whResp = await fetch("https://marketplace-api.wildberries.ru/api/v3/warehouses", {
+              headers: wbHeaders,
+            });
+            
+            if (!whResp.ok) {
+              result = { success: false, error: `Failed to fetch warehouses: ${whResp.status}` };
+            } else {
+              const warehouses = await whResp.json();
+              const whList = Array.isArray(warehouses) ? warehouses : [];
+              
+              if (whList.length === 0) {
+                result = { success: false, error: "WB skladlar topilmadi. Avval WB kabinetida sklad yarating." };
+              } else {
+                // Use first warehouse (FBS) by default
+                const warehouseId = whList[0].id;
+                console.log(`WB stock update: warehouse=${warehouseId} (${whList[0].name}), items=${updates.length}`);
+                
+                // WB expects: PUT /api/v3/stocks/{warehouseId} with { stocks: [{ sku, amount }] }
+                // sku = barcode of the size (from card.sizes[].skus[])
+                // We need to map vendorCode/offerId to actual barcodes
+                
+                // First fetch all cards to get barcode mapping
+                const cardsResp = await fetch("https://content-api.wildberries.ru/content/v2/get/cards/list", {
+                  method: "POST",
+                  headers: wbHeaders,
+                  body: JSON.stringify({
+                    settings: {
+                      cursor: { limit: 100 },
+                      filter: { withPhoto: -1 },
+                    },
+                  }),
+                });
+                
+                const skuMap = new Map<string, string[]>(); // vendorCode -> barcodes
+                if (cardsResp.ok) {
+                  const cardsData = await cardsResp.json();
+                  for (const card of (cardsData.cards || [])) {
+                    const vc = card.vendorCode?.toLowerCase() || "";
+                    const barcodes: string[] = [];
+                    for (const size of (card.sizes || [])) {
+                      for (const sku of (size.skus || [])) {
+                        if (sku) barcodes.push(sku);
+                      }
+                    }
+                    if (vc && barcodes.length > 0) skuMap.set(vc, barcodes);
+                  }
+                }
+                console.log(`WB barcode map: ${skuMap.size} cards mapped`);
+                
+                const stockPayload: Array<{ sku: string; amount: number }> = [];
+                const unmapped: string[] = [];
+                
+                for (const u of updates) {
+                  const offerId = (u.offerId || u.sku || "").toLowerCase();
+                  const qty = u.quantity || u.amount || u.stock || 0;
+                  const barcodes = skuMap.get(offerId);
+                  
+                  if (barcodes && barcodes.length > 0) {
+                    for (const barcode of barcodes) {
+                      stockPayload.push({ sku: barcode, amount: qty });
+                    }
+                  } else {
+                    unmapped.push(offerId);
+                  }
+                }
+                
+                if (unmapped.length > 0) {
+                  console.warn(`WB unmapped offerIds (no barcode found): ${unmapped.slice(0, 5).join(", ")}...`);
+                }
+                
+                if (stockPayload.length === 0) {
+                  result = { success: false, error: "Barkodlar topilmadi. Mahsulotlar WB da to'liq yaratilmagan bo'lishi mumkin." };
+                } else {
+                  const stockResp = await fetch(`https://marketplace-api.wildberries.ru/api/v3/stocks/${warehouseId}`, {
+                    method: "PUT",
+                    headers: { ...wbHeaders, "Content-Type": "application/json" },
+                    body: JSON.stringify({ stocks: stockPayload }),
+                  });
+                  
+                  if (stockResp.ok) {
+                    console.log(`WB stock update success: ${stockPayload.length} SKUs updated`);
+                    result = { success: true, updated: stockPayload.length, warehouseId, warehouseName: whList[0].name };
+                  } else {
+                    const errText = await stockResp.text();
+                    console.error(`WB stock update failed (${stockResp.status}):`, errText);
+                    result = { success: false, error: `WB qoldiq yangilash xatosi: ${stockResp.status}`, details: errText };
+                  }
+                }
+              }
+            }
+          }
+        } catch (e: any) {
+          console.error("WB stock update error:", e?.message || e);
+          result = { success: false, error: "WB qoldiq yangilashda xato" };
+        }
       } else if (dataType === "update-prices") {
         // Update prices via Discounts/Prices API
         try {
