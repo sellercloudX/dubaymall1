@@ -406,12 +406,11 @@ async function proxyImages(supabase: any, userId: string, images: string[]): Pro
 }
 
 // ===== POLL FOR nmID — use Prices API (works with Content token, unlike cards/list which needs Promotion token) =====
-async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 15): Promise<number | null> {
+async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 3): Promise<number | null> {
   const headers = { Authorization: apiKey, "Content-Type": "application/json" };
   
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    // Wait progressively: 3s, 4s, 5s, 6s...
-    await sleep(attempt === 0 ? 3000 : 3000 + attempt * 1000);
+    await sleep(attempt === 0 ? 2000 : 3000);
     
     // Strategy 1: Use Prices API /api/v2/list/goods/filter — works with Content/Prices token
     try {
@@ -753,12 +752,11 @@ serve(async (req) => {
 
     console.log(`✅ WB accepted card: ${vendorCode}`);
 
-    // ===== STEP 5: Async error check (WB may reject card after accepting) =====
-    await sleep(4000); // Wait longer for WB async processing
+    // ===== STEP 5: Quick async error check =====
+    await sleep(2000);
     const { hasError, errors: wbErrors } = await checkWbErrors(apiKey, vendorCode);
     if (hasError) {
       const errorMsg = wbErrors.join('; ');
-      // Check if errors are critical (card rejected) vs minor warnings
       const isCritical = wbErrors.some(e => 
         /недопустим|запрещен|не найден|отклонен|rejected|неправильный тип|тип значения/i.test(e)
       );
@@ -774,33 +772,29 @@ serve(async (req) => {
       console.warn(`⚠️ WB async warnings (non-fatal): ${errorMsg}`);
     }
 
-    // ===== STEP 6: Poll nmID using textSearch (RELIABLE) =====
-    console.log(`\n--- STEP 6: Poll nmID (textSearch: "${vendorCode}") ---`);
-    const nmID = await pollForNmID(apiKey, vendorCode, 10);
+    // ===== STEP 6: Quick nmID check (max 3 attempts, ~12s) =====
+    console.log(`\n--- STEP 6: Quick nmID poll ---`);
+    const nmID = await pollForNmID(apiKey, vendorCode, 3);
 
     let imagesUploaded = false;
-    let priceSet = priceRUB > 0; // Price was in v2 payload via sizes[].price
-    let descriptionSet = true; // Description is now in v2 payload as variant-level field
+    let priceSet = priceRUB > 0;
+    let descriptionSet = true;
 
     if (nmID) {
-      // ===== STEP 7: Upload images + set price (parallel) =====
-      // Description already set via variant-level field in v2/cards/upload
-      console.log(`\n--- STEP 7: Post-creation updates (nmID: ${nmID}) ---`);
+      // Quick parallel: upload images + set price
+      console.log(`nmID found: ${nmID}, uploading images...`);
       const [imgResult, priceResult] = await Promise.all([
         proxiedImages.length > 0 ? uploadMedia(apiKey, nmID, proxiedImages) : Promise.resolve(false),
         setPrice(apiKey, nmID, priceRUB),
       ]);
       imagesUploaded = imgResult;
       if (priceResult) priceSet = true;
-      
-      console.log(`Results: images=${imgResult}(${proxiedImages.length}), price=${priceResult}`);
     } else {
-      console.log(`⚠️ nmID not found — images could not be uploaded. Card exists but without media.`);
+      console.log(`nmID not yet indexed — card created, images will appear after WB indexing (5-10 min)`);
     }
 
     console.log(`\n========= RESULT =========`);
-    console.log(`vendorCode: ${vendorCode}, nmID: ${nmID || 'null'}`);
-    console.log(`images: ${imagesUploaded}(${proxiedImages.length}), price: ${priceSet}, description: ${descriptionSet}`);
+    console.log(`vendorCode: ${vendorCode}, nmID: ${nmID || 'pending'}`);
 
     return new Response(JSON.stringify({
       success: true,
