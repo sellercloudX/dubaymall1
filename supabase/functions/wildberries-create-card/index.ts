@@ -307,7 +307,8 @@ Rules:
           // WB v2 API: values depend on charcType
           // charcType 4 or 1 = numeric → send as raw number
           // charcType 0 or other = string → send as ["value"] array
-          const isNumericCharc = charc.charcType === 4 || charc.charcType === 1;
+          // If charc has a dictionary, it's ALWAYS a string type regardless of charcType
+          const isNumericCharc = !charc.dictionary?.length && (charc.charcType === 4 || charc.charcType === 1);
           
           if (isNumericCharc) {
             // Numeric characteristic: extract number from any format
@@ -416,29 +417,37 @@ async function proxyImages(supabase: any, userId: string, images: string[]): Pro
 }
 
 // ===== POLL FOR nmID — use Prices API (works with Content token, unlike cards/list which needs Promotion token) =====
-async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 3): Promise<number | null> {
+async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 8): Promise<number | null> {
   const headers = { Authorization: apiKey, "Content-Type": "application/json" };
   
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    await sleep(attempt === 0 ? 2000 : 3000);
+    await sleep(attempt === 0 ? 3000 : 4000);
     
     // Strategy 1: Use Prices API /api/v2/list/goods/filter — works with Content/Prices token
     try {
       const priceResp = await wbFetch("https://discounts-prices-api.wildberries.ru/api/v2/list/goods/filter", {
         method: "POST",
         headers,
-        body: JSON.stringify({ vendorCodes: [vendorCode] }),
+        body: JSON.stringify({ limit: 100, offset: 0, filterNmID: null }),
       });
       
       if (priceResp.ok) {
         const priceData = await priceResp.json();
         const goods = priceData.data?.listGoods || [];
+        // Search through all goods for matching vendorCode
         const found = goods.find((g: any) => g.vendorCode === vendorCode);
         if (found?.nmID) {
           console.log(`✅ nmID found via Prices API: ${found.nmID} (attempt ${attempt + 1})`);
           return found.nmID;
         }
-        console.log(`Prices API attempt ${attempt + 1}/${maxAttempts}: vendorCode not indexed yet`);
+        // Also try searching by checking sizes for our barcode
+        for (const g of goods) {
+          if (g.vendorCode === vendorCode && g.nmID) {
+            console.log(`✅ nmID found via Prices API (vendor match): ${g.nmID}`);
+            return g.nmID;
+          }
+        }
+        console.log(`Prices API attempt ${attempt + 1}/${maxAttempts}: ${goods.length} goods, vendorCode not found yet`);
       } else {
         const errText = await priceResp.text().catch(() => '');
         console.log(`Prices API HTTP ${priceResp.status}: ${errText.substring(0, 200)}`);
@@ -800,9 +809,9 @@ serve(async (req) => {
       console.warn(`⚠️ WB async warnings (non-fatal): ${errorMsg}`);
     }
 
-    // ===== STEP 6: Quick nmID check (max 3 attempts, ~12s) =====
-    console.log(`\n--- STEP 6: Quick nmID poll ---`);
-    const nmID = await pollForNmID(apiKey, vendorCode, 3);
+    // ===== STEP 6: nmID poll (max 8 attempts, ~35s) =====
+    console.log(`\n--- STEP 6: nmID poll ---`);
+    const nmID = await pollForNmID(apiKey, vendorCode, 8);
 
     let imagesUploaded = false;
     let priceSet = priceRUB > 0;
