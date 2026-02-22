@@ -64,17 +64,24 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
   // Get products for selected source
   const products = useMemo((): CloneableProduct[] => {
     if (!sourceMarketplace) return [];
-    return store.getProducts(sourceMarketplace).map(p => ({
-      offerId: p.offerId,
-      name: p.name || 'Nomsiz',
-      price: p.price || 0,
-      shopSku: p.shopSku || p.offerId,
-      pictures: p.pictures || [],
-      category: p.category || '',
-      description: p.description || '',
-      marketplace: sourceMarketplace,
-      selected: selectedIds.has(p.offerId),
-    }));
+    // Filter out deleted/archived/inactive products from Yandex and other marketplaces
+    const INACTIVE_STATUSES = ['INACTIVE', 'ARCHIVED', 'DELISTED', 'DELETED', 'DISABLED', 'REMOVED', 'NO_STOCKS', 'UNPUBLISHED'];
+    return store.getProducts(sourceMarketplace)
+      .filter(p => {
+        const status = (p.availability || '').toUpperCase();
+        return !INACTIVE_STATUSES.includes(status);
+      })
+      .map(p => ({
+        offerId: p.offerId,
+        name: p.name || 'Nomsiz',
+        price: p.price || 0,
+        shopSku: p.shopSku || p.offerId,
+        pictures: p.pictures || [],
+        category: p.category || '',
+        description: p.description || '',
+        marketplace: sourceMarketplace,
+        selected: selectedIds.has(p.offerId),
+      }));
   }, [sourceMarketplace, store.dataVersion, selectedIds]);
 
   const getProductCount = useCallback((mp: string) => {
