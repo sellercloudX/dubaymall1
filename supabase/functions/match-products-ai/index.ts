@@ -20,10 +20,21 @@ function wordOverlapScore(a: string, b: string): number {
   const wordsA = new Set(normalize(a).split(' ').filter(w => w.length >= 3));
   const wordsB = new Set(normalize(b).split(' ').filter(w => w.length >= 3));
   if (wordsA.size === 0 || wordsB.size === 0) return 0;
-  
+
+  // Also check partial matches (one word contains another)
   let overlap = 0;
   for (const w of wordsA) {
-    if (wordsB.has(w)) overlap++;
+    if (wordsB.has(w)) {
+      overlap++;
+    } else {
+      // Partial match: check if any word in B contains w or vice versa
+      for (const wb of wordsB) {
+        if (wb.includes(w) || w.includes(wb)) {
+          overlap += 0.5;
+          break;
+        }
+      }
+    }
   }
   
   return overlap / Math.min(wordsA.size, wordsB.size);
@@ -94,8 +105,8 @@ serve(async (req) => {
         }
       }
 
-      // Threshold: at least 40% word overlap
-      if (bestScore >= 0.4 && bestYandex) {
+      // Threshold: at least 30% word overlap
+      if (bestScore >= 0.3 && bestYandex) {
         const costUzs = costMap.get(bestYandex.offerId);
         if (costUzs && costUzs > 0) {
           textMatches.push({
