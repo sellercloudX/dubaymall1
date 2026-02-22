@@ -296,10 +296,35 @@ async function applyYandexFix(credentials: any, offerId: string, fix: any): Prom
   const businessId = await resolveBusinessId(credentials, headers);
   if (!businessId) throw new Error("Business ID topilmadi");
 
-  const offerUpdate: any = { offerId };
+  // CRITICAL: Fetch existing offer data first to preserve all fields
+  let existingOffer: any = {};
+  try {
+    const getResp = await fetchWithRetry(
+      `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-mappings`,
+      { method: 'POST', headers, body: JSON.stringify({ offerIds: [offerId] }) }
+    );
+    if (getResp.ok) {
+      const getData = await getResp.json();
+      existingOffer = getData.result?.offerMappings?.[0]?.offer || {};
+      console.log(`Fetched existing offer: price=${existingOffer.basicPrice?.value}, pictures=${existingOffer.pictures?.length}, vendor=${existingOffer.vendor}`);
+    }
+  } catch (e) {
+    console.warn('Could not fetch existing offer, proceeding with partial update:', e);
+  }
+
+  // Merge: start with existing offer, override only fix fields
+  const offerUpdate: any = { ...existingOffer, offerId };
+  // Only override fields that AI actually provided
   if (fix.name) offerUpdate.name = fix.name;
   if (fix.description) offerUpdate.description = fix.description;
   if (fix.vendor) offerUpdate.vendor = fix.vendor;
+  
+  // Remove internal/read-only fields that Yandex won't accept in update
+  delete offerUpdate.archived;
+  delete offerUpdate.cardStatus;
+  delete offerUpdate.mapping;
+  delete offerUpdate.awaitingModerationMapping;
+  delete offerUpdate.rejectedMapping;
 
   const resp = await fetchWithRetry(
     `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-mappings/update`,
