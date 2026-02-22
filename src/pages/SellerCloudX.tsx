@@ -38,7 +38,7 @@ const ABCAnalysis = lazy(() => import('@/components/sellercloud/ABCAnalysis').th
 const MinPriceProtection = lazy(() => import('@/components/sellercloud/MinPriceProtection').then(m => ({ default: m.MinPriceProtection })));
 const CardCloner = lazy(() => import('@/components/sellercloud/CardCloner').then(m => ({ default: m.CardCloner })));
 const ProblematicProducts = lazy(() => import('@/components/sellercloud/ProblematicProducts').then(m => ({ default: m.ProblematicProducts })));
-const CardQualityAudit = lazy(() => import('@/components/sellercloud/CardQualityAudit').then(m => ({ default: m.CardQualityAudit })));
+
 const MxikImport = lazy(() => import('@/components/sellercloud/MxikImport').then(m => ({ default: m.MxikImport })));
 const ProfitCalculator = lazy(() => import('@/components/sellercloud/ProfitCalculator').then(m => ({ default: m.ProfitCalculator })));
 const CostPriceManager = lazy(() => import('@/components/sellercloud/CostPriceManager').then(m => ({ default: m.CostPriceManager })));
@@ -340,9 +340,8 @@ function ToolsSubTabs({ connectedMarketplaces, store, subscription }: {
   connectedMarketplaces: string[]; store: any; subscription: any;
 }) {
   return (
-    <Tabs defaultValue="audit" className="space-y-4">
+    <Tabs defaultValue="inventory" className="space-y-4">
       <TabsList className="h-auto gap-1 p-1">
-        <TabsTrigger value="audit" className="text-xs gap-1"><Sparkles className="h-3.5 w-3.5" />Sifat auditi</TabsTrigger>
         <TabsTrigger value="inventory" className="text-xs gap-1"><ArrowDownUp className="h-3.5 w-3.5" />Zaxira</TabsTrigger>
         <TabsTrigger value="pricing" className="text-xs gap-1"><DollarSign className="h-3.5 w-3.5" />Narxlar</TabsTrigger>
         
@@ -351,7 +350,6 @@ function ToolsSubTabs({ connectedMarketplaces, store, subscription }: {
         <TabsTrigger value="problems" className="text-xs gap-1"><AlertOctagon className="h-3.5 w-3.5" />Muammolar</TabsTrigger>
         <TabsTrigger value="mxik" className="text-xs gap-1"><FileSpreadsheet className="h-3.5 w-3.5" />MXIK baza</TabsTrigger>
       </TabsList>
-      <TabsContent value="audit" forceMount className="data-[state=inactive]:hidden"><Suspense fallback={<TabLoader />}><CardQualityAudit connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
       <TabsContent value="inventory"><Suspense fallback={<TabLoader />}><InventorySync connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
       <TabsContent value="pricing"><Suspense fallback={<TabLoader />}><PriceManager connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
       
