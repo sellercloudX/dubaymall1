@@ -874,7 +874,6 @@ export type Database = {
           delivery_otp: string | null
           delivery_otp_expires_at: string | null
           delivery_type: string
-          dubaymall_order_id: string | null
           id: string
           notes: string | null
           payment_amount: number | null
@@ -902,7 +901,6 @@ export type Database = {
           delivery_otp?: string | null
           delivery_otp_expires_at?: string | null
           delivery_type: string
-          dubaymall_order_id?: string | null
           id?: string
           notes?: string | null
           payment_amount?: number | null
@@ -930,7 +928,6 @@ export type Database = {
           delivery_otp?: string | null
           delivery_otp_expires_at?: string | null
           delivery_type?: string
-          dubaymall_order_id?: string | null
           id?: string
           notes?: string | null
           payment_amount?: number | null
