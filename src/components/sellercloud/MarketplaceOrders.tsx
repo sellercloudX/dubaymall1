@@ -112,7 +112,7 @@ export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceO
           {connectedMarketplaces.map((mp) => (
             <Button key={mp} variant={selectedMarketplace === mp ? 'default' : 'outline'} size="sm"
               onClick={() => setSelectedMarketplace(mp)}>
-              {mp === 'yandex' ? '🟡 Yandex' : mp === 'uzum' ? '🟣 Uzum' : mp}
+              {mp === 'yandex' ? '🟡 Yandex' : mp === 'uzum' ? '🟣 Uzum' : mp === 'wildberries' ? '🟣 Wildberries' : mp}
             </Button>
           ))}
         </div>
