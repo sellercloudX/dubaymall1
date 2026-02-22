@@ -43,7 +43,7 @@ async function aiAnalyzeProduct(productName: string, description: string, catego
       method: "POST",
       headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-2.5-flash-lite",
         messages: [
           {
             role: "system",
@@ -157,6 +157,7 @@ async function findSubjectId(apiKey: string, keywords: string[], productName: st
         headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "google/gemini-2.5-flash-lite",
+          max_tokens: 50,
           messages: [
             { role: "system", content: "Return ONLY the subjectID number that best matches the product. No text." },
             { role: "user", content: `Product: "${productName}"\n\nSubjects:\n${subjectList}` },
@@ -252,7 +253,7 @@ async function getAndFillCharacteristics(
       method: "POST",
       headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-2.5-flash-lite",
         messages: [
           {
             role: "system",
@@ -352,14 +353,14 @@ async function proxyImages(supabase: any, userId: string, images: string[]): Pro
   return proxied;
 }
 
-// ===== POLL FOR nmID (extended polling: 12 attempts, ~90s with 150s wall clock) =====
-async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 12): Promise<number | null> {
+// ===== POLL FOR nmID (aggressive: 3s fixed intervals, max 25 attempts = ~75s) =====
+async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 25): Promise<number | null> {
   const headers = { Authorization: apiKey, "Content-Type": "application/json" };
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const delay = 5000 + attempt * 2000; // 5s, 7s, 9s, 11s... — total ~90s
+    // First check at 2s, then every 3s — fast and aggressive
+    const delay = attempt === 0 ? 2000 : 3000;
     await sleep(delay);
     try {
-      // Fetch 100 latest cards to reliably find our new card
       const listResp = await wbFetch(`${WB_API}/content/v2/get/cards/list`, {
         method: "POST",
         headers,
@@ -376,13 +377,13 @@ async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 12)
       const cards = listData.cards || listData.data?.cards || [];
       const found = cards.find((c: any) => c.vendorCode === vendorCode);
       if (found?.nmID) {
-        console.log(`✅ nmID found: ${found.nmID} (attempt ${attempt + 1}/${maxAttempts})`);
+        console.log(`✅ nmID found: ${found.nmID} (attempt ${attempt + 1}/${maxAttempts}, ${(attempt * 3 + 2)}s elapsed)`);
         return found.nmID;
       }
-      console.log(`Polling attempt ${attempt + 1}: checked ${cards.length} cards, not found yet`);
+      if (attempt % 5 === 0) console.log(`Polling attempt ${attempt + 1}: checked ${cards.length} cards, not found yet`);
     } catch (e) { /* continue */ }
   }
-  console.log(`⚠️ nmID not found after ${maxAttempts} attempts for ${vendorCode}`);
+  console.log(`⚠️ nmID not found after ${maxAttempts} attempts (~${maxAttempts * 3}s) for ${vendorCode}`);
   return null;
 }
 
@@ -646,8 +647,10 @@ serve(async (req) => {
     const descCharcId = charcResult.descCharcId;
     console.log(`Total characteristics: ${filledCharcs.length}, descCharcId: ${descCharcId}`);
 
-    // ===== STEP 4: Build MINIMAL v2 payload (NO description, NO brand) =====
-    console.log(`\n--- STEP 4: Create Card (minimal v2 payload) ---`);
+    // ===== STEP 4: Build MINIMAL v2 payload (NO description, NO brand, NO mediaFiles) =====
+    // CRITICAL INSIGHT: mediaFiles in v2/cards/upload is UNRELIABLE — WB may silently drop them.
+    // Images MUST be uploaded via v3/media/save AFTER nmID is obtained (like AI agent does).
+    console.log(`\n--- STEP 4: Create Card (minimal v2 — images via v3 after nmID) ---`);
     const vendorCode = generateVendorCode(product.name);
 
     const UZS_TO_RUB_RATE = 140;
@@ -655,7 +658,7 @@ serve(async (req) => {
     const priceRUB = rawPrice > 10000 ? Math.round(rawPrice / UZS_TO_RUB_RATE) : rawPrice;
     console.log(`Price: ${rawPrice} → ${priceRUB} RUB`);
 
-    // CRITICAL: v2 payload must NOT contain description or brand to avoid silent rejection
+    // v2 payload: NO mediaFiles (unreliable), NO description (causes rejection)
     const variant: any = {
       vendorCode,
       title: analysis.titleRu,
@@ -668,15 +671,9 @@ serve(async (req) => {
       }],
     };
 
-    // Include images in initial payload via mediaFiles
-    if (proxiedImages.length > 0) {
-      variant.mediaFiles = proxiedImages;
-      console.log(`📸 mediaFiles added to payload: ${proxiedImages.length} images`);
-    }
-
     const payload = [{ subjectID: subject.subjectID, variants: [variant] }];
     console.log(`Payload keys: ${Object.keys(variant).join(', ')}`);
-    console.log(`⚠️ Description intentionally excluded from v2 to prevent silent rejection`);
+    console.log(`⚠️ mediaFiles & description excluded — will use v3/media/save after nmID`);
 
     const wbResp = await wbFetch(`${WB_API}/content/v2/cards/upload`, {
       method: "POST",
@@ -718,8 +715,8 @@ serve(async (req) => {
 
     console.log(`✅ WB accepted card: ${vendorCode}`);
 
-    // ===== STEP 5: Check async errors (quick 2s wait) =====
-    await sleep(2000);
+    // ===== STEP 5: Quick async error check (1s — don't waste time) =====
+    await sleep(1000);
     const { hasError, errors: wbErrors } = await checkWbErrors(apiKey, vendorCode);
     if (hasError) {
       const errorMsg = wbErrors.map((e: any) => (e.errors || []).join(', ') || e.errorText || JSON.stringify(e)).join('; ');
@@ -730,27 +727,30 @@ serve(async (req) => {
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // ===== STEP 6: Poll nmID (12 attempts, ~90s with 150s wall clock timeout) =====
-    console.log(`\n--- STEP 6: Poll nmID (12 attempts, extended timeout) ---`);
-    const nmID = await pollForNmID(apiKey, vendorCode, 12);
+    // ===== STEP 6: Poll nmID (aggressive: 3s intervals, ~75s max) =====
+    console.log(`\n--- STEP 6: Poll nmID (3s intervals, aggressive) ---`);
+    const nmID = await pollForNmID(apiKey, vendorCode, 25);
 
-    let imagesUploaded = proxiedImages.length > 0; // sent via mediaFiles
+    let imagesUploaded = false;
     let priceSet = false;
     let descriptionSet = false;
 
     if (nmID) {
-      // After nmID found: upload images (v3 backup), set description via charcID, set price — all in parallel
+      // CRITICAL: After nmID found, upload images via v3/media/save (like AI agent does)
+      // This is the ONLY reliable way to attach images to WB cards
       console.log(`\n--- STEP 7: Post-creation updates (parallel) ---`);
       const [imgResult, descResult, priceResult] = await Promise.all([
         proxiedImages.length > 0 ? uploadMedia(apiKey, nmID, proxiedImages) : Promise.resolve(false),
         updateCardDescription(apiKey, nmID, analysis.descriptionRu, descCharcId),
         setPrice(apiKey, nmID, priceRUB),
       ]);
-      if (imgResult) imagesUploaded = true;
+      imagesUploaded = imgResult;
       descriptionSet = descResult;
       priceSet = priceResult;
+      
+      console.log(`Post-creation: images=${imagesUploaded}(${proxiedImages.length}), desc=${descriptionSet}, price=${priceSet}`);
     } else {
-      console.log(`⚠️ nmID not found — description, backup images and price will need manual setup`);
+      console.log(`⚠️ nmID not found — images, description, price need manual setup`);
     }
 
     console.log(`\n========= RESULT =========`);
