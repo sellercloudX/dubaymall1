@@ -101,6 +101,8 @@ Category: "${category || 'unknown'}"`
         
         let title = (parsed.titleRu || productName).slice(0, 60);
         let desc = parsed.descriptionRu || description || productName;
+        // Strip URLs — WB forbids links in description
+        desc = desc.replace(/https?:\/\/[^\s)>\]"']+/gi, '').replace(/www\.[^\s)>\]"']+/gi, '');
         if (desc.length < 1000) {
           desc = desc + '\n\n' + `${title} — высококачественный товар для повседневного использования. Отличается превосходным качеством и надежностью. Подходит для широкого круга покупателей. Произведен с использованием современных технологий и материалов. Гарантия качества от производителя. Удобная упаковка обеспечивает сохранность при транспортировке. Рекомендуется к покупке. Отличный выбор по соотношению цена-качество. Быстрая доставка. Возможен возврат в течение установленного срока.`;
         }
@@ -121,7 +123,7 @@ Category: "${category || 'unknown'}"`
   return {
     searchKeywords: fallbackKw.length > 0 ? fallbackKw : [productName.split(/\s+/)[0]],
     titleRu: productName.slice(0, 60),
-    descriptionRu: (description || productName).slice(0, 2000),
+    descriptionRu: (description || productName).replace(/https?:\/\/[^\s)>\]"']+/gi, '').replace(/www\.[^\s)>\]"']+/gi, '').slice(0, 2000),
   };
 }
 
@@ -426,6 +428,16 @@ Rules:
             }
           }
           
+          // Skip invalid color values that WB rejects
+          if (charc.name?.toLowerCase().includes('цвет') && Array.isArray(item.value)) {
+            const INVALID_COLORS = ['разноцветный', 'мультиколор', 'multicolor', 'mixed', 'ассорти'];
+            const colorVal = item.value[0]?.toString().toLowerCase().trim();
+            if (INVALID_COLORS.includes(colorVal)) {
+              console.log(`⚠️ Skipping invalid color "${item.value[0]}" — WB does not accept it`);
+              continue;
+            }
+          }
+
           // If characteristic has a dictionary, validate value against it
           if (charc?.dictionary?.length > 0 && Array.isArray(item.value)) {
             const allowedValues = new Set(charc.dictionary.map((d: any) => (d.value || d.title || d).toString().toLowerCase()));
@@ -803,6 +815,8 @@ serve(async (req) => {
 
     // Strip emojis and special unicode symbols from description (WB rejects them)
     const cleanDescription = analysis.descriptionRu
+      .replace(/https?:\/\/[^\s)>\]"']+/gi, '')
+      .replace(/www\.[^\s)>\]"']+/gi, '')
       .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]/gu, '')
       .replace(/\s{2,}/g, ' ')
       .trim();
@@ -872,7 +886,7 @@ serve(async (req) => {
     if (hasError) {
       const errorMsg = wbErrors.join('; ');
       // Color and "Особенности" errors are non-critical — WB still creates the card
-      const NON_CRITICAL_PATTERNS = /цвет|color|особенност|слишком много значений/i;
+      const NON_CRITICAL_PATTERNS = /цвет|color|особенност|слишком много значений|ссылки в поле|ссылк/i;
       const criticalErrors = wbErrors.filter(e => !NON_CRITICAL_PATTERNS.test(e));
       const isCritical = criticalErrors.length > 0 && criticalErrors.some(e => 
         /недопустим|запрещен|не найден|отклонен|rejected|неправильный тип|тип значения/i.test(e)
