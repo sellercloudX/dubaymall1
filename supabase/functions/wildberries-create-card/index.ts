@@ -266,9 +266,12 @@ async function getAndFillCharacteristics(
 Rules:
 - String type: {"id": N, "value": ["text"]} (array with ONE string)
 - Number type: {"id": N, "value": 123}
-- If ALLOWED_VALUES listed, use EXACTLY one from the list
+- If ALLOWED_VALUES listed, use EXACTLY one value from the list AS TEXT (not index/ID!)
+- "Страна производства" MUST be a country name like "Россия", "Китай", "Узбекистан" — NEVER a number!
+- "Состав" must be under 100 characters
 - Fill ALL [REQUIRED] fields — NEVER skip them
 - For optional fields, fill as many as you can determine from context
+- NEVER return numeric IDs — always return actual text values
 - No markdown, no explanation, ONLY JSON array`
           },
           {
@@ -321,27 +324,45 @@ Rules:
               continue;
             }
             item.value = numVal;
-          } else {
+           } else {
             // String characteristic: must be array of strings
             if (typeof item.value === 'number') {
-              // Pure numbers are invalid for string charcs like "Страна производства"
-              // Skip them — AI should provide actual text values
               const charcNameLower = charc.name?.toLowerCase() || '';
               if (charcNameLower.includes('страна')) {
-                // Default to "Россия" for country if AI returned a number
                 item.value = ["Россия"];
               } else {
-                console.log(`⚠️ Skipping string charc ${item.id} "${charc.name}": got number ${item.value}`);
-                continue;
+                // Try to find matching dictionary value by ID
+                if (charc.dictionary?.length > 0) {
+                  const dictEntry = charc.dictionary.find((d: any) => d.id === item.value || d.charcID === item.value);
+                  if (dictEntry) {
+                    item.value = [String(dictEntry.value || dictEntry.title || dictEntry.name)];
+                  } else {
+                    console.log(`⚠️ Skipping string charc ${item.id} "${charc.name}": got number ${item.value}, no dict match`);
+                    continue;
+                  }
+                } else {
+                  console.log(`⚠️ Skipping string charc ${item.id} "${charc.name}": got number ${item.value}`);
+                  continue;
+                }
               }
             } else if (Array.isArray(item.value)) {
               item.value = item.value.map((v: any) => String(v)).filter((v: string) => v.length > 0);
               if (item.value.length === 0) continue;
-              // Skip values that are pure numeric strings for known text-only charcs
-              if (/^\d+$/.test(item.value[0]) && KNOWN_STRING_CHARC_NAMES.some(s => charc.name?.toLowerCase().includes(s))) {
-                if (charc.name?.toLowerCase().includes('страна')) {
+              // Fix pure numeric strings for text-only charcs
+              if (/^\d+$/.test(item.value[0])) {
+                const charcNameLower = charc.name?.toLowerCase() || '';
+                if (charcNameLower.includes('страна')) {
                   item.value = ["Россия"];
-                } else {
+                } else if (charc.dictionary?.length > 0) {
+                  const numId = parseInt(item.value[0]);
+                  const dictEntry = charc.dictionary.find((d: any) => d.id === numId || d.charcID === numId);
+                  if (dictEntry) {
+                    item.value = [String(dictEntry.value || dictEntry.title || dictEntry.name)];
+                  } else {
+                    console.log(`⚠️ Skipping string charc ${item.id} "${charc.name}": numeric "${item.value[0]}", no dict match`);
+                    continue;
+                  }
+                } else if (KNOWN_STRING_CHARC_NAMES.some(s => charcNameLower.includes(s))) {
                   console.log(`⚠️ Skipping string charc ${item.id} "${charc.name}": numeric string "${item.value[0]}"`);
                   continue;
                 }
@@ -349,11 +370,16 @@ Rules:
             } else {
               const strVal = String(item.value).trim();
               if (!strVal) continue;
-              item.value = [strVal];
+              // Fix pure numeric string values  
+              if (/^\d+$/.test(strVal) && charc.name?.toLowerCase().includes('страна')) {
+                item.value = ["Россия"];
+              } else {
+                item.value = [strVal];
+              }
             }
             
-            // Enforce max length per WB rules (e.g. Состав max 100 chars)
-            const MAX_CHARC_LENGTH: Record<string, number> = { 'состав': 100 };
+            // Enforce max length per WB rules
+            const MAX_CHARC_LENGTH: Record<string, number> = { 'состав': 100, 'описание': 5000, 'комплектация': 200 };
             for (const [key, maxLen] of Object.entries(MAX_CHARC_LENGTH)) {
               if (charc.name?.toLowerCase().includes(key) && item.value[0]?.length > maxLen) {
                 item.value = [item.value[0].slice(0, maxLen)];
@@ -803,9 +829,9 @@ serve(async (req) => {
       console.warn(`⚠️ WB async warnings (non-fatal): ${errorMsg}`);
     }
 
-    // ===== STEP 6: Quick nmID poll (max 6 attempts, ~25s) =====
+    // ===== STEP 6: Quick nmID poll (max 10 attempts, ~45s) =====
     console.log(`\n--- STEP 6: Quick nmID poll ---`);
-    const nmID = await pollForNmID(apiKey, vendorCode, 6);
+    const nmID = await pollForNmID(apiKey, vendorCode, 10);
 
     let imagesUploaded = false;
     let priceSet = priceRUB > 0;
