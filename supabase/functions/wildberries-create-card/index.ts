@@ -14,6 +14,12 @@ async function wbFetch(url: string, options: RequestInit, retries = 3): Promise<
     try {
       const resp = await fetch(url, options);
       if (resp.status === 429) { await sleep(2000 * (i + 1)); continue; }
+      // Retry on 500/502/503 server errors (WB API can be temporarily unstable)
+      if (resp.status >= 500 && i < retries - 1) { 
+        console.log(`wbFetch: ${resp.status} on ${url.split('?')[0]}, retry ${i + 1}/${retries}`);
+        await sleep(1500 * (i + 1)); 
+        continue; 
+      }
       return resp;
     } catch (e) {
       if (i < retries - 1) { await sleep(1000 * (i + 1)); continue; }
@@ -410,7 +416,8 @@ async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 25)
           console.log(`Polling attempt ${attempt + 1}/${maxAttempts}: ${cards.length} cards scanned, vendorCode "${vendorCode}" not found`);
         }
       } else {
-        console.log(`Polling attempt ${attempt + 1}: HTTP ${resp.status}`);
+        const errBody = await resp.text().catch(() => '');
+        console.log(`Polling attempt ${attempt + 1}: HTTP ${resp.status} — ${errBody.slice(0, 200)}`);
       }
     } catch (e) { /* continue */ }
   }
