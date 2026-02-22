@@ -120,15 +120,50 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
 
   const selectedProducts = products.filter(p => selectedIds.has(p.offerId));
 
-  // Check if product already exists in target marketplace
+  // Normalize text for fuzzy comparison
+  const normalize = (s: string) => s.toLowerCase().replace(/[^a-zа-яё0-9]/gi, '').trim();
+  
+  // Check if product already exists in target marketplace (fuzzy matching)
   const isAlreadyCloned = useCallback((product: CloneableProduct, targetMp: string): boolean => {
     const targetProducts = store.getProducts(targetMp);
-    return targetProducts.some(p =>
-      p.offerId === product.offerId ||
-      p.shopSku === product.shopSku ||
-      (p.name && p.name.toLowerCase().trim() === product.name.toLowerCase().trim())
-    );
+    const srcName = normalize(product.name);
+    const srcSku = product.shopSku?.toLowerCase() || '';
+    const srcOfferId = product.offerId?.toLowerCase() || '';
+    
+    return targetProducts.some(p => {
+      if (p.offerId?.toLowerCase() === srcOfferId) return true;
+      if (p.shopSku?.toLowerCase() === srcSku) return true;
+      
+      const tgtName = normalize(p.name || '');
+      if (srcName && tgtName && srcName.length > 5 && tgtName.length > 5) {
+        if (tgtName.includes(srcName) || srcName.includes(tgtName)) return true;
+        const srcWords = new Set(product.name.toLowerCase().split(/\s+/).filter(w => w.length > 2));
+        const tgtWords = new Set((p.name || '').toLowerCase().split(/\s+/).filter(w => w.length > 2));
+        if (srcWords.size >= 3) {
+          let matches = 0;
+          for (const w of srcWords) { if (tgtWords.has(w)) matches++; }
+          if (matches / srcWords.size >= 0.6) return true;
+        }
+      }
+      return false;
+    });
   }, [store.dataVersion]);
+
+  // Get cloned status for each product across all selected targets
+  const clonedStatusMap = useMemo(() => {
+    const map = new Map<string, string[]>();
+    if (targetMarketplaces.length === 0) return map;
+    for (const product of products) {
+      const clonedTo: string[] = [];
+      for (const target of targetMarketplaces) {
+        if (isAlreadyCloned(product, target)) {
+          clonedTo.push(MARKETPLACE_INFO[target]?.name || target);
+        }
+      }
+      if (clonedTo.length > 0) map.set(product.offerId, clonedTo);
+    }
+    return map;
+  }, [products, targetMarketplaces, isAlreadyCloned]);
 
   // Clone product to external marketplace
   const cloneToMarketplace = async (product: CloneableProduct, targetMp: string): Promise<boolean> => {
@@ -420,7 +455,14 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-sm truncate">{product.name}</div>
-                    <code className="text-[10px] text-muted-foreground truncate block">{product.shopSku}</code>
+                    <div className="flex items-center gap-1">
+                      <code className="text-[10px] text-muted-foreground truncate">{product.shopSku}</code>
+                      {clonedStatusMap.has(product.offerId) && (
+                        <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-yellow-500/10 text-yellow-600 border-yellow-500/30 shrink-0">
+                          ✓ {clonedStatusMap.get(product.offerId)!.join(', ')}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                   <div className="font-medium text-xs whitespace-nowrap shrink-0">{formatPrice(product.price)}</div>
                 </div>
