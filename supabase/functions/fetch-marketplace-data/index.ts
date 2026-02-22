@@ -2734,8 +2734,75 @@ serve(async (req) => {
 
               if (resp.ok) {
                 const data = await resp.json();
-                console.log(`WB price update success: ${pricePayload.length} prices updated`);
-                result = { success: true, data, updated: pricePayload.length, unmapped: unmapped.length };
+                const taskId = data?.data?.id;
+                console.log(`WB price update submitted: ${pricePayload.length} prices, taskId: ${taskId}`);
+                console.log(`WB price payload sample:`, JSON.stringify(pricePayload.slice(0, 3)));
+                
+                // Check task status after a short delay
+                let taskStatus = null;
+                if (taskId) {
+                  await new Promise(r => setTimeout(r, 3000));
+                  try {
+                    const statusResp = await fetch(`https://discounts-prices-api.wildberries.ru/api/v2/history/tasks?limit=1`, {
+                      method: "GET",
+                      headers: wbHeaders,
+                    });
+                    if (statusResp.ok) {
+                      const statusData = await statusResp.json();
+                      taskStatus = statusData?.data?.tasks?.[0];
+                      console.log(`WB price task status:`, JSON.stringify(taskStatus));
+                      
+                      // Check for errors in the task
+                      if (taskStatus?.status === 5 || taskStatus?.status === 6) {
+                        // Get error details
+                        const detailResp = await fetch(`https://discounts-prices-api.wildberries.ru/api/v2/history/goods/task?uploadID=${taskId}&limit=10`, {
+                          method: "GET",
+                          headers: wbHeaders,
+                        });
+                        if (detailResp.ok) {
+                          const detailData = await detailResp.json();
+                          console.log(`WB price task errors:`, JSON.stringify(detailData?.data?.goods?.slice(0, 5)));
+                          taskStatus.errorDetails = detailData?.data?.goods?.slice(0, 10);
+                        } else {
+                          await detailResp.text();
+                        }
+                      }
+                    } else {
+                      await statusResp.text();
+                    }
+                  } catch (e2: any) {
+                    console.warn(`WB task status check failed:`, e2?.message);
+                  }
+                }
+                
+                // Check quarantine
+                let quarantineGoods: any[] = [];
+                try {
+                  const qResp = await fetch(`https://discounts-prices-api.wildberries.ru/api/v2/quarantine/goods?limit=10`, {
+                    method: "GET",
+                    headers: wbHeaders,
+                  });
+                  if (qResp.ok) {
+                    const qData = await qResp.json();
+                    quarantineGoods = qData?.data?.goods || [];
+                    if (quarantineGoods.length > 0) {
+                      console.warn(`WB QUARANTINE: ${quarantineGoods.length} products in quarantine!`, JSON.stringify(quarantineGoods.slice(0, 3)));
+                    }
+                  } else {
+                    await qResp.text();
+                  }
+                } catch (e3: any) {
+                  console.warn(`WB quarantine check failed:`, e3?.message);
+                }
+                
+                result = { 
+                  success: true, data, updated: pricePayload.length, unmapped: unmapped.length,
+                  taskStatus,
+                  quarantineCount: quarantineGoods.length,
+                  quarantineWarning: quarantineGoods.length > 0 
+                    ? `${quarantineGoods.length} ta mahsulot karantinga tushdi. WB seller kabinetidan karantinni tasdiqlang: https://seller.wildberries.ru/discount-and-prices/quarantine`
+                    : null
+                };
               } else {
                 const errText = await resp.text();
                 console.error(`WB price update failed (${resp.status}):`, errText);
