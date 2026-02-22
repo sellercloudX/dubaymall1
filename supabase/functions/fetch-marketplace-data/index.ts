@@ -2567,22 +2567,30 @@ serve(async (req) => {
                 // sku = barcode of the size (from card.sizes[].skus[])
                 // We need to map vendorCode/offerId to actual barcodes
                 
-                // First fetch all cards to get barcode mapping
-                const cardsResp = await fetch("https://content-api.wildberries.ru/content/v2/get/cards/list", {
-                  method: "POST",
-                  headers: wbHeaders,
-                  body: JSON.stringify({
-                    settings: {
-                      cursor: { limit: 100 },
-                      filter: { withPhoto: -1 },
-                    },
-                  }),
-                });
-                
+                // Fetch ALL cards with pagination to get barcode mapping
                 const skuMap = new Map<string, string[]>(); // vendorCode -> barcodes
-                if (cardsResp.ok) {
+                let cardsCursor = { limit: 100, updatedAt: undefined as string | undefined, nmID: undefined as number | undefined };
+                let cardsTotal = 0;
+                for (let page = 0; page < 20; page++) {
+                  const cursorPayload: any = { limit: cardsCursor.limit };
+                  if (cardsCursor.updatedAt) {
+                    cursorPayload.updatedAt = cardsCursor.updatedAt;
+                    cursorPayload.nmID = cardsCursor.nmID;
+                  }
+                  const cardsResp = await fetch("https://content-api.wildberries.ru/content/v2/get/cards/list", {
+                    method: "POST",
+                    headers: wbHeaders,
+                    body: JSON.stringify({
+                      settings: {
+                        cursor: cursorPayload,
+                        filter: { withPhoto: -1 },
+                      },
+                    }),
+                  });
+                  if (!cardsResp.ok) { await cardsResp.text(); break; }
                   const cardsData = await cardsResp.json();
-                  for (const card of (cardsData.cards || [])) {
+                  const cards = cardsData.cards || [];
+                  for (const card of cards) {
                     const vc = card.vendorCode?.toLowerCase() || "";
                     const barcodes: string[] = [];
                     for (const size of (card.sizes || [])) {
@@ -2592,8 +2600,12 @@ serve(async (req) => {
                     }
                     if (vc && barcodes.length > 0) skuMap.set(vc, barcodes);
                   }
+                  cardsTotal += cards.length;
+                  const nextCursor = cardsData.cursor;
+                  if (!nextCursor || cards.length < 100) break;
+                  cardsCursor = { limit: 100, updatedAt: nextCursor.updatedAt, nmID: nextCursor.nmID };
                 }
-                console.log(`WB barcode map: ${skuMap.size} cards mapped`);
+                console.log(`WB barcode map: ${skuMap.size} cards mapped (fetched ${cardsTotal} cards)`);
                 
                 const stockPayload: Array<{ sku: string; amount: number }> = [];
                 const unmapped: string[] = [];
@@ -2619,19 +2631,31 @@ serve(async (req) => {
                 if (stockPayload.length === 0) {
                   result = { success: false, error: "Barkodlar topilmadi. Mahsulotlar WB da to'liq yaratilmagan bo'lishi mumkin." };
                 } else {
-                  const stockResp = await fetch(`https://marketplace-api.wildberries.ru/api/v3/stocks/${warehouseId}`, {
-                    method: "PUT",
-                    headers: { ...wbHeaders, "Content-Type": "application/json" },
-                    body: JSON.stringify({ stocks: stockPayload }),
-                  });
-                  
-                  if (stockResp.ok) {
-                    console.log(`WB stock update success: ${stockPayload.length} SKUs updated`);
-                    result = { success: true, updated: stockPayload.length, warehouseId, warehouseName: whList[0].name };
+                  // WB API limit: max 100 SKUs per request, batch them
+                  const BATCH_SIZE = 100;
+                  let totalUpdated = 0;
+                  let lastError = "";
+                  for (let i = 0; i < stockPayload.length; i += BATCH_SIZE) {
+                    const batch = stockPayload.slice(i, i + BATCH_SIZE);
+                    const stockResp = await fetch(`https://marketplace-api.wildberries.ru/api/v3/stocks/${warehouseId}`, {
+                      method: "PUT",
+                      headers: { ...wbHeaders, "Content-Type": "application/json" },
+                      body: JSON.stringify({ stocks: batch }),
+                    });
+                    if (stockResp.ok) {
+                      totalUpdated += batch.length;
+                      console.log(`WB stock batch ${Math.floor(i/BATCH_SIZE)+1}: ${batch.length} SKUs updated`);
+                    } else {
+                      const errText = await stockResp.text();
+                      console.error(`WB stock batch ${Math.floor(i/BATCH_SIZE)+1} failed (${stockResp.status}):`, errText);
+                      lastError = errText;
+                    }
+                  }
+                  if (totalUpdated > 0) {
+                    console.log(`WB stock update total: ${totalUpdated}/${stockPayload.length} SKUs updated`);
+                    result = { success: true, updated: totalUpdated, total: stockPayload.length, warehouseId, warehouseName: whList[0].name };
                   } else {
-                    const errText = await stockResp.text();
-                    console.error(`WB stock update failed (${stockResp.status}):`, errText);
-                    result = { success: false, error: `WB qoldiq yangilash xatosi: ${stockResp.status}`, details: errText };
+                    result = { success: false, error: `WB qoldiq yangilash xatosi`, details: lastError };
                   }
                 }
               }
