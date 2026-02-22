@@ -243,15 +243,19 @@ async function getAndFillCharacteristics(
   if (selected.length === 0) return { charcs: preFilled, descCharcId, nameCharcId };
 
   const charcsList = selected.map((c: any) => {
-    const dict = c.dictionary?.length ? ` ALLOWED_VALUES: [${c.dictionary.slice(0, 20).map((d: any) => d.value || d.title || d).join(', ')}]` : '';
+    const dict = c.dictionary?.length ? ` ALLOWED_VALUES: [${c.dictionary.slice(0, 8).map((d: any) => d.value || d.title || d).join(', ')}]` : '';
     const req = c.required ? ' [REQUIRED]' : '';
     const t = (c.charcType === 4 || c.charcType === 1) ? 'number' : 'string';
     return `id=${c.charcID} "${c.name}" type=${t}${req}${dict}`;
   }).join('\n');
 
   try {
+    const charcController = new AbortController();
+    const charcTimeout = setTimeout(() => charcController.abort(), 15000);
+    console.log(`AI charcs request: ${selected.length} charcs for "${productName.slice(0, 40)}"`);
     const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
+      signal: charcController.signal,
       headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "google/gemini-2.5-flash-lite",
@@ -275,6 +279,7 @@ Rules:
         temperature: 0.1,
       }),
     });
+    clearTimeout(charcTimeout);
     if (!aiResp.ok) {
       console.error(`AI charcs failed: ${aiResp.status}`);
       return { charcs: preFilled, descCharcId, nameCharcId };
@@ -345,8 +350,8 @@ Rules:
         return { charcs: result, descCharcId, nameCharcId };
       }
     }
-  } catch (e) {
-    console.error("AI charcs error:", e);
+  } catch (e: any) {
+    console.error(`AI charcs error (${e?.name === 'AbortError' ? 'TIMEOUT 15s' : e?.message || e})`);
   }
   return { charcs: preFilled, descCharcId, nameCharcId };
 }
