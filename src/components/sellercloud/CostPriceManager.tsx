@@ -12,6 +12,7 @@ import { DollarSign, Save, Search, Package, CheckCircle2, AlertCircle, ChevronLe
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useCostPrices } from '@/hooks/useCostPrices';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 
 interface CostPriceManagerProps {
@@ -40,7 +41,7 @@ export function CostPriceManager({ connectedMarketplaces, store }: CostPriceMana
 
   const isLoading = store.isLoadingProducts || costLoading;
 
-  // Import cost prices from Yandex to WB (UZS → RUB)
+  // Import cost prices from Yandex to WB using AI matching
   const handleImportFromYandex = useCallback(async () => {
     if (!connectedMarketplaces.includes('yandex')) {
       toast.error('Yandex Market ulanmagan');
@@ -55,125 +56,36 @@ export function CostPriceManager({ connectedMarketplaces, store }: CostPriceMana
         toast.error('Yandex da mahsulotlar topilmadi');
         return;
       }
-
-      // Build a map of Yandex cost prices
-      const entries: { marketplace: string; offerId: string; costPrice: number }[] = [];
-      let matched = 0;
-      let skipped = 0;
-
-      // Helper: normalize name for matching
-      const normalizeName = (name: string) => 
-        name.toLowerCase()
-          .replace(/[^a-zа-яёўқғҳ0-9\s]/gi, ' ')
-          .replace(/\s+/g, ' ')
-          .trim();
-      
-      const getWords = (name: string) => 
-        normalizeName(name).split(' ').filter(w => w.length > 1);
-
-      // Pre-index Yandex products by normalized words for faster lookup
-      const yandexNormalized = yandexProducts.map(yp => ({
-        product: yp,
-        normalized: normalizeName(yp.name || ''),
-        words: new Set(getWords(yp.name || '')),
-      }));
-
-      for (const wbProduct of wbProducts) {
-        const wbName = wbProduct.name || '';
-        const wbNorm = normalizeName(wbName);
-        const wbWords = getWords(wbName);
-        const wbSku = (wbProduct.shopSku || wbProduct.offerId || '').toLowerCase();
-        
-        // 1) Exact SKU match
-        let yandexMatch = yandexProducts.find(yp => {
-          const ySku = (yp.shopSku || yp.offerId || '').toLowerCase();
-          return ySku && ySku === wbSku;
-        });
-        
-        // 2) Exact normalized name match
-        if (!yandexMatch && wbNorm.length > 3) {
-          const found = yandexNormalized.find(y => y.normalized === wbNorm);
-          if (found) yandexMatch = found.product;
-        }
-
-        // 3) Name containment
-        if (!yandexMatch && wbNorm.length > 5) {
-          const found = yandexNormalized.find(y => {
-            if (y.normalized.length < 5) return false;
-            return y.normalized.includes(wbNorm) || wbNorm.includes(y.normalized);
-          });
-          if (found) yandexMatch = found.product;
-        }
-
-        // 4) Fuzzy word matching (40%+ overlap from BOTH sides)
-        if (!yandexMatch && wbWords.length >= 2) {
-          const wbSet = new Set(wbWords);
-          let bestScore = 0;
-          let bestMatch: typeof yandexNormalized[0] | null = null;
-          
-          for (const y of yandexNormalized) {
-            if (y.words.size < 2) continue;
-            let common = 0;
-            for (const w of wbSet) { if (y.words.has(w)) common++; }
-            // Score = average of both coverage ratios
-            const score = (common / wbSet.size + common / y.words.size) / 2;
-            if (score > bestScore && score >= 0.4) {
-              bestScore = score;
-              bestMatch = y;
-            }
-          }
-          if (bestMatch) yandexMatch = bestMatch.product;
-        }
-
-        // 5) Number-based matching (article numbers, sizes in name)
-        if (!yandexMatch && wbWords.length >= 1) {
-          const wbNums = wbWords.filter(w => /\d/.test(w));
-          if (wbNums.length >= 1) {
-            const found = yandexNormalized.find(y => {
-              const yNums = [...y.words].filter(w => /\d/.test(w));
-              if (yNums.length === 0) return false;
-              const commonNums = wbNums.filter(n => yNums.includes(n));
-              // All numeric parts match + at least one text word matches
-              if (commonNums.length === wbNums.length && commonNums.length === yNums.length) {
-                const wbText = wbWords.filter(w => !/\d/.test(w));
-                return wbText.some(w => y.words.has(w));
-              }
-              return false;
-            });
-            if (found) yandexMatch = found.product;
-          }
-        }
-
-        if (yandexMatch) {
-          const yandexCost = getCostPrice('yandex', yandexMatch.offerId);
-          if (yandexCost !== null && yandexCost > 0) {
-            // Convert UZS → RUB
-            const costInRub = Math.round(yandexCost / UZS_TO_RUB);
-            if (costInRub > 0) {
-              entries.push({ marketplace: 'wildberries', offerId: wbProduct.offerId, costPrice: costInRub });
-              matched++;
-            }
-          } else {
-            skipped++;
-          }
-        }
+      if (wbProducts.length === 0) {
+        toast.error('WB da mahsulotlar topilmadi');
+        return;
       }
 
-      if (entries.length > 0) {
-        await bulkSetCostPrices(entries);
-        toast.success(`${matched} ta mahsulotga tannarx import qilindi (UZS → RUB)`);
-      } else if (skipped > 0) {
-        toast.warning(`Mos mahsulotlar topildi, lekin Yandex da tannarx kiritilmagan (${skipped} ta)`);
+      toast.info(`AI yordamida ${wbProducts.length} ta WB mahsulotni ${yandexProducts.length} ta Yandex mahsulot bilan solishtirilmoqda...`);
+
+      const { data, error } = await supabase.functions.invoke('match-products-ai', {
+        body: {
+          wbProducts: wbProducts.map(p => ({ name: p.name, offerId: p.offerId })),
+          yandexProducts: yandexProducts.map(p => ({ name: p.name, offerId: p.offerId })),
+        }
+      });
+
+      if (error) throw error;
+
+      if (data?.matches > 0) {
+        // Refresh cost prices cache
+        window.location.reload();
+        toast.success(`${data.matches} ta mahsulotga tannarx import qilindi (UZS → RUB)`);
       } else {
-        toast.warning('Mos mahsulotlar topilmadi — avval Yandex da tannarx kiriting');
+        toast.warning('Mos mahsulotlar topilmadi');
       }
     } catch (err) {
       console.error('Import error:', err);
-      toast.error('Import qilishda xatolik');
+      toast.error('Import qilishda xatolik: ' + (err as Error).message);
     } finally {
       setImporting(false);
     }
-  }, [connectedMarketplaces, store, getCostPrice, bulkSetCostPrices]);
+  }, [connectedMarketplaces, store]);
 
   const products = useMemo(() => {
     if (!selectedMp) return [];
