@@ -345,11 +345,11 @@ async function proxyImages(supabase: any, userId: string, images: string[]): Pro
   return proxied;
 }
 
-// ===== POLL FOR nmID (fast polling: 8 attempts, ~40s max) =====
-async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 12): Promise<number | null> {
+// ===== POLL FOR nmID (fast polling: 6 attempts, ~30s max to avoid edge function timeout) =====
+async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 6): Promise<number | null> {
   const headers = { Authorization: apiKey, "Content-Type": "application/json" };
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const delay = 3000 + attempt * 2000; // 3s, 5s, 7s, 9s... up to ~27s per attempt
+    const delay = 3000 + attempt * 1500; // 3s, 4.5s, 6s, 7.5s, 9s, 10.5s — total ~40s
     await sleep(delay);
     try {
       // Fetch 100 latest cards to reliably find our new card
@@ -637,9 +637,9 @@ serve(async (req) => {
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // ===== STEP 6: Poll nmID (8 attempts, ~40s max) =====
+    // ===== STEP 6: Poll nmID (6 attempts, ~30s max to avoid timeout) =====
     console.log(`\n--- STEP 6: Poll nmID ---`);
-    const nmID = await pollForNmID(apiKey, vendorCode, 12);
+    const nmID = await pollForNmID(apiKey, vendorCode, 6);
 
     let imagesUploaded = proxiedImages.length > 0; // sent via mediaFiles
     let priceSet = false;
