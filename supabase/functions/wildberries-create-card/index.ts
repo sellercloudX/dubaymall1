@@ -352,11 +352,11 @@ async function proxyImages(supabase: any, userId: string, images: string[]): Pro
   return proxied;
 }
 
-// ===== POLL FOR nmID (fast polling: 6 attempts, ~30s max to avoid edge function timeout) =====
-async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 6): Promise<number | null> {
+// ===== POLL FOR nmID (extended polling: 12 attempts, ~90s with 150s wall clock) =====
+async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 12): Promise<number | null> {
   const headers = { Authorization: apiKey, "Content-Type": "application/json" };
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const delay = 3000 + attempt * 1500; // 3s, 4.5s, 6s, 7.5s, 9s, 10.5s — total ~40s
+    const delay = 5000 + attempt * 2000; // 5s, 7s, 9s, 11s... — total ~90s
     await sleep(delay);
     try {
       // Fetch 100 latest cards to reliably find our new card
@@ -444,7 +444,24 @@ async function updateCardDescription(apiKey: string, nmID: number, description: 
 
 async function updateCardDescriptionFallback(apiKey: string, nmID: number, description: string): Promise<boolean> {
   try {
-    // Try to get card details to find description charcID
+    // Strategy 1: Try top-level description field in v2/cards/update (works for many categories)
+    console.log(`Fallback strategy 1: top-level description field for nmID ${nmID}`);
+    const directResp = await wbFetch(`${WB_API}/content/v2/cards/update`, {
+      method: "POST",
+      headers: { Authorization: apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify([{ nmID, description: description.slice(0, 5000) }]),
+    });
+    if (directResp.ok) {
+      const directData = await directResp.json();
+      if (!directData.error) {
+        console.log(`✅ Description updated via top-level field for nmID ${nmID}`);
+        return true;
+      }
+      console.log(`Top-level description failed: ${JSON.stringify(directData).substring(0, 200)}`);
+    }
+
+    // Strategy 2: Find description charcID from category charcs
+    console.log(`Fallback strategy 2: find descCharcId from card's subject`);
     const cardResp = await wbFetch(`${WB_API}/content/v2/get/cards/list`, {
       method: "POST",
       headers: { Authorization: apiKey, "Content-Type": "application/json" },
@@ -460,7 +477,10 @@ async function updateCardDescriptionFallback(apiKey: string, nmID: number, descr
         });
         if (charcsResp.ok) {
           const charcsData = await charcsResp.json();
-          const descCharc = (charcsData.data || []).find((c: any) => (c.name || '').toLowerCase().includes('описание'));
+          const descCharc = (charcsData.data || []).find((c: any) => {
+            const name = (c.name || '').toLowerCase();
+            return name === 'описание' || name.includes('описание');
+          });
           if (descCharc) {
             const resp = await wbFetch(`${WB_API}/content/v2/cards/update`, {
               method: "POST",
@@ -475,7 +495,23 @@ async function updateCardDescriptionFallback(apiKey: string, nmID: number, descr
         }
       }
     }
-    console.warn(`⚠️ Could not find description charcID for nmID ${nmID}`);
+
+    // Strategy 3: Try v3 update endpoint
+    console.log(`Fallback strategy 3: v3 cards/update for nmID ${nmID}`);
+    const v3Resp = await wbFetch(`${WB_API}/content/v2/cards/update`, {
+      method: "POST",
+      headers: { Authorization: apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify([{ nmID, characteristics: [], description: description.slice(0, 5000) }]),
+    });
+    if (v3Resp.ok) {
+      const v3Data = await v3Resp.json();
+      if (!v3Data.error) {
+        console.log(`✅ Description set via v3 strategy`);
+        return true;
+      }
+    }
+
+    console.warn(`⚠️ All description strategies failed for nmID ${nmID}`);
     return false;
   } catch (e) {
     console.error("Description fallback error:", e);
@@ -694,9 +730,9 @@ serve(async (req) => {
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // ===== STEP 6: Poll nmID (6 attempts, ~30s max to avoid timeout) =====
-    console.log(`\n--- STEP 6: Poll nmID ---`);
-    const nmID = await pollForNmID(apiKey, vendorCode, 6);
+    // ===== STEP 6: Poll nmID (12 attempts, ~90s with 150s wall clock timeout) =====
+    console.log(`\n--- STEP 6: Poll nmID (12 attempts, extended timeout) ---`);
+    const nmID = await pollForNmID(apiKey, vendorCode, 12);
 
     let imagesUploaded = proxiedImages.length > 0; // sent via mediaFiles
     let priceSet = false;
