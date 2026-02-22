@@ -202,7 +202,8 @@ async function getAndFillCharacteristics(
 
   console.log(`Total characteristics for subject ${subjectID}: ${charcs.length}`);
 
-  // Find name and description characteristics dynamically
+  // NOTE: Per official WB API docs, title and description are TOP-LEVEL variant fields,
+  // NOT characteristics. We only look for name charcID here for legacy compatibility.
   let nameCharcId: number | null = null;
   let descCharcId: number | null = null;
 
@@ -216,18 +217,11 @@ async function getAndFillCharacteristics(
     }
   }
 
-  console.log(`Name charc: ${nameCharcId ? `id=${nameCharcId}` : 'NOT FOUND'}`);
-  console.log(`Description charc: ${descCharcId ? `id=${descCharcId}` : 'NOT FOUND'}`);
+  console.log(`Name charc: ${nameCharcId ? `id=${nameCharcId}` : 'NOT FOUND (using variant.title)'}`);
+  console.log(`Description charc: ${descCharcId ? `id=${descCharcId}` : 'NOT FOUND (using variant.description)'}`);
 
+  // Do NOT put title/description in characteristics — they are variant-level fields per API docs
   const preFilled: Array<{ id: number; value: any }> = [];
-  if (nameCharcId) {
-    preFilled.push({ id: nameCharcId, value: [aiTitle] });
-  }
-  // Include description in characteristics if charcID found
-  if (descCharcId) {
-    preFilled.push({ id: descCharcId, value: [aiDescription.slice(0, 5000)] });
-    console.log(`Description PRE-FILLED in characteristics via charcID ${descCharcId}`);
-  }
 
   console.log(`Available charcs: ${charcs.slice(0, 10).map((c: any) => `${c.charcID}:"${c.name}"`).join(', ')}${charcs.length > 10 ? '...' : ''}`);
 
@@ -544,16 +538,24 @@ async function setPrice(apiKey: string, nmID: number, priceRUB: number): Promise
 }
 
 // ===== CHECK WB ASYNC ERRORS =====
-async function checkWbErrors(apiKey: string, vendorCode: string): Promise<{ hasError: boolean; errors: any[] }> {
+async function checkWbErrors(apiKey: string, vendorCode: string): Promise<{ hasError: boolean; errors: string[] }> {
   try {
+    // Per official docs, /content/v2/cards/error/list is a POST method
     const resp = await wbFetch(`${WB_API}/content/v2/cards/error/list`, {
-      headers: { Authorization: apiKey },
+      method: "POST",
+      headers: { Authorization: apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({ cursor: { limit: 100 }, order: { ascending: false } }),
     });
     if (!resp.ok) return { hasError: false, errors: [] };
     const data = await resp.json();
-    const all = data.data || [];
-    const ours = all.filter((e: any) => e.vendorCode === vendorCode || JSON.stringify(e).includes(vendorCode));
-    return { hasError: ours.length > 0, errors: ours };
+    const items = data.data?.items || [];
+    const errorMessages: string[] = [];
+    for (const item of items) {
+      if (item.vendorCodes?.includes(vendorCode) && item.errors?.[vendorCode]) {
+        errorMessages.push(...item.errors[vendorCode]);
+      }
+    }
+    return { hasError: errorMessages.length > 0, errors: errorMessages };
   } catch (e) {
     return { hasError: false, errors: [] };
   }
@@ -652,7 +654,9 @@ serve(async (req) => {
     const descCharcId = charcResult.descCharcId;
     console.log(`Characteristics: ${filledCharcs.length}, descCharcId: ${descCharcId}`);
 
-    // ===== STEP 4: Create card (CLEAN — no mediaFiles, images go via v3 after nmID) =====
+    // ===== STEP 4: Create card =====
+    // Per official WB API docs: title, description are VARIANT-LEVEL fields (NOT characteristics)
+    // Price goes in sizes[].price, images uploaded separately via v3/media/save after nmID
     console.log(`\n--- STEP 4: Create Card ---`);
     const vendorCode = generateVendorCode(product.name);
 
@@ -664,17 +668,18 @@ serve(async (req) => {
     const variant: any = {
       vendorCode,
       title: analysis.titleRu,
+      description: analysis.descriptionRu.slice(0, 5000), // TOP-LEVEL per API docs
       dimensions: { length: 20, width: 15, height: 10, weightBrutto: 0.5 },
-      characteristics: filledCharcs,
+      characteristics: filledCharcs, // Only non-title/description characteristics
       sizes: [{
         techSize: "0",
         price: priceRUB > 0 ? priceRUB : undefined,
         skus: barcode ? [barcode] : undefined,
       }],
     };
+    
+    console.log(`Variant: title(${analysis.titleRu.length}ch), desc(${analysis.descriptionRu.length}ch), charcs=${filledCharcs.length}, price=${priceRUB}`);
 
-    const payload = [{ subjectID: subject.subjectID, variants: [variant] }];
-    console.log(`Payload: vendorCode=${vendorCode}, charcs=${filledCharcs.length}, price=${priceRUB}`);
 
     const wbResp = await wbFetch(`${WB_API}/content/v2/cards/upload`, {
       method: "POST",
@@ -719,7 +724,7 @@ serve(async (req) => {
     await sleep(1500);
     const { hasError, errors: wbErrors } = await checkWbErrors(apiKey, vendorCode);
     if (hasError) {
-      const errorMsg = wbErrors.map((e: any) => (e.errors || []).join(', ') || e.errorText || JSON.stringify(e)).join('; ');
+      const errorMsg = wbErrors.join('; ');
       console.error(`❌ WB async error: ${errorMsg}`);
       return new Response(JSON.stringify({
         success: false, error: `WB kartochkani rad etdi: ${errorMsg}`,
@@ -732,22 +737,21 @@ serve(async (req) => {
     const nmID = await pollForNmID(apiKey, vendorCode, 30);
 
     let imagesUploaded = false;
-    let priceSet = priceRUB > 0; // Price was in v2 payload
-    let descriptionSet = descCharcId != null; // Description was in characteristics
+    let priceSet = priceRUB > 0; // Price was in v2 payload via sizes[].price
+    let descriptionSet = true; // Description is now in v2 payload as variant-level field
 
     if (nmID) {
-      // ===== STEP 7: Upload images + set price + update description (parallel) =====
+      // ===== STEP 7: Upload images + set price (parallel) =====
+      // Description already set via variant-level field in v2/cards/upload
       console.log(`\n--- STEP 7: Post-creation updates (nmID: ${nmID}) ---`);
-      const [imgResult, priceResult, descResult] = await Promise.all([
+      const [imgResult, priceResult] = await Promise.all([
         proxiedImages.length > 0 ? uploadMedia(apiKey, nmID, proxiedImages) : Promise.resolve(false),
         setPrice(apiKey, nmID, priceRUB),
-        !descriptionSet ? updateCardDescription(apiKey, nmID, analysis.descriptionRu, descCharcId) : Promise.resolve(true),
       ]);
       imagesUploaded = imgResult;
       if (priceResult) priceSet = true;
-      if (descResult) descriptionSet = true;
       
-      console.log(`Results: images=${imgResult}(${proxiedImages.length}), price=${priceResult}, desc=${descResult}`);
+      console.log(`Results: images=${imgResult}(${proxiedImages.length}), price=${priceResult}`);
     } else {
       console.log(`⚠️ nmID not found — images could not be uploaded. Card exists but without media.`);
     }
