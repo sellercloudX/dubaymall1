@@ -2729,7 +2729,7 @@ serve(async (req) => {
               const resp = await fetch("https://discounts-prices-api.wildberries.ru/api/v2/upload/task", {
                 method: "POST",
                 headers: wbHeaders,
-                body: JSON.stringify(pricePayload),
+                body: JSON.stringify({ data: pricePayload }),
               });
 
               if (resp.ok) {
