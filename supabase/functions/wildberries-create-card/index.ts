@@ -300,9 +300,10 @@ Rules:
           if (!charc) continue;
           
           // WB v2 API: values depend on charcType
-          // charcType 4 or 1 = numeric → send as raw number
+          // If charc has dictionary → ALWAYS string (even if charcType=1)
+          // charcType 4 or 1 WITHOUT dictionary = numeric → send as raw number
           // charcType 0 or other = string → send as ["value"] array
-          const isNumericCharc = charc.charcType === 4 || charc.charcType === 1;
+          const isNumericCharc = !charc.dictionary?.length && (charc.charcType === 4 || charc.charcType === 1);
           
           if (isNumericCharc) {
             // Numeric characteristic: extract number from any format
@@ -411,11 +412,11 @@ async function proxyImages(supabase: any, userId: string, images: string[]): Pro
 }
 
 // ===== POLL FOR nmID — use Prices API (works with Content token, unlike cards/list which needs Promotion token) =====
-async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 3): Promise<number | null> {
+async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 5): Promise<number | null> {
   const headers = { Authorization: apiKey, "Content-Type": "application/json" };
   
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    await sleep(attempt === 0 ? 2000 : 3000);
+    await sleep(attempt === 0 ? 3000 : 4000);
     
     // Strategy 1: Try cards/list (works if token has correct permissions)
     try {
@@ -443,17 +444,17 @@ async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 3):
       }
     } catch (e) { /* ignore */ }
     
-    // Strategy 2: Try Prices API as backup
+    // Strategy 2: Try Prices API as backup (correct format: limit+offset, then search in results)
     try {
       const priceResp = await wbFetch("https://discounts-prices-api.wildberries.ru/api/v2/list/goods/filter", {
         method: "POST",
         headers,
-        body: JSON.stringify({ vendorCodes: [vendorCode] }),
+        body: JSON.stringify({ limit: 100, offset: 0 }),
       });
       if (priceResp.ok) {
         const priceData = await priceResp.json();
         const goods = priceData.data?.listGoods || [];
-        const found = goods.find((g: any) => g.vendorCode === vendorCode);
+        const found = goods.find((g: any) => g.vendorCode === vendorCode || g.vendorCode?.includes(vendorCode.split('-')[1] || vendorCode));
         if (found?.nmID) {
           console.log(`✅ nmID found via Prices API: ${found.nmID} (attempt ${attempt + 1})`);
           return found.nmID;
