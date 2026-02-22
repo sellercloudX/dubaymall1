@@ -29,7 +29,7 @@ const FinancialDashboard = lazy(() => import('@/components/sellercloud/Financial
 const ProfitCalculator = lazy(() => import('@/components/sellercloud/ProfitCalculator').then(m => ({ default: m.ProfitCalculator })));
 const InventorySync = lazy(() => import('@/components/sellercloud/InventorySync').then(m => ({ default: m.InventorySync })));
 const PriceManager = lazy(() => import('@/components/sellercloud/PriceManager').then(m => ({ default: m.PriceManager })));
-const CardQualityAudit = lazy(() => import('@/components/sellercloud/CardQualityAudit').then(m => ({ default: m.CardQualityAudit })));
+
 const ReportsExport = lazy(() => import('@/components/sellercloud/ReportsExport').then(m => ({ default: m.ReportsExport })));
 const NotificationCenter = lazy(() => import('@/components/sellercloud/NotificationCenter').then(m => ({ default: m.NotificationCenter })));
 const SubscriptionBilling = lazy(() => import('@/components/sellercloud/SubscriptionBilling').then(m => ({ default: m.SubscriptionBilling })));
@@ -51,7 +51,7 @@ function TabLoader() {
 import { TrendingUp, Calculator, DollarSign, BarChart3, Shield, Copy, AlertOctagon, ArrowDownUp, Tag, Upload, FileSpreadsheet, Bell, CreditCard, Coins, Sparkles } from 'lucide-react';
 
 const moreSubTabs = [
-  { id: 'quality-audit' as const, icon: Sparkles, label: 'Sifat auditi' },
+  
   { id: 'inventory' as const, icon: ArrowDownUp, label: 'Qoldiq' },
   { id: 'financials' as const, icon: DollarSign, label: 'Moliya' },
   { id: 'calculator' as const, icon: Calculator, label: 'Kalkulyator' },
@@ -209,8 +209,6 @@ export default function SellerCloudMobile() {
         return <div className="p-4"><ProfitCalculator commissionPercent={subscription?.commission_percent || 4} /></div>;
       case 'inventory':
         return <div className="p-4"><InventorySync connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
-      case 'quality-audit':
-        return <div className="p-4"><CardQualityAudit connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'pricing':
         return <div className="p-4"><PriceManager connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'reports':
