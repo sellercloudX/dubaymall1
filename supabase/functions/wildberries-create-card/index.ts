@@ -245,7 +245,7 @@ async function getAndFillCharacteristics(
   const charcsList = selected.map((c: any) => {
     const dict = c.dictionary?.length ? ` ALLOWED_VALUES: [${c.dictionary.slice(0, 20).map((d: any) => d.value || d.title || d).join(', ')}]` : '';
     const req = c.required ? ' [REQUIRED]' : '';
-    const t = c.charcType === 4 ? 'number' : 'string';
+    const t = (c.charcType === 4 || c.charcType === 1) ? 'number' : 'string';
     return `id=${c.charcID} "${c.name}" type=${t}${req}${dict}`;
   }).join('\n');
 
@@ -294,28 +294,36 @@ Rules:
           const charc = charcMap.get(item.id);
           if (!charc) continue;
           
-          // WB v2 API: values are ALWAYS string arrays ["value"] or numbers
-          // Only send as number if value is already numeric AND charcType is 4 (numeric)
-          if (typeof item.value === 'number') {
-            // Keep as number — WB accepts raw numbers for numeric fields
-            item.value = item.value;
-          } else if (Array.isArray(item.value)) {
-            // Already an array — ensure strings
-            item.value = item.value.map((v: any) => String(v)).filter((v: string) => v.length > 0);
-            if (item.value.length === 0) continue;
-          } else {
-            // Single string value — wrap in array
-            const strVal = String(item.value).trim();
-            if (!strVal) continue;
-            // If charcType is 4 (numeric) and value is purely numeric, send as number
-            if (charc.charcType === 4) {
-              const numVal = parseFloat(strVal.replace(/[^\d.,]/g, '').replace(',', '.'));
-              if (!isNaN(numVal)) {
-                item.value = numVal;
-              } else {
-                item.value = [strVal];
-              }
+          // WB v2 API: values depend on charcType
+          // charcType 4 or 1 = numeric → send as raw number
+          // charcType 0 or other = string → send as ["value"] array
+          const isNumericCharc = charc.charcType === 4 || charc.charcType === 1;
+          
+          if (isNumericCharc) {
+            // Numeric characteristic: extract number from any format
+            let numVal: number;
+            if (typeof item.value === 'number') {
+              numVal = item.value;
+            } else if (Array.isArray(item.value) && item.value.length > 0) {
+              numVal = parseFloat(String(item.value[0]).replace(/[^\d.,]/g, '').replace(',', '.'));
             } else {
+              numVal = parseFloat(String(item.value).replace(/[^\d.,]/g, '').replace(',', '.'));
+            }
+            if (isNaN(numVal)) {
+              console.log(`⚠️ Skipping numeric charc ${item.id} "${charc.name}": cannot parse "${item.value}"`);
+              continue;
+            }
+            item.value = numVal;
+          } else {
+            // String characteristic: must be array of strings
+            if (typeof item.value === 'number') {
+              item.value = [String(item.value)];
+            } else if (Array.isArray(item.value)) {
+              item.value = item.value.map((v: any) => String(v)).filter((v: string) => v.length > 0);
+              if (item.value.length === 0) continue;
+            } else {
+              const strVal = String(item.value).trim();
+              if (!strVal) continue;
               item.value = [strVal];
             }
           }
@@ -398,22 +406,23 @@ async function proxyImages(supabase: any, userId: string, images: string[]): Pro
 }
 
 // ===== POLL FOR nmID — use textSearch filter for reliable matching =====
-async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 10): Promise<number | null> {
+// Per official WB API docs: sort only has "ascending" (boolean), NO "sortColumn" field
+async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 12): Promise<number | null> {
   const headers = { Authorization: apiKey, "Content-Type": "application/json" };
   
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    await sleep(attempt === 0 ? 3000 : 5000);
+    await sleep(attempt === 0 ? 3000 : 4000);
     
     try {
-      // Method 1: Use textSearch filter to find by vendorCode directly
+      // Official API format per docs: sort has only "ascending", filter has "textSearch" + "withPhoto"
       const resp = await wbFetch(`${WB_API}/content/v2/get/cards/list`, {
         method: "POST",
         headers,
         body: JSON.stringify({
           settings: {
-            cursor: { limit: 10 },
+            cursor: { limit: 100 },
             filter: { textSearch: vendorCode, withPhoto: -1 },
-            sort: { sortColumn: "updatedAt", ascending: false },
+            sort: { ascending: false },
           },
         }),
       });
@@ -428,39 +437,47 @@ async function pollForNmID(apiKey: string, vendorCode: string, maxAttempts = 10)
           return found.nmID;
         }
         
-        // Even partial match
-        if (cards.length > 0 && cards[0]?.nmID) {
-          console.log(`✅ nmID found (first match): ${cards[0].nmID} (attempt ${attempt + 1})`);
-          return cards[0].nmID;
+        // Partial match — vendorCode starts with our prefix
+        const partial = cards.find((c: any) => c.vendorCode?.startsWith(vendorCode.split('-').slice(0, 2).join('-')));
+        if (partial?.nmID) {
+          console.log(`✅ nmID found (partial match): ${partial.nmID} for ${partial.vendorCode} (attempt ${attempt + 1})`);
+          return partial.nmID;
         }
         
         console.log(`Polling ${attempt + 1}/${maxAttempts}: ${cards.length} cards, vendorCode not found yet`);
       } else {
-        // Method 2: If cards/list fails, try /content/v2/cards/filter endpoint
-        console.log(`cards/list HTTP ${resp.status}, trying cards/filter...`);
-        try {
-          const filterResp = await fetch(`${WB_API}/content/v2/cards/filter`, {
+        const errText = await resp.text().catch(() => '');
+        console.log(`cards/list HTTP ${resp.status}: ${errText.substring(0, 200)}`);
+        
+        // If textSearch fails, try without it — get latest cards and search manually
+        if (attempt >= 2) {
+          console.log(`Fallback: fetching latest 100 cards without textSearch...`);
+          const fallbackResp = await wbFetch(`${WB_API}/content/v2/get/cards/list`, {
             method: "POST",
             headers,
             body: JSON.stringify({
-              find: [{ column: "vendorCode", search: vendorCode }],
-              cursor: { limit: 10 },
+              settings: {
+                cursor: { limit: 100 },
+                filter: { withPhoto: -1 },
+                sort: { ascending: false },
+              },
             }),
           });
-          if (filterResp.ok) {
-            const filterData = await filterResp.json();
-            const filterCards = filterData.cards || filterData.data?.cards || [];
-            const found = filterCards.find((c: any) => c.vendorCode === vendorCode);
+          if (fallbackResp.ok) {
+            const fallbackData = await fallbackResp.json();
+            const fallbackCards = fallbackData.cards || fallbackData.data?.cards || [];
+            const found = fallbackCards.find((c: any) => c.vendorCode === vendorCode);
             if (found?.nmID) {
-              console.log(`✅ nmID found via filter: ${found.nmID} (attempt ${attempt + 1})`);
+              console.log(`✅ nmID found via fallback: ${found.nmID} (attempt ${attempt + 1})`);
               return found.nmID;
             }
-          } else {
-            console.log(`cards/filter also failed: HTTP ${filterResp.status}`);
+            console.log(`Fallback: ${fallbackCards.length} cards scanned, not found`);
           }
-        } catch (_) { /* continue polling */ }
+        }
       }
-    } catch (e) { /* continue */ }
+    } catch (e) {
+      console.log(`Polling attempt ${attempt + 1} error: ${e}`);
+    }
   }
   
   console.log(`⚠️ nmID not found after ${maxAttempts} attempts for ${vendorCode}`);
@@ -534,7 +551,7 @@ async function updateCardDescription(apiKey: string, nmID: number, description: 
     const cardResp = await wbFetch(`${WB_API}/content/v2/get/cards/list`, {
       method: "POST",
       headers: { Authorization: apiKey, "Content-Type": "application/json" },
-      body: JSON.stringify({ settings: { cursor: { limit: 100 }, filter: { withPhoto: -1 }, sort: { sortColumn: "updatedAt", ascending: false } } }),
+      body: JSON.stringify({ settings: { cursor: { limit: 100 }, filter: { withPhoto: -1 }, sort: { ascending: false } } }),
     });
     if (cardResp.ok) {
       const cardData = await cardResp.json();
