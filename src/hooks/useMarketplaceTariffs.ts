@@ -132,13 +132,13 @@ export function useMarketplaceTariffs(
         }
 
         if (mp === 'wildberries') {
-          // WB: commission ~15-20% depending on category, logistics ~50-100 RUB
+          // WB: commission ~15-20% depending on category, logistics ~30-100 RUB
           for (const p of products) {
             const price = p.price || 0;
             if (price <= 0) continue;
-            // WB typical: 15% commission + logistics
+            // WB typical: 15% commission + logistics in RUB
             const commission = price * 0.15;
-            const logistics = price > 500000 ? 15000 : price > 100000 ? 8000 : 5000;
+            const logistics = price > 5000 ? 100 : price > 1000 ? 50 : 30; // RUB
             const totalTariff = commission + logistics;
             tariffMap.set(p.offerId, {
               offerId: p.offerId,
@@ -303,10 +303,10 @@ export function getTariffForProduct(
     };
   }
 
-  // WB fallback
+  // WB fallback — values in RUB
   if (marketplace === 'wildberries') {
     const commission = price * 0.15;
-    const logistics = price > 500000 ? 15000 : price > 100000 ? 8000 : 5000;
+    const logistics = price > 5000 ? 100 : price > 1000 ? 50 : 30; // RUB
     return {
       commission,
       logistics,

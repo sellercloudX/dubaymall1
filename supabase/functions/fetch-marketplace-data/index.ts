@@ -2667,34 +2667,85 @@ serve(async (req) => {
         }
       } else if (dataType === "update-prices") {
         // Update prices via Discounts/Prices API
+        // Need to map vendorCode (offerId) → nmID first
         try {
           const { offers: priceOffers } = requestBody;
           if (!priceOffers || priceOffers.length === 0) {
             result = { success: false, error: "No offers provided" };
           } else {
-            const pricePayload = priceOffers.map((o: any) => ({
-              nmID: o.nmID || parseInt(o.offerId),
-              price: Math.round(o.price * 100), // to kopeks
-              discount: o.discount || 0,
-            }));
+            // Fetch all cards to map vendorCode → nmID
+            const nmIdMap = new Map<string, number>();
+            let cardsCursor: any = { limit: 100 };
+            for (let page = 0; page < 20; page++) {
+              const cursorPayload: any = { limit: cardsCursor.limit };
+              if (cardsCursor.updatedAt) {
+                cursorPayload.updatedAt = cardsCursor.updatedAt;
+                cursorPayload.nmID = cardsCursor.nmID;
+              }
+              const cardsResp = await fetch("https://content-api.wildberries.ru/content/v2/get/cards/list", {
+                method: "POST",
+                headers: wbHeaders,
+                body: JSON.stringify({
+                  settings: { cursor: cursorPayload, filter: { withPhoto: -1 } },
+                }),
+              });
+              if (!cardsResp.ok) { await cardsResp.text(); break; }
+              const cardsData = await cardsResp.json();
+              const cards = cardsData.cards || [];
+              for (const card of cards) {
+                if (card.vendorCode && card.nmID) {
+                  nmIdMap.set(card.vendorCode.toLowerCase(), card.nmID);
+                }
+              }
+              const nextCursor = cardsData.cursor;
+              if (!nextCursor || cards.length < 100) break;
+              cardsCursor = { limit: 100, updatedAt: nextCursor.updatedAt, nmID: nextCursor.nmID };
+            }
+            console.log(`WB price update: mapped ${nmIdMap.size} vendorCodes to nmIDs`);
 
-            const resp = await fetch("https://discounts-prices-api.wildberries.ru/api/v2/upload/task", {
-              method: "POST",
-              headers: wbHeaders,
-              body: JSON.stringify(pricePayload),
-            });
+            const pricePayload: any[] = [];
+            const unmapped: string[] = [];
+            for (const o of priceOffers) {
+              const offerId = (o.offerId || '').toLowerCase();
+              const nmID = o.nmID || nmIdMap.get(offerId);
+              if (!nmID) {
+                unmapped.push(o.offerId);
+                continue;
+              }
+              pricePayload.push({
+                nmID,
+                price: Math.round(o.price * 100), // to kopeks
+                discount: o.discount || 0,
+              });
+            }
 
-            if (resp.ok) {
-              const data = await resp.json();
-              result = { success: true, data, updated: priceOffers.length };
+            if (unmapped.length > 0) {
+              console.warn(`WB price update: ${unmapped.length} unmapped offerIds: ${unmapped.slice(0, 5).join(', ')}...`);
+            }
+
+            if (pricePayload.length === 0) {
+              result = { success: false, error: "nmID topilmadi — mahsulotlar WB da yaratilmagan bo'lishi mumkin" };
             } else {
-              const errText = await resp.text();
-              result = { success: false, error: `WB price update failed: ${resp.status}`, details: errText };
+              const resp = await fetch("https://discounts-prices-api.wildberries.ru/api/v2/upload/task", {
+                method: "POST",
+                headers: wbHeaders,
+                body: JSON.stringify(pricePayload),
+              });
+
+              if (resp.ok) {
+                const data = await resp.json();
+                console.log(`WB price update success: ${pricePayload.length} prices updated`);
+                result = { success: true, data, updated: pricePayload.length, unmapped: unmapped.length };
+              } else {
+                const errText = await resp.text();
+                console.error(`WB price update failed (${resp.status}):`, errText);
+                result = { success: false, error: `WB narx yangilash xatosi: ${resp.status}`, details: errText };
+              }
             }
           }
-        } catch (e) {
-          console.error("WB price update error:", e);
-          result = { success: false, error: "Error updating WB prices" };
+        } catch (e: any) {
+          console.error("WB price update error:", e?.message || e);
+          result = { success: false, error: "WB narxlarni yangilashda xato" };
         }
       } else if (dataType === "stats" || dataType === "financials") {
         // Financial report from Statistics API

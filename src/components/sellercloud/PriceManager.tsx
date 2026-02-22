@@ -21,6 +21,16 @@ const MARKETPLACE_NAMES: Record<string, string> = {
   yandex: 'Yandex', uzum: 'Uzum', wildberries: 'WB', ozon: 'Ozon',
 };
 
+const isRubMarketplace = (mp: string) => mp === 'wildberries';
+const getCurrencySymbol = (mp: string) => isRubMarketplace(mp) ? '₽' : "so'm";
+const formatPriceWithCurrency = (price: number | undefined, mp: string) => {
+  if (!price && price !== 0) return '—';
+  if (isRubMarketplace(mp)) {
+    return new Intl.NumberFormat('ru-RU').format(Math.round(price)) + ' ₽';
+  }
+  return new Intl.NumberFormat('uz-UZ').format(Math.round(price)) + " so'm";
+};
+
 interface ProductPrice {
   id: string;
   name: string;
@@ -179,7 +189,7 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
 
   const formatPrice = (price?: number) => {
     if (!price && price !== 0) return '—';
-    return new Intl.NumberFormat('uz-UZ').format(price);
+    return formatPriceWithCurrency(price, selectedMp);
   };
 
   const avgPrice = products.length > 0 ? products.reduce((s, p) => s + p.price, 0) / products.length : 0;
@@ -349,7 +359,7 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <div className="text-[10px] text-muted-foreground">Hozirgi narx</div>
-                        <div className="text-sm font-bold">{formatPrice(product.price)} so'm</div>
+                        <div className="text-sm font-bold">{formatPrice(product.price)}</div>
                       </div>
                       <div>
                         <div className="text-[10px] text-muted-foreground">Yangi narx</div>
