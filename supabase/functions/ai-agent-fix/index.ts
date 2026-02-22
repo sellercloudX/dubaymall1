@@ -241,20 +241,33 @@ Clean white background, product centered, large, studio lighting, sharp focus, 3
       const businessId = await resolveBusinessId(credentials, headers);
       if (!businessId) return { success: false, message: 'Business ID topilmadi' };
 
+      // CRITICAL: Fetch existing offer to preserve ALL fields (name, price, description, etc.)
+      let existingOffer: any = {};
       const getResp = await fetchWithRetry(
         `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-mappings`,
         { method: 'POST', headers: { ...headers }, body: JSON.stringify({ offerIds: [product.offerId] }) }
       );
-      let existingPictures: string[] = [];
       if (getResp.ok) {
         const getData = await getResp.json();
-        existingPictures = getData.result?.offerMappings?.[0]?.offer?.pictures || [];
+        existingOffer = getData.result?.offerMappings?.[0]?.offer || {};
+        console.log(`Image upload: preserving existing offer data - price=${existingOffer.basicPrice?.value}, name=${existingOffer.name?.substring(0, 30)}, pictures=${existingOffer.pictures?.length}`);
       }
 
+      const existingPictures = existingOffer.pictures || [];
       const allPictures = [publicUrl, ...existingPictures];
+      
+      // Merge: keep all existing offer fields, only update pictures
+      const offerUpdate: any = { ...existingOffer, offerId: product.offerId, pictures: allPictures };
+      // Remove read-only fields that Yandex won't accept
+      delete offerUpdate.archived;
+      delete offerUpdate.cardStatus;
+      delete offerUpdate.mapping;
+      delete offerUpdate.awaitingModerationMapping;
+      delete offerUpdate.rejectedMapping;
+
       const updateResp = await fetchWithRetry(
         `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-mappings/update`,
-        { method: 'POST', headers, body: JSON.stringify({ offerMappings: [{ offer: { offerId: product.offerId, pictures: allPictures } }] }) }
+        { method: 'POST', headers, body: JSON.stringify({ offerMappings: [{ offer: offerUpdate }] }) }
       );
       if (!updateResp.ok) return { success: false, message: 'Yandex rasm yuklash xatosi' };
       return { success: true, message: `Rasm yaratildi va 1-chi o'ringa qo'yildi (jami ${allPictures.length})` };
