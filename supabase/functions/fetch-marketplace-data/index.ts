@@ -3289,6 +3289,178 @@ serve(async (req) => {
           console.error("WB seller analytics error:", e);
           result = { success: false, error: "Error fetching WB seller analytics" };
         }
+      } else if (dataType === "ads-campaigns") {
+        // WB Ads API — list advertising campaigns
+        try {
+          // Get list of campaigns
+          const adsResp = await fetch("https://advert-api.wildberries.ru/adv/v1/promotion/count", {
+            headers: wbHeaders,
+          });
+
+          if (adsResp.ok) {
+            const adsData = await adsResp.json();
+            const adverts = adsData.adverts || [];
+            console.log(`WB ads: ${adverts.length} campaign groups`);
+
+            // Flatten all campaigns
+            const allCampaigns: any[] = [];
+            for (const group of adverts) {
+              const status = group.status;
+              const type = group.type;
+              for (const advert of (group.advert_list || [])) {
+                allCampaigns.push({
+                  advertId: advert.advertId,
+                  changeTime: advert.changeTime,
+                  status, // 4=ready, 7=complete, 9=active, 11=paused
+                  type,   // 4=catalog, 5=card, 6=search, 7=recommend, 8=auto, 9=search+catalog
+                  statusLabel: status === 9 ? 'Faol' : status === 11 ? 'To\'xtatilgan' : status === 7 ? 'Tugagan' : status === 4 ? 'Tayyor' : `Status ${status}`,
+                  typeLabel: type === 8 ? 'Avto' : type === 6 ? 'Qidiruv' : type === 5 ? 'Kartochka' : type === 4 ? 'Katalog' : type === 9 ? 'Qidiruv+Katalog' : `Turi ${type}`,
+                });
+              }
+            }
+
+            // Get details for active/paused campaigns (max 50)
+            const activeIds = allCampaigns
+              .filter(c => c.status === 9 || c.status === 11)
+              .map(c => c.advertId)
+              .slice(0, 50);
+
+            let detailedCampaigns = allCampaigns;
+
+            if (activeIds.length > 0) {
+              await sleep(300);
+              try {
+                const detailResp = await fetch("https://advert-api.wildberries.ru/adv/v1/promotion/adverts", {
+                  method: "POST",
+                  headers: wbHeaders,
+                  body: JSON.stringify(activeIds),
+                });
+                if (detailResp.ok) {
+                  const details = await detailResp.json();
+                  const detailMap = new Map<number, any>();
+                  (Array.isArray(details) ? details : []).forEach((d: any) => {
+                    detailMap.set(d.advertId, d);
+                  });
+
+                  detailedCampaigns = allCampaigns.map(c => {
+                    const detail = detailMap.get(c.advertId);
+                    if (!detail) return c;
+                    return {
+                      ...c,
+                      name: detail.name || `Kampaniya #${c.advertId}`,
+                      dailyBudget: detail.dailyBudget || 0,
+                      createTime: detail.createTime,
+                      endTime: detail.endTime,
+                      // Params
+                      cpm: detail.params?.[0]?.price || 0,
+                      nms: detail.params?.[0]?.nms || [],
+                      subjectName: detail.params?.[0]?.subjectName || "",
+                    };
+                  });
+                }
+              } catch (e2: any) {
+                console.warn("WB ads detail fetch error:", e2?.message);
+              }
+            }
+
+            // Get campaign stats
+            await sleep(300);
+            const statsMap = new Map<number, any>();
+            if (activeIds.length > 0) {
+              try {
+                const endDate = new Date();
+                const startDate = new Date(endDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+                
+                for (const campaignId of activeIds.slice(0, 10)) {
+                  try {
+                    const statsResp = await fetch(
+                      `https://advert-api.wildberries.ru/adv/v2/fullstats`,
+                      {
+                        method: "POST",
+                        headers: wbHeaders,
+                        body: JSON.stringify([{
+                          id: campaignId,
+                          dates: [startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0]],
+                        }]),
+                      }
+                    );
+                    if (statsResp.ok) {
+                      const statsData = await statsResp.json();
+                      if (statsData?.[0]) {
+                        const days = statsData[0].days || [];
+                        const totals = {
+                          views: days.reduce((s: number, d: any) => s + (d.views || 0), 0),
+                          clicks: days.reduce((s: number, d: any) => s + (d.clicks || 0), 0),
+                          orders: days.reduce((s: number, d: any) => s + (d.orders || 0), 0),
+                          sum: days.reduce((s: number, d: any) => s + (d.sum || 0), 0),
+                          atbs: days.reduce((s: number, d: any) => s + (d.atbs || 0), 0),
+                          shks: days.reduce((s: number, d: any) => s + (d.shks || 0), 0),
+                          ctr: 0,
+                          cpc: 0,
+                        };
+                        if (totals.views > 0) totals.ctr = (totals.clicks / totals.views) * 100;
+                        if (totals.clicks > 0) totals.cpc = totals.sum / totals.clicks;
+                        statsMap.set(campaignId, totals);
+                      }
+                    }
+                    await sleep(200); // Rate limit
+                  } catch (_) {}
+                }
+              } catch (e3: any) {
+                console.warn("WB ads stats error:", e3?.message);
+              }
+            }
+
+            // Merge stats
+            const finalCampaigns = detailedCampaigns.map(c => ({
+              ...c,
+              stats: statsMap.get(c.advertId) || null,
+            }));
+
+            const summary = {
+              total: finalCampaigns.length,
+              active: finalCampaigns.filter(c => c.status === 9).length,
+              paused: finalCampaigns.filter(c => c.status === 11).length,
+              completed: finalCampaigns.filter(c => c.status === 7).length,
+              totalSpent: Array.from(statsMap.values()).reduce((s, st) => s + (st.sum || 0), 0),
+              totalViews: Array.from(statsMap.values()).reduce((s, st) => s + (st.views || 0), 0),
+              totalClicks: Array.from(statsMap.values()).reduce((s, st) => s + (st.clicks || 0), 0),
+              totalOrders: Array.from(statsMap.values()).reduce((s, st) => s + (st.orders || 0), 0),
+            };
+
+            result = { success: true, data: finalCampaigns, summary, total: finalCampaigns.length };
+          } else {
+            const errText = await adsResp.text();
+            console.error("WB ads error:", adsResp.status, errText);
+            result = { success: false, error: `WB ads failed: ${adsResp.status}` };
+          }
+        } catch (e) {
+          console.error("WB ads error:", e);
+          result = { success: false, error: "Error fetching WB ads" };
+        }
+      } else if (dataType === "ads-pause" || dataType === "ads-start") {
+        // WB Ads: pause or start a campaign
+        try {
+          const { advertId } = requestBody;
+          if (!advertId) {
+            result = { success: false, error: "advertId required" };
+          } else {
+            const action = dataType === "ads-pause" ? "pause" : "start";
+            const resp = await fetch(
+              `https://advert-api.wildberries.ru/adv/v0//${action}?id=${advertId}`,
+              { method: "GET", headers: wbHeaders }
+            );
+            if (resp.ok || resp.status === 204) {
+              result = { success: true, message: `Kampaniya ${action === 'pause' ? 'to\'xtatildi' : 'ishga tushirildi'}` };
+            } else {
+              const errText = await resp.text();
+              result = { success: false, error: `${action} failed: ${resp.status}`, details: errText };
+            }
+          }
+        } catch (e) {
+          console.error("WB ads action error:", e);
+          result = { success: false, error: "Error performing ads action" };
+        }
       }
 
       // Update connection with latest sync time
