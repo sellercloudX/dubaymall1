@@ -227,157 +227,107 @@ export function MarketplaceOAuth({
   };
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Link2 className="h-5 w-5" />
-            Marketplace ulanishlari
-          </CardTitle>
-          <CardDescription>
-            API kalitlar orqali marketplacelarni ulang. Ulangandan so'ng barcha 
-            mahsulotlar va buyurtmalarni shu yerdan boshqarishingiz mumkin.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="grid gap-4 md:grid-cols-2">
-              {[1, 2, 3, 4].map((i) => (
-                <Card key={i}>
-                  <CardHeader className="pb-3">
-                    <Skeleton className="h-12 w-12 rounded-xl" />
-                    <Skeleton className="h-4 w-24 mt-2" />
-                  </CardHeader>
-                  <CardContent>
-                    <Skeleton className="h-10 w-full" />
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2">
-              {MARKETPLACES.map((mp) => {
-                const connection = getConnection(mp.id);
-                const connected = !!connection;
+    <div className="space-y-3">
+      {/* Compact header */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-base font-bold flex items-center gap-2">
+          <Link2 className="h-4 w-4 text-primary" /> Marketplace
+        </h2>
+        <span className="text-[10px] text-muted-foreground">{connections.length} ulangan</span>
+      </div>
 
-                return (
-                  <Card 
-                    key={mp.id} 
-                    className={`relative overflow-hidden transition-all ${
-                      connected ? 'border-green-500/50 bg-green-50/50 dark:bg-green-950/20' : ''
-                    } ${mp.status === 'coming_soon' ? 'opacity-60' : ''}`}
-                  >
-                    <div className={`absolute top-0 right-0 w-2 h-full ${
-                      connected ? 'bg-green-500' : 
-                      mp.status === 'coming_soon' ? 'bg-gray-300' : 'bg-gray-400'
-                    }`} />
-                    
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${mp.color} flex items-center justify-center overflow-hidden`}>
-                            <img src={mp.logo} alt={mp.name} className="w-full h-full object-cover" />
-                          </div>
-                          <div>
-                            <CardTitle className="text-lg">{mp.name}</CardTitle>
-                            <Badge variant={connected ? 'default' : mp.status === 'coming_soon' ? 'outline' : 'secondary'}>
-                              {connected ? (
-                                <><Check className="h-3 w-3 mr-1" /> Ulangan</>
-                              ) : mp.status === 'coming_soon' ? (
-                                'Tez kunda'
-                              ) : (
-                                'Ulanmagan'
-                              )}
-                            </Badge>
-                          </div>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    
-                    <CardContent>
-                      {connected && connection ? (
-                        <div className="space-y-3">
-                          {(connection.account_info?.campaignName || connection.account_info?.storeName) && (
-                            <p className="text-sm font-medium text-muted-foreground">
-                              {connection.account_info.campaignName || connection.account_info.storeName}
-                            </p>
-                          )}
-                          
-                          <div className="grid grid-cols-3 gap-2 text-center">
-                            <div className="p-2 rounded-lg bg-muted/50">
-                              <Package className="h-4 w-4 mx-auto text-muted-foreground mb-1" />
-                              <div className="text-lg font-bold">
-                                {store?.isLoadingProducts ? '...' : formatNumber(store?.getProducts(mp.id)?.length || connection.products_count)}
-                              </div>
-                              <div className="text-xs text-muted-foreground">Mahsulotlar</div>
-                            </div>
-                            <div className="p-2 rounded-lg bg-muted/50">
-                              <ShoppingCart className="h-4 w-4 mx-auto text-muted-foreground mb-1" />
-                              <div className="text-lg font-bold">
-                                {store?.isLoadingOrders ? '...' : formatNumber(store?.getOrders(mp.id)?.length || connection.orders_count)}
-                              </div>
-                              <div className="text-xs text-muted-foreground">Buyurtmalar</div>
-                            </div>
-                            <div className="p-2 rounded-lg bg-muted/50">
-                              <TrendingUp className="h-4 w-4 mx-auto text-muted-foreground mb-1" />
-                              <div className="text-lg font-bold">{formatRevenue(connection.total_revenue)}</div>
-                              <div className="text-xs text-muted-foreground">Daromad</div>
-                            </div>
-                          </div>
+      {isLoading ? (
+        <div className="space-y-2">
+          {[1, 2, 3].map(i => <Skeleton key={i} className="h-20 rounded-xl" />)}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {MARKETPLACES.map((mp) => {
+            const connection = getConnection(mp.id);
+            const connected = !!connection;
 
-                          {connection.last_sync_at && (
-                            <p className="text-xs text-muted-foreground text-center">
-                              Oxirgi sinxronizatsiya: {new Date(connection.last_sync_at).toLocaleString('uz-UZ')}
-                            </p>
-                          )}
-                          
-                          <div className="flex gap-2">
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              className="flex-1"
-                              onClick={() => handleSync(mp.id)}
-                              disabled={syncingId === mp.id}
-                            >
-                              {syncingId === mp.id ? (
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              ) : (
-                                <RefreshCw className="h-4 w-4 mr-2" />
-                              )}
-                              Sinxronlash
-                            </Button>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => {
-                                setSettingsId(mp.id);
-                                setSettingsMode('menu');
-                                setCredentials({});
-                              }}
-                            >
-                              <Settings className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <Button 
-                          className={`w-full bg-gradient-to-r ${mp.color} hover:opacity-90`}
-                          onClick={() => handleConnect(mp)}
-                          disabled={mp.status === 'coming_soon'}
-                        >
-                          {mp.status === 'coming_soon' ? 'Tez kunda' : (
-                            <><Link2 className="h-4 w-4 mr-2" /> Ulash</>
-                          )}
-                        </Button>
+            return (
+              <div
+                key={mp.id}
+                className={`rounded-xl border p-3 transition-all ${
+                  connected ? 'border-primary/30 bg-primary/5' : ''
+                } ${mp.status === 'coming_soon' ? 'opacity-50' : ''}`}
+              >
+                <div className="flex items-center gap-3">
+                  {/* Logo */}
+                  <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${mp.color} flex items-center justify-center overflow-hidden shrink-0`}>
+                    <img src={mp.logo} alt={mp.name} className="w-full h-full object-cover" />
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-sm">{mp.name}</span>
+                      {connected && (
+                        <Badge variant="default" className="text-[9px] px-1.5 py-0 h-4">
+                          <Check className="h-2.5 w-2.5 mr-0.5" />Ulangan
+                        </Badge>
                       )}
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                      {mp.status === 'coming_soon' && (
+                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4">Tez kunda</Badge>
+                      )}
+                    </div>
+
+                    {connected && connection ? (
+                      <div className="flex items-center gap-3 mt-1 text-[11px] text-muted-foreground">
+                        <span className="flex items-center gap-0.5">
+                          <Package className="h-3 w-3" />
+                          {store?.isLoadingProducts ? '...' : (store?.getProducts(mp.id)?.length || connection.products_count)}
+                        </span>
+                        <span className="flex items-center gap-0.5">
+                          <ShoppingCart className="h-3 w-3" />
+                          {store?.isLoadingOrders ? '...' : (store?.getOrders(mp.id)?.length || connection.orders_count)}
+                        </span>
+                        <span className="flex items-center gap-0.5">
+                          <TrendingUp className="h-3 w-3" />
+                          {formatRevenue(connection.total_revenue)}
+                        </span>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  {/* Action */}
+                  <div className="shrink-0 flex items-center gap-1">
+                    {connected ? (
+                      <>
+                        <Button variant="ghost" size="icon" className="h-7 w-7"
+                          onClick={() => handleSync(mp.id)} disabled={syncingId === mp.id}>
+                          {syncingId === mp.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7"
+                          onClick={() => { setSettingsId(mp.id); setSettingsMode('menu'); setCredentials({}); }}>
+                          <Settings className="h-3.5 w-3.5" />
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        size="sm"
+                        className={`h-7 text-xs px-3 bg-gradient-to-r ${mp.color} hover:opacity-90`}
+                        onClick={() => handleConnect(mp)}
+                        disabled={mp.status === 'coming_soon'}
+                      >
+                        <Link2 className="h-3 w-3 mr-1" /> Ulash
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Last sync info */}
+                {connected && connection?.last_sync_at && (
+                  <p className="text-[10px] text-muted-foreground mt-1.5 pl-[52px]">
+                    Sinx: {new Date(connection.last_sync_at).toLocaleString('uz-UZ')}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Connection Dialog */}
       <Dialog open={!!connectingId} onOpenChange={() => setConnectingId(null)}>

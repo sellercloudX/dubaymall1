@@ -227,7 +227,7 @@ export default function SellerCloudMobile() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-32 overflow-x-hidden safe-area-bottom">
+    <div className="min-h-screen bg-background overflow-x-hidden safe-area-bottom" style={{ paddingBottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }}>
       <MobileSellerCloudHeader connectedCount={connectedMarketplaces.length} onRefresh={refetch} isLoading={connectionsLoading} />
       {isMoreActive && (
         <div className="fixed left-0 right-0 z-40 flex items-center gap-2 px-4 py-2 border-b border-border/50 bg-background/80 backdrop-blur-xl" style={{ top: 'calc(3rem + env(safe-area-inset-top, 0px))' }}>
