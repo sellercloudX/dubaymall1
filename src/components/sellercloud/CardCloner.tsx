@@ -165,11 +165,12 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
   const cloneToMarketplace = async (product: CloneableProduct, targetMp: string): Promise<boolean> => {
     try {
       const validImages = (product.pictures || []).filter(p => p && p.startsWith('http'));
-      const costPrice = Math.round(product.price * 0.6);
+      const convertedPrice = convertPrice(product.price, product.marketplace, targetMp);
+      const costPrice = Math.round(convertedPrice * 0.6);
       const productDescription = product.description || product.name;
       const productCategory = product.category || '';
       
-      console.log(`Cloning "${product.name}" to ${targetMp}, images: ${validImages.length}, desc: ${productDescription.length}ch`);
+      console.log(`Cloning "${product.name}" to ${targetMp}, price: ${product.price} → ${convertedPrice}, images: ${validImages.length}`);
       
       if (targetMp === 'yandex') {
         const { data, error } = await supabase.functions.invoke('yandex-market-create-card', {
@@ -178,19 +179,19 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
             product: {
               name: product.name,
               description: productDescription,
-              price: product.price,
+              price: convertedPrice,
               costPrice,
               images: validImages,
               category: productCategory,
             },
             pricing: {
               costPrice,
-              marketplaceCommission: Math.round(product.price * 0.15),
+              marketplaceCommission: Math.round(convertedPrice * 0.15),
               logisticsCost: 3000,
               taxRate: 4,
-              targetProfit: Math.round(product.price * 0.2),
-              recommendedPrice: product.price,
-              netProfit: Math.round(product.price * 0.2),
+              targetProfit: Math.round(convertedPrice * 0.2),
+              recommendedPrice: convertedPrice,
+              netProfit: Math.round(convertedPrice * 0.2),
             },
             skipImageGeneration: validImages.length >= 4, // Only skip if we have enough images
             cloneMode: true,
@@ -216,7 +217,7 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
             product: {
               name: product.name,
               description: productDescription,
-              price: product.price,
+              price: convertedPrice,
               costPrice,
               images: validImages,
               category: productCategory,
@@ -243,7 +244,7 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
             product: {
               name: product.name,
               description: productDescription,
-              price: product.price,
+              price: convertedPrice,
               costPrice: costPrice,
               images: validImages,
               category: productCategory,
@@ -324,7 +325,25 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
     if (failed > 0) toast.error(`${failed} ta mahsulot klonlanmadi`);
   };
 
-  const formatPrice = (price: number) => new Intl.NumberFormat('uz-UZ').format(price) + ' so\'m';
+  const RUB_TO_UZS = 140;
+  const isRubMarketplace = (mp: string) => mp === 'wildberries';
+  
+  const formatPrice = (price: number, marketplace?: string) => {
+    const mp = marketplace || sourceMarketplace;
+    if (isRubMarketplace(mp)) {
+      return new Intl.NumberFormat('ru-RU').format(Math.round(price)) + ' ₽';
+    }
+    return new Intl.NumberFormat('uz-UZ').format(Math.round(price)) + ' so\'m';
+  };
+
+  // Convert price between marketplaces
+  const convertPrice = (price: number, fromMp: string, toMp: string): number => {
+    const fromRub = isRubMarketplace(fromMp);
+    const toRub = isRubMarketplace(toMp);
+    if (fromRub && !toRub) return Math.round(price * RUB_TO_UZS); // RUB → UZS
+    if (!fromRub && toRub) return Math.round(price / RUB_TO_UZS); // UZS → RUB
+    return price; // same currency
+  };
 
   const skippedCount = useMemo(() => {
     if (targetMarketplaces.length === 0) return 0;
@@ -460,7 +479,7 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
                       )}
                     </div>
                   </div>
-                  <div className="font-medium text-xs whitespace-nowrap shrink-0">{formatPrice(product.price)}</div>
+                  <div className="font-medium text-xs whitespace-nowrap shrink-0">{formatPrice(product.price, product.marketplace)}</div>
                 </div>
               ))}
             </div>
