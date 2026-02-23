@@ -2249,10 +2249,18 @@ serve(async (req) => {
                 });
               });
 
+              // Extract barcodes from sizes for stock enrichment later
+              const barcodes: string[] = [];
+              sizes.forEach((s: any) => {
+                (s.skus || []).forEach((sku: string) => {
+                  if (sku) barcodes.push(sku);
+                });
+              });
+
               allCards.push({
                 offerId: card.vendorCode || String(card.nmID),
                 name: card.title || card.subjectName || "",
-                price: (card.sizes?.[0]?.price || 0) / 100, // WB stores prices in kopeks
+                price: (card.sizes?.[0]?.price || 0) / 100, // WB content API stores prices in kopeks
                 shopSku: card.vendorCode || "",
                 category: card.subjectName || "",
                 marketCategoryId: card.subjectID || 0,
@@ -2266,6 +2274,7 @@ serve(async (req) => {
                 brand: card.brand || "",
                 rating: card.rating || 0,
                 feedbacks: card.feedbackCount || card.mediaCount || 0,
+                _barcodes: barcodes, // Internal: used for stock enrichment
               });
             }
 
@@ -2279,11 +2288,10 @@ serve(async (req) => {
             await sleep(300);
           } while (pageNum < 50); // Safety limit
 
-          // Try to get accurate stocks from Marketplace API
+          // Enrich with accurate stocks from Marketplace API using barcodes
           if (allCards.length > 0) {
             try {
               await sleep(300);
-              // Get warehouses first
               const whResp = await fetch("https://marketplace-api.wildberries.ru/api/v3/warehouses", {
                 headers: wbHeaders,
               });
@@ -2291,58 +2299,110 @@ serve(async (req) => {
                 const warehouses = await whResp.json();
                 const warehouseIds = (Array.isArray(warehouses) ? warehouses : []).map((w: any) => w.id);
                 
-                // Get stocks for each warehouse
+                // Collect ALL barcodes from cards
+                const allBarcodes: string[] = [];
+                const barcodeToVendorCode = new Map<string, string>();
+                for (const card of allCards) {
+                  for (const barcode of (card._barcodes || [])) {
+                    allBarcodes.push(barcode);
+                    barcodeToVendorCode.set(barcode, card.offerId);
+                  }
+                }
+                
+                console.log(`WB stock enrichment: ${allBarcodes.length} barcodes from ${allCards.length} cards`);
+                
+                // Stock map: vendorCode -> { fbo, fbs }
+                const stockMap = new Map<string, { fbo: number; fbs: number }>();
+                
                 for (const whId of warehouseIds.slice(0, 5)) {
                   try {
-                    const stockResp = await fetch(`https://marketplace-api.wildberries.ru/api/v3/stocks/${whId}`, {
-                      method: "POST",
-                      headers: wbHeaders,
-                      body: JSON.stringify({ skus: allCards.slice(0, 1000).flatMap((c: any) => {
-                        const sizes = [];
-                        // Try to extract barcodes/skus
-                        return [c.offerId];
-                      }) }),
-                    });
-                    // Note: stock endpoint expects barcodes, not vendorCodes
-                    // This is a best-effort approach
+                    // WB API expects barcodes in skus array, max 1000 per request
+                    for (let i = 0; i < allBarcodes.length; i += 1000) {
+                      const batch = allBarcodes.slice(i, i + 1000);
+                      const stockResp = await fetch(`https://marketplace-api.wildberries.ru/api/v3/stocks/${whId}`, {
+                        method: "POST",
+                        headers: wbHeaders,
+                        body: JSON.stringify({ skus: batch }),
+                      });
+                      if (stockResp.ok) {
+                        const stockData = await stockResp.json();
+                        const stocks = stockData.stocks || [];
+                        for (const s of stocks) {
+                          const vc = barcodeToVendorCode.get(s.sku);
+                          if (!vc) continue;
+                          const existing = stockMap.get(vc) || { fbo: 0, fbs: 0 };
+                          existing.fbs += s.amount || 0;
+                          stockMap.set(vc, existing);
+                        }
+                      }
+                      if (i + 1000 < allBarcodes.length) await sleep(200);
+                    }
                   } catch (e) {
                     console.warn(`Stock fetch for warehouse ${whId} failed:`, e);
                   }
                 }
+                
+                // Apply stock data to cards
+                for (const card of allCards) {
+                  const stocks = stockMap.get(card.offerId);
+                  if (stocks) {
+                    card.stockFBS = stocks.fbs;
+                    card.stockCount = (card.stockFBO || 0) + stocks.fbs;
+                  }
+                }
+                console.log(`WB stocks enriched for ${stockMap.size} products`);
               }
             } catch (e) {
               console.warn("WB stocks enrichment failed:", e);
             }
           }
 
-          // Try to get prices from Prices API
+          // Enrich with real prices from Prices API v2
+          // Note: Prices API v2 returns prices in rubles (not kopeks!)
           try {
             await sleep(300);
-            const pricesResp = await fetch("https://discounts-prices-api.wildberries.ru/api/v2/list/goods/filter?limit=1000&offset=0", {
-              headers: wbHeaders,
-            });
-            if (pricesResp.ok) {
+            const allGoods: any[] = [];
+            let offset = 0;
+            const priceLimit = 1000;
+            
+            // Paginate to get ALL prices
+            for (let pg = 0; pg < 10; pg++) {
+              const pricesResp = await fetch(`https://discounts-prices-api.wildberries.ru/api/v2/list/goods/filter?limit=${priceLimit}&offset=${offset}`, {
+                headers: wbHeaders,
+              });
+              if (!pricesResp.ok) break;
               const pricesData = await pricesResp.json();
               const goods = pricesData.data?.listGoods || [];
-              const priceMap = new Map<number, { price: number; discount: number }>();
-              goods.forEach((g: any) => {
+              if (goods.length === 0) break;
+              allGoods.push(...goods);
+              if (goods.length < priceLimit) break;
+              offset += priceLimit;
+              await sleep(200);
+            }
+            
+            if (allGoods.length > 0) {
+              const priceMap = new Map<number, { price: number; discount: number; discountedPrice: number }>();
+              allGoods.forEach((g: any) => {
                 const sizes = g.sizes || [];
                 sizes.forEach((s: any) => {
                   priceMap.set(g.nmID, {
-                    price: s.price || g.price || 0,
-                    discount: s.discountedPrice || g.discount || 0,
+                    price: s.price || g.price || 0, // Already in rubles
+                    discount: g.discount || s.discount || 0,
+                    discountedPrice: s.discountedPrice || Math.round((s.price || 0) * (1 - (g.discount || 0) / 100)),
                   });
                 });
               });
               
-              // Enrich cards with real prices
+              // Enrich cards with real prices — Prices API returns rubles, NOT kopeks
               allCards.forEach(card => {
                 const priceInfo = priceMap.get(card.nmID);
                 if (priceInfo) {
-                  card.price = priceInfo.price / 100; // kopeks to rubles
+                  card.price = priceInfo.price; // Already in rubles
+                  card.discountedPrice = priceInfo.discountedPrice;
+                  card.discount = priceInfo.discount;
                 }
               });
-              console.log(`WB prices enriched for ${priceMap.size} products`);
+              console.log(`WB prices enriched for ${priceMap.size} products (paginated ${allGoods.length} goods)`);
             }
           } catch (e) {
             console.warn("WB prices enrichment failed:", e);
@@ -2350,10 +2410,13 @@ serve(async (req) => {
 
           console.log(`WB total products: ${allCards.length}`);
 
+          // Remove internal fields before returning
+          const cleanedCards = allCards.map(({ _barcodes, ...card }) => card);
+
           result = {
             success: true,
-            data: allCards,
-            total: allCards.length,
+            data: cleanedCards,
+            total: cleanedCards.length,
           };
         } catch (e) {
           console.error("WB products fetch error:", e);

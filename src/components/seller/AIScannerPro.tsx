@@ -95,6 +95,7 @@ interface BackgroundTask {
 }
 
 type Step = 'capture' | 'analyzing' | 'pricing';
+type TargetMarketplace = 'yandex' | 'wildberries';
 
 interface AIScannerProProps {
   shopId: string;
@@ -119,6 +120,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
   const [isRealTariff, setIsRealTariff] = useState(false);
   const [generateInfographics, setGenerateInfographics] = useState(true);
   const [infographicCount, setInfographicCount] = useState(4);
+  const [targetMarketplace, setTargetMarketplace] = useState<TargetMarketplace>('yandex');
   
   // Background processing state
   const [backgroundTasks, setBackgroundTasks] = useState<BackgroundTask[]>([]);
@@ -327,7 +329,8 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
     analyzed: AnalyzedProduct | null,
     pricingData: PricingCalculation,
     shouldGenerateInfographics: boolean,
-    infoCount: number
+    infoCount: number,
+    targetMarketplace: TargetMarketplace = 'yandex'
   ) => {
     const updateTaskProgress = (stepIndex: number, status: AIStep['status']) => {
       setBackgroundTasks(prev => prev.map(task => {
@@ -445,49 +448,70 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
         updateTaskProgress(4, 'completed');
       }
 
-      // Step 6: Create Yandex card — pass ALL data, let card creator do full AI optimization
-      // CRITICAL: Only pass AI-generated images, NOT camera/gallery source images
+      // Step 6: Create marketplace card based on target
       updateTaskProgress(5, 'running');
       
       // Use only AI-generated images for the card; reference image is for AI only
       const cardImages = generatedInfos.length > 0 ? generatedInfos : (referenceImageUrl ? [referenceImageUrl] : []);
       
-      const { data: cardResult, error } = await supabase.functions.invoke('yandex-market-create-card', {
-        body: {
-          shopId,
-          product: {
-            name: normalizedProductName,
-            nameRu: analyzed?.name || normalizedProductName,
-            description: product.description || analyzed?.description,
-            descriptionRu: product.description || analyzed?.description,
-            category: analyzed?.category,
-            brand: analyzed?.brand,
-            price: pricingData.sellingPrice,
-            costPrice: pricingData.costPrice,
-            image: referenceImageUrl,
-            images: cardImages,
-            sourceUrl: product.url,
-            specifications: analyzed?.specifications,
-            mxikCode: mxikResult?.mxik_code,
-            mxikName: mxikResult?.mxik_name,
+      if (targetMarketplace === 'wildberries') {
+        // WB card creation
+        const { data: cardResult, error } = await supabase.functions.invoke('wildberries-create-card', {
+          body: {
+            shopId,
+            product: {
+              name: normalizedProductName,
+              description: product.description || analyzed?.description,
+              category: analyzed?.category,
+              brand: analyzed?.brand,
+              price: pricingData.sellingPrice,
+              costPrice: pricingData.costPrice,
+              images: cardImages,
+            },
+            skipImageGeneration: generatedInfos.length >= 2,
+            cloneMode: false,
           },
-          // If infographics were already generated, skip image generation in card creator
-          skipImageGeneration: generatedInfos.length >= 2,
-          pricing: {
-            costPrice: pricingData.costPrice,
-            recommendedPrice: pricingData.sellingPrice,
-            marketplaceCommission: pricingData.marketplaceCommission,
-            logisticsCost: pricingData.logisticsCost,
-            taxRate: pricingData.taxPercent,
-            targetProfit: pricingData.netProfit,
-            netProfit: pricingData.netProfit,
+        });
+
+        console.log('WB Card creation result:', cardResult);
+        if (error) throw error;
+      } else {
+        // Yandex card creation (default)
+        const { data: cardResult, error } = await supabase.functions.invoke('yandex-market-create-card', {
+          body: {
+            shopId,
+            product: {
+              name: normalizedProductName,
+              nameRu: analyzed?.name || normalizedProductName,
+              description: product.description || analyzed?.description,
+              descriptionRu: product.description || analyzed?.description,
+              category: analyzed?.category,
+              brand: analyzed?.brand,
+              price: pricingData.sellingPrice,
+              costPrice: pricingData.costPrice,
+              image: referenceImageUrl,
+              images: cardImages,
+              sourceUrl: product.url,
+              specifications: analyzed?.specifications,
+              mxikCode: mxikResult?.mxik_code,
+              mxikName: mxikResult?.mxik_name,
+            },
+            skipImageGeneration: generatedInfos.length >= 2,
+            pricing: {
+              costPrice: pricingData.costPrice,
+              recommendedPrice: pricingData.sellingPrice,
+              marketplaceCommission: pricingData.marketplaceCommission,
+              logisticsCost: pricingData.logisticsCost,
+              taxRate: pricingData.taxPercent,
+              targetProfit: pricingData.netProfit,
+              netProfit: pricingData.netProfit,
+            },
           },
-        },
-      });
+        });
 
-      console.log('Card creation result:', cardResult);
-
-      if (error) throw error;
+        console.log('Yandex Card creation result:', cardResult);
+        if (error) throw error;
+      }
 
       updateTaskProgress(5, 'completed');
       updateTaskStatus('completed', generatedInfos);
@@ -519,11 +543,11 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
       status: 'processing',
       progress: [
         { name: 'Rasm tahlili', status: 'pending', model: 'GPT-4o Vision', icon: <Camera className="h-4 w-4" /> },
-        { name: 'SEO kontent', status: 'pending', model: 'Yandex AI', icon: <Search className="h-4 w-4" /> },
-        { name: 'Tavsif yaratish', status: 'pending', model: 'Yandex AI', icon: <FileText className="h-4 w-4" /> },
+        { name: 'SEO kontent', status: 'pending', model: 'AI', icon: <Search className="h-4 w-4" /> },
+        { name: 'Tavsif yaratish', status: 'pending', model: 'AI', icon: <FileText className="h-4 w-4" /> },
         { name: 'MXIK aniqlash', status: 'pending', model: 'Gemini + DB', icon: <Hash className="h-4 w-4" /> },
         { name: 'Rasm + Infografika', status: 'pending', model: 'OpenAI gpt-image-1', icon: <ImageLucide className="h-4 w-4" /> },
-        { name: 'Kartochka yaratish', status: 'pending', model: 'Yandex API', icon: <Store className="h-4 w-4" /> },
+        { name: 'Kartochka yaratish', status: 'pending', model: targetMarketplace === 'wildberries' ? 'WB API' : 'Yandex API', icon: <Store className="h-4 w-4" /> },
       ],
       generatedImages: [],
       startedAt: new Date(),
@@ -540,7 +564,8 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
       analyzedProduct,
       pricing,
       generateInfographics,
-      infographicCount
+      infographicCount,
+      targetMarketplace
     );
 
     // Reset scanner for next product
@@ -581,7 +606,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
                 <span className="truncate">AI Scanner Pro</span>
               </CardTitle>
               <CardDescription className="text-xs truncate mt-0.5">
-                Rasmdan mahsulot kartochkasini Yandex Market'ga yuklash
+                Rasmdan mahsulot kartochkasini marketplace'ga yuklash
               </CardDescription>
             </div>
             <div className="flex items-center gap-2 shrink-0">
@@ -835,6 +860,25 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* Marketplace Target Selection */}
+            <div className="flex gap-2">
+              <Button
+                variant={targetMarketplace === 'yandex' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setTargetMarketplace('yandex')}
+                className="flex-1"
+              >
+                🟡 Yandex Market
+              </Button>
+              <Button
+                variant={targetMarketplace === 'wildberries' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setTargetMarketplace('wildberries')}
+                className="flex-1"
+              >
+                🟣 Wildberries
+              </Button>
+            </div>
             {/* Selected Product Preview */}
             <div className="flex gap-3 p-3 bg-muted/50 rounded-lg border">
               <div className="w-16 h-16 flex-shrink-0">
