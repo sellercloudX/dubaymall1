@@ -63,6 +63,30 @@ serve(async (req) => {
       );
     }
 
+    // Rate limit: 5 requests per hour per user (most expensive function)
+    const adminSupabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+    const oneHourAgo = new Date(Date.now() - 3600000).toISOString();
+    const { count: recentCount } = await adminSupabase
+      .from('ai_usage_log')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('action_type', 'create-marketplace-card')
+      .gte('created_at', oneHourAgo);
+
+    if ((recentCount || 0) >= 5) {
+      return new Response(
+        JSON.stringify({ error: 'Rate limit exceeded. Max 5 card creations per hour.' }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    await adminSupabase.from('ai_usage_log').insert({
+      user_id: userId, action_type: 'create-marketplace-card', model_used: 'multi-model-pipeline',
+    });
+
     console.log(`Creating marketplace card for user ${userId}`);
 
     const request: CardRequest = await req.json();

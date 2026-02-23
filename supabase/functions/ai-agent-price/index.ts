@@ -436,6 +436,26 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Admin ruxsati yo\'q' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
+    // Rate limit: 10 price operations per hour per user
+    const adminSupabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    const oneHourAgo = new Date(Date.now() - 3600000).toISOString();
+    const { count: recentCount } = await adminSupabase
+      .from('ai_usage_log')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('action_type', 'ai-agent-price')
+      .gte('created_at', oneHourAgo);
+
+    if ((recentCount || 0) >= 10) {
+      return new Response(JSON.stringify({ error: 'Soatiga 10 ta narx operatsiyasi limiti.' }), {
+        status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    await adminSupabase.from('ai_usage_log').insert({
+      user_id: user.id, action_type: 'ai-agent-price', model_used: 'marketplace-api',
+    });
+
     const body = await req.json();
     const { partnerId, action, targetMargin } = body;
 

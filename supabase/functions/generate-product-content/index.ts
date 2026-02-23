@@ -47,6 +47,30 @@ serve(async (req) => {
       );
     }
 
+    // Rate limit: 20 requests per hour per user
+    const adminSupabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
+    const oneHourAgo = new Date(Date.now() - 3600000).toISOString();
+    const { count: recentCount } = await adminSupabase
+      .from('ai_usage_log')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('action_type', 'generate-product-content')
+      .gte('created_at', oneHourAgo);
+
+    if ((recentCount || 0) >= 20) {
+      return new Response(
+        JSON.stringify({ error: 'Rate limit exceeded. Try again later.' }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    await adminSupabase.from('ai_usage_log').insert({
+      user_id: user.id, action_type: 'generate-product-content', model_used: 'claude/gemini',
+    });
+
     const request: ContentRequest = await req.json();
     
     // Input validation

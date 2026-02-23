@@ -799,6 +799,26 @@ serve(async (req) => {
       }
     }
 
+    // Rate limit: 10 image operations per hour per user
+    const adminSupabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    const oneHourAgo = new Date(Date.now() - 3600000).toISOString();
+    const { count: recentCount } = await adminSupabase
+      .from('ai_usage_log')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('action_type', 'ai-agent-images')
+      .gte('created_at', oneHourAgo);
+
+    if ((recentCount || 0) >= 10) {
+      return new Response(JSON.stringify({ error: 'Soatiga 10 ta rasm operatsiyasi limiti.' }), {
+        status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    await adminSupabase.from('ai_usage_log').insert({
+      user_id: user.id, action_type: 'ai-agent-images', model_used: 'openai-gpt-image',
+    });
+
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     if (!OPENAI_API_KEY) {
       return new Response(JSON.stringify({ error: 'OPENAI_API_KEY sozlanmagan' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
