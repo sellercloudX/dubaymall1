@@ -140,91 +140,15 @@ serve(async (req) => {
       systemPrompt += `\n\n👤 KONTEKST: Foydalanuvchi SellerCloudX platformasidan foydalanmoqda. Marketplace avtomatizatsiya bo'yicha yordam bering.`;
     }
 
-    // Try OpenAI first, then Claude, then Lovable AI as fallback
-    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-    const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+    // Cost-optimized: Lovable AI only (no OpenAI/Claude)
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 
     let assistantMessage = '';
     let apiSuccess = false;
 
-    // Try OpenAI GPT-4o-mini (fast and efficient)
-    if (OPENAI_API_KEY && !apiSuccess) {
+    if (LOVABLE_API_KEY) {
       try {
-        console.log('Trying OpenAI API...');
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${OPENAI_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o-mini',
-            messages: [
-              { role: 'system', content: systemPrompt },
-              ...messages,
-            ],
-            temperature: 0.7,
-            max_tokens: 1000,
-          }),
-        });
-
-        if (response.ok) {
-          const result = await response.json();
-          assistantMessage = result.choices?.[0]?.message?.content || '';
-          if (assistantMessage) {
-            apiSuccess = true;
-            console.log('OpenAI API success');
-          }
-        } else {
-          console.error('OpenAI API error:', response.status);
-        }
-      } catch (err) {
-        console.error('OpenAI API error:', err);
-      }
-    }
-
-    // Try Claude as fallback
-    if (ANTHROPIC_API_KEY && !apiSuccess) {
-      try {
-        console.log('Trying Anthropic Claude API...');
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'x-api-key': ANTHROPIC_API_KEY,
-            'content-type': 'application/json',
-            'anthropic-version': '2023-06-01',
-          },
-          body: JSON.stringify({
-            model: 'claude-3-haiku-20240307',
-            max_tokens: 1000,
-            system: systemPrompt,
-            messages: messages.map(m => ({
-              role: m.role === 'assistant' ? 'assistant' : 'user',
-              content: m.content,
-            })),
-          }),
-        });
-
-        if (response.ok) {
-          const result = await response.json();
-          assistantMessage = result.content?.[0]?.text || '';
-          if (assistantMessage) {
-            apiSuccess = true;
-            console.log('Claude API success');
-          }
-        } else {
-          console.error('Claude API error:', response.status);
-        }
-      } catch (err) {
-        console.error('Claude API error:', err);
-      }
-    }
-
-    // Try Lovable AI as final fallback
-    if (LOVABLE_API_KEY && !apiSuccess) {
-      try {
-        console.log('Trying Lovable AI Gateway...');
+        console.log('Using Lovable AI (gemini-2.5-flash-lite)...');
         const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -232,7 +156,7 @@ serve(async (req) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'google/gemini-3-flash-preview',
+            model: 'google/gemini-2.5-flash-lite',
             messages: [
               { role: 'system', content: systemPrompt },
               ...messages,

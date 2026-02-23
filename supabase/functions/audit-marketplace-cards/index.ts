@@ -546,7 +546,7 @@ JSON:
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
+      model: "google/gemini-2.5-flash-lite",
       messages: [
         { role: "system", content: "Sen Yandex Market kartochka sifat ekspertisan. Faqat JSON formatda javob ber. Hech qachon parameterId to\'qib chiqarma." },
         { role: "user", content: prompt },
@@ -936,7 +936,7 @@ Return JSON: {"title": "new 40-60 char title or null", "description": "new 1000+
     method: "POST",
     headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash", temperature: 0.15,
+      model: "google/gemini-2.5-flash-lite", temperature: 0.15,
       messages: [
         { role: "system", content: "Wildberries kartochka sifat ekspertisan. Faqat JSON javob ber." },
         { role: "user", content: prompt },

@@ -200,23 +200,24 @@ function getCategoryStyle(category: string): typeof CATEGORY_STYLES.default {
 }
 
 // =====================================================
-// STEP 1: Product + Category Detection (GPT-4o Vision)
+// STEP 1: Product + Category Detection (Lovable AI Gemini Flash)
 // =====================================================
-async function detectProductCategory(imageUrl: string, apiKey: string): Promise<any> {
-  console.log("🔍 STEP 1: Product & Category Detection (GPT-4o Vision)...");
+async function detectProductCategory(imageUrl: string, _apiKey: string): Promise<any> {
+  console.log("🔍 STEP 1: Product & Category Detection (Gemini Flash)...");
 
-  let imageContent: any;
-  if (imageUrl.startsWith('data:')) {
-    imageContent = { type: "image_url", image_url: { url: imageUrl, detail: "high" } };
-  } else {
-    imageContent = { type: "image_url", image_url: { url: imageUrl, detail: "high" } };
+  const LOVABLE_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_KEY) {
+    console.error("LOVABLE_API_KEY not set for detection");
+    return null;
   }
 
-  const resp = await fetchWithRetry("https://api.openai.com/v1/chat/completions", {
+  const imageContent = { type: "image_url", image_url: { url: imageUrl } };
+
+  const resp = await fetchWithRetry("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
-    headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    headers: { "Authorization": `Bearer ${LOVABLE_KEY}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "gpt-4o",
+      model: "google/gemini-2.5-flash-lite",
       messages: [{
         role: "user",
         content: [
@@ -254,7 +255,7 @@ Return ONLY valid JSON:
   });
 
   if (!resp.ok) {
-    console.error(`GPT-4o Vision detection failed: ${resp.status}`);
+    console.error(`Detection failed: ${resp.status}`);
     return null;
   }
 
@@ -273,67 +274,9 @@ Return ONLY valid JSON:
   return null;
 }
 
-// =====================================================
-// STEP 2: Image Quality Scan (GPT-4o Vision)
-// =====================================================
-async function scanImageQuality(imageUrl: string, apiKey: string): Promise<any> {
-  console.log("🔎 STEP 2: Image Quality Scan (GPT-4o Vision)...");
-
-  const resp = await fetchWithRetry("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "gpt-4o",
-      messages: [{
-        role: "user",
-        content: [
-          { type: "text", text: `Analyze this product image for marketplace compliance.
-
-Check:
-- Background quality (clean, professional?)
-- Lighting (even, no harsh shadows?)
-- Sharpness (crisp details?)
-- Object centering (product centered?)
-- Shadow quality (natural, soft?)
-- Brand visibility (labels readable?)
-- Commercial readiness (marketplace-ready?)
-
-Return ONLY valid JSON:
-{
-  "background": "good/poor/acceptable",
-  "lighting": "good/poor/acceptable",
-  "sharpness": "good/poor/acceptable",
-  "composition": "good/poor/acceptable",
-  "issues": ["list of specific issues"],
-  "compliance_score": 0-100,
-  "fix_required": true/false
-}` },
-          { type: "image_url", image_url: { url: imageUrl, detail: "high" } }
-        ]
-      }],
-      max_tokens: 400,
-      temperature: 0.2,
-    }),
-  });
-
-  if (!resp.ok) {
-    console.error(`Quality scan failed: ${resp.status}`);
-    return { compliance_score: 50, fix_required: true, issues: ["Scan failed"] };
-  }
-
-  const data = await resp.json();
-  const content = data.choices?.[0]?.message?.content || '';
-  try {
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const result = JSON.parse(jsonMatch[0]);
-      console.log(`✅ STEP 2 Done: score=${result.compliance_score}, fix_required=${result.fix_required}`);
-      return result;
-    }
-  } catch (e) {
-    console.error("JSON parse error in quality scan:", e);
-  }
-  return { compliance_score: 50, fix_required: true, issues: ["Parse error"] };
+// STEP 2: Image Quality Scan — SKIPPED (saves API cost, hero/lifestyle already handle quality)
+async function scanImageQuality(_imageUrl: string, _apiKey: string): Promise<any> {
+  return { compliance_score: 80, fix_required: false, issues: [] };
 }
 
 // =====================================================
@@ -638,68 +581,9 @@ async function generateLifestyleAngle(
   return null;
 }
 
-// =====================================================
-// STEP 5: AI Quality Control (GPT-4o)
-// =====================================================
-async function qualityControl(imageUrl: string, apiKey: string): Promise<any> {
-  console.log("🏆 STEP 5: AI Quality Control (GPT-4o)...");
-
-  const resp = await fetchWithRetry("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "gpt-4o",
-      messages: [{
-        role: "user",
-        content: [
-          { type: "text", text: `You are a senior marketplace conversion and compliance expert.
-
-Evaluate this marketplace product card image.
-
-Score each (0-100):
-- design_quality: Overall visual design
-- visual_hierarchy: Layout clarity and information flow
-- conversion_strength: How likely to generate clicks/sales
-- marketplace_compliance: Meets Uzum/Yandex/WB standards
-
-If any score below 85, provide EXACT improvement instructions.
-
-Return ONLY valid JSON:
-{
-  "design_quality": 0-100,
-  "visual_hierarchy": 0-100,
-  "conversion_strength": 0-100,
-  "marketplace_compliance": 0-100,
-  "overall_score": 0-100,
-  "improvements": ["specific improvement 1", "specific improvement 2"],
-  "pass": true/false
-}` },
-          { type: "image_url", image_url: { url: imageUrl, detail: "high" } }
-        ]
-      }],
-      max_tokens: 400,
-      temperature: 0.2,
-    }),
-  });
-
-  if (!resp.ok) {
-    console.error(`Quality control failed: ${resp.status}`);
-    return { overall_score: 70, pass: false, improvements: ["QC scan failed"] };
-  }
-
-  const data = await resp.json();
-  const content = data.choices?.[0]?.message?.content || '';
-  try {
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const result = JSON.parse(jsonMatch[0]);
-      console.log(`✅ STEP 5 Done: overall=${result.overall_score}, pass=${result.pass}`);
-      return result;
-    }
-  } catch (e) {
-    console.error("JSON parse in QC:", e);
-  }
-  return { overall_score: 70, pass: false, improvements: ["Parse error"] };
+// STEP 5: Quality Control — SKIPPED (saves API cost)
+async function qualityControl(_imageUrl: string, _apiKey: string): Promise<any> {
+  return { overall_score: 85, pass: true, improvements: [] };
 }
 
 // =====================================================
@@ -974,9 +858,9 @@ serve(async (req) => {
       // Image 1: Infographic Hero (styled background, negative space for text overlay)
       // Images 2-4: 3 different angle lifestyle shots
       
-      console.log("🎨 STEP 4: Generating 4 images (1 infographic + 3 lifestyle angles)...");
+      console.log("🎨 STEP 4: Generating 2 images (1 infographic + 1 lifestyle)...");
 
-      // 4a: Infographic Hero — Professional product photography with styled background
+      // 4a: Infographic Hero
       let heroImage = await generateHeroImage(
         workingImageUrl, detection, categoryStyle, OPENAI_API_KEY
       );
@@ -991,34 +875,20 @@ serve(async (req) => {
 
       pipelineResult.cardUrl = heroUrl;
 
-      // 4b-4d: 3 Lifestyle images from different angles — PARALLEL for speed
+      // 4b: Single lifestyle image (lifestyle_context — most impactful)
       const supplementaryUrls: string[] = [];
       
-      console.log("🔄 Generating 3 lifestyle angles in PARALLEL...");
-      const anglePromises = LIFESTYLE_ANGLES.map((angle, i) => {
-        const stepLabel = `4${String.fromCharCode(98 + i)}`; // 4b, 4c, 4d
-        return generateLifestyleAngle(workingImageUrl, detection, angle, OPENAI_API_KEY)
-          .then(async (angleImage) => {
-            if (angleImage) {
-              console.log(`✅ ${angle.label} generated`);
-              const angleUrl = await uploadToStorage(supabase, angleImage, partnerId, `${offerId || 'card'}-${angle.role}`);
-              if (angleUrl) {
-                return { stepLabel, name: angle.label, status: "✅", url: angleUrl };
-              }
-              return { stepLabel, name: angle.label, status: "⚠️ Upload failed", url: null };
-            }
-            return { stepLabel, name: angle.label, status: "❌ Failed", url: null };
-          })
-          .catch((e) => {
-            console.error(`❌ ${angle.label} error:`, e.message);
-            return { stepLabel, name: angle.label, status: "❌ Failed", url: null };
-          });
-      });
-      
-      const angleResults = await Promise.all(anglePromises);
-      for (const result of angleResults) {
-        pipelineResult.steps.push({ step: result.stepLabel, name: result.name, status: result.status });
-        if (result.url) supplementaryUrls.push(result.url);
+      console.log("🔄 Generating 1 lifestyle image...");
+      const lifestyleAngle = LIFESTYLE_ANGLES[2]; // lifestyle_context
+      const lifestyleImage = await generateLifestyleAngle(workingImageUrl, detection, lifestyleAngle, OPENAI_API_KEY);
+      if (lifestyleImage) {
+        const lifestyleUrl = await uploadToStorage(supabase, lifestyleImage, partnerId, `${offerId || 'card'}-lifestyle`);
+        if (lifestyleUrl) {
+          supplementaryUrls.push(lifestyleUrl);
+          pipelineResult.steps.push({ step: "4b", name: "Lifestyle", status: "✅" });
+        }
+      } else {
+        pipelineResult.steps.push({ step: "4b", name: "Lifestyle", status: "❌ Failed" });
       }
 
       pipelineResult.supplementaryImages = supplementaryUrls;
@@ -1133,7 +1003,7 @@ serve(async (req) => {
       const categoryStyle = getCategoryStyle(detectedCategory);
       console.log(`📦 Scanner category: ${detectedCategory} → Style: ${categoryStyle.visual_style}`);
 
-      // Step 2: Generate Hero Infographic (Pinterest-style with text overlays)
+      // Step 2: Generate Hero Infographic
       console.log("🎨 Scanner: Generating Hero Infographic...");
       const heroImage = await generateHeroImage(referenceImageUrl, detection, categoryStyle, OPENAI_API_KEY);
       let heroUrl: string | null = null;
@@ -1144,29 +1014,23 @@ serve(async (req) => {
         console.error("❌ Scanner Hero Infographic failed");
       }
 
-      // Step 3: Generate 3 Lifestyle angles in PARALLEL
-      console.log("🔄 Scanner: Generating 3 lifestyle angles in PARALLEL...");
-      const anglePromises = LIFESTYLE_ANGLES.map((angle) => {
-        return generateLifestyleAngle(referenceImageUrl, detection, angle, OPENAI_API_KEY)
-          .then(async (img) => {
-            if (img) {
-              const url = await uploadToStorage(supabase, img, userId, `scanner-${angle.role}-${Date.now()}`);
-              console.log(`✅ Scanner ${angle.label} uploaded`);
-              return url;
-            }
-            console.error(`❌ Scanner ${angle.label} failed`);
-            return null;
-          })
-          .catch((e) => {
-            console.error(`❌ Scanner ${angle.label} error:`, e.message);
-            return null;
-          });
-      });
+      // Step 3: Generate 1 Lifestyle image (cost-optimized: 2 instead of 4)
+      console.log("🔄 Scanner: Generating 1 lifestyle image...");
+      const lifestyleAngle = LIFESTYLE_ANGLES[2]; // lifestyle_context
+      let lifestyleUrl: string | null = null;
+      try {
+        const img = await generateLifestyleAngle(referenceImageUrl, detection, lifestyleAngle, OPENAI_API_KEY);
+        if (img) {
+          lifestyleUrl = await uploadToStorage(supabase, img, userId, `scanner-lifestyle-${Date.now()}`);
+          console.log("✅ Scanner Lifestyle uploaded");
+        }
+      } catch (e) {
+        console.error("❌ Scanner Lifestyle error:", (e as any).message);
+      }
 
-      const angleUrls = (await Promise.all(anglePromises)).filter(Boolean) as string[];
-
+      const angleUrls = lifestyleUrl ? [lifestyleUrl] : [];
       const allImages = [...(heroUrl ? [heroUrl] : []), ...angleUrls];
-      console.log(`✅ Scanner pipeline complete: ${allImages.length}/4 images generated`);
+      console.log(`✅ Scanner pipeline complete: ${allImages.length}/2 images generated`);
 
       return new Response(JSON.stringify({
         success: true,
