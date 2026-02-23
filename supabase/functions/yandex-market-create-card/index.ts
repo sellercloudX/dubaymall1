@@ -824,8 +824,7 @@ serve(async (req) => {
         // ═══ STEP 1: Handle images ═══
         const rawImgs: string[] = [];
         if (product.images?.length) rawImgs.push(...product.images);
-        // Reference image goes AFTER AI-generated images (not first)
-        if (product.image && !rawImgs.includes(product.image)) rawImgs.push(product.image);
+        // Reference/camera image is NOT added to card — only AI-generated images are used
         
         // Proxy all images to storage first
         const sourceImages = await proxyImagesToStorage(supabase, user.id, rawImgs, SUPABASE_URL);
