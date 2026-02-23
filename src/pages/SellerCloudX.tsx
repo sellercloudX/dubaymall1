@@ -21,6 +21,7 @@ import {
   Upload, Bell, FileSpreadsheet, CreditCard, Calculator, AlertTriangle,
   Shield, Copy, AlertOctagon, Wrench, RefreshCw, Sparkles
 } from 'lucide-react';
+import { MarketplaceLogo, MARKETPLACE_CONFIG } from '@/lib/marketplaceConfig';
 
 // Lazy load heavy tab components
 const MarketplaceOAuth = lazy(() => import('@/components/sellercloud/MarketplaceOAuth').then(m => ({ default: m.MarketplaceOAuth })));
@@ -206,7 +207,19 @@ export default function SellerCloudX() {
               <p className="text-sm text-muted-foreground">Marketplace avtomatizatsiya markazi</p>
             </div>
           </div>
-          <Button variant="outline" asChild><Link to="/">Bosh sahifa →</Link></Button>
+          <div className="flex items-center gap-3">
+            {connectedMarketplaces.length > 0 && (
+              <div className="flex items-center gap-2">
+                {connectedMarketplaces.map(mp => (
+                  <div key={mp} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-muted/50 border">
+                    <MarketplaceLogo marketplace={mp} size={20} />
+                    <span className="text-xs font-medium text-muted-foreground">{MARKETPLACE_CONFIG[mp]?.name || mp}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <Button variant="outline" asChild><Link to="/">Bosh sahifa →</Link></Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
