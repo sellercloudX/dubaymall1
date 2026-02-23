@@ -325,9 +325,9 @@ function drawPriceTag(
 
 function formatPrice(price: number): string {
   if (price >= 1000000) {
-    return `${(price / 1000000).toFixed(1)}M so'm`;
+    return `${(price / 1000000).toFixed(1)}M сум`;
   }
-  return `${price.toLocaleString('uz-UZ')} so'm`;
+  return `${price.toLocaleString('ru-RU')} сум`;
 }
 
 function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {

@@ -231,8 +231,8 @@ Analyze this product image and determine:
 5. Recommended advertising style
 6. Recommended background style
 7. Recommended color palette
-8. Product name (best guess in Russian/Uzbek)
-9. Key selling features (3-5 items)
+8. Product name (best guess in RUSSIAN language — Русский язык)
+9. Key selling features (3-5 items, ALL IN RUSSIAN — Русский язык)
 
 Return ONLY valid JSON:
 {
@@ -368,6 +368,8 @@ async function generateHeroImage(
 
 FORMAT: 1080x1440 vertical (3:4 portrait).
 
+CRITICAL LANGUAGE RULE: ALL TEXT ON THE IMAGE MUST BE IN RUSSIAN (Русский язык). Product name, feature badges, all labels — everything must be written in Russian. NO English text allowed.
+
 DESIGN DIRECTION:
 - Style: ${categoryStyle.visual_style}
 - Background: ${categoryStyle.background_style}  
@@ -408,6 +410,7 @@ ${featureBadgesText || '   - Show key product characteristics as short text badg
 7. QUALITY: This must look like a TOP-SELLING marketplace product card — the kind that gets 10x more clicks. Think Wildberries/Ozon TOP seller infographic level. Professional, clean, information-rich but NOT cluttered.
 
 CRITICAL TEXT ACCURACY:
+- ALL TEXT MUST BE IN RUSSIAN (Русский язык) — NO English, NO Uzbek
 - Every letter and word must be EXACTLY as specified above
 - Do NOT invent, modify, or add any text that is not specified
 - All text must be clearly readable, even at small thumbnail sizes
