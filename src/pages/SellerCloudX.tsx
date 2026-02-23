@@ -19,7 +19,7 @@ import {
   Loader2, Globe, Package, ShoppingCart, BarChart3, 
   Scan, Crown, Check, ArrowRight, ArrowDownUp, DollarSign,
   Upload, Bell, FileSpreadsheet, CreditCard, Calculator, AlertTriangle,
-  Shield, Copy, AlertOctagon, Wrench, RefreshCw, Sparkles
+  Shield, Copy, AlertOctagon, Wrench, RefreshCw, Sparkles, MessageCircle, Activity, Megaphone
 } from 'lucide-react';
 import { MarketplaceLogo, MARKETPLACE_CONFIG } from '@/lib/marketplaceConfig';
 
@@ -44,6 +44,9 @@ const MxikImport = lazy(() => import('@/components/sellercloud/MxikImport').then
 const ProfitCalculator = lazy(() => import('@/components/sellercloud/ProfitCalculator').then(m => ({ default: m.ProfitCalculator })));
 const CostPriceManager = lazy(() => import('@/components/sellercloud/CostPriceManager').then(m => ({ default: m.CostPriceManager })));
 const AIScannerPro = lazy(() => import('@/components/seller/AIScannerPro').then(m => ({ default: m.AIScannerPro })));
+const MarketplaceReviews = lazy(() => import('@/components/sellercloud/MarketplaceReviews').then(m => ({ default: m.MarketplaceReviews })));
+const WBSellerAnalytics = lazy(() => import('@/components/sellercloud/WBSellerAnalytics').then(m => ({ default: m.WBSellerAnalytics })));
+const WBAdsCampaigns = lazy(() => import('@/components/sellercloud/WBAdsCampaigns').then(m => ({ default: m.WBAdsCampaigns })));
 
 const TabLoader = () => <div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
 
@@ -333,14 +336,16 @@ function AnalyticsSubTabs({ connectedMarketplaces, store, subscription, totalRev
 }) {
   return (
     <Tabs defaultValue="overview" className="space-y-4">
-      <TabsList className="h-auto gap-1 p-1">
+      <TabsList className="h-auto gap-1 p-1 flex-wrap">
         <TabsTrigger value="overview" className="text-xs gap-1"><BarChart3 className="h-3.5 w-3.5" />Umumiy</TabsTrigger>
+        <TabsTrigger value="wb-analytics" className="text-xs gap-1"><Activity className="h-3.5 w-3.5" />WB Analitika</TabsTrigger>
         <TabsTrigger value="financials" className="text-xs gap-1"><Calculator className="h-3.5 w-3.5" />Moliya</TabsTrigger>
         <TabsTrigger value="abc" className="text-xs gap-1"><BarChart3 className="h-3.5 w-3.5" />ABC-analiz</TabsTrigger>
         <TabsTrigger value="cost-prices" className="text-xs gap-1"><DollarSign className="h-3.5 w-3.5" />Tannarx</TabsTrigger>
         <TabsTrigger value="calculator" className="text-xs gap-1"><Calculator className="h-3.5 w-3.5" />Kalkulyator</TabsTrigger>
       </TabsList>
       <TabsContent value="overview"><Suspense fallback={<TabLoader />}><MarketplaceAnalytics connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
+      <TabsContent value="wb-analytics"><Suspense fallback={<TabLoader />}><WBSellerAnalytics connectedMarketplaces={connectedMarketplaces} /></Suspense></TabsContent>
       <TabsContent value="financials"><Suspense fallback={<TabLoader />}><FinancialDashboard connectedMarketplaces={connectedMarketplaces} store={store} monthlyFee={subscription?.monthly_fee || 499} commissionPercent={subscription?.commission_percent || 4} /></Suspense></TabsContent>
       <TabsContent value="abc"><Suspense fallback={<TabLoader />}><ABCAnalysis connectedMarketplaces={connectedMarketplaces} store={store} commissionPercent={subscription?.commission_percent || 4} /></Suspense></TabsContent>
       <TabsContent value="cost-prices"><Suspense fallback={<TabLoader />}><CostPriceManager connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
@@ -354,10 +359,11 @@ function ToolsSubTabs({ connectedMarketplaces, store, subscription }: {
 }) {
   return (
     <Tabs defaultValue="inventory" className="space-y-4">
-      <TabsList className="h-auto gap-1 p-1">
+      <TabsList className="h-auto gap-1 p-1 flex-wrap">
         <TabsTrigger value="inventory" className="text-xs gap-1"><ArrowDownUp className="h-3.5 w-3.5" />Zaxira</TabsTrigger>
         <TabsTrigger value="pricing" className="text-xs gap-1"><DollarSign className="h-3.5 w-3.5" />Narxlar</TabsTrigger>
-        
+        <TabsTrigger value="reviews" className="text-xs gap-1"><MessageCircle className="h-3.5 w-3.5" />Sharhlar</TabsTrigger>
+        <TabsTrigger value="ads" className="text-xs gap-1"><Megaphone className="h-3.5 w-3.5" />Reklama</TabsTrigger>
         <TabsTrigger value="min-price" className="text-xs gap-1"><Shield className="h-3.5 w-3.5" />Min narx</TabsTrigger>
         <TabsTrigger value="clone" className="text-xs gap-1"><Copy className="h-3.5 w-3.5" />Klonlash</TabsTrigger>
         <TabsTrigger value="problems" className="text-xs gap-1"><AlertOctagon className="h-3.5 w-3.5" />Muammolar</TabsTrigger>
@@ -365,7 +371,8 @@ function ToolsSubTabs({ connectedMarketplaces, store, subscription }: {
       </TabsList>
       <TabsContent value="inventory"><Suspense fallback={<TabLoader />}><InventorySync connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
       <TabsContent value="pricing"><Suspense fallback={<TabLoader />}><PriceManager connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
-      
+      <TabsContent value="reviews"><Suspense fallback={<TabLoader />}><MarketplaceReviews connectedMarketplaces={connectedMarketplaces} /></Suspense></TabsContent>
+      <TabsContent value="ads"><Suspense fallback={<TabLoader />}><WBAdsCampaigns connectedMarketplaces={connectedMarketplaces} /></Suspense></TabsContent>
       <TabsContent value="min-price"><Suspense fallback={<TabLoader />}><MinPriceProtection connectedMarketplaces={connectedMarketplaces} store={store} commissionPercent={subscription?.commission_percent || 4} /></Suspense></TabsContent>
       <TabsContent value="clone"><Suspense fallback={<TabLoader />}><CardCloner connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
       <TabsContent value="problems"><Suspense fallback={<TabLoader />}><ProblematicProducts connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>

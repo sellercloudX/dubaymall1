@@ -38,6 +38,7 @@ const UzumCardHelper = lazy(() => import('@/components/sellercloud/UzumCardHelpe
 const MxikImport = lazy(() => import('@/components/sellercloud/MxikImport').then(m => ({ default: m.MxikImport })));
 const MarketplaceReviews = lazy(() => import('@/components/sellercloud/MarketplaceReviews').then(m => ({ default: m.MarketplaceReviews })));
 const WBSellerAnalytics = lazy(() => import('@/components/sellercloud/WBSellerAnalytics').then(m => ({ default: m.WBSellerAnalytics })));
+const WBAdsCampaigns = lazy(() => import('@/components/sellercloud/WBAdsCampaigns').then(m => ({ default: m.WBAdsCampaigns })));
 
 // Lightweight tab loading skeleton
 function TabLoader() {
@@ -51,7 +52,7 @@ function TabLoader() {
 }
 
 // Icons for more sub-tabs (imported inline to avoid heavy lucide bundle at top)
-import { TrendingUp, Calculator, DollarSign, BarChart3, Shield, Copy, AlertOctagon, ArrowDownUp, Tag, Upload, FileSpreadsheet, Bell, CreditCard, Coins, Sparkles, MessageCircle, Activity } from 'lucide-react';
+import { TrendingUp, Calculator, DollarSign, BarChart3, Shield, Copy, AlertOctagon, ArrowDownUp, Tag, Upload, FileSpreadsheet, Bell, CreditCard, Coins, Sparkles, MessageCircle, Activity, Megaphone } from 'lucide-react';
 
 const moreSubTabs = [
   { id: 'inventory' as const, icon: ArrowDownUp, label: 'Qoldiq' },
@@ -60,6 +61,7 @@ const moreSubTabs = [
   { id: 'abc-analysis' as const, icon: BarChart3, label: 'ABC-analiz' },
   { id: 'seller-analytics' as const, icon: Activity, label: 'WB Analitika' },
   { id: 'reviews' as const, icon: MessageCircle, label: 'Sharhlar' },
+  { id: 'ads' as const, icon: Megaphone, label: 'Reklama' },
   { id: 'cost-prices' as const, icon: Coins, label: 'Tannarx' },
   { id: 'min-price' as const, icon: Shield, label: 'Min narx' },
   { id: 'card-clone' as const, icon: Copy, label: 'Klonlash' },
@@ -236,6 +238,8 @@ export default function SellerCloudMobile() {
         return <div className="p-4"><MarketplaceReviews connectedMarketplaces={connectedMarketplaces} /></div>;
       case 'seller-analytics':
         return <div className="p-4"><WBSellerAnalytics connectedMarketplaces={connectedMarketplaces} /></div>;
+      case 'ads':
+        return <div className="p-4"><WBAdsCampaigns connectedMarketplaces={connectedMarketplaces} /></div>;
       default:
         return null;
     }
