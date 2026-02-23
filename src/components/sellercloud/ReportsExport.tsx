@@ -26,7 +26,7 @@ const REPORT_TYPES = [
 ];
 
 const MARKETPLACE_NAMES: Record<string, string> = {
-  yandex: 'Yandex Market', uzum: 'Uzum Market', wildberries: 'Wildberries', ozon: 'Ozon', all: 'Barcha marketplacelar',
+  yandex: 'Yandex Market', uzum: 'Uzum Market', wildberries: 'WB', ozon: 'Ozon', all: 'Barcha marketplacelar',
 };
 
 function downloadCSV(filename: string, headers: string[], rows: string[][]) {

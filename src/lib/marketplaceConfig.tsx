@@ -12,14 +12,21 @@ export interface MarketplaceInfo {
 export const MARKETPLACE_CONFIG: Record<string, MarketplaceInfo> = {
   yandex: { name: 'Yandex Market', logo: magnitLogo, color: 'from-yellow-500 to-amber-500' },
   uzum: { name: 'Uzum Market', logo: uzumLogo, color: 'from-purple-500 to-violet-500' },
-  wildberries: { name: 'Wildberries', logo: wbLogo, color: 'from-fuchsia-500 to-pink-500' },
+  wildberries: { name: 'WB', logo: wbLogo, color: 'from-fuchsia-500 to-pink-500' },
   ozon: { name: 'Ozon', logo: ozonLogo, color: 'from-blue-500 to-cyan-500' },
 };
 
 export const MARKETPLACE_NAMES: Record<string, string> = {
   yandex: 'Yandex Market',
   uzum: 'Uzum Market',
-  wildberries: 'Wildberries',
+  wildberries: 'WB',
+  ozon: 'Ozon',
+};
+
+export const MARKETPLACE_SHORT_NAMES: Record<string, string> = {
+  yandex: 'Yandex',
+  uzum: 'Uzum',
+  wildberries: 'WB',
   ozon: 'Ozon',
 };
 

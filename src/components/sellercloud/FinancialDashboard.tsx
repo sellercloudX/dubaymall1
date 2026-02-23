@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { MarketplaceLogo, MARKETPLACE_SHORT_NAMES } from '@/lib/marketplaceConfig';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
@@ -23,7 +24,7 @@ interface FinancialDashboardProps {
 const USD_TO_UZS = 12800;
 
 const MARKETPLACE_NAMES: Record<string, string> = {
-  yandex: 'Yandex Market', uzum: 'Uzum Market', wildberries: 'Wildberries', ozon: 'Ozon',
+  yandex: 'Yandex Market', uzum: 'Uzum Market', wildberries: 'WB', ozon: 'Ozon',
 };
 
 const MARKETPLACE_FEE_LABELS: Record<string, string> = {
@@ -181,7 +182,7 @@ export function FinancialDashboard({
             {connectedMarketplaces.map(mp => (
               <Button key={mp} variant={selectedMp === mp ? 'default' : 'outline'} size="sm"
                 onClick={() => setSelectedMp(mp)} className="shrink-0 text-xs">
-                {mp === 'yandex' ? '🟡' : mp === 'uzum' ? '🟣' : '📦'} {MARKETPLACE_NAMES[mp]?.split(' ')[0]}
+                <MarketplaceLogo marketplace={mp} size={14} className="mr-1" /> {MARKETPLACE_SHORT_NAMES[mp] || mp}
               </Button>
             ))}
           </div>

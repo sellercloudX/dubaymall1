@@ -16,7 +16,7 @@ interface MarketplaceAnalyticsProps {
 const MARKETPLACE_NAMES: Record<string, string> = {
   yandex: 'Yandex Market',
   uzum: 'Uzum Market',
-  wildberries: 'Wildberries',
+  wildberries: 'WB',
   ozon: 'Ozon',
 };
 
