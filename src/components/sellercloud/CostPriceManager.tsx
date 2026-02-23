@@ -14,6 +14,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useCostPrices } from '@/hooks/useCostPrices';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { toDisplayUzs, toMarketplaceCurrency, isRubMarketplace } from '@/lib/currency';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 
 interface CostPriceManagerProps {
@@ -25,11 +26,9 @@ const MARKETPLACE_NAMES: Record<string, string> = {
   yandex: 'Yandex', uzum: 'Uzum', wildberries: 'WB', ozon: 'Ozon',
 };
 
-const UZS_TO_RUB = 140; // 1 RUB = 140 UZS
-
-const isRubMarketplace = (mp: string) => mp === 'wildberries';
-const getCurrencyLabel = (mp: string) => isRubMarketplace(mp) ? '₽' : "so'm";
-const getCurrencyLabelFull = (mp: string) => isRubMarketplace(mp) ? 'руб' : "so'm";
+// All display in SellerCloudX is in UZS (so'm)
+const getCurrencyLabel = () => "so'm";
+const getCurrencyLabelFull = () => "so'm";
 
 export function CostPriceManager({ connectedMarketplaces, store }: CostPriceManagerProps) {
   const isMobile = useIsMobile();
@@ -119,7 +118,9 @@ export function CostPriceManager({ connectedMarketplaces, store }: CostPriceMana
       toast.error('Raqam kiriting');
       return;
     }
-    await setCostPrice(selectedMp, offerId, Number(value));
+    // User enters in so'm — convert to marketplace-native currency for storage
+    const nativePrice = toMarketplaceCurrency(Number(value), selectedMp);
+    await setCostPrice(selectedMp, offerId, nativePrice);
     setEditingPrices(prev => {
       const next = { ...prev };
       delete next[offerId];
@@ -131,7 +132,12 @@ export function CostPriceManager({ connectedMarketplaces, store }: CostPriceMana
   const handleSaveAll = async () => {
     const entries = Object.entries(editingPrices)
       .filter(([_, v]) => v && !isNaN(Number(v)))
-      .map(([offerId, v]) => ({ marketplace: selectedMp, offerId, costPrice: Number(v) }));
+      .map(([offerId, v]) => ({
+        marketplace: selectedMp,
+        offerId,
+        // Convert from display UZS to marketplace-native currency
+        costPrice: toMarketplaceCurrency(Number(v), selectedMp),
+      }));
     if (entries.length === 0) {
       toast.error('Saqlash uchun tannarx kiriting');
       return;
@@ -148,10 +154,8 @@ export function CostPriceManager({ connectedMarketplaces, store }: CostPriceMana
   const changedCount = Object.keys(editingPrices).filter(k => editingPrices[k] && !isNaN(Number(editingPrices[k]))).length;
 
   const formatPrice = (price: number) => {
-    if (isRubMarketplace(selectedMp)) {
-      return new Intl.NumberFormat('ru-RU').format(price) + ' ₽';
-    }
-    return new Intl.NumberFormat('uz-UZ').format(price) + " so'm";
+    // Always display in so'm
+    return new Intl.NumberFormat('uz-UZ').format(Math.round(price)) + " so'm";
   };
 
   if (connectedMarketplaces.length === 0) {
@@ -250,10 +254,12 @@ export function CostPriceManager({ connectedMarketplaces, store }: CostPriceMana
                 return (
                   <>
                     {pageProducts.map(product => {
-                      const existingCost = getCostPrice(selectedMp, product.offerId);
+                      const existingCostRaw = getCostPrice(selectedMp, product.offerId);
+                      // Convert stored cost (RUB for WB) to display UZS
+                      const existingCostUzs = existingCostRaw !== null ? toDisplayUzs(existingCostRaw, selectedMp) : null;
                       const editValue = editingPrices[product.offerId];
-                      const displayValue = editValue !== undefined ? editValue : (existingCost !== null ? String(existingCost) : '');
-                      const hasCost = existingCost !== null;
+                      const displayValue = editValue !== undefined ? editValue : (existingCostUzs !== null ? String(Math.round(existingCostUzs)) : '');
+                      const hasCost = existingCostRaw !== null;
                       return (
                         <div key={product.offerId} className="p-3 rounded-lg border space-y-2">
                           <div className="flex items-start gap-2">
@@ -273,7 +279,7 @@ export function CostPriceManager({ connectedMarketplaces, store }: CostPriceMana
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
-                            <div className="text-xs text-muted-foreground shrink-0">Sotish: <span className="font-medium text-foreground">{formatPrice(product.price || 0)}</span></div>
+                            <div className="text-xs text-muted-foreground shrink-0">Sotish: <span className="font-medium text-foreground">{formatPrice(toDisplayUzs(product.price || 0, selectedMp))}</span></div>
                           </div>
                           <div className="flex items-center gap-2">
                             <Input type="number" placeholder="Tannarx kiriting..." value={displayValue}
@@ -311,7 +317,7 @@ export function CostPriceManager({ connectedMarketplaces, store }: CostPriceMana
                     <TableHead className="min-w-[200px]">Mahsulot</TableHead>
                     <TableHead className="w-24">SKU</TableHead>
                     <TableHead className="w-32 text-right">Sotish narxi</TableHead>
-                    <TableHead className="w-40">Tannarx ({getCurrencyLabelFull(selectedMp)})</TableHead>
+                    <TableHead className="w-40">Tannarx ({getCurrencyLabelFull()})</TableHead>
                     <TableHead className="w-24 text-right">Marja</TableHead>
                     <TableHead className="w-16"></TableHead>
                   </TableRow>
@@ -322,12 +328,14 @@ export function CostPriceManager({ connectedMarketplaces, store }: CostPriceMana
                   const startIdx = (currentPage - 1) * ITEMS_PER_PAGE;
                   const pageProducts = products.slice(startIdx, startIdx + ITEMS_PER_PAGE);
                   return pageProducts.map(product => {
-                    const existingCost = getCostPrice(selectedMp, product.offerId);
+                    const existingCostRaw = getCostPrice(selectedMp, product.offerId);
+                    const existingCostUzs = existingCostRaw !== null ? toDisplayUzs(existingCostRaw, selectedMp) : null;
                     const editValue = editingPrices[product.offerId];
-                    const displayValue = editValue !== undefined ? editValue : (existingCost !== null ? String(existingCost) : '');
+                    const displayValue = editValue !== undefined ? editValue : (existingCostUzs !== null ? String(Math.round(existingCostUzs)) : '');
                     const costNum = Number(displayValue) || 0;
-                    const margin = product.price && costNum > 0 ? ((product.price - costNum) / product.price * 100) : null;
-                    const hasCost = existingCost !== null;
+                    const priceUzs = toDisplayUzs(product.price || 0, selectedMp);
+                    const margin = priceUzs && costNum > 0 ? ((priceUzs - costNum) / priceUzs * 100) : null;
+                    const hasCost = existingCostRaw !== null;
                     return (
                       <TableRow key={product.offerId}>
                         <TableCell>
@@ -347,7 +355,7 @@ export function CostPriceManager({ connectedMarketplaces, store }: CostPriceMana
                           </div>
                         </TableCell>
                         <TableCell><code className="text-xs">{product.shopSku || '—'}</code></TableCell>
-                        <TableCell className="text-right font-medium whitespace-nowrap">{formatPrice(product.price || 0)}</TableCell>
+                        <TableCell className="text-right font-medium whitespace-nowrap">{formatPrice(toDisplayUzs(product.price || 0, selectedMp))}</TableCell>
                         <TableCell>
                           <Input type="number" placeholder="Tannarx..." value={displayValue}
                             onChange={e => handlePriceChange(product.offerId, e.target.value)} className="h-8 text-sm w-full" />

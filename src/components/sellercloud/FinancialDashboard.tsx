@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { MarketplaceLogo, MARKETPLACE_SHORT_NAMES } from '@/lib/marketplaceConfig';
+import { toDisplayUzs } from '@/lib/currency';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
@@ -89,16 +90,19 @@ export function FinancialDashboard({
         (order.items || []).forEach(item => {
           const cost = getCostPrice(marketplace, item.offerId);
           const qty = item.count || 1;
-          const itemPrice = item.priceUZS || item.price || 0;
+          // Convert item price to UZS for uniform calculations
+          const itemPrice = item.priceUZS || toDisplayUzs(item.price || 0, marketplace);
           const itemRevenue = itemPrice * qty;
           totalProductCount += qty;
           mpRevenue += itemRevenue;
           
           if (cost !== null) {
-            totalProductCost += cost * qty;
+            // Cost price for WB is in RUB, convert to UZS
+            totalProductCost += toDisplayUzs(cost, marketplace) * qty;
             costPricesCovered += qty;
           }
 
+          // Tariffs are already in UZS (WB tariffs converted in useMarketplaceTariffs)
           const tariff = getTariffForProduct(tariffMap, item.offerId, itemPrice, marketplace);
           const itemFees = tariff.totalFee * qty;
           mpFees += itemFees;
