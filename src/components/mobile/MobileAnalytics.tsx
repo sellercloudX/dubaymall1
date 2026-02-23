@@ -6,19 +6,13 @@ import { DollarSign, Package, ShoppingCart, Globe, RefreshCw, WifiOff, AlertTria
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
+import { MarketplaceLogo } from '@/lib/marketplaceConfig';
 
 interface MobileAnalyticsProps {
   connections: any[];
   connectedMarketplaces: string[];
   store: MarketplaceDataStore;
 }
-
-const MARKETPLACE_EMOJI: Record<string, string> = {
-  yandex: '🟡',
-  uzum: '🟣',
-  wildberries: '🔵',
-  ozon: '🟢',
-};
 
 export function MobileAnalytics({ connections, connectedMarketplaces, store }: MobileAnalyticsProps) {
   const isOnline = navigator.onLine;
@@ -236,7 +230,7 @@ export function MobileAnalytics({ connections, connectedMarketplaces, store }: M
           <div className="flex flex-wrap gap-2">
             {connectedMarketplaces.map(mp => (
               <Badge key={mp} variant="secondary" className="text-xs capitalize">
-                {MARKETPLACE_EMOJI[mp]} {mp}
+                <MarketplaceLogo marketplace={mp} size={14} className="mr-1" /> {mp}
               </Badge>
             ))}
           </div>

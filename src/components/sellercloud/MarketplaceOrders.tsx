@@ -12,6 +12,7 @@ import {
 import { ShoppingCart, RefreshCw, Loader2, ChevronDown, User, Package } from 'lucide-react';
 import { format } from 'date-fns';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
+import { MARKETPLACE_CONFIG, MarketplaceLogo } from '@/lib/marketplaceConfig';
 
 interface MarketplaceOrdersProps {
   connectedMarketplaces: string[];
@@ -112,7 +113,7 @@ export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceO
           {connectedMarketplaces.map((mp) => (
             <Button key={mp} variant={selectedMarketplace === mp ? 'default' : 'outline'} size="sm"
               onClick={() => setSelectedMarketplace(mp)}>
-              {mp === 'yandex' ? '🟡 Yandex' : mp === 'uzum' ? '🟣 Uzum' : mp === 'wildberries' ? '🟣 Wildberries' : mp}
+              <MarketplaceLogo marketplace={mp} size={16} className="mr-1" /> {MARKETPLACE_CONFIG[mp]?.name || mp}
             </Button>
           ))}
         </div>

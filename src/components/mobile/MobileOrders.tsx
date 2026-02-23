@@ -21,15 +21,12 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import type { MarketplaceDataStore, MarketplaceOrder } from '@/hooks/useMarketplaceDataStore';
+import { MarketplaceLogo } from '@/lib/marketplaceConfig';
 
 interface MobileOrdersProps {
   connectedMarketplaces: string[];
   store: MarketplaceDataStore;
 }
-
-const MARKETPLACE_EMOJI: Record<string, string> = {
-  yandex: '🟡', uzum: '🟣', wildberries: '🔵', ozon: '🟢',
-};
 
 const ORDER_STATUSES = [
   { value: 'all', label: 'Barchasi' },
@@ -196,7 +193,7 @@ export function MobileOrders({ connectedMarketplaces, store }: MobileOrdersProps
           {connectedMarketplaces.map(mp => (
             <Button key={mp} variant={selectedMp === mp ? 'default' : 'outline'} size="sm"
               onClick={() => setSelectedMp(mp)} className="shrink-0 text-xs h-8 px-3">
-              {MARKETPLACE_EMOJI[mp]} {mp}
+              <MarketplaceLogo marketplace={mp} size={14} className="mr-1" /> {mp}
             </Button>
           ))}
         </div>

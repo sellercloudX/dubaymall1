@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { MARKETPLACE_CONFIG, MarketplaceLogo } from '@/lib/marketplaceConfig';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -117,7 +118,7 @@ export function MarketplaceProducts({ connectedMarketplaces, store }: Marketplac
               size="sm"
               onClick={() => setSelectedMarketplace(mp)}
             >
-              {mp === 'yandex' ? '🟡 Yandex' : mp === 'uzum' ? '🟣 Uzum' : mp}
+              <MarketplaceLogo marketplace={mp} size={16} className="mr-1" /> {MARKETPLACE_CONFIG[mp]?.name || mp}
             </Button>
           ))}
         </div>

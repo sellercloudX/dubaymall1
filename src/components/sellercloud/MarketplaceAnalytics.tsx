@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { MarketplaceLogo } from '@/lib/marketplaceConfig';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -228,7 +229,7 @@ export function MarketplaceAnalytics({ connectedMarketplaces, store }: Marketpla
                 <div key={stat.marketplace} className="flex items-center justify-between p-4 rounded-lg border">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                      {stat.marketplace === 'yandex' ? '🟡' : stat.marketplace === 'uzum' ? '🟣' : '📦'}
+                      <MarketplaceLogo marketplace={stat.marketplace} size={24} />
                     </div>
                     <div>
                       <div className="font-medium">{MARKETPLACE_NAMES[stat.marketplace] || stat.marketplace}</div>

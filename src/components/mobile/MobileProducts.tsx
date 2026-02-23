@@ -6,18 +6,12 @@ import { Package, Search, RefreshCw, WifiOff } from 'lucide-react';
 import { toast } from 'sonner';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 import { VirtualProductList } from './VirtualProductList';
+import { MarketplaceLogo } from '@/lib/marketplaceConfig';
 
 interface MobileProductsProps {
   connectedMarketplaces: string[];
   store: MarketplaceDataStore;
 }
-
-const MARKETPLACE_EMOJI: Record<string, string> = {
-  yandex: '🟡',
-  uzum: '🟣',
-  wildberries: '🔵',
-  ozon: '🟢',
-};
 
 export function MobileProducts({ connectedMarketplaces, store }: MobileProductsProps) {
   const [selectedMp, setSelectedMp] = useState('');
@@ -99,7 +93,7 @@ export function MobileProducts({ connectedMarketplaces, store }: MobileProductsP
           {connectedMarketplaces.map(mp => (
             <Button key={mp} variant={selectedMp === mp ? 'default' : 'outline'} size="sm"
               onClick={() => setSelectedMp(mp)} className="shrink-0 text-xs h-8 px-3">
-              {MARKETPLACE_EMOJI[mp]} {mp}
+              <MarketplaceLogo marketplace={mp} size={14} className="mr-1" /> {mp}
             </Button>
           ))}
         </div>

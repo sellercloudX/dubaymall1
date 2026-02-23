@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { MarketplaceLogo } from '@/lib/marketplaceConfig';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -188,7 +189,7 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
             {connectedMarketplaces.map(mp => (
               <Button key={mp} variant={selectedMp === mp ? 'default' : 'outline'} size="sm"
                 onClick={() => setSelectedMp(mp)} className="shrink-0 text-xs">
-                {mp === 'yandex' ? '🟡' : mp === 'uzum' ? '🟣' : '📦'} {MARKETPLACE_NAMES[mp]}
+                <MarketplaceLogo marketplace={mp} size={14} className="mr-1" /> {MARKETPLACE_NAMES[mp]}
               </Button>
             ))}
           </div>
