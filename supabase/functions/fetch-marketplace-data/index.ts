@@ -3199,6 +3199,96 @@ serve(async (req) => {
           console.error("WB answer question error:", e);
           result = { success: false, error: "Error answering question" };
         }
+      } else if (dataType === "seller-analytics") {
+        // WB Seller Analytics — nm-report for detailed product performance
+        try {
+          const { period = 7 } = requestBody;
+          const endDate = new Date();
+          const startDate = new Date(endDate.getTime() - period * 24 * 60 * 60 * 1000);
+          const beginStr = startDate.toISOString().split('T')[0];
+          const endStr = endDate.toISOString().split('T')[0];
+
+          // First page
+          const analyticsResp = await fetch(
+            "https://seller-analytics-api.wildberries.ru/api/v2/nm-report/detail",
+            {
+              method: "POST",
+              headers: wbHeaders,
+              body: JSON.stringify({
+                period: { begin: beginStr, end: endStr },
+                page: 1,
+              }),
+            }
+          );
+
+          if (analyticsResp.ok) {
+            const analyticsData = await analyticsResp.json();
+            const cards = analyticsData.data?.cards || [];
+            console.log(`WB seller analytics: ${cards.length} cards for ${period} days`);
+
+            // Map to useful format
+            const mapped = cards.map((card: any) => {
+              const stats = card.statistics?.selectedPeriod || card.statistics?.previousPeriod || {};
+              return {
+                nmID: card.nmID,
+                vendorCode: card.vendorCode || "",
+                brandName: card.brandName || "",
+                objectName: card.object?.name || card.subjectName || "",
+                title: card.title || "",
+                photo: card.mediaFiles?.[0] || "",
+                // Key metrics
+                openCardCount: stats.openCardCount || 0,
+                addToCartCount: stats.addToCartCount || 0,
+                ordersCount: stats.ordersCount || 0,
+                ordersSumRub: stats.ordersSumRub || 0,
+                buyoutsCount: stats.buyoutsCount || 0,
+                buyoutsSumRub: stats.buyoutsSumRub || 0,
+                cancelCount: stats.cancelCount || 0,
+                cancelSumRub: stats.cancelSumRub || 0,
+                avgPriceRub: stats.avgPriceRub || 0,
+                avgOrdersCountPerDay: stats.avgOrdersCountPerDay || 0,
+                // Conversion funnel
+                conversions: {
+                  addToCartPercent: stats.addToCartPercent || stats.conversions?.addToCartPercent || 0,
+                  cartToOrderPercent: stats.cartToOrderPercent || stats.conversions?.cartToOrderPercent || 0,
+                  buyoutsPercent: stats.buyoutsPercent || stats.conversions?.buyoutsPercent || 0,
+                },
+              };
+            });
+
+            // Summary
+            const summary = {
+              totalViews: mapped.reduce((s: number, c: any) => s + c.openCardCount, 0),
+              totalAddToCart: mapped.reduce((s: number, c: any) => s + c.addToCartCount, 0),
+              totalOrders: mapped.reduce((s: number, c: any) => s + c.ordersCount, 0),
+              totalOrdersSum: mapped.reduce((s: number, c: any) => s + c.ordersSumRub, 0),
+              totalBuyouts: mapped.reduce((s: number, c: any) => s + c.buyoutsCount, 0),
+              totalBuyoutsSum: mapped.reduce((s: number, c: any) => s + c.buyoutsSumRub, 0),
+              totalCancels: mapped.reduce((s: number, c: any) => s + c.cancelCount, 0),
+              avgConversionToCart: mapped.length > 0
+                ? mapped.reduce((s: number, c: any) => s + c.conversions.addToCartPercent, 0) / mapped.length
+                : 0,
+              avgConversionToOrder: mapped.length > 0
+                ? mapped.reduce((s: number, c: any) => s + c.conversions.cartToOrderPercent, 0) / mapped.length
+                : 0,
+            };
+
+            result = {
+              success: true,
+              data: mapped,
+              summary,
+              total: analyticsData.data?.page?.total || mapped.length,
+              period: { from: beginStr, to: endStr },
+            };
+          } else {
+            const errText = await analyticsResp.text();
+            console.error("WB seller analytics error:", analyticsResp.status, errText);
+            result = { success: false, error: `WB analytics failed: ${analyticsResp.status}` };
+          }
+        } catch (e) {
+          console.error("WB seller analytics error:", e);
+          result = { success: false, error: "Error fetching WB seller analytics" };
+        }
       }
 
       // Update connection with latest sync time

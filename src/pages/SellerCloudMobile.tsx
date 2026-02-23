@@ -36,6 +36,8 @@ const SubscriptionBilling = lazy(() => import('@/components/sellercloud/Subscrip
 const CostPriceManager = lazy(() => import('@/components/sellercloud/CostPriceManager').then(m => ({ default: m.CostPriceManager })));
 const UzumCardHelper = lazy(() => import('@/components/sellercloud/UzumCardHelper').then(m => ({ default: m.UzumCardHelper })));
 const MxikImport = lazy(() => import('@/components/sellercloud/MxikImport').then(m => ({ default: m.MxikImport })));
+const MarketplaceReviews = lazy(() => import('@/components/sellercloud/MarketplaceReviews').then(m => ({ default: m.MarketplaceReviews })));
+const WBSellerAnalytics = lazy(() => import('@/components/sellercloud/WBSellerAnalytics').then(m => ({ default: m.WBSellerAnalytics })));
 
 // Lightweight tab loading skeleton
 function TabLoader() {
@@ -49,13 +51,15 @@ function TabLoader() {
 }
 
 // Icons for more sub-tabs (imported inline to avoid heavy lucide bundle at top)
-import { TrendingUp, Calculator, DollarSign, BarChart3, Shield, Copy, AlertOctagon, ArrowDownUp, Tag, Upload, FileSpreadsheet, Bell, CreditCard, Coins, Sparkles } from 'lucide-react';
+import { TrendingUp, Calculator, DollarSign, BarChart3, Shield, Copy, AlertOctagon, ArrowDownUp, Tag, Upload, FileSpreadsheet, Bell, CreditCard, Coins, Sparkles, MessageCircle, Activity } from 'lucide-react';
 
 const moreSubTabs = [
   { id: 'inventory' as const, icon: ArrowDownUp, label: 'Qoldiq' },
   { id: 'financials' as const, icon: DollarSign, label: 'Moliya' },
   { id: 'calculator' as const, icon: Calculator, label: 'Kalkulyator' },
   { id: 'abc-analysis' as const, icon: BarChart3, label: 'ABC-analiz' },
+  { id: 'seller-analytics' as const, icon: Activity, label: 'WB Analitika' },
+  { id: 'reviews' as const, icon: MessageCircle, label: 'Sharhlar' },
   { id: 'cost-prices' as const, icon: Coins, label: 'Tannarx' },
   { id: 'min-price' as const, icon: Shield, label: 'Min narx' },
   { id: 'card-clone' as const, icon: Copy, label: 'Klonlash' },
@@ -228,6 +232,10 @@ export default function SellerCloudMobile() {
         return <div className="p-4"><SubscriptionBilling totalSalesVolume={totalRevenue} /></div>;
       case 'mxik':
         return <div className="p-4"><MxikImport /></div>;
+      case 'reviews':
+        return <div className="p-4"><MarketplaceReviews connectedMarketplaces={connectedMarketplaces} /></div>;
+      case 'seller-analytics':
+        return <div className="p-4"><WBSellerAnalytics connectedMarketplaces={connectedMarketplaces} /></div>;
       default:
         return null;
     }
