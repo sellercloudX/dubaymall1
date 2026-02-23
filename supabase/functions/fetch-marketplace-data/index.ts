@@ -77,23 +77,28 @@ interface YandexOrder {
 }
 
 // Helper to map WB order object to unified format
-function mapWBOrder(o: any, defaultStatus: string) {
+// WB new orders API (/api/v3/orders/new) returns prices in KOPECKS
+// WB statistics API returns prices in RUBLES — no conversion needed
+function mapWBOrder(o: any, defaultStatus: string, fromNewApi = false) {
+  // convertedPrice and price from new orders API are in kopecks → divide by 100
+  const rawPrice = o.convertedPrice || o.price || o.salePrice || 0;
+  const price = fromNewApi ? rawPrice / 100 : rawPrice;
   return {
     id: o.id || o.rid,
     status: defaultStatus,
     createdAt: o.createdAt || o.dateCreated || new Date().toISOString(),
-    total: o.convertedPrice || o.price || o.salePrice || 0,
-    totalUZS: o.convertedPrice || o.price || o.salePrice || 0,
-    itemsTotal: o.convertedPrice || o.price || o.salePrice || 0,
-    itemsTotalUZS: o.convertedPrice || o.price || o.salePrice || 0,
+    total: price,
+    totalUZS: price,
+    itemsTotal: price,
+    itemsTotalUZS: price,
     deliveryTotal: 0,
     deliveryTotalUZS: 0,
     items: [{
       offerId: o.article || o.supplierArticle || "",
       offerName: o.subject || "",
       count: 1,
-      price: o.convertedPrice || o.price || 0,
-      priceUZS: o.convertedPrice || o.price || 0,
+      price: price,
+      priceUZS: price,
     }],
     buyer: { firstName: o.regionName || "", lastName: "" },
     nmID: o.nmId,
@@ -2501,7 +2506,7 @@ serve(async (req) => {
             for (const o of newOrders) {
               if (orderIdsSeen.has(o.id)) continue;
               orderIdsSeen.add(o.id);
-              allOrders.push(mapWBOrder(o, "NEW"));
+              allOrders.push(mapWBOrder(o, "NEW", true));
             }
           }
 

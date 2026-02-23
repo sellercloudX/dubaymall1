@@ -179,17 +179,17 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
   return (
     <div className="space-y-4 overflow-hidden">
       {/* Marketplace Filter + Date */}
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-2">
         {connectedMarketplaces.length > 1 && (
-          <div className="flex gap-2 overflow-x-auto no-scrollbar">
+          <div className="flex gap-1 overflow-x-auto no-scrollbar">
             <Button variant={selectedMp === 'all' ? 'default' : 'outline'} size="sm"
-              onClick={() => setSelectedMp('all')} className="shrink-0 text-xs">
-              📊 Umumiy
+              onClick={() => setSelectedMp('all')} className="shrink-0 text-[10px] h-6 px-2 rounded-full">
+              Umumiy
             </Button>
             {connectedMarketplaces.map(mp => (
               <Button key={mp} variant={selectedMp === mp ? 'default' : 'outline'} size="sm"
-                onClick={() => setSelectedMp(mp)} className="shrink-0 text-xs">
-                <MarketplaceLogo marketplace={mp} size={14} className="mr-1" /> {MARKETPLACE_NAMES[mp]}
+                onClick={() => setSelectedMp(mp)} className="shrink-0 text-[10px] h-6 px-2 rounded-full">
+                <MarketplaceLogo marketplace={mp} size={12} className="mr-0.5" /> {MARKETPLACE_NAMES[mp]}
               </Button>
             ))}
           </div>

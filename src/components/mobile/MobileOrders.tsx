@@ -188,27 +188,27 @@ export function MobileOrders({ connectedMarketplaces, store }: MobileOrdersProps
 
   return (
     <div className="flex flex-col" style={{ height: 'calc(100vh - 3.5rem - env(safe-area-inset-top, 0px) - 5rem)' }}>
-      <div className="sticky top-0 bg-background z-30 px-3 py-2 border-b space-y-2">
-        <div className="flex gap-2 overflow-x-auto pb-1 -mx-3 px-3 scrollbar-hide">
-          {connectedMarketplaces.map(mp => (
-            <Button key={mp} variant={selectedMp === mp ? 'default' : 'outline'} size="sm"
-              onClick={() => setSelectedMp(mp)} className="shrink-0 text-xs h-8 px-3">
-              <MarketplaceLogo marketplace={mp} size={14} className="mr-1" /> {mp}
-            </Button>
-          ))}
-        </div>
-        <div className="flex gap-2">
+      <div className="sticky top-0 bg-background z-30 px-3 py-1.5 border-b space-y-1.5">
+        <div className="flex items-center gap-1.5">
+          <div className="flex gap-1 overflow-x-auto scrollbar-hide flex-1">
+            {connectedMarketplaces.map(mp => (
+              <Button key={mp} variant={selectedMp === mp ? 'default' : 'outline'} size="sm"
+                onClick={() => setSelectedMp(mp)} className="shrink-0 text-[10px] h-6 px-2 rounded-full">
+                <MarketplaceLogo marketplace={mp} size={12} className="mr-0.5" /> {mp === 'wildberries' ? 'WB' : mp === 'yandex' ? 'Yandex' : mp === 'uzum' ? 'Uzum' : mp}
+              </Button>
+            ))}
+          </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="flex-1 h-9 text-sm"><SelectValue placeholder="Holat" /></SelectTrigger>
+            <SelectTrigger className="w-auto h-6 text-[10px] px-2 min-w-0"><SelectValue placeholder="Holat" /></SelectTrigger>
             <SelectContent>
               {ORDER_STATUSES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Button variant="outline" size="icon" onClick={handleRefresh} disabled={isLoading || isFetching} className="shrink-0 h-9 w-9">
-            <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+          <Button variant="ghost" size="icon" onClick={handleRefresh} disabled={isLoading || isFetching} className="shrink-0 h-6 w-6">
+            <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`} />
           </Button>
         </div>
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <div className="flex items-center justify-between text-[10px] text-muted-foreground">
           <span>{orders.length} ta buyurtma</span>
           {!isOnline && <span className="text-amber-600 inline-flex items-center gap-1"><WifiOff className="h-3 w-3" /> Offline</span>}
         </div>
