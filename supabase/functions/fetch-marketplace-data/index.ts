@@ -2493,9 +2493,9 @@ serve(async (req) => {
         // All orders with status: POST /api/v3/orders/status
         try {
           const allOrders: any[] = [];
-          const orderIdsSeen = new Set<number>();
+          const orderIdsSeen = new Set<string>();
 
-          // 1. Get new orders
+          // 1. Get new orders (prices in KOPECKS — mapWBOrder divides by 100)
           const newOrdersResp = await fetch("https://marketplace-api.wildberries.ru/api/v3/orders/new", {
             headers: wbHeaders,
           });
@@ -2504,16 +2504,20 @@ serve(async (req) => {
             const newOrders = newData.orders || [];
             console.log(`WB new orders: ${newOrders.length}`);
             for (const o of newOrders) {
-              if (orderIdsSeen.has(o.id)) continue;
-              orderIdsSeen.add(o.id);
+              const key = `new-${o.id}`;
+              if (orderIdsSeen.has(key)) continue;
+              orderIdsSeen.add(key);
               allOrders.push(mapWBOrder(o, "NEW", true));
             }
           }
 
-          // 2. Get recent orders (last 30 days via Statistics API)
+          // 2. Get recent orders via Statistics API (prices in RUBLES — no division)
           await sleep(300);
           const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
           const dateFrom = thirtyDaysAgo.toISOString().split('.')[0];
+          
+          // Track nmId+date combos from stats to deduplicate against sales
+          const statsNmDateKeys = new Set<string>();
           
           const statsOrdersResp = await fetch(
             `https://statistics-api.wildberries.ru/api/v1/supplier/orders?dateFrom=${dateFrom}`,
@@ -2523,26 +2527,42 @@ serve(async (req) => {
             const statsOrders = await statsOrdersResp.json();
             const ordersList = Array.isArray(statsOrders) ? statsOrders : [];
             console.log(`WB stats orders: ${ordersList.length}`);
+            if (ordersList.length > 0) {
+              console.log(`WB stats sample prices: totalPrice=${ordersList[0].totalPrice}, finishedPrice=${ordersList[0].finishedPrice}, priceWithDisc=${ordersList[0].priceWithDisc}`);
+            }
             for (const o of ordersList) {
-              const orderId = o.orderID || o.odid || o.srid;
-              if (!orderId || orderIdsSeen.has(orderId)) continue;
-              orderIdsSeen.add(orderId);
+              // Use srid as primary unique key (most reliable for WB stats)
+              const key = `stats-${o.srid || o.odid || o.orderID || Math.random()}`;
+              if (orderIdsSeen.has(key)) continue;
+              orderIdsSeen.add(key);
+              
+              // Track for dedup against sales
+              if (o.nmId && o.date) {
+                statsNmDateKeys.add(`${o.nmId}-${o.date.substring(0, 10)}`);
+              }
+              
+              // WB statistics API returns prices in RUBLES (not kopecks)
+              // finishedPrice = final price after discounts (most accurate)
+              // totalPrice = price before WB discount
+              // priceWithDisc = price with seller discount
+              const price = o.finishedPrice || o.priceWithDisc || o.totalPrice || 0;
+              
               allOrders.push({
-                id: orderId,
+                id: o.srid || o.odid || o.orderID,
                 status: o.isCancel ? "CANCELLED" : "DELIVERED",
                 createdAt: o.date || o.lastChangeDate || new Date().toISOString(),
-                total: o.totalPrice || o.finishedPrice || 0,
-                totalUZS: o.totalPrice || o.finishedPrice || 0,
-                itemsTotal: o.totalPrice || o.finishedPrice || 0,
-                itemsTotalUZS: o.totalPrice || o.finishedPrice || 0,
+                total: price,
+                totalUZS: price,
+                itemsTotal: price,
+                itemsTotalUZS: price,
                 deliveryTotal: 0,
                 deliveryTotalUZS: 0,
                 items: [{
                   offerId: o.supplierArticle || o.techSize || "",
                   offerName: o.subject || o.category || "",
                   count: 1,
-                  price: o.totalPrice || o.finishedPrice || 0,
-                  priceUZS: o.totalPrice || o.finishedPrice || 0,
+                  price: price,
+                  priceUZS: price,
                 }],
                 buyer: { firstName: o.regionName || "", lastName: "" },
                 nmID: o.nmId,
@@ -2553,7 +2573,7 @@ serve(async (req) => {
             console.warn(`WB stats orders failed: ${statsOrdersResp.status}`);
           }
 
-          // 3. Also fetch sales data for revenue accuracy
+          // 3. Fetch sales data — BUT only add entries NOT already covered by stats
           await sleep(300);
           const salesResp = await fetch(
             `https://statistics-api.wildberries.ru/api/v1/supplier/sales?dateFrom=${dateFrom}`,
@@ -2563,31 +2583,48 @@ serve(async (req) => {
             const salesData = await salesResp.json();
             const salesList = Array.isArray(salesData) ? salesData : [];
             console.log(`WB sales entries: ${salesList.length}`);
-            // Sales data enriches order revenue info
+            let salesAdded = 0;
+            let salesSkipped = 0;
+            
             for (const sale of salesList) {
-              const saleId = sale.saleID || sale.odid;
-              if (!saleId || orderIdsSeen.has(saleId)) continue;
-              orderIdsSeen.add(saleId);
+              // Skip if this nmId+date combo was already added from stats
+              if (sale.nmId && sale.date) {
+                const nmDateKey = `${sale.nmId}-${sale.date.substring(0, 10)}`;
+                if (statsNmDateKeys.has(nmDateKey)) {
+                  salesSkipped++;
+                  continue;
+                }
+              }
+              
+              const saleKey = `sale-${sale.srid || sale.saleID || sale.odid || Math.random()}`;
+              if (orderIdsSeen.has(saleKey)) { salesSkipped++; continue; }
+              orderIdsSeen.add(saleKey);
+              
+              // Sales API also returns prices in RUBLES
+              const price = sale.finishedPrice || sale.priceWithDisc || sale.totalPrice || 0;
+              
+              salesAdded++;
               allOrders.push({
-                id: saleId,
+                id: sale.srid || sale.saleID || sale.odid,
                 status: sale.saleID?.startsWith("R") ? "RETURNED" : "DELIVERED",
                 createdAt: sale.date || new Date().toISOString(),
-                total: sale.totalPrice || sale.finishedPrice || sale.priceWithDisc || 0,
-                totalUZS: sale.totalPrice || sale.finishedPrice || sale.priceWithDisc || 0,
-                itemsTotal: sale.totalPrice || sale.finishedPrice || sale.priceWithDisc || 0,
-                itemsTotalUZS: sale.totalPrice || sale.finishedPrice || sale.priceWithDisc || 0,
+                total: price,
+                totalUZS: price,
+                itemsTotal: price,
+                itemsTotalUZS: price,
                 deliveryTotal: 0,
                 deliveryTotalUZS: 0,
                 items: [{
                   offerId: sale.supplierArticle || "",
                   offerName: sale.subject || sale.category || "",
                   count: 1,
-                  price: sale.totalPrice || sale.finishedPrice || sale.priceWithDisc || 0,
-                  priceUZS: sale.totalPrice || sale.finishedPrice || sale.priceWithDisc || 0,
+                  price: price,
+                  priceUZS: price,
                 }],
                 buyer: { firstName: sale.regionName || "", lastName: "" },
               });
             }
+            console.log(`WB sales: ${salesAdded} added, ${salesSkipped} skipped (dedup)`);
           }
 
           console.log(`WB total orders: ${allOrders.length}`);
