@@ -12,7 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { 
   CreditCard, AlertTriangle, CheckCircle2, Clock, Crown, 
-   Calendar, Receipt, DollarSign, TrendingUp, XCircle, FileText, ArrowRight
+   Calendar, Receipt, DollarSign, TrendingUp, XCircle, FileText, ArrowRight, Landmark
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { PromoCodeInput, type PromoValidation } from './PromoCodeInput';
@@ -41,6 +41,7 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
    const [selectedPlan, setSelectedPlan] = useState<'pro' | 'enterprise'>('pro');
    const [termsAccepted, setTermsAccepted] = useState(false);
    const [promoValidation, setPromoValidation] = useState<PromoValidation | null>(null);
+   const [paymentMethod, setPaymentMethod] = useState<'click' | 'uzum'>('click');
 
   const formatPrice = (price: number, currency: 'uzs' | 'usd' = 'uzs') => {
     if (currency === 'usd') {
@@ -145,12 +146,80 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
      }
    };
 
-   // Initial subscription payment after terms accepted
-   const handleInitialPayment = async () => {
+   // Uzum Bank payment handler
+   const handleUzumPayment = async (months: number = 1) => {
      if (!subscription) return;
-     // Default to 1 month
-     await handleSubscriptionPayment(1);
+     
+     const baseMonthlyUSD = subscription.monthly_fee;
+     const promoDiscount = (promoValidation && months === 1) ? (promoValidation.discount || 0) : 0;
+     const firstMonthUSD = baseMonthlyUSD - promoDiscount;
+     
+     let totalAmountUSD: number;
+     if (months === 1) {
+       totalAmountUSD = firstMonthUSD;
+     } else {
+       const discount = getDiscount(months);
+       totalAmountUSD = Math.round((firstMonthUSD + baseMonthlyUSD * (months - 1)) * (1 - discount));
+     }
+     
+     const totalAmountUZS = Math.round(totalAmountUSD * USD_TO_UZS);
+     
+     setIsCreating(true);
+     try {
+       const { data, error } = await supabase.functions.invoke('uzum-checkout', {
+         body: {
+           action: 'register',
+           subscriptionId: subscription.id,
+           amount: totalAmountUZS,
+           months: months,
+           promoCode: promoValidation?.promo_id ? promoValidation : undefined,
+           returnUrl: window.location.origin + '/seller-cloud-mobile?tab=billing'
+         }
+       });
+
+       if (error) throw error;
+
+       if (data?.paymentUrl) {
+         window.open(data.paymentUrl, '_blank');
+         toast.success('Uzum Bank to\'lov sahifasi ochildi. To\'lov yakunlangach aktivatsiya avtomatik bo\'ladi.');
+         
+         // Notify affiliate system
+         if (user?.email) {
+           const isFirstPayment = !billing.some(b => b.status === 'paid');
+           notifyAffiliatePayment({
+             eventType: isFirstPayment ? 'FIRST_PAYMENT' : 'RENEWAL',
+             customerEmail: user.email,
+             customerName: user.user_metadata?.full_name || '',
+             customerPhone: user.user_metadata?.phone || '',
+             amount: totalAmountUSD,
+             currency: 'USD',
+             promoCode: promoValidation ? promoValidation.promo_id || '' : undefined,
+             providerPaymentId: data.orderId || `SCX-UZUM-${Date.now()}`,
+           }).catch(err => console.warn('Affiliate webhook failed:', err));
+         }
+       }
+     } catch (error: any) {
+       console.error('Uzum payment error:', error);
+       toast.error('To\'lov xatosi: ' + (error.message || 'Noma\'lum xato'));
+     } finally {
+       setIsCreating(false);
+     }
    };
+
+   // Generic payment handler
+   const handlePayment = async (months: number = 1) => {
+     if (paymentMethod === 'uzum') {
+       await handleUzumPayment(months);
+     } else {
+       await handleSubscriptionPayment(months);
+     }
+   };
+
+   // Initial subscription payment after terms accepted
+    const handleInitialPayment = async () => {
+      if (!subscription) return;
+      await handlePayment(1);
+    };
 
   if (isLoading) {
     return (
@@ -318,23 +387,43 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
                   )}
                 </div>
 
-                <PromoCodeInput
-                  customerEmail={user?.email || ''}
-                  onValidated={setPromoValidation}
-                  disabled={isCreating}
-                />
+                 <PromoCodeInput
+                   customerEmail={user?.email || ''}
+                   onValidated={setPromoValidation}
+                   disabled={isCreating}
+                 />
 
-                <Button 
-                  onClick={handleInitialPayment}
-                  className="w-full"
-                  disabled={isCreating || !subscription}
-                >
-                  {isCreating ? 'Yuklanmoqda...' : (
-                    <>
-                      Click orqali to'lash
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </>
-                  )}
+                 {/* Payment Method Selector */}
+                 <div className="flex gap-2">
+                   <Button
+                     variant={paymentMethod === 'click' ? 'default' : 'outline'}
+                     className="flex-1"
+                     onClick={() => setPaymentMethod('click')}
+                     type="button"
+                   >
+                     <CreditCard className="h-4 w-4 mr-1" /> Click
+                   </Button>
+                   <Button
+                     variant={paymentMethod === 'uzum' ? 'default' : 'outline'}
+                     className="flex-1"
+                     onClick={() => setPaymentMethod('uzum')}
+                     type="button"
+                   >
+                     <Landmark className="h-4 w-4 mr-1" /> Uzum Bank
+                   </Button>
+                 </div>
+
+                 <Button 
+                   onClick={handleInitialPayment}
+                   className="w-full"
+                   disabled={isCreating || !subscription}
+                 >
+                   {isCreating ? 'Yuklanmoqda...' : (
+                     <>
+                       {paymentMethod === 'click' ? 'Click' : 'Uzum Bank'} orqali to'lash
+                       <ArrowRight className="ml-2 h-4 w-4" />
+                     </>
+                   )}
                  </Button>
                  <p className="text-xs text-center text-muted-foreground">
                    Muammo bormi? Telegram: <a href="https://t.me/sellercloudx_support" target="_blank" className="text-primary underline">@sellercloudx_support</a>
@@ -383,9 +472,9 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
                  )}
                  <p className="text-xs text-muted-foreground mt-2">Yordam kerakmi? Telegram: <a href="https://t.me/sellercloudx_support" target="_blank" className="text-primary underline">@sellercloudx_support</a></p>
               </div>
-               <Button variant="destructive" size="sm" onClick={() => handleSubscriptionPayment(1)} disabled={isCreating}>
-                  {isCreating ? 'Yuklanmoqda...' : 'Click orqali to\'lash'}
-                </Button>
+                <Button variant="destructive" size="sm" onClick={() => handlePayment(1)} disabled={isCreating}>
+                   {isCreating ? 'Yuklanmoqda...' : 'To\'lash'}
+                 </Button>
             </div>
           </CardContent>
         </Card>
@@ -495,22 +584,43 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
               />
             </div>
 
-            {/* Click Payment Options */}
+            {/* Payment Method Selector */}
             <div className="mt-4 pt-4 border-t space-y-3">
-              <p className="text-sm font-medium">Click orqali to'lash:</p>
-              <div className="space-y-2">
+              <p className="text-sm font-medium">To'lov usulini tanlang:</p>
+              <div className="flex gap-2">
+                <Button
+                  variant={paymentMethod === 'click' ? 'default' : 'outline'}
+                  className="flex-1"
+                  onClick={() => setPaymentMethod('click')}
+                  type="button"
+                >
+                  <CreditCard className="h-4 w-4 mr-1" /> Click
+                </Button>
+                <Button
+                  variant={paymentMethod === 'uzum' ? 'default' : 'outline'}
+                  className="flex-1"
+                  onClick={() => setPaymentMethod('uzum')}
+                  type="button"
+                >
+                  <Landmark className="h-4 w-4 mr-1" /> Uzum Bank
+                </Button>
+              </div>
+            </div>
+
+            {/* Payment Options */}
+            <div className="mt-4 space-y-2">
                 {/* 1 month */}
                 <div className="relative">
                   {promoValidation && (
                     <div className="absolute -top-2 right-3 z-10">
-                      <Badge className="bg-green-600 text-white text-[10px] px-1.5 py-0">-${promoValidation.discount}</Badge>
+                      <Badge className="bg-primary text-primary-foreground text-[10px] px-1.5 py-0">-${promoValidation.discount}</Badge>
                     </div>
                   )}
                   <Button 
                     variant="outline" 
-                    onClick={() => handleSubscriptionPayment(1)}
+                    onClick={() => handlePayment(1)}
                     disabled={isCreating}
-                    className={`w-full justify-between h-auto py-3 px-4 ${promoValidation ? 'border-green-500/30' : ''}`}
+                    className={`w-full justify-between h-auto py-3 px-4 ${promoValidation ? 'border-primary/30' : ''}`}
                   >
                     <span className="text-sm font-medium">1 oy</span>
                     <div className="flex items-center gap-2">
@@ -529,7 +639,7 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
                   </div>
                   <Button 
                     variant="outline" 
-                    onClick={() => handleSubscriptionPayment(3)}
+                    onClick={() => handlePayment(3)}
                     disabled={isCreating}
                     className="w-full justify-between h-auto py-3 px-4 border-primary/30"
                   >
@@ -547,7 +657,7 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
                     <Badge className="bg-accent text-accent-foreground text-[10px] px-1.5 py-0">-15%</Badge>
                   </div>
                   <Button 
-                    onClick={() => handleSubscriptionPayment(6)}
+                    onClick={() => handlePayment(6)}
                     disabled={isCreating}
                     className="w-full justify-between h-auto py-3 px-4"
                   >
@@ -558,8 +668,8 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
                     </div>
                   </Button>
                 </div>
-              </div>
             </div>
+
          </CardContent>
        </Card>
 
@@ -616,7 +726,7 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
               </div>
               <div className="text-right">
                 <div className="text-2xl font-bold text-destructive">{formatPrice(totalDebt)}</div>
-                 <Button variant="destructive" size="sm" className="mt-2" onClick={() => handleSubscriptionPayment(1)} disabled={isCreating}>
+                 <Button variant="destructive" size="sm" className="mt-2" onClick={() => handlePayment(1)} disabled={isCreating}>
                    {isCreating ? 'Yuklanmoqda...' : 'Hozir to\'lash'}
                  </Button>
                  <p className="text-xs text-muted-foreground mt-2">Telegram: <a href="https://t.me/sellercloudx_support" target="_blank" className="text-primary underline">@sellercloudx_support</a></p>
