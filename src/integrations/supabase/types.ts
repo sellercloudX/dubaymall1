@@ -504,6 +504,36 @@ export type Database = {
           },
         ]
       }
+      clone_history: {
+        Row: {
+          cloned_at: string
+          id: string
+          source_marketplace: string
+          source_offer_id: string
+          status: string
+          target_marketplace: string
+          user_id: string
+        }
+        Insert: {
+          cloned_at?: string
+          id?: string
+          source_marketplace: string
+          source_offer_id: string
+          status?: string
+          target_marketplace: string
+          user_id: string
+        }
+        Update: {
+          cloned_at?: string
+          id?: string
+          source_marketplace?: string
+          source_offer_id?: string
+          status?: string
+          target_marketplace?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       commissions: {
         Row: {
           affiliate_link_id: string | null
