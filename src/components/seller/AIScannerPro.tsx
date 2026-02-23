@@ -476,7 +476,9 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
         console.log('WB Card creation result:', cardResult);
         if (error) throw error;
       } else {
-        // Yandex card creation (default)
+        // Yandex card creation — ALWAYS skip image gen since AIScannerPro already generated them
+        // This prevents duplicate image generation and speeds up card creation significantly
+        const hasAiImages = generatedInfos.length >= 1;
         const { data: cardResult, error } = await supabase.functions.invoke('yandex-market-create-card', {
           body: {
             shopId,
@@ -496,7 +498,8 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
               mxikCode: mxikResult?.mxik_code,
               mxikName: mxikResult?.mxik_name,
             },
-            skipImageGeneration: generatedInfos.length >= 2,
+            // CRITICAL: Skip image generation if we already have AI images from scanner
+            skipImageGeneration: hasAiImages,
             pricing: {
               costPrice: pricingData.costPrice,
               recommendedPrice: pricingData.sellingPrice,
