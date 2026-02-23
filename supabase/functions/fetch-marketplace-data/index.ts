@@ -83,10 +83,27 @@ function mapWBOrder(o: any, defaultStatus: string, fromNewApi = false) {
   const rawPrice = o.convertedPrice || o.price || o.salePrice || 0;
   // New orders API returns price×10000; stats/sales return rubles directly
   const price = fromNewApi ? rawPrice / 10000 : rawPrice;
+  
+  // Build buyer info from available data
+  // New orders: address object with province/city
+  // Stats/Sales: regionName, oblast, countryName
+  const region = fromNewApi 
+    ? (o.address?.province || o.address?.city || o.regionName || '')
+    : (o.regionName || o.oblast || '');
+  const city = fromNewApi ? (o.address?.city || '') : '';
+  const buyerLocation = city && region && city !== region 
+    ? `${region}, ${city}` 
+    : (region || '');
+
+  // Order ID: prefer numeric odid/orderID for cleaner display
+  const orderId = fromNewApi 
+    ? (o.id || o.rid)
+    : (o.odid || o.orderID || o.id || o.rid);
+
   return {
-    id: o.id || o.rid,
+    id: orderId,
     status: defaultStatus,
-    createdAt: o.createdAt || o.dateCreated || new Date().toISOString(),
+    createdAt: o.createdAt || o.dateCreated || o.date || new Date().toISOString(),
     total: price,
     totalUZS: price,
     itemsTotal: price,
@@ -95,12 +112,12 @@ function mapWBOrder(o: any, defaultStatus: string, fromNewApi = false) {
     deliveryTotalUZS: 0,
     items: [{
       offerId: o.article || o.supplierArticle || "",
-      offerName: o.subject || "",
+      offerName: o.subject || o.category || "",
       count: 1,
       price: price,
       priceUZS: price,
     }],
-    buyer: { firstName: o.regionName || "", lastName: "" },
+    buyer: { firstName: buyerLocation, lastName: "" },
     nmID: o.nmId,
     warehouseName: o.warehouseName || "",
     deliveryType: o.deliveryType || "",
@@ -2528,10 +2545,10 @@ serve(async (req) => {
             const ordersList = Array.isArray(statsOrders) ? statsOrders : [];
             console.log(`WB stats orders: ${ordersList.length}`);
             if (ordersList.length > 0) {
-              console.log(`WB stats sample prices: totalPrice=${ordersList[0].totalPrice}, finishedPrice=${ordersList[0].finishedPrice}, priceWithDisc=${ordersList[0].priceWithDisc}`);
+              console.log(`WB stats sample: totalPrice=${ordersList[0].totalPrice}, finishedPrice=${ordersList[0].finishedPrice}, odid=${ordersList[0].odid}, orderID=${ordersList[0].orderID}, srid=${ordersList[0].srid}, isSupply=${ordersList[0].isSupply}`);
             }
-            for (const o of ordersList) {
-              // Use srid as primary unique key (most reliable for WB stats)
+               for (const o of ordersList) {
+              // Use srid for dedup key (most unique), but odid for display ID
               const key = `stats-${o.srid || o.odid || o.orderID || Math.random()}`;
               if (orderIdsSeen.has(key)) continue;
               orderIdsSeen.add(key);
@@ -2542,14 +2559,22 @@ serve(async (req) => {
               }
               
               // WB statistics API returns prices in RUBLES (not kopecks)
-              // finishedPrice = final price after discounts (most accurate)
-              // totalPrice = price before WB discount
-              // priceWithDisc = price with seller discount
               const price = o.finishedPrice || o.priceWithDisc || o.totalPrice || 0;
               
+              // Stats API = completed orders. isCancel means cancelled, otherwise delivered
+              let status = "DELIVERED";
+              if (o.isCancel) status = "CANCELLED";
+
+              // Build buyer info from region
+              const buyerRegion = o.regionName || o.oblast || '';
+              
+              // Clean srid: strip ".0.0" suffix for cleaner display
+              const rawSrid = String(o.srid || '');
+              const cleanId = rawSrid.endsWith('.0.0') ? rawSrid.slice(0, -4) : rawSrid;
+
               allOrders.push({
-                id: o.srid || o.odid || o.orderID,
-                status: o.isCancel ? "CANCELLED" : "DELIVERED",
+                id: cleanId || o.nmId || Math.random(),
+                status,
                 createdAt: o.date || o.lastChangeDate || new Date().toISOString(),
                 total: price,
                 totalUZS: price,
@@ -2564,7 +2589,7 @@ serve(async (req) => {
                   price: price,
                   priceUZS: price,
                 }],
-                buyer: { firstName: o.regionName || "", lastName: "" },
+                buyer: { firstName: buyerRegion, lastName: "" },
                 nmID: o.nmId,
                 warehouseName: o.warehouseName || "",
               });
@@ -2605,7 +2630,7 @@ serve(async (req) => {
               
               salesAdded++;
               allOrders.push({
-                id: sale.srid || sale.saleID || sale.odid,
+                id: sale.odid || sale.saleID || sale.srid,
                 status: sale.saleID?.startsWith("R") ? "RETURNED" : "DELIVERED",
                 createdAt: sale.date || new Date().toISOString(),
                 total: price,
@@ -2621,7 +2646,7 @@ serve(async (req) => {
                   price: price,
                   priceUZS: price,
                 }],
-                buyer: { firstName: sale.regionName || "", lastName: "" },
+                buyer: { firstName: sale.regionName || sale.oblast || "", lastName: "" },
               });
             }
             console.log(`WB sales: ${salesAdded} added, ${salesSkipped} skipped (dedup)`);
