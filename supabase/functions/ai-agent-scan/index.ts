@@ -117,7 +117,8 @@ async function scanYandexProducts(credentials: any): Promise<any> {
     const quality = qualityMap.get(offer.offerId);
     const issues: string[] = [];
     const issueDetails: any[] = [];
-    let score = quality?.score ?? -1;
+    let score = quality?.score;
+    if (typeof score !== 'number' || isNaN(score)) score = -1;
 
     if (!offer.name || offer.name.length < 40) {
       issues.push('Nom juda qisqa');
@@ -186,6 +187,9 @@ async function scanYandexProducts(credentials: any): Promise<any> {
       const warningCount = issueDetails.filter(i => i.type === 'warning').length;
       score = Math.max(5, 100 - (criticalCount * 20) - (warningCount * 8));
     }
+
+    // Final NaN guard
+    if (typeof score !== 'number' || isNaN(score)) score = 0;
 
     return {
       offerId: offer.offerId, name: offer.name || offer.offerId, category: offer.category,
