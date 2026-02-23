@@ -11,6 +11,7 @@ export type MobileTabType =
 interface MobileSellerCloudNavProps {
   activeTab: MobileTabType;
   onTabChange: (tab: MobileTabType) => void;
+  onMorePress?: () => void;
 }
 
 const navItems = [
@@ -24,7 +25,7 @@ const navItems = [
 
 const primaryTabIds: MobileTabType[] = ['marketplaces', 'analytics', 'scanner', 'products', 'orders'];
 
-export function MobileSellerCloudNav({ activeTab, onTabChange }: MobileSellerCloudNavProps) {
+export function MobileSellerCloudNav({ activeTab, onTabChange, onMorePress }: MobileSellerCloudNavProps) {
   const isMoreActive = !primaryTabIds.includes(activeTab);
 
   return (
@@ -39,9 +40,7 @@ export function MobileSellerCloudNav({ activeTab, onTabChange }: MobileSellerClo
               key={item.id}
               onClick={() => {
                 if (item.id === 'more') {
-                  if (!isMoreActive) {
-                    onTabChange('financials');
-                  }
+                  onMorePress?.();
                 } else {
                   onTabChange(item.id as MobileTabType);
                 }
