@@ -41,7 +41,8 @@ interface ScanResult {
 
 interface FixResult {
   offerId: string; name: string; success: boolean; message: string;
-  rounds?: number; newScore?: number; fix?: { name: string; summary: string };
+  verified?: boolean; remainingErrors?: string[];
+  rounds?: number; newScore?: number; fix?: { name: string; summary: string; fixedErrors?: string[] };
 }
 
 interface PriceProduct {
@@ -141,8 +142,20 @@ function CardAuditTab({ selectedPartnerId, scanResults, setScanResults }: any) {
     },
     onSuccess: (data) => {
       setFixHistory(prev => [...prev, ...(data.results || [])]);
-      toast.success(`${data.totalFixed} ta tuzatildi, ${data.totalFailed} ta xato.`);
-      if (selectedPartnerId) scanMutation.mutate(selectedPartnerId);
+      const verified = data.totalVerified || 0;
+      const pending = data.totalPending || 0;
+      const failed = data.totalFailed || 0;
+      let msg = '';
+      if (verified > 0) msg += `✅ ${verified} ta tasdiqlandi. `;
+      if (pending > 0) msg += `⏳ ${pending} ta moderatsiyada. `;
+      if (failed > 0) msg += `❌ ${failed} ta xato. `;
+      if (verified > 0) toast.success(msg.trim());
+      else if (pending > 0) toast.info(msg.trim());
+      else toast.error(msg.trim() || 'Tuzatish muvaffaqiyatsiz');
+      // Don't re-scan immediately - Yandex moderation takes time
+      if (pending === 0 && verified > 0 && selectedPartnerId) {
+        setTimeout(() => scanMutation.mutate(selectedPartnerId!), 15000);
+      }
     },
     onError: (err: any) => toast.error(`Tuzatish xatosi: ${err.message}`),
   });
@@ -427,9 +440,25 @@ function CardAuditTab({ selectedPartnerId, scanResults, setScanResults }: any) {
                                     )}
                                     {/* Fix result */}
                                     {fixResult && (
-                                      <div className={`text-xs p-2 rounded ${fixResult.success ? 'bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400' : 'bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400'}`}>
-                                        <strong>{fixResult.success ? '✅ Tuzatildi' : '❌ Xato'}:</strong> {fixResult.message}
+                                      <div className={`text-xs p-2 rounded space-y-1 ${
+                                        fixResult.success && fixResult.verified ? 'bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400' : 
+                                        fixResult.success && !fixResult.verified ? 'bg-yellow-50 dark:bg-yellow-950/20 text-yellow-700 dark:text-yellow-400' :
+                                        'bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400'
+                                      }`}>
+                                        <strong>
+                                          {fixResult.success && fixResult.verified ? '✅ Tasdiqlandi' : 
+                                           fixResult.success && !fixResult.verified ? '⏳ Moderatsiyada' : 
+                                           '❌ Xato'}:
+                                        </strong> {fixResult.message}
                                         {fixResult.fix?.summary && <span className="block mt-1 text-muted-foreground">{fixResult.fix.summary}</span>}
+                                        {fixResult.remainingErrors?.length > 0 && (
+                                          <div className="mt-1 space-y-0.5">
+                                            <span className="font-semibold">Qolgan xatolar:</span>
+                                            {fixResult.remainingErrors.map((e: string, i: number) => (
+                                              <div key={i} className="text-red-600 dark:text-red-400">{e}</div>
+                                            ))}
+                                          </div>
+                                        )}
                                       </div>
                                     )}
                                   </div>

@@ -25,7 +25,7 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3)
   return fetch(url, options);
 }
 
-// ===== AI: Generate fix with self-healing context =====
+// ===== AI: Generate fix with EXACT moderation errors =====
 async function generateFix(product: any, marketplace: string, previousAttempt?: any): Promise<any> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY sozlanmagan");
@@ -36,11 +36,34 @@ async function generateFix(product: any, marketplace: string, previousAttempt?: 
   if (previousAttempt) {
     retryContext = `
 MUHIM: Oldingi urinish muvaffaqiyatsiz bo'ldi:
-- Xatolik: ${previousAttempt.error || 'Noma\'lum'}
+- Yandex qaytargan xatolik: ${previousAttempt.error || 'Noma\'lum'}
 - Oldingi nom: "${previousAttempt.fix?.name || ''}"
 - Oldingi tavsif uzunligi: ${previousAttempt.fix?.description?.length || 0}
 
-Bu xatoni tuzat va boshqa yondashuv qo'lla.
+Bu Yandex xatosini ANIQ tuzat. Nima noto'g'ri bo'lganini tahlil qil va boshqa yondashuv qo'lla.
+Masalan: agar "Значение параметра не найдено" bo'lsa, parametr qiymatini o'zgartir.
+Agar "Слишком длинное название" bo'lsa, nomni qisqartir.
+`;
+  }
+
+  // Build EXACT moderation errors section
+  let moderationSection = '';
+  const apiErrors = product.apiErrorMessages || [];
+  const issueDetails = product.issueDetails || [];
+  const apiIssues = issueDetails.filter((d: any) => d.field === 'api');
+  
+  if (apiErrors.length > 0 || apiIssues.length > 0) {
+    const allErrors = [...new Set([...apiErrors, ...apiIssues.map((i: any) => `[${i.type}] ${i.msg} (parametr: ${i.parameter || '?'})`)])];
+    moderationSection = `
+⚠️ YANDEX MODERATSIYA XATOLIKLARI (BU XATOLARNI ANIQ TUZATISH KERAK):
+${allErrors.map((e, i) => `${i + 1}. ${e}`).join('\n')}
+
+Bu xatolar Yandex moderatsiyasidan qaytgan HAQIQIY xatolar. Har birini MAQSADLI tuzat:
+- "Значение параметра не найдено" → parametr qiymatini to'g'ri ko'rsat
+- "Слишком длинное/короткое название" → nom uzunligini qoidaga mosla
+- "Описание не соответствует" → tavsifni qayta yoz
+- "Изображение не прошло модерацию" → rasm kerak (needsImage=true)
+- "Не указан бренд" → vendor maydonini to'ldir
 `;
   }
 
@@ -53,13 +76,14 @@ WB MAXSUS QOIDALAR:
 ` : `
 YANDEX MAXSUS QOIDALAR:
 - NOM: Ruscha, 60-100 belgi. Brend + Tur + Model + Asosiy xususiyat
-- TAVSIF: Ruscha, 1000-2000 belgi, SEO-optimallashtirilgan
+- TAVSIF: Ruscha, 1000-2000 belgi, SEO-optimallashtirilgan, batafsil texnik xususiyatlar
 - name_uz: O'zbekcha lotin alifbosida nom
+- TAVSIFDA taqiqlangan: emoji, HTML teglar, ortiqcha bosh harflar, telefon raqamlar, URL
 `;
 
-  const issuesDetail = (product.issueDetails || []).map((d: any) => `[${d.type}] ${d.field}: ${d.msg}`).join('\n');
+  const otherIssues = issueDetails.filter((d: any) => d.field !== 'api').map((d: any) => `[${d.type}] ${d.field}: ${d.msg}`).join('\n');
 
-  const prompt = `Sen ${mpName} kartochka sifat ekspertisan. MAQSAD: Sifat balini 90+ ga ko'tarish.
+  const prompt = `Sen ${mpName} kartochka sifat ekspertisan. ASOSIY MAQSAD: Yandex moderatsiya xatolarini to'liq tuzatish.
 
 MAHSULOT:
 - Nom: "${product.name}"
@@ -67,27 +91,32 @@ MAHSULOT:
 - Kategoriya: ${product.category || 'Noma\'lum'}
 - Hozirgi ball: ${product.score || '?'}
 - Rasmlar: ${product.imageCount || 0} ta
-- Tavsif: ${product.descriptionLength || 0} belgi
+- Tavsif uzunligi: ${product.descriptionLength || 0} belgi
 - Brend: ${product.hasVendor ? 'bor' : 'yo\'q'}
-- Async xatolar: ${product.asyncErrors || 0} ta
-
-MUAMMOLAR:
-${issuesDetail || product.issues?.join(', ') || 'yo\'q'}
+- API xatolar: ${product.apiErrors || 0} ta
+- API ogohlantirishlar: ${product.apiWarnings || 0} ta
+${moderationSection}
+BOSHQA MUAMMOLAR:
+${otherIssues || 'yo\'q'}
 ${retryContext}
 ${wbRules}
 
-VAZIFA: Sifat balini 90+ ga ko'tarish uchun tuzatishlar yarat.
-Tavsif kamida 1000 belgi, nom uzunligi marketplace qoidalariga mos bo'lsin.
-Agar brend yo'q bo'lsa, mahsulot kategoriyasiga qarab mantiqiy brend tavsiya qil.
+VAZIFA: 
+1. BIRINCHI NAVBATDA moderatsiya xatolarini to'liq tuzat
+2. Keyin sifat balini 90+ ga ko'tar
+3. Tavsif kamida 1000 belgi, professional ruscha, SEO kalit so'zlar bilan
+4. Nom marketplace qoidalariga mos uzunlikda
+5. Agar brend yo'q bo'lsa, mahsulot turiga mos brend qo'y
 
 FAQAT JSON javob ber (boshqa hech narsa yozma):
 {
-  "name": "yangilangan nom (ruscha)",
+  "name": "yangilangan nom (ruscha, Yandex uchun 60-100 belgi)",
   "name_uz": "o'zbekcha nom (lotin)",
-  "description": "batafsil tavsif (ruscha, 1000+ belgi, SEO kalit so'zlar bilan)",
+  "description": "batafsil tavsif (ruscha, 1000+ belgi, SEO kalit so'zlar, texnik xususiyatlar)",
   "vendor": "brend nomi",
-  "summary": "qisqa xulosa nima tuzatildi",
-  "needsImage": true/false
+  "summary": "qisqa xulosa: qaysi moderatsiya xatosi qanday tuzatildi",
+  "needsImage": true/false,
+  "fixedErrors": ["tuzatilgan xato 1", "tuzatilgan xato 2"]
 }`;
 
   const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -99,7 +128,7 @@ FAQAT JSON javob ber (boshqa hech narsa yozma):
     body: JSON.stringify({
       model: "google/gemini-2.5-flash",
       messages: [
-        { role: "system", content: "Sen marketplace kartochka sifat ekspertisan. FAQAT JSON javob ber, hech qanday qo'shimcha matn yo'q." },
+        { role: "system", content: "Sen marketplace kartochka sifat ekspertisan. FAQAT JSON javob ber, hech qanday qo'shimcha matn yo'q. Yandex moderatsiya xatolarini ANIQ tuzatishga ixtisoslashgansan." },
         { role: "user", content: prompt },
       ],
       temperature: previousAttempt ? 0.4 : 0.2,
@@ -123,14 +152,17 @@ FAQAT JSON javob ber (boshqa hech narsa yozma):
   if (marketplace === 'wildberries' && fix.name && fix.name.length > 60) {
     fix.name = fix.name.substring(0, 57) + '...';
   }
-  if (marketplace === 'yandex' && fix.name && fix.name.length < 60) {
-    const category = product.category || '';
-    if (category && fix.name.length + category.length + 3 <= 100) {
-      fix.name = `${fix.name} — ${category}`;
+  if (marketplace === 'yandex' && fix.name) {
+    // Ensure name is between 60-100 chars
+    if (fix.name.length > 100) fix.name = fix.name.substring(0, 97) + '...';
+    if (fix.name.length < 60) {
+      const category = product.category || '';
+      if (category && fix.name.length + category.length + 3 <= 100) {
+        fix.name = `${fix.name} — ${category}`;
+      }
     }
   }
 
-  // Check if images are needed
   if (fix.needsImage === undefined) {
     fix.needsImage = (product.imageCount || 0) < 3;
   }
@@ -144,14 +176,12 @@ async function generateAndUploadImage(supabase: any, partnerId: string, product:
   if (!LOVABLE_API_KEY) return { success: false, message: 'AI key yo\'q' };
 
   try {
-    // Find existing reference image from the product
     const existingImages = product.pictures || [];
     const referenceUrl = existingImages.find((p: string) => p && p.startsWith('http')) || null;
     console.log(`Generating image for: "${product.name}", ref: ${referenceUrl ? 'YES' : 'NO'}`);
     
     let imageUrl: string | null = null;
 
-    // Use reference image if available for product-specific generation
     if (referenceUrl) {
       const editPrompt = `Create a professional e-commerce product photo based on this exact product.
 Requirements:
@@ -165,19 +195,10 @@ Requirements:
 
       const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
+        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "google/gemini-2.5-flash-image",
-          messages: [{
-            role: "user",
-            content: [
-              { type: "text", text: editPrompt },
-              { type: "image_url", image_url: { url: referenceUrl } }
-            ]
-          }],
+          messages: [{ role: "user", content: [{ type: "text", text: editPrompt }, { type: "image_url", image_url: { url: referenceUrl } }] }],
           modalities: ["image", "text"],
         }),
       });
@@ -188,22 +209,14 @@ Requirements:
       }
     }
 
-    // Fallback: text-only generation
     if (!imageUrl) {
       const prompt = `Generate a professional e-commerce product photo of "${product.name}" (category: ${product.category || ''}). 
 Clean white background, product centered, large, studio lighting, sharp focus, 3:4 aspect ratio, no text, no watermarks, photorealistic.`;
 
       const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash-image",
-          messages: [{ role: "user", content: prompt }],
-          modalities: ["image", "text"],
-        }),
+        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "google/gemini-2.5-flash-image", messages: [{ role: "user", content: prompt }], modalities: ["image", "text"] }),
       });
 
       if (!resp.ok) return { success: false, message: `Rasm yaratish: ${resp.status}` };
@@ -213,7 +226,6 @@ Clean white background, product centered, large, studio lighting, sharp focus, 3
 
     if (!imageUrl) return { success: false, message: 'Rasm generatsiya qilinmadi' };
 
-    // Upload to storage
     let bytes: Uint8Array;
     if (imageUrl.startsWith('data:')) {
       const base64Content = imageUrl.replace(/^data:image\/\w+;base64,/, '');
@@ -234,36 +246,28 @@ Clean white background, product centered, large, studio lighting, sharp focus, 3
     const publicUrl = urlData?.publicUrl;
     if (!publicUrl) return { success: false, message: 'Public URL olinmadi' };
 
-    // Upload to marketplace
     if (marketplace === 'yandex') {
       const apiKey = credentials.apiKey || credentials.api_key;
       const headers: Record<string, string> = { "Api-Key": apiKey, "Content-Type": "application/json" };
       const businessId = await resolveBusinessId(credentials, headers);
       if (!businessId) return { success: false, message: 'Business ID topilmadi' };
 
-      // CRITICAL: Fetch existing offer to preserve ALL fields (name, price, description, etc.)
       let existingOffer: any = {};
       const getResp = await fetchWithRetry(
         `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-mappings`,
-        { method: 'POST', headers: { ...headers }, body: JSON.stringify({ offerIds: [product.offerId] }) }
+        { method: 'POST', headers, body: JSON.stringify({ offerIds: [product.offerId] }) }
       );
       if (getResp.ok) {
         const getData = await getResp.json();
         existingOffer = getData.result?.offerMappings?.[0]?.offer || {};
-        console.log(`Image upload: preserving existing offer data - price=${existingOffer.basicPrice?.value}, name=${existingOffer.name?.substring(0, 30)}, pictures=${existingOffer.pictures?.length}`);
       }
 
       const existingPictures = existingOffer.pictures || [];
       const allPictures = [publicUrl, ...existingPictures];
       
-      // Merge: keep all existing offer fields, only update pictures
       const offerUpdate: any = { ...existingOffer, offerId: product.offerId, pictures: allPictures };
-      // Remove read-only fields that Yandex won't accept
-      delete offerUpdate.archived;
-      delete offerUpdate.cardStatus;
-      delete offerUpdate.mapping;
-      delete offerUpdate.awaitingModerationMapping;
-      delete offerUpdate.rejectedMapping;
+      delete offerUpdate.archived; delete offerUpdate.cardStatus; delete offerUpdate.mapping;
+      delete offerUpdate.awaitingModerationMapping; delete offerUpdate.rejectedMapping;
 
       const updateResp = await fetchWithRetry(
         `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-mappings/update`,
@@ -302,8 +306,8 @@ async function resolveBusinessId(credentials: any, headers: Record<string, strin
   return businessId || null;
 }
 
-// ===== YANDEX: Apply fix with verification =====
-async function applyYandexFix(credentials: any, offerId: string, fix: any): Promise<{ success: boolean; message: string; newScore?: number }> {
+// ===== YANDEX: Apply fix with REAL verification =====
+async function applyYandexFix(credentials: any, offerId: string, fix: any): Promise<{ success: boolean; message: string; newScore?: number; remainingErrors?: string[]; verified: boolean }> {
   const apiKey = credentials.apiKey || credentials.api_key;
   const headers = { "Api-Key": apiKey, "Content-Type": "application/json" };
   const businessId = await resolveBusinessId(credentials, headers);
@@ -322,17 +326,16 @@ async function applyYandexFix(credentials: any, offerId: string, fix: any): Prom
       console.log(`Fetched existing offer: price=${existingOffer.basicPrice?.value}, pictures=${existingOffer.pictures?.length}, vendor=${existingOffer.vendor}`);
     }
   } catch (e) {
-    console.warn('Could not fetch existing offer, proceeding with partial update:', e);
+    console.warn('Could not fetch existing offer:', e);
   }
 
   // Merge: start with existing offer, override only fix fields
   const offerUpdate: any = { ...existingOffer, offerId };
-  // Only override fields that AI actually provided
   if (fix.name) offerUpdate.name = fix.name;
   if (fix.description) offerUpdate.description = fix.description;
   if (fix.vendor) offerUpdate.vendor = fix.vendor;
   
-  // Remove internal/read-only fields that Yandex won't accept in update
+  // Remove read-only fields
   delete offerUpdate.archived;
   delete offerUpdate.cardStatus;
   delete offerUpdate.mapping;
@@ -346,18 +349,24 @@ async function applyYandexFix(credentials: any, offerId: string, fix: any): Prom
 
   if (!resp.ok) {
     const errText = await resp.text();
-    return { success: false, message: `Yandex API: ${resp.status} - ${errText.substring(0, 200)}` };
+    return { success: false, message: `Yandex API: ${resp.status} - ${errText.substring(0, 200)}`, verified: false };
   }
 
   const respData = await resp.json();
-  const errors = respData.results?.[0]?.errors || respData.result?.errors || [];
-  if (errors.length > 0) {
-    return { success: false, message: `Yandex: ${errors.map((e: any) => e.message).join(', ')}` };
+  const apiErrors = respData.results?.[0]?.errors || respData.result?.errors || [];
+  if (apiErrors.length > 0) {
+    const errorMsgs = apiErrors.map((e: any) => e.message || e.code || 'unknown');
+    return { success: false, message: `Yandex rad etdi: ${errorMsgs.join('; ').substring(0, 300)}`, verified: true, remainingErrors: errorMsgs };
   }
 
-  // Verify score
-  await sleep(2000);
+  // Real verification: wait and check quality score + errors
+  console.log(`[Verification] Waiting 8 seconds for Yandex to process ${offerId}...`);
+  await sleep(8000);
+  
   let newScore: number | undefined;
+  let remainingErrors: string[] = [];
+  let verified = false;
+  
   try {
     const verifyResp = await fetchWithRetry(
       `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-cards`,
@@ -367,20 +376,55 @@ async function applyYandexFix(credentials: any, offerId: string, fix: any): Prom
       const verifyData = await verifyResp.json();
       const card = verifyData.result?.offerCards?.[0];
       if (card) {
+        verified = true;
         newScore = typeof card.contentRating === 'number' ? card.contentRating : card.contentRating?.rating ?? undefined;
+        if (typeof newScore !== 'number' || isNaN(newScore)) newScore = undefined;
+        
+        // Check remaining errors
+        const cardErrors = card.errors || [];
+        const cardWarnings = card.warnings || [];
+        remainingErrors = [
+          ...cardErrors.map((e: any) => `❌ ${e.message || e.description || e.code}`),
+          ...cardWarnings.map((w: any) => `⚠️ ${w.message || w.description || w.code}`),
+        ];
+        
+        console.log(`[Verification] ${offerId}: score=${newScore}, errors=${cardErrors.length}, warnings=${cardWarnings.length}`);
+        
+        if (cardErrors.length > 0) {
+          // Fix was applied but moderation errors STILL exist
+          return { 
+            success: false, 
+            verified: true,
+            newScore,
+            remainingErrors,
+            message: `Yandex qabul qildi, lekin moderatsiya xatoliklari saqlanmoqda: ${remainingErrors.slice(0, 3).join('; ')}` 
+          };
+        }
       }
     }
-  } catch (e) { /* optional */ }
+  } catch (e) { 
+    console.warn('Verification failed:', e);
+  }
 
-  return { success: true, message: 'Yandex kartochka yangilandi', newScore };
+  // If we verified and no errors found, it's truly successful
+  if (verified && remainingErrors.length === 0) {
+    return { success: true, verified: true, newScore, remainingErrors: [], message: `✅ Yandex kartochka tuzatildi va moderatsiyadan o'tdi${newScore ? ` (ball: ${newScore})` : ''}` };
+  }
+  
+  // If we couldn't verify (API issue), mark as pending
+  if (!verified) {
+    return { success: true, verified: false, newScore: undefined, remainingErrors: [], message: '⏳ Yandex qabul qildi, moderatsiya tekshirilmoqda (qayta skanerlang)' };
+  }
+
+  return { success: true, verified, newScore, remainingErrors, message: 'Yandex kartochka yangilandi' };
 }
 
 // ===== WILDBERRIES: Apply fix =====
-async function applyWildberriesFix(credentials: any, product: any, fix: any): Promise<{ success: boolean; message: string; newScore?: number }> {
+async function applyWildberriesFix(credentials: any, product: any, fix: any): Promise<{ success: boolean; message: string; newScore?: number; verified: boolean }> {
   const apiKey = credentials.apiKey || credentials.api_key || credentials.token;
   const headers = { Authorization: apiKey, "Content-Type": "application/json" };
   const nmID = product.nmID;
-  if (!nmID) return { success: false, message: 'nmID topilmadi' };
+  if (!nmID) return { success: false, message: 'nmID topilmadi', verified: false };
 
   let descCharcId: number | null = null;
   let nameCharcId: number | null = null;
@@ -416,7 +460,7 @@ async function applyWildberriesFix(credentials: any, product: any, fix: any): Pr
 
   if (!resp.ok) {
     const errText = await resp.text();
-    return { success: false, message: `WB API: ${resp.status} - ${errText.substring(0, 200)}` };
+    return { success: false, message: `WB API: ${resp.status} - ${errText.substring(0, 200)}`, verified: false };
   }
 
   // Check for async errors
@@ -430,12 +474,12 @@ async function applyWildberriesFix(credentials: any, product: any, fix: any): Pr
       const errData = await errResp.json();
       const errors = (errData.data || errData.errors || []).filter((e: any) => (e.nmID || e.nmId) === nmID);
       if (errors.length > 0) {
-        return { success: false, message: `WB async: ${errors.map((e: any) => e.message || e.error).join('; ').substring(0, 200)}` };
+        return { success: false, verified: true, message: `WB async: ${errors.map((e: any) => e.message || e.error).join('; ').substring(0, 200)}` };
       }
     }
   } catch (e) { /* optional */ }
 
-  return { success: true, message: 'WB kartochka yangilandi' };
+  return { success: true, verified: true, message: 'WB kartochka yangilandi' };
 }
 
 serve(async (req) => {
@@ -467,7 +511,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Admin ruxsati yo\'q' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Rate limit: 10 fix operations per hour per user
+    // Rate limit: 10 fix operations per hour
     const adminSupabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
     const oneHourAgo = new Date(Date.now() - 3600000).toISOString();
     const { count: recentCount } = await adminSupabase
@@ -525,27 +569,31 @@ serve(async (req) => {
 
       for (let round = 0; round <= maxRetries; round++) {
         try {
-          console.log(`[Round ${round + 1}] Fixing ${product.offerId} on ${marketplace}...`);
+          console.log(`[Round ${round + 1}/${maxRetries + 1}] Fixing ${product.offerId} on ${marketplace}...`);
           
-          const previousAttempt = round > 0 ? { error: lastResult?.message, fix: lastFix } : undefined;
+          // For retry rounds, pass the EXACT remaining errors from Yandex
+          const previousAttempt = round > 0 ? { 
+            error: lastResult?.remainingErrors?.join('; ') || lastResult?.message, 
+            fix: lastFix 
+          } : undefined;
+          
           const fix = await generateFix(product, marketplace, previousAttempt);
           lastFix = fix;
           console.log(`AI fix (round ${round + 1}): ${fix.summary}`);
 
-          // Step 1: Apply text fixes (name, description, vendor)
           let applyResult;
           if (marketplace === 'yandex') {
             applyResult = await applyYandexFix(creds, product.offerId, fix);
           } else if (marketplace === 'wildberries') {
             applyResult = await applyWildberriesFix(creds, product, fix);
           } else {
-            applyResult = { success: false, message: `${marketplace} qo'llab-quvvatlanmaydi` };
+            applyResult = { success: false, message: `${marketplace} qo'llab-quvvatlanmaydi`, verified: false };
           }
 
           lastResult = applyResult;
 
           if (applyResult.success) {
-            // Step 2: Generate and upload image if needed
+            // Generate image if needed
             let imageResult: any = null;
             if (fix.needsImage && (product.imageCount || 0) < 3) {
               console.log(`Generating image for ${product.offerId}...`);
@@ -558,21 +606,28 @@ serve(async (req) => {
               offerId: product.offerId,
               name: product.name,
               success: true,
+              verified: applyResult.verified,
               message: applyResult.message + (imageResult?.success ? ` + ${imageResult.message}` : ''),
               rounds: round + 1,
               newScore: applyResult.newScore,
+              remainingErrors: applyResult.remainingErrors || [],
               imageGenerated: imageResult?.success || false,
-              fix: { name: fix.name, summary: fix.summary },
+              fix: { name: fix.name, summary: fix.summary, fixedErrors: fix.fixedErrors || [] },
             });
             break;
           }
 
-          console.log(`Round ${round + 1} failed: ${applyResult.message}. ${round < maxRetries ? 'Retrying...' : 'Giving up.'}`);
-          await sleep(1000);
+          // If Yandex returned remaining errors, feed them back for self-healing
+          if (applyResult.remainingErrors?.length > 0) {
+            console.log(`Round ${round + 1}: Yandex still has ${applyResult.remainingErrors.length} errors. ${round < maxRetries ? 'Self-healing...' : 'Giving up.'}`);
+          } else {
+            console.log(`Round ${round + 1} failed: ${applyResult.message}. ${round < maxRetries ? 'Retrying...' : 'Giving up.'}`);
+          }
+          await sleep(1500);
 
         } catch (e) {
           console.error(`Fix error round ${round + 1} for ${product.offerId}:`, e);
-          lastResult = { success: false, message: (e as any).message || 'Xatolik' };
+          lastResult = { success: false, message: (e as any).message || 'Xatolik', verified: false };
           if (round >= maxRetries) break;
           await sleep(1000);
         }
@@ -583,7 +638,9 @@ serve(async (req) => {
           offerId: product.offerId,
           name: product.name,
           success: false,
+          verified: lastResult?.verified || false,
           message: lastResult?.message || 'Barcha urinishlar muvaffaqiyatsiz',
+          remainingErrors: lastResult?.remainingErrors || [],
           rounds: maxRetries + 1,
         });
       }
@@ -592,10 +649,14 @@ serve(async (req) => {
     }
 
     const successCount = fixResults.filter(r => r.success).length;
+    const verifiedCount = fixResults.filter(r => r.success && r.verified).length;
+    const pendingCount = fixResults.filter(r => r.success && !r.verified).length;
 
     return new Response(JSON.stringify({
       success: true,
       totalFixed: successCount,
+      totalVerified: verifiedCount,
+      totalPending: pendingCount,
       totalFailed: fixResults.length - successCount,
       results: fixResults,
     }), {
