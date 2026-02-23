@@ -16,6 +16,7 @@ import {
 import React, { useState, useEffect, useRef, ReactNode } from 'react';
 import heroDashboard from '@/assets/hero-dashboard.png';
 import abstractShapes from '@/assets/abstract-shapes.png';
+import { MARKETPLACE_CONFIG } from '@/lib/marketplaceConfig';
 
 // ─── Animation hooks ───
 function useCountUp(end: number, duration = 2000, trigger = false) {
@@ -547,14 +548,9 @@ export default function Index() {
               <div className="mt-8 animate-fade-up text-center lg:text-left" style={{ animationDelay: '0.5s' }}>
                 <p className="text-xs text-muted-foreground mb-3 uppercase tracking-widest font-medium">{txt.trusted}</p>
                 <div className="flex items-center gap-6 md:gap-8 justify-center lg:justify-start">
-                  {[
-                    { name: 'Uzum', color: 'text-purple-500' },
-                    { name: 'Yandex', color: 'text-yellow-500' },
-                    { name: 'Wildberries', color: 'text-pink-500' },
-                    { name: 'Ozon', color: 'text-blue-500' },
-                  ].map((mp) => (
-                    <div key={mp.name} className="flex items-center gap-1.5 opacity-70 hover:opacity-100 transition-opacity">
-                      <div className={`w-2 h-2 rounded-full ${mp.color} bg-current`} />
+                  {Object.entries(MARKETPLACE_CONFIG).map(([key, mp]) => (
+                    <div key={key} className="flex items-center gap-1.5 opacity-70 hover:opacity-100 transition-opacity">
+                      <img src={mp.logo} alt={mp.name} className="w-5 h-5 rounded object-cover" />
                       <span className="text-sm font-medium text-muted-foreground">{mp.name}</span>
                     </div>
                   ))}

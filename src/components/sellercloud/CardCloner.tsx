@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
+import { MARKETPLACE_CONFIG, MarketplaceLogo } from '@/lib/marketplaceConfig';
 
 interface CardClonerProps {
   connectedMarketplaces: string[];
@@ -29,12 +30,7 @@ interface CloneableProduct {
   selected: boolean;
 }
 
-const MARKETPLACE_INFO: Record<string, { name: string; logo: string; color: string }> = {
-  yandex: { name: 'Yandex Market', logo: '🟡', color: 'from-yellow-500 to-amber-500' },
-  uzum: { name: 'Uzum Market', logo: '🟣', color: 'from-purple-500 to-violet-500' },
-  wildberries: { name: 'Wildberries', logo: '🟣', color: 'from-fuchsia-500 to-pink-500' },
-  ozon: { name: 'Ozon', logo: '🔵', color: 'from-blue-500 to-cyan-500' },
-};
+const MARKETPLACE_INFO = MARKETPLACE_CONFIG;
 
 export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
   const { user } = useAuth();
@@ -370,7 +366,7 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
                 return (
                   <button key={mp} onClick={() => setSourceMarketplace(mp)}
                     className={`w-full flex items-center gap-3 p-2.5 rounded-lg border-2 transition-all ${sourceMarketplace === mp ? 'border-primary bg-primary/5' : 'border-transparent hover:bg-muted'}`}>
-                    <span className="text-xl shrink-0">{info.logo}</span>
+                    <MarketplaceLogo marketplace={mp} size={24} className="shrink-0" />
                     <div className="text-left min-w-0">
                       <div className="font-medium text-sm truncate">{info.name}</div>
                       <div className="text-xs text-muted-foreground">{count} mahsulot</div>
@@ -398,7 +394,7 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
                   return (
                     <button key={mp} onClick={() => toggleTarget(mp)}
                       className={`w-full flex items-center gap-3 p-2.5 rounded-lg border-2 transition-all ${isSelected ? 'border-primary bg-primary/5' : 'border-transparent hover:bg-muted'}`}>
-                      <span className="text-xl shrink-0">{info.logo}</span>
+                      <MarketplaceLogo marketplace={mp} size={24} className="shrink-0" />
                       <div className="text-left min-w-0">
                         <div className="font-medium text-sm truncate">{info.name}</div>
                       </div>

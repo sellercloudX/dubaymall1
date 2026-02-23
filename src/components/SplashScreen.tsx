@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import sellerCloudXLogo from '@/assets/logos/sellercloudx-logo.png';
-import uzumLogo from '@/assets/logos/uzum-market.png';
-import magnitLogo from '@/assets/logos/magnit.png';
-import wbLogo from '@/assets/logos/wildberries.jpg';
-import ozonLogo from '@/assets/logos/ozon.png';
+import uzumLogo from '@/assets/logos/uzum-market-new.png';
+import magnitLogo from '@/assets/logos/magnit-new.png';
+import wbLogo from '@/assets/logos/wildberries-new.jpg';
+import ozonLogo from '@/assets/logos/ozon-new.png';
 
 interface SplashScreenProps {
   onComplete: () => void;
@@ -12,7 +12,7 @@ interface SplashScreenProps {
 
 const marketplaces = [
   { src: uzumLogo, name: 'Uzum Market' },
-  { src: magnitLogo, name: 'Magnit' },
+  { src: magnitLogo, name: 'Yandex Market' },
   { src: wbLogo, name: 'Wildberries' },
   { src: ozonLogo, name: 'Ozon' },
 ];

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { MarketplaceLogo, MARKETPLACE_CONFIG } from '@/lib/marketplaceConfig';
 import ReactMarkdown from 'react-markdown';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -73,7 +74,7 @@ function PartnerSelector({ partners, selectedPartnerId, onSelect }: any) {
         <div className="flex gap-2 flex-wrap">
           {partners.find((p: any) => p.userId === selectedPartnerId).marketplaces.map((mp: string) => (
             <Badge key={mp} variant="outline" className="text-xs">
-              {mp === 'yandex' ? '🟡 Yandex' : mp === 'wildberries' ? '🟣 WB' : mp}
+              <MarketplaceLogo marketplace={mp} size={14} className="mr-1 inline-block" /> {MARKETPLACE_CONFIG[mp]?.name || mp}
             </Badge>
           ))}
         </div>
@@ -241,7 +242,7 @@ function CardAuditTab({ selectedPartnerId, scanResults, setScanResults }: any) {
             <CardHeader>
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <CardTitle className="flex items-center gap-2 text-lg">
-                  {result.marketplace === 'yandex' ? '🟡 Yandex Market' : result.marketplace === 'uzum' ? '🟢 Uzum Market' : '🟣 Wildberries'}
+                  <MarketplaceLogo marketplace={result.marketplace} size={20} className="mr-2 inline-block" /> {MARKETPLACE_CONFIG[result.marketplace]?.name || result.marketplace}
                   <Badge variant="outline">{result.totalProducts} ta</Badge>
                 </CardTitle>
                 <div className="flex gap-2 flex-wrap">
