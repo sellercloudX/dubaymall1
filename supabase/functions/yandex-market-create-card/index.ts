@@ -528,8 +528,8 @@ QOIDALAR:
 JAVOB FAQAT JSON:
 {"name_ru":"...","name_uz":"...","description_ru":"...","description_uz":"...","vendor":"...","vendorCode":"...","manufacturerCountry":"...","shelfLife":null,"lifeTime":null,"parameterValues":[{"parameterId":123,"valueId":456},{"parameterId":789,"value":"qiymat"}],"warranty":"1 год","adult":false,"weightKg":0.15,"lengthCm":10,"widthCm":8,"heightCm":5}`;
 
-  // Use better model for first pass
-  const aiModel = cloneMode ? "google/gemini-2.5-flash" : "google/gemini-2.5-pro";
+  // Cost-optimized: flash for all modes
+  const aiModel = "google/gemini-2.5-flash";
   
   let result: any = null;
   

@@ -321,7 +321,7 @@ async function aiSelectBestCode(
       method: 'POST',
       headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'google/gemini-2.5-flash-lite',
         messages: [
           { role: 'system', content: 'Sen O\'zbekiston MXIK (IKPU) kod mutaxassisizan. Mahsulot nomi va kategoriyasi asosida eng mos MXIK kodni taklif qil. MXIK kodlar 17 xonali raqam. Faqat JSON javob ber.' },
           { role: 'user', content: `Mahsulot: "${productName}"\n${category ? `Kategoriya: "${category}"` : ''}\n${description ? `Tavsif: "${description}"` : ''}\n\nEng mos MXIK kodni 17 xonali formatda taklif qil.\nJSON: {"mxik_code":"17_digit_code","mxik_name":"nomi","vat_rate":12,"confidence":50}` },
@@ -392,7 +392,7 @@ JSON:
     method: 'POST',
     headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'google/gemini-2.5-flash',
+      model: 'google/gemini-2.5-flash-lite',
       messages: [
         { role: 'system', content: 'Sen MXIK kod mutaxassisizan. FAQAT berilgan ro\'yxatdagi kodlardan tanlaysan. Yangi kod to\'qib chiqarma. MUHIM: Kosmetika/go\'zallik mahsulotlarini (krem, shampun, vosk, depilyatsiya, parfyum) HECH QACHON dori-darmon yoki farmatsevtika kategoriyasiga qo\'yma! Mahsulot turini ANIQ farqla! JSON formatda javob ber.' },
         { role: 'user', content: prompt },
