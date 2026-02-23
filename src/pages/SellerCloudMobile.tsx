@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMarketplaceConnections } from '@/hooks/useMarketplaceConnections';
@@ -35,6 +35,7 @@ const NotificationCenter = lazy(() => import('@/components/sellercloud/Notificat
 const SubscriptionBilling = lazy(() => import('@/components/sellercloud/SubscriptionBilling').then(m => ({ default: m.SubscriptionBilling })));
 const CostPriceManager = lazy(() => import('@/components/sellercloud/CostPriceManager').then(m => ({ default: m.CostPriceManager })));
 const UzumCardHelper = lazy(() => import('@/components/sellercloud/UzumCardHelper').then(m => ({ default: m.UzumCardHelper })));
+const MxikImport = lazy(() => import('@/components/sellercloud/MxikImport').then(m => ({ default: m.MxikImport })));
 
 // Lightweight tab loading skeleton
 function TabLoader() {
@@ -51,7 +52,6 @@ function TabLoader() {
 import { TrendingUp, Calculator, DollarSign, BarChart3, Shield, Copy, AlertOctagon, ArrowDownUp, Tag, Upload, FileSpreadsheet, Bell, CreditCard, Coins, Sparkles } from 'lucide-react';
 
 const moreSubTabs = [
-  
   { id: 'inventory' as const, icon: ArrowDownUp, label: 'Qoldiq' },
   { id: 'financials' as const, icon: DollarSign, label: 'Moliya' },
   { id: 'calculator' as const, icon: Calculator, label: 'Kalkulyator' },
@@ -62,6 +62,7 @@ const moreSubTabs = [
   { id: 'uzum-card' as const, icon: Sparkles, label: 'Uzum Card' },
   { id: 'problems' as const, icon: AlertOctagon, label: 'Muammolar' },
   { id: 'pricing' as const, icon: Tag, label: 'Narxlar' },
+  { id: 'mxik' as const, icon: FileSpreadsheet, label: 'MXIK baza' },
   { id: 'reports' as const, icon: FileSpreadsheet, label: 'Hisobotlar' },
   { id: 'notifications' as const, icon: Bell, label: 'Bildirishnoma' },
   { id: 'subscription' as const, icon: CreditCard, label: 'Obuna' },
@@ -95,11 +96,19 @@ export default function SellerCloudMobile() {
     createSubscription,
   } = useSellerCloudSubscription();
   
-   const connectedMarketplaces = connections.map(c => c.marketplace);
-   const totalRevenue = connections.reduce((sum, c) => sum + (c.total_revenue || 0), 0);
+   const connectedMarketplaces = useMemo(() => connections.map(c => c.marketplace), [connections]);
    
    // Centralized data store — fetches once, cached for all tabs
    const store = useMarketplaceDataStore(connectedMarketplaces);
+   
+   // Calculate revenue from actual order data (same logic as desktop)
+   const totalRevenue = useMemo(() => {
+     const orders = store.allOrders;
+     if (orders.length === 0) return connections.reduce((sum, c) => sum + (c.total_revenue || 0), 0);
+     return orders
+       .filter((o: any) => !['CANCELLED', 'CANCELED', 'RETURNED'].includes(String(o.status).toUpperCase()))
+       .reduce((sum: number, o: any) => sum + (o.itemsTotal || o.total || 0), 0);
+   }, [store.allOrders, connections]);
 
   const handleMarketplaceConnect = async () => {
     await refetch();
@@ -217,6 +226,8 @@ export default function SellerCloudMobile() {
         return <div className="p-4"><NotificationCenter /></div>;
       case 'subscription':
         return <div className="p-4"><SubscriptionBilling totalSalesVolume={totalRevenue} /></div>;
+      case 'mxik':
+        return <div className="p-4"><MxikImport /></div>;
       default:
         return null;
     }
