@@ -43,7 +43,7 @@ export function MinPriceProtection({
   const [logisticsPerOrder, setLogisticsPerOrder] = useState(4000);
   const isMobile = useIsMobile();
   const isLoading = store.isLoadingProducts;
-  const { getCostPrice } = useCostPrices();
+  const { getCostPrice, loading: costLoading } = useCostPrices();
   const { data: tariffMap, isLoading: tariffsLoading, dataUpdatedAt: tariffUpdatedAt } = useMarketplaceTariffs(connectedMarketplaces, store);
 
   const products = useMemo(() => {
@@ -127,7 +127,7 @@ export function MinPriceProtection({
     return (<Card><CardContent className="py-12 text-center"><Shield className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" /><h3 className="text-lg font-semibold mb-2">Minimal narx himoyasi</h3><p className="text-muted-foreground">Avval marketplace ulang</p></CardContent></Card>);
   }
 
-  if (isLoading || tariffsLoading) {
+  if (isLoading || tariffsLoading || costLoading) {
     return (<div className="space-y-4"><div className="grid grid-cols-2 gap-3">{[1,2,3,4].map(i => <Skeleton key={i} className="h-24" />)}</div><Skeleton className="h-96" /></div>);
   }
 
