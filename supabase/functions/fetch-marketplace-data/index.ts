@@ -1141,6 +1141,55 @@ serve(async (req) => {
           console.error("Yandex stock update error:", e);
           result = { success: false, error: "Stock update error" };
         }
+      } else if (dataType === "reviews") {
+        // Yandex Market: Fetch product reviews/feedbacks
+        try {
+          if (!effectiveBusinessId) {
+            result = { success: false, error: "Business ID required for reviews" };
+          } else {
+            const { page: reviewPage = 1 } = requestBody;
+            const reviewsResp = await fetchWithRetry(
+              `https://api.partner.market.yandex.ru/businesses/${effectiveBusinessId}/goods-feedback?page=${reviewPage}&pageSize=50`,
+              { headers }
+            );
+            
+            if (reviewsResp.ok) {
+              const reviewsData = await reviewsResp.json();
+              const feedbacks = reviewsData.result?.feedbacks || [];
+              console.log(`Yandex reviews: ${feedbacks.length} on page ${reviewPage}`);
+              
+              const mapped = feedbacks.map((fb: any) => ({
+                id: fb.feedbackId || fb.id,
+                offerId: fb.offer?.offerId || "",
+                productName: fb.offer?.name || "",
+                userName: fb.author?.name || "Покупатель",
+                text: fb.comment?.text || fb.text || "",
+                pros: fb.comment?.pros || "",
+                cons: fb.comment?.cons || "",
+                answer: fb.shop?.comment || null,
+                rating: fb.grade?.overall || fb.rating || 0,
+                createdAt: fb.createdAt || "",
+                photos: (fb.media?.photos || []).map((p: any) => p.url || ""),
+                isAnswered: !!fb.shop?.comment,
+                orderId: fb.order?.id || null,
+              }));
+              
+              result = { 
+                success: true, 
+                data: mapped, 
+                total: reviewsData.result?.paging?.total || mapped.length,
+                hasMore: !!reviewsData.result?.paging?.nextPageToken,
+              };
+            } else {
+              const errText = await reviewsResp.text();
+              console.error("Yandex reviews error:", reviewsResp.status, errText);
+              result = { success: false, error: `Yandex reviews failed: ${reviewsResp.status}` };
+            }
+          }
+        } catch (e) {
+          console.error("Yandex reviews error:", e);
+          result = { success: false, error: "Error fetching Yandex reviews" };
+        }
       }
 
       // Update connection with latest sync time
@@ -3032,6 +3081,123 @@ serve(async (req) => {
         } catch (e) {
           console.error("WB reconciliation error:", e);
           result = { success: false, error: "WB inventory reconciliation error" };
+        }
+      } else if (dataType === "feedbacks") {
+        // WB Feedbacks API — fetch product reviews
+        try {
+          const { isAnswered = false, take = 100, skip = 0 } = requestBody;
+          const fbResp = await fetch(
+            `https://feedbacks-api.wildberries.ru/api/v1/feedbacks?isAnswered=${isAnswered}&take=${take}&skip=${skip}&order=dateDesc`,
+            { headers: wbHeaders }
+          );
+          if (fbResp.ok) {
+            const fbData = await fbResp.json();
+            const feedbacks = fbData.data?.feedbacks || [];
+            console.log(`WB feedbacks: ${feedbacks.length} (isAnswered=${isAnswered})`);
+            
+            const mapped = feedbacks.map((fb: any) => ({
+              id: fb.id,
+              nmID: fb.nmId,
+              productName: fb.productDetails?.productName || fb.subjectName || "",
+              userName: fb.userName || "Anonim",
+              text: fb.text || "",
+              answer: fb.answer?.text || null,
+              rating: fb.productValuation || 0,
+              createdAt: fb.createdDate || "",
+              photos: (fb.photoLinks || []).map((p: any) => p.fullSize || p.miniSize || ""),
+              isAnswered: !!fb.answer,
+              supplierArticle: fb.supplierArticle || "",
+            }));
+            
+            result = { success: true, data: mapped, total: fbData.data?.feedbacksCount || mapped.length };
+          } else {
+            const errText = await fbResp.text();
+            console.error("WB feedbacks error:", fbResp.status, errText);
+            result = { success: false, error: `WB feedbacks failed: ${fbResp.status}` };
+          }
+        } catch (e) {
+          console.error("WB feedbacks error:", e);
+          result = { success: false, error: "Error fetching WB feedbacks" };
+        }
+      } else if (dataType === "questions") {
+        // WB Questions API — fetch product questions
+        try {
+          const { isAnswered = false, take = 100, skip = 0 } = requestBody;
+          const qResp = await fetch(
+            `https://feedbacks-api.wildberries.ru/api/v1/questions?isAnswered=${isAnswered}&take=${take}&skip=${skip}&order=dateDesc`,
+            { headers: wbHeaders }
+          );
+          if (qResp.ok) {
+            const qData = await qResp.json();
+            const questions = qData.data?.questions || [];
+            console.log(`WB questions: ${questions.length} (isAnswered=${isAnswered})`);
+            
+            const mapped = questions.map((q: any) => ({
+              id: q.id,
+              nmID: q.nmId,
+              productName: q.productDetails?.productName || q.subjectName || "",
+              text: q.text || "",
+              answer: q.answer?.text || null,
+              createdAt: q.createdDate || "",
+              isAnswered: !!q.answer,
+              supplierArticle: q.supplierArticle || "",
+            }));
+            
+            result = { success: true, data: mapped, total: qData.data?.countUnanswered || mapped.length };
+          } else {
+            const errText = await qResp.text();
+            console.error("WB questions error:", qResp.status, errText);
+            result = { success: false, error: `WB questions failed: ${qResp.status}` };
+          }
+        } catch (e) {
+          console.error("WB questions error:", e);
+          result = { success: false, error: "Error fetching WB questions" };
+        }
+      } else if (dataType === "answer-feedback") {
+        // WB: Answer a feedback
+        try {
+          const { feedbackId, text } = requestBody;
+          if (!feedbackId || !text) {
+            result = { success: false, error: "feedbackId and text required" };
+          } else {
+            const resp = await fetch("https://feedbacks-api.wildberries.ru/api/v1/feedbacks", {
+              method: "PATCH",
+              headers: { ...wbHeaders, "Content-Type": "application/json" },
+              body: JSON.stringify({ id: feedbackId, text }),
+            });
+            if (resp.ok) {
+              result = { success: true, message: "Javob yuborildi" };
+            } else {
+              const errText = await resp.text();
+              result = { success: false, error: `Answer failed: ${resp.status}`, details: errText };
+            }
+          }
+        } catch (e) {
+          console.error("WB answer feedback error:", e);
+          result = { success: false, error: "Error answering feedback" };
+        }
+      } else if (dataType === "answer-question") {
+        // WB: Answer a question
+        try {
+          const { questionId, text } = requestBody;
+          if (!questionId || !text) {
+            result = { success: false, error: "questionId and text required" };
+          } else {
+            const resp = await fetch("https://feedbacks-api.wildberries.ru/api/v1/questions", {
+              method: "PATCH",
+              headers: { ...wbHeaders, "Content-Type": "application/json" },
+              body: JSON.stringify({ id: questionId, text }),
+            });
+            if (resp.ok) {
+              result = { success: true, message: "Javob yuborildi" };
+            } else {
+              const errText = await resp.text();
+              result = { success: false, error: `Answer failed: ${resp.status}`, details: errText };
+            }
+          }
+        } catch (e) {
+          console.error("WB answer question error:", e);
+          result = { success: false, error: "Error answering question" };
         }
       }
 
