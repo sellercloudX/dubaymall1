@@ -6,7 +6,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
-import { Copy, ArrowRight, Globe, Package, Search, Check, X, Loader2, Image, RefreshCw, Zap, Store, AlertTriangle } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Copy, ArrowRight, Globe, Package, Search, Check, X, Loader2, Image, RefreshCw, Zap, Store, AlertTriangle, Filter } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { backgroundTaskManager } from '@/lib/backgroundTaskManager';
@@ -42,6 +43,41 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
   const [targetMarketplaces, setTargetMarketplaces] = useState<string[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterTab, setFilterTab] = useState<'all' | 'not_cloned' | 'cloned'>('all');
+
+  // Clone history from DB: Set of "sourceMarketplace:offerId:targetMarketplace"
+  const [cloneHistoryKeys, setCloneHistoryKeys] = useState<Set<string>>(new Set());
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  // Fetch clone history when source/target changes
+  useEffect(() => {
+    if (!user || targetMarketplaces.length === 0) {
+      setCloneHistoryKeys(new Set());
+      return;
+    }
+    const fetchHistory = async () => {
+      setHistoryLoading(true);
+      try {
+        const { data } = await supabase
+          .from('clone_history')
+          .select('source_marketplace, source_offer_id, target_marketplace')
+          .eq('user_id', user.id)
+          .eq('source_marketplace', sourceMarketplace)
+          .in('target_marketplace', targetMarketplaces);
+        
+        const keys = new Set<string>();
+        (data || []).forEach(row => {
+          keys.add(`${row.source_marketplace}:${row.source_offer_id}:${row.target_marketplace}`);
+        });
+        setCloneHistoryKeys(keys);
+      } catch (err) {
+        console.error('Clone history fetch error:', err);
+      } finally {
+        setHistoryLoading(false);
+      }
+    };
+    fetchHistory();
+  }, [user, sourceMarketplace, targetMarketplaces]);
 
   // Track active clone task from background manager
   const activeCloneTask = tasks.find(t => t.type === 'clone' && (t.status === 'running' || t.status === 'pending'));
@@ -54,6 +90,7 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
   useEffect(() => {
     setSelectedIds(new Set());
     setTargetMarketplaces([]);
+    setFilterTab('all');
   }, [sourceMarketplace]);
 
   // Set default source when marketplaces change
@@ -125,8 +162,13 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
   // Normalize text for fuzzy comparison
   const normalize = (s: string) => s.toLowerCase().replace(/[^a-zа-яё0-9]/gi, '').trim();
   
-  // Check if product already exists in target marketplace (fuzzy matching)
+  // Check if product already exists in target marketplace (DB history OR fuzzy matching)
   const isAlreadyCloned = useCallback((product: CloneableProduct, targetMp: string): boolean => {
+    // 1. Check DB clone history first
+    const historyKey = `${sourceMarketplace}:${product.offerId}:${targetMp}`;
+    if (cloneHistoryKeys.has(historyKey)) return true;
+
+    // 2. Fallback to fuzzy matching against target products
     const targetProducts = store.getProducts(targetMp);
     const srcName = normalize(product.name);
     const srcSku = product.shopSku?.toLowerCase() || '';
@@ -149,7 +191,7 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
       }
       return false;
     });
-  }, [store.dataVersion]);
+  }, [store.dataVersion, cloneHistoryKeys, sourceMarketplace]);
 
   // Get cloned status for each product across all selected targets
   const clonedStatusMap = useMemo(() => {
@@ -166,6 +208,25 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
     }
     return map;
   }, [products, targetMarketplaces, isAlreadyCloned]);
+
+  // Filtered products by clone status
+  const clonedCount = useMemo(() => {
+    if (targetMarketplaces.length === 0) return 0;
+    return products.filter(p => {
+      // "Cloned" = cloned to ALL selected targets
+      return targetMarketplaces.every(t => isAlreadyCloned(p, t));
+    }).length;
+  }, [products, targetMarketplaces, isAlreadyCloned]);
+
+  const notClonedCount = products.length - clonedCount;
+
+  const filteredByTab = useMemo(() => {
+    if (targetMarketplaces.length === 0 || filterTab === 'all') return filteredProducts;
+    return filteredProducts.filter(p => {
+      const isFullyCloned = targetMarketplaces.every(t => isAlreadyCloned(p, t));
+      return filterTab === 'cloned' ? isFullyCloned : !isFullyCloned;
+    });
+  }, [filteredProducts, filterTab, targetMarketplaces, isAlreadyCloned]);
 
   // Clone product to external marketplace
   const cloneToMarketplace = async (product: CloneableProduct, targetMp: string): Promise<boolean> => {
@@ -325,12 +386,21 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
 
         const batch = cloneTasks.slice(i, i + BATCH_SIZE);
         const results = await Promise.allSettled(
-          batch.map(({ product, target }) => cloneToMarketplace(product, target))
+          batch.map(({ product, target }) => cloneToMarketplace(product, target).then(ok => ({ ok, product, target })))
         );
         for (const r of results) {
-          if (r.status === 'fulfilled' && r.value) {
+          if (r.status === 'fulfilled' && r.value.ok) {
             success++;
             backgroundTaskManager.incrementCompleted(taskId);
+            // Save to clone_history
+            if (user) {
+              supabase.from('clone_history').upsert({
+                user_id: user.id,
+                source_marketplace: r.value.product.marketplace,
+                source_offer_id: r.value.product.offerId,
+                target_marketplace: r.value.target,
+              }, { onConflict: 'user_id,source_marketplace,source_offer_id,target_marketplace' }).then(() => {});
+            }
           } else {
             failed++;
             backgroundTaskManager.incrementFailed(taskId);
@@ -474,22 +544,41 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
                 <Input placeholder="Qidirish..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-8 h-8 text-sm w-full sm:w-36" />
               </div>
               <Button variant="outline" size="sm" onClick={selectAll} className="shrink-0 text-xs h-8">
-                {filteredProducts.every(p => selectedIds.has(p.offerId)) ? 'Bekor' : 'Barchasi'}
+                {filteredByTab.every(p => selectedIds.has(p.offerId)) ? 'Bekor' : 'Barchasi'}
               </Button>
             </div>
           </div>
+
+          {/* Filter tabs - only show when targets selected */}
+          {targetMarketplaces.length > 0 && (
+            <div className="mt-3">
+              <Tabs value={filterTab} onValueChange={(v) => setFilterTab(v as any)}>
+                <TabsList className="h-8 w-full grid grid-cols-3">
+                  <TabsTrigger value="all" className="text-xs h-7">
+                    Jami ({products.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="not_cloned" className="text-xs h-7">
+                    Klonlanmagan ({notClonedCount})
+                  </TabsTrigger>
+                  <TabsTrigger value="cloned" className="text-xs h-7">
+                    Klonlangan ({clonedCount})
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+          )}
         </CardHeader>
         <CardContent className="p-0 sm:p-6 sm:pt-0">
-          {isLoading ? (
+          {isLoading || historyLoading ? (
             <div className="space-y-2 p-3">{[1, 2, 3].map(i => <Skeleton key={i} className="h-14 w-full" />)}</div>
-          ) : filteredProducts.length === 0 ? (
+          ) : filteredByTab.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <Package className="h-12 w-12 mx-auto mb-3 opacity-50" />
-              <p className="text-sm">Topilmadi</p>
+              <p className="text-sm">{filterTab === 'not_cloned' ? 'Barcha mahsulotlar klonlangan ✓' : filterTab === 'cloned' ? 'Hali klonlanmagan' : 'Topilmadi'}</p>
             </div>
           ) : (
             <div className="space-y-1.5 max-h-[400px] overflow-y-auto px-3 pb-3">
-              {filteredProducts.map(product => (
+              {filteredByTab.map(product => (
                 <div key={product.offerId}
                   className={`flex items-center gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-colors ${selectedIds.has(product.offerId) ? 'bg-primary/5 border-primary/30' : 'hover:bg-muted'}`}
                   onClick={() => toggleProduct(product.offerId)}>
@@ -504,7 +593,7 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
                     <div className="flex items-center gap-1">
                       <code className="text-[10px] text-muted-foreground truncate">{product.shopSku}</code>
                       {clonedStatusMap.has(product.offerId) && (
-                        <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-yellow-500/10 text-yellow-600 border-yellow-500/30 shrink-0">
+                        <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-accent/50 text-accent-foreground border-accent shrink-0">
                           ✓ {clonedStatusMap.get(product.offerId)!.join(', ')}
                         </Badge>
                       )}
