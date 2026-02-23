@@ -161,16 +161,27 @@ serve(async (req) => {
     let credentials: { apiKey: string; campaignId?: string; businessId?: string; sellerId?: string };
     
     if (connection.encrypted_credentials) {
-      const { data: decData, error: decError } = await supabase
-        .rpc("decrypt_credentials", { p_encrypted: connection.encrypted_credentials });
-      if (decError || !decData) {
-        console.error("Failed to decrypt credentials:", decError);
-        return new Response(
-          JSON.stringify({ error: "Failed to decrypt credentials" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+      try {
+        const { data: decData, error: decError } = await supabase
+          .rpc("decrypt_credentials", { p_encrypted: connection.encrypted_credentials });
+        if (decError || !decData) {
+          console.warn("Decrypt failed, trying base64 fallback:", decError?.message);
+          // Fallback: encrypted_credentials may be plain base64-encoded JSON
+          try {
+            const decoded = atob(connection.encrypted_credentials);
+            credentials = JSON.parse(decoded);
+          } catch {
+            // Final fallback: use plain credentials column
+            console.warn("Base64 fallback failed, using plain credentials");
+            credentials = connection.credentials as any;
+          }
+        } else {
+          credentials = decData as any;
+        }
+      } catch (e) {
+        console.warn("Decrypt exception, falling back to plain credentials:", e);
+        credentials = connection.credentials as any;
       }
-      credentials = decData as any;
     } else {
       credentials = connection.credentials as any;
     }
