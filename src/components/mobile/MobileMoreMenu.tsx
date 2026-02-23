@@ -68,18 +68,18 @@ export function MobileMoreMenu({ open, onOpenChange, activeTab, onTabChange }: M
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="max-h-[85vh] overflow-y-auto px-4 pb-8">
+      <DrawerContent className="max-h-[90vh] overflow-y-auto px-3 pb-6">
         <VisuallyHidden.Root>
           <DrawerTitle>Menyu</DrawerTitle>
           <DrawerDescription>Qo'shimcha bo'limlar</DrawerDescription>
         </VisuallyHidden.Root>
-        <div className="space-y-3 pt-1">
-          {menuCategories.map((cat, catIdx) => (
+        <div className="space-y-1 pt-0.5">
+          {menuCategories.map((cat) => (
             <div key={cat.title}>
-              <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-1.5 px-0.5">
+              <h3 className="text-[9px] font-semibold text-muted-foreground uppercase tracking-widest mb-1 px-1">
                 {cat.title}
               </h3>
-              <div className="grid grid-cols-4 gap-1">
+              <div className="grid grid-cols-4 gap-0.5">
                 {cat.items.map((item) => {
                   const Icon = item.icon;
                   const isActive = activeTab === item.id;
@@ -88,21 +88,20 @@ export function MobileMoreMenu({ open, onOpenChange, activeTab, onTabChange }: M
                       key={item.id}
                       onClick={() => handleSelect(item.id)}
                       className={cn(
-                        'flex flex-col items-center gap-1 py-2 px-1 rounded-xl transition-all duration-200 active:scale-[0.92]',
+                        'flex flex-col items-center gap-0.5 py-1.5 px-1 rounded-lg transition-all duration-150 active:scale-[0.92]',
                         isActive
-                          ? 'bg-primary/10 shadow-sm'
-                          : 'hover:bg-muted/60 active:bg-muted'
+                          ? 'bg-primary/10'
+                          : 'active:bg-muted'
                       )}
                     >
                       <div className={cn(
-                        'w-9 h-9 rounded-xl flex items-center justify-center',
+                        'w-8 h-8 rounded-lg flex items-center justify-center',
                         item.color,
-                        isActive && 'scale-110 shadow-sm'
                       )}>
-                        <Icon className={cn('h-4 w-4', isActive && 'stroke-[2.5]')} />
+                        <Icon className={cn('h-3.5 w-3.5', isActive && 'stroke-[2.5]')} />
                       </div>
                       <span className={cn(
-                        'text-[9px] leading-tight text-center line-clamp-1',
+                        'text-[9px] leading-none text-center line-clamp-1',
                         isActive ? 'text-primary font-bold' : 'text-muted-foreground font-medium'
                       )}>
                         {item.label}
@@ -111,9 +110,6 @@ export function MobileMoreMenu({ open, onOpenChange, activeTab, onTabChange }: M
                   );
                 })}
               </div>
-              {catIdx < menuCategories.length - 1 && (
-                <div className="border-b border-border/50 mt-2.5" />
-              )}
             </div>
           ))}
         </div>
