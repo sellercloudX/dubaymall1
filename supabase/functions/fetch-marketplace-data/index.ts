@@ -77,11 +77,12 @@ interface YandexOrder {
 }
 
 // Helper to map WB order object to unified format
-// ALL WB APIs return prices in KOPECKS — always divide by 100
+// New Orders API (/api/v3/orders/new): convertedPrice/price in smallest units (rub×10000) → divide by 10000
+// Statistics/Sales APIs: prices in RUBLES → NO division
 function mapWBOrder(o: any, defaultStatus: string, fromNewApi = false) {
-  // convertedPrice and price from new orders API are in kopecks → divide by 100
   const rawPrice = o.convertedPrice || o.price || o.salePrice || 0;
-  const price = fromNewApi ? rawPrice / 100 : rawPrice;
+  // New orders API returns price×10000; stats/sales return rubles directly
+  const price = fromNewApi ? rawPrice / 10000 : rawPrice;
   return {
     id: o.id || o.rid,
     status: defaultStatus,
@@ -2540,12 +2541,11 @@ serve(async (req) => {
                 statsNmDateKeys.add(`${o.nmId}-${o.date.substring(0, 10)}`);
               }
               
-              // WB statistics API returns prices in KOPECKS (same as new orders)
+              // WB statistics API returns prices in RUBLES (not kopecks)
               // finishedPrice = final price after discounts (most accurate)
               // totalPrice = price before WB discount
               // priceWithDisc = price with seller discount
-              const rawPrice = o.finishedPrice || o.priceWithDisc || o.totalPrice || 0;
-              const price = rawPrice / 100; // Convert kopecks to rubles
+              const price = o.finishedPrice || o.priceWithDisc || o.totalPrice || 0;
               
               allOrders.push({
                 id: o.srid || o.odid || o.orderID,
@@ -2600,9 +2600,8 @@ serve(async (req) => {
               if (orderIdsSeen.has(saleKey)) { salesSkipped++; continue; }
               orderIdsSeen.add(saleKey);
               
-              // Sales API also returns prices in KOPECKS
-              const rawSalePrice = sale.finishedPrice || sale.priceWithDisc || sale.totalPrice || 0;
-              const price = rawSalePrice / 100; // Convert kopecks to rubles
+              // Sales API returns prices in RUBLES (not kopecks)
+              const price = sale.finishedPrice || sale.priceWithDisc || sale.totalPrice || 0;
               
               salesAdded++;
               allOrders.push({
