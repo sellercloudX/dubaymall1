@@ -211,6 +211,36 @@ serve(async (req) => {
       });
     }
 
+    // Rate limit: 15 requests per hour per user
+    const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+    const rateLimitSupabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+    // Extract user from token for rate limiting
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user: rateLimitUser } } = await rateLimitSupabase.auth.getUser(token);
+    if (rateLimitUser) {
+      const oneHourAgo = new Date(Date.now() - 3600000).toISOString();
+      const { count: recentCount } = await rateLimitSupabase
+        .from('ai_usage_log')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', rateLimitUser.id)
+        .eq('action_type', 'generate-infographic')
+        .gte('created_at', oneHourAgo);
+
+      if ((recentCount || 0) >= 15) {
+        return new Response(
+          JSON.stringify({ error: 'Rate limit exceeded. Max 15 infographics per hour.' }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      await rateLimitSupabase.from('ai_usage_log').insert({
+        user_id: rateLimitUser.id, action_type: 'generate-infographic', model_used: 'gemini-3-pro-image',
+      });
+    }
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       return new Response(JSON.stringify({ error: "AI service not configured" }), {
