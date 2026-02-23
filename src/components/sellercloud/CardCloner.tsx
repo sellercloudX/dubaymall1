@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Copy, ArrowRight, Globe, Package, Search, Check, X, Loader2, Image, RefreshCw, Zap, Store, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { backgroundTaskManager } from '@/lib/backgroundTaskManager';
+import { useBackgroundTasks } from '@/hooks/useBackgroundTasks';
 import { useAuth } from '@/contexts/AuthContext';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 import { MARKETPLACE_CONFIG, MarketplaceLogo } from '@/lib/marketplaceConfig';
@@ -34,14 +36,18 @@ const MARKETPLACE_INFO = MARKETPLACE_CONFIG;
 
 export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
   const { user } = useAuth();
+  const { tasks } = useBackgroundTasks();
 
   const [sourceMarketplace, setSourceMarketplace] = useState(connectedMarketplaces[0] || '');
   const [targetMarketplaces, setTargetMarketplaces] = useState<string[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [isCloning, setIsCloning] = useState(false);
-  const [cloneProgress, setCloneProgress] = useState(0);
-  const [cloneResults, setCloneResults] = useState<{ success: number; failed: number; skipped: number } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Track active clone task from background manager
+  const activeCloneTask = tasks.find(t => t.type === 'clone' && (t.status === 'running' || t.status === 'pending'));
+  const completedCloneTask = tasks.find(t => t.type === 'clone' && (t.status === 'completed' || t.status === 'failed'));
+  const isCloning = !!activeCloneTask;
+  const cloneProgress = activeCloneTask?.progress || 0;
 
   const isLoading = store.isLoadingProducts;
 
@@ -278,51 +284,76 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
 
   const handleClone = async () => {
     if (selectedProducts.length === 0 || targetMarketplaces.length === 0) return;
-    setIsCloning(true);
-    setCloneProgress(0);
-    setCloneResults(null);
-
-    let success = 0;
-    let failed = 0;
-    let skipped = 0;
-
     // Build all clone tasks
-    const tasks: { product: CloneableProduct; target: string }[] = [];
+    const cloneTasks: { product: CloneableProduct; target: string }[] = [];
+    let skipped = 0;
     for (const product of selectedProducts) {
       for (const target of targetMarketplaces) {
         if (isAlreadyCloned(product, target)) {
           skipped++;
         } else {
-          tasks.push({ product, target });
+          cloneTasks.push({ product, target });
         }
       }
     }
 
-    const total = tasks.length + skipped;
-    let processed = skipped;
-    setCloneProgress(total > 0 ? Math.round((processed / total) * 100) : 100);
-
-    // Process in parallel batches of 3
-    const BATCH_SIZE = 3;
-    for (let i = 0; i < tasks.length; i += BATCH_SIZE) {
-      const batch = tasks.slice(i, i + BATCH_SIZE);
-      const results = await Promise.allSettled(
-        batch.map(({ product, target }) => cloneToMarketplace(product, target))
-      );
-      for (const r of results) {
-        if (r.status === 'fulfilled' && r.value) success++;
-        else failed++;
-        processed++;
-      }
-      setCloneProgress(Math.round((processed / total) * 100));
+    const total = cloneTasks.length + skipped;
+    if (cloneTasks.length === 0) {
+      toast.info(`Barcha ${skipped} ta mahsulot allaqachon mavjud`);
+      return;
     }
 
-    setCloneResults({ success, failed, skipped });
-    setIsCloning(false);
+    // Create background task
+    const taskId = backgroundTaskManager.createTask(
+      'clone',
+      `Klonlanmoqda: 0/${cloneTasks.length}`,
+      { skipped },
+      cloneTasks.length
+    );
 
-    if (success > 0) toast.success(`${success} ta mahsulot klonlandi`);
-    if (skipped > 0) toast.info(`${skipped} ta mahsulot allaqachon mavjud — o'tkazib yuborildi`);
-    if (failed > 0) toast.error(`${failed} ta mahsulot klonlanmadi`);
+    // Start running asynchronously (fire-and-forget)
+    (async () => {
+      backgroundTaskManager.updateTask(taskId, { status: 'running' });
+      let success = 0;
+      let failed = 0;
+      const BATCH_SIZE = 3;
+
+      for (let i = 0; i < cloneTasks.length; i += BATCH_SIZE) {
+        // Check if cancelled
+        const currentTask = backgroundTaskManager.getTask(taskId);
+        if (currentTask?.status === 'cancelled') break;
+
+        const batch = cloneTasks.slice(i, i + BATCH_SIZE);
+        const results = await Promise.allSettled(
+          batch.map(({ product, target }) => cloneToMarketplace(product, target))
+        );
+        for (const r of results) {
+          if (r.status === 'fulfilled' && r.value) {
+            success++;
+            backgroundTaskManager.incrementCompleted(taskId);
+          } else {
+            failed++;
+            backgroundTaskManager.incrementFailed(taskId);
+          }
+        }
+        backgroundTaskManager.updateTask(taskId, {
+          message: `Klonlanmoqda: ${success + failed}/${cloneTasks.length}`,
+          currentItem: batch[batch.length - 1]?.product.name,
+        });
+      }
+
+      // Final update
+      const finalMsg = `✅ ${success} ta muvaffaqiyatli${failed > 0 ? `, ❌ ${failed} ta xato` : ''}${skipped > 0 ? `, ⏭ ${skipped} ta o'tkazildi` : ''}`;
+      backgroundTaskManager.updateTask(taskId, {
+        status: failed > 0 && success === 0 ? 'failed' : 'completed',
+        message: finalMsg,
+        progress: 100,
+        data: { success, failed, skipped },
+      });
+    })();
+
+    // Clear selection after starting
+    setSelectedIds(new Set());
   };
 
   const RUB_TO_UZS = 140;
@@ -488,7 +519,7 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
       </Card>
 
       {/* Deduplication warning */}
-      {skippedCount > 0 && !isCloning && !cloneResults && (
+      {skippedCount > 0 && !isCloning && !completedCloneTask && (
         <Card className="border-warning/30 bg-warning/5 overflow-hidden">
           <CardContent className="py-3 px-4 flex items-center gap-3">
             <AlertTriangle className="h-4 w-4 text-warning shrink-0" />
@@ -505,23 +536,54 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
           <CardContent className="py-6">
             <div className="text-center mb-3">
               <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-primary" />
-              <p className="text-sm">Klonlanmoqda... {cloneProgress}%</p>
+              <p className="text-sm">{activeCloneTask?.message || `Klonlanmoqda... ${cloneProgress}%`}</p>
+              {activeCloneTask?.currentItem && (
+                <p className="text-xs text-muted-foreground mt-1 truncate max-w-xs mx-auto">
+                  {activeCloneTask.currentItem}
+                </p>
+              )}
             </div>
             <Progress value={cloneProgress} className="h-2" />
+            <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
+              <span>{activeCloneTask?.completedItems || 0} / {activeCloneTask?.totalItems || 0}</span>
+              <span>{cloneProgress}%</span>
+            </div>
+            <p className="text-xs text-center text-muted-foreground mt-3">
+              💡 Boshqa sahifaga o'tishingiz mumkin — jarayon fonida davom etadi
+            </p>
           </CardContent>
         </Card>
-      ) : cloneResults ? (
+      ) : completedCloneTask ? (
         <Card className="overflow-hidden">
           <CardContent className="py-6">
             <div className="text-center space-y-3">
-              <Check className="h-8 w-8 mx-auto text-primary" />
+              {completedCloneTask.status === 'completed' ? (
+                <Check className="h-8 w-8 mx-auto text-primary" />
+              ) : (
+                <X className="h-8 w-8 mx-auto text-destructive" />
+              )}
               <h3 className="font-semibold">Klonlash yakunlandi</h3>
-              <div className="flex justify-center gap-4 text-sm">
-                {cloneResults.success > 0 && <Badge variant="default">{cloneResults.success} muvaffaqiyatli</Badge>}
-                {cloneResults.skipped > 0 && <Badge variant="outline">{cloneResults.skipped} o'tkazildi</Badge>}
-                {cloneResults.failed > 0 && <Badge variant="destructive">{cloneResults.failed} xato</Badge>}
+              <div className="flex justify-center gap-3 text-sm flex-wrap">
+                {(completedCloneTask.data?.success > 0) && (
+                  <Badge variant="default">{completedCloneTask.data.success} ta muvaffaqiyatli klonlandi</Badge>
+                )}
+                {(completedCloneTask.data?.skipped > 0) && (
+                  <Badge variant="outline">{completedCloneTask.data.skipped} ta o'tkazildi</Badge>
+                )}
+                {(completedCloneTask.data?.failed > 0) && (
+                  <Badge variant="destructive">{completedCloneTask.data.failed} ta klonlanmadi</Badge>
+                )}
+                {(completedCloneTask.failedItems || 0) > 0 && !completedCloneTask.data?.failed && (
+                  <Badge variant="destructive">{completedCloneTask.failedItems} ta xato</Badge>
+                )}
               </div>
-              <Button variant="outline" size="sm" onClick={() => setCloneResults(null)}>Yangi klonlash</Button>
+              <Button 
+                variant="default" 
+                size="sm" 
+                onClick={() => backgroundTaskManager.removeTask(completedCloneTask.id)}
+              >
+                OK — Yangi klonlash
+              </Button>
             </div>
           </CardContent>
         </Card>

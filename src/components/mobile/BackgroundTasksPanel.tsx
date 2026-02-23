@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
  import { Button } from '@/components/ui/button';
  import { Progress } from '@/components/ui/progress';
  import { Badge } from '@/components/ui/badge';
-import { ListTodo, CheckCircle2, XCircle, Loader2, Trash2, Ban, Package, ShoppingCart, Sparkles, RefreshCw } from 'lucide-react';
+import { ListTodo, CheckCircle2, XCircle, Loader2, Trash2, Ban, Package, ShoppingCart, Sparkles, RefreshCw, Copy } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { backgroundTaskManager, BackgroundTask } from '@/lib/backgroundTaskManager';
 
@@ -14,6 +14,7 @@ const taskTypeIcons: Record<string, React.ReactNode> = {
   'order-sync': <ShoppingCart className="h-4 w-4" />,
   'ai-process': <Sparkles className="h-4 w-4" />,
   'batch': <ListTodo className="h-4 w-4" />,
+  'clone': <Copy className="h-4 w-4" />,
 };
 
 function getTaskIcon(type: string) {
