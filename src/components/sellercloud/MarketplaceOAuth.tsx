@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { MARKETPLACE_CONFIG, MarketplaceLogo } from '@/lib/marketplaceConfig';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -62,7 +63,7 @@ const MARKETPLACES: Marketplace[] = [
   {
     id: 'yandex',
     name: 'Yandex Market',
-    logo: '🟡',
+    logo: MARKETPLACE_CONFIG.yandex.logo,
     color: 'from-yellow-500 to-amber-500',
     oauthUrl: 'https://oauth.yandex.ru/authorize',
     requiresManualKey: true,
@@ -75,7 +76,7 @@ const MARKETPLACES: Marketplace[] = [
   {
     id: 'uzum',
     name: 'Uzum Market',
-    logo: '🟣',
+    logo: MARKETPLACE_CONFIG.uzum.logo,
     color: 'from-purple-500 to-violet-500',
     requiresManualKey: true,
     fields: [
@@ -87,7 +88,7 @@ const MARKETPLACES: Marketplace[] = [
    {
      id: 'wildberries',
      name: 'Wildberries',
-     logo: '🟣',
+     logo: MARKETPLACE_CONFIG.wildberries.logo,
      color: 'from-fuchsia-500 to-pink-500',
      requiresManualKey: true,
      fields: [
@@ -98,7 +99,7 @@ const MARKETPLACES: Marketplace[] = [
   {
     id: 'ozon',
     name: 'Ozon',
-    logo: '🔵',
+    logo: MARKETPLACE_CONFIG.ozon.logo,
     color: 'from-blue-500 to-cyan-500',
     requiresManualKey: true,
     fields: [
@@ -274,8 +275,8 @@ export function MarketplaceOAuth({
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${mp.color} flex items-center justify-center text-2xl`}>
-                            {mp.logo}
+                          <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${mp.color} flex items-center justify-center overflow-hidden`}>
+                            <img src={mp.logo} alt={mp.name} className="w-full h-full object-cover" />
                           </div>
                           <div>
                             <CardTitle className="text-lg">{mp.name}</CardTitle>
@@ -387,7 +388,7 @@ export function MarketplaceOAuth({
               <>
                 <DialogHeader>
                   <DialogTitle className="flex items-center gap-2">
-                    <span className="text-2xl">{mp.logo}</span>
+                    <img src={mp.logo} alt={mp.name} className="w-6 h-6 rounded object-cover" />
                     {mp.name} ulash
                   </DialogTitle>
                   <DialogDescription>

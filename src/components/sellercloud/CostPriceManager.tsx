@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
+import { MarketplaceLogo } from '@/lib/marketplaceConfig';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -194,7 +195,7 @@ export function CostPriceManager({ connectedMarketplaces, store }: CostPriceMana
             <Button key={mp} variant={selectedMp === mp ? 'default' : 'outline'} size="sm"
               onClick={() => { setSelectedMp(mp); setSearch(''); setEditingPrices({}); setCurrentPage(1); }}
               className="shrink-0 text-xs">
-              {mp === 'yandex' ? '🟡' : mp === 'uzum' ? '🟣' : mp === 'wildberries' ? '🔵' : '🟢'} {MARKETPLACE_NAMES[mp]}
+              <MarketplaceLogo marketplace={mp} size={14} className="mr-1" /> {MARKETPLACE_NAMES[mp]}
             </Button>
           ))}
         </div>

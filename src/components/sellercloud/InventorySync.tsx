@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
+import { MarketplaceLogo } from '@/lib/marketplaceConfig';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -289,7 +290,7 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
               size="sm"
               onClick={() => setSelectedMarketplace(mp)}
             >
-              {MARKETPLACE_NAMES[mp] || mp}
+              <MarketplaceLogo marketplace={mp} size={14} className="mr-1" /> {MARKETPLACE_NAMES[mp] || mp}
             </Button>
           ))}
         </div>

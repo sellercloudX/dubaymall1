@@ -60,7 +60,7 @@ const SEVERITY_CONFIG = {
 };
 
 const MARKETPLACE_NAMES: Record<string, string> = {
-  yandex: 'Yandex Market', uzum: 'Uzum Market', wildberries: 'Wildberries', ozon: 'Ozon',
+  yandex: 'Yandex Market', uzum: 'Uzum Market', wildberries: 'WB', ozon: 'Ozon',
 };
 
 const SCORE_COLORS = (score: number) => {
