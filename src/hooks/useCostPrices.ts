@@ -15,7 +15,7 @@ interface CostPriceEntry {
 export function useCostPrices() {
   const { user } = useAuth();
   const [costPrices, setCostPrices] = useState<CostPriceEntry[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const fetchCostPrices = useCallback(async () => {
     if (!user) return;
