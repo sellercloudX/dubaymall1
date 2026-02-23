@@ -159,15 +159,21 @@ async function scanYandexProducts(credentials: any): Promise<any> {
       issueDetails.push({ type: 'warning', field: 'dimensions', msg: 'Og\'irlik/o\'lcham kiritilmagan' });
     }
 
+    // Yandex moderation errors (appear after card review)
+    const apiErrorMessages: string[] = [];
     if (quality?.errors?.length > 0) {
       for (const e of quality.errors) {
-        issues.push(e.message || `Xatolik: ${e.code || 'unknown'}`);
-        issueDetails.push({ type: 'critical', field: 'api', msg: e.message || e.code });
+        const errMsg = e.message || e.description || `Xatolik: ${e.code || 'unknown'}`;
+        issues.push(errMsg);
+        issueDetails.push({ type: 'critical', field: 'api', msg: errMsg, parameter: e.parameter || e.code || '' });
+        apiErrorMessages.push(errMsg);
       }
     }
     if (quality?.warnings?.length > 0) {
       for (const w of quality.warnings) {
-        issueDetails.push({ type: 'warning', field: 'api', msg: w.message || w.code });
+        const warnMsg = w.message || w.description || `Ogohlantirish: ${w.code || 'unknown'}`;
+        issueDetails.push({ type: 'warning', field: 'api', msg: warnMsg, parameter: w.parameter || w.code || '' });
+        apiErrorMessages.push(warnMsg);
       }
       if (quality.warnings.length > 0) issues.push(`${quality.warnings.length} ta ogohlantirish`);
     }
@@ -188,6 +194,7 @@ async function scanYandexProducts(credentials: any): Promise<any> {
       hasDescription: (offer.description?.length || 0) >= 1000, hasVendor: !!offer.vendor,
       hasBarcodes: (offer.barcodes?.length || 0) > 0, hasDimensions: !!offer.weightDimensions,
       apiErrors: quality?.errors?.length || 0, apiWarnings: quality?.warnings?.length || 0,
+      apiErrorMessages,
       pictures: offer.pictures || [],
     };
   });
