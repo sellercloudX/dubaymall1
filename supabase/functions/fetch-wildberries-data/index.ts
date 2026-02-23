@@ -210,10 +210,10 @@ serve(async (req: Request) => {
 
     const { supplierId, connectionId, warehouseId, dataType = 'all' } = await req.json() as FetchWildberriesDataRequest;
 
-    // Get API key from database
+    // Get encrypted API key from database
     const { data: connection, error: connError } = await supabase
       .from('wildberries_connections')
-      .select('api_key')
+      .select('encrypted_api_key')
       .eq('id', connectionId)
       .eq('user_id', user.id)
       .single();
@@ -221,6 +221,20 @@ serve(async (req: Request) => {
     if (connError || !connection) {
       throw new Error("Connection not found");
     }
+
+    if (!connection.encrypted_api_key) {
+      throw new Error("API key not configured");
+    }
+
+    // Decrypt the API key server-side
+    const { data: decryptedData, error: decryptError } = await supabase
+      .rpc('decrypt_credentials', { p_encrypted: connection.encrypted_api_key });
+
+    if (decryptError || !decryptedData) {
+      throw new Error("Failed to decrypt API key");
+    }
+
+    const apiKey = decryptedData.apiKey || decryptedData;
 
     const results: Record<string, any> = {};
 
@@ -230,7 +244,7 @@ serve(async (req: Request) => {
         user.id,
         connectionId,
         supplierId,
-        connection.api_key,
+        apiKey,
         warehouseId
       );
     }
@@ -241,7 +255,7 @@ serve(async (req: Request) => {
         user.id,
         connectionId,
         supplierId,
-        connection.api_key
+        apiKey
       );
     }
 
@@ -251,7 +265,7 @@ serve(async (req: Request) => {
         user.id,
         connectionId,
         supplierId,
-        connection.api_key
+        apiKey
       );
     }
 
