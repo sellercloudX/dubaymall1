@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, Fragment } from 'react';
 import { MarketplaceLogo, MARKETPLACE_CONFIG } from '@/lib/marketplaceConfig';
 import ReactMarkdown from 'react-markdown';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -27,9 +27,10 @@ import {
 interface ProductIssue {
   offerId: string; nmID?: number; subjectID?: number; name: string;
   category: string; score: number; issueCount: number; issues: string[];
-  issueDetails?: { type: string; field: string; msg: string }[];
+  issueDetails?: { type: string; field: string; msg: string; parameter?: string }[];
   imageCount: number; descriptionLength?: number; hasDescription: boolean;
   hasVendor: boolean; asyncErrors?: number; apiErrors?: number; apiWarnings?: number;
+  apiErrorMessages?: string[];
 }
 
 interface ScanResult {
@@ -107,6 +108,7 @@ function CardAuditTab({ selectedPartnerId, scanResults, setScanResults }: any) {
   const [expandedProduct, setExpandedProduct] = useState<string | null>(null);
   const [autoFixProgress, setAutoFixProgress] = useState<{ current: number; total: number; marketplace: string } | null>(null);
   const [currentPage, setCurrentPage] = useState<Record<string, number>>({});
+  const [filterMode, setFilterMode] = useState<'all' | 'yandex-errors'>('all');
   const PAGE_SIZE = 50;
 
   const scanMutation = useMutation({
@@ -179,7 +181,37 @@ function CardAuditTab({ selectedPartnerId, scanResults, setScanResults }: any) {
   };
 
   const totalCritical = scanResults.reduce((s: number, r: ScanResult) => s + r.criticalCount, 0);
+  const totalYandexErrors = scanResults.reduce((s: number, r: ScanResult) => {
+    if (r.marketplace !== 'yandex') return s;
+    return s + r.products.filter((p: ProductIssue) => (p.apiErrors || 0) > 0 || (p.apiWarnings || 0) > 0).length;
+  }, 0);
   const isFixing = fixMutation.isPending || !!autoFixProgress;
+
+  // Auto-fix only Yandex moderation errors
+  const autoFixYandexErrors = async () => {
+    if (!selectedPartnerId) return;
+    const yandexResult = scanResults.find((r: ScanResult) => r.marketplace === 'yandex');
+    if (!yandexResult) { toast.info('Yandex ma\'lumotlari topilmadi'); return; }
+    const errorProducts = yandexResult.products.filter((p: ProductIssue) => (p.apiErrors || 0) > 0 || (p.apiWarnings || 0) > 0);
+    if (errorProducts.length === 0) { toast.info('Yandex xatoliklari topilmadi'); return; }
+
+    setAutoFixProgress({ current: 0, total: errorProducts.length, marketplace: 'yandex' });
+    let processed = 0;
+    for (let i = 0; i < errorProducts.length; i += 10) {
+      const batch = errorProducts.slice(i, i + 10);
+      setAutoFixProgress({ current: processed, total: errorProducts.length, marketplace: 'yandex' });
+      try {
+        const { data } = await supabase.functions.invoke('ai-agent-fix', {
+          body: { partnerId: selectedPartnerId, marketplace: 'yandex', products: batch, maxRetries: 2 },
+        });
+        if (data?.results) setFixHistory(prev => [...prev, ...data.results]);
+      } catch (e: any) { console.error('Yandex fix error:', e); }
+      processed += batch.length;
+    }
+    setAutoFixProgress(null);
+    toast.success(`Yandex xatoliklari tuzatildi: ${errorProducts.length} ta kartochka`);
+    scanMutation.mutate(selectedPartnerId);
+  };
 
   return (
     <div className="space-y-4">
@@ -190,11 +222,29 @@ function CardAuditTab({ selectedPartnerId, scanResults, setScanResults }: any) {
         </Button>
         {scanResults.length > 0 && totalCritical > 0 && (
           <Button onClick={autoFixAll} disabled={isFixing} variant="destructive" className="gap-2">
-            {autoFixProgress ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
+            {autoFixProgress && autoFixProgress.marketplace !== 'yandex' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
             Hammasini tuzat ({totalCritical + scanResults.reduce((s: number, r: ScanResult) => s + r.warningCount, 0)})
           </Button>
         )}
+        {scanResults.length > 0 && totalYandexErrors > 0 && (
+          <Button onClick={autoFixYandexErrors} disabled={isFixing} variant="outline" className="gap-2 border-yellow-500 text-yellow-700 hover:bg-yellow-50 dark:text-yellow-400 dark:hover:bg-yellow-950/20">
+            {autoFixProgress?.marketplace === 'yandex' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4" />}
+            Yandex xatolarini tuzat ({totalYandexErrors})
+          </Button>
+        )}
       </div>
+
+      {/* Filter mode */}
+      {scanResults.length > 0 && totalYandexErrors > 0 && (
+        <div className="flex gap-2">
+          <Button size="sm" variant={filterMode === 'all' ? 'default' : 'outline'} onClick={() => setFilterMode('all')} className="text-xs">
+            Barchasi
+          </Button>
+          <Button size="sm" variant={filterMode === 'yandex-errors' ? 'default' : 'outline'} onClick={() => setFilterMode('yandex-errors')} className="text-xs gap-1">
+            <Shield className="h-3 w-3" />Yandex xatoliklari ({totalYandexErrors})
+          </Button>
+        </div>
+      )}
 
       {autoFixProgress && (
         <Card className="border-primary/30">
@@ -233,9 +283,18 @@ function CardAuditTab({ selectedPartnerId, scanResults, setScanResults }: any) {
       )}
 
       {scanResults.map((result: ScanResult) => {
+        // Filter products based on filterMode
+        const filteredProducts = filterMode === 'yandex-errors' && result.marketplace === 'yandex'
+          ? result.products.filter((p: ProductIssue) => (p.apiErrors || 0) > 0 || (p.apiWarnings || 0) > 0)
+          : filterMode === 'yandex-errors' && result.marketplace !== 'yandex'
+          ? [] // Hide non-yandex marketplaces in yandex-errors mode
+          : result.products;
+        
+        if (filteredProducts.length === 0 && filterMode === 'yandex-errors') return null;
+        
         const page = currentPage[result.marketplace] || 0;
-        const totalPages = Math.ceil(result.products.length / PAGE_SIZE);
-        const paginatedProducts = result.products.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+        const totalPages = Math.ceil(filteredProducts.length / PAGE_SIZE);
+        const paginatedProducts = filteredProducts.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
         return (
           <Card key={result.marketplace}>
@@ -268,12 +327,15 @@ function CardAuditTab({ selectedPartnerId, scanResults, setScanResults }: any) {
                 <div className="text-center py-8 text-destructive"><XCircle className="h-8 w-8 mx-auto mb-2" /><p>{result.error}</p></div>
               ) : (
                 <>
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
-                    <StatCard value={result.totalProducts} label="Jami" />
+                  <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 mb-4">
+                    <StatCard value={filteredProducts.length} label={filterMode === 'yandex-errors' ? 'Xatoli' : 'Jami'} />
                     <StatCard value={result.avgScore} label="O'rtacha ball" />
                     <StatCard value={result.criticalCount} label="Kritik" color="text-red-600" />
                     <StatCard value={result.warningCount} label="Ogohlantirish" color="text-yellow-600" />
                     <StatCard value={result.goodCount} label="Yaxshi" color="text-green-600" />
+                    {result.marketplace === 'yandex' && (
+                      <StatCard value={result.products.filter((p: ProductIssue) => (p.apiErrors || 0) > 0).length} label="YM xatolik" color="text-yellow-600" />
+                    )}
                   </div>
 
                   <Table>
@@ -284,6 +346,7 @@ function CardAuditTab({ selectedPartnerId, scanResults, setScanResults }: any) {
                         <TableHead className="text-center">Ball</TableHead>
                         <TableHead className="text-center"><Image className="h-3.5 w-3.5 inline" /></TableHead>
                         <TableHead className="text-center"><FileText className="h-3.5 w-3.5 inline" /></TableHead>
+                        {result.marketplace === 'yandex' && <TableHead className="text-center"><Shield className="h-3.5 w-3.5 inline" /></TableHead>}
                         <TableHead>Holat</TableHead>
                         <TableHead></TableHead>
                       </TableRow>
@@ -291,31 +354,87 @@ function CardAuditTab({ selectedPartnerId, scanResults, setScanResults }: any) {
                     <TableBody>
                       {paginatedProducts.map((product: ProductIssue) => {
                         const fixResult = fixHistory.find(r => r.offerId === product.offerId);
+                        const hasYandexErrors = (product.apiErrors || 0) > 0 || (product.apiWarnings || 0) > 0;
+                        const isExpanded = expandedProduct === product.offerId;
                         return (
-                          <TableRow key={product.offerId} className={`${product.score < 50 ? 'bg-red-50/50 dark:bg-red-950/10' : ''} ${fixResult?.success ? 'bg-green-50/50 dark:bg-green-950/10' : ''}`}>
-                            <TableCell>
-                              <Checkbox checked={selectedProducts.has(product.offerId)} onCheckedChange={() => toggleProduct(product.offerId)} disabled={product.issueCount === 0} />
-                            </TableCell>
-                            <TableCell className="max-w-[200px] truncate font-medium" title={product.name}>{product.name}</TableCell>
-                            <TableCell className="text-center"><ScoreBadge score={product.score} /></TableCell>
-                            <TableCell className="text-center">
-                              {product.imageCount >= 3 ? <CheckCircle2 className="h-4 w-4 text-green-500 inline" /> : <XCircle className="h-4 w-4 text-red-500 inline" />}
-                              <span className="text-[10px] ml-0.5">{product.imageCount}</span>
-                            </TableCell>
-                            <TableCell className="text-center">{product.hasDescription ? <CheckCircle2 className="h-4 w-4 text-green-500 inline" /> : <XCircle className="h-4 w-4 text-red-500 inline" />}</TableCell>
-                            <TableCell>
-                              {fixResult ? (
-                                fixResult.success ? <Badge className="bg-green-500 text-white text-[10px]">✅ Tuzatildi</Badge>
-                                : <Badge variant="destructive" className="text-[10px]">❌ Xato</Badge>
-                              ) : product.issueCount > 0 ? <Badge variant="outline" className="text-[10px]">{product.issueCount} muammo</Badge>
-                              : <Badge className="bg-green-500/20 text-green-700 text-[10px]">OK</Badge>}
-                            </TableCell>
-                            <TableCell>
-                              <Button size="sm" variant="ghost" onClick={() => fixMutation.mutate({ partnerId: selectedPartnerId, marketplace: result.marketplace, products: [product] })} disabled={product.issueCount === 0 || isFixing} className="h-7 px-2">
-                                <Wrench className="h-3 w-3" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
+                          <Fragment key={product.offerId}>
+                            <TableRow key={product.offerId} className={`cursor-pointer ${product.score < 50 ? 'bg-red-50/50 dark:bg-red-950/10' : ''} ${fixResult?.success ? 'bg-green-50/50 dark:bg-green-950/10' : ''} ${hasYandexErrors ? 'border-l-2 border-l-yellow-500' : ''}`}
+                              onClick={() => setExpandedProduct(isExpanded ? null : product.offerId)}>
+                              <TableCell>
+                                <Checkbox checked={selectedProducts.has(product.offerId)} onCheckedChange={() => toggleProduct(product.offerId)} disabled={product.issueCount === 0} onClick={e => e.stopPropagation()} />
+                              </TableCell>
+                              <TableCell className="max-w-[200px] truncate font-medium" title={product.name}>{product.name}</TableCell>
+                              <TableCell className="text-center"><ScoreBadge score={product.score} /></TableCell>
+                              <TableCell className="text-center">
+                                {product.imageCount >= 3 ? <CheckCircle2 className="h-4 w-4 text-green-500 inline" /> : <XCircle className="h-4 w-4 text-red-500 inline" />}
+                                <span className="text-[10px] ml-0.5">{product.imageCount}</span>
+                              </TableCell>
+                              <TableCell className="text-center">{product.hasDescription ? <CheckCircle2 className="h-4 w-4 text-green-500 inline" /> : <XCircle className="h-4 w-4 text-red-500 inline" />}</TableCell>
+                              {result.marketplace === 'yandex' && (
+                                <TableCell className="text-center">
+                                  {hasYandexErrors ? (
+                                    <Badge variant="destructive" className="text-[10px]">
+                                      {(product.apiErrors || 0) + (product.apiWarnings || 0)}
+                                    </Badge>
+                                  ) : <CheckCircle2 className="h-4 w-4 text-green-500 inline" />}
+                                </TableCell>
+                              )}
+                              <TableCell>
+                                {fixResult ? (
+                                  fixResult.success ? <Badge className="bg-green-500 text-white text-[10px]">✅ Tuzatildi</Badge>
+                                  : <Badge variant="destructive" className="text-[10px]">❌ Xato</Badge>
+                                ) : product.issueCount > 0 ? <Badge variant="outline" className="text-[10px]">{product.issueCount} muammo</Badge>
+                                : <Badge className="bg-green-500/20 text-green-700 text-[10px]">OK</Badge>}
+                              </TableCell>
+                              <TableCell>
+                                <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); fixMutation.mutate({ partnerId: selectedPartnerId, marketplace: result.marketplace, products: [product] }); }} disabled={product.issueCount === 0 || isFixing} className="h-7 px-2">
+                                  <Wrench className="h-3 w-3" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                            {/* Expanded: show Yandex API errors and issue details */}
+                            {isExpanded && (
+                              <TableRow key={`${product.offerId}-details`}>
+                                <TableCell colSpan={result.marketplace === 'yandex' ? 8 : 7} className="bg-muted/30 p-3">
+                                  <div className="space-y-2">
+                                    {/* Yandex API Errors */}
+                                    {product.apiErrorMessages && product.apiErrorMessages.length > 0 && (
+                                      <div className="space-y-1">
+                                        <p className="text-xs font-semibold flex items-center gap-1 text-yellow-700 dark:text-yellow-400">
+                                          <Shield className="h-3.5 w-3.5" />Yandex moderatsiya xatoliklari:
+                                        </p>
+                                        {product.apiErrorMessages.map((msg, idx) => (
+                                          <div key={idx} className="flex items-start gap-2 text-xs bg-yellow-50 dark:bg-yellow-950/20 p-2 rounded border border-yellow-200 dark:border-yellow-800">
+                                            <AlertTriangle className="h-3.5 w-3.5 text-yellow-600 shrink-0 mt-0.5" />
+                                            <span>{msg}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                    {/* All issue details */}
+                                    {product.issueDetails && product.issueDetails.length > 0 && (
+                                      <div className="space-y-1">
+                                        <p className="text-xs font-semibold text-muted-foreground">Barcha muammolar:</p>
+                                        {product.issueDetails.map((d, idx) => (
+                                          <div key={idx} className={`flex items-start gap-2 text-xs p-1.5 rounded ${d.type === 'critical' ? 'text-red-700 dark:text-red-400' : 'text-muted-foreground'}`}>
+                                            {d.type === 'critical' ? <XCircle className="h-3 w-3 shrink-0 mt-0.5" /> : <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5" />}
+                                            <span><strong>{d.field}:</strong> {d.msg}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                    {/* Fix result */}
+                                    {fixResult && (
+                                      <div className={`text-xs p-2 rounded ${fixResult.success ? 'bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400' : 'bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400'}`}>
+                                        <strong>{fixResult.success ? '✅ Tuzatildi' : '❌ Xato'}:</strong> {fixResult.message}
+                                        {fixResult.fix?.summary && <span className="block mt-1 text-muted-foreground">{fixResult.fix.summary}</span>}
+                                      </div>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </Fragment>
                         );
                       })}
                     </TableBody>
@@ -325,7 +444,7 @@ function CardAuditTab({ selectedPartnerId, scanResults, setScanResults }: any) {
                   {totalPages > 1 && (
                     <div className="flex items-center justify-between mt-4 pt-3 border-t">
                       <span className="text-sm text-muted-foreground">
-                        {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, result.products.length)} / {result.products.length}
+                        {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, filteredProducts.length)} / {filteredProducts.length}
                       </span>
                       <div className="flex gap-2">
                         <Button size="sm" variant="outline" onClick={() => setCurrentPage(p => ({ ...p, [result.marketplace]: page - 1 }))} disabled={page === 0}>
