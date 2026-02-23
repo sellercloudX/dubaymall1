@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { Drawer, DrawerContent } from '@/components/ui/drawer';
 import type { MobileTabType } from './MobileSellerCloudNav';
 import {
   ArrowDownUp, DollarSign, Calculator, BarChart3, Shield, Copy,
@@ -66,14 +66,9 @@ export function MobileMoreMenu({ open, onOpenChange, activeTab, onTabChange }: M
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-3xl max-h-[80vh] overflow-y-auto px-5 pb-10 pt-0 [&>button]:hidden">
-        {/* Drag handle */}
-        <div className="sticky top-0 pt-3 pb-2 bg-background z-10">
-          <div className="w-9 h-1 bg-muted-foreground/25 rounded-full mx-auto" />
-        </div>
-
-        <div className="space-y-6 pb-2">
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerContent className="max-h-[80vh] overflow-y-auto px-5 pb-10">
+        <div className="space-y-6 pb-2 pt-2">
           {menuCategories.map((cat, catIdx) => (
             <div key={cat.title}>
               <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-3 px-0.5">
@@ -117,7 +112,7 @@ export function MobileMoreMenu({ open, onOpenChange, activeTab, onTabChange }: M
             </div>
           ))}
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }
