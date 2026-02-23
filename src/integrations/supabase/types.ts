@@ -2516,6 +2516,81 @@ export type Database = {
         }
         Relationships: []
       }
+      uzum_transactions: {
+        Row: {
+          account_params: Json | null
+          amount: number
+          callback_data: Json | null
+          checkout_order_id: string | null
+          confirmed_at: string | null
+          created_at: string
+          currency: number
+          id: string
+          months: number | null
+          order_number: string
+          payment_method: string
+          payment_redirect_url: string | null
+          payment_source: string | null
+          phone: string | null
+          promo_data: Json | null
+          reversed_at: string | null
+          service_id: number | null
+          status: string
+          subscription_id: string | null
+          trans_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_params?: Json | null
+          amount: number
+          callback_data?: Json | null
+          checkout_order_id?: string | null
+          confirmed_at?: string | null
+          created_at?: string
+          currency?: number
+          id?: string
+          months?: number | null
+          order_number: string
+          payment_method?: string
+          payment_redirect_url?: string | null
+          payment_source?: string | null
+          phone?: string | null
+          promo_data?: Json | null
+          reversed_at?: string | null
+          service_id?: number | null
+          status?: string
+          subscription_id?: string | null
+          trans_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_params?: Json | null
+          amount?: number
+          callback_data?: Json | null
+          checkout_order_id?: string | null
+          confirmed_at?: string | null
+          created_at?: string
+          currency?: number
+          id?: string
+          months?: number | null
+          order_number?: string
+          payment_method?: string
+          payment_redirect_url?: string | null
+          payment_source?: string | null
+          phone?: string | null
+          promo_data?: Json | null
+          reversed_at?: string | null
+          service_id?: number | null
+          status?: string
+          subscription_id?: string | null
+          trans_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       wildberries_connections: {
         Row: {
           account_info: Json | null
