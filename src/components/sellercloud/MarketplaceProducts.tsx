@@ -45,7 +45,10 @@ export function MarketplaceProducts({ connectedMarketplaces, store }: Marketplac
 
   const formatPrice = (price?: number) => {
     if (!price && price !== 0) return '—';
-    return new Intl.NumberFormat('uz-UZ').format(price) + ' so\'m';
+    if (selectedMarketplace === 'wildberries') {
+      return new Intl.NumberFormat('ru-RU').format(Math.round(price)) + ' ₽';
+    }
+    return new Intl.NumberFormat('uz-UZ').format(Math.round(price)) + ' so\'m';
   };
 
   const getAvailabilityBadge = (availability?: string) => {
