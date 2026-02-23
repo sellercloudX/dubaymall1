@@ -2594,8 +2594,8 @@ export type Database = {
       wildberries_connections: {
         Row: {
           account_info: Json | null
-          api_key: string
           created_at: string | null
+          encrypted_api_key: string | null
           id: string
           is_active: boolean | null
           last_sync_at: string | null
@@ -2609,8 +2609,8 @@ export type Database = {
         }
         Insert: {
           account_info?: Json | null
-          api_key: string
           created_at?: string | null
+          encrypted_api_key?: string | null
           id?: string
           is_active?: boolean | null
           last_sync_at?: string | null
@@ -2624,8 +2624,8 @@ export type Database = {
         }
         Update: {
           account_info?: Json | null
-          api_key?: string
           created_at?: string | null
+          encrypted_api_key?: string | null
           id?: string
           is_active?: boolean | null
           last_sync_at?: string | null
