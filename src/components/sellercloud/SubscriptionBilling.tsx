@@ -42,6 +42,8 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
    const [termsAccepted, setTermsAccepted] = useState(false);
    const [promoValidation, setPromoValidation] = useState<PromoValidation | null>(null);
    const [paymentMethod, setPaymentMethod] = useState<'click' | 'uzum'>('click');
+   const [showUzumInstructions, setShowUzumInstructions] = useState(false);
+   const [uzumPaymentAmount, setUzumPaymentAmount] = useState(0);
 
   const formatPrice = (price: number, currency: 'uzs' | 'usd' = 'uzs') => {
     if (currency === 'usd') {
@@ -146,65 +148,43 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
      }
    };
 
-   // Uzum Bank payment handler
-   const handleUzumPayment = async (months: number = 1) => {
-     if (!subscription) return;
-     
-     const baseMonthlyUSD = subscription.monthly_fee;
-     const promoDiscount = (promoValidation && months === 1) ? (promoValidation.discount || 0) : 0;
-     const firstMonthUSD = baseMonthlyUSD - promoDiscount;
-     
-     let totalAmountUSD: number;
-     if (months === 1) {
-       totalAmountUSD = firstMonthUSD;
-     } else {
-       const discount = getDiscount(months);
-       totalAmountUSD = Math.round((firstMonthUSD + baseMonthlyUSD * (months - 1)) * (1 - discount));
-     }
-     
-     const totalAmountUZS = Math.round(totalAmountUSD * USD_TO_UZS);
-     
-     setIsCreating(true);
-     try {
-       const { data, error } = await supabase.functions.invoke('uzum-checkout', {
-         body: {
-           action: 'register',
-           subscriptionId: subscription.id,
-           amount: totalAmountUZS,
-           months: months,
-           promoCode: promoValidation?.promo_id ? promoValidation : undefined,
-           returnUrl: window.location.origin + '/seller-cloud-mobile?tab=billing'
-         }
-       });
+   // Uzum Bank payment handler — Merchant API (webhook-based)
+    // User pays through Uzum Bank app by entering subscription ID as account number
 
-       if (error) throw error;
-
-       if (data?.paymentUrl) {
-         window.open(data.paymentUrl, '_blank');
-         toast.success('Uzum Bank to\'lov sahifasi ochildi. To\'lov yakunlangach aktivatsiya avtomatik bo\'ladi.');
-         
-         // Notify affiliate system
-         if (user?.email) {
-           const isFirstPayment = !billing.some(b => b.status === 'paid');
-           notifyAffiliatePayment({
-             eventType: isFirstPayment ? 'FIRST_PAYMENT' : 'RENEWAL',
-             customerEmail: user.email,
-             customerName: user.user_metadata?.full_name || '',
-             customerPhone: user.user_metadata?.phone || '',
-             amount: totalAmountUSD,
-             currency: 'USD',
-             promoCode: promoValidation ? promoValidation.promo_id || '' : undefined,
-             providerPaymentId: data.orderId || `SCX-UZUM-${Date.now()}`,
-           }).catch(err => console.warn('Affiliate webhook failed:', err));
-         }
-       }
-     } catch (error: any) {
-       console.error('Uzum payment error:', error);
-       toast.error('To\'lov xatosi: ' + (error.message || 'Noma\'lum xato'));
-     } finally {
-       setIsCreating(false);
-     }
-   };
+    const handleUzumPayment = async (months: number = 1) => {
+      if (!subscription) return;
+      
+      const baseMonthlyUSD = subscription.monthly_fee;
+      const promoDiscount = (promoValidation && months === 1) ? (promoValidation.discount || 0) : 0;
+      const firstMonthUSD = baseMonthlyUSD - promoDiscount;
+      
+      let totalAmountUSD: number;
+      if (months === 1) {
+        totalAmountUSD = firstMonthUSD;
+      } else {
+        const discount = getDiscount(months);
+        totalAmountUSD = Math.round((firstMonthUSD + baseMonthlyUSD * (months - 1)) * (1 - discount));
+      }
+      
+      const totalAmountUZS = Math.round(totalAmountUSD * USD_TO_UZS);
+      setUzumPaymentAmount(totalAmountUZS);
+      setShowUzumInstructions(true);
+      
+      // Notify affiliate system
+      if (user?.email) {
+        const isFirstPayment = !billing.some(b => b.status === 'paid');
+        notifyAffiliatePayment({
+          eventType: isFirstPayment ? 'FIRST_PAYMENT' : 'RENEWAL',
+          customerEmail: user.email,
+          customerName: user.user_metadata?.full_name || '',
+          customerPhone: user.user_metadata?.phone || '',
+          amount: totalAmountUSD,
+          currency: 'USD',
+          promoCode: promoValidation ? promoValidation.promo_id || '' : undefined,
+          providerPaymentId: `SCX-UZUM-${Date.now()}`,
+        }).catch(err => console.warn('Affiliate webhook failed:', err));
+      }
+    };
 
    // Generic payment handler
    const handlePayment = async (months: number = 1) => {
@@ -425,8 +405,81 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
                      </>
                    )}
                  </Button>
+                  <p className="text-xs text-center text-muted-foreground">
+                    Muammo bormi? Telegram: <a href="https://t.me/sellercloudx_support" target="_blank" className="text-primary underline">@sellercloudx_support</a>
+                  </p>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+           {/* Uzum Bank Payment Instructions Dialog */}
+           <Dialog open={showUzumInstructions} onOpenChange={setShowUzumInstructions}>
+             <DialogContent className="max-w-md">
+               <DialogHeader>
+                 <DialogTitle className="flex items-center gap-2">
+                   <Landmark className="h-5 w-5" />
+                   Uzum Bank orqali to'lov
+                 </DialogTitle>
+               </DialogHeader>
+               <div className="space-y-4">
+                 <div className="p-4 rounded-lg bg-muted/50 space-y-3">
+                   <p className="text-sm font-medium">To'lov qilish tartibi:</p>
+                   <ol className="list-decimal pl-5 space-y-2 text-sm">
+                     <li>Uzum Bank ilovasini oching</li>
+                     <li><strong>"To'lovlar"</strong> bo'limiga o'ting</li>
+                     <li><strong>"SellerCloudX"</strong> xizmatini toping</li>
+                     <li>Quyidagi <strong>hisob raqamni</strong> kiriting:</li>
+                   </ol>
+                   
+                   <div className="p-3 bg-background rounded-lg border-2 border-primary/30 text-center">
+                     <p className="text-xs text-muted-foreground mb-1">Hisob raqam (Account ID):</p>
+                     <p className="font-mono text-lg font-bold text-primary select-all break-all">
+                       {subscription?.id || '—'}
+                     </p>
+                     <Button
+                       variant="ghost"
+                       size="sm"
+                       className="mt-1"
+                       onClick={() => {
+                         navigator.clipboard.writeText(subscription?.id || '');
+                         toast.success('Hisob raqam nusxalandi!');
+                       }}
+                     >
+                       📋 Nusxalash
+                     </Button>
+                   </div>
+                   
+                   <div className="p-3 bg-background rounded-lg border text-center">
+                     <p className="text-xs text-muted-foreground mb-1">To'lov miqdori:</p>
+                     <p className="text-xl font-bold">{formatPrice(uzumPaymentAmount)}</p>
+                   </div>
+                   
+                   <ol className="list-decimal pl-5 space-y-2 text-sm" start={5}>
+                     <li>To'lov miqdorini tekshiring va <strong>tasdiqlang</strong></li>
+                     <li>To'lov muvaffaqiyatli bo'lgach, obuna <strong>avtomatik aktivlashadi</strong></li>
+                   </ol>
+                 </div>
+                 
+                 <div className="p-3 rounded-lg bg-accent/20 border border-accent/30">
+                   <p className="text-xs text-muted-foreground">
+                     ⏱ To'lov tasdiqlangach 1-2 daqiqa ichida obuna aktivlashadi. 
+                     Agar 5 daqiqadan keyin ham aktivlashmasa, sahifani yangilang yoki qo'llab-quvvatlash bilan bog'laning.
+                   </p>
+                 </div>
+                 
+                 <Button
+                   variant="outline"
+                   className="w-full"
+                   onClick={() => {
+                     setShowUzumInstructions(false);
+                     refetch();
+                   }}
+                 >
+                   Tushundim, to'lov qilaman
+                 </Button>
+                 
                  <p className="text-xs text-center text-muted-foreground">
-                   Muammo bormi? Telegram: <a href="https://t.me/sellercloudx_support" target="_blank" className="text-primary underline">@sellercloudx_support</a>
+                   Yordam: <a href="https://t.me/sellercloudx_support" target="_blank" className="text-primary underline">@sellercloudx_support</a>
                  </p>
                </div>
              </DialogContent>
