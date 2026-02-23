@@ -105,3 +105,9 @@ verify_jwt = false
 
 [functions.affiliate-webhook]
 verify_jwt = false
+
+[functions.uzum-merchant-webhook]
+verify_jwt = false
+
+[functions.uzum-checkout]
+verify_jwt = false
