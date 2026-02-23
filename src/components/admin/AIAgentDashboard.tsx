@@ -85,16 +85,18 @@ function PartnerSelector({ partners, selectedPartnerId, onSelect }: any) {
 }
 
 function ScoreBadge({ score }: { score: number }) {
-  if (score >= 80) return <Badge className="bg-green-500 text-white font-bold">{score}</Badge>;
-  if (score >= 50) return <Badge className="bg-yellow-500 text-white font-bold">{score}</Badge>;
-  return <Badge variant="destructive" className="font-bold">{score}</Badge>;
+  const s = typeof score === 'number' && !isNaN(score) ? score : 0;
+  if (s >= 80) return <Badge className="bg-green-500 text-white font-bold">{s}</Badge>;
+  if (s >= 50) return <Badge className="bg-yellow-500 text-white font-bold">{s}</Badge>;
+  return <Badge variant="destructive" className="font-bold">{s}</Badge>;
 }
 
 function StatCard({ value, label, color }: { value: number | string; label: string; color?: string }) {
+  const displayValue = typeof value === 'number' && isNaN(value) ? 0 : value;
   return (
     <Card className="bg-muted/50">
       <CardContent className="p-3 text-center">
-        <p className={`text-2xl font-bold ${color || ''}`}>{value}</p>
+        <p className={`text-2xl font-bold ${color || ''}`}>{displayValue}</p>
         <p className="text-xs text-muted-foreground">{label}</p>
       </CardContent>
     </Card>
