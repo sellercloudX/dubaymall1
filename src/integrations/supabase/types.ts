@@ -3054,6 +3054,14 @@ export type Database = {
       }
       increment_view_count: { Args: { product_id: string }; Returns: undefined }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      manage_admin: {
+        Args: {
+          p_action: string
+          p_permissions?: Json
+          p_target_user_id: string
+        }
+        Returns: Json
+      }
       process_pending_payouts: { Args: never; Returns: number }
       search_mxik_fuzzy: {
         Args: { p_limit?: number; p_search_term: string }
