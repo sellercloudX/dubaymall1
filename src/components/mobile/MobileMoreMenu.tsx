@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils';
-import { Drawer, DrawerContent } from '@/components/ui/drawer';
+import { Drawer, DrawerContent, DrawerTitle, DrawerDescription } from '@/components/ui/drawer';
+import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 import type { MobileTabType } from './MobileSellerCloudNav';
 import {
   ArrowDownUp, DollarSign, Calculator, BarChart3, Shield, Copy,
@@ -67,14 +68,18 @@ export function MobileMoreMenu({ open, onOpenChange, activeTab, onTabChange }: M
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="max-h-[80vh] overflow-y-auto px-5 pb-10">
-        <div className="space-y-6 pb-2 pt-2">
+      <DrawerContent className="max-h-[85vh] overflow-y-auto px-4 pb-8">
+        <VisuallyHidden.Root>
+          <DrawerTitle>Menyu</DrawerTitle>
+          <DrawerDescription>Qo'shimcha bo'limlar</DrawerDescription>
+        </VisuallyHidden.Root>
+        <div className="space-y-3 pt-1">
           {menuCategories.map((cat, catIdx) => (
             <div key={cat.title}>
-              <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-3 px-0.5">
+              <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-1.5 px-0.5">
                 {cat.title}
               </h3>
-              <div className="grid grid-cols-4 gap-1.5">
+              <div className="grid grid-cols-4 gap-1">
                 {cat.items.map((item) => {
                   const Icon = item.icon;
                   const isActive = activeTab === item.id;
@@ -83,21 +88,21 @@ export function MobileMoreMenu({ open, onOpenChange, activeTab, onTabChange }: M
                       key={item.id}
                       onClick={() => handleSelect(item.id)}
                       className={cn(
-                        'flex flex-col items-center gap-1.5 py-3 px-1 rounded-2xl transition-all duration-200 active:scale-[0.92]',
+                        'flex flex-col items-center gap-1 py-2 px-1 rounded-xl transition-all duration-200 active:scale-[0.92]',
                         isActive
                           ? 'bg-primary/10 shadow-sm'
                           : 'hover:bg-muted/60 active:bg-muted'
                       )}
                     >
                       <div className={cn(
-                        'w-11 h-11 rounded-2xl flex items-center justify-center transition-transform duration-200',
+                        'w-9 h-9 rounded-xl flex items-center justify-center',
                         item.color,
                         isActive && 'scale-110 shadow-sm'
                       )}>
-                        <Icon className={cn('h-5 w-5', isActive && 'stroke-[2.5]')} />
+                        <Icon className={cn('h-4 w-4', isActive && 'stroke-[2.5]')} />
                       </div>
                       <span className={cn(
-                        'text-[10px] leading-tight text-center line-clamp-1 transition-colors',
+                        'text-[9px] leading-tight text-center line-clamp-1',
                         isActive ? 'text-primary font-bold' : 'text-muted-foreground font-medium'
                       )}>
                         {item.label}
@@ -107,7 +112,7 @@ export function MobileMoreMenu({ open, onOpenChange, activeTab, onTabChange }: M
                 })}
               </div>
               {catIdx < menuCategories.length - 1 && (
-                <div className="border-b border-border/50 mt-5" />
+                <div className="border-b border-border/50 mt-2.5" />
               )}
             </div>
           ))}
