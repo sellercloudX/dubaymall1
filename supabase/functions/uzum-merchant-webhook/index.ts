@@ -1,5 +1,16 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+/**
+ * Uzum Bank Merchant API v1.0.0
+ * Webhook handler for: check, create, confirm, reverse, status
+ * Docs: https://developer.uzumbank.uz/merchant-api/
+ * 
+ * Uzum Bank sends POST requests to this endpoint.
+ * Auth: Basic Auth (login:password base64)
+ * Format: application/json
+ * Amounts: in tiyin (1 UZS = 100 tiyin)
+ */
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -9,29 +20,37 @@ const corsHeaders = {
 
 function validateString(val: unknown, name: string, maxLen = 500): string {
   if (typeof val !== 'string' || val.length === 0 || val.length > maxLen) {
-    throw new Error(`Invalid ${name}: must be a non-empty string (max ${maxLen} chars)`);
+    throw new Error(`Invalid ${name}`);
   }
   return val;
 }
 
-function validateNumber(val: unknown, name: string): number {
-  if (typeof val !== 'number' || !Number.isFinite(val)) {
-    throw new Error(`Invalid ${name}: must be a finite number`);
+function validateInteger(val: unknown, name: string): number {
+  if (typeof val !== 'number' || !Number.isFinite(val) || !Number.isInteger(val)) {
+    throw new Error(`Invalid ${name}`);
   }
   return val;
 }
 
-function validatePositiveNumber(val: unknown, name: string): number {
-  const n = validateNumber(val, name);
+function validatePositiveInteger(val: unknown, name: string): number {
+  const n = validateInteger(val, name);
   if (n <= 0) throw new Error(`Invalid ${name}: must be positive`);
   return n;
 }
 
-function validateAccountParams(params: any): { orderId: string } {
-  if (!params || typeof params !== 'object') throw new Error('Invalid params');
-  if (!params.account || typeof params.account !== 'object') throw new Error('Invalid account');
-  const orderId = validateString(params.account.order_id, 'account.order_id', 200);
-  return { orderId };
+// ==================== Error Responses ====================
+
+function errorResponse(serviceId: number | null, code: number, message: string, httpStatus = 400) {
+  return new Response(
+    JSON.stringify({
+      serviceId,
+      status: "FAILED",
+      errorCode: code,
+      errorMessage: message,
+      timestamp: Date.now(),
+    }),
+    { status: httpStatus, headers: { "Content-Type": "application/json" } }
+  );
 }
 
 // ==================== Main Handler ====================
@@ -42,107 +61,154 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Basic Auth verification
+    // ---- Basic Auth verification ----
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Basic ")) {
-      return jsonRpcError(-32504, "Unauthorized", null);
+      return errorResponse(null, 401, "Unauthorized", 401);
     }
 
     const credentials = atob(authHeader.replace("Basic ", ""));
-    const [login, password] = credentials.split(":");
+    const colonIdx = credentials.indexOf(":");
+    if (colonIdx < 0) {
+      return errorResponse(null, 401, "Invalid credentials", 401);
+    }
+    const login = credentials.slice(0, colonIdx);
+    const password = credentials.slice(colonIdx + 1);
 
     const expectedLogin = Deno.env.get("UZUM_MERCHANT_LOGIN");
     const expectedPassword = Deno.env.get("UZUM_MERCHANT_PASSWORD");
 
     if (!expectedLogin || !expectedPassword) {
       console.error("UZUM_MERCHANT_LOGIN or UZUM_MERCHANT_PASSWORD not configured");
-      return jsonRpcError(-32400, "Service not configured", null);
+      return errorResponse(null, 500, "Service not configured", 500);
     }
 
     if (login !== expectedLogin || password !== expectedPassword) {
-      return jsonRpcError(-32504, "Authentication failed", null);
+      return errorResponse(null, 401, "Authentication failed", 401);
     }
 
+    // ---- Parse request body ----
     const body = await req.json();
-    
     if (!body || typeof body !== 'object') {
-      return jsonRpcError(-32600, "Invalid request", null);
+      return errorResponse(null, 400, "Invalid request body");
     }
+
+    const serviceId = typeof body.serviceId === 'number' ? body.serviceId : null;
     
-    const { method, params, id: requestId } = body;
-
-    if (typeof method !== 'string' || method.length === 0 || method.length > 100) {
-      return jsonRpcError(-32600, "Invalid method", requestId);
+    // Validate serviceId against our configured service
+    const expectedServiceId = Deno.env.get("UZUM_MERCHANT_SERVICE_ID");
+    if (expectedServiceId && serviceId !== null && String(serviceId) !== expectedServiceId) {
+      console.error(`ServiceId mismatch: got ${serviceId}, expected ${expectedServiceId}`);
+      return errorResponse(serviceId, 400, "Invalid serviceId");
     }
 
-    console.log(`Uzum Merchant API: method=${method}`);
+    // ---- Determine webhook type from URL path ----
+    const url = new URL(req.url);
+    const pathSegments = url.pathname.split('/').filter(Boolean);
+    // Last segment after function name is the webhook type
+    // e.g., /functions/v1/uzum-merchant-webhook/check → "check"
+    const webhookType = pathSegments[pathSegments.length - 1];
+
+    console.log(`Uzum Merchant API webhook: type=${webhookType}, serviceId=${serviceId}`);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    let result: any;
-
-    switch (method) {
-      case "CheckPerformTransaction":
-        result = await checkPerformTransaction(supabase, params);
-        break;
-      case "CreateTransaction":
-        result = await createTransaction(supabase, params);
-        break;
-      case "PerformTransaction":
-        result = await performTransaction(supabase, params);
-        break;
-      case "CancelTransaction":
-        result = await cancelTransaction(supabase, params);
-        break;
-      case "CheckTransaction":
-        result = await checkTransaction(supabase, params);
-        break;
-      case "GetStatement":
-        result = await getStatement(supabase, params);
-        break;
+    switch (webhookType) {
+      case "check":
+        return await handleCheck(supabase, body, serviceId);
+      case "create":
+        return await handleCreate(supabase, body, serviceId);
+      case "confirm":
+        return await handleConfirm(supabase, body, serviceId);
+      case "reverse":
+        return await handleReverse(supabase, body, serviceId);
+      case "status":
+        return await handleStatus(supabase, body, serviceId);
       default:
-        return jsonRpcResponse({ error: { code: -32601, message: "Method not found" } }, requestId);
+        // If no sub-path, try to route by checking body fields
+        // Fallback: if transId + paymentSource exist → confirm
+        // if transId + amount exist → create
+        // if only params → check
+        if (body.paymentSource) return await handleConfirm(supabase, body, serviceId);
+        if (body.transId && body.amount) return await handleCreate(supabase, body, serviceId);
+        if (body.transId && !body.amount) return await handleStatus(supabase, body, serviceId);
+        if (body.params) return await handleCheck(supabase, body, serviceId);
+        return errorResponse(serviceId, 400, "Unknown webhook type");
     }
-
-    return jsonRpcResponse(result, requestId);
   } catch (err) {
     console.error("Uzum Merchant webhook error:", err);
-    return jsonRpcError(-32400, "Internal error", null);
+    return errorResponse(null, 500, "Internal error", 500);
   }
 });
 
-// ==================== Methods ====================
+// ==================== /check — Verify payment possibility ====================
 
-async function checkPerformTransaction(supabase: any, params: any) {
-  const { orderId } = validateAccountParams(params);
-  const amount = validatePositiveNumber(params.amount, 'amount');
+async function handleCheck(supabase: any, body: any, serviceId: number | null) {
+  const params = body.params;
+  if (!params || typeof params !== 'object') {
+    return errorResponse(serviceId, 400, "Missing params");
+  }
 
+  // Extract account identifier (subscription ID or order number)
+  const account = params.account;
+  if (account === undefined || account === null || String(account).length === 0) {
+    return errorResponse(serviceId, 400, "Missing account");
+  }
+  const accountStr = String(account);
+
+  // Look up subscription by ID
   const { data: sub, error } = await supabase
     .from("sellercloud_subscriptions")
-    .select("id, is_active, monthly_fee")
-    .eq("id", orderId)
+    .select("id, user_id, plan_type, monthly_fee, is_active")
+    .eq("id", accountStr)
     .single();
 
   if (error || !sub) {
-    return { error: { code: -31050, message: "Order not found" } };
+    return errorResponse(serviceId, 400, "Account not found");
   }
 
-  return { result: { allow: true } };
+  // Get user profile for FIO
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name")
+    .eq("user_id", sub.user_id)
+    .single();
+
+  const fio = profile?.full_name || "SellerCloudX User";
+
+  return new Response(
+    JSON.stringify({
+      serviceId,
+      timestamp: Date.now(),
+      status: "OK",
+      data: {
+        account: { value: accountStr },
+        fio: { value: fio },
+      },
+    }),
+    { headers: { "Content-Type": "application/json" } }
+  );
 }
 
-async function createTransaction(supabase: any, params: any) {
-  if (!params || typeof params !== 'object') {
-    return { error: { code: -31050, message: "Invalid params" } };
-  }
-  
-  const transId = validateString(String(params.id), 'id', 200);
-  const time = validateNumber(params.time, 'time');
-  const amount = validatePositiveNumber(params.amount, 'amount');
-  const { orderId } = validateAccountParams(params);
+// ==================== /create — Create payment transaction ====================
 
-  // Check for existing transaction
+async function handleCreate(supabase: any, body: any, serviceId: number | null) {
+  const transId = validateString(body.transId, 'transId', 200);
+  const amount = validatePositiveInteger(body.amount, 'amount');
+  const params = body.params;
+
+  if (!params || typeof params !== 'object') {
+    return errorResponse(serviceId, 400, "Missing params");
+  }
+
+  const account = String(params.account || '');
+  if (!account) {
+    return errorResponse(serviceId, 400, "Missing account");
+  }
+
+  // Check for existing transaction with same transId
   const { data: existing } = await supabase
     .from("uzum_transactions")
     .select("*")
@@ -151,49 +217,85 @@ async function createTransaction(supabase: any, params: any) {
 
   if (existing) {
     if (existing.status === "created") {
-      return {
-        result: {
-          create_time: new Date(existing.created_at).getTime(),
-          transaction: existing.id,
-          state: 1,
-        },
-      };
+      return new Response(
+        JSON.stringify({
+          serviceId,
+          transId,
+          status: "CREATED",
+          transTime: new Date(existing.created_at).getTime(),
+          data: {
+            account: { value: account },
+          },
+          amount: existing.amount,
+        }),
+        { headers: { "Content-Type": "application/json" } }
+      );
     }
-    return { error: { code: -31008, message: "Transaction already exists with different state" } };
+    return errorResponse(serviceId, 400, "Transaction already exists with different state");
   }
 
-  const { data: txn, error } = await supabase
+  // Verify subscription exists
+  const { data: sub } = await supabase
+    .from("sellercloud_subscriptions")
+    .select("id, monthly_fee")
+    .eq("id", account)
+    .single();
+
+  if (!sub) {
+    return errorResponse(serviceId, 400, "Account not found");
+  }
+
+  // Calculate months from amount
+  const monthlyAmountTiyin = Math.round(sub.monthly_fee * 12800 * 100);
+  const months = Math.max(1, Math.round(amount / monthlyAmountTiyin));
+
+  // Create transaction record
+  const { data: txn, error: createErr } = await supabase
     .from("uzum_transactions")
     .insert({
       trans_id: transId,
-      order_number: orderId,
+      order_number: account,
       amount: amount,
       status: "created",
       payment_method: "uzum_merchant",
-      metadata: { account: { order_id: orderId }, create_time: time },
+      metadata: {
+        service_id: serviceId,
+        months,
+        account,
+        create_timestamp: body.timestamp,
+      },
     })
     .select()
     .single();
 
-  if (error) {
-    console.error("Create transaction error:", error);
-    return { error: { code: -31001, message: "Database error" } };
+  if (createErr) {
+    console.error("Create transaction error:", createErr);
+    return errorResponse(serviceId, 500, "Database error", 500);
   }
 
-  return {
-    result: {
-      create_time: new Date(txn.created_at).getTime(),
-      transaction: txn.id,
-      state: 1,
-    },
-  };
+  const transTime = new Date(txn.created_at).getTime();
+
+  return new Response(
+    JSON.stringify({
+      serviceId,
+      transId,
+      status: "CREATED",
+      transTime,
+      data: {
+        account: { value: account },
+      },
+      amount,
+    }),
+    { headers: { "Content-Type": "application/json" } }
+  );
 }
 
-async function performTransaction(supabase: any, params: any) {
-  if (!params || typeof params !== 'object') {
-    return { error: { code: -31003, message: "Invalid params" } };
-  }
-  const transId = validateString(String(params.id), 'id', 200);
+// ==================== /confirm — Confirm payment transaction ====================
+
+async function handleConfirm(supabase: any, body: any, serviceId: number | null) {
+  const transId = validateString(body.transId, 'transId', 200);
+  const paymentSource = typeof body.paymentSource === 'string' ? body.paymentSource : null;
+  const phone = typeof body.phone === 'string' ? body.phone.slice(0, 20) : null;
 
   const { data: txn, error: findErr } = await supabase
     .from("uzum_transactions")
@@ -202,64 +304,87 @@ async function performTransaction(supabase: any, params: any) {
     .single();
 
   if (findErr || !txn) {
-    return { error: { code: -31003, message: "Transaction not found" } };
+    return errorResponse(serviceId, 400, "Transaction not found");
   }
 
+  // Already confirmed
   if (txn.status === "paid") {
-    return {
-      result: {
-        perform_time: new Date(txn.paid_at).getTime(),
-        transaction: txn.id,
-        state: 2,
-      },
-    };
+    return new Response(
+      JSON.stringify({
+        serviceId,
+        transId,
+        status: "CONFIRMED",
+        confirmTime: new Date(txn.paid_at).getTime(),
+        data: {
+          account: { value: txn.order_number },
+        },
+        amount: txn.amount,
+      }),
+      { headers: { "Content-Type": "application/json" } }
+    );
   }
 
   if (txn.status !== "created") {
-    return { error: { code: -31008, message: "Invalid transaction state" } };
+    return errorResponse(serviceId, 400, "Invalid transaction state for confirm");
   }
 
   const now = new Date();
+  const confirmTime = now.getTime();
 
+  // Update transaction to paid
   const { error: updateErr } = await supabase
     .from("uzum_transactions")
     .update({
       status: "paid",
       paid_at: now.toISOString(),
+      metadata: {
+        ...(txn.metadata || {}),
+        payment_source: paymentSource,
+        phone,
+        tariff: body.tariff || null,
+        card_type: body.cardType || null,
+        processing_ref: body.processingReferenceNumber || null,
+        confirm_timestamp: body.timestamp,
+      },
     })
     .eq("id", txn.id);
 
   if (updateErr) {
-    return { error: { code: -31001, message: "Database error" } };
+    console.error("Confirm transaction error:", updateErr);
+    return errorResponse(serviceId, 500, "Database error", 500);
   }
 
   // Activate subscription
+  const months = (txn.metadata as any)?.months || 1;
   try {
-    const months = Math.max(1, Math.round(txn.amount / (499 * 12800 * 100)));
     await supabase.rpc("activate_subscription_by_payment", {
       p_subscription_id: txn.order_number,
       p_months: months,
     });
-    console.log(`Subscription ${txn.order_number} activated for ${months} months via Uzum`);
+    console.log(`Subscription ${txn.order_number} activated for ${months} months via Uzum Merchant API`);
   } catch (activateErr) {
     console.error("Subscription activation error:", activateErr);
   }
 
-  return {
-    result: {
-      perform_time: now.getTime(),
-      transaction: txn.id,
-      state: 2,
-    },
-  };
+  return new Response(
+    JSON.stringify({
+      serviceId,
+      transId,
+      status: "CONFIRMED",
+      confirmTime,
+      data: {
+        account: { value: txn.order_number },
+      },
+      amount: txn.amount,
+    }),
+    { headers: { "Content-Type": "application/json" } }
+  );
 }
 
-async function cancelTransaction(supabase: any, params: any) {
-  if (!params || typeof params !== 'object') {
-    return { error: { code: -31003, message: "Invalid params" } };
-  }
-  const transId = validateString(String(params.id), 'id', 200);
-  const reason = params.reason != null ? validateNumber(params.reason, 'reason') : null;
+// ==================== /reverse — Cancel/reverse transaction ====================
+
+async function handleReverse(supabase: any, body: any, serviceId: number | null) {
+  const transId = validateString(body.transId, 'transId', 200);
 
   const { data: txn, error: findErr } = await supabase
     .from("uzum_transactions")
@@ -268,45 +393,64 @@ async function cancelTransaction(supabase: any, params: any) {
     .single();
 
   if (findErr || !txn) {
-    return { error: { code: -31003, message: "Transaction not found" } };
+    return errorResponse(serviceId, 400, "Transaction not found");
   }
 
+  // Already reversed
   if (txn.status === "cancelled") {
-    return {
-      result: {
-        cancel_time: new Date(txn.updated_at).getTime(),
-        transaction: txn.id,
-        state: -1,
-      },
-    };
+    return new Response(
+      JSON.stringify({
+        serviceId,
+        transId,
+        status: "REVERSED",
+        reverseTime: new Date(txn.updated_at).getTime(),
+        data: {
+          account: { value: txn.order_number },
+        },
+        amount: txn.amount,
+      }),
+      { headers: { "Content-Type": "application/json" } }
+    );
   }
+
+  const reverseTime = Date.now();
 
   const { error: updateErr } = await supabase
     .from("uzum_transactions")
     .update({
       status: "cancelled",
-      metadata: { ...((txn.metadata as any) || {}), cancel_reason: reason },
+      metadata: {
+        ...(txn.metadata || {}),
+        reverse_timestamp: body.timestamp,
+        reversed_from_status: txn.status,
+      },
     })
     .eq("id", txn.id);
 
   if (updateErr) {
-    return { error: { code: -31001, message: "Database error" } };
+    console.error("Reverse transaction error:", updateErr);
+    return errorResponse(serviceId, 500, "Database error", 500);
   }
 
-  return {
-    result: {
-      cancel_time: Date.now(),
-      transaction: txn.id,
-      state: -1,
-    },
-  };
+  return new Response(
+    JSON.stringify({
+      serviceId,
+      transId,
+      status: "REVERSED",
+      reverseTime,
+      data: {
+        account: { value: txn.order_number },
+      },
+      amount: txn.amount,
+    }),
+    { headers: { "Content-Type": "application/json" } }
+  );
 }
 
-async function checkTransaction(supabase: any, params: any) {
-  if (!params || typeof params !== 'object') {
-    return { error: { code: -31003, message: "Invalid params" } };
-  }
-  const transId = validateString(String(params.id), 'id', 200);
+// ==================== /status — Check transaction status ====================
+
+async function handleStatus(supabase: any, body: any, serviceId: number | null) {
+  const transId = validateString(body.transId, 'transId', 200);
 
   const { data: txn, error } = await supabase
     .from("uzum_transactions")
@@ -315,80 +459,28 @@ async function checkTransaction(supabase: any, params: any) {
     .single();
 
   if (error || !txn) {
-    return { error: { code: -31003, message: "Transaction not found" } };
+    return errorResponse(serviceId, 400, "Transaction not found");
   }
 
-  const stateMap: Record<string, number> = {
-    created: 1,
-    paid: 2,
-    cancelled: -1,
+  const statusMap: Record<string, string> = {
+    created: "CREATED",
+    paid: "CONFIRMED",
+    cancelled: "REVERSED",
+    failed: "FAILED",
   };
 
-  return {
-    result: {
-      create_time: new Date(txn.created_at).getTime(),
-      perform_time: txn.paid_at ? new Date(txn.paid_at).getTime() : 0,
-      cancel_time: txn.status === "cancelled" ? new Date(txn.updated_at).getTime() : 0,
-      transaction: txn.id,
-      state: stateMap[txn.status] || 0,
-      reason: (txn.metadata as any)?.cancel_reason || null,
-    },
-  };
-}
-
-async function getStatement(supabase: any, params: any) {
-  if (!params || typeof params !== 'object') {
-    return { error: { code: -31001, message: "Invalid params" } };
-  }
-  const from = validateNumber(params.from, 'from');
-  const to = validateNumber(params.to, 'to');
-
-  const fromDate = new Date(from).toISOString();
-  const toDate = new Date(to).toISOString();
-
-  const { data: txns, error } = await supabase
-    .from("uzum_transactions")
-    .select("*")
-    .gte("created_at", fromDate)
-    .lte("created_at", toDate)
-    .eq("payment_method", "uzum_merchant")
-    .order("created_at", { ascending: true });
-
-  if (error) {
-    return { error: { code: -31001, message: "Database error" } };
-  }
-
-  const transactions = (txns || []).map((t: any) => ({
-    id: t.trans_id,
-    time: new Date(t.created_at).getTime(),
-    amount: t.amount,
-    account: { order_id: t.order_number },
-    create_time: new Date(t.created_at).getTime(),
-    perform_time: t.paid_at ? new Date(t.paid_at).getTime() : 0,
-    cancel_time: t.status === "cancelled" ? new Date(t.updated_at).getTime() : 0,
-    transaction: t.id,
-    state: t.status === "paid" ? 2 : t.status === "cancelled" ? -1 : 1,
-    reason: (t.metadata as any)?.cancel_reason || null,
-  }));
-
-  return { result: { transactions } };
-}
-
-// ==================== Helpers ====================
-
-function jsonRpcResponse(data: any, id: any = null) {
-  return new Response(
-    JSON.stringify({ jsonrpc: "2.0", id, ...data }),
-    { headers: { "Content-Type": "application/json" } }
-  );
-}
-
-function jsonRpcError(code: number, message: string, id: any) {
   return new Response(
     JSON.stringify({
-      jsonrpc: "2.0",
-      id,
-      error: { code, message },
+      serviceId,
+      transId,
+      status: statusMap[txn.status] || "FAILED",
+      transTime: new Date(txn.created_at).getTime(),
+      confirmTime: txn.paid_at ? new Date(txn.paid_at).getTime() : null,
+      reverseTime: txn.status === "cancelled" ? new Date(txn.updated_at).getTime() : null,
+      data: {
+        account: { value: txn.order_number },
+      },
+      amount: txn.amount,
     }),
     { headers: { "Content-Type": "application/json" } }
   );

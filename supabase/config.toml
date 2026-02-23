@@ -109,5 +109,5 @@ verify_jwt = false
 [functions.uzum-merchant-webhook]
 verify_jwt = false
 
-[functions.uzum-checkout]
+[functions.uzum-merchant-webhook]
 verify_jwt = false
