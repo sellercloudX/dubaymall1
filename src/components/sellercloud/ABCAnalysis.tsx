@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { MarketplaceLogo } from '@/lib/marketplaceConfig';
+import { toDisplayUzs } from '@/lib/currency';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -89,21 +90,27 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
           if (!key) return;
           const existing = salesMap.get(key) || { qty: 0, revenue: 0 };
           existing.qty += item.count || 1;
-          existing.revenue += (item.priceUZS || item.price || 0) * (item.count || 1);
+          // Convert item price to UZS for uniform calculations
+          const itemPrice = item.priceUZS || toDisplayUzs(item.price || 0, marketplace);
+          existing.revenue += itemPrice * (item.count || 1);
           salesMap.set(key, existing);
         });
       });
 
       productsList.forEach(product => {
         const sales = salesMap.get(product.offerId) || { qty: 0, revenue: 0 };
-        const price = product.price || 0;
-        const totalRevenue = sales.revenue || sales.qty * price;
+        // Convert product price to UZS
+        const priceUzs = toDisplayUzs(product.price || 0, marketplace);
+        const totalRevenue = sales.revenue || sales.qty * priceUzs;
         
-        const realCostPrice = getCostPrice(marketplace, product.offerId);
-        const productCost = realCostPrice !== null ? realCostPrice * sales.qty : 0;
+        // Cost price: for WB stored in RUB, convert to UZS
+        const rawCostPrice = getCostPrice(marketplace, product.offerId);
+        const costPriceUzs = rawCostPrice !== null ? toDisplayUzs(rawCostPrice, marketplace) : null;
+        const productCost = costPriceUzs !== null ? costPriceUzs * sales.qty : 0;
         
-        const avgSoldPrice = sales.qty > 0 ? sales.revenue / sales.qty : price;
-        const tariff = getTariffForProduct(tariffMap, product.offerId, avgSoldPrice, marketplace);
+        const avgSoldPrice = sales.qty > 0 ? sales.revenue / sales.qty : priceUzs;
+        // Tariffs are already in UZS (WB tariffs converted in useMarketplaceTariffs)
+        const tariff = getTariffForProduct(tariffMap, product.offerId, priceUzs, marketplace);
         const marketplaceFees = tariff.totalFee * sales.qty;
         
         const taxAmount = totalRevenue * taxRate;
@@ -113,7 +120,7 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
 
         allProducts.push({
           id: product.offerId, name: product.name || 'Nomsiz',
-          sku: product.shopSku || product.offerId, marketplace, price,
+          sku: product.shopSku || product.offerId, marketplace, price: priceUzs,
           totalSold: sales.qty, totalRevenue, estimatedCost: totalCosts,
           commissionAmount: tariff.commission * sales.qty, 
           logisticsCost: tariff.logistics * sales.qty,

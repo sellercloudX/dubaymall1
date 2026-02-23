@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { MarketplaceDataStore, MarketplaceProduct } from './useMarketplaceDataStore';
+import { RUB_TO_UZS } from '@/lib/currency';
 
 export interface TariffInfo {
   offerId: string;
@@ -131,23 +132,25 @@ export function useMarketplaceTariffs(
           continue;
         }
 
-        if (mp === 'wildberries') {
+      if (mp === 'wildberries') {
           // WB: commission ~15-20% depending on category, logistics ~30-100 RUB
+          // Convert ALL values to UZS for uniform SellerCloudX calculations
           for (const p of products) {
-            const price = p.price || 0;
-            if (price <= 0) continue;
+            const priceRub = p.price || 0;
+            if (priceRub <= 0) continue;
             // WB typical: 15% commission + logistics in RUB
-            const commission = price * 0.15;
-            const logistics = price > 5000 ? 100 : price > 1000 ? 50 : 30; // RUB
-            const totalTariff = commission + logistics;
+            const commissionRub = priceRub * 0.15;
+            const logisticsRub = priceRub > 5000 ? 100 : priceRub > 1000 ? 50 : 30; // RUB
+            const totalTariffRub = commissionRub + logisticsRub;
+            // Store in UZS so all downstream consumers work uniformly
             tariffMap.set(p.offerId, {
               offerId: p.offerId,
-              agencyCommission: commission,
-              fulfillment: logistics,
+              agencyCommission: commissionRub * RUB_TO_UZS,
+              fulfillment: logisticsRub * RUB_TO_UZS,
               delivery: 0,
-              totalTariff,
-              tariffPercent: price > 0 ? (totalTariff / price) * 100 : 0,
-              commissionPercent: price > 0 ? (commission / price) * 100 : 0,
+              totalTariff: totalTariffRub * RUB_TO_UZS,
+              tariffPercent: priceRub > 0 ? (totalTariffRub / priceRub) * 100 : 0,
+              commissionPercent: priceRub > 0 ? (commissionRub / priceRub) * 100 : 0,
             });
           }
           continue;
@@ -303,14 +306,14 @@ export function getTariffForProduct(
     };
   }
 
-  // WB fallback — values in RUB
+  // WB fallback — values in RUB, convert to UZS for uniform calculations
   if (marketplace === 'wildberries') {
-    const commission = price * 0.15;
-    const logistics = price > 5000 ? 100 : price > 1000 ? 50 : 30; // RUB
+    const commissionRub = price * 0.15;
+    const logisticsRub = price > 5000 ? 100 : price > 1000 ? 50 : 30; // RUB
     return {
-      commission,
-      logistics,
-      totalFee: commission + logistics,
+      commission: commissionRub * RUB_TO_UZS,
+      logistics: logisticsRub * RUB_TO_UZS,
+      totalFee: (commissionRub + logisticsRub) * RUB_TO_UZS,
       isReal: false,
     };
   }

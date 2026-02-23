@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Activity, Eye, ShoppingCart, Package, TrendingUp, RefreshCw, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { rubToUzs, formatUzs } from '@/lib/currency';
 import { useQuery } from '@tanstack/react-query';
 
 interface WBSellerAnalyticsProps {
@@ -46,6 +47,7 @@ export function WBSellerAnalytics({ connectedMarketplaces }: WBSellerAnalyticsPr
   const cards = data?.data || [];
 
   const formatNum = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}K` : String(Math.round(n));
+  const formatSom = (rubAmount: number) => formatUzs(rubToUzs(rubAmount));
 
   return (
     <div className="space-y-4">
@@ -102,7 +104,7 @@ export function WBSellerAnalytics({ connectedMarketplaces }: WBSellerAnalyticsPr
                   <Package className="h-3.5 w-3.5" /><span className="text-[11px]">Buyurtmalar</span>
                 </div>
                 <p className="text-lg font-bold">{formatNum(summary.totalOrders)}</p>
-                <p className="text-[10px] text-muted-foreground">{formatNum(summary.totalOrdersSum)} ₽</p>
+                <p className="text-[10px] text-muted-foreground">{formatSom(summary.totalOrdersSum)} so'm</p>
               </CardContent>
             </Card>
             <Card>
@@ -111,7 +113,7 @@ export function WBSellerAnalytics({ connectedMarketplaces }: WBSellerAnalyticsPr
                   <TrendingUp className="h-3.5 w-3.5" /><span className="text-[11px]">Sotuvlar</span>
                 </div>
                 <p className="text-lg font-bold">{formatNum(summary.totalBuyouts)}</p>
-                <p className="text-[10px] text-muted-foreground">{formatNum(summary.totalBuyoutsSum)} ₽</p>
+                <p className="text-[10px] text-muted-foreground">{formatSom(summary.totalBuyoutsSum)} so'm</p>
               </CardContent>
             </Card>
           </div>
@@ -148,7 +150,7 @@ export function WBSellerAnalytics({ connectedMarketplaces }: WBSellerAnalyticsPr
                       <span>👁 {card.openCardCount}</span>
                       <span>🛒 {card.addToCartCount}</span>
                       <span>📦 {card.ordersCount}</span>
-                      <span>💰 {formatNum(card.ordersSumRub)} ₽</span>
+                      <span>💰 {formatSom(card.ordersSumRub)} so'm</span>
                     </div>
                   </div>
                   <div className="text-right shrink-0">

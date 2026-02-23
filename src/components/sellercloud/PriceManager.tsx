@@ -8,6 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DollarSign, Calculator, RefreshCw, Save, AlertTriangle, CheckCircle2, Package } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { toDisplayUzs, toMarketplaceCurrency, formatUzs, isRubMarketplace } from '@/lib/currency';
 import { toast } from 'sonner';
 import { useCostPrices } from '@/hooks/useCostPrices';
 import { useMarketplaceTariffs, getTariffForProduct } from '@/hooks/useMarketplaceTariffs';
@@ -22,13 +23,9 @@ const MARKETPLACE_NAMES: Record<string, string> = {
   yandex: 'Yandex', uzum: 'Uzum', wildberries: 'WB', ozon: 'Ozon',
 };
 
-const isRubMarketplace = (mp: string) => mp === 'wildberries';
-const getCurrencySymbol = (mp: string) => isRubMarketplace(mp) ? '₽' : "so'm";
-const formatPriceWithCurrency = (price: number | undefined, mp: string) => {
+// All prices in SellerCloudX are displayed in UZS (so'm)
+const formatPriceUzs = (price: number | undefined) => {
   if (!price && price !== 0) return '—';
-  if (isRubMarketplace(mp)) {
-    return new Intl.NumberFormat('ru-RU').format(Math.round(price)) + ' ₽';
-  }
   return new Intl.NumberFormat('uz-UZ').format(Math.round(price)) + " so'm";
 };
 
@@ -62,25 +59,27 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
     const allProducts: ProductPrice[] = [];
     for (const marketplace of activeMarketplaces) {
       store.getProducts(marketplace).forEach(product => {
-        const price = product.price || 0;
-        const costPrice = getCostPrice(marketplace, product.offerId);
-        const tariff = getTariffForProduct(tariffMap, product.offerId, price, marketplace);
+        const rawPrice = product.price || 0;
+        // Convert price to UZS for display
+        const priceUzs = toDisplayUzs(rawPrice, marketplace);
+        const rawCostPrice = getCostPrice(marketplace, product.offerId);
+        // Cost price for WB is stored in RUB, convert to UZS
+        const costPriceUzs = rawCostPrice !== null ? toDisplayUzs(rawCostPrice, marketplace) : null;
+        // Tariffs are already in UZS (converted in useMarketplaceTariffs)
+        const tariff = getTariffForProduct(tariffMap, product.offerId, priceUzs, marketplace);
         
         // Min price formula: Price = (CostPrice + Logistics) / (1 - Commission% - Tax% - Margin%)
-        // Commission% = only marketplace fee (NOT logistics)
-        // Logistics = absolute cost added to cost price
         let calculatedMinPrice = 0;
-        if (costPrice !== null && costPrice > 0) {
-          // Separate commission (%) from logistics (absolute)
-          const commissionPercent = tariff.isReal && price > 0
-            ? tariff.commission / price  // commission as fraction of price
-            : 0.15; // fallback 15%
-          const logisticsCost = tariff.isReal ? tariff.logistics : 3000; // absolute logistics
+        if (costPriceUzs !== null && costPriceUzs > 0) {
+          const commissionPercent = tariff.isReal && priceUzs > 0
+            ? tariff.commission / priceUzs
+            : 0.15;
+          const logisticsCost = tariff.isReal ? tariff.logistics : 3000;
           const taxPercent = 0.04;
           const marginPercent = minProfit / 100;
           const denominator = 1 - commissionPercent - taxPercent - marginPercent;
           if (denominator > 0.05) {
-            calculatedMinPrice = Math.ceil((costPrice + logisticsCost) / denominator);
+            calculatedMinPrice = Math.ceil((costPriceUzs + logisticsCost) / denominator);
           }
         }
 
@@ -88,10 +87,10 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
           id: product.offerId,
           name: product.name || 'Nomsiz',
           sku: product.shopSku || product.offerId,
-          price,
-          newPrice: priceChanges[`${marketplace}-${product.offerId}`] || price,
+          price: priceUzs,
+          newPrice: priceChanges[`${marketplace}-${product.offerId}`] || priceUzs,
           marketplace,
-          costPrice,
+          costPrice: costPriceUzs,
           tariffFee: tariff.totalFee,
           isRealTariff: tariff.isReal,
           minPrice: calculatedMinPrice,
@@ -148,15 +147,17 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
 
     setIsSaving(true);
     try {
-      // Group by marketplace
+      // Group by marketplace — convert UZS prices back to marketplace currency (RUB for WB)
       const byMarketplace = new Map<string, Array<{ offerId: string; price: number }>>();
       changedProducts.forEach(p => {
         const key = `${p.marketplace}-${p.id}`;
-        const newPrice = priceChanges[key];
-        if (!newPrice || newPrice === p.price) return;
+        const newPriceUzs = priceChanges[key];
+        if (!newPriceUzs || newPriceUzs === p.price) return;
         
         const list = byMarketplace.get(p.marketplace) || [];
-        list.push({ offerId: p.id, price: newPrice });
+        // Convert from UZS display price back to marketplace-native currency
+        const nativePrice = toMarketplaceCurrency(newPriceUzs, p.marketplace);
+        list.push({ offerId: p.id, price: nativePrice });
         byMarketplace.set(p.marketplace, list);
       });
 
@@ -201,7 +202,7 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
 
   const formatPrice = (price?: number) => {
     if (!price && price !== 0) return '—';
-    return formatPriceWithCurrency(price, selectedMp);
+    return formatPriceUzs(price);
   };
 
   const avgPrice = products.length > 0 ? products.reduce((s, p) => s + p.price, 0) / products.length : 0;
