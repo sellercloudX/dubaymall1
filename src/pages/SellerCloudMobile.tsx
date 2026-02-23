@@ -14,6 +14,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
+import { MobileMoreMenu } from '@/components/mobile/MobileMoreMenu';
 
 // Lazy load ALL tab content components for instant tab switching
 const MobileAnalytics = lazy(() => import('@/components/mobile/MobileAnalytics').then(m => ({ default: m.MobileAnalytics })));
@@ -51,28 +52,7 @@ function TabLoader() {
   );
 }
 
-// Icons for more sub-tabs (imported inline to avoid heavy lucide bundle at top)
-import { TrendingUp, Calculator, DollarSign, BarChart3, Shield, Copy, AlertOctagon, ArrowDownUp, Tag, Upload, FileSpreadsheet, Bell, CreditCard, Coins, Sparkles, MessageCircle, Activity, Megaphone } from 'lucide-react';
-
-const moreSubTabs = [
-  { id: 'inventory' as const, icon: ArrowDownUp, label: 'Qoldiq' },
-  { id: 'financials' as const, icon: DollarSign, label: 'Moliya' },
-  { id: 'calculator' as const, icon: Calculator, label: 'Kalkulyator' },
-  { id: 'abc-analysis' as const, icon: BarChart3, label: 'ABC-analiz' },
-  { id: 'seller-analytics' as const, icon: Activity, label: 'WB Analitika' },
-  { id: 'reviews' as const, icon: MessageCircle, label: 'Sharhlar' },
-  { id: 'ads' as const, icon: Megaphone, label: 'Reklama' },
-  { id: 'cost-prices' as const, icon: Coins, label: 'Tannarx' },
-  { id: 'min-price' as const, icon: Shield, label: 'Min narx' },
-  { id: 'card-clone' as const, icon: Copy, label: 'Klonlash' },
-  { id: 'uzum-card' as const, icon: Sparkles, label: 'Uzum Card' },
-  { id: 'problems' as const, icon: AlertOctagon, label: 'Muammolar' },
-  { id: 'pricing' as const, icon: Tag, label: 'Narxlar' },
-  { id: 'mxik' as const, icon: FileSpreadsheet, label: 'MXIK baza' },
-  { id: 'reports' as const, icon: FileSpreadsheet, label: 'Hisobotlar' },
-  { id: 'notifications' as const, icon: Bell, label: 'Bildirishnoma' },
-  { id: 'subscription' as const, icon: CreditCard, label: 'Obuna' },
-];
+// moreSubTabs moved to MobileMoreMenu component
 
 const primaryTabIds: MobileTabType[] = ['marketplaces', 'analytics', 'scanner', 'products', 'orders'];
 
@@ -80,6 +60,7 @@ export default function SellerCloudMobile() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTabRaw] = useState<MobileTabType>('analytics');
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   
   const setActiveTab = useCallback((tab: MobileTabType) => {
     setActiveTabRaw(tab);
@@ -249,21 +230,40 @@ export default function SellerCloudMobile() {
     <div className="min-h-screen bg-background pb-32 overflow-x-hidden safe-area-bottom">
       <MobileSellerCloudHeader connectedCount={connectedMarketplaces.length} onRefresh={refetch} isLoading={connectionsLoading} />
       {isMoreActive && (
-        <div className="fixed left-0 right-0 z-40 flex gap-1.5 px-3 py-1.5 overflow-x-auto no-scrollbar border-b bg-background/95 backdrop-blur-sm" style={{ top: 'calc(3rem + env(safe-area-inset-top, 0px))' }}>
-          {moreSubTabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                className={cn("flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-medium whitespace-nowrap transition-all duration-150 min-h-[30px]",
-                  isActive ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/80 active:scale-95")}>
-                <Icon className="h-3.5 w-3.5 shrink-0" />{tab.label}
-              </button>
-            );
-          })}
+        <div className="fixed left-0 right-0 z-40 flex items-center gap-2 px-3 py-2 border-b bg-background/95 backdrop-blur-sm" style={{ top: 'calc(3rem + env(safe-area-inset-top, 0px))' }}>
+          <button
+            onClick={() => setMoreMenuOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-primary text-primary-foreground shadow-sm"
+          >
+            {(() => {
+              const menuCategories = [
+                { items: ['financials', 'calculator', 'cost-prices', 'pricing'] },
+                { items: ['abc-analysis', 'seller-analytics', 'reviews', 'ads'] },
+                { items: ['inventory', 'min-price', 'card-clone', 'uzum-card', 'problems', 'mxik'] },
+                { items: ['reports', 'notifications', 'subscription'] },
+              ];
+              const allItems = menuCategories.flatMap(c => c.items);
+              const labels: Record<string, string> = {
+                'financials': 'Moliya', 'calculator': 'Kalkulyator', 'cost-prices': 'Tannarx',
+                'pricing': 'Narxlar', 'abc-analysis': 'ABC-analiz', 'seller-analytics': 'WB Analitika',
+                'reviews': 'Sharhlar', 'ads': 'Reklama', 'inventory': 'Qoldiq',
+                'min-price': 'Min narx', 'card-clone': 'Klonlash', 'uzum-card': 'Uzum Card',
+                'problems': 'Muammolar', 'mxik': 'MXIK baza', 'reports': 'Hisobotlar',
+                'notifications': 'Bildirishnoma', 'subscription': 'Obuna',
+              };
+              return labels[activeTab] || activeTab;
+            })()}
+          </button>
+          <span className="text-xs text-muted-foreground">·</span>
+          <button
+            onClick={() => setMoreMenuOpen(true)}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Boshqa bo'limlar →
+          </button>
         </div>
       )}
-      <main style={{ paddingTop: isMoreActive ? 'calc(5rem + env(safe-area-inset-top, 0px))' : 'calc(3rem + env(safe-area-inset-top, 0px))' }}>
+      <main style={{ paddingTop: isMoreActive ? 'calc(5.5rem + env(safe-area-inset-top, 0px))' : 'calc(3rem + env(safe-area-inset-top, 0px))' }}>
         <PullToRefresh onRefresh={async () => { await refetch(); toast.success("Ma'lumotlar yangilandi"); }}>
         <Suspense fallback={<TabLoader />}>
           <div className="transition-none">
@@ -272,7 +272,13 @@ export default function SellerCloudMobile() {
         </Suspense>
         </PullToRefresh>
       </main>
-      <MobileSellerCloudNav activeTab={activeTab} onTabChange={setActiveTab} />
+      <MobileSellerCloudNav activeTab={activeTab} onTabChange={setActiveTab} onMorePress={() => setMoreMenuOpen(true)} />
+      <MobileMoreMenu
+        open={moreMenuOpen}
+        onOpenChange={setMoreMenuOpen}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+      />
       <BackgroundTasksPanel />
     </div>
   );
