@@ -35,6 +35,20 @@ serve(async (req) => {
       });
     }
 
+    // Verify user is admin before allowing bulk import
+    const { data: adminRole } = await authClient
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
+      .single();
+
+    if (!adminRole) {
+      return new Response(JSON.stringify({ error: 'Admin access required' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // Use service role for inserts
     const supabase = createClient(supabaseUrl, serviceKey);
 
