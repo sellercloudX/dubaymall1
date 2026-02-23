@@ -230,36 +230,28 @@ export default function SellerCloudMobile() {
     <div className="min-h-screen bg-background pb-32 overflow-x-hidden safe-area-bottom">
       <MobileSellerCloudHeader connectedCount={connectedMarketplaces.length} onRefresh={refetch} isLoading={connectionsLoading} />
       {isMoreActive && (
-        <div className="fixed left-0 right-0 z-40 flex items-center gap-2 px-3 py-2 border-b bg-background/95 backdrop-blur-sm" style={{ top: 'calc(3rem + env(safe-area-inset-top, 0px))' }}>
+        <div className="fixed left-0 right-0 z-40 flex items-center gap-2 px-4 py-2 border-b border-border/50 bg-background/80 backdrop-blur-xl" style={{ top: 'calc(3rem + env(safe-area-inset-top, 0px))' }}>
           <button
             onClick={() => setMoreMenuOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-primary text-primary-foreground shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-primary text-primary-foreground shadow-sm active:scale-95 transition-transform"
           >
             {(() => {
-              const menuCategories = [
-                { items: ['financials', 'calculator', 'cost-prices', 'pricing'] },
-                { items: ['abc-analysis', 'seller-analytics', 'reviews', 'ads'] },
-                { items: ['inventory', 'min-price', 'card-clone', 'uzum-card', 'problems', 'mxik'] },
-                { items: ['reports', 'notifications', 'subscription'] },
-              ];
-              const allItems = menuCategories.flatMap(c => c.items);
               const labels: Record<string, string> = {
-                'financials': 'Moliya', 'calculator': 'Kalkulyator', 'cost-prices': 'Tannarx',
-                'pricing': 'Narxlar', 'abc-analysis': 'ABC-analiz', 'seller-analytics': 'WB Analitika',
-                'reviews': 'Sharhlar', 'ads': 'Reklama', 'inventory': 'Qoldiq',
-                'min-price': 'Min narx', 'card-clone': 'Klonlash', 'uzum-card': 'Uzum Card',
-                'problems': 'Muammolar', 'mxik': 'MXIK baza', 'reports': 'Hisobotlar',
-                'notifications': 'Bildirishnoma', 'subscription': 'Obuna',
+                'financials': '💰 Moliya', 'calculator': '🧮 Kalkulyator', 'cost-prices': '💲 Tannarx',
+                'pricing': '🏷 Narxlar', 'abc-analysis': '📊 ABC-analiz', 'seller-analytics': '📈 WB Analitika',
+                'reviews': '💬 Sharhlar', 'ads': '📢 Reklama', 'inventory': '📦 Qoldiq',
+                'min-price': '🛡 Min narx', 'card-clone': '📋 Klonlash', 'uzum-card': '✨ Uzum Card',
+                'problems': '⚠️ Muammolar', 'mxik': '📄 MXIK baza', 'reports': '📑 Hisobotlar',
+                'notifications': '🔔 Bildirishnoma', 'subscription': '💳 Obuna',
               };
               return labels[activeTab] || activeTab;
             })()}
           </button>
-          <span className="text-xs text-muted-foreground">·</span>
           <button
             onClick={() => setMoreMenuOpen(true)}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors ml-auto"
           >
-            Boshqa bo'limlar →
+            Boshqa →
           </button>
         </div>
       )}

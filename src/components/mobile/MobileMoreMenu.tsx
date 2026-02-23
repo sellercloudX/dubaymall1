@@ -1,6 +1,5 @@
-import { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 import type { MobileTabType } from './MobileSellerCloudNav';
 import {
   ArrowDownUp, DollarSign, Calculator, BarChart3, Shield, Copy,
@@ -22,7 +21,7 @@ type MenuCategory = {
 
 const menuCategories: MenuCategory[] = [
   {
-    title: 'Moliya',
+    title: '💰 Moliya',
     items: [
       { id: 'financials', icon: DollarSign, label: 'Moliya', color: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' },
       { id: 'calculator', icon: Calculator, label: 'Kalkulyator', color: 'bg-blue-500/15 text-blue-600 dark:text-blue-400' },
@@ -31,7 +30,7 @@ const menuCategories: MenuCategory[] = [
     ],
   },
   {
-    title: 'Analitika',
+    title: '📊 Analitika',
     items: [
       { id: 'abc-analysis', icon: BarChart3, label: 'ABC-analiz', color: 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400' },
       { id: 'seller-analytics', icon: Activity, label: 'WB Analitika', color: 'bg-sky-500/15 text-sky-600 dark:text-sky-400' },
@@ -40,7 +39,7 @@ const menuCategories: MenuCategory[] = [
     ],
   },
   {
-    title: 'Asboblar',
+    title: '🛠 Asboblar',
     items: [
       { id: 'inventory', icon: ArrowDownUp, label: 'Qoldiq', color: 'bg-teal-500/15 text-teal-600 dark:text-teal-400' },
       { id: 'min-price', icon: Shield, label: 'Min narx', color: 'bg-red-500/15 text-red-600 dark:text-red-400' },
@@ -51,7 +50,7 @@ const menuCategories: MenuCategory[] = [
     ],
   },
   {
-    title: 'Tizim',
+    title: '⚙️ Tizim',
     items: [
       { id: 'reports', icon: FileSpreadsheet, label: 'Hisobotlar', color: 'bg-gray-500/15 text-gray-600 dark:text-gray-400' },
       { id: 'notifications', icon: Bell, label: 'Bildirishnoma', color: 'bg-yellow-500/15 text-yellow-600 dark:text-yellow-400' },
@@ -68,19 +67,19 @@ export function MobileMoreMenu({ open, onOpenChange, activeTab, onTabChange }: M
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] overflow-y-auto px-4 pb-8 pt-3 [&>button]:hidden">
-        <div className="w-10 h-1 bg-muted-foreground/30 rounded-full mx-auto mb-4" />
-        <SheetHeader className="mb-4">
-          <SheetTitle className="text-left text-lg">Barcha bo'limlar</SheetTitle>
-        </SheetHeader>
+      <SheetContent side="bottom" className="rounded-t-3xl max-h-[80vh] overflow-y-auto px-5 pb-10 pt-0 [&>button]:hidden">
+        {/* Drag handle */}
+        <div className="sticky top-0 pt-3 pb-2 bg-background z-10">
+          <div className="w-9 h-1 bg-muted-foreground/25 rounded-full mx-auto" />
+        </div>
 
-        <div className="space-y-5">
-          {menuCategories.map((cat) => (
+        <div className="space-y-6 pb-2">
+          {menuCategories.map((cat, catIdx) => (
             <div key={cat.title}>
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2.5 px-1">
+              <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-3 px-0.5">
                 {cat.title}
               </h3>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-4 gap-1.5">
                 {cat.items.map((item) => {
                   const Icon = item.icon;
                   const isActive = activeTab === item.id;
@@ -89,18 +88,22 @@ export function MobileMoreMenu({ open, onOpenChange, activeTab, onTabChange }: M
                       key={item.id}
                       onClick={() => handleSelect(item.id)}
                       className={cn(
-                        'flex flex-col items-center gap-1.5 p-3 rounded-xl transition-all duration-150 active:scale-95',
+                        'flex flex-col items-center gap-1.5 py-3 px-1 rounded-2xl transition-all duration-200 active:scale-[0.92]',
                         isActive
-                          ? 'bg-primary/10 ring-1 ring-primary/30'
-                          : 'hover:bg-muted/80'
+                          ? 'bg-primary/10 shadow-sm'
+                          : 'hover:bg-muted/60 active:bg-muted'
                       )}
                     >
-                      <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center', item.color)}>
-                        <Icon className="h-5 w-5" />
+                      <div className={cn(
+                        'w-11 h-11 rounded-2xl flex items-center justify-center transition-transform duration-200',
+                        item.color,
+                        isActive && 'scale-110 shadow-sm'
+                      )}>
+                        <Icon className={cn('h-5 w-5', isActive && 'stroke-[2.5]')} />
                       </div>
                       <span className={cn(
-                        'text-[10px] font-medium leading-tight text-center line-clamp-1',
-                        isActive ? 'text-primary font-semibold' : 'text-foreground/80'
+                        'text-[10px] leading-tight text-center line-clamp-1 transition-colors',
+                        isActive ? 'text-primary font-bold' : 'text-muted-foreground font-medium'
                       )}>
                         {item.label}
                       </span>
@@ -108,6 +111,9 @@ export function MobileMoreMenu({ open, onOpenChange, activeTab, onTabChange }: M
                   );
                 })}
               </div>
+              {catIdx < menuCategories.length - 1 && (
+                <div className="border-b border-border/50 mt-5" />
+              )}
             </div>
           ))}
         </div>

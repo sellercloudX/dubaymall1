@@ -29,8 +29,8 @@ export function MobileSellerCloudNav({ activeTab, onTabChange, onMorePress }: Mo
   const isMoreActive = !primaryTabIds.includes(activeTab);
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-t safe-area-bottom safe-area-left safe-area-right shadow-[0_-2px_10px_rgba(0,0,0,0.1)]" style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 6px)' }}>
-      <div className="flex items-center justify-around h-16">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-t border-border/50 safe-area-bottom safe-area-left safe-area-right" style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 4px)' }}>
+      <div className="flex items-center justify-around h-14">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = item.id === 'more' ? isMoreActive : activeTab === item.id;
@@ -46,19 +46,21 @@ export function MobileSellerCloudNav({ activeTab, onTabChange, onMorePress }: Mo
                 }
               }}
               className={cn(
-                "flex flex-col items-center justify-center w-full h-full gap-0.5 transition-colors",
+                "flex flex-col items-center justify-center w-full h-full gap-0.5 transition-colors relative",
                 isActive ? "text-primary" : "text-muted-foreground"
               )}
             >
-              <div className={cn(
-                "flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-200",
-                isActive ? "bg-primary/10 scale-110" : "active:scale-90"
-              )}>
-                <Icon className={cn("h-5 w-5 transition-all duration-200", isActive && "stroke-[2.5] text-primary")} />
-              </div>
+              {/* Active indicator dot */}
+              {isActive && (
+                <div className="absolute top-0.5 w-5 h-0.5 rounded-full bg-primary" />
+              )}
+              <Icon className={cn(
+                "h-5 w-5 transition-all duration-150",
+                isActive ? "stroke-[2.5] text-primary" : ""
+              )} />
               <span className={cn(
-                "text-[10px] font-medium leading-tight transition-colors duration-200",
-                isActive ? "font-bold text-primary" : "text-muted-foreground"
+                "text-[10px] leading-tight transition-colors",
+                isActive ? "font-bold text-primary" : "font-medium text-muted-foreground"
               )}>
                 {item.label}
               </span>
