@@ -3028,6 +3028,16 @@ export type Database = {
         Returns: boolean
       }
       check_sellercloud_access: { Args: { p_user_id: string }; Returns: Json }
+      create_notification: {
+        Args: {
+          p_message: string
+          p_reference_id?: string
+          p_title: string
+          p_type?: string
+          p_user_id: string
+        }
+        Returns: string
+      }
       decrypt_credentials: { Args: { p_encrypted: string }; Returns: Json }
       encrypt_credentials: { Args: { p_credentials: Json }; Returns: string }
       generate_affiliate_code: { Args: never; Returns: string }
