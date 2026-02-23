@@ -30,16 +30,22 @@ export const MARKETPLACE_SHORT_NAMES: Record<string, string> = {
   ozon: 'Ozon',
 };
 
-export function MarketplaceLogo({ marketplace, size = 20, className = '' }: { marketplace: string; size?: number; className?: string }) {
-  const config = MARKETPLACE_CONFIG[marketplace];
-  if (!config) return <span className={`inline-block ${className}`}>📦</span>;
-  return (
-    <img 
-      src={config.logo} 
-      alt={config.name} 
-      width={size} 
-      height={size} 
-      className={`rounded object-cover ${className}`}
-    />
-  );
-}
+import { forwardRef } from 'react';
+
+export const MarketplaceLogo = forwardRef<HTMLImageElement, { marketplace: string; size?: number; className?: string }>(
+  ({ marketplace, size = 20, className = '' }, ref) => {
+    const config = MARKETPLACE_CONFIG[marketplace];
+    if (!config) return <span className={`inline-block ${className}`}>📦</span>;
+    return (
+      <img 
+        ref={ref}
+        src={config.logo} 
+        alt={config.name} 
+        width={size} 
+        height={size} 
+        className={`rounded object-cover ${className}`}
+      />
+    );
+  }
+);
+MarketplaceLogo.displayName = 'MarketplaceLogo';
