@@ -126,10 +126,16 @@ export function ProblematicProducts({ connectedMarketplaces, store }: Problemati
   const warningCount = problems.filter(p => p.severity === 'warning').length;
   const displayProblems = activeTab === 'all' ? problems : (byType[activeTab] || []);
 
-  const formatPrice = (price: number) => {
+  const formatPrice = (price: number, marketplace?: string) => {
+    const isRub = (marketplace || '').toLowerCase() === 'wildberries';
+    if (isRub) {
+      if (price >= 1000000) return (price / 1000000).toFixed(1) + ' mln ₽';
+      if (price >= 1000) return (price / 1000).toFixed(0) + 'K ₽';
+      return new Intl.NumberFormat('ru-RU').format(Math.round(price)) + ' ₽';
+    }
     if (price >= 1000000) return (price / 1000000).toFixed(1) + ' mln';
     if (price >= 1000) return (price / 1000).toFixed(0) + ' ming';
-    return new Intl.NumberFormat('uz-UZ').format(price) + ' so\'m';
+    return new Intl.NumberFormat('uz-UZ').format(Math.round(price)) + ' so\'m';
   };
 
   if (connectedMarketplaces.length === 0) {
@@ -207,7 +213,7 @@ export function ProblematicProducts({ connectedMarketplaces, store }: Problemati
                         <div className="text-[11px] text-blue-600">💡 {problem.suggestion}</div>
                       </div>
                       <div className="text-right shrink-0 ml-1">
-                        <div className="font-bold text-xs whitespace-nowrap">{formatPrice(problem.price)}</div>
+                        <div className="font-bold text-xs whitespace-nowrap">{formatPrice(problem.price, problem.marketplace)}</div>
                         <div className="text-[10px] text-muted-foreground">{problem.stock} dona</div>
                       </div>
                     </div>
