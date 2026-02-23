@@ -287,6 +287,9 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
 
   const uploadImageToStorage = async (base64Image: string): Promise<string | null> => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+
       const base64Data = base64Image.split(',')[1];
       const byteCharacters = atob(base64Data);
       const byteNumbers = new Array(byteCharacters.length);
@@ -296,7 +299,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
       const byteArray = new Uint8Array(byteNumbers);
       const blob = new Blob([byteArray], { type: 'image/jpeg' });
 
-      const fileName = `scanner/${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
+      const fileName = `${user.id}/scanner/${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
 
       const { error } = await supabase.storage
         .from('product-images')
