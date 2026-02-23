@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ShoppingCart, RefreshCw, User, ChevronRight, WifiOff, Clock, Package } from 'lucide-react';
+import { ShoppingCart, RefreshCw, User, ChevronRight, WifiOff, Clock, Package, MapPin } from 'lucide-react';
 import { format, parse, isValid } from 'date-fns';
 import {
   Dialog,
@@ -30,10 +30,12 @@ interface MobileOrdersProps {
 
 const ORDER_STATUSES = [
   { value: 'all', label: 'Barchasi' },
+  { value: 'NEW', label: 'Yangi' },
   { value: 'PROCESSING', label: 'Jarayonda' },
   { value: 'DELIVERY', label: 'Yetkazilmoqda' },
   { value: 'DELIVERED', label: 'Yetkazildi' },
   { value: 'CANCELLED', label: 'Bekor' },
+  { value: 'RETURNED', label: 'Qaytarildi' },
 ];
 
 const formatPrice = (price?: number, marketplace?: string) => {
@@ -72,6 +74,7 @@ const formatTime = (dateStr: string) => {
 
 const getStatusBadge = (status: string) => {
   const config: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string; className?: string }> = {
+    NEW: { variant: 'secondary', label: 'Yangi', className: 'bg-blue-100 text-blue-700 border-blue-200' },
     PROCESSING: { variant: 'secondary', label: 'Jarayonda' },
     DELIVERY: { variant: 'default', label: 'Yetkazilmoqda' },
     PICKUP: { variant: 'default', label: 'Olib ketish' },
@@ -130,9 +133,9 @@ const OrderRow = memo(({ order, onClick, store, marketplace }: { order: Marketpl
           </div>
         </div>
         <div className="flex items-center justify-between gap-2 pt-1 border-t border-dashed">
-          {order.buyer ? (
+          {order.buyer && (order.buyer.firstName || order.buyer.lastName) ? (
             <div className="flex items-center gap-1 text-[10px] text-muted-foreground min-w-0 flex-1 truncate">
-              <User className="h-3 w-3 shrink-0" />
+              {marketplace === 'wildberries' ? <MapPin className="h-3 w-3 shrink-0" /> : <User className="h-3 w-3 shrink-0" />}
               <span className="truncate">{order.buyer.firstName} {order.buyer.lastName}</span>
             </div>
           ) : <div className="flex-1" />}
