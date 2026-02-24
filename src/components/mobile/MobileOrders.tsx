@@ -22,6 +22,7 @@ import {
 import { toast } from 'sonner';
 import type { MarketplaceDataStore, MarketplaceOrder } from '@/hooks/useMarketplaceDataStore';
 import { MarketplaceLogo } from '@/lib/marketplaceConfig';
+import { toDisplayUzs, formatUzs } from '@/lib/currency';
 
 interface MobileOrdersProps {
   connectedMarketplaces: string[];
@@ -40,10 +41,8 @@ const ORDER_STATUSES = [
 
 const formatPrice = (price?: number, marketplace?: string) => {
   if (!price) return '—';
-  const isRub = marketplace === 'wildberries';
-  const currency = isRub ? ' ₽' : ' so\'m';
-  if (!isRub && price >= 1000000) return (price / 1000000).toFixed(1) + ' mln';
-  return new Intl.NumberFormat(isRub ? 'ru-RU' : 'uz-UZ').format(Math.round(price)) + currency;
+  const priceUzs = toDisplayUzs(price, marketplace || '');
+  return formatUzs(priceUzs) + " so'm";
 };
 
 const formatDate = (dateStr: string) => {
@@ -96,9 +95,7 @@ const OrderRow = memo(({ order, onClick, store, marketplace }: { order: Marketpl
   const productName = getFirstProductName(order);
   const itemCount = order.items?.length || 0;
   const isRub = marketplace === 'wildberries';
-  const totalPrice = isRub 
-    ? (order.total || order.itemsTotal || 0)
-    : (order.itemsTotalUZS || order.itemsTotal || order.totalUZS || order.total || 0);
+  const totalPrice = toDisplayUzs(order.total || order.itemsTotal || 0, marketplace);
   
   // Get product image: first from order item photo, then from store products
   const firstItem = order.items?.[0];

@@ -8,6 +8,7 @@ import { Megaphone, Play, Pause, Eye, MousePointerClick, ShoppingCart, DollarSig
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { rubToUzs, formatUzs } from '@/lib/currency';
 
 interface WBAdsCampaignsProps {
   connectedMarketplaces: string[];
@@ -61,7 +62,7 @@ export function WBAdsCampaigns({ connectedMarketplaces }: WBAdsCampaignsProps) {
   const campaigns = data?.data || [];
   const summary = data?.summary;
   const formatNum = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}K` : String(Math.round(n));
-  const formatMoney = (n: number) => `${formatNum(n)} ₽`;
+  const formatMoney = (n: number) => formatUzs(rubToUzs(n)) + " so'm";
 
   return (
     <div className="space-y-4">
@@ -148,7 +149,7 @@ export function WBAdsCampaigns({ connectedMarketplaces }: WBAdsCampaignsProps) {
                         </div>
                       )}
                       {c.cpm > 0 && (
-                        <p className="text-[10px] text-muted-foreground mt-1">CPM: {c.cpm} ₽ | Kunlik: {formatMoney(c.dailyBudget || 0)}</p>
+                        <p className="text-[10px] text-muted-foreground mt-1">CPM: {formatMoney(c.cpm)} | Kunlik: {formatMoney(c.dailyBudget || 0)}</p>
                       )}
                     </div>
                     <div className="shrink-0">

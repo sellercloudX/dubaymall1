@@ -1,8 +1,9 @@
  import { useRef, memo } from 'react';
  import { useVirtualizer } from '@tanstack/react-virtual';
- import { Card, CardContent } from '@/components/ui/card';
- import { Badge } from '@/components/ui/badge';
- import { Image as ImageIcon, Package, Warehouse } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Image as ImageIcon, Package, Warehouse } from 'lucide-react';
+import { toDisplayUzs, formatUzs } from '@/lib/currency';
  
  interface Product {
    offerId: string;
@@ -26,10 +27,8 @@ interface VirtualProductListProps {
  
 const formatPrice = (price?: number, marketplace?: string) => {
   if (!price) return '—';
-  const isRub = marketplace === 'wildberries';
-  const currency = isRub ? ' ₽' : ' so\'m';
-  if (!isRub && price >= 1000000) return (price / 1000000).toFixed(1) + ' mln';
-  return new Intl.NumberFormat(isRub ? 'ru-RU' : 'uz-UZ').format(Math.round(price)) + currency;
+  const priceUzs = toDisplayUzs(price, marketplace || '');
+  return formatUzs(priceUzs) + " so'm";
 };
  
  const getStockBadge = (fbo?: number, fbs?: number) => {

@@ -13,6 +13,7 @@ import { ShoppingCart, RefreshCw, Loader2, ChevronDown, User, Package } from 'lu
 import { format } from 'date-fns';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 import { MARKETPLACE_CONFIG, MarketplaceLogo } from '@/lib/marketplaceConfig';
+import { toDisplayUzs, formatUzs } from '@/lib/currency';
 
 interface MarketplaceOrdersProps {
   connectedMarketplaces: string[];
@@ -57,10 +58,8 @@ export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceO
 
   const formatPrice = (price?: number) => {
     if (!price && price !== 0) return '—';
-    if (selectedMarketplace === 'wildberries') {
-      return new Intl.NumberFormat('ru-RU').format(Math.round(price)) + ' ₽';
-    }
-    return new Intl.NumberFormat('uz-UZ', { style: 'decimal', minimumFractionDigits: 0 }).format(Math.round(price)) + ' so\'m';
+    const priceUzs = toDisplayUzs(price, selectedMarketplace);
+    return formatUzs(priceUzs) + " so'm";
   };
 
   const getStatusBadge = (status: string, substatus?: string) => {
