@@ -10,6 +10,7 @@ import {
   AlertOctagon, Clock
 } from 'lucide-react';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
+import { toDisplayUzs, formatUzs } from '@/lib/currency';
 
 interface ProblematicProductsProps {
   connectedMarketplaces: string[];
@@ -127,15 +128,8 @@ export function ProblematicProducts({ connectedMarketplaces, store }: Problemati
   const displayProblems = activeTab === 'all' ? problems : (byType[activeTab] || []);
 
   const formatPrice = (price: number, marketplace?: string) => {
-    const isRub = (marketplace || '').toLowerCase() === 'wildberries';
-    if (isRub) {
-      if (price >= 1000000) return (price / 1000000).toFixed(1) + ' mln ₽';
-      if (price >= 1000) return (price / 1000).toFixed(0) + 'K ₽';
-      return new Intl.NumberFormat('ru-RU').format(Math.round(price)) + ' ₽';
-    }
-    if (price >= 1000000) return (price / 1000000).toFixed(1) + ' mln';
-    if (price >= 1000) return (price / 1000).toFixed(0) + ' ming';
-    return new Intl.NumberFormat('uz-UZ').format(Math.round(price)) + ' so\'m';
+    const priceUzs = toDisplayUzs(price, marketplace || '');
+    return formatUzs(priceUzs) + " so'm";
   };
 
   if (connectedMarketplaces.length === 0) {

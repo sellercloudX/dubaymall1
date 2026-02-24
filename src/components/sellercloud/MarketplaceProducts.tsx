@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/table';
 import { Package, Plus, RefreshCw, Loader2, Image, AlertCircle } from 'lucide-react';
 import type { MarketplaceDataStore, MarketplaceProduct } from '@/hooks/useMarketplaceDataStore';
+import { toDisplayUzs, formatUzs } from '@/lib/currency';
 
 interface MarketplaceProductsProps {
   connectedMarketplaces: string[];
@@ -45,10 +46,8 @@ export function MarketplaceProducts({ connectedMarketplaces, store }: Marketplac
 
   const formatPrice = (price?: number) => {
     if (!price && price !== 0) return '—';
-    if (selectedMarketplace === 'wildberries') {
-      return new Intl.NumberFormat('ru-RU').format(Math.round(price)) + ' ₽';
-    }
-    return new Intl.NumberFormat('uz-UZ').format(Math.round(price)) + ' so\'m';
+    const priceUzs = toDisplayUzs(price, selectedMarketplace);
+    return formatUzs(priceUzs) + " so'm";
   };
 
   const getAvailabilityBadge = (availability?: string) => {

@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { backgroundTaskManager } from '@/lib/backgroundTaskManager';
 import { useBackgroundTasks } from '@/hooks/useBackgroundTasks';
 import { useAuth } from '@/contexts/AuthContext';
+import { toDisplayUzs, formatUzs, isRubMarketplace, RUB_TO_UZS } from '@/lib/currency';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 import { MARKETPLACE_CONFIG, MarketplaceLogo } from '@/lib/marketplaceConfig';
 
@@ -426,15 +427,10 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
     setSelectedIds(new Set());
   };
 
-  const RUB_TO_UZS = 140;
-  const isRubMarketplace = (mp: string) => mp === 'wildberries';
-  
   const formatPrice = (price: number, marketplace?: string) => {
     const mp = marketplace || sourceMarketplace;
-    if (isRubMarketplace(mp)) {
-      return new Intl.NumberFormat('ru-RU').format(Math.round(price)) + ' ₽';
-    }
-    return new Intl.NumberFormat('uz-UZ').format(Math.round(price)) + ' so\'m';
+    const priceUzs = toDisplayUzs(price, mp);
+    return formatUzs(priceUzs) + " so'm";
   };
 
   // Convert price between marketplaces
