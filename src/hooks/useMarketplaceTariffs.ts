@@ -306,14 +306,18 @@ export function getTariffForProduct(
     };
   }
 
-  // WB fallback — values in RUB, convert to UZS for uniform calculations
+  // WB fallback — price is ALREADY in UZS (converted by caller via toDisplayUzs)
+  // Commission is a % of price, so it's already in UZS
+  // Logistics is a flat RUB amount that we convert to UZS
   if (marketplace === 'wildberries') {
-    const commissionRub = price * 0.15;
-    const logisticsRub = price > 5000 ? 100 : price > 1000 ? 50 : 30; // RUB
+    const commission = price * 0.15; // 15% of UZS price = UZS
+    // Thresholds in UZS (5000 RUB = 700k UZS, 1000 RUB = 140k UZS)
+    const logisticsRub = price > 700000 ? 100 : price > 140000 ? 50 : 30;
+    const logisticsUzs = logisticsRub * RUB_TO_UZS;
     return {
-      commission: commissionRub * RUB_TO_UZS,
-      logistics: logisticsRub * RUB_TO_UZS,
-      totalFee: (commissionRub + logisticsRub) * RUB_TO_UZS,
+      commission,
+      logistics: logisticsUzs,
+      totalFee: commission + logisticsUzs,
       isReal: false,
     };
   }
