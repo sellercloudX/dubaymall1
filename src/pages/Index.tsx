@@ -201,15 +201,22 @@ const T = {
     faq6q: 'Ma\'lumotlarim xavfsizmi?',
     faq6a: 'Ha. API kalitlaringiz shifrlangan holda saqlanadi. SSL himoyasi va GDPR standartlariga muvofiq ishlaymiz.',
     bloggerNav: 'Blogerlar uchun',
-    bloggerTitle: 'Blogerlar uchun pul ishlash imkoniyati',
-    bloggerSubtitle: 'Sellzen.online orqali mahsulotlarni targ\'ib qiling va har bir sotuvdan daromad oling',
-    bloggerDesc: 'Sellzen.online — bu blogerlar va influenserlar uchun maxsus platforma. Sotuvchilarning mahsulotlarini o\'z auditoriyangizga tavsiya qiling va har bir muvaffaqiyatli sotuvdan 5-15% komissiya oling. Hech qanday boshlang\'ich sarmoya kerak emas!',
-    bloggerFeature1: 'Havola yarating — mahsulotni tanlang va shaxsiy affiliate havolangizni oling',
-    bloggerFeature2: 'Auditoriyangizga ulashing — Telegram, Instagram, YouTube yoki blogingizda joylashtiring',
-    bloggerFeature3: 'Daromad oling — har bir sotuvdan 5-15% komissiya avtomatik hisoblanadi',
-    bloggerFeature4: 'Real-vaqt statistika — kliklar, konversiyalar va daromadingizni kuzating',
-    bloggerCta: 'Sellzen.online ga o\'tish',
-    bloggerEarning: 'Oyiga 3-10 mln so\'m daromad imkoniyati',
+    bloggerTitle: 'SellerCloudX bilan pul ishlang!',
+    bloggerSubtitle: 'Blogger sifatida hamkor bo\'ling, promo kodingiz orqali yangi mijozlar olib keling va har bir mijozdan $125 gacha bonus oling',
+    bloggerDesc: 'Hech qanday investitsiya kerak emas! Promo kodingiz orqali SellerCloudX ga yangi mijozlar olib keling — har bir mijoz uchun 3 oy davomida bonus oling. Qo\'shimcha haftalik va oylik mega bonuslar ham bor!',
+    bloggerStep1: 'Bepul hamkor sifatida ro\'yxatdan o\'ting',
+    bloggerStep2: 'O\'zingizga xos promo kod yarating (masalan: ALI05)',
+    bloggerStep3: 'SellerCloudX haqida kontent yarating va ulashing',
+    bloggerStep4: 'Har bir mijoz uchun 3 oy bonus + mega bonuslar oling',
+    bloggerBonus1: '1-oy: $50',
+    bloggerBonus2: '2-oy: $50',
+    bloggerBonus3: '3-oy: $25',
+    bloggerBonusTotal: '= Har bir mijozdan $125',
+    bloggerWeekly: 'Haftalik bonus: 10+ mijoz = +$150, 15+ mijoz = +$250',
+    bloggerMonthly: 'Oylik mega bonus: 35+ mijoz = +$1,000, 55+ mijoz = +$2,500',
+    bloggerInstagram: 'Instagram Challenge: Har kuni 1 video = oyiga $100 bonus',
+    bloggerCta: 'Sellzen.online da hamkor bo\'lish',
+    bloggerEarning: 'Oyiga $2,500 gacha ishlash mumkin',
   },
   ru: {
     badge: '🚀 Платформа #1 для маркетплейсов Узбекистана',
@@ -307,15 +314,22 @@ const T = {
     faq6q: 'Мои данные в безопасности?',
     faq6a: 'Да. API-ключи хранятся в зашифрованном виде. SSL-защита и соответствие стандартам GDPR.',
     bloggerNav: 'Для блогеров',
-    bloggerTitle: 'Зарабатывайте как блогер',
-    bloggerSubtitle: 'Продвигайте товары через Sellzen.online и получайте доход с каждой продажи',
-    bloggerDesc: 'Sellzen.online — специальная платформа для блогеров и инфлюенсеров. Рекомендуйте товары продавцов своей аудитории и получайте 5-15% комиссии с каждой успешной продажи. Никаких начальных вложений!',
-    bloggerFeature1: 'Создайте ссылку — выберите товар и получите персональную affiliate-ссылку',
-    bloggerFeature2: 'Поделитесь с аудиторией — в Telegram, Instagram, YouTube или блоге',
-    bloggerFeature3: 'Получайте доход — 5-15% комиссии автоматически начисляется с каждой продажи',
-    bloggerFeature4: 'Статистика в реальном времени — отслеживайте клики, конверсии и доход',
-    bloggerCta: 'Перейти на Sellzen.online',
-    bloggerEarning: 'Доход от 3 до 10 млн сум в месяц',
+    bloggerTitle: 'Зарабатывайте с SellerCloudX!',
+    bloggerSubtitle: 'Станьте партнёром, привлекайте клиентов по промо-коду и получайте до $125 за каждого',
+    bloggerDesc: 'Никаких вложений! Привлекайте новых клиентов в SellerCloudX через свой промо-код — получайте бонус за каждого клиента 3 месяца подряд. Плюс еженедельные и ежемесячные мега-бонусы!',
+    bloggerStep1: 'Зарегистрируйтесь бесплатно как партнёр',
+    bloggerStep2: 'Создайте уникальный промо-код (например: ALI05)',
+    bloggerStep3: 'Создавайте контент о SellerCloudX и делитесь',
+    bloggerStep4: 'Получайте бонус 3 месяца за каждого + мега-бонусы',
+    bloggerBonus1: '1-й мес: $50',
+    bloggerBonus2: '2-й мес: $50',
+    bloggerBonus3: '3-й мес: $25',
+    bloggerBonusTotal: '= $125 за каждого клиента',
+    bloggerWeekly: 'Еженедельный бонус: 10+ клиентов = +$150, 15+ = +$250',
+    bloggerMonthly: 'Ежемесячный мега-бонус: 35+ клиентов = +$1,000, 55+ = +$2,500',
+    bloggerInstagram: 'Instagram Challenge: 1 видео в день = $100/месяц бонус',
+    bloggerCta: 'Стать партнёром на Sellzen.online',
+    bloggerEarning: 'До $2,500 в месяц',
   },
   en: {
     badge: '🚀 #1 Marketplace Automation Platform in Uzbekistan',
@@ -413,15 +427,22 @@ const T = {
     faq6q: 'Is my data secure?',
     faq6a: 'Yes. API keys are stored encrypted. SSL protection and GDPR compliance.',
     bloggerNav: 'For Bloggers',
-    bloggerTitle: 'Earn Money as a Blogger',
-    bloggerSubtitle: 'Promote products via Sellzen.online and earn from every sale',
-    bloggerDesc: 'Sellzen.online is a dedicated platform for bloggers and influencers. Recommend seller products to your audience and earn 5-15% commission on every successful sale. No initial investment needed!',
-    bloggerFeature1: 'Create a link — choose a product and get your personal affiliate link',
-    bloggerFeature2: 'Share with your audience — on Telegram, Instagram, YouTube or your blog',
-    bloggerFeature3: 'Earn income — 5-15% commission is automatically calculated per sale',
-    bloggerFeature4: 'Real-time stats — track clicks, conversions and your earnings',
-    bloggerCta: 'Go to Sellzen.online',
-    bloggerEarning: 'Earn 3-10M UZS per month',
+    bloggerTitle: 'Earn with SellerCloudX!',
+    bloggerSubtitle: 'Become a partner, bring new clients via your promo code and earn up to $125 per client',
+    bloggerDesc: 'No investment needed! Bring new clients to SellerCloudX with your promo code — earn bonuses for each client for 3 months straight. Plus weekly and monthly mega bonuses!',
+    bloggerStep1: 'Sign up free as a partner',
+    bloggerStep2: 'Create your unique promo code (e.g., ALI05)',
+    bloggerStep3: 'Create content about SellerCloudX and share',
+    bloggerStep4: 'Earn 3-month bonuses per client + mega bonuses',
+    bloggerBonus1: 'Month 1: $50',
+    bloggerBonus2: 'Month 2: $50',
+    bloggerBonus3: 'Month 3: $25',
+    bloggerBonusTotal: '= $125 per client',
+    bloggerWeekly: 'Weekly bonus: 10+ clients = +$150, 15+ = +$250',
+    bloggerMonthly: 'Monthly mega bonus: 35+ clients = +$1,000, 55+ = +$2,500',
+    bloggerInstagram: 'Instagram Challenge: 1 video/day = $100/month bonus',
+    bloggerCta: 'Become a partner on Sellzen.online',
+    bloggerEarning: 'Earn up to $2,500/month',
   },
 };
 
@@ -901,17 +922,30 @@ export default function Index() {
             <FadeInSection>
               <div className="space-y-6">
                 <p className="text-muted-foreground leading-relaxed">{txt.bloggerDesc}</p>
-                <div className="space-y-4">
-                  {[txt.bloggerFeature1, txt.bloggerFeature2, txt.bloggerFeature3, txt.bloggerFeature4].map((feat, i) => (
+                
+                {/* 4 Steps */}
+                <div className="space-y-3">
+                  {[txt.bloggerStep1, txt.bloggerStep2, txt.bloggerStep3, txt.bloggerStep4].map((step, i) => (
                     <div key={i} className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                         <span className="text-primary font-bold text-sm">{i + 1}</span>
                       </div>
-                      <p className="text-sm font-medium">{feat}</p>
+                      <p className="text-sm font-medium pt-1.5">{step}</p>
                     </div>
                   ))}
                 </div>
-                <Button size="lg" className="shadow-lg shadow-primary/20 group" asChild>
+
+                {/* Bonus breakdown */}
+                <div className="rounded-xl border-2 border-primary/20 p-4 space-y-3 bg-primary/5">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <Badge className="bg-primary text-primary-foreground">{txt.bloggerBonus1}</Badge>
+                    <Badge className="bg-primary text-primary-foreground">{txt.bloggerBonus2}</Badge>
+                    <Badge className="bg-primary text-primary-foreground">{txt.bloggerBonus3}</Badge>
+                  </div>
+                  <div className="text-center font-bold text-lg text-primary">{txt.bloggerBonusTotal}</div>
+                </div>
+
+                <Button size="lg" className="shadow-lg shadow-primary/20 group w-full md:w-auto" asChild>
                   <a href="https://sellzen.online" target="_blank" rel="noopener noreferrer">
                     <ExternalLink className="mr-2 h-4 w-4" />
                     {txt.bloggerCta}
@@ -923,34 +957,49 @@ export default function Index() {
 
             <FadeInSection delay={200}>
               <Card className="border-2 border-primary/20 shadow-xl bg-gradient-to-br from-primary/5 to-accent/5">
-                <CardContent className="p-8 text-center space-y-6">
-                  <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
-                    <Coins className="h-10 w-10 text-primary" />
+                <CardContent className="p-6 md:p-8 space-y-5">
+                  <div className="text-center">
+                    <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
+                      <Coins className="h-8 w-8 text-primary" />
+                    </div>
+                    <div className="text-3xl md:text-4xl font-bold font-display text-primary mb-1">$125</div>
+                    <p className="text-muted-foreground text-sm">{txt.bloggerBonusTotal}</p>
                   </div>
-                  <div>
-                    <div className="text-3xl md:text-4xl font-bold font-display text-primary mb-2">5-15%</div>
-                    <p className="text-muted-foreground text-sm">
-                      {language === 'uz' ? 'Har bir sotuvdan komissiya' : language === 'ru' ? 'Комиссия с каждой продажи' : 'Commission per sale'}
-                    </p>
+                  
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-start gap-2 p-2.5 rounded-lg bg-muted/50">
+                      <span className="text-primary font-bold shrink-0">💰</span>
+                      <span>{txt.bloggerWeekly}</span>
+                    </div>
+                    <div className="flex items-start gap-2 p-2.5 rounded-lg bg-muted/50">
+                      <span className="text-primary font-bold shrink-0">🏆</span>
+                      <span>{txt.bloggerMonthly}</span>
+                    </div>
+                    <div className="flex items-start gap-2 p-2.5 rounded-lg bg-muted/50">
+                      <span className="text-primary font-bold shrink-0">📸</span>
+                      <span>{txt.bloggerInstagram}</span>
+                    </div>
                   </div>
-                  <div className="border-t pt-4">
+
+                  <div className="border-t pt-4 text-center">
                     <Badge className="bg-primary/10 text-primary border-primary/20 text-sm px-4 py-1.5">
                       <TrendingUp className="h-3.5 w-3.5 mr-1.5" />
                       {txt.bloggerEarning}
                     </Badge>
                   </div>
-                  <div className="grid grid-cols-3 gap-4 text-center pt-2">
+
+                  <div className="grid grid-cols-3 gap-3 text-center pt-2">
                     <div>
-                      <div className="text-2xl font-bold font-display">0</div>
+                      <div className="text-2xl font-bold font-display">$0</div>
                       <div className="text-[10px] text-muted-foreground">{language === 'uz' ? 'Sarmoya' : language === 'ru' ? 'Вложения' : 'Investment'}</div>
                     </div>
                     <div>
-                      <div className="text-2xl font-bold font-display">∞</div>
-                      <div className="text-[10px] text-muted-foreground">{language === 'uz' ? 'Mahsulotlar' : language === 'ru' ? 'Товары' : 'Products'}</div>
+                      <div className="text-2xl font-bold font-display">4</div>
+                      <div className="text-[10px] text-muted-foreground">{language === 'uz' ? 'Oddiy qadam' : language === 'ru' ? 'Простых шага' : 'Easy steps'}</div>
                     </div>
                     <div>
-                      <div className="text-2xl font-bold font-display">24/7</div>
-                      <div className="text-[10px] text-muted-foreground">{language === 'uz' ? 'Statistika' : language === 'ru' ? 'Статистика' : 'Analytics'}</div>
+                      <div className="text-2xl font-bold font-display">$2.5K</div>
+                      <div className="text-[10px] text-muted-foreground">{language === 'uz' ? 'Oylik max' : language === 'ru' ? 'Макс/месяц' : 'Max/month'}</div>
                     </div>
                   </div>
                 </CardContent>
