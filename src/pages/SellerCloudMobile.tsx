@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { useExchangeRate } from '@/hooks/useExchangeRate';
 import { Skeleton } from '@/components/ui/skeleton';
 import { MobileMoreMenu } from '@/components/mobile/MobileMoreMenu';
+import { OnboardingWizard } from '@/components/sellercloud/OnboardingWizard';
 
 // Lazy load ALL tab content components for instant tab switching
 const MobileAnalytics = lazy(() => import('@/components/mobile/MobileAnalytics').then(m => ({ default: m.MobileAnalytics })));
@@ -123,22 +124,20 @@ export default function SellerCloudMobile() {
 
   if (!subscription) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
-        <div className="w-20 h-20 rounded-full bg-amber-500/20 flex items-center justify-center mb-6">
-          <Lock className="h-10 w-10 text-amber-500" />
-        </div>
-        <h1 className="text-2xl font-bold text-center mb-2">SellerCloudX Pro</h1>
-        <p className="text-muted-foreground text-center mb-6">Barcha marketplacelarni bitta joydan boshqaring</p>
-        <Button size="lg" onClick={async () => {
-          const result = await createSubscription('pro');
-          if (result.success) {
-            toast.success('Obuna yaratildi! To\'lov sahifasiga o\'tyapsiz...');
-            setActiveTab('subscription' as MobileTabType);
-          } else {
-            toast.error(result.error || 'Xatolik yuz berdi');
-          }
-        }}>Obuna bo'lish</Button>
-        <Button variant="ghost" className="mt-4" onClick={() => navigate('/')}>Bosh sahifaga qaytish</Button>
+      <div className="min-h-screen bg-background p-4 pb-20 overflow-y-auto">
+        <OnboardingWizard 
+          onActivate={async () => {
+            const result = await createSubscription('pro');
+            if (result.success) {
+              toast.success('Obuna yaratildi! To\'lov sahifasiga o\'tyapsiz...');
+            } else {
+              toast.error(result.error || 'Xatolik yuz berdi');
+            }
+          }}
+          onContactAdmin={() => {
+            window.open('https://t.me/sellercloudx_support', '_blank');
+          }}
+        />
       </div>
     );
   }

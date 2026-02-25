@@ -23,6 +23,7 @@ import {
   Shield, Copy, AlertOctagon, Wrench, RefreshCw, Sparkles, MessageCircle, Activity, Megaphone
 } from 'lucide-react';
 import { MarketplaceLogo, MARKETPLACE_CONFIG } from '@/lib/marketplaceConfig';
+import { OnboardingWizard } from '@/components/sellercloud/OnboardingWizard';
 
 // Lazy load heavy tab components
 const MarketplaceOAuth = lazy(() => import('@/components/sellercloud/MarketplaceOAuth').then(m => ({ default: m.MarketplaceOAuth })));
@@ -148,51 +149,22 @@ export default function SellerCloudX() {
     return (
       <>
         <Navbar />
-        <div className="container mx-auto px-4 py-12">
-          <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-12">
-              <Badge className="mb-4 bg-gradient-to-r from-primary to-primary/80 text-primary-foreground">
-                <Crown className="h-3 w-3 mr-1" />Premium
-              </Badge>
-              <h1 className="text-4xl font-bold mb-4">SellerCloudX</h1>
-              <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                Barcha marketplacelarni bitta joydan boshqaring. Uzum, Yandex, Wildberries, Ozon - hammasi bir dashboardda.
-              </p>
-            </div>
-            <Card className="max-w-lg mx-auto border-2 border-primary/20 shadow-xl">
-              <CardHeader className="text-center pb-2">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center mx-auto mb-4">
-                  <Globe className="h-8 w-8 text-white" />
-                </div>
-                <CardTitle className="text-2xl">SellerCloudX Pro</CardTitle>
-                <CardDescription>Marketplace avtomatizatsiya tizimi</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="text-center">
-                  <div className="text-5xl font-bold text-primary">$499</div>
-                  <div className="text-muted-foreground">/oyiga</div>
-                </div>
-                <ul className="space-y-3">
-                  {["4 ta marketplace: Uzum, Yandex, Wildberries, Ozon","OAuth orqali bir tugmada ulash","AI bilan avtomatik kartochka yaratish","Barcha marketplacelar analitikasi","Buyurtmalarni markazlashtirilgan boshqarish","Zaxira sinxronizatsiyasi","Narxlarni avtomatik optimallashtirish","24/7 texnik yordam"].map((feature, idx) => (
-                    <li key={idx} className="flex items-start gap-3 text-sm">
-                      <Check className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" /><span>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-                <Button className="w-full" size="lg" onClick={async () => {
-                  const result = await createSubscription('pro');
-                  if (result.success) {
-                    toast.success('Obuna so\'rovi yuborildi! Admin tasdiqlashini kuting.');
-                  } else {
-                    toast.error(result.error || 'Xatolik yuz berdi');
-                  }
-                }}>Obunani boshlash<ArrowRight className="ml-2 h-4 w-4" /></Button>
-                
-              </CardContent>
-            </Card>
-            <div className="text-center mt-8">
-              <Button variant="ghost" asChild><Link to="/">← Bosh sahifaga qaytish</Link></Button>
-            </div>
+        <div className="container mx-auto px-4 py-8">
+          <OnboardingWizard 
+            onActivate={async () => {
+              const result = await createSubscription('pro');
+              if (result.success) {
+                toast.success('Obuna yaratildi! To\'lov sahifasiga o\'tyapsiz...');
+              } else {
+                toast.error(result.error || 'Xatolik yuz berdi');
+              }
+            }}
+            onContactAdmin={() => {
+              window.open('https://t.me/sellercloudx_support', '_blank');
+            }}
+          />
+          <div className="text-center mt-6">
+            <Button variant="ghost" asChild><Link to="/">← Bosh sahifaga qaytish</Link></Button>
           </div>
         </div>
         <Footer />
