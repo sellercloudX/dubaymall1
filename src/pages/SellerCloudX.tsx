@@ -14,6 +14,7 @@ import { useMarketplaceConnections } from '@/hooks/useMarketplaceConnections';
 import { useSellerCloudSubscription } from '@/hooks/useSellerCloudSubscription';
 import { useMarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 import { toast } from 'sonner';
+import { useExchangeRate } from '@/hooks/useExchangeRate';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Loader2, Globe, Package, ShoppingCart, BarChart3, 
@@ -55,6 +56,9 @@ export default function SellerCloudX() {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  
+  // Load real exchange rate from CBU.uz
+  useExchangeRate();
   
   // Persist active tab in URL hash so it survives re-renders and refreshes
   const getInitialTab = () => {
