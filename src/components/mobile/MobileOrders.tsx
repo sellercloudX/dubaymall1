@@ -39,9 +39,9 @@ const ORDER_STATUSES = [
   { value: 'RETURNED', label: 'Qaytarildi' },
 ];
 
-const formatPrice = (price?: number, marketplace?: string) => {
-  if (!price) return '—';
-  const priceUzs = toDisplayUzs(price, marketplace || '');
+/** Format a price that is ALREADY in UZS */
+const formatPriceUzs = (priceUzs?: number) => {
+  if (!priceUzs) return '—';
   return formatUzs(priceUzs) + " so'm";
 };
 
@@ -94,7 +94,6 @@ const getFirstProductName = (order: MarketplaceOrder): string => {
 const OrderRow = memo(({ order, onClick, store, marketplace }: { order: MarketplaceOrder; onClick: (o: MarketplaceOrder) => void; store: MarketplaceDataStore; marketplace: string }) => {
   const productName = getFirstProductName(order);
   const itemCount = order.items?.length || 0;
-  const isRub = marketplace === 'wildberries';
   const totalPrice = toDisplayUzs(order.total || order.itemsTotal || 0, marketplace);
   
   // Get product image: first from order item photo, then from store products
@@ -137,7 +136,7 @@ const OrderRow = memo(({ order, onClick, store, marketplace }: { order: Marketpl
             </div>
           ) : <div className="flex-1" />}
           <div className="flex items-center gap-2 shrink-0">
-            <span className="font-bold text-primary text-sm">{formatPrice(totalPrice, marketplace)}</span>
+            <span className="font-bold text-primary text-sm">{formatPriceUzs(totalPrice)}</span>
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
           </div>
         </div>
@@ -270,7 +269,7 @@ export function MobileOrders({ connectedMarketplaces, store }: MobileOrdersProps
                         <div className="text-sm font-medium line-clamp-2">{item.offerName}</div>
                         <div className="text-xs text-muted-foreground">× {item.count}</div>
                       </div>
-                      <div className="font-medium text-right">{formatPrice(item.priceUZS || item.price, selectedMp)}</div>
+                      <div className="font-medium text-right">{formatPriceUzs(toDisplayUzs(item.price || 0, selectedMp))}</div>
                     </div>
                   ))}
                 </div>
@@ -278,15 +277,15 @@ export function MobileOrders({ connectedMarketplaces, store }: MobileOrdersProps
               <div className="border-t pt-4 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Mahsulotlar:</span>
-                  <span>{formatPrice(selectedOrder.itemsTotalUZS || selectedOrder.itemsTotal, selectedMp)}</span>
+                  <span>{formatPriceUzs(toDisplayUzs(selectedOrder.itemsTotal || 0, selectedMp))}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Yetkazish:</span>
-                  <span>{formatPrice(selectedOrder.deliveryTotalUZS || selectedOrder.deliveryTotal, selectedMp)}</span>
+                  <span>{formatPriceUzs(toDisplayUzs(selectedOrder.deliveryTotal || 0, selectedMp))}</span>
                 </div>
                 <div className="flex justify-between font-bold">
                   <span>Jami:</span>
-                  <span className="text-primary">{formatPrice(selectedOrder.totalUZS || selectedOrder.total, selectedMp)}</span>
+                  <span className="text-primary">{formatPriceUzs(toDisplayUzs(selectedOrder.total || 0, selectedMp))}</span>
                 </div>
               </div>
             </div>
