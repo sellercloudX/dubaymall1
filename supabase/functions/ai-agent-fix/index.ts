@@ -532,10 +532,123 @@ serve(async (req) => {
     });
 
     const body = await req.json();
-    const { partnerId, marketplace, products, maxRetries = 2 } = body;
+    const { partnerId, marketplace, products, maxRetries = 2, action } = body;
 
     if (!partnerId || !marketplace || !products?.length) {
       return new Response(JSON.stringify({ error: 'partnerId, marketplace, products kerak' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // ===== DIMENSION ESTIMATION =====
+    if (action === 'estimate-dimensions') {
+      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+      if (!LOVABLE_API_KEY) {
+        return new Response(JSON.stringify({ error: 'AI kalit sozlanmagan' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      
+      const productList = products.map((p: any) => `- "${p.name}" (${p.category || 'unknown'})`).join('\n');
+      
+      try {
+        const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash-lite",
+            messages: [
+              { role: "system", content: `Estimate realistic PACKAGING dimensions (cm) and weight (kg) for each product. WB logistics fees depend on volume (L*W*H/5000), so accurate dimensions save money. Return ONLY a JSON array: [{"offerId":"...","length":N,"width":N,"height":N,"weightBrutto":N}]. Be realistic - don't oversize. Consider product IN its shipping packaging.` },
+              { role: "user", content: `Products:\n${productList}\n\nOfferIDs: ${products.map((p: any) => p.offerId).join(', ')}` },
+            ],
+            temperature: 0.1,
+          }),
+        });
+        
+        if (aiResp.ok) {
+          const data = await aiResp.json();
+          const content = data.choices?.[0]?.message?.content || '';
+          const match = content.match(/\[[\s\S]*?\]/);
+          if (match) {
+            const parsed = JSON.parse(match[0]);
+            const dimensions = parsed.map((d: any, i: number) => ({
+              offerId: d.offerId || products[i]?.offerId,
+              length: Math.max(1, Math.min(120, Math.round(d.length || 15))),
+              width: Math.max(1, Math.min(80, Math.round(d.width || 10))),
+              height: Math.max(1, Math.min(60, Math.round(d.height || 5))),
+              weightBrutto: Math.max(0.01, Math.min(50, parseFloat((d.weightBrutto || d.weight || 0.3).toFixed(2)))),
+            }));
+            return new Response(JSON.stringify({ success: true, dimensions }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+          }
+        }
+      } catch (e) {
+        console.error('AI dimension estimate error:', e);
+      }
+      
+      return new Response(JSON.stringify({ error: 'AI baholash muvaffaqiyatsiz' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // ===== DIMENSION UPDATE VIA WB API =====
+    if (action === 'update-dimensions') {
+      // Get WB credentials
+      const { data: connections } = await supabase
+        .from('marketplace_connections')
+        .select('*')
+        .eq('user_id', partnerId)
+        .eq('marketplace', 'wildberries')
+        .eq('is_active', true)
+        .limit(1);
+
+      if (!connections?.length) {
+        return new Response(JSON.stringify({ error: 'WB ulanishi topilmadi' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      const conn = connections[0];
+      let creds: any;
+      if (conn.encrypted_credentials) {
+        const { data: decrypted } = await supabase.rpc('decrypt_credentials', { p_encrypted: conn.encrypted_credentials });
+        creds = typeof decrypted === 'string' ? JSON.parse(decrypted) : decrypted;
+      } else {
+        creds = conn.credentials || {};
+      }
+      
+      const apiKey = creds?.apiKey || creds?.api_key;
+      if (!apiKey) {
+        return new Response(JSON.stringify({ error: 'WB API kaliti yo\'q' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      let updated = 0;
+      const results: any[] = [];
+
+      for (const product of products) {
+        if (!product.nmID || !product.dimensions) continue;
+        try {
+          const resp = await fetchWithRetry(
+            'https://content-api.wildberries.ru/content/v2/cards/update',
+            {
+              method: 'POST',
+              headers: { Authorization: apiKey, 'Content-Type': 'application/json' },
+              body: JSON.stringify([{
+                nmID: product.nmID,
+                dimensions: product.dimensions,
+              }]),
+            }
+          );
+          if (resp.ok) {
+            const data = await resp.json();
+            if (!data.error) {
+              updated++;
+              results.push({ offerId: product.offerId, success: true });
+              console.log(`✅ Dimensions updated for nmID ${product.nmID}: ${JSON.stringify(product.dimensions)}`);
+            } else {
+              results.push({ offerId: product.offerId, success: false, error: data.errorText || data.error });
+            }
+          } else {
+            results.push({ offerId: product.offerId, success: false, error: `HTTP ${resp.status}` });
+          }
+          await sleep(300); // Rate limit
+        } catch (e: any) {
+          results.push({ offerId: product.offerId, success: false, error: e.message });
+        }
+      }
+
+      return new Response(JSON.stringify({ success: true, updated, results }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     // Get credentials
