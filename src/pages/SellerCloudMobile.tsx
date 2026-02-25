@@ -144,6 +144,7 @@ export default function SellerCloudMobile() {
           onContactAdmin={() => {
             window.open('https://t.me/sellercloudx_support', '_blank');
           }}
+          onGoHome={() => navigate('/')}
         />
       </div>
     );
@@ -160,6 +161,7 @@ export default function SellerCloudMobile() {
           onContactAdmin={() => {
             window.open('https://t.me/sellercloudx_support', '_blank');
           }}
+          onGoHome={() => navigate('/')}
         />
       </div>
     );
