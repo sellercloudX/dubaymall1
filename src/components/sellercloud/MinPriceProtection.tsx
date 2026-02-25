@@ -16,6 +16,7 @@ import {
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useCostPrices } from '@/hooks/useCostPrices';
 import { useMarketplaceTariffs, getTariffForProduct } from '@/hooks/useMarketplaceTariffs';
+import { toDisplayUzs } from '@/lib/currency';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 
 interface MinPriceProtectionProps {
@@ -50,14 +51,17 @@ export function MinPriceProtection({
     const allProducts: ProtectedProduct[] = [];
     for (const marketplace of connectedMarketplaces) {
       store.getProducts(marketplace).forEach(product => {
-        const currentPrice = product.price || 0;
-        if (currentPrice <= 0) return; // Skip products without price
+        const rawPrice = product.price || 0;
+        if (rawPrice <= 0) return; // Skip products without price
+        // Convert to UZS for uniform display (WB prices are in RUB)
+        const currentPrice = toDisplayUzs(rawPrice, marketplace);
         
         const realCost = getCostPrice(marketplace, product.offerId);
         const hasCostPrice = realCost !== null && realCost > 0;
-        const costPrice = hasCostPrice ? realCost : 0;
+        // Cost price for WB is stored in RUB, convert to UZS
+        const costPrice = hasCostPrice ? toDisplayUzs(realCost!, marketplace) : 0;
 
-        // Use real tariff data
+        // Use real tariff data — tariffs are already in UZS (converted in useMarketplaceTariffs)
         const tariff = getTariffForProduct(tariffMap, product.offerId, currentPrice, marketplace);
         const tariffPercent = tariff.isReal && currentPrice > 0
           ? tariff.totalFee / currentPrice
