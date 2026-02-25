@@ -11,7 +11,7 @@ import {
   Bot, DollarSign, LineChart, Clock, Users, Star, 
   ChevronRight, Crown, TrendingUp, AlertTriangle,
   Play, Sparkles, Shield, Rocket, Send, MessageCircle,
-  ChevronDown, Lock, FileCheck
+  ChevronDown, Lock, FileCheck, ExternalLink, Coins, Heart
 } from 'lucide-react';
 import React, { useState, useEffect, useRef, ReactNode } from 'react';
 import heroDashboard from '@/assets/hero-dashboard.png';
@@ -200,6 +200,16 @@ const T = {
     faq5a: 'Agar 60 kun ichida savdolaringiz o\'smasa, to\'langan summani qaytarib olamiz. Bu bizning sifatga ishonchimiz.',
     faq6q: 'Ma\'lumotlarim xavfsizmi?',
     faq6a: 'Ha. API kalitlaringiz shifrlangan holda saqlanadi. SSL himoyasi va GDPR standartlariga muvofiq ishlaymiz.',
+    bloggerNav: 'Blogerlar uchun',
+    bloggerTitle: 'Blogerlar uchun pul ishlash imkoniyati',
+    bloggerSubtitle: 'Sellzen.online orqali mahsulotlarni targ\'ib qiling va har bir sotuvdan daromad oling',
+    bloggerDesc: 'Sellzen.online — bu blogerlar va influenserlar uchun maxsus platforma. Sotuvchilarning mahsulotlarini o\'z auditoriyangizga tavsiya qiling va har bir muvaffaqiyatli sotuvdan 5-15% komissiya oling. Hech qanday boshlang\'ich sarmoya kerak emas!',
+    bloggerFeature1: 'Havola yarating — mahsulotni tanlang va shaxsiy affiliate havolangizni oling',
+    bloggerFeature2: 'Auditoriyangizga ulashing — Telegram, Instagram, YouTube yoki blogingizda joylashtiring',
+    bloggerFeature3: 'Daromad oling — har bir sotuvdan 5-15% komissiya avtomatik hisoblanadi',
+    bloggerFeature4: 'Real-vaqt statistika — kliklar, konversiyalar va daromadingizni kuzating',
+    bloggerCta: 'Sellzen.online ga o\'tish',
+    bloggerEarning: 'Oyiga 3-10 mln so\'m daromad imkoniyati',
   },
   ru: {
     badge: '🚀 Платформа #1 для маркетплейсов Узбекистана',
@@ -296,6 +306,16 @@ const T = {
     faq5a: 'Если за 60 дней ваши продажи не вырастут, мы вернём оплаченную сумму. Это наша уверенность в качестве.',
     faq6q: 'Мои данные в безопасности?',
     faq6a: 'Да. API-ключи хранятся в зашифрованном виде. SSL-защита и соответствие стандартам GDPR.',
+    bloggerNav: 'Для блогеров',
+    bloggerTitle: 'Зарабатывайте как блогер',
+    bloggerSubtitle: 'Продвигайте товары через Sellzen.online и получайте доход с каждой продажи',
+    bloggerDesc: 'Sellzen.online — специальная платформа для блогеров и инфлюенсеров. Рекомендуйте товары продавцов своей аудитории и получайте 5-15% комиссии с каждой успешной продажи. Никаких начальных вложений!',
+    bloggerFeature1: 'Создайте ссылку — выберите товар и получите персональную affiliate-ссылку',
+    bloggerFeature2: 'Поделитесь с аудиторией — в Telegram, Instagram, YouTube или блоге',
+    bloggerFeature3: 'Получайте доход — 5-15% комиссии автоматически начисляется с каждой продажи',
+    bloggerFeature4: 'Статистика в реальном времени — отслеживайте клики, конверсии и доход',
+    bloggerCta: 'Перейти на Sellzen.online',
+    bloggerEarning: 'Доход от 3 до 10 млн сум в месяц',
   },
   en: {
     badge: '🚀 #1 Marketplace Automation Platform in Uzbekistan',
@@ -392,6 +412,16 @@ const T = {
     faq5a: 'If your sales don\'t grow within 60 days, we refund the paid amount. That\'s our confidence in quality.',
     faq6q: 'Is my data secure?',
     faq6a: 'Yes. API keys are stored encrypted. SSL protection and GDPR compliance.',
+    bloggerNav: 'For Bloggers',
+    bloggerTitle: 'Earn Money as a Blogger',
+    bloggerSubtitle: 'Promote products via Sellzen.online and earn from every sale',
+    bloggerDesc: 'Sellzen.online is a dedicated platform for bloggers and influencers. Recommend seller products to your audience and earn 5-15% commission on every successful sale. No initial investment needed!',
+    bloggerFeature1: 'Create a link — choose a product and get your personal affiliate link',
+    bloggerFeature2: 'Share with your audience — on Telegram, Instagram, YouTube or your blog',
+    bloggerFeature3: 'Earn income — 5-15% commission is automatically calculated per sale',
+    bloggerFeature4: 'Real-time stats — track clicks, conversions and your earnings',
+    bloggerCta: 'Go to Sellzen.online',
+    bloggerEarning: 'Earn 3-10M UZS per month',
   },
 };
 
@@ -466,6 +496,10 @@ export default function Index() {
             </a>
             <a href="#faq" className="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">
               FAQ
+            </a>
+            <a href="#bloggers" className="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium flex items-center gap-1">
+              <Heart className="h-3.5 w-3.5" />
+              {txt.bloggerNav}
             </a>
           </div>
 
@@ -845,6 +879,83 @@ export default function Index() {
                  </Card>
                </FadeInSection>
              ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ━━━ Bloggers / Sellzen Section ━━━ */}
+      <section id="bloggers" className="py-24 md:py-32">
+        <div className="container mx-auto px-4">
+          <FadeInSection className="text-center mb-16">
+            <Badge variant="outline" className="mb-4 px-4 py-1.5">
+              <Heart className="h-3 w-3 mr-1.5" />
+              {txt.bloggerNav}
+            </Badge>
+            <h2 className="text-3xl md:text-5xl font-bold mb-3 font-display">
+              {txt.bloggerTitle}
+            </h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto text-lg">{txt.bloggerSubtitle}</p>
+          </FadeInSection>
+
+          <div className="grid md:grid-cols-2 gap-8 md:gap-12 max-w-5xl mx-auto items-center">
+            <FadeInSection>
+              <div className="space-y-6">
+                <p className="text-muted-foreground leading-relaxed">{txt.bloggerDesc}</p>
+                <div className="space-y-4">
+                  {[txt.bloggerFeature1, txt.bloggerFeature2, txt.bloggerFeature3, txt.bloggerFeature4].map((feat, i) => (
+                    <div key={i} className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                        <span className="text-primary font-bold text-sm">{i + 1}</span>
+                      </div>
+                      <p className="text-sm font-medium">{feat}</p>
+                    </div>
+                  ))}
+                </div>
+                <Button size="lg" className="shadow-lg shadow-primary/20 group" asChild>
+                  <a href="https://sellzen.online" target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    {txt.bloggerCta}
+                    <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                  </a>
+                </Button>
+              </div>
+            </FadeInSection>
+
+            <FadeInSection delay={200}>
+              <Card className="border-2 border-primary/20 shadow-xl bg-gradient-to-br from-primary/5 to-accent/5">
+                <CardContent className="p-8 text-center space-y-6">
+                  <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
+                    <Coins className="h-10 w-10 text-primary" />
+                  </div>
+                  <div>
+                    <div className="text-3xl md:text-4xl font-bold font-display text-primary mb-2">5-15%</div>
+                    <p className="text-muted-foreground text-sm">
+                      {language === 'uz' ? 'Har bir sotuvdan komissiya' : language === 'ru' ? 'Комиссия с каждой продажи' : 'Commission per sale'}
+                    </p>
+                  </div>
+                  <div className="border-t pt-4">
+                    <Badge className="bg-primary/10 text-primary border-primary/20 text-sm px-4 py-1.5">
+                      <TrendingUp className="h-3.5 w-3.5 mr-1.5" />
+                      {txt.bloggerEarning}
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4 text-center pt-2">
+                    <div>
+                      <div className="text-2xl font-bold font-display">0</div>
+                      <div className="text-[10px] text-muted-foreground">{language === 'uz' ? 'Sarmoya' : language === 'ru' ? 'Вложения' : 'Investment'}</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold font-display">∞</div>
+                      <div className="text-[10px] text-muted-foreground">{language === 'uz' ? 'Mahsulotlar' : language === 'ru' ? 'Товары' : 'Products'}</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold font-display">24/7</div>
+                      <div className="text-[10px] text-muted-foreground">{language === 'uz' ? 'Statistika' : language === 'ru' ? 'Статистика' : 'Analytics'}</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </FadeInSection>
           </div>
         </div>
       </section>

@@ -56,9 +56,16 @@ export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceO
     : allOrders.filter(o => o.status === statusFilter);
   const total = orders.length;
 
+  /** Format a native-currency price to display in UZS */
   const formatPrice = (price?: number) => {
     if (!price && price !== 0) return '—';
     const priceUzs = toDisplayUzs(price, selectedMarketplace);
+    return formatUzs(priceUzs) + " so'm";
+  };
+
+  /** Format a price that is ALREADY in UZS */
+  const formatPriceUzs = (priceUzs?: number) => {
+    if (!priceUzs && priceUzs !== 0) return '—';
     return formatUzs(priceUzs) + " so'm";
   };
 
@@ -216,7 +223,7 @@ export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceO
                             )}
                             {getStatusBadge(order.status, order.substatus)}
                             <div className="text-right">
-                              <div className="font-bold">{formatPrice(order.totalUZS || order.total)}</div>
+                              <div className="font-bold">{formatPrice(order.total)}</div>
                               <div className="text-xs text-muted-foreground">{order.items?.length || 0} mahsulot</div>
                             </div>
                             <ChevronDown className={`h-5 w-5 transition-transform ${expandedOrder === order.id ? 'rotate-180' : ''}`} />
@@ -249,7 +256,7 @@ export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceO
                                   </div>
                                 </div>
                                 <div className="text-right shrink-0">
-                                  <div className="font-medium">{formatPrice(item.priceUZS || item.price)}</div>
+                                  <div className="font-medium">{formatPrice(item.price)}</div>
                                   <div className="text-xs text-muted-foreground">× {item.count}</div>
                                 </div>
                               </div>
@@ -262,15 +269,15 @@ export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceO
                         <div className="mt-4 pt-3 border-t grid grid-cols-3 gap-4 text-sm">
                           <div>
                             <div className="text-muted-foreground">Mahsulotlar:</div>
-                            <div className="font-medium">{formatPrice(order.itemsTotalUZS || order.itemsTotal)}</div>
+                            <div className="font-medium">{formatPrice(order.itemsTotal)}</div>
                           </div>
                           <div>
                             <div className="text-muted-foreground">Yetkazish:</div>
-                            <div className="font-medium">{formatPrice(order.deliveryTotalUZS || order.deliveryTotal)}</div>
+                            <div className="font-medium">{formatPrice(order.deliveryTotal)}</div>
                           </div>
                           <div>
                             <div className="text-muted-foreground">Jami:</div>
-                            <div className="font-bold text-primary">{formatPrice(order.totalUZS || order.total)}</div>
+                            <div className="font-bold text-primary">{formatPrice(order.total)}</div>
                           </div>
                         </div>
                       </div>

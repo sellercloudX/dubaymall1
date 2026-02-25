@@ -3286,8 +3286,8 @@ serve(async (req) => {
           const beginStr = startDate.toISOString().split('T')[0];
           const endStr = endDate.toISOString().split('T')[0];
 
-          // First page
-          const analyticsResp = await fetch(
+          // nm-report detail — try v2 first, fallback to v1
+          let analyticsResp = await fetch(
             "https://seller-analytics-api.wildberries.ru/api/v2/nm-report/detail",
             {
               method: "POST",
@@ -3298,6 +3298,22 @@ serve(async (req) => {
               }),
             }
           );
+          
+          // If v2 returns 404, try alternative endpoint
+          if (analyticsResp.status === 404) {
+            console.log("WB nm-report v2 returned 404, trying /api/v1/analytics/nm-report/detail");
+            analyticsResp = await fetch(
+              "https://seller-analytics-api.wildberries.ru/api/v1/analytics/nm-report/detail",
+              {
+                method: "POST",
+                headers: wbHeaders,
+                body: JSON.stringify({
+                  period: { begin: beginStr, end: endStr },
+                  page: 1,
+                }),
+              }
+            );
+          }
 
           if (analyticsResp.ok) {
             const analyticsData = await analyticsResp.json();
