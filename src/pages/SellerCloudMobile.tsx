@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useMarketplaceConnections } from '@/hooks/useMarketplaceConnections';
 import { useSellerCloudSubscription } from '@/hooks/useSellerCloudSubscription';
 import { useMarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
+import { toDisplayUzs } from '@/lib/currency';
 import { MobileSellerCloudNav, type MobileTabType } from '@/components/mobile/MobileSellerCloudNav';
 import { MobileSellerCloudHeader } from '@/components/mobile/MobileSellerCloudHeader';
 import { BackgroundTasksPanel } from '@/components/mobile/BackgroundTasksPanel';
@@ -94,14 +95,19 @@ export default function SellerCloudMobile() {
    // Centralized data store — fetches once, cached for all tabs
    const store = useMarketplaceDataStore(connectedMarketplaces);
    
-   // Calculate revenue from actual order data (same logic as desktop)
+   // Calculate revenue from actual order data with proper currency conversion
    const totalRevenue = useMemo(() => {
      const orders = store.allOrders;
      if (orders.length === 0) return connections.reduce((sum, c) => sum + (c.total_revenue || 0), 0);
+     // Build order→marketplace map
+     const orderMpMap = new Map<number, string>();
+     connectedMarketplaces.forEach(mp => {
+       store.getOrders(mp).forEach(o => orderMpMap.set(o.id, mp));
+     });
      return orders
        .filter((o: any) => !['CANCELLED', 'CANCELED', 'RETURNED'].includes(String(o.status).toUpperCase()))
-       .reduce((sum: number, o: any) => sum + (o.itemsTotal || o.total || 0), 0);
-   }, [store.allOrders, connections]);
+       .reduce((sum: number, o: any) => sum + toDisplayUzs(o.itemsTotal || o.total || 0, orderMpMap.get(o.id) || ''), 0);
+   }, [store.allOrders, connections, connectedMarketplaces]);
 
   const handleMarketplaceConnect = async () => {
     await refetch();

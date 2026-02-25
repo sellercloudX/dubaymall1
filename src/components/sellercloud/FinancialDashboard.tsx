@@ -90,8 +90,8 @@ export function FinancialDashboard({
         (order.items || []).forEach(item => {
           const cost = getCostPrice(marketplace, item.offerId);
           const qty = item.count || 1;
-          // Convert item price to UZS for uniform calculations
-          const itemPrice = item.priceUZS || toDisplayUzs(item.price || 0, marketplace);
+          // Always convert from native currency — never trust priceUZS (may be RUB for WB)
+          const itemPrice = toDisplayUzs(item.price || 0, marketplace);
           const itemRevenue = itemPrice * qty;
           totalProductCount += qty;
           mpRevenue += itemRevenue;
