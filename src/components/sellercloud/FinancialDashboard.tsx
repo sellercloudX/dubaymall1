@@ -38,6 +38,7 @@ const MARKETPLACE_FEE_LABELS: Record<string, string> = {
 const MARKETPLACE_FEE_DETAILS: Record<string, string> = {
   yandex: 'API orqali real tarif',
   uzum: 'Komissiya (10-20%) + logistika (4-20k)',
+  wildberries: 'API orqali real komissiya + logistika',
 };
 
 const MARKETPLACE_TAX: Record<string, number> = {
