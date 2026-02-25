@@ -128,7 +128,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    const redirectUrl = `${window.location.origin}/`;
+    // Always redirect to published domain, not preview/dev URL
+    const redirectUrl = 'https://sellercloudx.lovable.app/';
     
     const { error } = await supabase.auth.signUp({
       email,
