@@ -29,6 +29,114 @@ async function wbFetch(url: string, options: RequestInit, retries = 3): Promise<
   return fetch(url, options);
 }
 
+// ===== AI DIMENSION ESTIMATOR =====
+interface ProductDimensions {
+  length: number; // cm
+  width: number;  // cm
+  height: number; // cm
+  weightBrutto: number; // kg
+}
+
+async function aiEstimateDimensions(productName: string, category: string): Promise<ProductDimensions> {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  
+  // Category-based defaults (better than one-size-fits-all)
+  const CATEGORY_DEFAULTS: Record<string, ProductDimensions> = {
+    'телефон': { length: 16, width: 8, height: 3, weightBrutto: 0.3 },
+    'смартфон': { length: 16, width: 8, height: 3, weightBrutto: 0.3 },
+    'чехол': { length: 17, width: 9, height: 1.5, weightBrutto: 0.05 },
+    'наушник': { length: 10, width: 8, height: 5, weightBrutto: 0.15 },
+    'зарядк': { length: 12, width: 7, height: 3, weightBrutto: 0.1 },
+    'кабель': { length: 15, width: 5, height: 2, weightBrutto: 0.05 },
+    'обувь': { length: 35, width: 22, height: 14, weightBrutto: 0.8 },
+    'кроссовк': { length: 35, width: 22, height: 14, weightBrutto: 0.7 },
+    'ботинк': { length: 35, width: 22, height: 16, weightBrutto: 1.0 },
+    'футболк': { length: 30, width: 22, height: 3, weightBrutto: 0.2 },
+    'рубашк': { length: 35, width: 25, height: 3, weightBrutto: 0.25 },
+    'платье': { length: 35, width: 25, height: 4, weightBrutto: 0.3 },
+    'куртк': { length: 40, width: 30, height: 10, weightBrutto: 0.8 },
+    'пальто': { length: 45, width: 35, height: 10, weightBrutto: 1.2 },
+    'брюк': { length: 35, width: 25, height: 4, weightBrutto: 0.4 },
+    'джинс': { length: 35, width: 25, height: 5, weightBrutto: 0.5 },
+    'сумк': { length: 30, width: 25, height: 12, weightBrutto: 0.5 },
+    'рюкзак': { length: 45, width: 30, height: 15, weightBrutto: 0.7 },
+    'часы': { length: 12, width: 10, height: 8, weightBrutto: 0.2 },
+    'косметик': { length: 15, width: 8, height: 5, weightBrutto: 0.15 },
+    'крем': { length: 10, width: 6, height: 6, weightBrutto: 0.12 },
+    'шампун': { length: 22, width: 8, height: 8, weightBrutto: 0.4 },
+    'парфюм': { length: 15, width: 8, height: 5, weightBrutto: 0.2 },
+    'книг': { length: 25, width: 18, height: 3, weightBrutto: 0.4 },
+    'игрушк': { length: 25, width: 20, height: 15, weightBrutto: 0.3 },
+    'посуда': { length: 25, width: 25, height: 10, weightBrutto: 0.5 },
+    'бытов': { length: 30, width: 25, height: 20, weightBrutto: 1.5 },
+    'ноутбук': { length: 38, width: 26, height: 3, weightBrutto: 2.0 },
+    'планшет': { length: 28, width: 20, height: 2, weightBrutto: 0.5 },
+    'клавиатур': { length: 45, width: 15, height: 4, weightBrutto: 0.6 },
+    'мышь': { length: 13, width: 7, height: 4, weightBrutto: 0.1 },
+    'очки': { length: 17, width: 7, height: 5, weightBrutto: 0.05 },
+    'ремен': { length: 30, width: 10, height: 4, weightBrutto: 0.15 },
+    'кошелек': { length: 12, width: 10, height: 3, weightBrutto: 0.1 },
+    'украшен': { length: 10, width: 8, height: 3, weightBrutto: 0.05 },
+    'подушк': { length: 50, width: 40, height: 15, weightBrutto: 0.8 },
+    'одеял': { length: 45, width: 35, height: 20, weightBrutto: 2.0 },
+    'полотенц': { length: 30, width: 22, height: 5, weightBrutto: 0.4 },
+    'нож': { length: 30, width: 5, height: 3, weightBrutto: 0.15 },
+    'лампа': { length: 20, width: 15, height: 15, weightBrutto: 0.4 },
+    'свеча': { length: 10, width: 8, height: 8, weightBrutto: 0.2 },
+  };
+
+  // Try to match category defaults first
+  const searchText = `${productName} ${category}`.toLowerCase();
+  for (const [key, dims] of Object.entries(CATEGORY_DEFAULTS)) {
+    if (searchText.includes(key)) {
+      console.log(`📏 Dimensions from category "${key}": ${dims.length}x${dims.width}x${dims.height}cm, ${dims.weightBrutto}kg`);
+      return dims;
+    }
+  }
+
+  // If no category match, ask AI
+  if (!LOVABLE_API_KEY) {
+    console.log(`📏 Using fallback dimensions (no AI key)`);
+    return { length: 15, width: 10, height: 5, weightBrutto: 0.3 };
+  }
+
+  try {
+    const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash-lite",
+        max_tokens: 100,
+        messages: [
+          { role: "system", content: `Estimate realistic PACKAGING dimensions (cm) and weight (kg) for a product. Return ONLY JSON: {"length":N,"width":N,"height":N,"weightBrutto":N}. Use cm for dimensions, kg for weight. Be realistic - oversized dimensions cause high WB logistics fees. Consider the product IN its packaging.` },
+          { role: "user", content: `Product: "${productName}", Category: "${category}"` },
+        ],
+        temperature: 0,
+      }),
+    });
+    if (aiResp.ok) {
+      const data = await aiResp.json();
+      const content = data.choices?.[0]?.message?.content || '';
+      const match = content.match(/\{[\s\S]*?\}/);
+      if (match) {
+        const parsed = JSON.parse(match[0]);
+        const dims: ProductDimensions = {
+          length: Math.max(1, Math.min(120, Math.round(parsed.length || 15))),
+          width: Math.max(1, Math.min(80, Math.round(parsed.width || 10))),
+          height: Math.max(1, Math.min(60, Math.round(parsed.height || 5))),
+          weightBrutto: Math.max(0.01, Math.min(50, parseFloat((parsed.weightBrutto || 0.3).toFixed(2)))),
+        };
+        console.log(`📏 AI dimensions: ${dims.length}x${dims.width}x${dims.height}cm, ${dims.weightBrutto}kg`);
+        return dims;
+      }
+    }
+  } catch (e) {
+    console.error("AI dimensions error:", e);
+  }
+
+  return { length: 15, width: 10, height: 5, weightBrutto: 0.3 };
+}
+
 // ===== AI UNIVERSAL ANALYZER =====
 async function aiAnalyzeProduct(productName: string, description: string, category: string): Promise<{
   searchKeywords: string[];
@@ -761,19 +869,21 @@ serve(async (req) => {
       return new Response(JSON.stringify({ success: false, error: "Wildberries API kaliti yo'q" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const { product } = await req.json();
+    const { product, dimensions: manualDimensions } = await req.json();
     console.log(`\n========= WB CARD CREATION =========`);
     console.log(`Product: "${product.name}"`);
     console.log(`Category: "${product.category || 'none'}"`);
     console.log(`Images: ${(product.images || []).length}`);
     console.log(`Description length: ${(product.description || '').length}`);
+    if (manualDimensions) console.log(`Manual dimensions: ${JSON.stringify(manualDimensions)}`);
 
     // ===== STEP 1: AI + barcode + image proxy (parallel) =====
     console.log(`\n--- STEP 1: AI + Barcode + Images (parallel) ---`);
-    const [analysis, barcode, proxiedImages] = await Promise.all([
+    const [analysis, barcode, proxiedImages, estimatedDimensions] = await Promise.all([
       aiAnalyzeProduct(product.name, product.description || '', product.category || ''),
       generateBarcode(apiKey),
       proxyImages(supabase, user.id, product.images || []),
+      manualDimensions ? Promise.resolve(manualDimensions as ProductDimensions) : aiEstimateDimensions(product.name, product.category || ''),
     ]);
     console.log(`Title(${analysis.titleRu.length}ch): "${analysis.titleRu}"`);
     console.log(`Description: ${analysis.descriptionRu.length} chars`);
@@ -825,7 +935,7 @@ serve(async (req) => {
       vendorCode,
       title: analysis.titleRu,
       description: cleanDescription.slice(0, 2000),
-      dimensions: { length: 20, width: 15, height: 10, weightBrutto: 0.5 },
+      dimensions: estimatedDimensions,
       characteristics: filledCharcs,
       sizes: [{
         techSize: "0",

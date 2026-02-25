@@ -20,7 +20,7 @@ import {
   Loader2, Image, FileText, Tag, ChevronLeft, ChevronRight,
   Zap, RotateCcw, Shield, DollarSign, TrendingUp, TrendingDown,
   Camera, Sparkles, BarChart3, Wallet, MessageCircle, Send,
-  ArrowUp, ArrowDown, Minus
+  ArrowUp, ArrowDown, Minus, Ruler, Weight, Package
 } from 'lucide-react';
 
 // ===== Types =====
@@ -998,6 +998,327 @@ function AgentChatTab({ selectedPartnerId, scanResults, priceData }: any) {
   );
 }
 
+// ===== Dimensions Tab =====
+function DimensionsTab({ selectedPartnerId }: any) {
+  const [wbProducts, setWbProducts] = useState<any[]>([]);
+  const [selectedDims, setSelectedDims] = useState<Set<string>>(new Set());
+  const [dimOverrides, setDimOverrides] = useState<Record<string, { length: number; width: number; height: number; weight: number }>>({});
+  const [isScanning, setIsScanning] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [updateProgress, setUpdateProgress] = useState<{ current: number; total: number } | null>(null);
+
+  const scanDimensions = async () => {
+    if (!selectedPartnerId) return;
+    setIsScanning(true);
+    try {
+      // Fetch WB products from cache
+      const { data } = await supabase
+        .from('marketplace_products_cache')
+        .select('offer_id, data')
+        .eq('user_id', selectedPartnerId)
+        .eq('marketplace', 'wildberries');
+      
+      const products = (data || []).map((p: any) => {
+        const d = typeof p.data === 'string' ? JSON.parse(p.data) : p.data;
+        return {
+          offerId: p.offer_id,
+          name: d.name || d.title || p.offer_id,
+          nmID: d.nmID || d.nmId,
+          category: d.category || d.subjectName || '',
+          length: d.dimensions?.length || d.length || 20,
+          width: d.dimensions?.width || d.width || 15,
+          height: d.dimensions?.height || d.height || 10,
+          weight: d.dimensions?.weightBrutto || d.weight || 0.5,
+          volume: 0,
+          imageUrl: d.pictures?.[0] || d.images?.[0] || '',
+        };
+      }).map((p: any) => ({
+        ...p,
+        volume: ((p.length * p.width * p.height) / 1000).toFixed(1),
+      }));
+      
+      setWbProducts(products);
+      toast.success(`${products.length} ta WB mahsulot topildi`);
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  const updateDimension = (offerId: string, field: string, value: number) => {
+    setDimOverrides(prev => ({
+      ...prev,
+      [offerId]: { ...prev[offerId] || { length: 0, width: 0, height: 0, weight: 0 }, [field]: value },
+    }));
+  };
+
+  const aiEstimateDimensions = async () => {
+    if (!selectedPartnerId) return;
+    const toEstimate = wbProducts.filter(p => selectedDims.has(p.offerId) || selectedDims.size === 0);
+    if (toEstimate.length === 0) { toast.info('Mahsulotlar yo\'q'); return; }
+    
+    setIsUpdating(true);
+    setUpdateProgress({ current: 0, total: toEstimate.length });
+    
+    try {
+      const LOVABLE_API_KEY = undefined; // AI estimation happens in edge function
+      const BATCH = 10;
+      let estimated = 0;
+      
+      for (let i = 0; i < toEstimate.length; i += BATCH) {
+        const batch = toEstimate.slice(i, i + BATCH);
+        
+        // Use edge function for AI estimation
+        const { data, error } = await supabase.functions.invoke('ai-agent-fix', {
+          body: {
+            partnerId: selectedPartnerId,
+            marketplace: 'wildberries',
+            action: 'estimate-dimensions',
+            products: batch.map(p => ({ offerId: p.offerId, name: p.name, category: p.category, nmID: p.nmID })),
+          },
+        });
+        
+        if (!error && data?.dimensions) {
+          for (const dim of data.dimensions) {
+            setDimOverrides(prev => ({
+              ...prev,
+              [dim.offerId]: { length: dim.length, width: dim.width, height: dim.height, weight: dim.weightBrutto },
+            }));
+          }
+          estimated += data.dimensions.length;
+        }
+        
+        setUpdateProgress({ current: Math.min(i + BATCH, toEstimate.length), total: toEstimate.length });
+      }
+      
+      toast.success(`${estimated} ta mahsulot uchun gabarit baholandi`);
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setIsUpdating(false);
+      setUpdateProgress(null);
+    }
+  };
+
+  const applyDimensions = async () => {
+    const entries = Object.entries(dimOverrides).filter(([id, d]) => d.length > 0 && d.width > 0 && d.height > 0 && d.weight > 0);
+    if (entries.length === 0) { toast.error('Gabarit kiritilmagan'); return; }
+    
+    setIsUpdating(true);
+    setUpdateProgress({ current: 0, total: entries.length });
+    
+    try {
+      let success = 0, failed = 0;
+      
+      // Get WB API key
+      const { data: conn } = await supabase
+        .from('marketplace_connections')
+        .select('encrypted_credentials, credentials')
+        .eq('user_id', selectedPartnerId)
+        .eq('marketplace', 'wildberries')
+        .eq('is_active', true)
+        .limit(1)
+        .single();
+      
+      if (!conn) { toast.error('WB ulanmagan'); return; }
+      
+      // Use edge function to update dimensions via WB API
+      for (let i = 0; i < entries.length; i += 10) {
+        const batch = entries.slice(i, i + 10);
+        const updates = batch.map(([offerId, dims]) => {
+          const product = wbProducts.find(p => p.offerId === offerId);
+          return {
+            offerId,
+            nmID: product?.nmID,
+            dimensions: {
+              length: dims.length,
+              width: dims.width,
+              height: dims.height,
+              weightBrutto: dims.weight,
+            },
+          };
+        }).filter(u => u.nmID);
+
+        const { data, error } = await supabase.functions.invoke('ai-agent-fix', {
+          body: {
+            partnerId: selectedPartnerId,
+            marketplace: 'wildberries',
+            action: 'update-dimensions',
+            products: updates,
+          },
+        });
+
+        if (!error && data?.updated) success += data.updated;
+        else failed += batch.length;
+        
+        setUpdateProgress({ current: Math.min(i + 10, entries.length), total: entries.length });
+      }
+      
+      toast.success(`${success} ta yangilandi, ${failed} ta xato`);
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setIsUpdating(false);
+      setUpdateProgress(null);
+    }
+  };
+
+  const toggleProduct = (offerId: string) => {
+    setSelectedDims(prev => { const n = new Set(prev); n.has(offerId) ? n.delete(offerId) : n.add(offerId); return n; });
+  };
+
+  // Find products with suspicious dimensions (all same = default)
+  const suspiciousProducts = wbProducts.filter(p => 
+    p.length === 20 && p.width === 15 && p.height === 10 && p.weight === 0.5
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2 flex-wrap">
+        <Button onClick={scanDimensions} disabled={!selectedPartnerId || isScanning} className="gap-2">
+          {isScanning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Ruler className="h-4 w-4" />}
+          Gabaritlarni skanerlash
+        </Button>
+        {wbProducts.length > 0 && (
+          <>
+            <Button onClick={aiEstimateDimensions} disabled={isUpdating} variant="outline" className="gap-2">
+              {isUpdating && !updateProgress ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              AI baholash {selectedDims.size > 0 ? `(${selectedDims.size})` : `(${wbProducts.length})`}
+            </Button>
+            <Button onClick={applyDimensions} disabled={isUpdating || Object.keys(dimOverrides).length === 0} variant="destructive" className="gap-2">
+              {isUpdating && updateProgress ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
+              WB'ga qo'llash ({Object.keys(dimOverrides).length})
+            </Button>
+          </>
+        )}
+      </div>
+
+      {updateProgress && (
+        <Card className="border-primary/30"><CardContent className="py-4">
+          <div className="flex items-center gap-3 mb-2"><Loader2 className="h-5 w-5 animate-spin text-primary" /><span>Yangilanmoqda...</span></div>
+          <Progress value={(updateProgress.current / updateProgress.total) * 100} className="h-3" />
+          <p className="text-sm text-muted-foreground mt-1">{updateProgress.current} / {updateProgress.total}</p>
+        </CardContent></Card>
+      )}
+
+      {suspiciousProducts.length > 0 && wbProducts.length > 0 && (
+        <Card className="border-yellow-500/50 bg-yellow-50/50 dark:bg-yellow-950/10">
+          <CardContent className="py-3">
+            <div className="flex items-center gap-2 text-yellow-700 dark:text-yellow-400">
+              <AlertTriangle className="h-4 w-4" />
+              <span className="text-sm font-medium">
+                {suspiciousProducts.length} ta mahsulotda standart gabarit (20x15x10, 0.5kg) — ortiqcha logistika harajati!
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {wbProducts.length > 0 && (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <StatCard value={wbProducts.length} label="Jami WB mahsulot" />
+            <StatCard value={suspiciousProducts.length} label="Standart gabarit" color="text-yellow-600" />
+            <StatCard value={Object.keys(dimOverrides).length} label="O'zgartirilgan" color="text-blue-600" />
+            <StatCard value={`${(wbProducts.reduce((s: number, p: any) => s + parseFloat(p.volume), 0) / wbProducts.length).toFixed(1)}L`} label="O'rtacha hajm" />
+          </div>
+
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader><TableRow>
+                <TableHead className="w-8"></TableHead>
+                <TableHead>Mahsulot</TableHead>
+                <TableHead>Kategoriya</TableHead>
+                <TableHead className="text-center">Uzunlik (sm)</TableHead>
+                <TableHead className="text-center">Eni (sm)</TableHead>
+                <TableHead className="text-center">Balandlik (sm)</TableHead>
+                <TableHead className="text-center">Og'irlik (kg)</TableHead>
+                <TableHead className="text-center">Hajm (L)</TableHead>
+              </TableRow></TableHeader>
+              <TableBody>
+                {wbProducts.map((p: any) => {
+                  const override = dimOverrides[p.offerId];
+                  const isDefault = p.length === 20 && p.width === 15 && p.height === 10 && p.weight === 0.5;
+                  const vol = override 
+                    ? ((override.length * override.width * override.height) / 1000).toFixed(1)
+                    : p.volume;
+                  
+                  return (
+                    <TableRow key={p.offerId} className={`${isDefault ? 'bg-yellow-50/50 dark:bg-yellow-950/10' : ''} ${selectedDims.has(p.offerId) ? 'ring-1 ring-primary/30' : ''}`}>
+                      <TableCell>
+                        <Checkbox checked={selectedDims.has(p.offerId)} onCheckedChange={() => toggleProduct(p.offerId)} />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2 max-w-[200px]">
+                          {p.imageUrl ? (
+                            <img src={p.imageUrl} alt="" className="w-8 h-8 rounded object-cover shrink-0" />
+                          ) : (
+                            <div className="w-8 h-8 rounded bg-muted flex items-center justify-center shrink-0">
+                              <Package className="h-3 w-3 text-muted-foreground" />
+                            </div>
+                          )}
+                          <span className="font-medium truncate text-sm" title={p.name}>{p.name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{p.category}</TableCell>
+                      <TableCell>
+                        <Input
+                          type="number" min={1} max={120} step={1}
+                          value={override?.length || p.length}
+                          onChange={e => updateDimension(p.offerId, 'length', Number(e.target.value))}
+                          className={`w-16 h-7 text-center text-xs ${override?.length ? 'border-primary' : ''}`}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number" min={1} max={80} step={1}
+                          value={override?.width || p.width}
+                          onChange={e => updateDimension(p.offerId, 'width', Number(e.target.value))}
+                          className={`w-16 h-7 text-center text-xs ${override?.width ? 'border-primary' : ''}`}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number" min={1} max={60} step={1}
+                          value={override?.height || p.height}
+                          onChange={e => updateDimension(p.offerId, 'height', Number(e.target.value))}
+                          className={`w-16 h-7 text-center text-xs ${override?.height ? 'border-primary' : ''}`}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number" min={0.01} max={50} step={0.01}
+                          value={override?.weight || p.weight}
+                          onChange={e => updateDimension(p.offerId, 'weight', Number(e.target.value))}
+                          className={`w-16 h-7 text-center text-xs ${override?.weight ? 'border-primary' : ''}`}
+                        />
+                      </TableCell>
+                      <TableCell className={`text-center text-xs font-mono ${isDefault ? 'text-yellow-600' : ''}`}>
+                        {vol}L
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </>
+      )}
+
+      {wbProducts.length === 0 && (
+        <Card className="border-dashed"><CardContent className="flex flex-col items-center justify-center py-16">
+          <Ruler className="h-16 w-16 text-muted-foreground/50 mb-4" />
+          <h3 className="text-lg font-semibold mb-1">Gabarit boshqaruvi</h3>
+          <p className="text-muted-foreground text-center max-w-md text-sm">
+            WB mahsulotlarning o'lchamlari va og'irligini to'g'ri sozlash — logistika harajatini kamaytiradi
+          </p>
+        </CardContent></Card>
+      )}
+    </div>
+  );
+}
+
 // ===== Financial Tab =====
 function FinancialOverviewTab({ selectedPartnerId }: any) {
   const { data: fd, isLoading } = useQuery({
@@ -1141,6 +1462,9 @@ export function AIAgentDashboard() {
           <TabsTrigger value="pricing" className="gap-1.5 text-xs">
             <DollarSign className="h-3.5 w-3.5" />Narx
           </TabsTrigger>
+          <TabsTrigger value="dimensions" className="gap-1.5 text-xs">
+            <Ruler className="h-3.5 w-3.5" />Gabarit
+          </TabsTrigger>
           <TabsTrigger value="finance" className="gap-1.5 text-xs">
             <BarChart3 className="h-3.5 w-3.5" />Moliya
           </TabsTrigger>
@@ -1157,6 +1481,9 @@ export function AIAgentDashboard() {
         </TabsContent>
         <TabsContent value="pricing">
           <PriceOptimizationTab selectedPartnerId={selectedPartnerId} />
+        </TabsContent>
+        <TabsContent value="dimensions">
+          <DimensionsTab selectedPartnerId={selectedPartnerId} />
         </TabsContent>
         <TabsContent value="finance">
           <FinancialOverviewTab selectedPartnerId={selectedPartnerId} />
