@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { useExchangeRate } from '@/hooks/useExchangeRate';
 import { Skeleton } from '@/components/ui/skeleton';
 import { MobileMoreMenu } from '@/components/mobile/MobileMoreMenu';
 
@@ -59,6 +60,10 @@ const primaryTabIds: MobileTabType[] = ['marketplaces', 'analytics', 'scanner', 
 export default function SellerCloudMobile() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  
+  // Load real exchange rate from CBU.uz
+  useExchangeRate();
+  
   const [activeTab, setActiveTabRaw] = useState<MobileTabType>('analytics');
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   

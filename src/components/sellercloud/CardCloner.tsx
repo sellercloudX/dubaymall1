@@ -13,7 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { backgroundTaskManager } from '@/lib/backgroundTaskManager';
 import { useBackgroundTasks } from '@/hooks/useBackgroundTasks';
 import { useAuth } from '@/contexts/AuthContext';
-import { toDisplayUzs, formatUzs, isRubMarketplace, RUB_TO_UZS } from '@/lib/currency';
+import { toDisplayUzs, formatUzs, isRubMarketplace, getRubToUzs } from '@/lib/currency';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 import { MARKETPLACE_CONFIG, MarketplaceLogo } from '@/lib/marketplaceConfig';
 
@@ -149,9 +149,11 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
   );
 
   const selectAll = () => {
-    const allSelected = filteredProducts.every(p => selectedIds.has(p.offerId));
+    // Use tab-filtered products so "Select All" works on visible items only
+    const visibleProducts = filteredByTab;
+    const allSelected = visibleProducts.every(p => selectedIds.has(p.offerId));
     const newIds = new Set(selectedIds);
-    filteredProducts.forEach(p => {
+    visibleProducts.forEach(p => {
       if (allSelected) newIds.delete(p.offerId);
       else newIds.add(p.offerId);
     });
@@ -433,12 +435,13 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
     return formatUzs(priceUzs) + " so'm";
   };
 
-  // Convert price between marketplaces
+  // Convert price between marketplaces using dynamic exchange rate
   const convertPrice = (price: number, fromMp: string, toMp: string): number => {
     const fromRub = isRubMarketplace(fromMp);
     const toRub = isRubMarketplace(toMp);
-    if (fromRub && !toRub) return Math.round(price * RUB_TO_UZS); // RUB → UZS
-    if (!fromRub && toRub) return Math.round(price / RUB_TO_UZS); // UZS → RUB
+    const rubToUzs = getRubToUzs();
+    if (fromRub && !toRub) return Math.round(price * rubToUzs); // RUB → UZS
+    if (!fromRub && toRub) return Math.round(price / rubToUzs); // UZS → RUB
     return price; // same currency
   };
 
@@ -540,7 +543,7 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
                 <Input placeholder="Qidirish..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-8 h-8 text-sm w-full sm:w-36" />
               </div>
               <Button variant="outline" size="sm" onClick={selectAll} className="shrink-0 text-xs h-8">
-                {filteredByTab.every(p => selectedIds.has(p.offerId)) ? 'Bekor' : 'Barchasi'}
+                {filteredByTab.length > 0 && filteredByTab.every(p => selectedIds.has(p.offerId)) ? 'Bekor' : 'Barchasi'}
               </Button>
             </div>
           </div>

@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { MarketplaceDataStore, MarketplaceProduct } from './useMarketplaceDataStore';
-import { RUB_TO_UZS } from '@/lib/currency';
+import { getRubToUzs } from '@/lib/currency';
 
 export interface TariffInfo {
   offerId: string;
@@ -133,24 +133,63 @@ export function useMarketplaceTariffs(
         }
 
       if (mp === 'wildberries') {
-          // WB: commission ~15-20% depending on category, logistics ~30-100 RUB
-          // Convert ALL values to UZS for uniform SellerCloudX calculations
+          // WB: Fetch REAL commission rates from API, then calculate per product
+          const rubToUzs = getRubToUzs();
+          let commissionBySubject = new Map<string, number>(); // subjectName → commission %
+          
+          try {
+            const { data: tariffData, error: tariffError } = await supabase.functions.invoke('fetch-marketplace-data', {
+              body: { marketplace: 'wildberries', dataType: 'tariffs' },
+            });
+            if (!tariffError && tariffData?.success && Array.isArray(tariffData?.data)) {
+              tariffData.data.forEach((t: any) => {
+                const subject = (t.subjectName || t.parentName || '').toLowerCase();
+                const commission = t.kgvpMarketplace || t.paidStorageKgvp || t.commission || 0;
+                if (subject && commission > 0) {
+                  commissionBySubject.set(subject, commission / 100); // convert % to decimal
+                }
+              });
+              console.log(`WB real tariffs: ${commissionBySubject.size} categories loaded`);
+            }
+          } catch (e) {
+            console.warn('WB tariff fetch failed, using estimates:', e);
+          }
+
           for (const p of products) {
             const priceRub = p.price || 0;
             if (priceRub <= 0) continue;
-            // WB typical: 15% commission + logistics in RUB
-            const commissionRub = priceRub * 0.15;
-            const logisticsRub = priceRub > 5000 ? 100 : priceRub > 1000 ? 50 : 30; // RUB
+            
+            // Find real commission for this product's category
+            const productCategory = (p.category || '').toLowerCase();
+            let commissionPercent = 0.15; // fallback 15%
+            
+            // Try exact match first, then partial match
+            if (commissionBySubject.has(productCategory)) {
+              commissionPercent = commissionBySubject.get(productCategory)!;
+            } else {
+              // Try partial match
+              for (const [subject, rate] of commissionBySubject) {
+                if (productCategory.includes(subject) || subject.includes(productCategory)) {
+                  commissionPercent = rate;
+                  break;
+                }
+              }
+            }
+            
+            const commissionRub = priceRub * commissionPercent;
+            // Logistics based on volume/weight (simplified by price tier)
+            const logisticsRub = priceRub > 5000 ? 100 : priceRub > 1000 ? 50 : 30;
             const totalTariffRub = commissionRub + logisticsRub;
-            // Store in UZS so all downstream consumers work uniformly
+            
+            // Store in UZS for uniform downstream consumers
             tariffMap.set(p.offerId, {
               offerId: p.offerId,
-              agencyCommission: commissionRub * RUB_TO_UZS,
-              fulfillment: logisticsRub * RUB_TO_UZS,
+              agencyCommission: Math.round(commissionRub * rubToUzs),
+              fulfillment: Math.round(logisticsRub * rubToUzs),
               delivery: 0,
-              totalTariff: totalTariffRub * RUB_TO_UZS,
+              totalTariff: Math.round(totalTariffRub * rubToUzs),
               tariffPercent: priceRub > 0 ? (totalTariffRub / priceRub) * 100 : 0,
-              commissionPercent: priceRub > 0 ? (commissionRub / priceRub) * 100 : 0,
+              commissionPercent: commissionPercent * 100,
             });
           }
           continue;
@@ -307,17 +346,16 @@ export function getTariffForProduct(
   }
 
   // WB fallback — price is ALREADY in UZS (converted by caller via toDisplayUzs)
-  // Commission is a % of price, so it's already in UZS
-  // Logistics is a flat RUB amount that we convert to UZS
   if (marketplace === 'wildberries') {
+    const rubToUzs = getRubToUzs();
     const commission = price * 0.15; // 15% of UZS price = UZS
-    // Thresholds in UZS (5000 RUB = 700k UZS, 1000 RUB = 140k UZS)
-    const logisticsRub = price > 700000 ? 100 : price > 140000 ? 50 : 30;
-    const logisticsUzs = logisticsRub * RUB_TO_UZS;
+    // Thresholds in UZS
+    const logisticsRub = price > (5000 * rubToUzs) ? 100 : price > (1000 * rubToUzs) ? 50 : 30;
+    const logisticsUzs = Math.round(logisticsRub * rubToUzs);
     return {
-      commission,
+      commission: Math.round(commission),
       logistics: logisticsUzs,
-      totalFee: commission + logisticsUzs,
+      totalFee: Math.round(commission) + logisticsUzs,
       isReal: false,
     };
   }

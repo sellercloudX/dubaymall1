@@ -9,43 +9,58 @@
  * When displaying WB data in SellerCloudX → convert RUB to UZS.
  */
 
-// 1 RUB = 140 UZS (configurable, can be replaced with API call later)
+// Dynamic exchange rate — updated from CBU.uz via useExchangeRate hook
+let _rubToUzs = 140; // Default fallback
+
+/** Get current RUB→UZS rate */
+export function getRubToUzs(): number { return _rubToUzs; }
+
+/** Update rate (called from useExchangeRate hook) */
+export function setRubToUzs(rate: number) {
+  if (rate > 0) {
+    _rubToUzs = Math.round(rate * 100) / 100;
+    console.log(`Currency rate updated: 1 RUB = ${_rubToUzs} UZS`);
+  }
+}
+
+/** @deprecated Use getRubToUzs() for dynamic rate. Kept for backward compat in static imports. */
 export const RUB_TO_UZS = 140;
-export const UZS_TO_RUB = 1 / RUB_TO_UZS;
 
 export const isRubMarketplace = (mp: string) => mp === 'wildberries';
 
 /** Convert marketplace-native amount to UZS for display in SellerCloudX */
 export function toDisplayUzs(amount: number, marketplace: string): number {
-  return isRubMarketplace(marketplace) ? amount * RUB_TO_UZS : amount;
+  return isRubMarketplace(marketplace) ? amount * _rubToUzs : amount;
 }
 
 /** Convert UZS amount to marketplace-native currency (RUB for WB, UZS for others) */
 export function toMarketplaceCurrency(amountUzs: number, marketplace: string): number {
-  return isRubMarketplace(marketplace) ? Math.round(amountUzs * UZS_TO_RUB) : amountUzs;
+  return isRubMarketplace(marketplace) ? Math.round(amountUzs / _rubToUzs) : amountUzs;
 }
 
 /** Convert RUB to UZS */
 export function rubToUzs(rub: number): number {
-  return rub * RUB_TO_UZS;
+  return rub * _rubToUzs;
 }
 
 /** Convert UZS to RUB */
 export function uzsToRub(uzs: number): number {
-  return uzs * UZS_TO_RUB;
+  return uzs / _rubToUzs;
 }
 
-/** Format price in UZS (so'm) for display */
+/** Format price in UZS (so'm) for display — rounds to integer */
 export function formatUzs(amount: number): string {
-  if (Math.abs(amount) >= 1_000_000) return (amount / 1_000_000).toFixed(1) + ' mln';
-  if (Math.abs(amount) >= 1_000) return (amount / 1_000).toFixed(0) + ' ming';
-  return new Intl.NumberFormat('uz-UZ').format(Math.round(amount));
+  const rounded = Math.round(amount);
+  if (Math.abs(rounded) >= 1_000_000) return (rounded / 1_000_000).toFixed(1) + ' mln';
+  if (Math.abs(rounded) >= 1_000) return Math.round(rounded / 1_000) + ' ming';
+  return new Intl.NumberFormat('uz-UZ').format(rounded);
 }
 
 /** Format price with "so'm" suffix */
 export function formatUzsFull(amount: number): string {
-  if (Math.abs(amount) >= 1_000_000) return (amount / 1_000_000).toFixed(2) + " mln so'm";
-  return new Intl.NumberFormat('uz-UZ').format(Math.round(amount)) + " so'm";
+  const rounded = Math.round(amount);
+  if (Math.abs(rounded) >= 1_000_000) return (rounded / 1_000_000).toFixed(2) + " mln so'm";
+  return new Intl.NumberFormat('uz-UZ').format(rounded) + " so'm";
 }
 
 /** Get currency symbol for a marketplace (for raw display only) */
