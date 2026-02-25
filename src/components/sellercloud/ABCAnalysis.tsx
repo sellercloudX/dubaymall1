@@ -90,8 +90,8 @@ export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 
           if (!key) return;
           const existing = salesMap.get(key) || { qty: 0, revenue: 0 };
           existing.qty += item.count || 1;
-          // Convert item price to UZS for uniform calculations
-          const itemPrice = item.priceUZS || toDisplayUzs(item.price || 0, marketplace);
+          // Always convert from native currency — never trust priceUZS (may be RUB for WB)
+          const itemPrice = toDisplayUzs(item.price || 0, marketplace);
           existing.revenue += itemPrice * (item.count || 1);
           salesMap.set(key, existing);
         });

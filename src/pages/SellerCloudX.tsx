@@ -13,6 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { useMarketplaceConnections } from '@/hooks/useMarketplaceConnections';
 import { useSellerCloudSubscription } from '@/hooks/useSellerCloudSubscription';
 import { useMarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
+import { toDisplayUzs } from '@/lib/currency';
 import { toast } from 'sonner';
 import { useExchangeRate } from '@/hooks/useExchangeRate';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -105,13 +106,17 @@ export default function SellerCloudX() {
    // Centralized data store — fetches once, cached for all tabs
    const store = useMarketplaceDataStore(connectedMarketplaces);
   
-  // Calculate revenue from actual order data, excluding cancelled/returned
+  // Calculate revenue from actual order data with proper currency conversion
   const totalRevenue = (() => {
     const orders = store.allOrders;
     if (orders.length === 0) return connections.reduce((sum, c) => sum + (c.total_revenue || 0), 0);
+    const orderMpMap = new Map<number, string>();
+    connectedMarketplaces.forEach(mp => {
+      store.getOrders(mp).forEach(o => orderMpMap.set(o.id, mp));
+    });
     return orders
       .filter((o: any) => !['CANCELLED', 'CANCELED', 'RETURNED'].includes(String(o.status).toUpperCase()))
-      .reduce((sum: number, o: any) => sum + (o.itemsTotal || o.total || 0), 0);
+      .reduce((sum: number, o: any) => sum + toDisplayUzs(o.itemsTotal || o.total || 0, orderMpMap.get(o.id) || ''), 0);
   })();
 
   const handleMarketplaceConnect = async (marketplace: string) => {

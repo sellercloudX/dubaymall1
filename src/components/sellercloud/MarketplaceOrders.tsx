@@ -196,7 +196,12 @@ export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceO
                             })()}
                             <div className="min-w-0 flex-1">
                               <div className="font-semibold text-sm line-clamp-1">
-                                {order.items?.[0]?.offerName || `Buyurtma #${order.id}`}
+                                {(() => {
+                                  const item = order.items?.[0];
+                                  if (!item) return `Buyurtma #${order.id}`;
+                                  const product = store.getProducts(selectedMarketplace).find(p => p.offerId === item.offerId || p.shopSku === item.offerId);
+                                  return item.offerName || product?.name || item.offerId || `Buyurtma #${order.id}`;
+                                })()}
                               </div>
                               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                 <span>#{order.id}</span>
@@ -251,7 +256,7 @@ export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceO
                                     )}
                                   </div>
                                   <div className="min-w-0">
-                                    <div className="text-sm font-medium line-clamp-1">{item.offerName}</div>
+                                    <div className="text-sm font-medium line-clamp-1">{item.offerName || store.getProducts(selectedMarketplace).find(p => p.offerId === item.offerId)?.name || item.offerId}</div>
                                     <code className="text-[10px] text-muted-foreground">{item.offerId}</code>
                                   </div>
                                 </div>

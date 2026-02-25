@@ -5,6 +5,7 @@ import { DollarSign, Package, ShoppingCart, Globe, AlertTriangle, Wallet, Trendi
 import { Badge } from '@/components/ui/badge';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 import { MarketplaceLogo } from '@/lib/marketplaceConfig';
+import { toDisplayUzs } from '@/lib/currency';
 
 interface MobileAnalyticsProps {
   connections: any[];
@@ -20,8 +21,17 @@ export function MobileAnalytics({ connections, connectedMarketplaces, store }: M
     const allOrders = store.allOrders;
     const totalProducts = allProducts.length;
     const totalOrders = allOrders.length;
+    
+    // Build order→marketplace map for efficient currency conversion
+    const orderMpMap = new Map<number, string>();
+    connectedMarketplaces.forEach(mp => {
+      store.getOrders(mp).forEach(o => orderMpMap.set(o.id, mp));
+    });
+    
     const validOrders = allOrders.filter(o => !['CANCELLED', 'RETURNED'].includes(o.status));
-    const totalRevenue = validOrders.reduce((sum, o) => sum + (o.totalUZS || o.total || 0), 0);
+    const totalRevenue = validOrders.reduce((sum, o) => {
+      return sum + toDisplayUzs(o.total || 0, orderMpMap.get(o.id) || '');
+    }, 0);
     const avgCheck = validOrders.length > 0 ? Math.round(totalRevenue / validOrders.length) : 0;
     const pendingOrders = allOrders.filter(o => o.status === 'PENDING').length;
     const processingOrders = allOrders.filter(o => ['PROCESSING', 'DELIVERY', 'PICKUP'].includes(o.status)).length;
@@ -33,10 +43,11 @@ export function MobileAnalytics({ connections, connectedMarketplaces, store }: M
     const productSales = new Map<string, { name: string; quantity: number; revenue: number }>();
     allOrders.forEach(order => {
       if (['CANCELLED', 'RETURNED'].includes(order.status)) return;
+      const mp = orderMpMap.get(order.id) || '';
       order.items?.forEach(item => {
         const existing = productSales.get(item.offerId) || { name: item.offerName || '', quantity: 0, revenue: 0 };
         existing.quantity += item.count || 1;
-        existing.revenue += (item.priceUZS || item.price || 0) * (item.count || 1);
+        existing.revenue += toDisplayUzs(item.price || 0, mp) * (item.count || 1);
         productSales.set(item.offerId, existing);
       });
     });

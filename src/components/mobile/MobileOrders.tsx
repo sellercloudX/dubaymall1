@@ -85,15 +85,22 @@ const getStatusBadge = (status: string) => {
   return <Badge variant={c.variant} className={`text-[10px] ${c.className || ''}`}>{c.label}</Badge>;
 };
 
-const getFirstProductName = (order: MarketplaceOrder): string => {
+const getFirstProductName = (order: MarketplaceOrder, store: MarketplaceDataStore, marketplace: string): string => {
   if (!order.items || order.items.length === 0) return 'Mahsulot nomi yuklanmadi';
-  const firstName = order.items[0].offerName || order.items[0].offerId || '';
-  return firstName.length > 40 ? firstName.substring(0, 40) + '...' : firstName;
+  const item = order.items[0];
+  // Try offerName first, but for WB it's often just a category — look up real name from products
+  let name = item.offerName || '';
+  if ((!name || name.length < 3) && item.offerId) {
+    const product = store.getProducts(marketplace).find(p => p.offerId === item.offerId || p.shopSku === item.offerId);
+    name = product?.name || item.offerId;
+  }
+  return name.length > 40 ? name.substring(0, 40) + '...' : name;
 };
 
 const OrderRow = memo(({ order, onClick, store, marketplace }: { order: MarketplaceOrder; onClick: (o: MarketplaceOrder) => void; store: MarketplaceDataStore; marketplace: string }) => {
-  const productName = getFirstProductName(order);
+  const productName = getFirstProductName(order, store, marketplace);
   const itemCount = order.items?.length || 0;
+  // Always convert from native currency — never trust *UZS fields (they may be RUB for WB)
   const totalPrice = toDisplayUzs(order.total || order.itemsTotal || 0, marketplace);
   
   // Get product image: first from order item photo, then from store products
@@ -263,15 +270,20 @@ export function MobileOrders({ connectedMarketplaces, store }: MobileOrdersProps
               {selectedOrder.items && selectedOrder.items.length > 0 && (
                 <div className="space-y-2">
                   <h4 className="font-medium text-sm">Mahsulotlar:</h4>
-                  {selectedOrder.items.map((item: any, idx: number) => (
+                  {selectedOrder.items.map((item: any, idx: number) => {
+                    // Look up real product name from store
+                    const product = store.getProducts(selectedMp).find(p => p.offerId === item.offerId || p.shopSku === item.offerId);
+                    const displayName = item.offerName || product?.name || item.offerId;
+                    return (
                     <div key={idx} className="flex justify-between p-3 bg-muted rounded-lg">
                       <div className="min-w-0 flex-1">
-                        <div className="text-sm font-medium line-clamp-2">{item.offerName}</div>
+                        <div className="text-sm font-medium line-clamp-2">{displayName}</div>
                         <div className="text-xs text-muted-foreground">× {item.count}</div>
                       </div>
                       <div className="font-medium text-right">{formatPriceUzs(toDisplayUzs(item.price || 0, selectedMp))}</div>
                     </div>
-                  ))}
+                    );})}
+
                 </div>
               )}
               <div className="border-t pt-4 space-y-2">
