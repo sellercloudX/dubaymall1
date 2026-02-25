@@ -68,6 +68,7 @@ export default function SellerCloudMobile() {
   
   const [activeTab, setActiveTabRaw] = useState<MobileTabType>('analytics');
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [showPaymentBypass, setShowPaymentBypass] = useState(false);
   
   const setActiveTab = useCallback((tab: MobileTabType) => {
     setActiveTabRaw(tab);
@@ -148,7 +149,7 @@ export default function SellerCloudMobile() {
     );
   }
 
-  if (accessStatus && !accessStatus.is_active) {
+  if (accessStatus && !accessStatus.is_active && !showPaymentBypass) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
         <Card className="border-destructive max-w-sm w-full"><CardContent className="pt-6 text-center space-y-4">
@@ -163,7 +164,7 @@ export default function SellerCloudMobile() {
             </ul>
           </div>
           <div className="flex gap-2">
-            <Button variant="destructive" className="flex-1" onClick={() => setActiveTab('subscription' as any)}>To'lov qilish</Button>
+            <Button variant="destructive" className="flex-1" onClick={() => { setShowPaymentBypass(true); setActiveTab('subscription' as any); }}>To'lov qilish</Button>
             <Button variant="outline" className="flex-1" onClick={() => navigate('/')}>Bosh sahifa</Button>
           </div>
         </CardContent></Card>
