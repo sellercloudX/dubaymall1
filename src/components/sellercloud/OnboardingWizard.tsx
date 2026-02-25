@@ -15,6 +15,7 @@ import { MarketplaceLogo, MARKETPLACE_CONFIG } from '@/lib/marketplaceConfig';
 interface OnboardingWizardProps {
   onActivate: () => void;
   onContactAdmin: () => void;
+  onGoHome?: () => void;
 }
 
 const content = {
@@ -345,7 +346,7 @@ const featureIcons: Record<string, any> = {
 
 const marketplaceKeys = ['uzum', 'wildberries', 'yandex', 'ozon'];
 
-export function OnboardingWizard({ onActivate, onContactAdmin }: OnboardingWizardProps) {
+export function OnboardingWizard({ onActivate, onContactAdmin, onGoHome }: OnboardingWizardProps) {
   const { language } = useLanguage();
   const lang = (language || 'uz') as 'uz' | 'ru' | 'en';
   const t = content[lang] || content.uz;
@@ -386,6 +387,12 @@ export function OnboardingWizard({ onActivate, onContactAdmin }: OnboardingWizar
         <Button variant="ghost" size="sm" onClick={() => setStep(totalSteps)}>
           {t.skipToActivate} →
         </Button>
+        {onGoHome && (
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={onGoHome}>
+            <ArrowLeft className="h-3.5 w-3.5" />
+            {lang === 'uz' ? 'Bosh sahifaga qaytish' : lang === 'ru' ? 'На главную' : 'Back to home'}
+          </Button>
+        )}
       </div>
     </div>
   );
