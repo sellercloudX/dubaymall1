@@ -605,8 +605,16 @@ serve(async (req) => {
       user_id: user.id, action_type: 'ai-agent-scan', model_used: 'marketplace-api',
     });
 
-    const body = await req.json();
-    const { partnerId, marketplace } = body;
+    let body: any;
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    const partnerId = typeof body?.partnerId === 'string' && body.partnerId.length <= 100 ? body.partnerId : null;
+    const validMarketplaces = ['yandex', 'wildberries', 'uzum', 'ozon'];
+    const marketplace = typeof body?.marketplace === 'string' && validMarketplaces.includes(body.marketplace) ? body.marketplace : undefined;
 
     if (!partnerId) {
       return new Response(JSON.stringify({ error: 'partnerId kerak' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -648,7 +656,7 @@ serve(async (req) => {
         }
       } catch (e) {
         console.error(`Scan error for ${conn.marketplace}:`, e);
-        results.push({ marketplace: conn.marketplace, error: (e as any).message, totalProducts: 0, avgScore: 0, criticalCount: 0, warningCount: 0, goodCount: 0, products: [] });
+        results.push({ marketplace: conn.marketplace, error: 'Marketplace skan xatosi', totalProducts: 0, avgScore: 0, criticalCount: 0, warningCount: 0, goodCount: 0, products: [] });
       }
     }
 
@@ -657,7 +665,7 @@ serve(async (req) => {
     });
   } catch (e) {
     console.error('AI Agent scan error:', e);
-    return new Response(JSON.stringify({ error: (e as any).message || 'Server xatosi' }), {
+    return new Response(JSON.stringify({ error: 'Ichki server xatosi' }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

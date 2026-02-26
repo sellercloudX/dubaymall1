@@ -1070,7 +1070,7 @@ serve(async (req) => {
     });
   } catch (e) {
     console.error('AI Agent images error:', e);
-    return new Response(JSON.stringify({ error: (e as any).message || 'Server xatosi' }), {
+    return new Response(JSON.stringify({ error: 'Ichki server xatosi' }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
