@@ -610,7 +610,7 @@ serve(async (req) => {
       const conn = connections[0];
       let creds: any;
       if (conn.encrypted_credentials) {
-        const { data: decrypted } = await supabase.rpc('decrypt_credentials', { p_encrypted: conn.encrypted_credentials });
+        const { data: decrypted } = await adminSupabase.rpc('decrypt_credentials', { p_encrypted: conn.encrypted_credentials });
         creds = typeof decrypted === 'string' ? JSON.parse(decrypted) : decrypted;
       } else {
         creds = conn.credentials || {};
@@ -675,7 +675,7 @@ serve(async (req) => {
     const conn = connections[0];
     let creds: any;
     if (conn.encrypted_credentials) {
-      const { data: decrypted } = await supabase.rpc('decrypt_credentials', { p_encrypted: conn.encrypted_credentials });
+      const { data: decrypted } = await adminSupabase.rpc('decrypt_credentials', { p_encrypted: conn.encrypted_credentials });
       creds = typeof decrypted === 'string' ? JSON.parse(decrypted) : decrypted;
     } else {
       creds = conn.credentials || {};

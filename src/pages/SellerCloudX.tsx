@@ -154,7 +154,7 @@ export default function SellerCloudX() {
     return (
       <>
         <Navbar />
-        <div className="container mx-auto px-4 py-8">
+        <div className="container mx-auto px-4 py-8 max-w-2xl">
           <OnboardingWizard 
             onActivate={async () => {
               const result = await createSubscription('pro');
