@@ -121,6 +121,11 @@ export default function AdminDashboard() {
                 <Bot className="h-3.5 w-3.5" />AI Agent
               </TabsTrigger>
             )}
+            {hasPermission('can_manage_users') && (
+              <TabsTrigger value="chat" className="gap-1.5 text-xs">
+                <MessageCircle className="h-3.5 w-3.5" />Chat
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="metrics">
