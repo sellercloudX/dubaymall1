@@ -2720,6 +2720,13 @@ export type Database = {
             referencedRelation: "wildberries_connections"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "wildberries_financials_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "wildberries_connections_safe"
+            referencedColumns: ["id"]
+          },
         ]
       }
       wildberries_orders: {
@@ -2788,6 +2795,13 @@ export type Database = {
             referencedRelation: "wildberries_connections"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "wildberries_orders_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "wildberries_connections_safe"
+            referencedColumns: ["id"]
+          },
         ]
       }
       wildberries_products: {
@@ -2845,6 +2859,13 @@ export type Database = {
             columns: ["connection_id"]
             isOneToOne: false
             referencedRelation: "wildberries_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wildberries_products_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "wildberries_connections_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -2909,6 +2930,66 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_connections_safe: {
+        Row: {
+          account_info: Json | null
+          created_at: string | null
+          id: string | null
+          is_active: boolean | null
+          last_sync_at: string | null
+          marketplace: string | null
+          orders_count: number | null
+          products_count: number | null
+          shop_id: string | null
+          total_revenue: number | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          account_info?: Json | null
+          created_at?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          last_sync_at?: string | null
+          marketplace?: string | null
+          orders_count?: number | null
+          products_count?: number | null
+          shop_id?: string | null
+          total_revenue?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          account_info?: Json | null
+          created_at?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          last_sync_at?: string | null
+          marketplace?: string | null
+          orders_count?: number | null
+          products_count?: number | null
+          shop_id?: string | null
+          total_revenue?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_connections_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_connections_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops_public"
             referencedColumns: ["id"]
           },
         ]
@@ -2998,6 +3079,51 @@ export type Database = {
           slug?: string | null
           total_sales?: number | null
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      wildberries_connections_safe: {
+        Row: {
+          account_info: Json | null
+          created_at: string | null
+          id: string | null
+          is_active: boolean | null
+          last_sync_at: string | null
+          orders_count: number | null
+          products_count: number | null
+          supplier_id: number | null
+          total_revenue: number | null
+          updated_at: string | null
+          user_id: string | null
+          warehouse_id: number | null
+        }
+        Insert: {
+          account_info?: Json | null
+          created_at?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          last_sync_at?: string | null
+          orders_count?: number | null
+          products_count?: number | null
+          supplier_id?: number | null
+          total_revenue?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+          warehouse_id?: number | null
+        }
+        Update: {
+          account_info?: Json | null
+          created_at?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          last_sync_at?: string | null
+          orders_count?: number | null
+          products_count?: number | null
+          supplier_id?: number | null
+          total_revenue?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+          warehouse_id?: number | null
         }
         Relationships: []
       }

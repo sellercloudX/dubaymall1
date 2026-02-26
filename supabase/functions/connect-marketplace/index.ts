@@ -460,7 +460,7 @@ serve(async (req) => {
     if (dbError) {
       console.error("Database error:", dbError);
       return new Response(
-        JSON.stringify({ error: "Failed to save connection: " + dbError.message }),
+        JSON.stringify({ error: "Failed to save connection" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -487,7 +487,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: false,
-        error: error instanceof Error ? error.message : "Unknown error" 
+        error: "Internal server error" 
       }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

@@ -456,8 +456,17 @@ serve(async (req) => {
       user_id: user.id, action_type: 'ai-agent-price', model_used: 'marketplace-api',
     });
 
-    const body = await req.json();
-    const { partnerId, action, targetMargin } = body;
+    let body: any;
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    const partnerId = typeof body?.partnerId === 'string' && body.partnerId.length <= 100 ? body.partnerId : null;
+    const validActions = ['scan', 'recommend', 'apply'];
+    const action = typeof body?.action === 'string' && validActions.includes(body.action) ? body.action : null;
+    const targetMargin = typeof body?.targetMargin === 'number' && body.targetMargin >= 0 && body.targetMargin <= 100 ? body.targetMargin : undefined;
 
     if (!partnerId) {
       return new Response(JSON.stringify({ error: 'partnerId kerak' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -669,7 +678,7 @@ serve(async (req) => {
     });
   } catch (e) {
     console.error('AI Agent price error:', e);
-    return new Response(JSON.stringify({ error: (e as any).message || 'Server xatosi' }), {
+    return new Response(JSON.stringify({ error: 'Ichki server xatosi' }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
