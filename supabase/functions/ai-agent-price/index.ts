@@ -247,10 +247,19 @@ async function fetchWBRealTariffs(headers: Record<string, string>): Promise<{
       const commData = await commResp.json();
       const reports = commData.report || [];
       for (const r of reports) {
-        const subjectName = r.subjectName || r.kgvpMarketplace || '';
-        const commission = r.kgvpMarketplace || r.kgvpSupplier || r.kgvpSupplierExpress || 15;
+        const subjectName = (r.subjectName || '').trim();
+        const parentName = (r.parentName || '').trim();
+        // Use proper null check — kgvpMarketplace can be 0
+        const commission = typeof r.kgvpMarketplace === 'number' ? r.kgvpMarketplace
+          : typeof r.kgvpSupplier === 'number' ? r.kgvpSupplier
+          : typeof r.kgvpSupplierExpress === 'number' ? r.kgvpSupplierExpress
+          : 15;
         if (subjectName) {
           commissionMap.set(subjectName.toLowerCase(), commission);
+        }
+        // Also store by parentName for fallback matching
+        if (parentName && !commissionMap.has(parentName.toLowerCase())) {
+          commissionMap.set(parentName.toLowerCase(), commission);
         }
       }
       console.log(`WB real commissions: ${commissionMap.size} categories loaded`);
@@ -350,12 +359,32 @@ async function fetchWBPrices(credentials: any): Promise<any[]> {
     const photos = card.photos || card.mediaFiles || [];
     const imageUrl = photos.length > 0 ? (photos[0]?.big || photos[0]?.c246x328 || photos[0]) : null;
     
-    // Real commission from category
-    const categoryName = (card.subjectName || '').toLowerCase();
-    const commissionPercent = tariffs.commissionMap.get(categoryName) || 15;
+    // Real commission from category — try exact match, then parent, then partial
+    const categoryName = (card.subjectName || '').trim().toLowerCase();
+    const parentName = (card.parentName || '').trim().toLowerCase();
+    let commissionPercent: number | undefined = tariffs.commissionMap.get(categoryName);
+    let hasRealTariff = commissionPercent !== undefined;
+    
+    if (commissionPercent === undefined && parentName) {
+      commissionPercent = tariffs.commissionMap.get(parentName);
+      hasRealTariff = commissionPercent !== undefined;
+    }
+    
+    // Partial match fallback
+    if (commissionPercent === undefined && categoryName.length >= 3) {
+      for (const [key, val] of tariffs.commissionMap) {
+        if (key.includes(categoryName) || categoryName.includes(key)) {
+          commissionPercent = val;
+          hasRealTariff = true;
+          break;
+        }
+      }
+    }
+    
+    if (commissionPercent === undefined) commissionPercent = 15;
+    
     // Real logistics (estimate ~5 liters volume)
     const logisticsCost = getWBLogisticsCostRub(tariffs.logisticsBase, tariffs.logisticsLiter, 5);
-    const hasRealTariff = tariffs.commissionMap.has(categoryName);
 
     return {
       offerId: card.vendorCode || card.nmID?.toString() || '',
@@ -618,8 +647,8 @@ serve(async (req) => {
               costPrice = Math.round(costPrice / UZS_PER_RUB);
             }
             
-            const commissionPercent = p.commissionPercent || 15;
-            const logisticsCost = p.logisticsCost || (p.marketplace === 'wildberries' ? 50 : p.marketplace === 'uzum' ? 6000 : 6000);
+            const commissionPercent = typeof p.commissionPercent === 'number' ? p.commissionPercent : 15;
+            const logisticsCost = typeof p.logisticsCost === 'number' && p.logisticsCost > 0 ? p.logisticsCost : (p.marketplace === 'wildberries' ? 50 : p.marketplace === 'uzum' ? 6000 : 6000);
             
             let actualMargin: number | null = null;
             if (costPrice > 0 && p.price > 0) {
@@ -649,7 +678,9 @@ serve(async (req) => {
       }
 
       const withCost = allProducts.filter(p => p.costPrice > 0);
+      const realTariffCount = allProducts.filter(p => p.hasRealTariff).length;
       const avgMargin = withCost.length > 0 ? Math.round(withCost.reduce((s, p) => s + (p.margin || 0), 0) / withCost.length) : 0;
+      console.log(`Price scan done: ${allProducts.length} products, ${realTariffCount} with real tariffs, ${withCost.length} with cost price, avg margin ${avgMargin}%`);
 
       return new Response(JSON.stringify({
         success: true,
@@ -677,8 +708,8 @@ serve(async (req) => {
           costPrice = Math.round(costPrice / UZS_PER_RUB);
         }
         
-        const commissionPercent = product.commissionPercent || 15;
-        const logisticsCost = product.logisticsCost || (product.marketplace === 'wildberries' ? 50 : product.marketplace === 'uzum' ? 6000 : 6000);
+        const commissionPercent = typeof product.commissionPercent === 'number' ? product.commissionPercent : 15;
+        const logisticsCost = typeof product.logisticsCost === 'number' && product.logisticsCost > 0 ? product.logisticsCost : (product.marketplace === 'wildberries' ? 50 : product.marketplace === 'uzum' ? 6000 : 6000);
 
         if (costPrice <= 0) {
           recommendations.push({
