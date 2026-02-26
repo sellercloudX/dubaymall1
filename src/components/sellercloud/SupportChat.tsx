@@ -97,7 +97,7 @@ export function SupportChat() {
           </CardTitle>
           <Button variant="ghost" size="sm" asChild>
             <a href="https://t.me/sellercloudx_support" target="_blank" rel="noopener noreferrer" className="gap-1 text-xs">
-              <ExternalLink className="h-3.5 w-3.5" />Telegram
+              <ExternalLink className="h-3.5 w-3.5" />@sellercloudx_support
             </a>
           </Button>
         </div>
