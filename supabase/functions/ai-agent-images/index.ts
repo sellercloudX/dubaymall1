@@ -893,7 +893,7 @@ serve(async (req) => {
       pipelineResult.steps.push({ step: 3, name: "Auto Fix", status: "⏭ Skipped" });
 
       // Upload clean product image
-      const cleanImageUrl = await uploadToStorage(supabase, workingImageUrl, partnerId, offerId || 'product');
+      const cleanImageUrl = await uploadToStorage(adminSupabase, workingImageUrl, partnerId, offerId || 'product');
       pipelineResult.imageUrl = cleanImageUrl;
 
       // ── STEP 4: Generate 4 Professional Images ──
@@ -909,7 +909,7 @@ serve(async (req) => {
 
       let heroUrl: string | null = null;
       if (heroImage) {
-        heroUrl = await uploadToStorage(supabase, heroImage, partnerId, `${offerId || 'card'}-hero`);
+        heroUrl = await uploadToStorage(adminSupabase, heroImage, partnerId, `${offerId || 'card'}-hero`);
         pipelineResult.steps.push({ step: "4a", name: "Infographic Hero", status: "✅" });
       } else {
         pipelineResult.steps.push({ step: "4a", name: "Infographic Hero", status: "❌ Failed" });
@@ -924,7 +924,7 @@ serve(async (req) => {
       const lifestyleAngle = LIFESTYLE_ANGLES[2]; // lifestyle_context
       const lifestyleImage = await generateLifestyleAngle(workingImageUrl, detection, lifestyleAngle, OPENAI_API_KEY);
       if (lifestyleImage) {
-        const lifestyleUrl = await uploadToStorage(supabase, lifestyleImage, partnerId, `${offerId || 'card'}-lifestyle`);
+        const lifestyleUrl = await uploadToStorage(adminSupabase, lifestyleImage, partnerId, `${offerId || 'card'}-lifestyle`);
         if (lifestyleUrl) {
           supplementaryUrls.push(lifestyleUrl);
           pipelineResult.steps.push({ step: "4b", name: "Lifestyle", status: "✅" });
@@ -1044,7 +1044,7 @@ serve(async (req) => {
       const heroImage = await generateHeroImage(referenceImageUrl, detection, categoryStyle, OPENAI_API_KEY);
       let heroUrl: string | null = null;
       if (heroImage) {
-        heroUrl = await uploadToStorage(supabase, heroImage, userId, `scanner-hero-${Date.now()}`);
+        heroUrl = await uploadToStorage(adminSupabase, heroImage, userId, `scanner-hero-${Date.now()}`);
         console.log("✅ Scanner Hero Infographic uploaded");
       } else {
         console.error("❌ Scanner Hero Infographic failed");
@@ -1057,7 +1057,7 @@ serve(async (req) => {
       try {
         const img = await generateLifestyleAngle(referenceImageUrl, detection, lifestyleAngle, OPENAI_API_KEY);
         if (img) {
-          lifestyleUrl = await uploadToStorage(supabase, img, userId, `scanner-lifestyle-${Date.now()}`);
+          lifestyleUrl = await uploadToStorage(adminSupabase, img, userId, `scanner-lifestyle-${Date.now()}`);
           console.log("✅ Scanner Lifestyle uploaded");
         }
       } catch (e) {
