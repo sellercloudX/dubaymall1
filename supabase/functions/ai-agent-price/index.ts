@@ -227,33 +227,99 @@ async function fetchYandexPrices(credentials: any): Promise<any[]> {
   });
 }
 
-// Fetch WB prices (DEDUPLICATED)
+// ===== Fetch REAL WB tariffs (commission + logistics) =====
+async function fetchWBRealTariffs(headers: Record<string, string>): Promise<{
+  commissionMap: Map<string, number>;
+  logisticsBase: number;
+  logisticsLiter: number;
+}> {
+  const commissionMap = new Map<string, number>();
+  let logisticsBase = 46;
+  let logisticsLiter = 14;
+
+  try {
+    // 1. Commission tariffs by category
+    const commResp = await fetchWithRetry(
+      'https://common-api.wildberries.ru/api/v1/tariffs/commission',
+      { headers }
+    );
+    if (commResp.ok) {
+      const commData = await commResp.json();
+      const reports = commData.report || [];
+      for (const r of reports) {
+        const subjectName = r.subjectName || r.kgvpMarketplace || '';
+        const commission = r.kgvpMarketplace || r.kgvpSupplier || r.kgvpSupplierExpress || 15;
+        if (subjectName) {
+          commissionMap.set(subjectName.toLowerCase(), commission);
+        }
+      }
+      console.log(`WB real commissions: ${commissionMap.size} categories loaded`);
+    }
+
+    // 2. Logistics (box) tariffs
+    const today = new Date().toISOString().split('T')[0];
+    const boxResp = await fetchWithRetry(
+      `https://common-api.wildberries.ru/api/v1/tariffs/box?date=${today}`,
+      { headers }
+    );
+    if (boxResp.ok) {
+      const boxData = await boxResp.json();
+      const warehouseList = boxData.response?.data?.warehouseList || [];
+      // Find main warehouse (usually "Коледино" or first)
+      const mainWh = warehouseList.find((w: any) => w.warehouseName?.includes('Коледино')) || warehouseList[0];
+      if (mainWh) {
+        logisticsBase = mainWh.boxDeliveryAndStorageExpr || mainWh.boxDeliveryBase || 46;
+        logisticsLiter = mainWh.boxDeliveryLiter || 14;
+      }
+      console.log(`WB logistics: base=${logisticsBase}, liter=${logisticsLiter}`);
+    }
+  } catch (e) {
+    console.error('WB tariff fetch error:', e);
+  }
+
+  return { commissionMap, logisticsBase, logisticsLiter };
+}
+
+function getWBLogisticsCostRub(logisticsBase: number, logisticsLiter: number, volumeLiters: number = 5): number {
+  return Math.round(logisticsBase + logisticsLiter * Math.max(0, volumeLiters - 1));
+}
+
+// Fetch WB prices (DEDUPLICATED) with REAL tariffs
 async function fetchWBPrices(credentials: any): Promise<any[]> {
   const apiKey = credentials.apiKey || credentials.api_key || credentials.token;
   const headers = { Authorization: apiKey, "Content-Type": "application/json" };
 
-  const seenNmIDs = new Set<number>();
-  let allCards: any[] = [];
-  let cursor: any = { limit: 100 };
-  for (let page = 0; page < 50; page++) {
-    const resp = await fetchWithRetry(
-      `https://content-api.wildberries.ru/content/v2/get/cards/list`,
-      { method: 'POST', headers, body: JSON.stringify({ settings: { cursor, filter: { withPhoto: -1 } } }) }
-    );
-    if (!resp.ok) break;
-    const data = await resp.json();
-    const cards = data.cards || [];
-    for (const card of cards) {
-      if (card.nmID && !seenNmIDs.has(card.nmID)) {
-        seenNmIDs.add(card.nmID);
-        allCards.push(card);
+  // Fetch real tariffs in parallel with cards
+  const [tariffs, cardsResult] = await Promise.all([
+    fetchWBRealTariffs(headers),
+    (async () => {
+      const seenNmIDs = new Set<number>();
+      let allCards: any[] = [];
+      let cursor: any = { limit: 100 };
+      for (let page = 0; page < 50; page++) {
+        const resp = await fetchWithRetry(
+          `https://content-api.wildberries.ru/content/v2/get/cards/list`,
+          { method: 'POST', headers, body: JSON.stringify({ settings: { cursor, filter: { withPhoto: -1 } } }) }
+        );
+        if (!resp.ok) break;
+        const data = await resp.json();
+        const cards = data.cards || [];
+        for (const card of cards) {
+          if (card.nmID && !seenNmIDs.has(card.nmID)) {
+            seenNmIDs.add(card.nmID);
+            allCards.push(card);
+          }
+        }
+        if (cards.length < 100) break;
+        const lastCard = cards[cards.length - 1];
+        cursor = { limit: 100, updatedAt: lastCard.updatedAt, nmID: lastCard.nmID };
+        await sleep(300);
       }
-    }
-    if (cards.length < 100) break;
-    const lastCard = cards[cards.length - 1];
-    cursor = { limit: 100, updatedAt: lastCard.updatedAt, nmID: lastCard.nmID };
-    await sleep(300);
-  }
+      return allCards;
+    })(),
+  ]);
+
+  const allCards = cardsResult;
 
   let priceMap = new Map<number, any>();
   try {
@@ -283,6 +349,14 @@ async function fetchWBPrices(credentials: any): Promise<any[]> {
     const prices = priceMap.get(card.nmID) || {};
     const photos = card.photos || card.mediaFiles || [];
     const imageUrl = photos.length > 0 ? (photos[0]?.big || photos[0]?.c246x328 || photos[0]) : null;
+    
+    // Real commission from category
+    const categoryName = (card.subjectName || '').toLowerCase();
+    const commissionPercent = tariffs.commissionMap.get(categoryName) || 15;
+    // Real logistics (estimate ~5 liters volume)
+    const logisticsCost = getWBLogisticsCostRub(tariffs.logisticsBase, tariffs.logisticsLiter, 5);
+    const hasRealTariff = tariffs.commissionMap.has(categoryName);
+
     return {
       offerId: card.vendorCode || card.nmID?.toString() || '',
       sku: card.vendorCode || card.nmID?.toString() || '', nmID: card.nmID,
@@ -290,7 +364,7 @@ async function fetchWBPrices(credentials: any): Promise<any[]> {
       price: prices.salePrice || prices.price || 0,
       originalPrice: prices.price || 0, discount: prices.discount || 0,
       currency: 'RUB', category: card.subjectName || '',
-      marketplace: 'wildberries', commissionPercent: 15, logisticsCost: 50, imageUrl,
+      marketplace: 'wildberries', commissionPercent, logisticsCost, hasRealTariff, imageUrl,
     };
   });
 }
