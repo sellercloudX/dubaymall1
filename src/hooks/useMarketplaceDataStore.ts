@@ -39,6 +39,7 @@ export interface MarketplaceOrder {
     price: number;
     priceUZS: number;
     photo?: string;
+    nmID?: number;
   }>;
 }
 
