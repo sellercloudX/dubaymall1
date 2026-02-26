@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DollarSign, Calculator, RefreshCw, Save, AlertTriangle, CheckCircle2, Package } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { toDisplayUzs, toMarketplaceCurrency, formatUzs, isRubMarketplace } from '@/lib/currency';
+import { toDisplayUzs, toMarketplaceCurrency } from '@/lib/currency';
 import { toast } from 'sonner';
 import { useCostPrices } from '@/hooks/useCostPrices';
 import { useMarketplaceTariffs, getTariffForProduct } from '@/hooks/useMarketplaceTariffs';
@@ -31,6 +31,7 @@ const formatPriceUzs = (price: number | undefined) => {
 
 interface ProductPrice {
   id: string;
+  nmID?: number;
   name: string;
   sku: string;
   price: number;
@@ -49,7 +50,9 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
   const [isSaving, setIsSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMp, setSelectedMp] = useState(connectedMarketplaces[0] || '');
-  const { getCostPrice } = useCostPrices();
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 50;
+  const { getCostPrice, refetch: refetchCostPrices } = useCostPrices();
   const { data: tariffMap, isLoading: tariffsLoading } = useMarketplaceTariffs(connectedMarketplaces, store);
   const isLoading = store.isLoadingProducts || tariffsLoading;
 
@@ -85,6 +88,7 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
 
         allProducts.push({
           id: product.offerId,
+          nmID: (product as any).nmID,
           name: product.name || 'Nomsiz',
           sku: product.shopSku || product.offerId,
           price: priceUzs,
@@ -100,15 +104,19 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
     return allProducts;
   }, [activeMarketplaces, store.dataVersion, getCostPrice, tariffMap, minProfit, priceChanges]);
 
-  const filteredProducts = searchQuery 
-    ? products.filter(p => 
-        p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+  const filteredProducts = searchQuery
+    ? products.filter(p =>
+        p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         p.sku.toLowerCase().includes(searchQuery.toLowerCase()))
     : products;
 
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / ITEMS_PER_PAGE));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedProducts = filteredProducts.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE);
+
   const changedProducts = products.filter(p => {
     const key = `${p.marketplace}-${p.id}`;
-    return priceChanges[key] && priceChanges[key] !== p.price;
+    return priceChanges[key] !== undefined && priceChanges[key] !== p.price;
   });
 
   const handlePriceChange = (marketplace: string, offerId: string, newPrice: number) => {
@@ -148,16 +156,16 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
     setIsSaving(true);
     try {
       // Group by marketplace — convert UZS prices back to marketplace currency (RUB for WB)
-      const byMarketplace = new Map<string, Array<{ offerId: string; price: number }>>();
+      const byMarketplace = new Map<string, Array<{ offerId: string; price: number; nmID?: number }>>();
       changedProducts.forEach(p => {
         const key = `${p.marketplace}-${p.id}`;
         const newPriceUzs = priceChanges[key];
-        if (!newPriceUzs || newPriceUzs === p.price) return;
-        
+        if (newPriceUzs === undefined || newPriceUzs === p.price) return;
+
         const list = byMarketplace.get(p.marketplace) || [];
         // Convert from UZS display price back to marketplace-native currency
         const nativePrice = toMarketplaceCurrency(newPriceUzs, p.marketplace);
-        list.push({ offerId: p.id, price: nativePrice });
+        list.push({ offerId: p.id, price: nativePrice, nmID: p.nmID });
         byMarketplace.set(p.marketplace, list);
       });
 
@@ -191,6 +199,7 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
       }
 
       setPriceChanges({});
+      await refetchCostPrices();
       // Refresh products after price update
       setTimeout(() => store.refetchProducts(), 2000);
     } catch (e) {
@@ -225,7 +234,11 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
         <div className="flex gap-2 overflow-x-auto no-scrollbar">
           {connectedMarketplaces.map(mp => (
             <Button key={mp} variant={selectedMp === mp ? 'default' : 'outline'} size="sm"
-              onClick={() => setSelectedMp(mp)} className="shrink-0 text-xs">
+              onClick={() => {
+                setSelectedMp(mp);
+                setCurrentPage(1);
+                setSearchQuery('');
+              }} className="shrink-0 text-xs">
               <MarketplaceLogo marketplace={mp} size={14} className="mr-1" /> {MARKETPLACE_NAMES[mp]}
             </Button>
           ))}
@@ -313,7 +326,10 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
       <Input 
         placeholder="Mahsulot qidirish..." 
         value={searchQuery} 
-        onChange={e => setSearchQuery(e.target.value)}
+        onChange={e => {
+          setSearchQuery(e.target.value);
+          setCurrentPage(1);
+        }}
         className="h-9"
       />
 
@@ -335,10 +351,10 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
             <div className="space-y-3">{[1,2,3].map(i => <Skeleton key={i} className="h-20 w-full" />)}</div>
           ) : (
             <div className="space-y-2 max-h-[500px] overflow-y-auto">
-              {filteredProducts.slice(0, 50).map(product => {
+              {paginatedProducts.map(product => {
                 const key = `${product.marketplace}-${product.id}`;
-                const hasChange = priceChanges[key] && priceChanges[key] !== product.price;
-                const isBelowMin = product.costPrice !== null && product.minPrice > 0 && (priceChanges[key] || product.price) < product.minPrice;
+                const hasChange = priceChanges[key] !== undefined && priceChanges[key] !== product.price;
+                const isBelowMin = product.costPrice !== null && product.minPrice > 0 && (priceChanges[key] ?? product.price) < product.minPrice;
                 
                 return (
                   <div key={key} className={`p-3 rounded-lg border space-y-2 ${isBelowMin ? 'border-destructive/30 bg-destructive/5' : ''}`}>
@@ -378,7 +394,7 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
                         <div className="text-[10px] text-muted-foreground">Yangi narx</div>
                         <Input 
                           type="number" 
-                          value={priceChanges[key] || product.price}
+                          value={priceChanges[key] ?? product.price}
                           onChange={e => handlePriceChange(product.marketplace, product.id, Number(e.target.value))}
                           className={`h-7 text-sm ${hasChange ? 'border-primary' : ''}`}
                         />
@@ -394,9 +410,17 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
                   </div>
                 );
               })}
-              {filteredProducts.length > 50 && (
-                <div className="text-xs text-muted-foreground text-center py-2">
-                  50 / {filteredProducts.length} ko'rsatilmoqda
+              {filteredProducts.length > ITEMS_PER_PAGE && (
+                <div className="flex items-center justify-between text-xs text-muted-foreground pt-2">
+                  <Button size="sm" variant="outline" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={safePage <= 1}>
+                    Oldingi
+                  </Button>
+                  <span>
+                    {(safePage - 1) * ITEMS_PER_PAGE + 1}-{Math.min(safePage * ITEMS_PER_PAGE, filteredProducts.length)} / {filteredProducts.length}
+                  </span>
+                  <Button size="sm" variant="outline" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={safePage >= totalPages}>
+                    Keyingi
+                  </Button>
                 </div>
               )}
             </div>

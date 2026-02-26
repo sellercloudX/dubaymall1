@@ -467,16 +467,26 @@ serve(async (req) => {
     const validActions = ['scan', 'recommend', 'apply'];
     const action = typeof body?.action === 'string' && validActions.includes(body.action) ? body.action : null;
     const targetMargin = typeof body?.targetMargin === 'number' && body.targetMargin >= 0 && body.targetMargin <= 100 ? body.targetMargin : undefined;
+    const validMarketplaces = ['yandex', 'wildberries', 'uzum', 'ozon'];
+    const marketplaceFilter = typeof body?.marketplace === 'string' && validMarketplaces.includes(body.marketplace)
+      ? body.marketplace
+      : undefined;
 
     if (!partnerId) {
       return new Response(JSON.stringify({ error: 'partnerId kerak' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const { data: connections } = await supabase
+    let connectionsQuery = supabase
       .from('marketplace_connections')
       .select('*')
       .eq('user_id', partnerId)
       .eq('is_active', true);
+
+    if (marketplaceFilter) {
+      connectionsQuery = connectionsQuery.eq('marketplace', marketplaceFilter);
+    }
+
+    const { data: connections } = await connectionsQuery;
 
     if (!connections?.length) {
       return new Response(JSON.stringify({ error: 'Ulanish topilmadi' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
