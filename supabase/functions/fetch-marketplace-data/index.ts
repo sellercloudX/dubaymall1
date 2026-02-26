@@ -73,6 +73,7 @@ interface YandexOrder {
     count: number;
     price: number;
     priceUZS: number;
+    nmID?: number;
   }>;
 }
 
@@ -116,6 +117,7 @@ function mapWBOrder(o: any, defaultStatus: string, fromNewApi = false) {
       count: 1,
       price: price,
       priceUZS: price,
+      nmID: o.nmId || undefined,
     }],
     buyer: { firstName: buyerLocation, lastName: "" },
     nmID: o.nmId,
@@ -2588,6 +2590,7 @@ serve(async (req) => {
                   count: 1,
                   price: price,
                   priceUZS: price,
+                  nmID: o.nmId || undefined,
                 }],
                 buyer: { firstName: buyerRegion, lastName: "" },
                 nmID: o.nmId,
@@ -2645,6 +2648,7 @@ serve(async (req) => {
                   count: 1,
                   price: price,
                   priceUZS: price,
+                  nmID: sale.nmId || undefined,
                 }],
                 buyer: { firstName: sale.regionName || sale.oblast || "", lastName: "" },
               });

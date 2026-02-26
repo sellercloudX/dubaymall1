@@ -87,22 +87,33 @@ const getStatusBadge = (status: string) => {
 
 const normalizeOfferKey = (value?: string) => String(value || '').trim().toLowerCase();
 
-const findProductByOffer = (store: MarketplaceDataStore, marketplace: string, offerId?: string) => {
+const findProductByOffer = (store: MarketplaceDataStore, marketplace: string, offerId?: string, nmID?: number) => {
   const normalizedOfferId = normalizeOfferKey(offerId);
-  if (!normalizedOfferId) return null;
-
-  return store.getProducts(marketplace).find((p) => {
-    const offer = normalizeOfferKey(p.offerId);
-    const sku = normalizeOfferKey(p.shopSku);
-    return offer === normalizedOfferId || sku === normalizedOfferId;
-  });
+  const products = store.getProducts(marketplace);
+  
+  if (normalizedOfferId) {
+    const byOffer = products.find((p) => {
+      const offer = normalizeOfferKey(p.offerId);
+      const sku = normalizeOfferKey(p.shopSku);
+      return offer === normalizedOfferId || sku === normalizedOfferId;
+    });
+    if (byOffer) return byOffer;
+  }
+  
+  // Fallback: match by nmID (WB orders always have nmID)
+  if (nmID) {
+    const nmIdStr = String(nmID);
+    return products.find((p) => p.offerId === nmIdStr || normalizeOfferKey(p.offerId) === nmIdStr);
+  }
+  
+  return null;
 };
 
 const getFirstProductName = (order: MarketplaceOrder, store: MarketplaceDataStore, marketplace: string): string => {
   if (!order.items || order.items.length === 0) return 'Mahsulot nomi yuklanmadi';
   const item = order.items[0];
-  if (item.offerId) {
-    const product = findProductByOffer(store, marketplace, item.offerId);
+  if (item.offerId || item.nmID) {
+    const product = findProductByOffer(store, marketplace, item.offerId, item.nmID);
     if (product?.name) {
       const name = product.name;
       return name.length > 40 ? name.substring(0, 40) + '...' : name;
@@ -121,7 +132,7 @@ const OrderRow = memo(({ order, onClick, store, marketplace }: { order: Marketpl
   // Get product image: first from order item photo, then from store products
   const firstItem = order.items?.[0];
   const itemPhoto = firstItem?.photo;
-  const matchedProduct = firstItem ? findProductByOffer(store, marketplace, firstItem.offerId) : null;
+  const matchedProduct = firstItem ? findProductByOffer(store, marketplace, firstItem.offerId, firstItem.nmID) : null;
   const imgUrl = itemPhoto || matchedProduct?.pictures?.[0];
   
   return (
@@ -286,7 +297,7 @@ export function MobileOrders({ connectedMarketplaces, store }: MobileOrdersProps
                 <div className="space-y-2">
                   <h4 className="font-medium text-sm">Mahsulotlar:</h4>
                   {selectedOrder.items.map((item: any, idx: number) => {
-                    const product = findProductByOffer(store, selectedMp, item.offerId);
+                    const product = findProductByOffer(store, selectedMp, item.offerId, item.nmID);
                     const displayName = product?.name || item.offerName || item.offerId;
                     return (
                     <div key={idx} className="flex justify-between p-3 bg-muted rounded-lg">

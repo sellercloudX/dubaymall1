@@ -38,15 +38,26 @@ const ORDER_STATUSES = [
 
 const normalizeOfferKey = (value?: string) => String(value || '').trim().toLowerCase();
 
-const findProductByOffer = (store: MarketplaceDataStore, marketplace: string, offerId?: string) => {
+const findProductByOffer = (store: MarketplaceDataStore, marketplace: string, offerId?: string, nmID?: number) => {
   const normalizedOfferId = normalizeOfferKey(offerId);
-  if (!normalizedOfferId) return null;
-
-  return store.getProducts(marketplace).find((p) => {
-    const offer = normalizeOfferKey(p.offerId);
-    const sku = normalizeOfferKey(p.shopSku);
-    return offer === normalizedOfferId || sku === normalizedOfferId;
-  });
+  const products = store.getProducts(marketplace);
+  
+  if (normalizedOfferId) {
+    const byOffer = products.find((p) => {
+      const offer = normalizeOfferKey(p.offerId);
+      const sku = normalizeOfferKey(p.shopSku);
+      return offer === normalizedOfferId || sku === normalizedOfferId;
+    });
+    if (byOffer) return byOffer;
+  }
+  
+  // Fallback: match by nmID (WB orders always have nmID)
+  if (nmID) {
+    const nmIdStr = String(nmID);
+    return products.find((p) => p.offerId === nmIdStr || normalizeOfferKey(p.offerId) === nmIdStr);
+  }
+  
+  return null;
 };
 
 export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceOrdersProps) {
@@ -195,7 +206,7 @@ export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceO
                             {(() => {
                               const firstItem = order.items?.[0];
                               const itemPhoto = (firstItem as any)?.photo;
-                              const product = firstItem ? findProductByOffer(store, selectedMarketplace, firstItem.offerId) : null;
+                              const product = firstItem ? findProductByOffer(store, selectedMarketplace, firstItem.offerId, firstItem.nmID) : null;
                               const imgUrl = itemPhoto || product?.pictures?.[0];
                               return (
                                 <div className="w-10 h-10 rounded bg-muted flex items-center justify-center overflow-hidden shrink-0">
@@ -212,7 +223,7 @@ export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceO
                                 {(() => {
                                   const item = order.items?.[0];
                                   if (!item) return `Buyurtma #${order.id}`;
-                                  const product = findProductByOffer(store, selectedMarketplace, item.offerId);
+                                  const product = findProductByOffer(store, selectedMarketplace, item.offerId, item.nmID);
                                   return product?.name || item.offerName || item.offerId || `Buyurtma #${order.id}`;
                                 })()}
                               </div>
@@ -256,7 +267,7 @@ export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceO
                             <h4 className="font-medium text-sm mb-3">Mahsulotlar:</h4>
                             {order.items.map((item, idx) => {
                               const itemPhoto = (item as any)?.photo;
-                              const matchedProduct = findProductByOffer(store, selectedMarketplace, item.offerId);
+                              const matchedProduct = findProductByOffer(store, selectedMarketplace, item.offerId, (item as any).nmID);
                               const itemImg = itemPhoto || matchedProduct?.pictures?.[0];
                               return (
                               <div key={idx} className="flex items-center justify-between p-2 bg-background rounded gap-2">
@@ -269,7 +280,7 @@ export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceO
                                     )}
                                   </div>
                                   <div className="min-w-0">
-                                    <div className="text-sm font-medium line-clamp-1">{findProductByOffer(store, selectedMarketplace, item.offerId)?.name || item.offerName || item.offerId}</div>
+                                    <div className="text-sm font-medium line-clamp-1">{findProductByOffer(store, selectedMarketplace, item.offerId, (item as any).nmID)?.name || item.offerName || item.offerId}</div>
                                     <code className="text-[10px] text-muted-foreground">{item.offerId}</code>
                                   </div>
                                 </div>
