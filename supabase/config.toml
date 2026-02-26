@@ -109,3 +109,9 @@ verify_jwt = false
 
 [functions.uzum-merchant-webhook]
 verify_jwt = false
+
+[functions.telegram-webhook]
+verify_jwt = false
+
+[functions.telegram-send]
+verify_jwt = false

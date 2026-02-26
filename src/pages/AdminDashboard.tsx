@@ -170,6 +170,10 @@ export default function AdminDashboard() {
           <TabsContent value="ai-agent">
             <AIAgentDashboard />
           </TabsContent>
+
+          <TabsContent value="chat">
+            <AdminSupportChat />
+          </TabsContent>
         </Tabs>
       </div>
     </Layout>
