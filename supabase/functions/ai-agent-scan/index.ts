@@ -25,6 +25,25 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3)
   return fetch(url, options);
 }
 
+async function resolveConnectionCredentials(adminClient: any, conn: any): Promise<any> {
+  if (!conn?.encrypted_credentials) return conn?.credentials || {};
+
+  try {
+    const { data: decrypted, error: decErr } = await adminClient.rpc('decrypt_credentials', { p_encrypted: conn.encrypted_credentials });
+    if (!decErr && decrypted) return typeof decrypted === 'string' ? JSON.parse(decrypted) : decrypted;
+    console.warn(`[${conn.marketplace}] decrypt failed, trying base64/plain fallback:`, decErr?.message);
+  } catch (e) {
+    console.warn(`[${conn.marketplace}] decrypt exception, trying fallback:`, (e as Error)?.message || e);
+  }
+
+  try {
+    const decoded = atob(conn.encrypted_credentials);
+    return JSON.parse(decoded);
+  } catch {
+    return conn?.credentials || {};
+  }
+}
+
 // ===== YANDEX: Deep scan =====
 async function scanYandexProducts(credentials: any): Promise<any> {
   const apiKey = credentials.apiKey || credentials.api_key;
@@ -635,17 +654,7 @@ serve(async (req) => {
     for (const conn of connections) {
       if (marketplace && conn.marketplace !== marketplace) continue;
       try {
-        let creds: any;
-        if (conn.encrypted_credentials) {
-          const { data: decrypted, error: decErr } = await adminSupabase.rpc('decrypt_credentials', { p_encrypted: conn.encrypted_credentials });
-          if (decErr || !decrypted) {
-            results.push({ marketplace: conn.marketplace, error: 'API kalitlarni deshifrlash xatosi', totalProducts: 0, products: [] });
-            continue;
-          }
-          creds = typeof decrypted === 'string' ? JSON.parse(decrypted) : decrypted;
-        } else {
-          creds = conn.credentials || {};
-        }
+        const creds = await resolveConnectionCredentials(adminSupabase, conn);
 
         if (conn.marketplace === 'yandex') {
           results.push(await scanYandexProducts(creds));
