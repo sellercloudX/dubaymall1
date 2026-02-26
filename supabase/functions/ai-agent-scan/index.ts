@@ -637,7 +637,7 @@ serve(async (req) => {
       try {
         let creds: any;
         if (conn.encrypted_credentials) {
-          const { data: decrypted, error: decErr } = await supabase.rpc('decrypt_credentials', { p_encrypted: conn.encrypted_credentials });
+          const { data: decrypted, error: decErr } = await adminSupabase.rpc('decrypt_credentials', { p_encrypted: conn.encrypted_credentials });
           if (decErr || !decrypted) {
             results.push({ marketplace: conn.marketplace, error: 'API kalitlarni deshifrlash xatosi', totalProducts: 0, products: [] });
             continue;

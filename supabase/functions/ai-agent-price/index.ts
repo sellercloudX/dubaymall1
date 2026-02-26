@@ -491,7 +491,7 @@ serve(async (req) => {
       const conn = connections!.find(c => c.marketplace === mp);
       if (!conn) return null;
       if (conn.encrypted_credentials) {
-        const { data: decrypted } = await supabase.rpc('decrypt_credentials', { p_encrypted: conn.encrypted_credentials });
+        const { data: decrypted } = await adminSupabase.rpc('decrypt_credentials', { p_encrypted: conn.encrypted_credentials });
         return typeof decrypted === 'string' ? JSON.parse(decrypted) : decrypted;
       }
       return conn.credentials || {};
@@ -506,7 +506,7 @@ serve(async (req) => {
         try {
           let creds: any;
           if (conn.encrypted_credentials) {
-            const { data: decrypted } = await supabase.rpc('decrypt_credentials', { p_encrypted: conn.encrypted_credentials });
+            const { data: decrypted } = await adminSupabase.rpc('decrypt_credentials', { p_encrypted: conn.encrypted_credentials });
             creds = typeof decrypted === 'string' ? JSON.parse(decrypted) : decrypted;
           } else { creds = conn.credentials || {}; }
 
