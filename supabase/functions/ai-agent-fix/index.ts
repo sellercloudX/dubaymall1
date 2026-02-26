@@ -550,7 +550,12 @@ serve(async (req) => {
       user_id: user.id, action_type: 'ai-agent-fix', model_used: 'gemini-2.5-flash',
     });
 
-    const body = await req.json();
+    let body: any;
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(JSON.stringify({ error: 'Invalid JSON body' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
     if (!body || typeof body !== 'object') {
       return new Response(JSON.stringify({ error: 'Invalid request body' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }

@@ -796,8 +796,25 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Invalid auth' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const body = await req.json();
-    const { action, partnerId, productName, category, offerId, nmID, marketplace, referenceImageUrl, features } = body;
+    let body: any;
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(JSON.stringify({ error: 'Invalid JSON body' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    if (!body || typeof body !== 'object') {
+      return new Response(JSON.stringify({ error: 'Invalid request body' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    const action = typeof body.action === 'string' ? body.action.slice(0, 50) : '';
+    const partnerId = typeof body.partnerId === 'string' ? body.partnerId.slice(0, 100) : undefined;
+    const productName = typeof body.productName === 'string' ? body.productName.slice(0, 500) : undefined;
+    const category = typeof body.category === 'string' ? body.category.slice(0, 200) : undefined;
+    const offerId = typeof body.offerId === 'string' ? body.offerId.slice(0, 200) : undefined;
+    const nmID = typeof body.nmID === 'number' && Number.isFinite(body.nmID) ? body.nmID : undefined;
+    const marketplace = typeof body.marketplace === 'string' && ['yandex', 'wildberries', 'uzum', 'ozon'].includes(body.marketplace) ? body.marketplace : undefined;
+    const referenceImageUrl = typeof body.referenceImageUrl === 'string' && body.referenceImageUrl.length <= 2000 ? body.referenceImageUrl : undefined;
+    const features = Array.isArray(body.features) ? body.features.slice(0, 10).map((f: any) => typeof f === 'string' ? f.slice(0, 200) : '').filter(Boolean) : undefined;
 
     // Role check: 'scanner-generate' allows seller role, others require admin
     if (action === 'scanner-generate') {
