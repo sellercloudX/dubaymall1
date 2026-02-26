@@ -125,11 +125,7 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
   };
 
   const handleAutoPrice = () => {
-    const normalizedProfit = Math.max(0, Math.min(Number.isFinite(minProfit) ? minProfit : 0, 80));
-    if (normalizedProfit !== minProfit) {
-      setMinProfit(normalizedProfit);
-      toast.warning("Minimal foyda 0%-80% orasida bo'lishi kerak");
-    }
+    const normalizedProfit = Math.max(0, Number.isFinite(minProfit) ? minProfit : 0);
 
     const newChanges: Record<string, number> = {};
     let noCostCount = 0;
@@ -325,7 +321,7 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
               <div className="flex items-center gap-3">
                 <div className="flex-1">
                   <div className="text-xs text-muted-foreground mb-1">Minimal foyda %</div>
-                  <Input type="number" value={minProfit} onChange={(e) => setMinProfit(Number(e.target.value))} className="h-8 text-sm" min={0} max={100} />
+                  <Input type="number" value={minProfit} onChange={(e) => setMinProfit(Number(e.target.value))} className="h-8 text-sm" min={0} />
                 </div>
                 <Button size="sm" variant="outline" onClick={handleAutoPrice} className="shrink-0 mt-4">
                   <Calculator className="h-3.5 w-3.5 mr-1" />Hisoblash
