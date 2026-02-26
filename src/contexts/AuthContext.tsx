@@ -6,7 +6,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, fullName: string, phone?: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
@@ -127,7 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const signUp = async (email: string, password: string, fullName: string) => {
+  const signUp = async (email: string, password: string, fullName: string, phone?: string) => {
     // Always redirect to published domain, not preview/dev URL
     const redirectUrl = 'https://sellercloudx.lovable.app/';
     
@@ -138,6 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         emailRedirectTo: redirectUrl,
         data: {
           full_name: fullName,
+          phone: phone || '',
         },
       },
     });
