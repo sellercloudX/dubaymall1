@@ -126,7 +126,8 @@ export default function Auth() {
           }
         }
       } else {
-        const { error } = await signUp(formData.email, formData.password, formData.fullName);
+        const cleanPhone = formData.phone.replace(/\s/g, '');
+        const { error } = await signUp(formData.email, formData.password, formData.fullName, cleanPhone);
         
         if (error) {
           toast({
@@ -135,15 +136,6 @@ export default function Auth() {
             variant: 'destructive',
           });
         } else {
-          // Update profile with phone number after signup
-          const { data: { user: newUser } } = await supabase.auth.getUser();
-          if (newUser) {
-            await supabase
-              .from('profiles')
-              .update({ phone: formData.phone.replace(/\s/g, '') })
-              .eq('user_id', newUser.id);
-          }
-          
           toast({
             title: 'Muvaffaqiyat',
             description: t.registrationSuccess,
