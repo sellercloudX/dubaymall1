@@ -71,7 +71,7 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
         // Tariffs are already in UZS (converted in useMarketplaceTariffs)
         const tariff = getTariffForProduct(tariffMap, product.offerId, priceUzs, marketplace);
         
-        // Min price formula: Price = (CostPrice + Logistics) / (1 - Commission% - Tax% - Margin%)
+        // Min price formula: markup-based for any margin %
         let calculatedMinPrice = 0;
         if (costPriceUzs !== null && costPriceUzs > 0) {
           const rawCommissionShare = priceUzs > 0 ? (tariff.commission / priceUzs) : 0;
@@ -81,9 +81,18 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
             : (marketplace === 'wildberries' ? (priceUzs > 700000 ? 14000 : priceUzs > 140000 ? 7000 : 4200) : 3000);
           const taxPercent = 0.04;
           const marginPercent = minProfit / 100;
+
+          // Use margin formula when denominator is positive, otherwise use markup formula
           const denominator = 1 - commissionPercent - taxPercent - marginPercent;
           if (denominator > 0.05) {
             calculatedMinPrice = Math.ceil((costPriceUzs + logisticsCost) / denominator);
+          } else {
+            // Markup approach: Price = (Cost + Logistics) * (1 + margin) / (1 - commission - tax)
+            const costBase = costPriceUzs + logisticsCost;
+            const feesDenom = 1 - commissionPercent - taxPercent;
+            if (feesDenom > 0.05) {
+              calculatedMinPrice = Math.ceil(costBase * (1 + marginPercent) / feesDenom);
+            }
           }
         }
 
