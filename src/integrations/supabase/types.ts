@@ -2530,6 +2530,7 @@ export type Database = {
           created_at: string
           id: string
           is_admin: boolean
+          reply_target_user_id: string | null
           telegram_chat_id: number
           telegram_first_name: string | null
           telegram_username: string | null
@@ -2539,6 +2540,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_admin?: boolean
+          reply_target_user_id?: string | null
           telegram_chat_id: number
           telegram_first_name?: string | null
           telegram_username?: string | null
@@ -2548,6 +2550,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_admin?: boolean
+          reply_target_user_id?: string | null
           telegram_chat_id?: number
           telegram_first_name?: string | null
           telegram_username?: string | null
