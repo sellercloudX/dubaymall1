@@ -55,7 +55,20 @@ serve(async (req) => {
       );
     }
 
-    const { shopId, marketplace, apiKey, campaignId, sellerId } = await req.json();
+    const body = await req.json();
+    if (!body || typeof body !== 'object') {
+      return new Response(
+        JSON.stringify({ error: "Invalid request body" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const validMarketplaces = ['yandex', 'wildberries', 'uzum', 'ozon'];
+    const marketplace = typeof body.marketplace === 'string' && validMarketplaces.includes(body.marketplace) ? body.marketplace : null;
+    const apiKey = typeof body.apiKey === 'string' && body.apiKey.length > 0 && body.apiKey.length <= 500 ? body.apiKey : null;
+    const shopId = typeof body.shopId === 'string' && body.shopId.length <= 100 ? body.shopId : undefined;
+    const campaignId = typeof body.campaignId === 'string' && body.campaignId.length <= 100 ? body.campaignId : undefined;
+    const sellerId = typeof body.sellerId === 'string' && body.sellerId.length <= 100 ? body.sellerId : undefined;
 
     if (!marketplace || !apiKey) {
       return new Response(
