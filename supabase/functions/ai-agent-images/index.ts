@@ -25,6 +25,25 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3)
   return fetch(url, options);
 }
 
+async function resolveConnectionCredentials(adminClient: any, conn: any): Promise<any> {
+  if (!conn?.encrypted_credentials) return conn?.credentials || {};
+
+  try {
+    const { data: decrypted, error: decErr } = await adminClient.rpc('decrypt_credentials', { p_encrypted: conn.encrypted_credentials });
+    if (!decErr && decrypted) return typeof decrypted === 'string' ? JSON.parse(decrypted) : decrypted;
+    console.warn(`[${conn.marketplace}] decrypt failed, trying base64/plain fallback:`, decErr?.message);
+  } catch (e) {
+    console.warn(`[${conn.marketplace}] decrypt exception, trying fallback:`, (e as Error)?.message || e);
+  }
+
+  try {
+    const decoded = atob(conn.encrypted_credentials);
+    return JSON.parse(decoded);
+  } catch {
+    return conn?.credentials || {};
+  }
+}
+
 // =====================================================
 // STOP WORDS — taqiqlangan sub'ektiv/reklama so'zlari
 // =====================================================
@@ -939,13 +958,7 @@ serve(async (req) => {
 
         if (conns?.length) {
           const conn = conns[0];
-          let creds: any;
-          if (conn.encrypted_credentials) {
-            const { data: decrypted } = await adminSupabase.rpc('decrypt_credentials', { p_encrypted: conn.encrypted_credentials });
-            creds = typeof decrypted === 'string' ? JSON.parse(decrypted) : decrypted;
-          } else {
-            creds = conn.credentials || {};
-          }
+          const creds = await resolveConnectionCredentials(adminSupabase, conn);
 
           if (marketplace === 'yandex') {
             mpResult = await uploadAllToYandex(creds, offerId, allGeneratedImages);
