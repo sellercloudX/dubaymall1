@@ -95,6 +95,7 @@ function App() {
               <Toaster />
               <Sonner />
               {!isCapacitor && <InstallPWA />}
+              <PhoneCompletionDialog />
               <BrowserRouter>
                 <Suspense fallback={<PageLoader />}>
                 <Routes>
