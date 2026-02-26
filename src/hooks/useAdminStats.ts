@@ -68,7 +68,7 @@ export function useAdminUsers() {
     queryFn: async () => {
       const { data: profiles } = await supabase
         .from('profiles')
-        .select('*')
+        .select('*, email')
         .order('created_at', { ascending: false });
 
       // Get roles for all users

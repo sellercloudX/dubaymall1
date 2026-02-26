@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useAdminUsers } from '@/hooks/useAdminStats';
-import { Search, Users, Eye, Phone, MapPin, Calendar, UserPlus, AlertCircle } from 'lucide-react';
+import { Search, Users, Eye, Phone, MapPin, Calendar, UserPlus, AlertCircle, Mail } from 'lucide-react';
 import { format } from 'date-fns';
 
 export function UsersManagement() {
@@ -17,8 +17,9 @@ export function UsersManagement() {
 
   const filteredUsers = users?.filter(user => {
     const matchesSearch = user.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-      user.phone?.includes(search);
-    
+      user.phone?.includes(search) ||
+      (user as any).email?.toLowerCase().includes(search.toLowerCase());
+
     if (!matchesSearch) return false;
     
     switch (filter) {
@@ -117,12 +118,21 @@ export function UsersManagement() {
                     {isNew && <Badge variant="outline" className="ml-2 text-[10px] border-blue-400 text-blue-600">YANGI</Badge>}
                   </TableCell>
                   <TableCell>
-                    {user.phone ? (
-                      <a href={`tel:${user.phone}`} className="text-primary hover:underline flex items-center gap-1">
-                        <Phone className="h-3 w-3" />
-                        {user.phone}
-                      </a>
-                    ) : <span className="text-destructive text-xs">Telefon yo'q</span>}
+                    <div className="space-y-0.5">
+                      {user.phone ? (
+                        <a href={`tel:${user.phone}`} className="text-primary hover:underline flex items-center gap-1 text-sm">
+                          <Phone className="h-3 w-3" />
+                          {user.phone}
+                        </a>
+                      ) : null}
+                      {(user as any).email ? (
+                        <a href={`mailto:${(user as any).email}`} className="text-muted-foreground hover:underline flex items-center gap-1 text-xs">
+                          <Mail className="h-3 w-3" />
+                          {(user as any).email}
+                        </a>
+                      ) : null}
+                      {!user.phone && !(user as any).email && <span className="text-destructive text-xs">Ma'lumot yo'q</span>}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <span className="text-sm text-muted-foreground flex items-center gap-1">
@@ -177,7 +187,15 @@ export function UsersManagement() {
                     {selectedUser.phone ? (
                       <a href={`tel:${selectedUser.phone}`} className="font-medium text-primary hover:underline">{selectedUser.phone}</a>
                     ) : (
-                      <p className="font-medium text-destructive">Kiritilmagan</p>
+                      <p className="font-medium text-muted-foreground">—</p>
+                    )}
+                  </div>
+                  <div className="p-3 bg-muted/50 rounded-lg col-span-2">
+                    <p className="text-muted-foreground text-xs flex items-center gap-1"><Mail className="h-3 w-3" />Email</p>
+                    {(selectedUser as any).email ? (
+                      <a href={`mailto:${(selectedUser as any).email}`} className="font-medium text-primary hover:underline">{(selectedUser as any).email}</a>
+                    ) : (
+                      <p className="font-medium text-muted-foreground">—</p>
                     )}
                   </div>
                   <div className="p-3 bg-muted/50 rounded-lg">

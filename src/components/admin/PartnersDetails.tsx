@@ -29,7 +29,7 @@ export function PartnersDetails() {
       const userIds = subscriptions.map(s => s.user_id);
       const { data: profilesData } = await supabase
         .from('profiles')
-        .select('user_id, full_name, phone, avatar_url')
+        .select('user_id, full_name, phone, avatar_url, email')
         .in('user_id', userIds);
       const profilesMap = Object.fromEntries((profilesData || []).map(p => [p.user_id, p]));
 
@@ -155,6 +155,9 @@ export function PartnersDetails() {
                   <div>
                     <p className="text-sm text-muted-foreground">Foydalanuvchi</p>
                     <p className="font-medium">{(selectedPartner.profiles as any)?.full_name || '-'}</p>
+                    {(selectedPartner.profiles as any)?.email && (
+                      <a href={`mailto:${(selectedPartner.profiles as any).email}`} className="text-xs text-primary hover:underline">{(selectedPartner.profiles as any).email}</a>
+                    )}
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Telefon</p>

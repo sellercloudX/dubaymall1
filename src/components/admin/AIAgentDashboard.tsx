@@ -56,26 +56,54 @@ interface PriceProduct {
 }
 
 // ===== Helpers =====
-function PartnerSelector({ partners, selectedPartnerId, onSelect }: any) {
+function PartnerSelector({ partners, selectedPartnerId, onSelect, selectedMarketplace, onMarketplaceChange }: any) {
+  const selectedPartner = partners?.find((p: any) => p.userId === selectedPartnerId);
   return (
     <div className="space-y-3">
-      <div className="flex-1 min-w-[200px]">
-        <label className="text-sm font-medium mb-1 block">Hamkorni tanlang</label>
-        <Select value={selectedPartnerId} onValueChange={onSelect}>
-          <SelectTrigger><SelectValue placeholder="Hamkor tanlash..." /></SelectTrigger>
-          <SelectContent>
-            {partners?.map((p: any) => (
-              <SelectItem key={p.userId} value={p.userId}>
-                {p.name} ({p.marketplaces.join(', ')})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="flex gap-3 flex-wrap items-end">
+        <div className="flex-1 min-w-[200px]">
+          <label className="text-sm font-medium mb-1 block">Hamkorni tanlang</label>
+          <Select value={selectedPartnerId} onValueChange={onSelect}>
+            <SelectTrigger><SelectValue placeholder="Hamkor tanlash..." /></SelectTrigger>
+            <SelectContent>
+              {partners?.map((p: any) => (
+                <SelectItem key={p.userId} value={p.userId}>
+                  {p.name} ({p.marketplaces.join(', ')})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {selectedPartner && selectedPartner.marketplaces.length > 0 && (
+          <div className="min-w-[160px]">
+            <label className="text-sm font-medium mb-1 block">Marketplace</label>
+            <Select value={selectedMarketplace || 'all'} onValueChange={onMarketplaceChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Barchasi" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">🌐 Barchasi</SelectItem>
+                {selectedPartner.marketplaces.map((mp: string) => (
+                  <SelectItem key={mp} value={mp}>
+                    <span className="flex items-center gap-1.5">
+                      <MarketplaceLogo marketplace={mp} size={14} /> {MARKETPLACE_CONFIG[mp]?.name || mp}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
-      {partners?.find((p: any) => p.userId === selectedPartnerId) && (
+      {selectedPartner && (
         <div className="flex gap-2 flex-wrap">
-          {partners.find((p: any) => p.userId === selectedPartnerId).marketplaces.map((mp: string) => (
-            <Badge key={mp} variant="outline" className="text-xs">
+          {selectedPartner.marketplaces.map((mp: string) => (
+            <Badge 
+              key={mp} 
+              variant={selectedMarketplace === mp ? 'default' : 'outline'} 
+              className={`text-xs cursor-pointer ${selectedMarketplace === mp ? '' : 'opacity-60'}`}
+              onClick={() => onMarketplaceChange(selectedMarketplace === mp ? 'all' : mp)}
+            >
               <MarketplaceLogo marketplace={mp} size={14} className="mr-1 inline-block" /> {MARKETPLACE_CONFIG[mp]?.name || mp}
             </Badge>
           ))}
@@ -105,7 +133,7 @@ function StatCard({ value, label, color }: { value: number | string; label: stri
 }
 
 // ===== Card Audit Tab with Pagination =====
-function CardAuditTab({ selectedPartnerId, scanResults, setScanResults }: any) {
+function CardAuditTab({ selectedPartnerId, scanResults, setScanResults, selectedMarketplace }: any) {
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [fixHistory, setFixHistory] = useState<FixResult[]>([]);
   const [expandedProduct, setExpandedProduct] = useState<string | null>(null);
@@ -116,7 +144,7 @@ function CardAuditTab({ selectedPartnerId, scanResults, setScanResults }: any) {
 
   const scanMutation = useMutation({
     mutationFn: async (partnerId: string) => {
-      const { data, error } = await supabase.functions.invoke('ai-agent-scan', { body: { partnerId } });
+      const { data, error } = await supabase.functions.invoke('ai-agent-scan', { body: { partnerId, marketplace: selectedMarketplace !== 'all' ? selectedMarketplace : undefined } });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       return data.results as ScanResult[];
@@ -660,7 +688,7 @@ function ImageAnalysisTab({ selectedPartnerId, scanResults }: any) {
 }
 
 // ===== Price Optimization Tab =====
-function PriceOptimizationTab({ selectedPartnerId }: any) {
+function PriceOptimizationTab({ selectedPartnerId, selectedMarketplace }: any) {
   const [priceData, setPriceData] = useState<{ products: PriceProduct[]; summary: any } | null>(null);
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [targetMargin, setTargetMargin] = useState(12);
@@ -669,7 +697,7 @@ function PriceOptimizationTab({ selectedPartnerId }: any) {
 
   const priceScanMutation = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke('ai-agent-price', { body: { partnerId: selectedPartnerId, action: 'scan', targetMargin } });
+      const { data, error } = await supabase.functions.invoke('ai-agent-price', { body: { partnerId: selectedPartnerId, action: 'scan', targetMargin, marketplace: selectedMarketplace !== 'all' ? selectedMarketplace : undefined } });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       return data;
@@ -1363,6 +1391,7 @@ function FinancialOverviewTab({ selectedPartnerId }: any) {
 // ===== Main Dashboard =====
 export function AIAgentDashboard() {
   const [selectedPartnerId, setSelectedPartnerId] = useState<string>('');
+  const [selectedMarketplace, setSelectedMarketplace] = useState<string>('all');
   const [scanResults, setScanResults] = useState<ScanResult[]>([]);
   const [priceData, setPriceData] = useState<any>(null);
 
@@ -1434,7 +1463,13 @@ export function AIAgentDashboard() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <PartnerSelector partners={partners} selectedPartnerId={selectedPartnerId} onSelect={setSelectedPartnerId} />
+          <PartnerSelector 
+            partners={partners} 
+            selectedPartnerId={selectedPartnerId} 
+            onSelect={(id: string) => { setSelectedPartnerId(id); setSelectedMarketplace('all'); setScanResults([]); setPriceData(null); }}
+            selectedMarketplace={selectedMarketplace}
+            onMarketplaceChange={setSelectedMarketplace}
+          />
         </CardContent>
       </Card>
 
@@ -1464,19 +1499,19 @@ export function AIAgentDashboard() {
           <AgentChatTab selectedPartnerId={selectedPartnerId} scanResults={scanResults} priceData={priceData} />
         </TabsContent>
         <TabsContent value="audit">
-          <CardAuditTab selectedPartnerId={selectedPartnerId} scanResults={scanResults} setScanResults={setScanResults} />
+          <CardAuditTab selectedPartnerId={selectedPartnerId} scanResults={selectedMarketplace === 'all' ? scanResults : scanResults.filter(r => r.marketplace === selectedMarketplace)} setScanResults={setScanResults} selectedMarketplace={selectedMarketplace} />
         </TabsContent>
         <TabsContent value="images">
-          <ImageAnalysisTab selectedPartnerId={selectedPartnerId} scanResults={scanResults} />
+          <ImageAnalysisTab selectedPartnerId={selectedPartnerId} scanResults={selectedMarketplace === 'all' ? scanResults : scanResults.filter(r => r.marketplace === selectedMarketplace)} selectedMarketplace={selectedMarketplace} />
         </TabsContent>
         <TabsContent value="pricing">
-          <PriceOptimizationTab selectedPartnerId={selectedPartnerId} />
+          <PriceOptimizationTab selectedPartnerId={selectedPartnerId} selectedMarketplace={selectedMarketplace} />
         </TabsContent>
         <TabsContent value="dimensions">
           <DimensionsTab selectedPartnerId={selectedPartnerId} />
         </TabsContent>
         <TabsContent value="finance">
-          <FinancialOverviewTab selectedPartnerId={selectedPartnerId} />
+          <FinancialOverviewTab selectedPartnerId={selectedPartnerId} selectedMarketplace={selectedMarketplace} />
         </TabsContent>
       </Tabs>
     </div>
