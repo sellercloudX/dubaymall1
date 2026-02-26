@@ -37,7 +37,29 @@ export function useCostPrices() {
 
   useEffect(() => {
     fetchCostPrices();
-  }, [fetchCostPrices]);
+
+    if (!user) return;
+
+    const channel = supabase
+      .channel(`cost-prices-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'marketplace_cost_prices',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          fetchCostPrices();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchCostPrices, user]);
 
   // Build a lookup map for O(1) access
   const costPriceMap = useMemo(() => {
