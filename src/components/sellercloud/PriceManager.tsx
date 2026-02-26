@@ -125,10 +125,10 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
   };
 
   const handleAutoPrice = () => {
-    const normalizedProfit = Math.max(0, Math.min(Number.isFinite(minProfit) ? minProfit : 0, 90));
+    const normalizedProfit = Math.max(0, Math.min(Number.isFinite(minProfit) ? minProfit : 0, 80));
     if (normalizedProfit !== minProfit) {
       setMinProfit(normalizedProfit);
-      toast.warning('Minimal foyda 0%–90% oralig‘ida bo‘lishi kerak');
+      toast.warning("Minimal foyda 0%-80% orasida bo'lishi kerak");
     }
 
     const newChanges: Record<string, number> = {};
@@ -147,24 +147,25 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
       }
 
       const key = `${p.marketplace}-${p.id}`;
-      const currentOrDraft = Math.round(priceChanges[key] ?? p.price);
       const target = Math.round(p.minPrice);
-      if (currentOrDraft !== target) {
-        newChanges[key] = target;
-        changedCount++;
-      }
+      newChanges[key] = target;
+      changedCount++;
     });
 
-    setPriceChanges(prev => ({ ...prev, ...newChanges }));
+    // Always replace with fresh calculation
+    setPriceChanges(newChanges);
 
     if (changedCount > 0) {
-      toast.info(`${changedCount} ta mahsulot narxi ${normalizedProfit}% foydaga moslandi`);
-    } else if (noCostCount > 0) {
-      toast.warning(`${noCostCount} ta mahsulotda tannarx kiritilmagan — avval tannarx kiriting`);
-    } else if (uncomputableCount > 0) {
-      toast.warning(`${uncomputableCount} ta mahsulotda tarif/marja sabab hisoblab bo‘lmadi`);
-    } else {
-      toast.success('Barcha narxlar allaqachon mos');
+      toast.success(`${changedCount} ta mahsulot narxi ${normalizedProfit}% foydaga moslandi`);
+    }
+    if (noCostCount > 0) {
+      toast.warning(`${noCostCount} ta mahsulotda tannarx kiritilmagan`);
+    }
+    if (uncomputableCount > 0) {
+      toast.warning(`${uncomputableCount} ta mahsulotda tarif hisoblab bo'lmadi`);
+    }
+    if (changedCount === 0 && noCostCount === 0 && uncomputableCount === 0) {
+      toast.info("Mahsulotlar topilmadi");
     }
   };
 
