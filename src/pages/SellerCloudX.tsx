@@ -50,6 +50,7 @@ const AIScannerPro = lazy(() => import('@/components/seller/AIScannerPro').then(
 const MarketplaceReviews = lazy(() => import('@/components/sellercloud/MarketplaceReviews').then(m => ({ default: m.MarketplaceReviews })));
 const WBSellerAnalytics = lazy(() => import('@/components/sellercloud/WBSellerAnalytics').then(m => ({ default: m.WBSellerAnalytics })));
 const WBAdsCampaigns = lazy(() => import('@/components/sellercloud/WBAdsCampaigns').then(m => ({ default: m.WBAdsCampaigns })));
+const SupportChat = lazy(() => import('@/components/sellercloud/SupportChat').then(m => ({ default: m.SupportChat })));
 
 const TabLoader = () => <div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
 
