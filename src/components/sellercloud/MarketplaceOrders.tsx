@@ -195,12 +195,13 @@ export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceO
                               );
                             })()}
                             <div className="min-w-0 flex-1">
-                              <div className="font-semibold text-sm line-clamp-1">
+                                <div className="font-semibold text-sm line-clamp-1">
                                 {(() => {
                                   const item = order.items?.[0];
                                   if (!item) return `Buyurtma #${order.id}`;
+                                  // Always prefer product store name (WB offerName is just category)
                                   const product = store.getProducts(selectedMarketplace).find(p => p.offerId === item.offerId || p.shopSku === item.offerId);
-                                  return item.offerName || product?.name || item.offerId || `Buyurtma #${order.id}`;
+                                  return product?.name || item.offerName || item.offerId || `Buyurtma #${order.id}`;
                                 })()}
                               </div>
                               <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -256,7 +257,7 @@ export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceO
                                     )}
                                   </div>
                                   <div className="min-w-0">
-                                    <div className="text-sm font-medium line-clamp-1">{item.offerName || store.getProducts(selectedMarketplace).find(p => p.offerId === item.offerId)?.name || item.offerId}</div>
+                                    <div className="text-sm font-medium line-clamp-1">{store.getProducts(selectedMarketplace).find(p => p.offerId === item.offerId || p.shopSku === item.offerId)?.name || item.offerName || item.offerId}</div>
                                     <code className="text-[10px] text-muted-foreground">{item.offerId}</code>
                                   </div>
                                 </div>

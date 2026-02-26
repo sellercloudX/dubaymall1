@@ -7,6 +7,7 @@ import { BarChart3, TrendingUp, DollarSign, Package, ShoppingCart, RefreshCw } f
 import { Button } from '@/components/ui/button';
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
+import { toDisplayUzs } from '@/lib/currency';
 
 interface MarketplaceAnalyticsProps {
   connectedMarketplaces: string[];
@@ -37,7 +38,8 @@ export function MarketplaceAnalytics({ connectedMarketplaces, store }: Marketpla
       const productsCount = products.length;
       const ordersCount = orders.length;
       const activeOrders = orders.filter(o => !['CANCELLED', 'RETURNED'].includes(o.status));
-      const totalRevenue = activeOrders.reduce((sum, order) => sum + (order.totalUZS || order.total || 0), 0);
+      // Always convert from native currency (WB=RUB) to UZS for display
+      const totalRevenue = activeOrders.reduce((sum, order) => sum + toDisplayUzs(order.total || 0, marketplace), 0);
 
       return { marketplace, productsCount, ordersCount, totalRevenue };
     });
