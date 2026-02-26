@@ -1111,17 +1111,7 @@ function DimensionsTab({ selectedPartnerId }: any) {
     try {
       let success = 0, failed = 0;
       
-      // Get WB API key
-      const { data: conn } = await supabase
-        .from('marketplace_connections')
-        .select('encrypted_credentials, credentials')
-        .eq('user_id', selectedPartnerId)
-        .eq('marketplace', 'wildberries')
-        .eq('is_active', true)
-        .limit(1)
-        .single();
-      
-      if (!conn) { toast.error('WB ulanmagan'); return; }
+      // Credentials are handled server-side by the edge function
       
       // Use edge function to update dimensions via WB API
       for (let i = 0; i < entries.length; i += 10) {
