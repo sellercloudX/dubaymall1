@@ -74,10 +74,11 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
         // Min price formula: Price = (CostPrice + Logistics) / (1 - Commission% - Tax% - Margin%)
         let calculatedMinPrice = 0;
         if (costPriceUzs !== null && costPriceUzs > 0) {
-          const commissionPercent = tariff.isReal && priceUzs > 0
-            ? tariff.commission / priceUzs
-            : 0.15;
-          const logisticsCost = tariff.isReal ? tariff.logistics : 3000;
+          const rawCommissionShare = priceUzs > 0 ? (tariff.commission / priceUzs) : 0;
+          const commissionPercent = rawCommissionShare > 0 && rawCommissionShare < 0.8 ? rawCommissionShare : 0.15;
+          const logisticsCost = tariff.logistics > 0 && tariff.logistics < priceUzs * 0.9
+            ? tariff.logistics
+            : (marketplace === 'wildberries' ? (priceUzs > 700000 ? 14000 : priceUzs > 140000 ? 7000 : 4200) : 3000);
           const taxPercent = 0.04;
           const marginPercent = minProfit / 100;
           const denominator = 1 - commissionPercent - taxPercent - marginPercent;
@@ -124,24 +125,44 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
   };
 
   const handleAutoPrice = () => {
+    const normalizedProfit = Math.max(0, Math.min(Number.isFinite(minProfit) ? minProfit : 0, 90));
+    if (normalizedProfit !== minProfit) {
+      setMinProfit(normalizedProfit);
+      toast.warning('Minimal foyda 0%–90% oralig‘ida bo‘lishi kerak');
+    }
+
     const newChanges: Record<string, number> = {};
     let noCostCount = 0;
     let changedCount = 0;
+    let uncomputableCount = 0;
+
     products.forEach(p => {
       if (p.costPrice === null || p.costPrice <= 0) {
         noCostCount++;
         return;
       }
-      if (p.minPrice > 0 && Math.round(p.price) !== Math.round(p.minPrice)) {
-        newChanges[`${p.marketplace}-${p.id}`] = p.minPrice;
+      if (p.minPrice <= 0) {
+        uncomputableCount++;
+        return;
+      }
+
+      const key = `${p.marketplace}-${p.id}`;
+      const currentOrDraft = Math.round(priceChanges[key] ?? p.price);
+      const target = Math.round(p.minPrice);
+      if (currentOrDraft !== target) {
+        newChanges[key] = target;
         changedCount++;
       }
     });
+
     setPriceChanges(prev => ({ ...prev, ...newChanges }));
+
     if (changedCount > 0) {
-      toast.info(`${changedCount} ta mahsulot narxi ${minProfit}% foydaga moslanadi`);
+      toast.info(`${changedCount} ta mahsulot narxi ${normalizedProfit}% foydaga moslandi`);
     } else if (noCostCount > 0) {
       toast.warning(`${noCostCount} ta mahsulotda tannarx kiritilmagan — avval tannarx kiriting`);
+    } else if (uncomputableCount > 0) {
+      toast.warning(`${uncomputableCount} ta mahsulotda tarif/marja sabab hisoblab bo‘lmadi`);
     } else {
       toast.success('Barcha narxlar allaqachon mos');
     }

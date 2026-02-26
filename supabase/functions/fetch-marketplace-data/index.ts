@@ -2710,16 +2710,67 @@ serve(async (req) => {
           result = { success: false, error: "Error fetching WB stocks" };
         }
       } else if (dataType === "tariffs") {
-        // WB commission tariffs — get from API
+        // WB commission tariffs + logistics tariffs
         try {
-          const commResp = await fetch("https://common-api.wildberries.ru/api/v1/tariffs/commission", {
-            headers: wbHeaders,
-          });
+          const today = new Date().toISOString().slice(0, 10);
+          const [commResp, boxResp] = await Promise.all([
+            fetch("https://common-api.wildberries.ru/api/v1/tariffs/commission", {
+              headers: wbHeaders,
+            }),
+            fetch(`https://common-api.wildberries.ru/api/v1/tariffs/box?date=${today}`, {
+              headers: wbHeaders,
+            }),
+          ]);
+
+          let commissions: any[] = [];
+          let logistics: {
+            deliveryBase: number;
+            deliveryLiter: number;
+            storageBase: number;
+            storageLiter: number;
+            warehouseName: string;
+          } | null = null;
+
           if (commResp.ok) {
             const commData = await commResp.json();
-            result = { success: true, data: commData.report || [] };
+            commissions = Array.isArray(commData?.report) ? commData.report : [];
           } else {
-            result = { success: false, error: `WB tariffs failed: ${commResp.status}` };
+            await commResp.text();
+          }
+
+          if (boxResp.ok) {
+            const boxData = await boxResp.json();
+            const warehouseList = boxData?.response?.data?.warehouseList
+              || boxData?.response?.warehouseList
+              || boxData?.warehouseList
+              || [];
+            const selectedWarehouse = warehouseList.find((w: any) =>
+              Number(w?.boxDeliveryBase || w?.deliveryBase || 0) > 0
+            ) || warehouseList[0];
+
+            if (selectedWarehouse) {
+              logistics = {
+                deliveryBase: Number(selectedWarehouse.boxDeliveryBase || selectedWarehouse.deliveryBase || 0),
+                deliveryLiter: Number(selectedWarehouse.boxDeliveryLiter || selectedWarehouse.deliveryLiter || 0),
+                storageBase: Number(selectedWarehouse.boxStorageBase || selectedWarehouse.storageBase || 0),
+                storageLiter: Number(selectedWarehouse.boxStorageLiter || selectedWarehouse.storageLiter || 0),
+                warehouseName: String(selectedWarehouse.warehouseName || selectedWarehouse.warehouse || "default"),
+              };
+            }
+          } else {
+            await boxResp.text();
+          }
+
+          if (commissions.length === 0) {
+            result = { success: false, error: "WB tariffs failed: commissions not available" };
+          } else {
+            result = {
+              success: true,
+              data: {
+                commissions,
+                logistics,
+              },
+            };
           }
         } catch (e) {
           console.error("WB tariffs error:", e);
