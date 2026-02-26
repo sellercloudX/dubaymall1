@@ -1,0 +1,1 @@
+ALTER TABLE public.telegram_chat_links ADD COLUMN IF NOT EXISTS reply_target_user_id text DEFAULT NULL;
