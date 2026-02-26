@@ -89,19 +89,27 @@ serve(async (req) => {
 
     console.log(`Creating marketplace card for user ${userId}`);
 
-    const request: CardRequest = await req.json();
-    const { 
-      imageBase64, 
-      costPrice, 
-      targetMargin = 30, 
-      targetMarketplaces = ["yandex"],
-      generateInfographics = true,
-      infographicCount = 6
-    } = request;
+    const rawRequest = await req.json();
+    if (!rawRequest || typeof rawRequest !== 'object') {
+      return new Response(
+        JSON.stringify({ error: "Invalid request body" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const validMPs = ['yandex', 'uzum', 'wildberries', 'ozon'];
+    const imageBase64 = typeof rawRequest.imageBase64 === 'string' && rawRequest.imageBase64.length > 0 && rawRequest.imageBase64.length <= 10_000_000 ? rawRequest.imageBase64 : null;
+    const costPrice = typeof rawRequest.costPrice === 'number' && Number.isFinite(rawRequest.costPrice) && rawRequest.costPrice >= 0 ? rawRequest.costPrice : undefined;
+    const targetMargin = typeof rawRequest.targetMargin === 'number' && rawRequest.targetMargin >= 0 && rawRequest.targetMargin <= 500 ? rawRequest.targetMargin : 30;
+    const targetMarketplaces = Array.isArray(rawRequest.targetMarketplaces) 
+      ? rawRequest.targetMarketplaces.filter((m: any) => typeof m === 'string' && validMPs.includes(m)).slice(0, 4)
+      : ["yandex"];
+    const generateInfographics = typeof rawRequest.generateInfographics === 'boolean' ? rawRequest.generateInfographics : true;
+    const infographicCount = typeof rawRequest.infographicCount === 'number' && rawRequest.infographicCount >= 0 && rawRequest.infographicCount <= 10 ? rawRequest.infographicCount : 6;
 
     if (!imageBase64) {
       return new Response(
-        JSON.stringify({ error: "Product image is required" }),
+        JSON.stringify({ error: "Product image is required (max 10MB)" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

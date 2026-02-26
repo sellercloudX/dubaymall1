@@ -55,7 +55,11 @@ serve(async (req) => {
       user_id: user.id, action_type: 'ai-agent-chat', model_used: 'gemini-2.5-flash-lite',
     });
 
-    const { message, partnerId, context } = await req.json();
+    const body = await req.json();
+    const message = typeof body?.message === 'string' ? body.message.slice(0, 5000) : '';
+    const partnerId = typeof body?.partnerId === 'string' && body.partnerId.length <= 100 ? body.partnerId : undefined;
+    const context = body?.context && typeof body.context === 'object' ? body.context : undefined;
+
     if (!message) {
       return new Response(JSON.stringify({ error: 'message kerak' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }

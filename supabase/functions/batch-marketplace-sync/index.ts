@@ -12,13 +12,48 @@
      return new Response(null, { headers: corsHeaders });
    }
  
-   try {
-     const { operation, marketplace, items, userId } = await req.json();
-     
-     const supabase = createClient(
-       Deno.env.get("SUPABASE_URL")!,
-       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-     );
+  try {
+    // Auth check
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const body = await req.json();
+    if (!body || typeof body !== 'object') {
+      return new Response(JSON.stringify({ error: "Invalid request body" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const validOps = ['sync', 'update', 'delete', 'refresh'];
+    const validMarketplaces = ['yandex', 'wildberries', 'uzum', 'ozon'];
+    const operation = typeof body.operation === 'string' && validOps.includes(body.operation) ? body.operation : null;
+    const marketplace = typeof body.marketplace === 'string' && validMarketplaces.includes(body.marketplace) ? body.marketplace : null;
+    const items = Array.isArray(body.items) ? body.items.slice(0, 5000) : null;
+    const userId = typeof body.userId === 'string' && body.userId.length <= 100 ? body.userId : null;
+
+    if (!operation || !marketplace || !items) {
+      return new Response(JSON.stringify({ error: "Missing required fields: operation, marketplace, items" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    // Verify caller identity
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: "Invalid authentication" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
  
      const BATCH_SIZE = 50;
      const results = { success: 0, failed: 0, errors: [] as string[] };

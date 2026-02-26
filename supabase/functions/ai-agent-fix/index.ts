@@ -532,7 +532,15 @@ serve(async (req) => {
     });
 
     const body = await req.json();
-    const { partnerId, marketplace, products, maxRetries = 2, action } = body;
+    if (!body || typeof body !== 'object') {
+      return new Response(JSON.stringify({ error: 'Invalid request body' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    const partnerId = typeof body.partnerId === 'string' && body.partnerId.length <= 100 ? body.partnerId : null;
+    const marketplace = typeof body.marketplace === 'string' && ['yandex', 'wildberries', 'uzum', 'ozon'].includes(body.marketplace) ? body.marketplace : null;
+    const products = Array.isArray(body.products) ? body.products.slice(0, 100) : null;
+    const maxRetries = typeof body.maxRetries === 'number' && body.maxRetries >= 0 && body.maxRetries <= 5 ? body.maxRetries : 2;
+    const action = typeof body.action === 'string' && body.action.length <= 50 ? body.action : undefined;
 
     if (!partnerId || !marketplace || !products?.length) {
       return new Response(JSON.stringify({ error: 'partnerId, marketplace, products kerak' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
