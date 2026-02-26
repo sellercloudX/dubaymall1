@@ -85,18 +85,29 @@ const getStatusBadge = (status: string) => {
   return <Badge variant={c.variant} className={`text-[10px] ${c.className || ''}`}>{c.label}</Badge>;
 };
 
+const normalizeOfferKey = (value?: string) => String(value || '').trim().toLowerCase();
+
+const findProductByOffer = (store: MarketplaceDataStore, marketplace: string, offerId?: string) => {
+  const normalizedOfferId = normalizeOfferKey(offerId);
+  if (!normalizedOfferId) return null;
+
+  return store.getProducts(marketplace).find((p) => {
+    const offer = normalizeOfferKey(p.offerId);
+    const sku = normalizeOfferKey(p.shopSku);
+    return offer === normalizedOfferId || sku === normalizedOfferId;
+  });
+};
+
 const getFirstProductName = (order: MarketplaceOrder, store: MarketplaceDataStore, marketplace: string): string => {
   if (!order.items || order.items.length === 0) return 'Mahsulot nomi yuklanmadi';
   const item = order.items[0];
-  // For WB, offerName is just a category (e.g. "Футболки") — always prefer product store lookup
   if (item.offerId) {
-    const product = store.getProducts(marketplace).find(p => p.offerId === item.offerId || p.shopSku === item.offerId);
+    const product = findProductByOffer(store, marketplace, item.offerId);
     if (product?.name) {
       const name = product.name;
       return name.length > 40 ? name.substring(0, 40) + '...' : name;
     }
   }
-  // Fallback to offerName only if no match in store
   const name = item.offerName || item.offerId || 'Nomsiz';
   return name.length > 40 ? name.substring(0, 40) + '...' : name;
 };
@@ -110,7 +121,7 @@ const OrderRow = memo(({ order, onClick, store, marketplace }: { order: Marketpl
   // Get product image: first from order item photo, then from store products
   const firstItem = order.items?.[0];
   const itemPhoto = firstItem?.photo;
-  const matchedProduct = firstItem ? store.getProducts(marketplace).find(p => p.offerId === firstItem.offerId) : null;
+  const matchedProduct = firstItem ? findProductByOffer(store, marketplace, firstItem.offerId) : null;
   const imgUrl = itemPhoto || matchedProduct?.pictures?.[0];
   
   return (
@@ -275,8 +286,7 @@ export function MobileOrders({ connectedMarketplaces, store }: MobileOrdersProps
                 <div className="space-y-2">
                   <h4 className="font-medium text-sm">Mahsulotlar:</h4>
                   {selectedOrder.items.map((item: any, idx: number) => {
-                    // Look up real product name from store
-                    const product = store.getProducts(selectedMp).find(p => p.offerId === item.offerId || p.shopSku === item.offerId);
+                    const product = findProductByOffer(store, selectedMp, item.offerId);
                     const displayName = product?.name || item.offerName || item.offerId;
                     return (
                     <div key={idx} className="flex justify-between p-3 bg-muted rounded-lg">

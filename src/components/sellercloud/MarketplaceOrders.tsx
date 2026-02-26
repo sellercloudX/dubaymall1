@@ -36,6 +36,19 @@ const ORDER_STATUSES = [
   { value: 'RETURNED', label: 'Qaytarildi' },
 ];
 
+const normalizeOfferKey = (value?: string) => String(value || '').trim().toLowerCase();
+
+const findProductByOffer = (store: MarketplaceDataStore, marketplace: string, offerId?: string) => {
+  const normalizedOfferId = normalizeOfferKey(offerId);
+  if (!normalizedOfferId) return null;
+
+  return store.getProducts(marketplace).find((p) => {
+    const offer = normalizeOfferKey(p.offerId);
+    const sku = normalizeOfferKey(p.shopSku);
+    return offer === normalizedOfferId || sku === normalizedOfferId;
+  });
+};
+
 export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceOrdersProps) {
   const [selectedMarketplace, setSelectedMarketplace] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -182,7 +195,7 @@ export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceO
                             {(() => {
                               const firstItem = order.items?.[0];
                               const itemPhoto = (firstItem as any)?.photo;
-                              const product = firstItem ? store.getProducts(selectedMarketplace).find(p => p.offerId === firstItem.offerId || p.shopSku === firstItem.offerId) : null;
+                              const product = firstItem ? findProductByOffer(store, selectedMarketplace, firstItem.offerId) : null;
                               const imgUrl = itemPhoto || product?.pictures?.[0];
                               return (
                                 <div className="w-10 h-10 rounded bg-muted flex items-center justify-center overflow-hidden shrink-0">
@@ -199,8 +212,7 @@ export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceO
                                 {(() => {
                                   const item = order.items?.[0];
                                   if (!item) return `Buyurtma #${order.id}`;
-                                  // Always prefer product store name (WB offerName is just category)
-                                  const product = store.getProducts(selectedMarketplace).find(p => p.offerId === item.offerId || p.shopSku === item.offerId);
+                                  const product = findProductByOffer(store, selectedMarketplace, item.offerId);
                                   return product?.name || item.offerName || item.offerId || `Buyurtma #${order.id}`;
                                 })()}
                               </div>
@@ -244,7 +256,7 @@ export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceO
                             <h4 className="font-medium text-sm mb-3">Mahsulotlar:</h4>
                             {order.items.map((item, idx) => {
                               const itemPhoto = (item as any)?.photo;
-                              const matchedProduct = store.getProducts(selectedMarketplace).find(p => p.offerId === item.offerId || p.shopSku === item.offerId);
+                              const matchedProduct = findProductByOffer(store, selectedMarketplace, item.offerId);
                               const itemImg = itemPhoto || matchedProduct?.pictures?.[0];
                               return (
                               <div key={idx} className="flex items-center justify-between p-2 bg-background rounded gap-2">
@@ -257,7 +269,7 @@ export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceO
                                     )}
                                   </div>
                                   <div className="min-w-0">
-                                    <div className="text-sm font-medium line-clamp-1">{store.getProducts(selectedMarketplace).find(p => p.offerId === item.offerId || p.shopSku === item.offerId)?.name || item.offerName || item.offerId}</div>
+                                    <div className="text-sm font-medium line-clamp-1">{findProductByOffer(store, selectedMarketplace, item.offerId)?.name || item.offerName || item.offerId}</div>
                                     <code className="text-[10px] text-muted-foreground">{item.offerId}</code>
                                   </div>
                                 </div>
