@@ -133,23 +133,39 @@ export function useMarketplaceTariffs(
         }
 
       if (mp === 'wildberries') {
-          // WB: Fetch REAL commission rates from API, then calculate per product
+          // WB: Fetch real commission rates from API + logistics coefficients when available
           const rubToUzs = getRubToUzs();
           let commissionBySubject = new Map<string, number>(); // subjectName → commission %
+          let wbLogisticsBaseRub = 0;
+          let wbLogisticsLiterRub = 0;
           
           try {
             const { data: tariffData, error: tariffError } = await supabase.functions.invoke('fetch-marketplace-data', {
               body: { marketplace: 'wildberries', dataType: 'tariffs' },
             });
-            if (!tariffError && tariffData?.success && Array.isArray(tariffData?.data)) {
-              tariffData.data.forEach((t: any) => {
+
+            const payload = tariffData?.data;
+            const commissionRows = Array.isArray(payload)
+              ? payload
+              : Array.isArray(payload?.commissions)
+                ? payload.commissions
+                : [];
+
+            if (!tariffError && tariffData?.success) {
+              commissionRows.forEach((t: any) => {
                 const subject = (t.subjectName || t.parentName || '').toLowerCase();
                 const commission = t.kgvpMarketplace || t.paidStorageKgvp || t.commission || 0;
                 if (subject && commission > 0) {
                   commissionBySubject.set(subject, commission / 100); // convert % to decimal
                 }
               });
-              console.log(`WB real tariffs: ${commissionBySubject.size} categories loaded`);
+
+              if (!Array.isArray(payload) && payload?.logistics) {
+                wbLogisticsBaseRub = Number(payload.logistics.deliveryBase || 0);
+                wbLogisticsLiterRub = Number(payload.logistics.deliveryLiter || 0);
+              }
+
+              console.log(`WB real tariffs: ${commissionBySubject.size} categories loaded; logistics base=${wbLogisticsBaseRub}, liter=${wbLogisticsLiterRub}`);
             }
           } catch (e) {
             console.warn('WB tariff fetch failed, using estimates:', e);
@@ -175,10 +191,15 @@ export function useMarketplaceTariffs(
                 }
               }
             }
-            
+
+            const estimatedVolumeLiters = priceRub > 7000 ? 8 : priceRub > 3000 ? 3 : 1.2;
+            const logisticsFromApiRub = wbLogisticsBaseRub > 0
+              ? wbLogisticsBaseRub + (wbLogisticsLiterRub * estimatedVolumeLiters)
+              : 0;
+            const logisticsRub = logisticsFromApiRub > 0
+              ? logisticsFromApiRub
+              : (priceRub > 5000 ? 100 : priceRub > 1000 ? 50 : 30);
             const commissionRub = priceRub * commissionPercent;
-            // Logistics based on volume/weight (simplified by price tier)
-            const logisticsRub = priceRub > 5000 ? 100 : priceRub > 1000 ? 50 : 30;
             const totalTariffRub = commissionRub + logisticsRub;
             
             // Store in UZS for uniform downstream consumers
