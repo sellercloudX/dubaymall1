@@ -88,12 +88,16 @@ const getStatusBadge = (status: string) => {
 const getFirstProductName = (order: MarketplaceOrder, store: MarketplaceDataStore, marketplace: string): string => {
   if (!order.items || order.items.length === 0) return 'Mahsulot nomi yuklanmadi';
   const item = order.items[0];
-  // Try offerName first, but for WB it's often just a category — look up real name from products
-  let name = item.offerName || '';
-  if ((!name || name.length < 3) && item.offerId) {
+  // For WB, offerName is just a category (e.g. "Футболки") — always prefer product store lookup
+  if (item.offerId) {
     const product = store.getProducts(marketplace).find(p => p.offerId === item.offerId || p.shopSku === item.offerId);
-    name = product?.name || item.offerId;
+    if (product?.name) {
+      const name = product.name;
+      return name.length > 40 ? name.substring(0, 40) + '...' : name;
+    }
   }
+  // Fallback to offerName only if no match in store
+  const name = item.offerName || item.offerId || 'Nomsiz';
   return name.length > 40 ? name.substring(0, 40) + '...' : name;
 };
 
@@ -273,7 +277,7 @@ export function MobileOrders({ connectedMarketplaces, store }: MobileOrdersProps
                   {selectedOrder.items.map((item: any, idx: number) => {
                     // Look up real product name from store
                     const product = store.getProducts(selectedMp).find(p => p.offerId === item.offerId || p.shopSku === item.offerId);
-                    const displayName = item.offerName || product?.name || item.offerId;
+                    const displayName = product?.name || item.offerName || item.offerId;
                     return (
                     <div key={idx} className="flex justify-between p-3 bg-muted rounded-lg">
                       <div className="min-w-0 flex-1">
