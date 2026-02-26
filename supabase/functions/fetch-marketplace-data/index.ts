@@ -77,12 +77,12 @@ interface YandexOrder {
 }
 
 // Helper to map WB order object to unified format
-// New Orders API may return prices in kopecks (×100)
-// Statistics/Sales APIs are handled in their own blocks below
+// New Orders API returns prices in "сотые доли копеек" (hundredths of kopecks = value × 10000)
+// Statistics/Sales APIs return prices directly in RUB
 function mapWBOrder(o: any, defaultStatus: string, fromNewApi = false) {
   const rawPrice = o.convertedPrice || o.price || o.salePrice || 0;
-  // New orders are normalized from kopecks to RUB
-  const price = fromNewApi ? rawPrice / 100 : rawPrice;
+  // New orders: divide by 10000 (hundredths of kopecks → RUB)
+  const price = fromNewApi ? rawPrice / 10000 : rawPrice;
   
   // Build buyer info from available data
   // New orders: address object with province/city
