@@ -50,6 +50,7 @@ const AIScannerPro = lazy(() => import('@/components/seller/AIScannerPro').then(
 const MarketplaceReviews = lazy(() => import('@/components/sellercloud/MarketplaceReviews').then(m => ({ default: m.MarketplaceReviews })));
 const WBSellerAnalytics = lazy(() => import('@/components/sellercloud/WBSellerAnalytics').then(m => ({ default: m.WBSellerAnalytics })));
 const WBAdsCampaigns = lazy(() => import('@/components/sellercloud/WBAdsCampaigns').then(m => ({ default: m.WBAdsCampaigns })));
+const SupportChat = lazy(() => import('@/components/sellercloud/SupportChat').then(m => ({ default: m.SupportChat })));
 
 const TabLoader = () => <div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
 
@@ -371,10 +372,12 @@ function SettingsSubTabs({ totalRevenue, connectedMarketplaces, store }: {
         <TabsTrigger value="subscription" className="text-xs gap-1"><CreditCard className="h-3.5 w-3.5" />Obuna</TabsTrigger>
         <TabsTrigger value="reports" className="text-xs gap-1"><FileSpreadsheet className="h-3.5 w-3.5" />Hisobotlar</TabsTrigger>
         <TabsTrigger value="notifications" className="text-xs gap-1"><Bell className="h-3.5 w-3.5" />Bildirishnoma</TabsTrigger>
+        <TabsTrigger value="support" className="text-xs gap-1"><MessageCircle className="h-3.5 w-3.5" />Yordam</TabsTrigger>
       </TabsList>
       <TabsContent value="subscription"><Suspense fallback={<TabLoader />}><SubscriptionBilling totalSalesVolume={totalRevenue} /></Suspense></TabsContent>
       <TabsContent value="reports"><Suspense fallback={<TabLoader />}><ReportsExport connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
       <TabsContent value="notifications"><Suspense fallback={<TabLoader />}><NotificationCenter /></Suspense></TabsContent>
+      <TabsContent value="support"><Suspense fallback={<TabLoader />}><SupportChat /></Suspense></TabsContent>
     </Tabs>
   );
 }

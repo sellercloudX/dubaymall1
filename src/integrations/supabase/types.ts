@@ -2492,6 +2492,69 @@ export type Database = {
           },
         ]
       }
+      support_messages: {
+        Row: {
+          admin_user_id: string | null
+          created_at: string
+          direction: string
+          id: string
+          is_read: boolean
+          message: string
+          metadata: Json | null
+          user_id: string
+        }
+        Insert: {
+          admin_user_id?: string | null
+          created_at?: string
+          direction: string
+          id?: string
+          is_read?: boolean
+          message: string
+          metadata?: Json | null
+          user_id: string
+        }
+        Update: {
+          admin_user_id?: string | null
+          created_at?: string
+          direction?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+          metadata?: Json | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      telegram_chat_links: {
+        Row: {
+          created_at: string
+          id: string
+          is_admin: boolean
+          telegram_chat_id: number
+          telegram_first_name: string | null
+          telegram_username: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_admin?: boolean
+          telegram_chat_id: number
+          telegram_first_name?: string | null
+          telegram_username?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_admin?: boolean
+          telegram_chat_id?: number
+          telegram_first_name?: string | null
+          telegram_username?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_addresses: {
         Row: {
           address: string
