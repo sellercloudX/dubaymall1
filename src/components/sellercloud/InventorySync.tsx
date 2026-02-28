@@ -45,11 +45,20 @@ interface ReconciliationItem {
   sku: string;
   name: string;
   marketplace: string;
-  invoiced: number; // Yuklangan
-  sold: number; // Sotilgan
+  invoiced: number; // FBO ga yuklangan
+  sold: number; // FBS da sotilgan (jami)
+  delivered: number; // Yetkazib berilgan
+  inProcess: number; // Jarayonda
+  cancelled: number; // Bekor qilingan
   currentStock: number; // Joriy qoldiq
-  returned: number; // Qaytarilgan
-  lost: number; // Yo'qolgan = invoiced - sold - currentStock - returned
+  returned: number; // Qaytarilgan (qabul qilingan)
+  returnRequested: number; // Qaytarish so'ralgan
+  returnReceived: number; // Qaytarib olingan (haqiqiy)
+  returnPending: number; // Qaytarish kutilmoqda
+  returnDiscrepancy: number; // Qaytarish farqi (so'ralgan - olingan)
+  financeSettled: number; // Puli tushgan
+  financePending: number; // Pul kutilmoqda
+  lost: number; // Yo'qolgan
   lossRate: number; // % yo'qotish
 }
 
