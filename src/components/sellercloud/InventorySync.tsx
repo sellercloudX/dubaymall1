@@ -45,11 +45,20 @@ interface ReconciliationItem {
   sku: string;
   name: string;
   marketplace: string;
-  invoiced: number; // Yuklangan
-  sold: number; // Sotilgan
+  invoiced: number; // FBO ga yuklangan
+  sold: number; // FBS da sotilgan (jami)
+  delivered: number; // Yetkazib berilgan
+  inProcess: number; // Jarayonda
+  cancelled: number; // Bekor qilingan
   currentStock: number; // Joriy qoldiq
-  returned: number; // Qaytarilgan
-  lost: number; // Yo'qolgan = invoiced - sold - currentStock - returned
+  returned: number; // Qaytarilgan (qabul qilingan)
+  returnRequested: number; // Qaytarish so'ralgan
+  returnReceived: number; // Qaytarib olingan (haqiqiy)
+  returnPending: number; // Qaytarish kutilmoqda
+  returnDiscrepancy: number; // Qaytarish farqi (so'ralgan - olingan)
+  financeSettled: number; // Puli tushgan
+  financePending: number; // Pul kutilmoqda
+  lost: number; // Yo'qolgan
   lossRate: number; // % yo'qotish
 }
 
@@ -130,36 +139,45 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
           continue;
         }
 
-        if (data?.success && Array.isArray(data.data)) {
-          // Map API response to ReconciliationItem with product names from store
-          const mpProducts = store.getProducts(mp);
-          const productNameMap = new Map<string, string>();
-          mpProducts.forEach(p => {
-            productNameMap.set(String(p.offerId), p.name || 'Nomsiz');
-            if (p.shopSku) productNameMap.set(String(p.shopSku), p.name || 'Nomsiz');
-          });
-
-          data.data.forEach((item: any) => {
-            const invoiced = item.invoiced || 0;
-            const sold = item.sold || 0;
-            const currentStock = item.currentStock || 0;
-            const returned = item.returned || 0;
-            const lost = item.lost || 0;
-            const lossRate = invoiced > 0 ? (lost / invoiced) * 100 : 0;
-
-            allItems.push({
-              sku: item.skuId || '',
-              name: productNameMap.get(String(item.skuId)) || `SKU: ${item.skuId}`,
-              marketplace: mp,
-              invoiced,
-              sold,
-              currentStock,
-              returned,
-              lost,
-              lossRate,
+          if (data?.success && Array.isArray(data.data)) {
+            // Map API response to ReconciliationItem with product names from store
+            const mpProducts = store.getProducts(mp);
+            const productNameMap = new Map<string, string>();
+            mpProducts.forEach(p => {
+              productNameMap.set(String(p.offerId), p.name || 'Nomsiz');
+              if (p.shopSku) productNameMap.set(String(p.shopSku), p.name || 'Nomsiz');
             });
-          });
-        }
+
+            data.data.forEach((item: any) => {
+              const invoiced = item.invoiced || 0;
+              const sold = item.sold || 0;
+              const currentStock = item.currentStock || 0;
+              const returned = item.returned || item.returnReceived || 0;
+              const lost = item.lost || 0;
+              const lossRate = invoiced > 0 ? (lost / invoiced) * 100 : 0;
+
+              allItems.push({
+                sku: item.skuId || '',
+                name: productNameMap.get(String(item.skuId)) || item.name || `SKU: ${item.skuId}`,
+                marketplace: mp,
+                invoiced,
+                sold,
+                delivered: item.delivered || 0,
+                inProcess: item.inProcess || 0,
+                cancelled: item.cancelled || 0,
+                currentStock,
+                returned,
+                returnRequested: item.returnRequested || 0,
+                returnReceived: item.returnReceived || returned,
+                returnPending: item.returnPending || 0,
+                returnDiscrepancy: item.returnDiscrepancy || 0,
+                financeSettled: item.financeSettled || 0,
+                financePending: item.financePending || 0,
+                lost,
+                lossRate,
+              });
+            });
+          }
       } catch (e) {
         console.error(`Reconciliation fetch error for ${mp}:`, e);
         setReconciliationError(`${mp} uchun ma'lumot olishda xato`);
@@ -205,7 +223,7 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
           }
         }
         const estimatedInvoiced = sold + currentStock + returned;
-        items.push({ sku, name: product.name || 'Nomsiz', marketplace, invoiced: estimatedInvoiced, sold, currentStock, returned, lost: 0, lossRate: 0 });
+        items.push({ sku, name: product.name || 'Nomsiz', marketplace, invoiced: estimatedInvoiced, sold, currentStock, returned, delivered: 0, inProcess: 0, cancelled: 0, returnRequested: 0, returnReceived: returned, returnPending: 0, returnDiscrepancy: 0, financeSettled: 0, financePending: 0, lost: 0, lossRate: 0 });
       }
     }
     return items;
@@ -235,8 +253,8 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
     const matchesSearch = r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       r.sku.toLowerCase().includes(searchQuery.toLowerCase());
     if (!matchesSearch) return false;
-    if (lossFilter === 'with_loss') return r.lost > 0;
-    if (lossFilter === 'no_loss') return r.lost === 0;
+    if (lossFilter === 'with_loss') return r.lost > 0 || r.returnDiscrepancy > 0;
+    if (lossFilter === 'no_loss') return r.lost === 0 && r.returnDiscrepancy === 0;
     return true;
   });
 
@@ -245,6 +263,7 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
   const outOfStockCount = products.filter(p => p.totalStock === 0).length;
   const inStockCount = products.filter(p => p.totalStock > 0 && !p.lowStockAlert).length;
   const totalLost = reconciliation.reduce((sum, r) => sum + r.lost, 0);
+  const totalReturnDiscrepancy = reconciliation.reduce((sum, r) => sum + r.returnDiscrepancy, 0);
   const itemsWithLoss = reconciliation.filter(r => r.lost > 0);
 
   const toggleSelectAllStock = useCallback(() => {
@@ -562,31 +581,53 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
           </div>
 
           {/* Summary */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 mb-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 mb-4">
             <Card>
-              <CardContent className="pt-4">
-                <div className="text-xs text-muted-foreground mb-1">Jami mahsulotlar</div>
-                <div className="text-2xl font-bold">{reconciliation.length}</div>
+              <CardContent className="pt-3 pb-2">
+                <div className="text-[10px] text-muted-foreground mb-0.5">FBO yuklangan</div>
+                <div className="text-lg font-bold">{reconciliation.reduce((s, r) => s + r.invoiced, 0)}</div>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="pt-4">
-                <div className="text-xs text-muted-foreground mb-1">Jami sotilgan</div>
-                <div className="text-2xl font-bold text-primary">{reconciliation.reduce((s, r) => s + r.sold, 0)}</div>
+              <CardContent className="pt-3 pb-2">
+                <div className="text-[10px] text-muted-foreground mb-0.5">FBS sotilgan</div>
+                <div className="text-lg font-bold text-primary">{reconciliation.reduce((s, r) => s + r.sold, 0)}</div>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="pt-4">
-                <div className="text-xs text-muted-foreground mb-1">Qaytarilgan</div>
-                <div className="text-2xl font-bold text-amber-600">{reconciliation.reduce((s, r) => s + r.returned, 0)}</div>
+              <CardContent className="pt-3 pb-2">
+                <div className="text-[10px] text-muted-foreground mb-0.5">Qoldiq</div>
+                <div className="text-lg font-bold">{reconciliation.reduce((s, r) => s + r.currentStock, 0)}</div>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="pt-4">
-                <div className="text-xs text-muted-foreground mb-1">Yo'qolgan</div>
-                <div className="text-2xl font-bold text-destructive">{totalLost}</div>
+              <CardContent className="pt-3 pb-2">
+                <div className="text-[10px] text-muted-foreground mb-0.5">Qaytarish (so'r/olingan)</div>
+                <div className="text-lg font-bold text-amber-600">
+                  {reconciliation.reduce((s, r) => s + r.returnRequested, 0)}/{reconciliation.reduce((s, r) => s + r.returnReceived, 0)}
+                </div>
+                {totalReturnDiscrepancy > 0 && (
+                  <div className="text-[10px] text-destructive">Farq: {totalReturnDiscrepancy}</div>
+                )}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-3 pb-2">
+                <div className="text-[10px] text-muted-foreground mb-0.5">Pul tushgan</div>
+                <div className="text-lg font-bold text-emerald-600">
+                  {reconciliation.reduce((s, r) => s + r.financeSettled, 0).toLocaleString()}
+                </div>
+                {reconciliation.reduce((s, r) => s + r.financePending, 0) > 0 && (
+                  <div className="text-[10px] text-muted-foreground">Kutilmoqda: {reconciliation.reduce((s, r) => s + r.financePending, 0).toLocaleString()}</div>
+                )}
+              </CardContent>
+            </Card>
+            <Card className={totalLost > 0 ? 'border-destructive/50' : ''}>
+              <CardContent className="pt-3 pb-2">
+                <div className="text-[10px] text-muted-foreground mb-0.5">Yo'qolgan</div>
+                <div className={`text-lg font-bold ${totalLost > 0 ? 'text-destructive' : ''}`}>{totalLost}</div>
                 {itemsWithLoss.length > 0 && (
-                  <div className="text-xs text-destructive mt-1">{itemsWithLoss.length} ta SKU</div>
+                  <div className="text-[10px] text-destructive">{itemsWithLoss.length} ta SKU</div>
                 )}
               </CardContent>
             </Card>
@@ -598,12 +639,12 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
               <div className="flex items-start gap-3">
                 <AlertOctagon className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
                 <div className="text-sm flex-1">
-                  <p className="font-medium text-blue-900 dark:text-blue-100">Yo'qotishlarni hisoblash formulasi</p>
+                  <p className="font-medium text-blue-900 dark:text-blue-100">Chuqur FBO/FBS tahlil formulasi</p>
                   <p className="text-blue-700 dark:text-blue-300 mt-1">
-                    <strong>YO'QOLGAN</strong> = YUKLANGAN − SOTILGAN − QOLDIQ − QAYTARILGAN
+                    <strong>YO'QOLGAN</strong> = FBO_YUKLANGAN − FBS_SOTILGAN − QOLDIQ − QAYTARIB_OLINGAN
                   </p>
                   <p className="text-xs text-blue-600/80 dark:text-blue-400/80 mt-1">
-                    * Barcha sotuvdagi mahsulotlar katalogdan olinadi. Invoice, buyurtma, qoldiq va qaytarish ma'lumotlari API'dan yuklanadi (90 kun). Yo'qotish faqat invoice mavjud bo'lganda aniq hisoblanadi.
+                    * Nakladnoy (invoice), FBS buyurtmalar, qoldiq, qaytarishlar va moliyaviy ma'lumotlar API'dan yuklanadi. Qaytarishda so'ralgan vs haqiqiy olingan farqi ko'rsatiladi.
                   </p>
                   {reconciliationError && (
                     <p className="text-xs text-destructive mt-1">{reconciliationError}</p>
@@ -621,7 +662,7 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
             <CardHeader className="py-3 px-4">
               <CardTitle className="text-sm flex items-center gap-2">
                 <FileWarning className="h-4 w-4" />
-                SKU bo'yicha inventar tahlili
+                SKU bo'yicha chuqur inventar tahlili ({filteredReconciliation.length} ta)
               </CardTitle>
             </CardHeader>
             <CardContent className="px-0 pb-4">
@@ -638,31 +679,50 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
                     <thead>
                       <tr className="border-b text-left">
                         <th className="px-4 py-2 font-medium text-xs text-muted-foreground">Mahsulot</th>
-                        <th className="px-3 py-2 font-medium text-xs text-muted-foreground text-center">MP</th>
-                        <th className="px-3 py-2 font-medium text-xs text-muted-foreground text-right">Yukl.</th>
-                        <th className="px-3 py-2 font-medium text-xs text-muted-foreground text-right">Sotilgan</th>
-                        <th className="px-3 py-2 font-medium text-xs text-muted-foreground text-right">Qoldiq</th>
-                        <th className="px-3 py-2 font-medium text-xs text-muted-foreground text-right">Qayt.</th>
-                        <th className="px-3 py-2 font-medium text-xs text-muted-foreground text-right">Yo'qolgan</th>
+                        <th className="px-2 py-2 font-medium text-xs text-muted-foreground text-right">FBO yukl.</th>
+                        <th className="px-2 py-2 font-medium text-xs text-muted-foreground text-right">FBS sotilgan</th>
+                        <th className="px-2 py-2 font-medium text-xs text-muted-foreground text-right">Jarayonda</th>
+                        <th className="px-2 py-2 font-medium text-xs text-muted-foreground text-right">Qoldiq</th>
+                        <th className="px-2 py-2 font-medium text-xs text-muted-foreground text-right">Qayt. so'r/olingan</th>
+                        <th className="px-2 py-2 font-medium text-xs text-muted-foreground text-right">Pul tushgan</th>
+                        <th className="px-2 py-2 font-medium text-xs text-muted-foreground text-right">Yo'qolgan</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredReconciliation
-                        .sort((a, b) => b.lost - a.lost)
+                        .sort((a, b) => (b.lost + b.returnDiscrepancy) - (a.lost + a.returnDiscrepancy))
                         .map(item => (
-                          <tr key={`${item.sku}-${item.marketplace}`} className="border-b last:border-0 hover:bg-muted/50">
+                          <tr key={`${item.sku}-${item.marketplace}`} className={`border-b last:border-0 hover:bg-muted/50 ${(item.lost > 0 || item.returnDiscrepancy > 0) ? 'bg-destructive/5' : ''}`}>
                             <td className="px-4 py-2.5">
-                              <div className="font-medium text-sm truncate max-w-[200px]">{item.name}</div>
-                              <code className="text-[10px] text-muted-foreground">{item.sku}</code>
+                              <div className="font-medium text-sm truncate max-w-[180px]">{item.name}</div>
+                              <div className="flex items-center gap-1 mt-0.5">
+                                <Badge variant="outline" className="text-[10px]">{MARKETPLACE_NAMES[item.marketplace]}</Badge>
+                                <code className="text-[10px] text-muted-foreground">{item.sku}</code>
+                              </div>
                             </td>
-                            <td className="px-3 py-2.5 text-center">
-                              <Badge variant="outline" className="text-[10px]">{MARKETPLACE_NAMES[item.marketplace]}</Badge>
+                            <td className="px-2 py-2.5 text-right font-medium">{item.invoiced}</td>
+                            <td className="px-2 py-2.5 text-right">
+                              <span className="font-medium text-primary">{item.delivered}</span>
+                              {item.cancelled > 0 && <span className="text-[10px] text-muted-foreground ml-1">(-{item.cancelled})</span>}
                             </td>
-                            <td className="px-3 py-2.5 text-right font-medium">{item.invoiced}</td>
-                            <td className="px-3 py-2.5 text-right font-medium text-primary">{item.sold}</td>
-                            <td className="px-3 py-2.5 text-right font-medium">{item.currentStock}</td>
-                            <td className="px-3 py-2.5 text-right font-medium text-amber-600">{item.returned}</td>
-                            <td className="px-3 py-2.5 text-right">
+                            <td className="px-2 py-2.5 text-right text-muted-foreground">{item.inProcess || 0}</td>
+                            <td className="px-2 py-2.5 text-right font-medium">{item.currentStock}</td>
+                            <td className="px-2 py-2.5 text-right">
+                              <span className={item.returnDiscrepancy > 0 ? 'text-destructive font-medium' : 'text-amber-600'}>
+                                {item.returnRequested}/{item.returnReceived}
+                              </span>
+                              {item.returnDiscrepancy > 0 && (
+                                <div className="text-[10px] text-destructive">Farq: {item.returnDiscrepancy}</div>
+                              )}
+                            </td>
+                            <td className="px-2 py-2.5 text-right">
+                              {item.financeSettled > 0 ? (
+                                <span className="text-emerald-600 font-medium">{item.financeSettled.toLocaleString()}</span>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </td>
+                            <td className="px-2 py-2.5 text-right">
                               {item.lost > 0 ? (
                                 <Badge variant="destructive" className="text-xs">{item.lost}</Badge>
                               ) : (
@@ -677,9 +737,9 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
                 {/* Mobile card layout */}
                 <div className="sm:hidden space-y-2 px-4">
                   {filteredReconciliation
-                    .sort((a, b) => b.lost - a.lost)
+                    .sort((a, b) => (b.lost + b.returnDiscrepancy) - (a.lost + a.returnDiscrepancy))
                     .map(item => (
-                      <div key={`${item.sku}-${item.marketplace}`} className="p-3 rounded-lg border space-y-2">
+                      <div key={`${item.sku}-${item.marketplace}`} className={`p-3 rounded-lg border space-y-2 ${(item.lost > 0 || item.returnDiscrepancy > 0) ? 'border-destructive/50 bg-destructive/5' : ''}`}>
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0 flex-1">
                             <div className="font-medium text-sm break-words">{item.name}</div>
@@ -688,28 +748,42 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
                               <code className="text-[10px] text-muted-foreground truncate">{item.sku}</code>
                             </div>
                           </div>
-                          {item.lost > 0 ? (
-                            <Badge variant="destructive" className="text-xs shrink-0">{item.lost} yo'q.</Badge>
+                          {(item.lost > 0 || item.returnDiscrepancy > 0) ? (
+                            <Badge variant="destructive" className="text-xs shrink-0">{item.lost > 0 ? `${item.lost} yo'q.` : `${item.returnDiscrepancy} farq`}</Badge>
                           ) : (
                             <Badge variant="outline" className="text-xs text-primary shrink-0">✓</Badge>
                           )}
                         </div>
-                        <div className="grid grid-cols-4 gap-1 text-center">
+                        <div className="grid grid-cols-3 gap-1 text-center">
                           <div>
-                            <div className="text-[10px] text-muted-foreground">Yukl.</div>
+                            <div className="text-[10px] text-muted-foreground">FBO yukl.</div>
                             <div className="font-medium text-xs">{item.invoiced}</div>
                           </div>
                           <div>
-                            <div className="text-[10px] text-muted-foreground">Sotilgan</div>
-                            <div className="font-medium text-xs text-primary">{item.sold}</div>
+                            <div className="text-[10px] text-muted-foreground">FBS sotilgan</div>
+                            <div className="font-medium text-xs text-primary">{item.delivered}</div>
                           </div>
                           <div>
                             <div className="text-[10px] text-muted-foreground">Qoldiq</div>
                             <div className="font-medium text-xs">{item.currentStock}</div>
                           </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1 text-center">
                           <div>
-                            <div className="text-[10px] text-muted-foreground">Qayt.</div>
-                            <div className="font-medium text-xs text-amber-600">{item.returned}</div>
+                            <div className="text-[10px] text-muted-foreground">Qayt. so'r/olingan</div>
+                            <div className={`font-medium text-xs ${item.returnDiscrepancy > 0 ? 'text-destructive' : 'text-amber-600'}`}>
+                              {item.returnRequested}/{item.returnReceived}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-muted-foreground">Pul tushgan</div>
+                            <div className="font-medium text-xs text-emerald-600">
+                              {item.financeSettled > 0 ? item.financeSettled.toLocaleString() : '—'}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-muted-foreground">Jarayonda</div>
+                            <div className="font-medium text-xs">{item.inProcess}</div>
                           </div>
                         </div>
                       </div>
