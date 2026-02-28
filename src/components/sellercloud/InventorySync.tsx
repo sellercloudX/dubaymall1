@@ -223,7 +223,7 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
           }
         }
         const estimatedInvoiced = sold + currentStock + returned;
-        items.push({ sku, name: product.name || 'Nomsiz', marketplace, invoiced: estimatedInvoiced, sold, currentStock, returned, lost: 0, lossRate: 0 });
+        items.push({ sku, name: product.name || 'Nomsiz', marketplace, invoiced: estimatedInvoiced, sold, currentStock, returned, delivered: 0, inProcess: 0, cancelled: 0, returnRequested: 0, returnReceived: returned, returnPending: 0, returnDiscrepancy: 0, financeSettled: 0, financePending: 0, lost: 0, lossRate: 0 });
       }
     }
     return items;
