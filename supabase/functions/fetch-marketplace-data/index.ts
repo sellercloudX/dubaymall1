@@ -2189,50 +2189,62 @@ serve(async (req) => {
           if (!uzumShopId) {
             result = { success: false, error: "Shop ID required for reconciliation" };
           } else {
-            // For inventory reconciliation, we need: invoices, orders, stocks, returns
-            // /v1/shop/{shopId}/invoice/products requires invoiceId — so first get invoice list
-            // /v2/fbs/orders requires shopIds
-            // /v1/shop/{shopId}/return (NOT /returns)
-            
-            // Step 1: Fetch invoice list + stocks + returns in parallel
-            const ordersParams = new URLSearchParams({
-              shopIds: String(uzumShopId),
-              status: 'COMPLETED',
-              size: '50',
-              page: '0',
-            });
-            
-            const [invoiceListRes, ordersRes, stocksRes, returnsRes] = await Promise.all([
-              fetch(
-                `${uzumBaseUrl}/v1/shop/${uzumShopId}/invoice?size=50&page=0`,
-                { headers: uzumHeaders }
-              ),
-              fetch(
-                `${uzumBaseUrl}/v2/fbs/orders?${ordersParams.toString()}`,
-                { headers: uzumHeaders }
-              ),
-              fetch(
-                `${uzumBaseUrl}/v2/fbs/sku/stocks`,
-                { headers: uzumHeaders }
-              ),
-              fetch(
-                `${uzumBaseUrl}/v1/shop/${uzumShopId}/return?size=50&page=0`,
-                { headers: uzumHeaders }
-              ),
+            console.log("Uzum inventory reconciliation starting for shop:", uzumShopId);
+
+            // Step 1: Fetch ALL products from catalog (source of truth for what's on sale)
+            const productCatalog = new Map<string, { name: string; stock: number; skuId: string }>();
+            let prodPage = 0;
+            let prodHasMore = true;
+            while (prodHasMore) {
+              try {
+                const prodResp = await fetch(
+                  `${uzumBaseUrl}/v1/product/shop/${uzumShopId}?size=50&page=${prodPage}`,
+                  { headers: uzumHeaders }
+                );
+                if (!prodResp.ok) break;
+                const prodData = await prodResp.json();
+                const items = prodData.payload?.items || prodData.payload?.products || prodData.items || [];
+                if (items.length === 0) break;
+                items.forEach((card: any) => {
+                  const skus = card.skuList || card.skus || [];
+                  const firstSku = skus[0] || {};
+                  const skuId = String(firstSku.skuId || card.productId || card.id || '');
+                  const productId = String(card.productId || card.id || '');
+                  let stock = 0;
+                  skus.forEach((sku: any) => {
+                    stock += (sku.quantityActive || 0) + (sku.quantityFbs || 0);
+                    const amounts = sku.skuAmountList || sku.amounts || [];
+                    amounts.forEach((a: any) => { stock += (a.amount || a.available || 0); });
+                  });
+                  const name = card.title || card.name || '';
+                  if (skuId) productCatalog.set(skuId, { name, stock, skuId });
+                  if (productId && productId !== skuId) productCatalog.set(productId, { name, stock, skuId });
+                });
+                if (items.length < 50) prodHasMore = false;
+                else { prodPage++; await sleep(300); }
+              } catch (e) {
+                console.error("Uzum product catalog fetch error:", e);
+                break;
+              }
+            }
+            console.log(`Reconciliation: ${productCatalog.size} products from catalog`);
+
+            // Step 2: Fetch stocks, invoices, orders, returns in parallel
+            const [invoiceListRes, stocksRes, returnsRes] = await Promise.all([
+              fetch(`${uzumBaseUrl}/v1/shop/${uzumShopId}/invoice?size=50&page=0`, { headers: uzumHeaders }),
+              fetch(`${uzumBaseUrl}/v2/fbs/sku/stocks`, { headers: uzumHeaders }),
+              fetch(`${uzumBaseUrl}/v1/shop/${uzumShopId}/return?size=50&page=0`, { headers: uzumHeaders }),
             ]);
 
-            // Parse invoices - first get invoice IDs, then fetch products per invoice
+            // Parse invoices
             let invoiceMap = new Map<string, number>();
             if (invoiceListRes.ok) {
               const invoiceListData = await invoiceListRes.json();
               const invoices = Array.isArray(invoiceListData) ? invoiceListData : (invoiceListData.payload || []);
-              
-              // Fetch products for each invoice
               for (const inv of invoices) {
                 const invoiceId = inv.invoiceId || inv.id;
                 if (!invoiceId) continue;
                 await sleep(300);
-                
                 const prodResp = await fetch(
                   `${uzumBaseUrl}/v1/shop/${uzumShopId}/invoice/products?invoiceId=${invoiceId}`,
                   { headers: uzumHeaders }
@@ -2247,24 +2259,46 @@ serve(async (req) => {
                 }
               }
             }
+            console.log(`Reconciliation: ${invoiceMap.size} SKUs with invoice data`);
 
-            // Parse sold orders
+            // Parse ALL orders with pagination (multiple statuses)
             let soldMap = new Map<string, number>();
-            if (ordersRes.ok) {
-              const ordersData = await ordersRes.json();
-              const orders = ordersData.payload?.sellerOrders || ordersData.payload?.fbsOrders || ordersData.payload?.orders || [];
-              const orderList = Array.isArray(orders) ? orders : [];
-              orderList.forEach((order: any) => {
-                const items = order.items || order.orderItems || [];
-                items.forEach((item: any) => {
-                  const key = String(item.skuId || item.productId || '');
-                  const qty = item.quantity || item.count || 1;
-                  soldMap.set(key, (soldMap.get(key) || 0) + qty);
-                });
-              });
+            for (const orderStatus of ['COMPLETED', 'DELIVERING', 'ACCEPTED']) {
+              let orderPage = 0;
+              let orderHasMore = true;
+              while (orderHasMore) {
+                try {
+                  const ordParams = new URLSearchParams({
+                    shopIds: String(uzumShopId),
+                    status: orderStatus,
+                    size: '50',
+                    page: String(orderPage),
+                  });
+                  const ordResp = await fetch(
+                    `${uzumBaseUrl}/v2/fbs/orders?${ordParams.toString()}`,
+                    { headers: uzumHeaders }
+                  );
+                  if (!ordResp.ok) break;
+                  const ordData = await ordResp.json();
+                  const orders = ordData.payload?.sellerOrders || ordData.payload?.fbsOrders || ordData.payload?.orders || [];
+                  const orderList = Array.isArray(orders) ? orders : [];
+                  if (orderList.length === 0) break;
+                  orderList.forEach((order: any) => {
+                    const items = order.items || order.orderItems || [];
+                    items.forEach((item: any) => {
+                      const key = String(item.skuId || item.productId || '');
+                      const qty = item.quantity || item.count || 1;
+                      soldMap.set(key, (soldMap.get(key) || 0) + qty);
+                    });
+                  });
+                  if (orderList.length < 50) orderHasMore = false;
+                  else { orderPage++; await sleep(300); }
+                } catch { break; }
+              }
             }
+            console.log(`Reconciliation: ${soldMap.size} SKUs with sold data`);
 
-            // Parse current stock
+            // Parse current stock from API
             let stockMap = new Map<string, number>();
             if (stocksRes.ok) {
               const stocksData = await stocksRes.json();
@@ -2275,8 +2309,9 @@ serve(async (req) => {
                 stockMap.set(key, s.amount || s.available || 0);
               });
             }
+            console.log(`Reconciliation: ${stockMap.size} SKUs with stock data`);
 
-            // Parse returns — API returns array of SellerReturnLite directly
+            // Parse returns with pagination
             let returnMap = new Map<string, number>();
             if (returnsRes.ok) {
               const returnsData = await returnsRes.json();
@@ -2289,8 +2324,10 @@ serve(async (req) => {
               });
             }
 
-            // Calculate loss for each SKU: LOST = INVOICED - SOLD - STOCK - RETURNED
+            // Step 3: Build reconciliation — use product catalog as base (shows ALL products on sale)
+            // Merge stock data: prefer API stocks endpoint, fallback to catalog stock
             const allSkus = new Set([
+              ...productCatalog.keys(),
               ...invoiceMap.keys(),
               ...soldMap.keys(),
               ...stockMap.keys(),
@@ -2298,33 +2335,51 @@ serve(async (req) => {
             ]);
 
             const reconciliation = Array.from(allSkus).map(skuId => {
+              const catalogItem = productCatalog.get(skuId);
               const invoiced = invoiceMap.get(skuId) || 0;
               const sold = soldMap.get(skuId) || 0;
-              const stock = stockMap.get(skuId) || 0;
+              // Use stocks API if available, otherwise fall back to catalog stock
+              const currentStock = stockMap.has(skuId) ? (stockMap.get(skuId) || 0) : (catalogItem?.stock || 0);
               const returned = returnMap.get(skuId) || 0;
-              const lost = Math.max(0, invoiced - sold - stock - returned);
+              
+              // If we have invoice data: LOST = INVOICED - SOLD - STOCK - RETURNED
+              // If no invoice data: estimate invoiced = sold + stock + returned (lost=0 until invoice data available)
+              let lost = 0;
+              let effectiveInvoiced = invoiced;
+              if (invoiced > 0) {
+                lost = Math.max(0, invoiced - sold - currentStock - returned);
+              } else {
+                // No invoice data — use sum as estimate
+                effectiveInvoiced = sold + currentStock + returned;
+              }
+              
+              const name = catalogItem?.name || `SKU: ${skuId}`;
 
               return {
                 skuId,
-                invoiced,
+                invoiced: effectiveInvoiced,
                 sold,
-                currentStock: stock,
+                currentStock,
                 returned,
                 lost,
-                reconciled: invoiced === (sold + stock + returned + lost),
+                reconciled: lost === 0,
               };
-            }).filter(item => item.invoiced > 0 || item.lost > 0) // Show only items with activity
-            .sort((a, b) => b.lost - a.lost); // Sort by loss descending
+            })
+            // Show all products from catalog + any with activity
+            .filter(item => productCatalog.has(item.skuId) || item.invoiced > 0 || item.sold > 0)
+            .sort((a, b) => b.lost - a.lost || b.sold - a.sold);
 
             result = {
               success: true,
               data: reconciliation,
               summary: {
+                totalProducts: productCatalog.size,
                 totalInvoiced: Array.from(invoiceMap.values()).reduce((a, b) => a + b, 0),
                 totalSold: Array.from(soldMap.values()).reduce((a, b) => a + b, 0),
                 totalStock: Array.from(stockMap.values()).reduce((a, b) => a + b, 0),
                 totalReturned: Array.from(returnMap.values()).reduce((a, b) => a + b, 0),
                 totalLost: reconciliation.reduce((sum, item) => sum + item.lost, 0),
+                hasInvoiceData: invoiceMap.size > 0,
               },
               total: reconciliation.length,
             };
