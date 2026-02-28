@@ -625,7 +625,7 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
               </CardTitle>
             </CardHeader>
             <CardContent className="px-0 pb-4">
-              {isLoading ? (
+              {(isLoading || isLoadingReconciliation) ? (
                 <div className="space-y-3 px-4">{[1,2,3].map(i => <Skeleton key={i} className="h-16 w-full" />)}</div>
               ) : filteredReconciliation.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground px-4">
