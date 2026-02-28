@@ -597,15 +597,21 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
             <CardContent className="py-3 px-4">
               <div className="flex items-start gap-3">
                 <AlertOctagon className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
-                <div className="text-sm">
+                <div className="text-sm flex-1">
                   <p className="font-medium text-blue-900 dark:text-blue-100">Yo'qotishlarni hisoblash formulasi</p>
                   <p className="text-blue-700 dark:text-blue-300 mt-1">
                     <strong>YO'QOLGAN</strong> = YUKLANGAN − SOTILGAN − QOLDIQ − QAYTARILGAN
                   </p>
                   <p className="text-xs text-blue-600/80 dark:text-blue-400/80 mt-1">
-                    * Hozir buyurtmalar va qoldiq asosida taxminiy hisob. Marketplace API'dan invoiced ma'lumot kelganda aniqlik oshadi.
+                    * Uzum va Yandex uchun haqiqiy invoice ma'lumotlari API'dan olinadi. Boshqa marketplace'lar uchun taxminiy hisob.
                   </p>
+                  {reconciliationError && (
+                    <p className="text-xs text-destructive mt-1">{reconciliationError}</p>
+                  )}
                 </div>
+                <Button variant="outline" size="sm" onClick={fetchReconciliation} disabled={isLoadingReconciliation} className="shrink-0">
+                  <RefreshCw className={`h-3.5 w-3.5 ${isLoadingReconciliation ? 'animate-spin' : ''}`} />
+                </Button>
               </div>
             </CardContent>
           </Card>
