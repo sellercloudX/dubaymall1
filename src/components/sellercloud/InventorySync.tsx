@@ -581,31 +581,53 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
           </div>
 
           {/* Summary */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 mb-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 mb-4">
             <Card>
-              <CardContent className="pt-4">
-                <div className="text-xs text-muted-foreground mb-1">Jami mahsulotlar</div>
-                <div className="text-2xl font-bold">{reconciliation.length}</div>
+              <CardContent className="pt-3 pb-2">
+                <div className="text-[10px] text-muted-foreground mb-0.5">FBO yuklangan</div>
+                <div className="text-lg font-bold">{reconciliation.reduce((s, r) => s + r.invoiced, 0)}</div>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="pt-4">
-                <div className="text-xs text-muted-foreground mb-1">Jami sotilgan</div>
-                <div className="text-2xl font-bold text-primary">{reconciliation.reduce((s, r) => s + r.sold, 0)}</div>
+              <CardContent className="pt-3 pb-2">
+                <div className="text-[10px] text-muted-foreground mb-0.5">FBS sotilgan</div>
+                <div className="text-lg font-bold text-primary">{reconciliation.reduce((s, r) => s + r.sold, 0)}</div>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="pt-4">
-                <div className="text-xs text-muted-foreground mb-1">Qaytarilgan</div>
-                <div className="text-2xl font-bold text-amber-600">{reconciliation.reduce((s, r) => s + r.returned, 0)}</div>
+              <CardContent className="pt-3 pb-2">
+                <div className="text-[10px] text-muted-foreground mb-0.5">Qoldiq</div>
+                <div className="text-lg font-bold">{reconciliation.reduce((s, r) => s + r.currentStock, 0)}</div>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="pt-4">
-                <div className="text-xs text-muted-foreground mb-1">Yo'qolgan</div>
-                <div className="text-2xl font-bold text-destructive">{totalLost}</div>
+              <CardContent className="pt-3 pb-2">
+                <div className="text-[10px] text-muted-foreground mb-0.5">Qaytarish (so'r/olingan)</div>
+                <div className="text-lg font-bold text-amber-600">
+                  {reconciliation.reduce((s, r) => s + r.returnRequested, 0)}/{reconciliation.reduce((s, r) => s + r.returnReceived, 0)}
+                </div>
+                {totalReturnDiscrepancy > 0 && (
+                  <div className="text-[10px] text-destructive">Farq: {totalReturnDiscrepancy}</div>
+                )}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-3 pb-2">
+                <div className="text-[10px] text-muted-foreground mb-0.5">Pul tushgan</div>
+                <div className="text-lg font-bold text-emerald-600">
+                  {reconciliation.reduce((s, r) => s + r.financeSettled, 0).toLocaleString()}
+                </div>
+                {reconciliation.reduce((s, r) => s + r.financePending, 0) > 0 && (
+                  <div className="text-[10px] text-muted-foreground">Kutilmoqda: {reconciliation.reduce((s, r) => s + r.financePending, 0).toLocaleString()}</div>
+                )}
+              </CardContent>
+            </Card>
+            <Card className={totalLost > 0 ? 'border-destructive/50' : ''}>
+              <CardContent className="pt-3 pb-2">
+                <div className="text-[10px] text-muted-foreground mb-0.5">Yo'qolgan</div>
+                <div className={`text-lg font-bold ${totalLost > 0 ? 'text-destructive' : ''}`}>{totalLost}</div>
                 {itemsWithLoss.length > 0 && (
-                  <div className="text-xs text-destructive mt-1">{itemsWithLoss.length} ta SKU</div>
+                  <div className="text-[10px] text-destructive">{itemsWithLoss.length} ta SKU</div>
                 )}
               </CardContent>
             </Card>
