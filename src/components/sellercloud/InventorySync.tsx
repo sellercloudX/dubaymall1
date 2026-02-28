@@ -603,7 +603,7 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
                     <strong>YO'QOLGAN</strong> = YUKLANGAN − SOTILGAN − QOLDIQ − QAYTARILGAN
                   </p>
                   <p className="text-xs text-blue-600/80 dark:text-blue-400/80 mt-1">
-                    * Uzum va Yandex uchun haqiqiy invoice ma'lumotlari API'dan olinadi. Boshqa marketplace'lar uchun taxminiy hisob.
+                    * Barcha sotuvdagi mahsulotlar katalogdan olinadi. Invoice, buyurtma, qoldiq va qaytarish ma'lumotlari API'dan yuklanadi (90 kun). Yo'qotish faqat invoice mavjud bo'lganda aniq hisoblanadi.
                   </p>
                   {reconciliationError && (
                     <p className="text-xs text-destructive mt-1">{reconciliationError}</p>
