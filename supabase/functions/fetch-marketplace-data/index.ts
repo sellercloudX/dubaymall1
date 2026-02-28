@@ -963,24 +963,30 @@ serve(async (req) => {
         }
       } else if (dataType === "inventory-reconciliation") {
         // Yandex Market: LOST = SUPPLIED - SOLD - STOCK - RETURNED
+        // Since Yandex has no direct "supplied/invoiced" API, we use FBY supply data
+        // or fall back to: all products in catalog with their stock + order history
         try {
           if (!campaignId) {
             result = { success: false, error: "Campaign ID required for reconciliation" };
           } else {
             console.log("Yandex inventory reconciliation starting...");
             
-            // 1. Get all products with stocks
+            // 1. Get ALL products with pagination
             const productMap = new Map<string, { name: string; price: number }>();
-            const stockMap = new Map<string, number>();
-            
-            // Fetch products
-            const productsResponse = await fetchWithRetry(
-              `https://api.partner.market.yandex.ru/campaigns/${campaignId}/offers`,
-              { method: 'POST', headers, body: JSON.stringify({ limit: 200 }) }
-            );
-            if (productsResponse.ok) {
+            let prodPageToken: string | undefined;
+            let prodPage = 0;
+            do {
+              const prodBody: any = { limit: 200 };
+              if (prodPageToken) prodBody.page_token = prodPageToken;
+              
+              const productsResponse = await fetchWithRetry(
+                `https://api.partner.market.yandex.ru/campaigns/${campaignId}/offers`,
+                { method: 'POST', headers, body: JSON.stringify(prodBody) }
+              );
+              if (!productsResponse.ok) break;
               const pd = await productsResponse.json();
               const offers = pd.result?.offers || [];
+              if (offers.length === 0) break;
               offers.forEach((o: any) => {
                 const offerId = o.offerId || '';
                 if (!offerId) return;
@@ -989,16 +995,27 @@ serve(async (req) => {
                   price: o.basicPrice?.value || o.price?.value || 0 
                 });
               });
-            }
+              prodPageToken = pd.result?.paging?.nextPageToken;
+              prodPage++;
+              if (prodPageToken) await sleep(500);
+            } while (prodPageToken && prodPage < 20);
             
+            console.log(`Reconciliation: found ${productMap.size} products`);
             await sleep(500);
             
-            // Fetch stocks
-            const stocksResponse = await fetchWithRetry(
-              `https://api.partner.market.yandex.ru/campaigns/${campaignId}/offers/stocks`,
-              { method: 'POST', headers, body: JSON.stringify({ limit: 200 }) }
-            );
-            if (stocksResponse.ok) {
+            // 2. Get ALL stocks with pagination
+            const stockMap = new Map<string, number>();
+            let stockPageToken: string | undefined;
+            let stockPage = 0;
+            do {
+              const stockBody: any = { limit: 200 };
+              if (stockPageToken) stockBody.page_token = stockPageToken;
+              
+              const stocksResponse = await fetchWithRetry(
+                `https://api.partner.market.yandex.ru/campaigns/${campaignId}/offers/stocks`,
+                { method: 'POST', headers, body: JSON.stringify(stockBody) }
+              );
+              if (!stocksResponse.ok) break;
               const sd = await stocksResponse.json();
               const warehouses = sd.result?.warehouses || [];
               warehouses.forEach((wh: any) => {
@@ -1007,19 +1024,23 @@ serve(async (req) => {
                   stockMap.set(offer.offerId, (stockMap.get(offer.offerId) || 0) + count);
                 });
               });
-            }
+              stockPageToken = sd.result?.paging?.nextPageToken;
+              stockPage++;
+              if (stockPageToken) await sleep(500);
+            } while (stockPageToken && stockPage < 20);
             
+            console.log(`Reconciliation: found stocks for ${stockMap.size} SKUs`);
             await sleep(500);
             
-            // 2. Fetch orders (last 90 days for comprehensive data)
+            // 3. Fetch ALL orders (last 90 days) with pagination
             const soldMap = new Map<string, number>();
             const returnedMap = new Map<string, number>();
             const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
             const ordFrom = ninetyDaysAgo.toISOString().split('T')[0];
             const ordTo = new Date().toISOString().split('T')[0];
             
-            // Fetch delivered/completed orders (sold items)
-            for (const orderStatus of ['DELIVERED', 'DELIVERY']) {
+            // Also track PROCESSING orders — items are reserved/shipped
+            for (const orderStatus of ['DELIVERED', 'DELIVERY', 'PROCESSING', 'PICKUP']) {
               let orderPage = 1;
               let hasMore = true;
               while (hasMore) {
@@ -1057,14 +1078,55 @@ serve(async (req) => {
               else { retPage++; await sleep(500); }
             }
             
-            // 3. Calculate: We use current stock + sold + returned as expected minimum
-            // If supplier delivered X items, then: X = stock + sold + returned + lost
-            // Since Yandex doesn't have a direct "supplied" endpoint, we calculate based on known data
+            console.log(`Reconciliation: sold=${Array.from(soldMap.values()).reduce((a,b) => a+b, 0)}, returned=${Array.from(returnedMap.values()).reduce((a,b) => a+b, 0)}`);
+            
+            // 4. Try to get supply/FBY shipment data for accurate "invoiced" numbers
+            let supplyMap = new Map<string, number>();
+            try {
+              // Yandex FBY: GET /campaigns/{id}/first-mile/shipments — shows supply shipments
+              const shipmentsResp = await fetchWithRetry(
+                `https://api.partner.market.yandex.ru/campaigns/${campaignId}/first-mile/shipments?status=ACCEPTED&status=FINISHED&limit=50`,
+                { headers }
+              );
+              if (shipmentsResp.ok) {
+                const shipmentsData = await shipmentsResp.json();
+                const shipments = shipmentsData.result?.shipments || [];
+                for (const shipment of shipments) {
+                  const shipmentId = shipment.id;
+                  if (!shipmentId) continue;
+                  await sleep(300);
+                  // Get shipment details with items
+                  const detailResp = await fetchWithRetry(
+                    `https://api.partner.market.yandex.ru/campaigns/${campaignId}/first-mile/shipments/${shipmentId}`,
+                    { headers }
+                  );
+                  if (detailResp.ok) {
+                    const detailData = await detailResp.json();
+                    const orderIds = detailData.result?.orderIds || [];
+                    // Each shipment contains orders — we already track those via soldMap
+                    // For supply-based reconciliation, items in shipment = invoiced
+                    const items = detailData.result?.items || detailData.result?.pallets?.flatMap((p: any) => p.items || []) || [];
+                    items.forEach((item: any) => {
+                      const offerId = item.offerId || item.shopSku || '';
+                      if (offerId) {
+                        supplyMap.set(offerId, (supplyMap.get(offerId) || 0) + (item.count || 1));
+                      }
+                    });
+                  }
+                }
+              }
+              console.log(`Supply data: ${supplyMap.size} SKUs with invoiced quantities`);
+            } catch (supplyErr) {
+              console.warn("Supply data fetch failed (FBS mode, no shipments):", supplyErr);
+            }
+            
+            // 5. Calculate reconciliation
             const allOfferIds = new Set([
               ...productMap.keys(),
               ...stockMap.keys(),
               ...soldMap.keys(),
               ...returnedMap.keys(),
+              ...supplyMap.keys(),
             ]);
             
             const reconciliation = Array.from(allOfferIds).map(offerId => {
@@ -1072,23 +1134,29 @@ serve(async (req) => {
               const stock = stockMap.get(offerId) || 0;
               const returned = returnedMap.get(offerId) || 0;
               const productInfo = productMap.get(offerId);
-              // For Yandex, "invoiced" = total known flow (sold + current stock + returned)
-              // Any discrepancy would need FBO supply reports which aren't public API
-              const accountedFor = sold + stock + returned;
+              const suppliedFromApi = supplyMap.get(offerId) || 0;
+              
+              // If we have real supply data, use it; otherwise estimate
+              // invoiced = max(supplyData, sold + stock + returned) to catch discrepancies
+              const minAccountedFor = sold + stock + returned;
+              const invoiced = suppliedFromApi > 0 ? Math.max(suppliedFromApi, minAccountedFor) : minAccountedFor;
+              const lost = Math.max(0, invoiced - sold - stock - returned);
               
               return {
                 skuId: offerId,
                 name: productInfo?.name || offerId,
                 price: productInfo?.price || 0,
-                invoiced: accountedFor, // Best estimate from available data
+                invoiced,
                 sold,
                 currentStock: stock,
                 returned,
-                lost: 0, // Will be calculated when supply data is available
-                reconciled: true,
+                lost,
+                reconciled: lost === 0,
               };
-            }).filter(item => item.sold > 0 || item.currentStock > 0)
-            .sort((a, b) => b.sold - a.sold);
+            })
+            // Show ALL products in catalog, not just those with sales
+            .filter(item => productMap.has(item.skuId))
+            .sort((a, b) => b.lost - a.lost || b.sold - a.sold);
             
             result = {
               success: true,
@@ -1098,6 +1166,8 @@ serve(async (req) => {
                 totalSold: Array.from(soldMap.values()).reduce((a, b) => a + b, 0),
                 totalStock: Array.from(stockMap.values()).reduce((a, b) => a + b, 0),
                 totalReturned: Array.from(returnedMap.values()).reduce((a, b) => a + b, 0),
+                totalLost: reconciliation.reduce((sum, r) => sum + r.lost, 0),
+                hasSupplyData: supplyMap.size > 0,
               },
               total: reconciliation.length,
             };
