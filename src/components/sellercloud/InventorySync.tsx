@@ -99,72 +99,126 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
     return allProducts;
   }, [connectedMarketplaces, store.dataVersion, selectedMarketplace]);
 
-  // Inventory reconciliation (yo'qolgan tovarlar tahlili)
-  const reconciliation = useMemo((): ReconciliationItem[] => {
-    const items: ReconciliationItem[] = [];
+  // Real inventory reconciliation from API (yo'qolgan tovarlar tahlili)
+  const [apiReconciliation, setApiReconciliation] = useState<ReconciliationItem[]>([]);
+  const [isLoadingReconciliation, setIsLoadingReconciliation] = useState(false);
+  const [reconciliationError, setReconciliationError] = useState<string | null>(null);
+
+  const fetchReconciliation = useCallback(async () => {
     const marketplaces = selectedMarketplace === 'all' ? connectedMarketplaces : [selectedMarketplace];
+    // Only Uzum and Yandex support real reconciliation
+    const supportedMps = marketplaces.filter(mp => ['uzum', 'yandex'].includes(mp));
     
+    if (supportedMps.length === 0) {
+      // Fallback: local estimate for unsupported marketplaces
+      setApiReconciliation(getLocalReconciliation(marketplaces));
+      return;
+    }
+
+    setIsLoadingReconciliation(true);
+    setReconciliationError(null);
+    const allItems: ReconciliationItem[] = [];
+
+    for (const mp of supportedMps) {
+      try {
+        const { data, error } = await supabase.functions.invoke('fetch-marketplace-data', {
+          body: { marketplace: mp, dataType: 'inventory-reconciliation' },
+        });
+
+        if (error) {
+          console.error(`Reconciliation error for ${mp}:`, error);
+          continue;
+        }
+
+        if (data?.success && Array.isArray(data.data)) {
+          // Map API response to ReconciliationItem with product names from store
+          const mpProducts = store.getProducts(mp);
+          const productNameMap = new Map<string, string>();
+          mpProducts.forEach(p => {
+            productNameMap.set(String(p.offerId), p.name || 'Nomsiz');
+            if (p.shopSku) productNameMap.set(String(p.shopSku), p.name || 'Nomsiz');
+          });
+
+          data.data.forEach((item: any) => {
+            const invoiced = item.invoiced || 0;
+            const sold = item.sold || 0;
+            const currentStock = item.currentStock || 0;
+            const returned = item.returned || 0;
+            const lost = item.lost || 0;
+            const lossRate = invoiced > 0 ? (lost / invoiced) * 100 : 0;
+
+            allItems.push({
+              sku: item.skuId || '',
+              name: productNameMap.get(String(item.skuId)) || `SKU: ${item.skuId}`,
+              marketplace: mp,
+              invoiced,
+              sold,
+              currentStock,
+              returned,
+              lost,
+              lossRate,
+            });
+          });
+        }
+      } catch (e) {
+        console.error(`Reconciliation fetch error for ${mp}:`, e);
+        setReconciliationError(`${mp} uchun ma'lumot olishda xato`);
+      }
+    }
+
+    // Add local estimates for unsupported marketplaces
+    const unsupportedMps = marketplaces.filter(mp => !['uzum', 'yandex'].includes(mp));
+    if (unsupportedMps.length > 0) {
+      allItems.push(...getLocalReconciliation(unsupportedMps));
+    }
+
+    setApiReconciliation(allItems);
+    setIsLoadingReconciliation(false);
+  }, [connectedMarketplaces, selectedMarketplace, store.dataVersion]);
+
+  // Local estimate fallback for marketplaces without real API reconciliation
+  const getLocalReconciliation = useCallback((marketplaces: string[]): ReconciliationItem[] => {
+    const items: ReconciliationItem[] = [];
     for (const marketplace of marketplaces) {
       const mpProducts = store.getProducts(marketplace);
       const mpOrders = store.getOrders(marketplace);
-      
       for (const product of mpProducts) {
         const sku = product.shopSku || product.offerId;
         const currentStock = product.stockCount || ((product.stockFBO || 0) + (product.stockFBS || 0));
-        
-        // Sotilgan — buyurtmalardan hisoblash
         let sold = 0;
         for (const order of mpOrders) {
           if (['CANCELLED', 'CANCELED', 'RETURNED'].includes(String(order.status).toUpperCase())) continue;
           if (order.items) {
             for (const item of order.items) {
-              if (item.offerId === product.offerId || item.offerId === sku) {
-                sold += item.count || 1;
-              }
+              if (item.offerId === product.offerId || item.offerId === sku) sold += item.count || 1;
             }
           }
         }
-
-        // Qaytarilgan — RETURNED statusli buyurtmalardan
         let returned = 0;
         for (const order of mpOrders) {
           if (String(order.status).toUpperCase() === 'RETURNED') {
             if (order.items) {
               for (const item of order.items) {
-                if (item.offerId === product.offerId || item.offerId === sku) {
-                  returned += item.count || 1;
-                }
+                if (item.offerId === product.offerId || item.offerId === sku) returned += item.count || 1;
               }
             }
           }
         }
-
-        // Yuklangan (invoiced) — taxminiy: sold + currentStock + returned + lost
-        // Haqiqiy invoiced ma'lumot API'dan keladi, hozir taxminiy hisob
         const estimatedInvoiced = sold + currentStock + returned;
-        
-        // Yo'qolgan = invoiced - sold - currentStock - returned
-        // Haqiqiy invoiced bo'lmasa, lost = 0 (taxminiy)
-        // Agar marketplace API'dan invoiced kelsa, u yerdan olamiz
-        const lost = Math.max(0, estimatedInvoiced - sold - currentStock - returned);
-        const lossRate = estimatedInvoiced > 0 ? (lost / estimatedInvoiced) * 100 : 0;
-
-        items.push({
-          sku,
-          name: product.name || 'Nomsiz',
-          marketplace,
-          invoiced: estimatedInvoiced,
-          sold,
-          currentStock,
-          returned,
-          lost,
-          lossRate,
-        });
+        items.push({ sku, name: product.name || 'Nomsiz', marketplace, invoiced: estimatedInvoiced, sold, currentStock, returned, lost: 0, lossRate: 0 });
       }
     }
-    
     return items;
-  }, [connectedMarketplaces, store.dataVersion, selectedMarketplace]);
+  }, [store.dataVersion]);
+
+  // Auto-fetch reconciliation on mount and marketplace change
+  useEffect(() => {
+    if (connectedMarketplaces.length > 0) {
+      fetchReconciliation();
+    }
+  }, [selectedMarketplace, connectedMarketplaces.length]);
+
+  const reconciliation = apiReconciliation;
 
   // Filter
   const filteredProducts = products.filter(p => {
