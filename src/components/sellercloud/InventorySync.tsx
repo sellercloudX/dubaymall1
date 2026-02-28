@@ -263,6 +263,7 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
   const outOfStockCount = products.filter(p => p.totalStock === 0).length;
   const inStockCount = products.filter(p => p.totalStock > 0 && !p.lowStockAlert).length;
   const totalLost = reconciliation.reduce((sum, r) => sum + r.lost, 0);
+  const totalReturnDiscrepancy = reconciliation.reduce((sum, r) => sum + r.returnDiscrepancy, 0);
   const itemsWithLoss = reconciliation.filter(r => r.lost > 0);
 
   const toggleSelectAllStock = useCallback(() => {
