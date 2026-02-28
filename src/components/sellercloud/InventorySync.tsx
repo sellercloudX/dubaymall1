@@ -139,36 +139,45 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
           continue;
         }
 
-        if (data?.success && Array.isArray(data.data)) {
-          // Map API response to ReconciliationItem with product names from store
-          const mpProducts = store.getProducts(mp);
-          const productNameMap = new Map<string, string>();
-          mpProducts.forEach(p => {
-            productNameMap.set(String(p.offerId), p.name || 'Nomsiz');
-            if (p.shopSku) productNameMap.set(String(p.shopSku), p.name || 'Nomsiz');
-          });
-
-          data.data.forEach((item: any) => {
-            const invoiced = item.invoiced || 0;
-            const sold = item.sold || 0;
-            const currentStock = item.currentStock || 0;
-            const returned = item.returned || 0;
-            const lost = item.lost || 0;
-            const lossRate = invoiced > 0 ? (lost / invoiced) * 100 : 0;
-
-            allItems.push({
-              sku: item.skuId || '',
-              name: productNameMap.get(String(item.skuId)) || `SKU: ${item.skuId}`,
-              marketplace: mp,
-              invoiced,
-              sold,
-              currentStock,
-              returned,
-              lost,
-              lossRate,
+          if (data?.success && Array.isArray(data.data)) {
+            // Map API response to ReconciliationItem with product names from store
+            const mpProducts = store.getProducts(mp);
+            const productNameMap = new Map<string, string>();
+            mpProducts.forEach(p => {
+              productNameMap.set(String(p.offerId), p.name || 'Nomsiz');
+              if (p.shopSku) productNameMap.set(String(p.shopSku), p.name || 'Nomsiz');
             });
-          });
-        }
+
+            data.data.forEach((item: any) => {
+              const invoiced = item.invoiced || 0;
+              const sold = item.sold || 0;
+              const currentStock = item.currentStock || 0;
+              const returned = item.returned || item.returnReceived || 0;
+              const lost = item.lost || 0;
+              const lossRate = invoiced > 0 ? (lost / invoiced) * 100 : 0;
+
+              allItems.push({
+                sku: item.skuId || '',
+                name: productNameMap.get(String(item.skuId)) || item.name || `SKU: ${item.skuId}`,
+                marketplace: mp,
+                invoiced,
+                sold,
+                delivered: item.delivered || 0,
+                inProcess: item.inProcess || 0,
+                cancelled: item.cancelled || 0,
+                currentStock,
+                returned,
+                returnRequested: item.returnRequested || 0,
+                returnReceived: item.returnReceived || returned,
+                returnPending: item.returnPending || 0,
+                returnDiscrepancy: item.returnDiscrepancy || 0,
+                financeSettled: item.financeSettled || 0,
+                financePending: item.financePending || 0,
+                lost,
+                lossRate,
+              });
+            });
+          }
       } catch (e) {
         console.error(`Reconciliation fetch error for ${mp}:`, e);
         setReconciliationError(`${mp} uchun ma'lumot olishda xato`);
