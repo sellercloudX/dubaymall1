@@ -253,8 +253,8 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
     const matchesSearch = r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       r.sku.toLowerCase().includes(searchQuery.toLowerCase());
     if (!matchesSearch) return false;
-    if (lossFilter === 'with_loss') return r.lost > 0;
-    if (lossFilter === 'no_loss') return r.lost === 0;
+    if (lossFilter === 'with_loss') return r.lost > 0 || r.returnDiscrepancy > 0;
+    if (lossFilter === 'no_loss') return r.lost === 0 && r.returnDiscrepancy === 0;
     return true;
   });
 
