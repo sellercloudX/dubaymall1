@@ -2412,6 +2412,9 @@ serve(async (req) => {
             }
 
             // Step 5: Fetch ALL returns with pagination — track requested vs actually received
+            // Split into FBO and FBS returns
+            const fboReturnMap = new Map<string, { requested: number; received: number; pending: number }>();
+            const fbsReturnMap = new Map<string, { requested: number; received: number; pending: number }>();
             const returnMap = new Map<string, { requested: number; received: number; pending: number; statuses: string[] }>();
             let returnPage = 0;
             let returnHasMore = true;
