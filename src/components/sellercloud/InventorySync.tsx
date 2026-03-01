@@ -696,10 +696,11 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
                       <tr className="border-b text-left">
                         <th className="px-4 py-2 font-medium text-xs text-muted-foreground">Mahsulot</th>
                         <th className="px-2 py-2 font-medium text-xs text-muted-foreground text-right">FBO yukl.</th>
-                        <th className="px-2 py-2 font-medium text-xs text-muted-foreground text-right">FBS sotilgan</th>
-                        <th className="px-2 py-2 font-medium text-xs text-muted-foreground text-right">Jarayonda</th>
-                        <th className="px-2 py-2 font-medium text-xs text-muted-foreground text-right">Qoldiq</th>
-                        <th className="px-2 py-2 font-medium text-xs text-muted-foreground text-right">Qayt. so'r/olingan</th>
+                        <th className="px-2 py-2 font-medium text-xs text-muted-foreground text-right">FBO sot.</th>
+                        <th className="px-2 py-2 font-medium text-xs text-muted-foreground text-right">FBS sot.</th>
+                        <th className="px-2 py-2 font-medium text-xs text-muted-foreground text-right">FBO qoldiq</th>
+                        <th className="px-2 py-2 font-medium text-xs text-muted-foreground text-right">FBO qayt.</th>
+                        <th className="px-2 py-2 font-medium text-xs text-muted-foreground text-right">FBS qayt.</th>
                         <th className="px-2 py-2 font-medium text-xs text-muted-foreground text-right">Pul tushgan</th>
                         <th className="px-2 py-2 font-medium text-xs text-muted-foreground text-right">Yo'qolgan</th>
                       </tr>
@@ -718,18 +719,20 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
                             </td>
                             <td className="px-2 py-2.5 text-right font-medium">{item.invoiced}</td>
                             <td className="px-2 py-2.5 text-right">
-                              <span className="font-medium text-primary">{item.delivered}</span>
-                              {item.cancelled > 0 && <span className="text-[10px] text-muted-foreground ml-1">(-{item.cancelled})</span>}
+                              <span className="font-medium text-primary">{item.fboSold}</span>
                             </td>
-                            <td className="px-2 py-2.5 text-right text-muted-foreground">{item.inProcess || 0}</td>
+                            <td className="px-2 py-2.5 text-right">
+                              <span className="font-medium text-primary">{item.fbsSold}</span>
+                            </td>
                             <td className="px-2 py-2.5 text-right font-medium">{item.currentStock}</td>
                             <td className="px-2 py-2.5 text-right">
-                              <span className={item.returnDiscrepancy > 0 ? 'text-destructive font-medium' : 'text-amber-600'}>
-                                {item.returnRequested}/{item.returnReceived}
-                              </span>
+                              <span className="text-amber-600 font-medium">{item.fboReturnReceived}</span>
                               {item.returnDiscrepancy > 0 && (
                                 <div className="text-[10px] text-destructive">Farq: {item.returnDiscrepancy}</div>
                               )}
+                            </td>
+                            <td className="px-2 py-2.5 text-right">
+                              <span className="text-amber-600 font-medium">{item.fbsReturnReceived}</span>
                             </td>
                             <td className="px-2 py-2.5 text-right">
                               {item.financeSettled > 0 ? (
