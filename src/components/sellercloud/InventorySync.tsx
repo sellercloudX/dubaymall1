@@ -46,16 +46,20 @@ interface ReconciliationItem {
   name: string;
   marketplace: string;
   invoiced: number; // FBO ga yuklangan
-  sold: number; // FBS da sotilgan (jami)
+  fboSold: number; // FBO orqali sotilgan
+  fbsSold: number; // FBS orqali sotilgan
+  sold: number; // Jami sotilgan (FBO + FBS)
   delivered: number; // Yetkazib berilgan
   inProcess: number; // Jarayonda
   cancelled: number; // Bekor qilingan
-  currentStock: number; // Joriy qoldiq
+  currentStock: number; // Joriy qoldiq (FBO)
   returned: number; // Qaytarilgan (qabul qilingan)
   returnRequested: number; // Qaytarish so'ralgan
   returnReceived: number; // Qaytarib olingan (haqiqiy)
   returnPending: number; // Qaytarish kutilmoqda
-  returnDiscrepancy: number; // Qaytarish farqi (so'ralgan - olingan)
+  returnDiscrepancy: number; // Qaytarish farqi
+  fboReturnReceived: number; // FBO qaytarib olingan
+  fbsReturnReceived: number; // FBS qaytarib olingan
   financeSettled: number; // Puli tushgan
   financePending: number; // Pul kutilmoqda
   lost: number; // Yo'qolgan
@@ -154,13 +158,16 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
               const currentStock = item.currentStock || 0;
               const returned = item.returned || item.returnReceived || 0;
               const lost = item.lost || 0;
-              const lossRate = invoiced > 0 ? (lost / invoiced) * 100 : 0;
+              const totalIn = invoiced + (item.fbsSold || 0);
+              const lossRate = totalIn > 0 ? (lost / totalIn) * 100 : 0;
 
               allItems.push({
                 sku: item.skuId || '',
                 name: productNameMap.get(String(item.skuId)) || item.name || `SKU: ${item.skuId}`,
                 marketplace: mp,
                 invoiced,
+                fboSold: item.fboSold || 0,
+                fbsSold: item.fbsSold || 0,
                 sold,
                 delivered: item.delivered || 0,
                 inProcess: item.inProcess || 0,
@@ -171,6 +178,8 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
                 returnReceived: item.returnReceived || returned,
                 returnPending: item.returnPending || 0,
                 returnDiscrepancy: item.returnDiscrepancy || 0,
+                fboReturnReceived: item.fboReturnReceived || 0,
+                fbsReturnReceived: item.fbsReturnReceived || 0,
                 financeSettled: item.financeSettled || 0,
                 financePending: item.financePending || 0,
                 lost,
@@ -223,7 +232,7 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
           }
         }
         const estimatedInvoiced = sold + currentStock + returned;
-        items.push({ sku, name: product.name || 'Nomsiz', marketplace, invoiced: estimatedInvoiced, sold, currentStock, returned, delivered: 0, inProcess: 0, cancelled: 0, returnRequested: 0, returnReceived: returned, returnPending: 0, returnDiscrepancy: 0, financeSettled: 0, financePending: 0, lost: 0, lossRate: 0 });
+        items.push({ sku, name: product.name || 'Nomsiz', marketplace, invoiced: estimatedInvoiced, fboSold: 0, fbsSold: sold, sold, currentStock, returned, delivered: 0, inProcess: 0, cancelled: 0, returnRequested: 0, returnReceived: returned, returnPending: 0, returnDiscrepancy: 0, fboReturnReceived: returned, fbsReturnReceived: 0, financeSettled: 0, financePending: 0, lost: 0, lossRate: 0 });
       }
     }
     return items;
@@ -581,7 +590,7 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
           </div>
 
           {/* Summary */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 mb-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 sm:gap-3 mb-4">
             <Card>
               <CardContent className="pt-3 pb-2">
                 <div className="text-[10px] text-muted-foreground mb-0.5">FBO yuklangan</div>
@@ -590,25 +599,32 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
             </Card>
             <Card>
               <CardContent className="pt-3 pb-2">
-                <div className="text-[10px] text-muted-foreground mb-0.5">FBS sotilgan</div>
-                <div className="text-lg font-bold text-primary">{reconciliation.reduce((s, r) => s + r.sold, 0)}</div>
+                <div className="text-[10px] text-muted-foreground mb-0.5">FBO sotilgan</div>
+                <div className="text-lg font-bold text-primary">{reconciliation.reduce((s, r) => s + r.fboSold, 0)}</div>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-3 pb-2">
-                <div className="text-[10px] text-muted-foreground mb-0.5">Qoldiq</div>
+                <div className="text-[10px] text-muted-foreground mb-0.5">FBS sotilgan</div>
+                <div className="text-lg font-bold text-primary">{reconciliation.reduce((s, r) => s + r.fbsSold, 0)}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-3 pb-2">
+                <div className="text-[10px] text-muted-foreground mb-0.5">FBO qoldiq</div>
                 <div className="text-lg font-bold">{reconciliation.reduce((s, r) => s + r.currentStock, 0)}</div>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-3 pb-2">
-                <div className="text-[10px] text-muted-foreground mb-0.5">Qaytarish (so'r/olingan)</div>
-                <div className="text-lg font-bold text-amber-600">
-                  {reconciliation.reduce((s, r) => s + r.returnRequested, 0)}/{reconciliation.reduce((s, r) => s + r.returnReceived, 0)}
-                </div>
-                {totalReturnDiscrepancy > 0 && (
-                  <div className="text-[10px] text-destructive">Farq: {totalReturnDiscrepancy}</div>
-                )}
+                <div className="text-[10px] text-muted-foreground mb-0.5">FBO qaytarilgan</div>
+                <div className="text-lg font-bold text-amber-600">{reconciliation.reduce((s, r) => s + r.fboReturnReceived, 0)}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-3 pb-2">
+                <div className="text-[10px] text-muted-foreground mb-0.5">FBS qaytarilgan</div>
+                <div className="text-lg font-bold text-amber-600">{reconciliation.reduce((s, r) => s + r.fbsReturnReceived, 0)}</div>
               </CardContent>
             </Card>
             <Card>
@@ -641,7 +657,7 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
                 <div className="text-sm flex-1">
                   <p className="font-medium text-blue-900 dark:text-blue-100">Chuqur FBO/FBS tahlil formulasi</p>
                   <p className="text-blue-700 dark:text-blue-300 mt-1">
-                    <strong>YO'QOLGAN</strong> = FBO_YUKLANGAN − FBS_SOTILGAN − QOLDIQ − QAYTARIB_OLINGAN
+                    <strong>YO'QOLGAN</strong> = (FBO_YUKLANGAN + FBS_SOTILGAN) − FBO_SOTILGAN − FBO_QOLDIQ − FBO_QAYTARILGAN − FBS_QAYTARILGAN
                   </p>
                   <p className="text-xs text-blue-600/80 dark:text-blue-400/80 mt-1">
                     * Nakladnoy (invoice), FBS buyurtmalar, qoldiq, qaytarishlar va moliyaviy ma'lumotlar API'dan yuklanadi. Qaytarishda so'ralgan vs haqiqiy olingan farqi ko'rsatiladi.
@@ -680,10 +696,11 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
                       <tr className="border-b text-left">
                         <th className="px-4 py-2 font-medium text-xs text-muted-foreground">Mahsulot</th>
                         <th className="px-2 py-2 font-medium text-xs text-muted-foreground text-right">FBO yukl.</th>
-                        <th className="px-2 py-2 font-medium text-xs text-muted-foreground text-right">FBS sotilgan</th>
-                        <th className="px-2 py-2 font-medium text-xs text-muted-foreground text-right">Jarayonda</th>
-                        <th className="px-2 py-2 font-medium text-xs text-muted-foreground text-right">Qoldiq</th>
-                        <th className="px-2 py-2 font-medium text-xs text-muted-foreground text-right">Qayt. so'r/olingan</th>
+                        <th className="px-2 py-2 font-medium text-xs text-muted-foreground text-right">FBO sot.</th>
+                        <th className="px-2 py-2 font-medium text-xs text-muted-foreground text-right">FBS sot.</th>
+                        <th className="px-2 py-2 font-medium text-xs text-muted-foreground text-right">FBO qoldiq</th>
+                        <th className="px-2 py-2 font-medium text-xs text-muted-foreground text-right">FBO qayt.</th>
+                        <th className="px-2 py-2 font-medium text-xs text-muted-foreground text-right">FBS qayt.</th>
                         <th className="px-2 py-2 font-medium text-xs text-muted-foreground text-right">Pul tushgan</th>
                         <th className="px-2 py-2 font-medium text-xs text-muted-foreground text-right">Yo'qolgan</th>
                       </tr>
@@ -702,18 +719,20 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
                             </td>
                             <td className="px-2 py-2.5 text-right font-medium">{item.invoiced}</td>
                             <td className="px-2 py-2.5 text-right">
-                              <span className="font-medium text-primary">{item.delivered}</span>
-                              {item.cancelled > 0 && <span className="text-[10px] text-muted-foreground ml-1">(-{item.cancelled})</span>}
+                              <span className="font-medium text-primary">{item.fboSold}</span>
                             </td>
-                            <td className="px-2 py-2.5 text-right text-muted-foreground">{item.inProcess || 0}</td>
+                            <td className="px-2 py-2.5 text-right">
+                              <span className="font-medium text-primary">{item.fbsSold}</span>
+                            </td>
                             <td className="px-2 py-2.5 text-right font-medium">{item.currentStock}</td>
                             <td className="px-2 py-2.5 text-right">
-                              <span className={item.returnDiscrepancy > 0 ? 'text-destructive font-medium' : 'text-amber-600'}>
-                                {item.returnRequested}/{item.returnReceived}
-                              </span>
+                              <span className="text-amber-600 font-medium">{item.fboReturnReceived}</span>
                               {item.returnDiscrepancy > 0 && (
                                 <div className="text-[10px] text-destructive">Farq: {item.returnDiscrepancy}</div>
                               )}
+                            </td>
+                            <td className="px-2 py-2.5 text-right">
+                              <span className="text-amber-600 font-medium">{item.fbsReturnReceived}</span>
                             </td>
                             <td className="px-2 py-2.5 text-right">
                               {item.financeSettled > 0 ? (
@@ -754,36 +773,38 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
                             <Badge variant="outline" className="text-xs text-primary shrink-0">✓</Badge>
                           )}
                         </div>
-                        <div className="grid grid-cols-3 gap-1 text-center">
+                        <div className="grid grid-cols-4 gap-1 text-center">
                           <div>
                             <div className="text-[10px] text-muted-foreground">FBO yukl.</div>
                             <div className="font-medium text-xs">{item.invoiced}</div>
                           </div>
                           <div>
-                            <div className="text-[10px] text-muted-foreground">FBS sotilgan</div>
-                            <div className="font-medium text-xs text-primary">{item.delivered}</div>
+                            <div className="text-[10px] text-muted-foreground">FBO sot.</div>
+                            <div className="font-medium text-xs text-primary">{item.fboSold}</div>
                           </div>
                           <div>
-                            <div className="text-[10px] text-muted-foreground">Qoldiq</div>
+                            <div className="text-[10px] text-muted-foreground">FBS sot.</div>
+                            <div className="font-medium text-xs text-primary">{item.fbsSold}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-muted-foreground">FBO qoldiq</div>
                             <div className="font-medium text-xs">{item.currentStock}</div>
                           </div>
                         </div>
                         <div className="grid grid-cols-3 gap-1 text-center">
                           <div>
-                            <div className="text-[10px] text-muted-foreground">Qayt. so'r/olingan</div>
-                            <div className={`font-medium text-xs ${item.returnDiscrepancy > 0 ? 'text-destructive' : 'text-amber-600'}`}>
-                              {item.returnRequested}/{item.returnReceived}
-                            </div>
+                            <div className="text-[10px] text-muted-foreground">FBO qayt.</div>
+                            <div className="font-medium text-xs text-amber-600">{item.fboReturnReceived}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-muted-foreground">FBS qayt.</div>
+                            <div className="font-medium text-xs text-amber-600">{item.fbsReturnReceived}</div>
                           </div>
                           <div>
                             <div className="text-[10px] text-muted-foreground">Pul tushgan</div>
                             <div className="font-medium text-xs text-emerald-600">
                               {item.financeSettled > 0 ? item.financeSettled.toLocaleString() : '—'}
                             </div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] text-muted-foreground">Jarayonda</div>
-                            <div className="font-medium text-xs">{item.inProcess}</div>
                           </div>
                         </div>
                       </div>
