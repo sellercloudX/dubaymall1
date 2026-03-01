@@ -158,13 +158,16 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
               const currentStock = item.currentStock || 0;
               const returned = item.returned || item.returnReceived || 0;
               const lost = item.lost || 0;
-              const lossRate = invoiced > 0 ? (lost / invoiced) * 100 : 0;
+              const totalIn = invoiced + (item.fbsSold || 0);
+              const lossRate = totalIn > 0 ? (lost / totalIn) * 100 : 0;
 
               allItems.push({
                 sku: item.skuId || '',
                 name: productNameMap.get(String(item.skuId)) || item.name || `SKU: ${item.skuId}`,
                 marketplace: mp,
                 invoiced,
+                fboSold: item.fboSold || 0,
+                fbsSold: item.fbsSold || 0,
                 sold,
                 delivered: item.delivered || 0,
                 inProcess: item.inProcess || 0,
@@ -175,6 +178,8 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
                 returnReceived: item.returnReceived || returned,
                 returnPending: item.returnPending || 0,
                 returnDiscrepancy: item.returnDiscrepancy || 0,
+                fboReturnReceived: item.fboReturnReceived || 0,
+                fbsReturnReceived: item.fbsReturnReceived || 0,
                 financeSettled: item.financeSettled || 0,
                 financePending: item.financePending || 0,
                 lost,
