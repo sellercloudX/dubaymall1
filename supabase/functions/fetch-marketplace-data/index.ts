@@ -2436,22 +2436,34 @@ serve(async (req) => {
                   const qty = ret.quantity || ret.amount || 1;
                   const receivedQty = ret.receivedQuantity || ret.acceptedQuantity || 0;
                   const status = String(ret.status || 'UNKNOWN').toUpperCase();
+                  const returnType = String(ret.type || ret.fulfillmentType || ret.orderType || '').toUpperCase();
+                  const isFbo = returnType.includes('FBO') || returnType.includes('WAREHOUSE');
                   
                   const existing = returnMap.get(key) || { requested: 0, received: 0, pending: 0, statuses: [] };
                   existing.requested += qty;
                   
-                  // Track actual received vs requested
+                  let actualReceived = 0;
                   if (['COMPLETED', 'RECEIVED', 'ACCEPTED', 'DONE'].includes(status)) {
-                    // If API gives receivedQuantity use it, otherwise use full qty for completed returns
-                    existing.received += (receivedQty > 0 ? receivedQty : qty);
+                    actualReceived = receivedQty > 0 ? receivedQty : qty;
+                    existing.received += actualReceived;
                   } else if (['PENDING', 'PROCESSING', 'IN_TRANSIT', 'CREATED'].includes(status)) {
                     existing.pending += qty;
                   } else {
-                    // For other statuses (REJECTED etc), count as received 0
+                    actualReceived = receivedQty;
                     existing.received += receivedQty;
                   }
                   existing.statuses.push(status);
                   returnMap.set(key, existing);
+
+                  // Split into FBO/FBS return maps
+                  const targetMap = isFbo ? fboReturnMap : fbsReturnMap;
+                  const retExisting = targetMap.get(key) || { requested: 0, received: 0, pending: 0 };
+                  retExisting.requested += qty;
+                  retExisting.received += actualReceived;
+                  if (['PENDING', 'PROCESSING', 'IN_TRANSIT', 'CREATED'].includes(status)) {
+                    retExisting.pending += qty;
+                  }
+                  targetMap.set(key, retExisting);
                 });
 
                 if (retList.length < 50) returnHasMore = false;
