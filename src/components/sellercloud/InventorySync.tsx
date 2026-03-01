@@ -590,7 +590,7 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
           </div>
 
           {/* Summary */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 mb-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 sm:gap-3 mb-4">
             <Card>
               <CardContent className="pt-3 pb-2">
                 <div className="text-[10px] text-muted-foreground mb-0.5">FBO yuklangan</div>
@@ -599,25 +599,32 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
             </Card>
             <Card>
               <CardContent className="pt-3 pb-2">
-                <div className="text-[10px] text-muted-foreground mb-0.5">FBS sotilgan</div>
-                <div className="text-lg font-bold text-primary">{reconciliation.reduce((s, r) => s + r.sold, 0)}</div>
+                <div className="text-[10px] text-muted-foreground mb-0.5">FBO sotilgan</div>
+                <div className="text-lg font-bold text-primary">{reconciliation.reduce((s, r) => s + r.fboSold, 0)}</div>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-3 pb-2">
-                <div className="text-[10px] text-muted-foreground mb-0.5">Qoldiq</div>
+                <div className="text-[10px] text-muted-foreground mb-0.5">FBS sotilgan</div>
+                <div className="text-lg font-bold text-primary">{reconciliation.reduce((s, r) => s + r.fbsSold, 0)}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-3 pb-2">
+                <div className="text-[10px] text-muted-foreground mb-0.5">FBO qoldiq</div>
                 <div className="text-lg font-bold">{reconciliation.reduce((s, r) => s + r.currentStock, 0)}</div>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-3 pb-2">
-                <div className="text-[10px] text-muted-foreground mb-0.5">Qaytarish (so'r/olingan)</div>
-                <div className="text-lg font-bold text-amber-600">
-                  {reconciliation.reduce((s, r) => s + r.returnRequested, 0)}/{reconciliation.reduce((s, r) => s + r.returnReceived, 0)}
-                </div>
-                {totalReturnDiscrepancy > 0 && (
-                  <div className="text-[10px] text-destructive">Farq: {totalReturnDiscrepancy}</div>
-                )}
+                <div className="text-[10px] text-muted-foreground mb-0.5">FBO qaytarilgan</div>
+                <div className="text-lg font-bold text-amber-600">{reconciliation.reduce((s, r) => s + r.fboReturnReceived, 0)}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-3 pb-2">
+                <div className="text-[10px] text-muted-foreground mb-0.5">FBS qaytarilgan</div>
+                <div className="text-lg font-bold text-amber-600">{reconciliation.reduce((s, r) => s + r.fbsReturnReceived, 0)}</div>
               </CardContent>
             </Card>
             <Card>
