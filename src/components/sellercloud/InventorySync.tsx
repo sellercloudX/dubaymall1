@@ -773,36 +773,38 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
                             <Badge variant="outline" className="text-xs text-primary shrink-0">✓</Badge>
                           )}
                         </div>
-                        <div className="grid grid-cols-3 gap-1 text-center">
+                        <div className="grid grid-cols-4 gap-1 text-center">
                           <div>
                             <div className="text-[10px] text-muted-foreground">FBO yukl.</div>
                             <div className="font-medium text-xs">{item.invoiced}</div>
                           </div>
                           <div>
-                            <div className="text-[10px] text-muted-foreground">FBS sotilgan</div>
-                            <div className="font-medium text-xs text-primary">{item.delivered}</div>
+                            <div className="text-[10px] text-muted-foreground">FBO sot.</div>
+                            <div className="font-medium text-xs text-primary">{item.fboSold}</div>
                           </div>
                           <div>
-                            <div className="text-[10px] text-muted-foreground">Qoldiq</div>
+                            <div className="text-[10px] text-muted-foreground">FBS sot.</div>
+                            <div className="font-medium text-xs text-primary">{item.fbsSold}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-muted-foreground">FBO qoldiq</div>
                             <div className="font-medium text-xs">{item.currentStock}</div>
                           </div>
                         </div>
                         <div className="grid grid-cols-3 gap-1 text-center">
                           <div>
-                            <div className="text-[10px] text-muted-foreground">Qayt. so'r/olingan</div>
-                            <div className={`font-medium text-xs ${item.returnDiscrepancy > 0 ? 'text-destructive' : 'text-amber-600'}`}>
-                              {item.returnRequested}/{item.returnReceived}
-                            </div>
+                            <div className="text-[10px] text-muted-foreground">FBO qayt.</div>
+                            <div className="font-medium text-xs text-amber-600">{item.fboReturnReceived}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-muted-foreground">FBS qayt.</div>
+                            <div className="font-medium text-xs text-amber-600">{item.fbsReturnReceived}</div>
                           </div>
                           <div>
                             <div className="text-[10px] text-muted-foreground">Pul tushgan</div>
                             <div className="font-medium text-xs text-emerald-600">
                               {item.financeSettled > 0 ? item.financeSettled.toLocaleString() : '—'}
                             </div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] text-muted-foreground">Jarayonda</div>
-                            <div className="font-medium text-xs">{item.inProcess}</div>
                           </div>
                         </div>
                       </div>
