@@ -2288,7 +2288,7 @@ serve(async (req) => {
             console.log(`Deep reconciliation: ${invoiceMap.size} SKUs with invoice data, pages: ${invoicePage + 1}`);
 
             // Step 3: Fetch ALL FBS orders with full pagination (multiple statuses)
-            const soldMap = new Map<string, { totalSold: number; delivered: number; inProcess: number; cancelled: number }>();
+            const fbsSoldMap = new Map<string, { totalSold: number; delivered: number; inProcess: number; cancelled: number }>();
             const orderStatuses = ['COMPLETED', 'DELIVERING', 'ACCEPTED', 'PROCESSING', 'CANCELLED', 'CANCELED'];
             for (const orderStatus of orderStatuses) {
               let orderPage = 0;
@@ -2321,7 +2321,7 @@ serve(async (req) => {
                       const key = String(item.skuId || item.skuTitle || item.barcode || item.productId || '');
                       const qty = item.quantity || item.count || 1;
                       if (!key) return;
-                      const existing = soldMap.get(key) || { totalSold: 0, delivered: 0, inProcess: 0, cancelled: 0 };
+                      const existing = fbsSoldMap.get(key) || { totalSold: 0, delivered: 0, inProcess: 0, cancelled: 0 };
                       if (isCancelled) {
                         existing.cancelled += qty;
                       } else {
@@ -2329,7 +2329,7 @@ serve(async (req) => {
                         if (isDelivered) existing.delivered += qty;
                         if (isInProcess) existing.inProcess += qty;
                       }
-                      soldMap.set(key, existing);
+                      fbsSoldMap.set(key, existing);
                     });
                   });
 
@@ -2338,7 +2338,61 @@ serve(async (req) => {
                 } catch { break; }
               }
             }
-            console.log(`Deep reconciliation: ${soldMap.size} SKUs with order data`);
+            console.log(`Deep reconciliation: ${fbsSoldMap.size} SKUs with FBS order data`);
+
+            // Step 3b: Fetch FBO orders (sold through Uzum warehouse fulfillment)
+            const fboSoldMap = new Map<string, { totalSold: number; delivered: number; inProcess: number; cancelled: number }>();
+            const fboOrderStatuses = ['COMPLETED', 'DELIVERING', 'ACCEPTED', 'PROCESSING', 'CANCELLED', 'CANCELED'];
+            for (const fboStatus of fboOrderStatuses) {
+              let fboOrderPage = 0;
+              let fboOrderHasMore = true;
+              while (fboOrderHasMore) {
+                try {
+                  const fboOrdParams = new URLSearchParams({
+                    shopIds: String(uzumShopId),
+                    status: fboStatus,
+                    size: '50',
+                    page: String(fboOrderPage),
+                  });
+                  // Try FBO orders endpoint
+                  const fboOrdResp = await fetch(
+                    `${uzumBaseUrl}/v2/fbo/orders?${fboOrdParams.toString()}`,
+                    { headers: uzumHeaders }
+                  );
+                  if (!fboOrdResp.ok) break;
+                  const fboOrdData = await fboOrdResp.json();
+                  const fboOrders = fboOrdData.payload?.sellerOrders || fboOrdData.payload?.fboOrders || fboOrdData.payload?.orders || [];
+                  const fboOrderList = Array.isArray(fboOrders) ? fboOrders : [];
+                  if (fboOrderList.length === 0) break;
+
+                  const isCancelled = ['CANCELLED', 'CANCELED'].includes(fboStatus);
+                  const isDelivered = fboStatus === 'COMPLETED';
+                  const isInProcess = ['DELIVERING', 'ACCEPTED', 'PROCESSING'].includes(fboStatus);
+
+                  fboOrderList.forEach((order: any) => {
+                    const items = order.items || order.orderItems || [];
+                    items.forEach((item: any) => {
+                      const key = String(item.skuId || item.skuTitle || item.barcode || item.productId || '');
+                      const qty = item.quantity || item.count || 1;
+                      if (!key) return;
+                      const existing = fboSoldMap.get(key) || { totalSold: 0, delivered: 0, inProcess: 0, cancelled: 0 };
+                      if (isCancelled) {
+                        existing.cancelled += qty;
+                      } else {
+                        existing.totalSold += qty;
+                        if (isDelivered) existing.delivered += qty;
+                        if (isInProcess) existing.inProcess += qty;
+                      }
+                      fboSoldMap.set(key, existing);
+                    });
+                  });
+
+                  if (fboOrderList.length < 50) fboOrderHasMore = false;
+                  else { fboOrderPage++; await sleep(300); }
+                } catch { break; }
+              }
+            }
+            console.log(`Deep reconciliation: ${fboSoldMap.size} SKUs with FBO order data`);
 
             // Step 4: Fetch current stock
             const stockMap = new Map<string, number>();
