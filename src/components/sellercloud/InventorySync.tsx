@@ -657,7 +657,7 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
                 <div className="text-sm flex-1">
                   <p className="font-medium text-blue-900 dark:text-blue-100">Chuqur FBO/FBS tahlil formulasi</p>
                   <p className="text-blue-700 dark:text-blue-300 mt-1">
-                    <strong>YO'QOLGAN</strong> = FBO_YUKLANGAN − FBS_SOTILGAN − QOLDIQ − QAYTARIB_OLINGAN
+                    <strong>YO'QOLGAN</strong> = (FBO_YUKLANGAN + FBS_SOTILGAN) − FBO_SOTILGAN − FBO_QOLDIQ − FBO_QAYTARILGAN − FBS_QAYTARILGAN
                   </p>
                   <p className="text-xs text-blue-600/80 dark:text-blue-400/80 mt-1">
                     * Nakladnoy (invoice), FBS buyurtmalar, qoldiq, qaytarishlar va moliyaviy ma'lumotlar API'dan yuklanadi. Qaytarishda so'ralgan vs haqiqiy olingan farqi ko'rsatiladi.
