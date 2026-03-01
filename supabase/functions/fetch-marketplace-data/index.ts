@@ -2532,6 +2532,10 @@ serve(async (req) => {
               name: string;
               fboSent: number;
               fboReceived: number;
+              fboSold: number;
+              fboSoldDelivered: number;
+              fboSoldInProcess: number;
+              fboSoldCancelled: number;
               fbsSold: number;
               fbsDelivered: number;
               fbsInProcess: number;
@@ -2541,6 +2545,8 @@ serve(async (req) => {
               returnReceived: number;
               returnPending: number;
               returnDiscrepancy: number;
+              fboReturnReceived: number;
+              fbsReturnReceived: number;
               financeSettled: number;
               financePending: number;
               lost: number;
@@ -2550,9 +2556,11 @@ serve(async (req) => {
               const existing = aggregated.get(primaryKey) || {
                 name: '',
                 fboSent: 0, fboReceived: 0,
+                fboSold: 0, fboSoldDelivered: 0, fboSoldInProcess: 0, fboSoldCancelled: 0,
                 fbsSold: 0, fbsDelivered: 0, fbsInProcess: 0, fbsCancelled: 0,
                 currentStock: 0,
                 returnRequested: 0, returnReceived: 0, returnPending: 0, returnDiscrepancy: 0,
+                fboReturnReceived: 0, fbsReturnReceived: 0,
                 financeSettled: 0, financePending: 0,
                 lost: 0,
               };
@@ -2566,12 +2574,22 @@ serve(async (req) => {
                 existing.fboReceived += inv.received;
               }
 
-              const sold = soldMap.get(key);
-              if (sold) {
-                existing.fbsSold += sold.totalSold;
-                existing.fbsDelivered += sold.delivered;
-                existing.fbsInProcess += sold.inProcess;
-                existing.fbsCancelled += sold.cancelled;
+              // FBO orders (sold through warehouse)
+              const fboSold = fboSoldMap.get(key);
+              if (fboSold) {
+                existing.fboSold += fboSold.totalSold;
+                existing.fboSoldDelivered += fboSold.delivered;
+                existing.fboSoldInProcess += fboSold.inProcess;
+                existing.fboSoldCancelled += fboSold.cancelled;
+              }
+
+              // FBS orders (seller fulfillment)
+              const fbsSold = fbsSoldMap.get(key);
+              if (fbsSold) {
+                existing.fbsSold += fbsSold.totalSold;
+                existing.fbsDelivered += fbsSold.delivered;
+                existing.fbsInProcess += fbsSold.inProcess;
+                existing.fbsCancelled += fbsSold.cancelled;
               }
 
               const stock = stockMap.get(key);
@@ -2581,11 +2599,30 @@ serve(async (req) => {
                 existing.currentStock = catItem.stock;
               }
 
+              // Total returns
               const ret = returnMap.get(key);
               if (ret) {
                 existing.returnRequested += ret.requested;
                 existing.returnReceived += ret.received;
                 existing.returnPending += ret.pending;
+              }
+
+              // FBO returns
+              const fboRet = fboReturnMap.get(key);
+              if (fboRet) {
+                existing.fboReturnReceived += fboRet.received;
+              }
+
+              // FBS returns
+              const fbsRet = fbsReturnMap.get(key);
+              if (fbsRet) {
+                existing.fbsReturnReceived += fbsRet.received;
+              }
+
+              // If no split data, use total returns as FBO returns (most returns are FBO)
+              // This handles cases where API doesn't provide return type
+              if (!fboRet && !fbsRet && ret && ret.received > 0) {
+                existing.fboReturnReceived += ret.received;
               }
 
               const fin = financeMap.get(key);
@@ -2598,17 +2635,19 @@ serve(async (req) => {
             }
 
             // Calculate losses and return discrepancies
+            // FORMULA: LOST = (FBO_SENT + FBS_SOLD) - FBO_SOLD - FBO_STOCK - FBO_RETURNED - FBS_RETURNED
             const reconciliation = Array.from(aggregated.entries()).map(([skuId, data]) => {
               // Return discrepancy: requested vs actually received back
               data.returnDiscrepancy = Math.max(0, data.returnRequested - data.returnReceived - data.returnPending);
 
-              // LOST = FBO_SENT - SOLD - CURRENT_STOCK - RETURN_RECEIVED
-              // Only calculate if we have FBO invoice data
-              if (data.fboSent > 0) {
-                data.lost = Math.max(0, data.fboSent - data.fbsSold - data.currentStock - data.returnReceived);
+              // NEW FORMULA: LOST = (FBO_YUKLANGAN + FBS_SOTILGAN) - FBO_SOTILGAN - FBO_QOLDIQ - FBO_QAYTARIB_OLINGAN - FBS_QAYTARIB_OLINGAN
+              // Total items in system = FBO sent to warehouse + FBS sold by seller
+              // Accounted for = FBO sold + remaining stock + FBO returns + FBS returns
+              if (data.fboSent > 0 || data.fbsSold > 0) {
+                const totalIn = data.fboSent + data.fbsSold;
+                const totalAccountedFor = data.fboSold + data.currentStock + data.fboReturnReceived + data.fbsReturnReceived;
+                data.lost = Math.max(0, totalIn - totalAccountedFor);
               } else {
-                // No invoice: estimate, lost = 0
-                data.fboSent = data.fbsSold + data.currentStock + data.returnReceived;
                 data.lost = 0;
               }
 
@@ -2617,16 +2656,22 @@ serve(async (req) => {
                 name: data.name || `SKU: ${skuId}`,
                 invoiced: data.fboSent,
                 fboReceived: data.fboReceived,
-                sold: data.fbsSold,
-                delivered: data.fbsDelivered,
-                inProcess: data.fbsInProcess,
-                cancelled: data.fbsCancelled,
+                fboSold: data.fboSold,
+                fboSoldDelivered: data.fboSoldDelivered,
+                fboSoldInProcess: data.fboSoldInProcess,
+                fbsSold: data.fbsSold,
+                sold: data.fboSold + data.fbsSold, // total sold (both channels)
+                delivered: data.fboSoldDelivered + data.fbsDelivered,
+                inProcess: data.fboSoldInProcess + data.fbsInProcess,
+                cancelled: data.fboSoldCancelled + data.fbsCancelled,
                 currentStock: data.currentStock,
                 returned: data.returnReceived,
                 returnRequested: data.returnRequested,
                 returnReceived: data.returnReceived,
                 returnPending: data.returnPending,
                 returnDiscrepancy: data.returnDiscrepancy,
+                fboReturnReceived: data.fboReturnReceived,
+                fbsReturnReceived: data.fbsReturnReceived,
                 financeSettled: data.financeSettled,
                 financePending: data.financePending,
                 lost: data.lost,
@@ -2642,12 +2687,16 @@ serve(async (req) => {
               summary: {
                 totalProducts: productCatalog.size,
                 totalFboSent: reconciliation.reduce((s, r) => s + r.invoiced, 0),
+                totalFboSold: reconciliation.reduce((s, r) => s + r.fboSold, 0),
+                totalFbsSold: reconciliation.reduce((s, r) => s + r.fbsSold, 0),
                 totalSold: reconciliation.reduce((s, r) => s + r.sold, 0),
                 totalDelivered: reconciliation.reduce((s, r) => s + r.delivered, 0),
                 totalInProcess: reconciliation.reduce((s, r) => s + r.inProcess, 0),
                 totalStock: reconciliation.reduce((s, r) => s + r.currentStock, 0),
                 totalReturnRequested: reconciliation.reduce((s, r) => s + r.returnRequested, 0),
                 totalReturnReceived: reconciliation.reduce((s, r) => s + r.returnReceived, 0),
+                totalFboReturnReceived: reconciliation.reduce((s, r) => s + r.fboReturnReceived, 0),
+                totalFbsReturnReceived: reconciliation.reduce((s, r) => s + r.fbsReturnReceived, 0),
                 totalReturnDiscrepancy: reconciliation.reduce((s, r) => s + r.returnDiscrepancy, 0),
                 totalFinanceSettled: reconciliation.reduce((s, r) => s + r.financeSettled, 0),
                 totalFinancePending: reconciliation.reduce((s, r) => s + r.financePending, 0),
