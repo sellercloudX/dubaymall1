@@ -2519,59 +2519,61 @@ serve(async (req) => {
             const fboReturnMap = new Map<string, { requested: number; received: number; pending: number }>();
             const fbsReturnMap = new Map<string, { requested: number; received: number; pending: number }>();
             const returnMap = new Map<string, { requested: number; received: number; pending: number; statuses: string[] }>();
-            let returnPage = 0;
-            let returnHasMore = true;
-            while (returnHasMore) {
-              try {
-                const retResp = await fetch(
-                  `${uzumBaseUrl}/v1/shop/${uzumShopId}/return?size=50&page=${returnPage}`,
-                  { headers: uzumHeaders }
-                );
-                if (!retResp.ok) break;
-                const retData = await retResp.json();
-                const returns = Array.isArray(retData) ? retData : (retData.payload?.items || retData.payload || []);
-                const retList = Array.isArray(returns) ? returns : [];
-                if (retList.length === 0) break;
+            for (const currentShopId of allShopIds) {
+              let returnPage = 0;
+              let returnHasMore = true;
+              while (returnHasMore) {
+                try {
+                  const retResp = await fetch(
+                    `${uzumBaseUrl}/v1/shop/${currentShopId}/return?size=50&page=${returnPage}`,
+                    { headers: uzumHeaders }
+                  );
+                  if (!retResp.ok) break;
+                  const retData = await retResp.json();
+                  const returns = Array.isArray(retData) ? retData : (retData.payload?.items || retData.payload || []);
+                  const retList = Array.isArray(returns) ? returns : [];
+                  if (retList.length === 0) break;
 
-                retList.forEach((ret: any) => {
-                  const key = String(ret.skuId || ret.productId || ret.barcode || '');
-                  if (!key) return;
-                  const qty = ret.quantity || ret.amount || 1;
-                  const receivedQty = ret.receivedQuantity || ret.acceptedQuantity || 0;
-                  const status = String(ret.status || 'UNKNOWN').toUpperCase();
-                  const returnType = String(ret.type || ret.fulfillmentType || ret.orderType || '').toUpperCase();
-                  const isFbo = returnType.includes('FBO') || returnType.includes('WAREHOUSE');
-                  
-                  const existing = returnMap.get(key) || { requested: 0, received: 0, pending: 0, statuses: [] };
-                  existing.requested += qty;
-                  
-                  let actualReceived = 0;
-                  if (['COMPLETED', 'RECEIVED', 'ACCEPTED', 'DONE'].includes(status)) {
-                    actualReceived = receivedQty > 0 ? receivedQty : qty;
-                    existing.received += actualReceived;
-                  } else if (['PENDING', 'PROCESSING', 'IN_TRANSIT', 'CREATED'].includes(status)) {
-                    existing.pending += qty;
-                  } else {
-                    actualReceived = receivedQty;
-                    existing.received += receivedQty;
-                  }
-                  existing.statuses.push(status);
-                  returnMap.set(key, existing);
+                  retList.forEach((ret: any) => {
+                    const key = String(ret.skuId || ret.productId || ret.barcode || '');
+                    if (!key) return;
+                    const qty = ret.quantity || ret.amount || 1;
+                    const receivedQty = ret.receivedQuantity || ret.acceptedQuantity || 0;
+                    const status = String(ret.status || 'UNKNOWN').toUpperCase();
+                    const returnType = String(ret.type || ret.fulfillmentType || ret.orderType || '').toUpperCase();
+                    const isFbo = returnType.includes('FBO') || returnType.includes('WAREHOUSE');
+                    
+                    const existing = returnMap.get(key) || { requested: 0, received: 0, pending: 0, statuses: [] };
+                    existing.requested += qty;
+                    
+                    let actualReceived = 0;
+                    if (['COMPLETED', 'RECEIVED', 'ACCEPTED', 'DONE'].includes(status)) {
+                      actualReceived = receivedQty > 0 ? receivedQty : qty;
+                      existing.received += actualReceived;
+                    } else if (['PENDING', 'PROCESSING', 'IN_TRANSIT', 'CREATED'].includes(status)) {
+                      existing.pending += qty;
+                    } else {
+                      actualReceived = receivedQty;
+                      existing.received += receivedQty;
+                    }
+                    existing.statuses.push(status);
+                    returnMap.set(key, existing);
 
-                  // Split into FBO/FBS return maps
-                  const targetMap = isFbo ? fboReturnMap : fbsReturnMap;
-                  const retExisting = targetMap.get(key) || { requested: 0, received: 0, pending: 0 };
-                  retExisting.requested += qty;
-                  retExisting.received += actualReceived;
-                  if (['PENDING', 'PROCESSING', 'IN_TRANSIT', 'CREATED'].includes(status)) {
-                    retExisting.pending += qty;
-                  }
-                  targetMap.set(key, retExisting);
-                });
+                    // Split into FBO/FBS return maps
+                    const targetMap = isFbo ? fboReturnMap : fbsReturnMap;
+                    const retExisting = targetMap.get(key) || { requested: 0, received: 0, pending: 0 };
+                    retExisting.requested += qty;
+                    retExisting.received += actualReceived;
+                    if (['PENDING', 'PROCESSING', 'IN_TRANSIT', 'CREATED'].includes(status)) {
+                      retExisting.pending += qty;
+                    }
+                    targetMap.set(key, retExisting);
+                  });
 
-                if (retList.length < 50) returnHasMore = false;
-                else { returnPage++; await sleep(300); }
-              } catch { break; }
+                  if (retList.length < 50) returnHasMore = false;
+                  else { returnPage++; await sleep(300); }
+                } catch { break; }
+              }
             }
             console.log(`Deep reconciliation: ${returnMap.size} SKUs with return data`);
 
