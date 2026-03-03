@@ -96,21 +96,38 @@ async function proxyImagesToStorage(
     if (url.includes('dropbox.com') || url.includes('drive.google.com')) continue;
 
     try {
-      const resp = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-          'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8',
-          'Referer': url.includes('yandex') ? 'https://market.yandex.ru/' : url.includes('uzum') ? 'https://uzum.uz/' : url.includes('wildberries') ? 'https://www.wildberries.ru/' : 'https://google.com/',
-        },
-      });
-      if (!resp.ok) { console.warn(`⚠️ Download failed (${resp.status}): ${url.substring(0, 80)}`); proxied.push(url); continue; }
+      // Retry up to 2 times for flaky image downloads
+      let resp: Response | null = null;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          resp = await fetch(url, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+              'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8',
+              'Referer': url.includes('yandex') ? 'https://market.yandex.ru/' : url.includes('uzum') ? 'https://uzum.uz/' : url.includes('wildberries') ? 'https://www.wildberries.ru/' : 'https://google.com/',
+            },
+          });
+          if (resp.ok) break;
+          console.warn(`⚠️ Image download attempt ${attempt + 1} failed (${resp.status}): ${url.substring(0, 80)}`);
+          if (attempt < 1) await new Promise(r => setTimeout(r, 500));
+        } catch (fetchErr) {
+          console.warn(`⚠️ Image fetch attempt ${attempt + 1} error: ${fetchErr}`);
+          if (attempt < 1) await new Promise(r => setTimeout(r, 500));
+        }
+      }
+      
+      if (!resp || !resp.ok) {
+        // Still use original URL as fallback — Yandex may access it directly
+        proxied.push(url);
+        continue;
+      }
 
       const ct = resp.headers.get('content-type') || 'image/jpeg';
-      if (!ct.startsWith('image/')) continue;
+      if (!ct.startsWith('image/')) { proxied.push(url); continue; }
 
       const data = await resp.arrayBuffer();
-      if (data.byteLength < 1000) continue;
+      if (data.byteLength < 1000) { proxied.push(url); continue; }
 
       const extMap: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
       const ext = extMap[ct] || 'jpg';
@@ -129,6 +146,7 @@ async function proxyImagesToStorage(
       }
     } catch (e) {
       console.error(`Proxy err: ${e}`);
+      proxied.push(url); // Use original URL as fallback
     }
   }
   return proxied;
