@@ -331,10 +331,12 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
         });
         
         if (error) {
-          toast.error(`${product.name}: ${error.message || 'Edge function xatosi'}`);
+          console.error(`Uzum clone error for "${product.name}":`, error);
+          toast.error(`${product.name.slice(0, 30)}: ${error.message || 'Edge function xatosi'}`);
           return false;
         }
         if (!data?.success) {
+          console.error(`Uzum API error for "${product.name}":`, JSON.stringify(data));
           toast.error(`${product.name.slice(0, 30)}: ${data?.error || 'API xatosi'}`);
           return false;
         }
