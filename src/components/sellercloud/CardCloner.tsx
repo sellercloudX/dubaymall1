@@ -269,11 +269,15 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
         });
         
         if (error) {
-          toast.error(`${product.name}: ${error.message || 'Edge function xatosi'}`);
+          console.error(`Yandex clone error for "${product.name}":`, error);
+          toast.error(`${product.name.slice(0, 30)}: ${error.message || 'Edge function xatosi'}`);
           return false;
         }
         if (!data?.success) {
-          toast.error(`${product.name.slice(0, 30)}: ${data?.error || 'API xatosi'}`);
+          // Show detailed Yandex API errors
+          const apiErrors = data?.results?.[0]?.error || data?.results?.[0]?.yandexResponse?.errors?.[0]?.message || data?.error || 'API xatosi';
+          console.error(`Yandex API error for "${product.name}":`, JSON.stringify(data?.results?.[0]?.yandexResponse || data));
+          toast.error(`${product.name.slice(0, 30)}: ${typeof apiErrors === 'string' ? apiErrors.slice(0, 100) : 'API xatosi'}`);
           return false;
         }
         return true;
@@ -298,11 +302,14 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
         });
         
         if (error) {
-          toast.error(`${product.name}: ${error.message || 'Edge function xatosi'}`);
+          console.error(`WB clone error for "${product.name}":`, error);
+          toast.error(`${product.name.slice(0, 30)}: ${error.message || 'Edge function xatosi'}`);
           return false;
         }
         if (!data?.success) {
-          toast.error(`${product.name.slice(0, 30)}: ${data?.error || 'API xatosi'}`);
+          const apiErr = data?.results?.[0]?.error || data?.error || 'API xatosi';
+          console.error(`WB API error for "${product.name}":`, JSON.stringify(data));
+          toast.error(`${product.name.slice(0, 30)}: ${typeof apiErr === 'string' ? apiErr.slice(0, 100) : 'API xatosi'}`);
           return false;
         }
         return true;

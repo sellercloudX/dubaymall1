@@ -251,7 +251,7 @@ async function getYandexCredentials(supabase: any, userId: string) {
 
   if (apiKey && campaignId && !businessId) {
     try {
-      const r = await fetch(`${YANDEX_API.replace('/v2', '')}/campaigns/${campaignId}`, {
+      const r = await fetch(`${YANDEX_API}/campaigns/${campaignId}`, {
         headers: { "Api-Key": apiKey },
       });
       if (r.ok) { const d = await r.json(); businessId = d.campaign?.business?.id?.toString() || ""; }
