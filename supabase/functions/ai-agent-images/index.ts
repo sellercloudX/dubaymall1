@@ -813,7 +813,9 @@ serve(async (req) => {
     const offerId = typeof body.offerId === 'string' ? body.offerId.slice(0, 200) : undefined;
     const nmID = typeof body.nmID === 'number' && Number.isFinite(body.nmID) ? body.nmID : undefined;
     const marketplace = typeof body.marketplace === 'string' && ['yandex', 'wildberries', 'uzum', 'ozon'].includes(body.marketplace) ? body.marketplace : undefined;
-    const referenceImageUrl = typeof body.referenceImageUrl === 'string' && body.referenceImageUrl.length <= 2000 ? body.referenceImageUrl : undefined;
+    // Allow storage URLs (up to 2000 chars) and data: URIs (up to 10MB base64)
+    const rawRefUrl = typeof body.referenceImageUrl === 'string' ? body.referenceImageUrl : undefined;
+    const referenceImageUrl = rawRefUrl && (rawRefUrl.length <= 2000 || rawRefUrl.startsWith('data:')) ? rawRefUrl : undefined;
     const features = Array.isArray(body.features) ? body.features.slice(0, 10).map((f: any) => typeof f === 'string' ? f.slice(0, 200) : '').filter(Boolean) : undefined;
 
     // Role check: 'scanner-generate' allows seller role, others require admin
