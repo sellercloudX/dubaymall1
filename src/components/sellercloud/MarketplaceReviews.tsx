@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Star, MessageCircle, HelpCircle, Send, CheckCircle2, Clock, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { MarketplaceLogo, MARKETPLACE_SHORT_NAMES } from '@/lib/marketplaceConfig';
 
 interface ReviewItem {
   id: string;
@@ -31,6 +32,8 @@ interface MarketplaceReviewsProps {
 
 type ReviewType = 'feedbacks' | 'questions';
 
+const SUPPORTED_REVIEW_MARKETPLACES = ['wildberries', 'yandex', 'uzum'];
+
 export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviewsProps) {
   const [reviewType, setReviewType] = useState<ReviewType>('feedbacks');
   const [showAnswered, setShowAnswered] = useState(false);
@@ -41,20 +44,23 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
   const [sendingAnswer, setSendingAnswer] = useState(false);
   const [selectedMp, setSelectedMp] = useState<string>('');
 
-  const hasWB = connectedMarketplaces.includes('wildberries');
-  const hasYandex = connectedMarketplaces.includes('yandex');
+  const supportedMps = connectedMarketplaces.filter(mp => SUPPORTED_REVIEW_MARKETPLACES.includes(mp));
 
   useEffect(() => {
-    if (hasWB) setSelectedMp('wildberries');
-    else if (hasYandex) setSelectedMp('yandex');
-  }, [hasWB, hasYandex]);
+    if (supportedMps.length > 0 && !supportedMps.includes(selectedMp)) {
+      setSelectedMp(supportedMps[0]);
+    }
+  }, [supportedMps.join(',')]);
 
   const fetchReviews = useCallback(async () => {
     if (!selectedMp) return;
     setIsLoading(true);
     try {
-      let dataType = reviewType;
-      if (selectedMp === 'yandex') dataType = 'reviews' as any;
+      let dataType: string = reviewType;
+      // Yandex and Uzum use 'reviews' dataType for feedbacks
+      if (selectedMp === 'yandex' || selectedMp === 'uzum') {
+        dataType = reviewType === 'feedbacks' ? 'reviews' : 'reviews';
+      }
 
       const { data, error } = await supabase.functions.invoke('fetch-marketplace-data', {
         body: {
@@ -65,10 +71,15 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
         },
       });
       if (error) throw error;
-      setItems(data?.data || []);
+      if (data?.success === false) {
+        console.warn('Reviews fetch returned error:', data.error);
+        setItems([]);
+      } else {
+        setItems(data?.data || []);
+      }
     } catch (e: any) {
       console.error('Fetch reviews error:', e);
-      toast.error('Ma\'lumotlarni yuklashda xato');
+      toast.error('Sharhlarni yuklashda xato');
     } finally {
       setIsLoading(false);
     }
@@ -82,23 +93,28 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
     if (!answerText.trim()) return;
     setSendingAnswer(true);
     try {
-      const answerDataType = reviewType === 'feedbacks' ? 'answer-feedback' : 'answer-question';
       const body: any = {
         marketplace: selectedMp,
-        dataType: answerDataType,
+        dataType: 'answer-feedback',
         text: answerText,
+        feedbackId: itemId,
       };
-      if (reviewType === 'feedbacks') body.feedbackId = itemId;
-      else body.questionId = itemId;
+      // WB questions use different endpoint
+      if (selectedMp === 'wildberries' && reviewType === 'questions') {
+        body.dataType = 'answer-question';
+        body.questionId = itemId;
+        delete body.feedbackId;
+      }
 
-      const { error } = await supabase.functions.invoke('fetch-marketplace-data', { body });
+      const { data, error } = await supabase.functions.invoke('fetch-marketplace-data', { body });
       if (error) throw error;
+      if (data?.success === false) throw new Error(data.error);
       toast.success('Javob yuborildi!');
       setAnsweringId(null);
       setAnswerText('');
       fetchReviews();
     } catch (e: any) {
-      toast.error('Javob yuborishda xato');
+      toast.error(`Javob yuborishda xato: ${e.message || 'Noma\'lum xato'}`);
     } finally {
       setSendingAnswer(false);
     }
@@ -112,11 +128,12 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
     </div>
   );
 
-  if (!hasWB && !hasYandex) {
+  if (supportedMps.length === 0) {
     return (
       <Card>
         <CardContent className="py-8 text-center text-muted-foreground">
-          Marketplace ulanmagan. Avval marketplace ulang.
+          <MessageCircle className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
+          <p>Marketplace ulanmagan. Avval marketplace ulang.</p>
         </CardContent>
       </Card>
     );
@@ -125,23 +142,19 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
   return (
     <div className="space-y-4">
       {/* Marketplace selector */}
-      <div className="flex gap-2">
-        {hasWB && (
-          <Button size="sm" variant={selectedMp === 'wildberries' ? 'default' : 'outline'} onClick={() => setSelectedMp('wildberries')}>
-            Wildberries
+      <div className="flex gap-2 flex-wrap">
+        {supportedMps.map(mp => (
+          <Button key={mp} size="sm" variant={selectedMp === mp ? 'default' : 'outline'} onClick={() => setSelectedMp(mp)}>
+            <MarketplaceLogo marketplace={mp} size={14} className="mr-1" />
+            {MARKETPLACE_SHORT_NAMES[mp] || mp}
           </Button>
-        )}
-        {hasYandex && (
-          <Button size="sm" variant={selectedMp === 'yandex' ? 'default' : 'outline'} onClick={() => setSelectedMp('yandex')}>
-            Yandex Market
-          </Button>
-        )}
-        <Button size="sm" variant="ghost" onClick={fetchReviews} disabled={isLoading}>
+        ))}
+        <Button size="sm" variant="ghost" onClick={fetchReviews} disabled={isLoading} className="ml-auto">
           <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
         </Button>
       </div>
 
-      {/* Type tabs (WB only has separate feedbacks/questions) */}
+      {/* Type tabs (WB has separate feedbacks/questions) */}
       {selectedMp === 'wildberries' && (
         <Tabs value={reviewType} onValueChange={v => setReviewType(v as ReviewType)}>
           <TabsList className="grid w-full grid-cols-2">
@@ -202,7 +215,7 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
                 {/* Photos */}
                 {item.photos && item.photos.length > 0 && (
                   <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
-                    {item.photos.slice(0, 4).map((url, i) => (
+                    {item.photos.filter(Boolean).slice(0, 4).map((url, i) => (
                       <img key={i} src={url} alt="" className="h-16 w-16 rounded object-cover shrink-0" />
                     ))}
                   </div>
@@ -216,8 +229,8 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
                   </div>
                 )}
 
-                {/* Answer form */}
-                {!item.isAnswered && selectedMp === 'wildberries' && (
+                {/* Answer form — enabled for ALL marketplaces */}
+                {!item.isAnswered && (
                   <>
                     {answeringId === item.id ? (
                       <div className="space-y-2">
@@ -229,7 +242,7 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
                         />
                         <div className="flex gap-2">
                           <Button size="sm" onClick={() => handleAnswer(item.id)} disabled={sendingAnswer || !answerText.trim()}>
-                            <Send className="h-3.5 w-3.5 mr-1" />Yuborish
+                            <Send className="h-3.5 w-3.5 mr-1" />{sendingAnswer ? 'Yuborilmoqda...' : 'Yuborish'}
                           </Button>
                           <Button size="sm" variant="ghost" onClick={() => { setAnsweringId(null); setAnswerText(''); }}>
                             Bekor

@@ -1295,9 +1295,37 @@ serve(async (req) => {
           console.error("Yandex reviews error:", e);
           result = { success: false, error: "Error fetching Yandex reviews" };
         }
+      } else if (dataType === "answer-feedback") {
+        // Yandex Market: Answer a review/feedback
+        try {
+          const { feedbackId, text } = requestBody;
+          if (!feedbackId || !text || !effectiveBusinessId) {
+            result = { success: false, error: "feedbackId, text and businessId required" };
+          } else {
+            const answerResp = await fetchWithRetry(
+              `https://api.partner.market.yandex.ru/businesses/${effectiveBusinessId}/goods-feedback/comments`,
+              {
+                method: "POST",
+                headers: { ...headers, "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  feedbackId: Number(feedbackId),
+                  comment: text,
+                }),
+              }
+            );
+            if (answerResp.ok) {
+              result = { success: true, message: "Javob yuborildi" };
+            } else {
+              const errText = await answerResp.text();
+              result = { success: false, error: `Yandex answer failed: ${answerResp.status}`, details: errText };
+            }
+          }
+        } catch (e) {
+          console.error("Yandex answer feedback error:", e);
+          result = { success: false, error: "Error answering Yandex feedback" };
+        }
       }
 
-      // Update connection with latest sync time
       await supabase
         .from("marketplace_connections")
         .update({ 
@@ -2773,6 +2801,94 @@ serve(async (req) => {
         } catch (e) {
           console.error("Deep reconciliation error:", e);
           result = { success: false, error: "Deep reconciliation error: " + (e as Error).message };
+        }
+      } else if (dataType === "feedbacks" || dataType === "reviews") {
+        // Uzum Market: Fetch product reviews
+        try {
+          // Try Uzum seller reviews API
+          const reviewParams = new URLSearchParams();
+          if (uzumShopId) reviewParams.append("shopId", String(uzumShopId));
+          reviewParams.append("size", "50");
+          reviewParams.append("page", String(requestBody.page || 0));
+          
+          const reviewEndpoints = [
+            `${uzumBaseUrl}/v1/review/list?${reviewParams.toString()}`,
+            `${uzumBaseUrl}/v2/review?${reviewParams.toString()}`,
+            `${uzumBaseUrl}/v1/feedback?${reviewParams.toString()}`,
+          ];
+
+          let reviews: any[] = [];
+          for (const endpoint of reviewEndpoints) {
+            try {
+              const revResp = await fetch(endpoint, { headers: uzumHeaders });
+              if (revResp.ok) {
+                const revData = await revResp.json();
+                const items = revData.payload || revData.data || revData.content || [];
+                if (Array.isArray(items) && items.length > 0) {
+                  reviews = items;
+                  console.log(`Uzum reviews: got ${reviews.length} from ${endpoint}`);
+                  break;
+                }
+              }
+            } catch {
+              // Try next endpoint
+            }
+          }
+
+          const mapped = reviews.map((r: any) => ({
+            id: String(r.id || r.reviewId || r.feedbackId || Math.random()),
+            offerId: String(r.productId || r.skuId || ''),
+            productName: r.productTitle || r.productName || r.skuTitle || '',
+            userName: r.authorName || r.customerName || 'Xaridor',
+            text: r.body || r.text || r.comment || '',
+            answer: r.answer?.body || r.sellerComment || r.reply || null,
+            rating: r.rating || r.grade || 0,
+            createdAt: r.createdAt || r.date || '',
+            photos: (r.photos || r.media || []).map((p: any) => typeof p === 'string' ? p : p.url || ''),
+            isAnswered: !!(r.answer?.body || r.sellerComment || r.reply),
+          }));
+
+          result = { success: true, data: mapped, total: mapped.length };
+        } catch (e) {
+          console.error("Uzum reviews error:", e);
+          result = { success: false, error: "Uzum reviews fetch error" };
+        }
+      } else if (dataType === "answer-feedback") {
+        // Uzum Market: Answer a review
+        try {
+          const { feedbackId, text } = requestBody;
+          if (!feedbackId || !text) {
+            result = { success: false, error: "feedbackId and text required" };
+          } else {
+            const answerEndpoints = [
+              { url: `${uzumBaseUrl}/v1/review/${feedbackId}/reply`, method: "POST" },
+              { url: `${uzumBaseUrl}/v1/feedback/${feedbackId}/answer`, method: "POST" },
+            ];
+
+            let answered = false;
+            for (const ep of answerEndpoints) {
+              try {
+                const resp = await fetch(ep.url, {
+                  method: ep.method,
+                  headers: { ...uzumHeaders, "Content-Type": "application/json" },
+                  body: JSON.stringify({ body: text, text }),
+                });
+                if (resp.ok) {
+                  answered = true;
+                  result = { success: true, message: "Javob yuborildi" };
+                  break;
+                }
+              } catch {
+                // Try next endpoint
+              }
+            }
+            if (!answered) {
+              result = { success: false, error: "Uzum answer API not available" };
+            }
+          }
+        } catch (e) {
+          console.error("Uzum answer error:", e);
+          result = { success: false, error: "Error answering Uzum review" };
         }
       }
 
