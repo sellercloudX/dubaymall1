@@ -29,6 +29,7 @@ verify_jwt = false
 
 [functions.fetch-marketplace-data]
 verify_jwt = false
+wall_clock_timeout = 300
 
 [functions.generate-product-content]
 verify_jwt = false
