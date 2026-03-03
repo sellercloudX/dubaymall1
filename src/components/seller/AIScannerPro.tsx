@@ -382,10 +382,25 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
           const uploadedUrl = await uploadImageToStorage(sourceImage);
           if (uploadedUrl) {
             referenceImageUrl = uploadedUrl;
+          } else {
+            console.warn('⚠️ Storage upload failed, retrying...');
+            // Retry once
+            const retryUrl = await uploadImageToStorage(sourceImage);
+            if (retryUrl) {
+              referenceImageUrl = retryUrl;
+            } else {
+              console.error('❌ Storage upload failed twice');
+              toast.error('Rasm yuklashda xato. Qayta urinib ko\'ring.');
+            }
           }
         } else if (sourceImage.startsWith('http')) {
           referenceImageUrl = sourceImage;
         }
+      }
+
+      // If no referenceImageUrl at all, we cannot continue image generation
+      if (!referenceImageUrl && sourceImage?.startsWith('data:')) {
+        console.error('❌ No reference image URL available — image generation will be skipped');
       }
 
       // Step 2-3: Card creator handles SEO + description with category context
@@ -414,14 +429,16 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
       }
       updateTaskProgress(3, 'completed');
 
-      // Step 5: AI Agent Image Pipeline — Hero Infographic + 3 Lifestyle angles (OpenAI gpt-image-1)
+      // Step 5: AI Agent Image Pipeline — Hero Infographic + Lifestyle (OpenAI gpt-image-1)
       const generatedInfos: string[] = [];
-      const bestImageForInfographic = referenceImageUrl || productImage;
+      // CRITICAL: Only use storage URLs (not base64) for ai-agent-images — base64 exceeds 2000 char limit
+      const bestImageForInfographic = referenceImageUrl;
       
       if (shouldGenerateInfographics && bestImageForInfographic) {
         updateTaskProgress(4, 'running');
 
         try {
+          console.log('🖼️ Calling ai-agent-images with URL:', bestImageForInfographic.substring(0, 80));
           const { data: imgData, error: imgError } = await supabase.functions.invoke('ai-agent-images', {
             body: {
               action: 'scanner-generate',
@@ -440,14 +457,21 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
             console.log(`✅ AI Agent pipeline: ${imgData.totalImages} ta rasm yaratildi`);
             updateTaskProgress(4, 'completed');
           } else {
-            console.warn('AI Agent images failed:', imgError?.message || imgData?.error);
+            const errMsg = imgError?.message || imgData?.error || 'Unknown image error';
+            console.warn('AI Agent images failed:', errMsg);
+            toast.error(`Rasm yaratish xatosi: ${errMsg}`);
             updateTaskProgress(4, 'failed');
           }
-        } catch (imgErr) {
+        } catch (imgErr: any) {
           console.error('AI Agent images error:', imgErr);
+          toast.error(`Rasm yaratish xatosi: ${imgErr?.message || 'Noma\'lum xato'}`);
           updateTaskProgress(4, 'failed');
         }
       } else {
+        if (shouldGenerateInfographics && !bestImageForInfographic) {
+          console.warn('⚠️ No reference image URL — skipping image generation');
+          toast.warning('Rasm yuklanmadi — infografika o\'tkazib yuborildi');
+        }
         updateTaskProgress(4, 'completed');
       }
 
@@ -476,11 +500,16 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
           },
         });
 
-        console.log('WB Card creation result:', cardResult);
-        if (error) throw error;
+        console.log('WB Card creation result:', JSON.stringify(cardResult)?.substring(0, 500));
+        if (error) {
+          const errDetail = cardResult?.error || error.message || 'WB xatosi';
+          throw new Error(`WB: ${errDetail}`);
+        }
+        if (cardResult && !cardResult.success && cardResult.error) {
+          throw new Error(`WB: ${cardResult.error}`);
+        }
       } else {
         // Yandex card creation — ALWAYS skip image gen since AIScannerPro already generated them
-        // This prevents duplicate image generation and speeds up card creation significantly
         const hasAiImages = generatedInfos.length >= 1;
         const { data: cardResult, error } = await supabase.functions.invoke('yandex-market-create-card', {
           body: {
@@ -501,7 +530,6 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
               mxikCode: mxikResult?.mxik_code,
               mxikName: mxikResult?.mxik_name,
             },
-            // CRITICAL: Skip image generation if we already have AI images from scanner
             skipImageGeneration: hasAiImages,
             pricing: {
               costPrice: pricingData.costPrice,
@@ -515,8 +543,18 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
           },
         });
 
-        console.log('Yandex Card creation result:', cardResult);
-        if (error) throw error;
+        console.log('Yandex Card creation result:', JSON.stringify(cardResult)?.substring(0, 500));
+        if (error) {
+          const errDetail = cardResult?.error || error.message || 'Yandex xatosi';
+          throw new Error(`Yandex: ${errDetail}`);
+        }
+        // Check for Yandex API-level errors in the response
+        if (cardResult?.results?.[0]?.error) {
+          const yErr = cardResult.results[0].error;
+          console.error('Yandex API error:', yErr);
+          toast.error(`Yandex xatosi: ${yErr.substring(0, 150)}`);
+          // Don't throw — card may still be partially created
+        }
       }
 
       updateTaskProgress(5, 'completed');
@@ -527,7 +565,8 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
     } catch (error: any) {
       console.error('Background card creation error:', error);
       updateTaskStatus('failed');
-      toast.error(`"${normalizeProductName(product.title)}" yaratishda xato`);
+      const errMsg = error?.message || 'Noma\'lum xato';
+      toast.error(`"${normalizeProductName(product.title)}" yaratishda xato: ${errMsg}`);
     }
   }, [shopId, onSuccess]);
 
