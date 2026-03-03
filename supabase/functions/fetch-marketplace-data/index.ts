@@ -2511,9 +2511,13 @@ serve(async (req) => {
             const allKeys = new Set([
               ...productCatalog.keys(),
               ...invoiceMap.keys(),
-              ...soldMap.keys(),
+              ...fbsSoldMap.keys(),
+              ...fboSoldMap.keys(),
               ...stockMap.keys(),
               ...returnMap.keys(),
+              ...fboReturnMap.keys(),
+              ...fbsReturnMap.keys(),
+              ...financeMap.keys(),
             ]);
 
             // Deduplicate: group by primary skuId from catalog
