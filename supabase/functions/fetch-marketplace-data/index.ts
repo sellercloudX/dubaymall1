@@ -2338,55 +2338,57 @@ serve(async (req) => {
 
             // Step 2: Fetch ALL invoices (FBO — goods sent to warehouse) with full pagination
             const invoiceMap = new Map<string, { sent: number; received: number; invoiceCount: number }>();
-            let invoicePage = 0;
-            let invoiceHasMore = true;
-            while (invoiceHasMore) {
-              try {
-                const invResp = await fetch(
-                  `${uzumBaseUrl}/v1/shop/${uzumShopId}/invoice?size=50&page=${invoicePage}`,
-                  { headers: uzumHeaders }
-                );
-                if (!invResp.ok) break;
-                const invData = await invResp.json();
-                const invoices = Array.isArray(invData) ? invData : (invData.payload?.items || invData.payload || []);
-                const invList = Array.isArray(invoices) ? invoices : [];
-                if (invList.length === 0) break;
+            for (const currentShopId of allShopIds) {
+              let invoicePage = 0;
+              let invoiceHasMore = true;
+              while (invoiceHasMore) {
+                try {
+                  const invResp = await fetch(
+                    `${uzumBaseUrl}/v1/shop/${currentShopId}/invoice?size=50&page=${invoicePage}`,
+                    { headers: uzumHeaders }
+                  );
+                  if (!invResp.ok) break;
+                  const invData = await invResp.json();
+                  const invoices = Array.isArray(invData) ? invData : (invData.payload?.items || invData.payload || []);
+                  const invList = Array.isArray(invoices) ? invoices : [];
+                  if (invList.length === 0) break;
 
-                for (const inv of invList) {
-                  const invoiceId = inv.invoiceId || inv.id;
-                  if (!invoiceId) continue;
-                  await sleep(300);
-                  try {
-                    const prodResp = await fetch(
-                      `${uzumBaseUrl}/v1/shop/${uzumShopId}/invoice/products?invoiceId=${invoiceId}`,
-                      { headers: uzumHeaders }
-                    );
-                    if (prodResp.ok) {
-                      const prodData = await prodResp.json();
-                      const items = Array.isArray(prodData) ? prodData : (prodData.payload || []);
-                      items.forEach((item: any) => {
-                        const key = String(item.skuId || item.productId || item.barcode || '');
-                        if (!key) return;
-                        const existing = invoiceMap.get(key) || { sent: 0, received: 0, invoiceCount: 0 };
-                        existing.sent += (item.quantity || item.amount || 0);
-                        existing.received += (item.receivedQuantity || item.receivedAmount || item.acceptedQuantity || 0);
-                        existing.invoiceCount++;
-                        invoiceMap.set(key, existing);
-                      });
+                  for (const inv of invList) {
+                    const invoiceId = inv.invoiceId || inv.id;
+                    if (!invoiceId) continue;
+                    await sleep(300);
+                    try {
+                      const prodResp = await fetch(
+                        `${uzumBaseUrl}/v1/shop/${currentShopId}/invoice/products?invoiceId=${invoiceId}`,
+                        { headers: uzumHeaders }
+                      );
+                      if (prodResp.ok) {
+                        const prodData = await prodResp.json();
+                        const items = Array.isArray(prodData) ? prodData : (prodData.payload || []);
+                        items.forEach((item: any) => {
+                          const key = String(item.skuId || item.productId || item.barcode || '');
+                          if (!key) return;
+                          const existing = invoiceMap.get(key) || { sent: 0, received: 0, invoiceCount: 0 };
+                          existing.sent += (item.quantity || item.amount || 0);
+                          existing.received += (item.receivedQuantity || item.receivedAmount || item.acceptedQuantity || 0);
+                          existing.invoiceCount++;
+                          invoiceMap.set(key, existing);
+                        });
+                      }
+                    } catch (e) {
+                      console.error(`Invoice ${invoiceId} products error:`, e);
                     }
-                  } catch (e) {
-                    console.error(`Invoice ${invoiceId} products error:`, e);
                   }
-                }
 
-                if (invList.length < 50) invoiceHasMore = false;
-                else { invoicePage++; await sleep(300); }
-              } catch (e) {
-                console.error("Invoice list fetch error:", e);
-                break;
+                  if (invList.length < 50) invoiceHasMore = false;
+                  else { invoicePage++; await sleep(300); }
+                } catch (e) {
+                  console.error("Invoice list fetch error:", e);
+                  break;
+                }
               }
             }
-            console.log(`Deep reconciliation: ${invoiceMap.size} SKUs with invoice data, pages: ${invoicePage + 1}`);
+            console.log(`Deep reconciliation: ${invoiceMap.size} SKUs with invoice data`);
 
             // Step 3: Fetch ALL FBS orders with full pagination (multiple statuses)
             const fbsSoldMap = new Map<string, { totalSold: number; delivered: number; inProcess: number; cancelled: number }>();
