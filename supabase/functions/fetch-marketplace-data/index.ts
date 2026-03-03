@@ -2749,18 +2749,27 @@ serve(async (req) => {
             }
 
             // Calculate losses and return discrepancies
-            // FORMULA: LOST = (FBO_SENT + FBS_SOLD) - FBO_SOLD - FBO_STOCK - FBO_RETURNED - FBS_RETURNED
+            const hasInvoiceData = invoiceMap.size > 0;
+            // FORMULA when invoice data available: LOST = (FBO_SENT + FBS_SOLD) - FBO_SOLD - STOCK - RETURNS
+            // FORMULA when no invoice data: estimate invoiced = sold + stock + returned, lost = invoiced - accounted
             const reconciliation = Array.from(aggregated.entries()).map(([skuId, data]) => {
               // Return discrepancy: requested vs actually received back
               data.returnDiscrepancy = Math.max(0, data.returnRequested - data.returnReceived - data.returnPending);
 
-              // NEW FORMULA: LOST = (FBO_YUKLANGAN + FBS_SOTILGAN) - FBO_SOTILGAN - FBO_QOLDIQ - FBO_QAYTARIB_OLINGAN - FBS_QAYTARIB_OLINGAN
-              // Total items in system = FBO sent to warehouse + FBS sold by seller
-              // Accounted for = FBO sold + remaining stock + FBO returns + FBS returns
-              if (data.fboSent > 0 || data.fbsSold > 0) {
+              if (hasInvoiceData && data.fboSent > 0) {
+                // Full reconciliation with invoice data
                 const totalIn = data.fboSent + data.fbsSold;
                 const totalAccountedFor = data.fboSold + data.currentStock + data.fboReturnReceived + data.fbsReturnReceived;
                 data.lost = Math.max(0, totalIn - totalAccountedFor);
+              } else if (data.fbsSold > 0 || data.fboSold > 0) {
+                // No invoice data — estimate: invoiced should be at least sold + current stock
+                // If API gave us FBO sold but no FBO sent, something may be lost
+                const totalSold = data.fboSold + data.fbsSold;
+                const totalReturned = data.fboReturnReceived + data.fbsReturnReceived;
+                // Estimate: what was sent in = at minimum what was sold + what's in stock + what was returned
+                const estimatedSent = totalSold + data.currentStock + totalReturned;
+                data.fboSent = data.fboSent || estimatedSent; // Fill in estimated if no real data
+                data.lost = 0; // Can't calculate loss without real invoice data
               } else {
                 data.lost = 0;
               }
