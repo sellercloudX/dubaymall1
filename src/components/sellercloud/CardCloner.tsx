@@ -167,31 +167,19 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
   
   // Check if product already exists in target marketplace (DB history OR fuzzy matching)
   const isAlreadyCloned = useCallback((product: CloneableProduct, targetMp: string): boolean => {
-    // 1. Check DB clone history first
+    // 1. Check DB clone history first (primary source of truth)
     const historyKey = `${sourceMarketplace}:${product.offerId}:${targetMp}`;
     if (cloneHistoryKeys.has(historyKey)) return true;
 
-    // 2. Fallback to fuzzy matching against target products
+    // 2. Strict matching only — exact SKU/offerId match against target products
     const targetProducts = store.getProducts(targetMp);
-    const srcName = normalize(product.name);
     const srcSku = product.shopSku?.toLowerCase() || '';
     const srcOfferId = product.offerId?.toLowerCase() || '';
     
     return targetProducts.some(p => {
-      if (p.offerId?.toLowerCase() === srcOfferId) return true;
-      if (p.shopSku?.toLowerCase() === srcSku) return true;
-      
-      const tgtName = normalize(p.name || '');
-      if (srcName && tgtName && srcName.length > 5 && tgtName.length > 5) {
-        if (tgtName.includes(srcName) || srcName.includes(tgtName)) return true;
-        const srcWords = new Set(product.name.toLowerCase().split(/\s+/).filter(w => w.length > 2));
-        const tgtWords = new Set((p.name || '').toLowerCase().split(/\s+/).filter(w => w.length > 2));
-        if (srcWords.size >= 3) {
-          let matches = 0;
-          for (const w of srcWords) { if (tgtWords.has(w)) matches++; }
-          if (matches / srcWords.size >= 0.6) return true;
-        }
-      }
+      // Only exact ID matches — no fuzzy name matching to avoid false positives
+      if (srcOfferId && p.offerId?.toLowerCase() === srcOfferId) return true;
+      if (srcSku && srcSku.length > 3 && p.shopSku?.toLowerCase() === srcSku) return true;
       return false;
     });
   }, [store.dataVersion, cloneHistoryKeys, sourceMarketplace]);
