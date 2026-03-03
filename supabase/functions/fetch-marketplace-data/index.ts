@@ -2338,10 +2338,13 @@ serve(async (req) => {
 
             // Step 2: Fetch ALL invoices (FBO — goods sent to warehouse) with full pagination
             const invoiceMap = new Map<string, { sent: number; received: number; invoiceCount: number }>();
+            let totalInvoicesFetched = 0;
+            const MAX_INVOICES = 200; // Limit to prevent timeout
             for (const currentShopId of allShopIds) {
+              if (totalInvoicesFetched >= MAX_INVOICES) break;
               let invoicePage = 0;
               let invoiceHasMore = true;
-              while (invoiceHasMore) {
+              while (invoiceHasMore && totalInvoicesFetched < MAX_INVOICES) {
                 try {
                   const invResp = await fetch(
                     `${uzumBaseUrl}/v1/shop/${currentShopId}/invoice?size=50&page=${invoicePage}`,
@@ -2354,9 +2357,10 @@ serve(async (req) => {
                   if (invList.length === 0) break;
 
                   for (const inv of invList) {
+                    if (totalInvoicesFetched >= MAX_INVOICES) break;
                     const invoiceId = inv.invoiceId || inv.id;
                     if (!invoiceId) continue;
-                    await sleep(300);
+                    await sleep(150); // Reduced delay
                     try {
                       const prodResp = await fetch(
                         `${uzumBaseUrl}/v1/shop/${currentShopId}/invoice/products?invoiceId=${invoiceId}`,
@@ -2375,20 +2379,21 @@ serve(async (req) => {
                           invoiceMap.set(key, existing);
                         });
                       }
+                      totalInvoicesFetched++;
                     } catch (e) {
                       console.error(`Invoice ${invoiceId} products error:`, e);
                     }
                   }
 
                   if (invList.length < 50) invoiceHasMore = false;
-                  else { invoicePage++; await sleep(300); }
+                  else { invoicePage++; await sleep(200); }
                 } catch (e) {
                   console.error("Invoice list fetch error:", e);
                   break;
                 }
               }
             }
-            console.log(`Deep reconciliation: ${invoiceMap.size} SKUs with invoice data`);
+            console.log(`Deep reconciliation: ${invoiceMap.size} SKUs with invoice data (${totalInvoicesFetched} invoices fetched)`);
 
             // Step 3: Fetch ALL FBS orders with full pagination (multiple statuses)
             const fbsSoldMap = new Map<string, { totalSold: number; delivered: number; inProcess: number; cancelled: number }>();
