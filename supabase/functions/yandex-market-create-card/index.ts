@@ -992,7 +992,12 @@ serve(async (req) => {
         let yResult: any;
         try { yResult = JSON.parse(respText); } catch { yResult = { raw: respText }; }
 
-        if (!yResp.ok) console.error(`❌ Yandex error (${yResp.status}):`, respText.substring(0, 300));
+        if (!yResp.ok) {
+          console.error(`❌ Yandex error (${yResp.status}):`, respText.substring(0, 500));
+          // Parse detailed error info for client
+          const errDetail = yResult?.errors?.map((e: any) => e.message || e.code).join('; ') || respText.substring(0, 200);
+          console.error(`❌ Error details: ${errDetail}`);
+        }
 
         // ═══ STEP 7: Uzbek content ═══
         let uzSent = false;
@@ -1112,7 +1117,7 @@ serve(async (req) => {
           qualityCheck,
           yandexResponse: yResult,
           localProductId: saved?.id,
-          error: yResp.ok ? null : (yResult?.errors?.[0]?.message || `HTTP ${yResp.status}`),
+          error: yResp.ok ? null : (yResult?.errors?.map((e: any) => e.message || e.code).join('; ') || `HTTP ${yResp.status}: ${respText.substring(0, 200)}`),
         });
 
         console.log(`${yResp.ok ? "✅" : "❌"} Done: params=${offer.parameterValues?.length || 0}, imgs=${images.length}`);
