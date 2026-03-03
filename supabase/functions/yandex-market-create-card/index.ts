@@ -6,7 +6,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const YANDEX_API = "https://api.partner.market.yandex.ru/v2";
+const YANDEX_API = "https://api.partner.market.yandex.ru";
+const YANDEX_API_V2 = "https://api.partner.market.yandex.ru/v2";
 
 // ============ TYPES ============
 
@@ -95,21 +96,38 @@ async function proxyImagesToStorage(
     if (url.includes('dropbox.com') || url.includes('drive.google.com')) continue;
 
     try {
-      const resp = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-          'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8',
-          'Referer': url.includes('yandex') ? 'https://market.yandex.ru/' : url.includes('uzum') ? 'https://uzum.uz/' : url.includes('wildberries') ? 'https://www.wildberries.ru/' : 'https://google.com/',
-        },
-      });
-      if (!resp.ok) { console.warn(`⚠️ Download failed (${resp.status}): ${url.substring(0, 80)}`); proxied.push(url); continue; }
+      // Retry up to 2 times for flaky image downloads
+      let resp: Response | null = null;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          resp = await fetch(url, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+              'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8',
+              'Referer': url.includes('yandex') ? 'https://market.yandex.ru/' : url.includes('uzum') ? 'https://uzum.uz/' : url.includes('wildberries') ? 'https://www.wildberries.ru/' : 'https://google.com/',
+            },
+          });
+          if (resp.ok) break;
+          console.warn(`⚠️ Image download attempt ${attempt + 1} failed (${resp.status}): ${url.substring(0, 80)}`);
+          if (attempt < 1) await new Promise(r => setTimeout(r, 500));
+        } catch (fetchErr) {
+          console.warn(`⚠️ Image fetch attempt ${attempt + 1} error: ${fetchErr}`);
+          if (attempt < 1) await new Promise(r => setTimeout(r, 500));
+        }
+      }
+      
+      if (!resp || !resp.ok) {
+        // Still use original URL as fallback — Yandex may access it directly
+        proxied.push(url);
+        continue;
+      }
 
       const ct = resp.headers.get('content-type') || 'image/jpeg';
-      if (!ct.startsWith('image/')) continue;
+      if (!ct.startsWith('image/')) { proxied.push(url); continue; }
 
       const data = await resp.arrayBuffer();
-      if (data.byteLength < 1000) continue;
+      if (data.byteLength < 1000) { proxied.push(url); continue; }
 
       const extMap: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
       const ext = extMap[ct] || 'jpg';
@@ -128,6 +146,7 @@ async function proxyImagesToStorage(
       }
     } catch (e) {
       console.error(`Proxy err: ${e}`);
+      proxied.push(url); // Use original URL as fallback
     }
   }
   return proxied;
@@ -250,7 +269,7 @@ async function getYandexCredentials(supabase: any, userId: string) {
 
   if (apiKey && campaignId && !businessId) {
     try {
-      const r = await fetch(`${YANDEX_API.replace('/v2', '')}/campaigns/${campaignId}`, {
+      const r = await fetch(`${YANDEX_API}/campaigns/${campaignId}`, {
         headers: { "Api-Key": apiKey },
       });
       if (r.ok) { const d = await r.json(); businessId = d.campaign?.business?.id?.toString() || ""; }
@@ -973,7 +992,12 @@ serve(async (req) => {
         let yResult: any;
         try { yResult = JSON.parse(respText); } catch { yResult = { raw: respText }; }
 
-        if (!yResp.ok) console.error(`❌ Yandex error (${yResp.status}):`, respText.substring(0, 300));
+        if (!yResp.ok) {
+          console.error(`❌ Yandex error (${yResp.status}):`, respText.substring(0, 500));
+          // Parse detailed error info for client
+          const errDetail = yResult?.errors?.map((e: any) => e.message || e.code).join('; ') || respText.substring(0, 200);
+          console.error(`❌ Error details: ${errDetail}`);
+        }
 
         // ═══ STEP 7: Uzbek content ═══
         let uzSent = false;
@@ -989,7 +1013,7 @@ serve(async (req) => {
             console.log("🔍 Running auto quality check...");
             await new Promise(r => setTimeout(r, 1000));
             
-            const checkResp = await fetch(`${YANDEX_API}/businesses/${creds.businessId}/offer-mappings?offerIds=${encodeURIComponent(sku)}`, {
+            const checkResp = await fetch(`${YANDEX_API}/businesses/${creds.businessId}/offer-mappings`, {
               method: "POST",
               headers: { "Api-Key": creds.apiKey, "Content-Type": "application/json" },
               body: JSON.stringify({ offerIds: [sku] }),
@@ -1093,7 +1117,7 @@ serve(async (req) => {
           qualityCheck,
           yandexResponse: yResult,
           localProductId: saved?.id,
-          error: yResp.ok ? null : (yResult?.errors?.[0]?.message || `HTTP ${yResp.status}`),
+          error: yResp.ok ? null : (yResult?.errors?.map((e: any) => e.message || e.code).join('; ') || `HTTP ${yResp.status}: ${respText.substring(0, 200)}`),
         });
 
         console.log(`${yResp.ok ? "✅" : "❌"} Done: params=${offer.parameterValues?.length || 0}, imgs=${images.length}`);
