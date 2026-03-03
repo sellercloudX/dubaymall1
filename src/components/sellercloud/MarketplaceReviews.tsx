@@ -57,29 +57,44 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
     setIsLoading(true);
     try {
       let dataType: string = reviewType;
-      // Yandex and Uzum use 'reviews' dataType for feedbacks
+      // Yandex and Uzum use 'reviews' dataType
       if (selectedMp === 'yandex' || selectedMp === 'uzum') {
-        dataType = reviewType === 'feedbacks' ? 'reviews' : 'reviews';
+        dataType = 'reviews';
+      }
+      // WB: feedbacks or questions
+      // Yandex/Uzum: always 'reviews'
+
+      const body: Record<string, any> = {
+        marketplace: selectedMp,
+        dataType,
+        take: 100,
+      };
+
+      // WB API supports isAnswered natively
+      if (selectedMp === 'wildberries') {
+        body.isAnswered = showAnswered;
       }
 
-      const { data, error } = await supabase.functions.invoke('fetch-marketplace-data', {
-        body: {
-          marketplace: selectedMp,
-          dataType,
-          isAnswered: showAnswered,
-          take: 50,
-        },
-      });
+      console.log('Fetching reviews:', body);
+
+      const { data, error } = await supabase.functions.invoke('fetch-marketplace-data', { body });
       if (error) throw error;
       if (data?.success === false) {
         console.warn('Reviews fetch returned error:', data.error);
+        toast.error(data.error || 'Sharhlarni yuklashda xato');
         setItems([]);
       } else {
-        setItems(data?.data || []);
+        let results: ReviewItem[] = data?.data || [];
+        // Yandex/Uzum: filter isAnswered client-side since API doesn't support it
+        if (selectedMp !== 'wildberries') {
+          results = results.filter(item => item.isAnswered === showAnswered);
+        }
+        console.log(`Reviews loaded: ${results.length} items (showAnswered=${showAnswered})`);
+        setItems(results);
       }
     } catch (e: any) {
       console.error('Fetch reviews error:', e);
-      toast.error('Sharhlarni yuklashda xato');
+      toast.error('Sharhlarni yuklashda xato: ' + (e.message || ''));
     } finally {
       setIsLoading(false);
     }
