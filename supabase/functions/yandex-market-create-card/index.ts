@@ -1013,7 +1013,7 @@ serve(async (req) => {
             console.log("🔍 Running auto quality check...");
             await new Promise(r => setTimeout(r, 1000));
             
-            const checkResp = await fetch(`${YANDEX_API}/businesses/${creds.businessId}/offer-mappings?offerIds=${encodeURIComponent(sku)}`, {
+            const checkResp = await fetch(`${YANDEX_API}/businesses/${creds.businessId}/offer-mappings`, {
               method: "POST",
               headers: { "Api-Key": creds.apiKey, "Content-Type": "application/json" },
               body: JSON.stringify({ offerIds: [sku] }),
