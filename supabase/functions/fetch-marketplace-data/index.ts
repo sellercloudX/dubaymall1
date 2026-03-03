@@ -2280,47 +2280,61 @@ serve(async (req) => {
           if (!uzumShopId) {
             result = { success: false, error: "Shop ID required for reconciliation" };
           } else {
-            console.log("Uzum DEEP reconciliation starting for shop:", uzumShopId);
+            console.log("Uzum DEEP reconciliation starting for ALL shops:", allShopIds.length, "primary:", uzumShopId);
 
-            // Step 1: Fetch ALL products from catalog
+            // Step 1: Fetch ALL products from catalog (iterate ALL shops like products endpoint)
             const productCatalog = new Map<string, { name: string; stock: number; skuId: string; barcode: string }>();
-            let prodPage = 0;
-            let prodHasMore = true;
-            while (prodHasMore) {
-              try {
-                const prodResp = await fetch(
-                  `${uzumBaseUrl}/v1/product/shop/${uzumShopId}?size=50&page=${prodPage}`,
-                  { headers: uzumHeaders }
-                );
-                if (!prodResp.ok) break;
-                const prodData = await prodResp.json();
-                const items = prodData.payload?.items || prodData.payload?.products || prodData.items || [];
-                if (items.length === 0) break;
-                items.forEach((card: any) => {
-                  const skus = card.skuList || card.skus || [];
-                  const firstSku = skus[0] || {};
-                  const skuId = String(firstSku.skuId || card.productId || card.id || '');
-                  const productId = String(card.productId || card.id || '');
-                  const barcode = String(firstSku.barcode || card.barcode || '');
-                  let stock = 0;
-                  skus.forEach((sku: any) => {
-                    stock += (sku.quantityActive || 0) + (sku.quantityFbs || 0);
-                    const amounts = sku.skuAmountList || sku.amounts || [];
-                    amounts.forEach((a: any) => { stock += (a.amount || a.available || 0); });
+            for (let shopIdx = 0; shopIdx < allShopIds.length; shopIdx++) {
+              const currentShopId = allShopIds[shopIdx];
+              if (shopIdx > 0) await sleep(500);
+              let prodPage = 0;
+              let prodHasMore = true;
+              while (prodHasMore) {
+                try {
+                  const prodResp = await fetch(
+                    `${uzumBaseUrl}/v1/product/shop/${currentShopId}?size=100&page=${prodPage}&filter=ALL`,
+                    { headers: uzumHeaders }
+                  );
+                  if (!prodResp.ok) {
+                    if (prodResp.status === 403) {
+                      console.log(`Reconciliation: no access to shop=${currentShopId}, skipping`);
+                    } else {
+                      console.error(`Reconciliation product fetch error shop=${currentShopId}:`, prodResp.status);
+                    }
+                    break;
+                  }
+                  const prodData = await prodResp.json();
+                  // Use SAME parsing as products endpoint
+                  const productCards = prodData.productList || prodData.productCards || prodData.payload?.productCards || prodData.payload?.productList || prodData.payload || prodData.data || [];
+                  const items = Array.isArray(productCards) ? productCards : [];
+                  console.log(`Reconciliation catalog shop=${currentShopId} page ${prodPage}: ${items.length} products`);
+                  if (items.length === 0) break;
+                  items.forEach((card: any) => {
+                    const skus = card.skuList || card.skus || [];
+                    const firstSku = skus[0] || {};
+                    const skuId = String(firstSku.skuId || card.productId || card.id || '');
+                    const productId = String(card.productId || card.id || '');
+                    const barcode = String(firstSku.barcode || firstSku.barCode || card.barcode || '');
+                    let stock = 0;
+                    skus.forEach((sku: any) => {
+                      stock += (sku.quantityActive || 0) + (sku.quantityFbs || 0);
+                      const amounts = sku.skuAmountList || sku.amounts || [];
+                      amounts.forEach((a: any) => { stock += (a.amount || a.available || 0); });
+                    });
+                    const name = card.title || card.name || '';
+                    if (skuId) productCatalog.set(skuId, { name, stock, skuId, barcode });
+                    if (productId && productId !== skuId) productCatalog.set(productId, { name, stock, skuId, barcode });
+                    if (barcode && barcode !== 'undefined') productCatalog.set(barcode, { name, stock, skuId, barcode });
                   });
-                  const name = card.title || card.name || '';
-                  if (skuId) productCatalog.set(skuId, { name, stock, skuId, barcode });
-                  if (productId && productId !== skuId) productCatalog.set(productId, { name, stock, skuId, barcode });
-                  if (barcode) productCatalog.set(barcode, { name, stock, skuId, barcode });
-                });
-                if (items.length < 50) prodHasMore = false;
-                else { prodPage++; await sleep(300); }
-              } catch (e) {
-                console.error("Uzum product catalog fetch error:", e);
-                break;
+                  if (items.length < 100) prodHasMore = false;
+                  else { prodPage++; await sleep(300); }
+                } catch (e) {
+                  console.error("Uzum product catalog fetch error:", e);
+                  break;
+                }
               }
             }
-            console.log(`Deep reconciliation: ${productCatalog.size} catalog entries`);
+            console.log(`Deep reconciliation: ${productCatalog.size} catalog entries from ${allShopIds.length} shops`);
 
             // Step 2: Fetch ALL invoices (FBO — goods sent to warehouse) with full pagination
             const invoiceMap = new Map<string, { sent: number; received: number; invoiceCount: number }>();
