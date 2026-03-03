@@ -6,7 +6,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const YANDEX_API = "https://api.partner.market.yandex.ru/v2";
+const YANDEX_API = "https://api.partner.market.yandex.ru";
+const YANDEX_API_V2 = "https://api.partner.market.yandex.ru/v2";
 
 // ============ TYPES ============
 
