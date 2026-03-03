@@ -1878,23 +1878,82 @@ serve(async (req) => {
         try {
           const financeParams = new URLSearchParams();
           if (uzumShopId) financeParams.append("shopIds", String(uzumShopId));
+          // Add date range — last 90 days for comprehensive data
+          const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+          financeParams.append("dateFrom", ninetyDaysAgo.toISOString().slice(0, 10));
+          financeParams.append("dateTo", new Date().toISOString().slice(0, 10));
           
-          const [ordersRes, expensesRes] = await Promise.all([
-            fetch(`${uzumBaseUrl}/v1/finance/orders?${financeParams.toString()}`, { headers: uzumHeaders }),
-            fetch(`${uzumBaseUrl}/v1/finance/expenses?${financeParams.toString()}`, { headers: uzumHeaders }),
-          ]);
+          // Try multiple API paths for expenses (Uzum API can vary)
+          const expenseEndpoints = [
+            `${uzumBaseUrl}/v1/finance/expenses?${financeParams.toString()}`,
+            `${uzumBaseUrl}/v2/finance/expenses?${financeParams.toString()}`,
+            `${uzumBaseUrl}/v1/finance/accruals?${financeParams.toString()}`,
+          ];
+
+          const ordersRes = await fetch(`${uzumBaseUrl}/v1/finance/orders?${financeParams.toString()}`, { headers: uzumHeaders });
 
           let financeOrders: any[] = [];
           let financeExpenses: any[] = [];
 
           if (ordersRes.ok) {
             const ordData = await ordersRes.json();
-            financeOrders = ordData.payload || ordData.data || [];
+            financeOrders = ordData.payload || ordData.data || ordData.content || [];
+            // Extract per-item expenses from order-level finance data
+            if (Array.isArray(financeOrders)) {
+              financeOrders.forEach((fo: any) => {
+                const items = fo.items || fo.orderItems || [];
+                items.forEach((item: any) => {
+                  const productId = String(item.skuId || item.skuTitle || item.productId || '');
+                  if (!productId) return;
+                  // Extract commission and logistics from order finance
+                  if (item.commission || item.commissionAmount) {
+                    financeExpenses.push({
+                      productId,
+                      type: 'commission',
+                      amount: Math.abs(item.commission || item.commissionAmount || 0),
+                    });
+                  }
+                  if (item.deliveryAmount || item.logisticsAmount || item.deliveryCost) {
+                    financeExpenses.push({
+                      productId,
+                      type: 'logistics',
+                      amount: Math.abs(item.deliveryAmount || item.logisticsAmount || item.deliveryCost || 0),
+                    });
+                  }
+                });
+                // Also check order-level fees
+                if (fo.commissionAmount && !fo.items?.length) {
+                  financeExpenses.push({
+                    productId: String(fo.orderId || fo.id || ''),
+                    type: 'commission',
+                    amount: Math.abs(fo.commissionAmount || 0),
+                  });
+                }
+              });
+            }
+          } else {
+            console.warn(`Uzum finance/orders failed: ${ordersRes.status}`);
           }
-          if (expensesRes.ok) {
-            const expData = await expensesRes.json();
-            financeExpenses = expData.payload || expData.data || [];
+
+          // Try expense endpoints with fallback
+          for (const endpoint of expenseEndpoints) {
+            try {
+              const expensesRes = await fetch(endpoint, { headers: uzumHeaders });
+              if (expensesRes.ok) {
+                const expData = await expensesRes.json();
+                const expenses = expData.payload || expData.data || expData.content || [];
+                if (Array.isArray(expenses) && expenses.length > 0) {
+                  financeExpenses.push(...expenses);
+                  console.log(`Uzum finance: got ${expenses.length} expenses from ${endpoint}`);
+                  break;
+                }
+              }
+            } catch (expErr) {
+              // Try next endpoint
+            }
           }
+
+          console.log(`Uzum finance result: ${financeOrders.length} orders, ${financeExpenses.length} expense items`);
 
           result = {
             success: true,
@@ -2511,9 +2570,13 @@ serve(async (req) => {
             const allKeys = new Set([
               ...productCatalog.keys(),
               ...invoiceMap.keys(),
-              ...soldMap.keys(),
+              ...fbsSoldMap.keys(),
+              ...fboSoldMap.keys(),
               ...stockMap.keys(),
               ...returnMap.keys(),
+              ...fboReturnMap.keys(),
+              ...fbsReturnMap.keys(),
+              ...financeMap.keys(),
             ]);
 
             // Deduplicate: group by primary skuId from catalog
