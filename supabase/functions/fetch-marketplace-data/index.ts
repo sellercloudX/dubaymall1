@@ -2280,99 +2280,120 @@ serve(async (req) => {
           if (!uzumShopId) {
             result = { success: false, error: "Shop ID required for reconciliation" };
           } else {
-            console.log("Uzum DEEP reconciliation starting for shop:", uzumShopId);
+            console.log("Uzum DEEP reconciliation starting for ALL shops:", allShopIds.length, "primary:", uzumShopId);
 
-            // Step 1: Fetch ALL products from catalog
+            // Step 1: Fetch ALL products from catalog (iterate ALL shops like products endpoint)
             const productCatalog = new Map<string, { name: string; stock: number; skuId: string; barcode: string }>();
-            let prodPage = 0;
-            let prodHasMore = true;
-            while (prodHasMore) {
-              try {
-                const prodResp = await fetch(
-                  `${uzumBaseUrl}/v1/product/shop/${uzumShopId}?size=50&page=${prodPage}`,
-                  { headers: uzumHeaders }
-                );
-                if (!prodResp.ok) break;
-                const prodData = await prodResp.json();
-                const items = prodData.payload?.items || prodData.payload?.products || prodData.items || [];
-                if (items.length === 0) break;
-                items.forEach((card: any) => {
-                  const skus = card.skuList || card.skus || [];
-                  const firstSku = skus[0] || {};
-                  const skuId = String(firstSku.skuId || card.productId || card.id || '');
-                  const productId = String(card.productId || card.id || '');
-                  const barcode = String(firstSku.barcode || card.barcode || '');
-                  let stock = 0;
-                  skus.forEach((sku: any) => {
-                    stock += (sku.quantityActive || 0) + (sku.quantityFbs || 0);
-                    const amounts = sku.skuAmountList || sku.amounts || [];
-                    amounts.forEach((a: any) => { stock += (a.amount || a.available || 0); });
+            for (let shopIdx = 0; shopIdx < allShopIds.length; shopIdx++) {
+              const currentShopId = allShopIds[shopIdx];
+              if (shopIdx > 0) await sleep(500);
+              let prodPage = 0;
+              let prodHasMore = true;
+              while (prodHasMore) {
+                try {
+                  const prodResp = await fetch(
+                    `${uzumBaseUrl}/v1/product/shop/${currentShopId}?size=100&page=${prodPage}&filter=ALL`,
+                    { headers: uzumHeaders }
+                  );
+                  if (!prodResp.ok) {
+                    if (prodResp.status === 403) {
+                      console.log(`Reconciliation: no access to shop=${currentShopId}, skipping`);
+                    } else {
+                      console.error(`Reconciliation product fetch error shop=${currentShopId}:`, prodResp.status);
+                    }
+                    break;
+                  }
+                  const prodData = await prodResp.json();
+                  // Use SAME parsing as products endpoint
+                  const productCards = prodData.productList || prodData.productCards || prodData.payload?.productCards || prodData.payload?.productList || prodData.payload || prodData.data || [];
+                  const items = Array.isArray(productCards) ? productCards : [];
+                  console.log(`Reconciliation catalog shop=${currentShopId} page ${prodPage}: ${items.length} products`);
+                  if (items.length === 0) break;
+                  items.forEach((card: any) => {
+                    const skus = card.skuList || card.skus || [];
+                    const firstSku = skus[0] || {};
+                    const skuId = String(firstSku.skuId || card.productId || card.id || '');
+                    const productId = String(card.productId || card.id || '');
+                    const barcode = String(firstSku.barcode || firstSku.barCode || card.barcode || '');
+                    let stock = 0;
+                    skus.forEach((sku: any) => {
+                      stock += (sku.quantityActive || 0) + (sku.quantityFbs || 0);
+                      const amounts = sku.skuAmountList || sku.amounts || [];
+                      amounts.forEach((a: any) => { stock += (a.amount || a.available || 0); });
+                    });
+                    const name = card.title || card.name || '';
+                    if (skuId) productCatalog.set(skuId, { name, stock, skuId, barcode });
+                    if (productId && productId !== skuId) productCatalog.set(productId, { name, stock, skuId, barcode });
+                    if (barcode && barcode !== 'undefined') productCatalog.set(barcode, { name, stock, skuId, barcode });
                   });
-                  const name = card.title || card.name || '';
-                  if (skuId) productCatalog.set(skuId, { name, stock, skuId, barcode });
-                  if (productId && productId !== skuId) productCatalog.set(productId, { name, stock, skuId, barcode });
-                  if (barcode) productCatalog.set(barcode, { name, stock, skuId, barcode });
-                });
-                if (items.length < 50) prodHasMore = false;
-                else { prodPage++; await sleep(300); }
-              } catch (e) {
-                console.error("Uzum product catalog fetch error:", e);
-                break;
+                  if (items.length < 100) prodHasMore = false;
+                  else { prodPage++; await sleep(300); }
+                } catch (e) {
+                  console.error("Uzum product catalog fetch error:", e);
+                  break;
+                }
               }
             }
-            console.log(`Deep reconciliation: ${productCatalog.size} catalog entries`);
+            console.log(`Deep reconciliation: ${productCatalog.size} catalog entries from ${allShopIds.length} shops`);
 
             // Step 2: Fetch ALL invoices (FBO — goods sent to warehouse) with full pagination
             const invoiceMap = new Map<string, { sent: number; received: number; invoiceCount: number }>();
-            let invoicePage = 0;
-            let invoiceHasMore = true;
-            while (invoiceHasMore) {
-              try {
-                const invResp = await fetch(
-                  `${uzumBaseUrl}/v1/shop/${uzumShopId}/invoice?size=50&page=${invoicePage}`,
-                  { headers: uzumHeaders }
-                );
-                if (!invResp.ok) break;
-                const invData = await invResp.json();
-                const invoices = Array.isArray(invData) ? invData : (invData.payload?.items || invData.payload || []);
-                const invList = Array.isArray(invoices) ? invoices : [];
-                if (invList.length === 0) break;
+            let totalInvoicesFetched = 0;
+            const MAX_INVOICES = 200; // Limit to prevent timeout
+            for (const currentShopId of allShopIds) {
+              if (totalInvoicesFetched >= MAX_INVOICES) break;
+              let invoicePage = 0;
+              let invoiceHasMore = true;
+              while (invoiceHasMore && totalInvoicesFetched < MAX_INVOICES) {
+                try {
+                  const invResp = await fetch(
+                    `${uzumBaseUrl}/v1/shop/${currentShopId}/invoice?size=50&page=${invoicePage}`,
+                    { headers: uzumHeaders }
+                  );
+                  if (!invResp.ok) break;
+                  const invData = await invResp.json();
+                  const invoices = Array.isArray(invData) ? invData : (invData.payload?.items || invData.payload || []);
+                  const invList = Array.isArray(invoices) ? invoices : [];
+                  if (invList.length === 0) break;
 
-                for (const inv of invList) {
-                  const invoiceId = inv.invoiceId || inv.id;
-                  if (!invoiceId) continue;
-                  await sleep(300);
-                  try {
-                    const prodResp = await fetch(
-                      `${uzumBaseUrl}/v1/shop/${uzumShopId}/invoice/products?invoiceId=${invoiceId}`,
-                      { headers: uzumHeaders }
-                    );
-                    if (prodResp.ok) {
-                      const prodData = await prodResp.json();
-                      const items = Array.isArray(prodData) ? prodData : (prodData.payload || []);
-                      items.forEach((item: any) => {
-                        const key = String(item.skuId || item.productId || item.barcode || '');
-                        if (!key) return;
-                        const existing = invoiceMap.get(key) || { sent: 0, received: 0, invoiceCount: 0 };
-                        existing.sent += (item.quantity || item.amount || 0);
-                        existing.received += (item.receivedQuantity || item.receivedAmount || item.acceptedQuantity || 0);
-                        existing.invoiceCount++;
-                        invoiceMap.set(key, existing);
-                      });
+                  for (const inv of invList) {
+                    if (totalInvoicesFetched >= MAX_INVOICES) break;
+                    const invoiceId = inv.invoiceId || inv.id;
+                    if (!invoiceId) continue;
+                    await sleep(150); // Reduced delay
+                    try {
+                      const prodResp = await fetch(
+                        `${uzumBaseUrl}/v1/shop/${currentShopId}/invoice/products?invoiceId=${invoiceId}`,
+                        { headers: uzumHeaders }
+                      );
+                      if (prodResp.ok) {
+                        const prodData = await prodResp.json();
+                        const items = Array.isArray(prodData) ? prodData : (prodData.payload || []);
+                        items.forEach((item: any) => {
+                          const key = String(item.skuId || item.productId || item.barcode || '');
+                          if (!key) return;
+                          const existing = invoiceMap.get(key) || { sent: 0, received: 0, invoiceCount: 0 };
+                          existing.sent += (item.quantity || item.amount || 0);
+                          existing.received += (item.receivedQuantity || item.receivedAmount || item.acceptedQuantity || 0);
+                          existing.invoiceCount++;
+                          invoiceMap.set(key, existing);
+                        });
+                      }
+                      totalInvoicesFetched++;
+                    } catch (e) {
+                      console.error(`Invoice ${invoiceId} products error:`, e);
                     }
-                  } catch (e) {
-                    console.error(`Invoice ${invoiceId} products error:`, e);
                   }
-                }
 
-                if (invList.length < 50) invoiceHasMore = false;
-                else { invoicePage++; await sleep(300); }
-              } catch (e) {
-                console.error("Invoice list fetch error:", e);
-                break;
+                  if (invList.length < 50) invoiceHasMore = false;
+                  else { invoicePage++; await sleep(200); }
+                } catch (e) {
+                  console.error("Invoice list fetch error:", e);
+                  break;
+                }
               }
             }
-            console.log(`Deep reconciliation: ${invoiceMap.size} SKUs with invoice data, pages: ${invoicePage + 1}`);
+            console.log(`Deep reconciliation: ${invoiceMap.size} SKUs with invoice data (${totalInvoicesFetched} invoices fetched)`);
 
             // Step 3: Fetch ALL FBS orders with full pagination (multiple statuses)
             const fbsSoldMap = new Map<string, { totalSold: number; delivered: number; inProcess: number; cancelled: number }>();
@@ -2503,59 +2524,61 @@ serve(async (req) => {
             const fboReturnMap = new Map<string, { requested: number; received: number; pending: number }>();
             const fbsReturnMap = new Map<string, { requested: number; received: number; pending: number }>();
             const returnMap = new Map<string, { requested: number; received: number; pending: number; statuses: string[] }>();
-            let returnPage = 0;
-            let returnHasMore = true;
-            while (returnHasMore) {
-              try {
-                const retResp = await fetch(
-                  `${uzumBaseUrl}/v1/shop/${uzumShopId}/return?size=50&page=${returnPage}`,
-                  { headers: uzumHeaders }
-                );
-                if (!retResp.ok) break;
-                const retData = await retResp.json();
-                const returns = Array.isArray(retData) ? retData : (retData.payload?.items || retData.payload || []);
-                const retList = Array.isArray(returns) ? returns : [];
-                if (retList.length === 0) break;
+            for (const currentShopId of allShopIds) {
+              let returnPage = 0;
+              let returnHasMore = true;
+              while (returnHasMore) {
+                try {
+                  const retResp = await fetch(
+                    `${uzumBaseUrl}/v1/shop/${currentShopId}/return?size=50&page=${returnPage}`,
+                    { headers: uzumHeaders }
+                  );
+                  if (!retResp.ok) break;
+                  const retData = await retResp.json();
+                  const returns = Array.isArray(retData) ? retData : (retData.payload?.items || retData.payload || []);
+                  const retList = Array.isArray(returns) ? returns : [];
+                  if (retList.length === 0) break;
 
-                retList.forEach((ret: any) => {
-                  const key = String(ret.skuId || ret.productId || ret.barcode || '');
-                  if (!key) return;
-                  const qty = ret.quantity || ret.amount || 1;
-                  const receivedQty = ret.receivedQuantity || ret.acceptedQuantity || 0;
-                  const status = String(ret.status || 'UNKNOWN').toUpperCase();
-                  const returnType = String(ret.type || ret.fulfillmentType || ret.orderType || '').toUpperCase();
-                  const isFbo = returnType.includes('FBO') || returnType.includes('WAREHOUSE');
-                  
-                  const existing = returnMap.get(key) || { requested: 0, received: 0, pending: 0, statuses: [] };
-                  existing.requested += qty;
-                  
-                  let actualReceived = 0;
-                  if (['COMPLETED', 'RECEIVED', 'ACCEPTED', 'DONE'].includes(status)) {
-                    actualReceived = receivedQty > 0 ? receivedQty : qty;
-                    existing.received += actualReceived;
-                  } else if (['PENDING', 'PROCESSING', 'IN_TRANSIT', 'CREATED'].includes(status)) {
-                    existing.pending += qty;
-                  } else {
-                    actualReceived = receivedQty;
-                    existing.received += receivedQty;
-                  }
-                  existing.statuses.push(status);
-                  returnMap.set(key, existing);
+                  retList.forEach((ret: any) => {
+                    const key = String(ret.skuId || ret.productId || ret.barcode || '');
+                    if (!key) return;
+                    const qty = ret.quantity || ret.amount || 1;
+                    const receivedQty = ret.receivedQuantity || ret.acceptedQuantity || 0;
+                    const status = String(ret.status || 'UNKNOWN').toUpperCase();
+                    const returnType = String(ret.type || ret.fulfillmentType || ret.orderType || '').toUpperCase();
+                    const isFbo = returnType.includes('FBO') || returnType.includes('WAREHOUSE');
+                    
+                    const existing = returnMap.get(key) || { requested: 0, received: 0, pending: 0, statuses: [] };
+                    existing.requested += qty;
+                    
+                    let actualReceived = 0;
+                    if (['COMPLETED', 'RECEIVED', 'ACCEPTED', 'DONE'].includes(status)) {
+                      actualReceived = receivedQty > 0 ? receivedQty : qty;
+                      existing.received += actualReceived;
+                    } else if (['PENDING', 'PROCESSING', 'IN_TRANSIT', 'CREATED'].includes(status)) {
+                      existing.pending += qty;
+                    } else {
+                      actualReceived = receivedQty;
+                      existing.received += receivedQty;
+                    }
+                    existing.statuses.push(status);
+                    returnMap.set(key, existing);
 
-                  // Split into FBO/FBS return maps
-                  const targetMap = isFbo ? fboReturnMap : fbsReturnMap;
-                  const retExisting = targetMap.get(key) || { requested: 0, received: 0, pending: 0 };
-                  retExisting.requested += qty;
-                  retExisting.received += actualReceived;
-                  if (['PENDING', 'PROCESSING', 'IN_TRANSIT', 'CREATED'].includes(status)) {
-                    retExisting.pending += qty;
-                  }
-                  targetMap.set(key, retExisting);
-                });
+                    // Split into FBO/FBS return maps
+                    const targetMap = isFbo ? fboReturnMap : fbsReturnMap;
+                    const retExisting = targetMap.get(key) || { requested: 0, received: 0, pending: 0 };
+                    retExisting.requested += qty;
+                    retExisting.received += actualReceived;
+                    if (['PENDING', 'PROCESSING', 'IN_TRANSIT', 'CREATED'].includes(status)) {
+                      retExisting.pending += qty;
+                    }
+                    targetMap.set(key, retExisting);
+                  });
 
-                if (retList.length < 50) returnHasMore = false;
-                else { returnPage++; await sleep(300); }
-              } catch { break; }
+                  if (retList.length < 50) returnHasMore = false;
+                  else { returnPage++; await sleep(300); }
+                } catch { break; }
+              }
             }
             console.log(`Deep reconciliation: ${returnMap.size} SKUs with return data`);
 
@@ -2726,18 +2749,27 @@ serve(async (req) => {
             }
 
             // Calculate losses and return discrepancies
-            // FORMULA: LOST = (FBO_SENT + FBS_SOLD) - FBO_SOLD - FBO_STOCK - FBO_RETURNED - FBS_RETURNED
+            const hasInvoiceData = invoiceMap.size > 0;
+            // FORMULA when invoice data available: LOST = (FBO_SENT + FBS_SOLD) - FBO_SOLD - STOCK - RETURNS
+            // FORMULA when no invoice data: estimate invoiced = sold + stock + returned, lost = invoiced - accounted
             const reconciliation = Array.from(aggregated.entries()).map(([skuId, data]) => {
               // Return discrepancy: requested vs actually received back
               data.returnDiscrepancy = Math.max(0, data.returnRequested - data.returnReceived - data.returnPending);
 
-              // NEW FORMULA: LOST = (FBO_YUKLANGAN + FBS_SOTILGAN) - FBO_SOTILGAN - FBO_QOLDIQ - FBO_QAYTARIB_OLINGAN - FBS_QAYTARIB_OLINGAN
-              // Total items in system = FBO sent to warehouse + FBS sold by seller
-              // Accounted for = FBO sold + remaining stock + FBO returns + FBS returns
-              if (data.fboSent > 0 || data.fbsSold > 0) {
+              if (hasInvoiceData && data.fboSent > 0) {
+                // Full reconciliation with invoice data
                 const totalIn = data.fboSent + data.fbsSold;
                 const totalAccountedFor = data.fboSold + data.currentStock + data.fboReturnReceived + data.fbsReturnReceived;
                 data.lost = Math.max(0, totalIn - totalAccountedFor);
+              } else if (data.fbsSold > 0 || data.fboSold > 0) {
+                // No invoice data — estimate: invoiced should be at least sold + current stock
+                // If API gave us FBO sold but no FBO sent, something may be lost
+                const totalSold = data.fboSold + data.fbsSold;
+                const totalReturned = data.fboReturnReceived + data.fbsReturnReceived;
+                // Estimate: what was sent in = at minimum what was sold + what's in stock + what was returned
+                const estimatedSent = totalSold + data.currentStock + totalReturned;
+                data.fboSent = data.fboSent || estimatedSent; // Fill in estimated if no real data
+                data.lost = 0; // Can't calculate loss without real invoice data
               } else {
                 data.lost = 0;
               }
