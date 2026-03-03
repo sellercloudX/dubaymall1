@@ -165,24 +165,12 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
   // Normalize text for fuzzy comparison
   const normalize = (s: string) => s.toLowerCase().replace(/[^a-zа-яё0-9]/gi, '').trim();
   
-  // Check if product already exists in target marketplace (DB history OR fuzzy matching)
+  // Check if product already exists in target marketplace — ONLY use DB clone history
+  // Do NOT compare SKU/offerId across marketplaces — different marketplaces have independent product IDs
   const isAlreadyCloned = useCallback((product: CloneableProduct, targetMp: string): boolean => {
-    // 1. Check DB clone history first (primary source of truth)
     const historyKey = `${sourceMarketplace}:${product.offerId}:${targetMp}`;
-    if (cloneHistoryKeys.has(historyKey)) return true;
-
-    // 2. Strict matching only — exact SKU/offerId match against target products
-    const targetProducts = store.getProducts(targetMp);
-    const srcSku = product.shopSku?.toLowerCase() || '';
-    const srcOfferId = product.offerId?.toLowerCase() || '';
-    
-    return targetProducts.some(p => {
-      // Only exact ID matches — no fuzzy name matching to avoid false positives
-      if (srcOfferId && p.offerId?.toLowerCase() === srcOfferId) return true;
-      if (srcSku && srcSku.length > 3 && p.shopSku?.toLowerCase() === srcSku) return true;
-      return false;
-    });
-  }, [store.dataVersion, cloneHistoryKeys, sourceMarketplace]);
+    return cloneHistoryKeys.has(historyKey);
+  }, [cloneHistoryKeys, sourceMarketplace]);
 
   // Get cloned status for each product across all selected targets
   const clonedStatusMap = useMemo(() => {
