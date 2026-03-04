@@ -459,6 +459,16 @@ BANNED:
   if (!resp.ok) {
     const errText = await resp.text();
     console.error(`Hero image failed (${resp.status}): ${errText.substring(0, 300)}`);
+    
+    // Fallback to Lovable AI (Gemini image generation) when OpenAI fails
+    if (resp.status === 400 || resp.status === 402 || resp.status === 429) {
+      console.log("🔄 Falling back to Lovable AI for hero image...");
+      const fallbackResult = await generateImageWithLovableAI(heroPrompt, imageUrl);
+      if (fallbackResult) {
+        console.log("✅ STEP 4 Done: Hero image generated (Lovable AI fallback)");
+        return fallbackResult;
+      }
+    }
     return null;
   }
 
