@@ -216,7 +216,8 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
       const productDescription = product.description || product.name;
       const productCategory = product.category || '';
       
-      console.log(`Cloning "${product.name}" to ${targetMp}, price: ${product.price} → ${convertedPrice}, images: ${validImages.length}`);
+      console.log(`[CardCloner] Cloning "${product.name}" to ${targetMp}, price: ${product.price} → ${convertedPrice}, images: ${validImages.length}`);
+      console.log(`[CardCloner] Calling edge function for ${targetMp}...`);
       
       if (targetMp === 'yandex') {
         const { data, error } = await supabase.functions.invoke('yandex-market-create-card', {
