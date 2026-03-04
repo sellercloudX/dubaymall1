@@ -1255,9 +1255,17 @@ serve(async (req) => {
             result = { success: false, error: "Business ID required for reviews" };
           } else {
             const { page: reviewPage = 1 } = requestBody;
+            // Yandex goods-feedback requires POST method
             const reviewsResp = await fetchWithRetry(
-              `https://api.partner.market.yandex.ru/businesses/${effectiveBusinessId}/goods-feedback?page=${reviewPage}&pageSize=50`,
-              { headers }
+              `https://api.partner.market.yandex.ru/businesses/${effectiveBusinessId}/goods-feedback`,
+              { 
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                  page: reviewPage,
+                  pageSize: 50,
+                }),
+              }
             );
             
             if (reviewsResp.ok) {
