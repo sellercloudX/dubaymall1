@@ -356,6 +356,70 @@ Requirements:
 }
 
 // =====================================================
+// LOVABLE AI FALLBACK — when OpenAI billing limit reached
+// =====================================================
+async function generateImageWithLovableAI(prompt: string, referenceImageUrl?: string): Promise<string | null> {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) {
+    console.warn("LOVABLE_API_KEY not available for fallback");
+    return null;
+  }
+
+  try {
+    const messages: any[] = [
+      {
+        role: "user",
+        content: referenceImageUrl 
+          ? [
+              { type: "text", text: prompt + "\n\nIMPORTANT: Generate a high-quality product image based on the reference photo and instructions above." },
+              { type: "image_url", image_url: { url: referenceImageUrl } }
+            ]
+          : prompt
+      }
+    ];
+
+    const response = await fetchWithRetry("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-3-pro-image-preview",
+        messages,
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error(`Lovable AI image fallback failed (${response.status}): ${errText.substring(0, 200)}`);
+      return null;
+    }
+
+    const data = await response.json();
+    // Extract image from response - Gemini image models return inline_data
+    const content = data.choices?.[0]?.message?.content;
+    if (typeof content === 'string' && content.length > 100) {
+      // Check if it's base64 image data
+      if (content.includes('data:image')) return content;
+    }
+    // Check for parts with inline_data (Gemini format)
+    const parts = data.choices?.[0]?.message?.parts || [];
+    for (const part of parts) {
+      if (part.inline_data?.data) {
+        const mime = part.inline_data.mime_type || 'image/png';
+        return `data:${mime};base64,${part.inline_data.data}`;
+      }
+    }
+    console.warn("Lovable AI returned no image data");
+    return null;
+  } catch (e) {
+    console.error("Lovable AI fallback error:", (e as Error).message);
+    return null;
+  }
+}
+
+// =====================================================
 // STEP 4: Hero Infographic Image — Pinterest-style with text overlays
 // =====================================================
 async function generateHeroImage(
