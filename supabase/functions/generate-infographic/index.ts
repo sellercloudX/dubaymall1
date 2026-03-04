@@ -267,59 +267,73 @@ serve(async (req) => {
 
     if (isInfographic) {
       // For infographic style: beautiful background + product + NEGATIVE SPACE for text overlay
-      prompt = `You are an elite product photographer. Create a PREMIUM product photo for a marketplace listing.
+      prompt = `You are an award-winning product infographic photographer creating TOP-SELLER marketplace cards (Wildberries/Ozon/Amazon level).
 
 PRODUCT: "${productName}" (Category: ${category || 'General'})
 
-CRITICAL RULES:
-1. DO NOT write ANY text, letters, words, labels, or watermarks on the image
-2. DO NOT add any typography, fonts, numbers, or characters
-3. The image must be PURELY visual — only the product and its background/environment
+ABSOLUTE RULES — NO EXCEPTIONS:
+1. DO NOT write ANY text, letters, words, labels, numbers, or watermarks on the image
+2. The image must be PURELY VISUAL — only the product and its styled environment
+3. Leave generous EMPTY SPACE around product edges for text overlay (added later by code)
 
-VISUAL DESIGN:
-- Background: ${designMatrix.background}
-- Lighting: ${designMatrix.lighting}
-- Color palette: ${designMatrix.colorScheme}
-- Composition: ${designMatrix.composition}
-- Product fills about 55-65% of the frame, centered
-- Leave generous EMPTY SPACE around the product edges (especially top, bottom, and sides) — this space will be used for text overlay later by code
-- The empty space should feel natural and aesthetically pleasing, not awkward
+━━━ VISUAL DESIGN DIRECTION ━━━
+🎨 Background: ${designMatrix.background}
+💡 Lighting: ${designMatrix.lighting}  
+🎨 Color palette: ${designMatrix.colorScheme}
+📐 Composition: ${designMatrix.composition}
 
-TECHNICAL:
+PRODUCT STYLING:
+- Product fills 50-60% of frame, elegantly centered
+- Professional studio-quality lighting with soft realistic shadows
+- Rich, layered background with depth (bokeh, gradients, texture, reflections)
+- Category-appropriate decorative environment elements
+- The product must look EXACTLY like a real "${productName}" — photorealistic
+
+ATMOSPHERE & MOOD:
+- Premium marketplace bestseller aesthetic
+- Pinterest/Behance trending quality — the kind that gets 10x more clicks
+- Rich visual storytelling through environment and lighting
+- NOT flat, NOT generic, NOT clip-art — think luxury brand campaign
+
+TECHNICAL SPECS:
 - VERTICAL 3:4 aspect ratio (1080x1440 pixels)
-- Ultra high resolution, photorealistic
-- Pinterest/Behance trending quality
-- The product must look EXACTLY like a real "${productName}"
+- Ultra high resolution, razor sharp
+- Natural realistic lighting — NO artificial AI look
 
-Generate this premium text-free product image now.`;
+Generate this premium text-free product environment image now.`;
     } else {
       // Clean product shots on neutral background
       const angleMap: Record<string, string> = {
-        'minimalist': 'perfectly centered front view, symmetrical composition',
-        'vibrant': '45-degree three-quarter angle showing depth and dimension',
-        'luxury': 'artistic close-up highlighting material texture and craftsmanship',
+        'minimalist': 'perfectly centered front view on clean surface, symmetrical zen composition, single accent element',
+        'vibrant': '45-degree three-quarter angle showing depth, vibrant colored backdrop with energy and movement',
+        'luxury': 'artistic macro close-up highlighting material texture, craftsmanship details, premium finish',
       };
-      const angle = angleMap[style] || 'professional studio angle';
+      const angle = angleMap[style] || 'professional studio angle with dimensional depth';
 
-      prompt = `You are an elite product photographer. Create a CLEAN marketplace product photo.
+      prompt = `You are an elite product photographer shooting for Apple Store / Sephora / Dyson level product pages.
 
 PRODUCT: "${productName}" (Category: ${category || 'General'})
 
-CRITICAL RULES:
+ABSOLUTE RULES:
 1. DO NOT write ANY text, letters, words, labels, or watermarks
-2. PURELY visual — only the product
-3. Background: Clean, solid light gray (#EFEFEF) — NO patterns, NO props
+2. PURELY visual — only the product and subtle environment
+3. Background: Clean, sophisticated — NOT plain flat gray
 
-SPECIFICATIONS:
+PHOTOGRAPHY DIRECTION:
 - Camera angle: ${angle}
-- Lighting: ${designMatrix.lighting}, soft diffused studio fill, subtle reflection below
-- Product fills 65-75% of frame
-- NO text, NO labels, NO watermarks, NO human hands
-- VERTICAL 3:4 aspect ratio (1080x1440 pixels)
-- Ultra high resolution, razor sharp
-- Quality: Apple Store / Sephora product photography
+- Lighting: ${designMatrix.lighting}, professional multi-point setup with rim light accent
+- Product fills 60-75% of frame
+- Subtle environment: soft gradient, minimal surface reflection, or clean studio sweep
+- Soft realistic shadow underneath
+- Ultra-sharp focus with beautiful depth of field
 
-Generate this clean product photo now.`;
+QUALITY STANDARD:
+- Magazine-cover product photography
+- Photorealistic, NOT AI-generated looking
+- Premium brand campaign quality
+- VERTICAL 3:4 aspect ratio (1080x1440 pixels)
+
+Generate this premium product photo now.`;
     }
 
     let generatedUrl: string | null = null;
