@@ -356,9 +356,143 @@ Requirements:
 }
 
 // =====================================================
-// LOVABLE AI FALLBACK — when OpenAI billing limit reached
+// LOVABLE AI FALLBACK — Premium image generation via Gemini
 // =====================================================
-async function generateImageWithLovableAI(prompt: string, referenceImageUrl?: string): Promise<string | null> {
+
+// Build professional Lovable AI prompt for HERO INFOGRAPHIC
+function buildLovableHeroPrompt(detection: any, categoryStyle: any): string {
+  const productName = sanitizeStopWords(detection?.product_name || 'Product');
+  const brand = detection?.brand || '';
+  const features = (detection?.key_features || []).slice(0, 4);
+  const featureText = features.map((f: string) => `✦ ${sanitizeStopWords(f)}`).join('\n');
+
+  return `You are an award-winning product infographic designer for top marketplace sellers (Wildberries, Ozon, Amazon level).
+
+CREATE A STUNNING VERTICAL PRODUCT INFOGRAPHIC (3:4 portrait, 1080x1440px).
+
+PRODUCT: "${productName}"
+${brand ? `BRAND: "${brand}"` : ''}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎨 VISUAL DIRECTION: ${categoryStyle.visual_style}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+BACKGROUND DESIGN:
+${categoryStyle.background_style}
+Color palette: ${categoryStyle.color_palette}
+
+PRODUCT PLACEMENT:
+- The product from the reference photo must be placed EXACTLY as-is into the new scene
+- Same shape, colors, labels, branding — NO modifications to the product itself
+- Product occupies 35-50% of frame, centered or slightly offset
+- Professional studio lighting with soft realistic shadow
+
+TEXT ELEMENTS (ALL IN RUSSIAN / Русский язык):
+1. PRODUCT NAME — "${productName}" — large bold typography at top or bottom
+   - Modern premium font, high contrast against background
+   ${brand ? `- Brand "${brand}" in smaller elegant text nearby` : ''}
+
+2. FEATURE BADGES — 3-4 rounded pill-shaped badges around the product:
+${featureText || '   - Show key product characteristics'}
+   - Semi-transparent frosted glass effect backgrounds
+   - Clean sans-serif font, readable even at thumbnail size
+   - Thin subtle connecting lines from badges to product areas
+
+DECORATIVE ELEMENTS:
+- Subtle geometric frames or corner accents
+- Category-appropriate decorative touches (${categoryStyle.prompt_addition.split('\n')[1] || 'professional styling'})
+- Gradient overlay zones for text readability
+- Premium bokeh, light particles, or texture accents
+
+${categoryStyle.prompt_addition}
+
+QUALITY STANDARD: This must look like a TOP-3 bestseller card on Wildberries/Ozon — rich, informative, click-worthy.
+
+BANNED: Flat solid backgrounds, clip-art, distorted product, unreadable text, English text (Russian only), cluttered layouts.`;
+}
+
+// Build professional Lovable AI prompt for LIFESTYLE image
+function buildLovableLifestylePrompt(detection: any, categoryStyle: any, angleType: string): string {
+  const category = detection?.category || '';
+  const audience = detection?.target_audience || 'general consumer';
+  const productName = detection?.product_name || 'Product';
+
+  const angleConfigs: Record<string, { label: string; direction: string }> = {
+    'closeup_detail': {
+      label: 'Macro Detail Shot',
+      direction: `EXTREME CLOSE-UP macro photography of "${productName}":
+- Fill 80-90% of frame with product detail
+- Raking side-light to reveal texture (fabric weave, metal finish, glass clarity)
+- Shallow depth of field — sharp focus area with beautiful bokeh blur
+- Show material quality, craftsmanship, label details
+- Premium "you can feel the quality" aesthetic
+- Like a luxury brand detail campaign shot`
+    },
+    'three_quarter_angle': {
+      label: '3/4 Dynamic Angle',
+      direction: `DYNAMIC THREE-QUARTER ANGLE shot of "${productName}":
+- 45-degree perspective showing front face + side simultaneously  
+- Slight 15-20° top-down tilt for added dimension
+- Professional 3-point studio lighting (key from upper-left, fill from right, rim from behind)
+- Product at 60-70% of frame, slightly left of center (rule of thirds)
+- Clean category-appropriate gradient background:
+  ${categoryStyle.background_style}
+- Soft shadow falling to the right
+- Three-dimensional, tangible, commercial-ready`
+    },
+    'lifestyle_context': {
+      label: 'Aspirational Lifestyle',
+      direction: `ASPIRATIONAL LIFESTYLE scene with "${productName}" in natural use context:
+
+SCENE DIRECTION for ${category}:
+- Perfume/Beauty → marble vanity, golden morning light, mirror reflection, fresh flowers
+- Electronics → modern minimalist desk, sleek workspace, coffee cup nearby
+- Fashion → styled on linen bed or wooden chair with curated accessories
+- Household → bright Scandinavian kitchen, organized shelf, fresh plants
+- Food → rustic farmhouse table, scattered ingredients, warm atmosphere
+- Kids → bright playful room, soft textures, colorful surroundings
+- Sport → gym setting, water bottle, towel, energetic post-workout vibe
+- Default → flat-lay on white marble with 3-5 complementary lifestyle props
+
+Product is hero (30-45% of frame) surrounded by storytelling props.
+Warm natural window light. The viewer should WANT this lifestyle.
+Like a premium Instagram lifestyle post with 10K+ saves.`
+    },
+  };
+
+  const angle = angleConfigs[angleType] || angleConfigs['lifestyle_context'];
+
+  return `You are an elite commercial product photographer shooting for premium marketplace listings.
+
+CREATE A STUNNING ${angle.label.toUpperCase()} (vertical 3:4, 1080x1440px).
+
+${angle.direction}
+
+PRODUCT PRESERVATION RULES:
+- The product from the reference photo must appear EXACTLY as-is
+- Same shape, colors, labels, brand logos, packaging — pixel-perfect preservation
+- Only change angle, background, and lighting context
+
+PHOTOGRAPHY QUALITY:
+- Ultra-high resolution, razor sharp focus
+- Natural realistic lighting — NO artificial/AI look
+- Real shadows and reflections
+- ${categoryStyle.visual_style} quality standard
+
+Target audience: ${audience}
+
+ABSOLUTELY BANNED:
+- ANY text, typography, badges, watermarks, icons, or graphic overlays
+- Distorted or altered product appearance
+- Flat/artificial looking compositions
+- Harsh unnatural lighting`;
+}
+
+async function generateImageWithLovableAI(
+  prompt: string, 
+  referenceImageUrl?: string,
+  options?: { type?: 'hero' | 'lifestyle'; detection?: any; categoryStyle?: any; angleType?: string }
+): Promise<string | null> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!LOVABLE_API_KEY) {
     console.warn("LOVABLE_API_KEY not available for fallback");
@@ -366,15 +500,25 @@ async function generateImageWithLovableAI(prompt: string, referenceImageUrl?: st
   }
 
   try {
+    // Use enhanced prompts when context is available
+    let finalPrompt = prompt;
+    if (options?.type === 'hero' && options.detection && options.categoryStyle) {
+      finalPrompt = buildLovableHeroPrompt(options.detection, options.categoryStyle);
+      console.log("🎨 Using enhanced Lovable AI HERO prompt");
+    } else if (options?.type === 'lifestyle' && options.detection && options.categoryStyle) {
+      finalPrompt = buildLovableLifestylePrompt(options.detection, options.categoryStyle, options.angleType || 'lifestyle_context');
+      console.log("📸 Using enhanced Lovable AI LIFESTYLE prompt");
+    }
+
     const messages: any[] = [
       {
         role: "user",
         content: referenceImageUrl 
           ? [
-              { type: "text", text: prompt + "\n\nIMPORTANT: Generate a high-quality product image based on the reference photo and instructions above." },
+              { type: "text", text: finalPrompt + "\n\nCRITICAL: Use the attached product photo as EXACT visual reference. Match the product perfectly." },
               { type: "image_url", image_url: { url: referenceImageUrl } }
             ]
-          : prompt
+          : finalPrompt
       }
     ];
 
@@ -387,30 +531,42 @@ async function generateImageWithLovableAI(prompt: string, referenceImageUrl?: st
       body: JSON.stringify({
         model: "google/gemini-3-pro-image-preview",
         messages,
+        modalities: ["image", "text"],
       }),
     });
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error(`Lovable AI image fallback failed (${response.status}): ${errText.substring(0, 200)}`);
+      console.error(`Lovable AI image failed (${response.status}): ${errText.substring(0, 200)}`);
       return null;
     }
 
     const data = await response.json();
-    // Extract image from response - Gemini image models return inline_data
-    const content = data.choices?.[0]?.message?.content;
-    if (typeof content === 'string' && content.length > 100) {
-      // Check if it's base64 image data
-      if (content.includes('data:image')) return content;
+    
+    // Check for images array (Lovable AI format)
+    const imageFromImages = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    if (imageFromImages) {
+      console.log("✅ Lovable AI image generated (images array)");
+      return imageFromImages;
     }
+    
+    // Check content for base64
+    const content = data.choices?.[0]?.message?.content;
+    if (typeof content === 'string' && content.includes('data:image')) {
+      console.log("✅ Lovable AI image generated (content base64)");
+      return content;
+    }
+    
     // Check for parts with inline_data (Gemini format)
     const parts = data.choices?.[0]?.message?.parts || [];
     for (const part of parts) {
       if (part.inline_data?.data) {
         const mime = part.inline_data.mime_type || 'image/png';
+        console.log("✅ Lovable AI image generated (inline_data)");
         return `data:${mime};base64,${part.inline_data.data}`;
       }
     }
+    
     console.warn("Lovable AI returned no image data");
     return null;
   } catch (e) {
@@ -527,7 +683,9 @@ BANNED:
     // Fallback to Lovable AI (Gemini image generation) when OpenAI fails
     if (resp.status === 400 || resp.status === 402 || resp.status === 429) {
       console.log("🔄 Falling back to Lovable AI for hero image...");
-      const fallbackResult = await generateImageWithLovableAI(heroPrompt, imageUrl);
+      const fallbackResult = await generateImageWithLovableAI(heroPrompt, imageUrl, {
+        type: 'hero', detection, categoryStyle,
+      });
       if (fallbackResult) {
         console.log("✅ STEP 4 Done: Hero image generated (Lovable AI fallback)");
         return fallbackResult;
@@ -670,7 +828,10 @@ async function generateLifestyleAngle(
     // Fallback to Lovable AI when OpenAI fails
     if (resp.status === 400 || resp.status === 402 || resp.status === 429) {
       console.log(`🔄 Falling back to Lovable AI for ${angleConfig.label}...`);
-      const fallbackResult = await generateImageWithLovableAI(prompt, imageUrl);
+      const catStyle = getCategoryStyle(detection?.category || '');
+      const fallbackResult = await generateImageWithLovableAI(prompt, imageUrl, {
+        type: 'lifestyle', detection, categoryStyle: catStyle, angleType: angleConfig.role,
+      });
       if (fallbackResult) {
         console.log(`✅ ${angleConfig.label} generated (Lovable AI fallback)`);
         return fallbackResult;
