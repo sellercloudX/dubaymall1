@@ -456,6 +456,12 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
             ));
             console.log(`✅ AI Agent pipeline: ${imgData.totalImages} ta rasm yaratildi`);
             updateTaskProgress(4, 'completed');
+          } else if (!imgError && imgData?.success && imgData.images?.length === 0) {
+            // Images returned 0 — OpenAI billing limit or similar issue
+            // This is a WARNING, not an error — continue to card creation
+            console.warn('AI Agent images: 0 images returned (billing limit?), proceeding to card creation');
+            toast.warning('Rasmlar yaratilmadi (limit), kartochka reference rasm bilan yaratiladi');
+            updateTaskProgress(4, 'completed'); // Mark as completed, not failed
           } else {
             const errMsg = imgError?.message || imgData?.error || 'Unknown image error';
             console.warn('AI Agent images failed:', errMsg);
