@@ -216,7 +216,8 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
       const productDescription = product.description || product.name;
       const productCategory = product.category || '';
       
-      console.log(`Cloning "${product.name}" to ${targetMp}, price: ${product.price} → ${convertedPrice}, images: ${validImages.length}`);
+      console.log(`[CardCloner] Cloning "${product.name}" to ${targetMp}, price: ${product.price} → ${convertedPrice}, images: ${validImages.length}`);
+      console.log(`[CardCloner] Calling edge function for ${targetMp}...`);
       
       if (targetMp === 'yandex') {
         const { data, error } = await supabase.functions.invoke('yandex-market-create-card', {
@@ -332,13 +333,23 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
   };
 
   const handleClone = async () => {
-    if (selectedProducts.length === 0 || targetMarketplaces.length === 0) return;
+    console.log('[CardCloner] handleClone called', { 
+      selectedCount: selectedProducts.length, 
+      targets: targetMarketplaces,
+      cloneHistorySize: cloneHistoryKeys.size 
+    });
+    if (selectedProducts.length === 0 || targetMarketplaces.length === 0) {
+      console.log('[CardCloner] No products or targets selected, returning');
+      return;
+    }
     // Build all clone tasks
     const cloneTasks: { product: CloneableProduct; target: string }[] = [];
     let skipped = 0;
     for (const product of selectedProducts) {
       for (const target of targetMarketplaces) {
-        if (isAlreadyCloned(product, target)) {
+        const alreadyCloned = isAlreadyCloned(product, target);
+        console.log(`[CardCloner] ${product.offerId} → ${target}: alreadyCloned=${alreadyCloned}`);
+        if (alreadyCloned) {
           skipped++;
         } else {
           cloneTasks.push({ product, target });
@@ -347,6 +358,7 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
     }
 
     const total = cloneTasks.length + skipped;
+    console.log('[CardCloner] Tasks built', { total, cloneTasks: cloneTasks.length, skipped });
     if (cloneTasks.length === 0) {
       toast.info(`Barcha ${skipped} ta mahsulot allaqachon mavjud`);
       return;
