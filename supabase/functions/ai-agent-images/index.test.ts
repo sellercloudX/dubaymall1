@@ -18,7 +18,6 @@ async function getAuthToken(): Promise<string> {
     }),
   });
   const data = await resp.json();
-  await resp.body?.cancel();
   if (!data.access_token) throw new Error("Auth failed: " + JSON.stringify(data));
   return data.access_token;
 }
