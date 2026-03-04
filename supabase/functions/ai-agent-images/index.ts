@@ -683,7 +683,9 @@ BANNED:
     // Fallback to Lovable AI (Gemini image generation) when OpenAI fails
     if (resp.status === 400 || resp.status === 402 || resp.status === 429) {
       console.log("🔄 Falling back to Lovable AI for hero image...");
-      const fallbackResult = await generateImageWithLovableAI(heroPrompt, imageUrl);
+      const fallbackResult = await generateImageWithLovableAI(heroPrompt, imageUrl, {
+        type: 'hero', detection, categoryStyle,
+      });
       if (fallbackResult) {
         console.log("✅ STEP 4 Done: Hero image generated (Lovable AI fallback)");
         return fallbackResult;
@@ -826,7 +828,10 @@ async function generateLifestyleAngle(
     // Fallback to Lovable AI when OpenAI fails
     if (resp.status === 400 || resp.status === 402 || resp.status === 429) {
       console.log(`🔄 Falling back to Lovable AI for ${angleConfig.label}...`);
-      const fallbackResult = await generateImageWithLovableAI(prompt, imageUrl);
+      const catStyle = getCategoryStyle(detection?.category || '');
+      const fallbackResult = await generateImageWithLovableAI(prompt, imageUrl, {
+        type: 'lifestyle', detection, categoryStyle: catStyle, angleType: angleConfig.role,
+      });
       if (fallbackResult) {
         console.log(`✅ ${angleConfig.label} generated (Lovable AI fallback)`);
         return fallbackResult;
