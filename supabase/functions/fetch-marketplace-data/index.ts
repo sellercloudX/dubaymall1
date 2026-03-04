@@ -753,40 +753,42 @@ serve(async (req) => {
           }
         }
       } else if (dataType === "stats") {
-        // Fetch statistics from Yandex Market
-        const response = await fetchWithRetry(
-          `https://api.partner.market.yandex.ru/campaigns/${campaignId}/stats/orders`,
-          { headers }
-        );
-
-        if (response.ok) {
-          const data = await response.json();
+        // Fetch statistics via business offers API (stats/orders and stats/offers are deprecated)
+        try {
+          const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+          const from = thirtyDaysAgo.toISOString().split('T')[0];
+          const to = new Date().toISOString().split('T')[0];
+          
+          // Use orders endpoint to build stats
+          let totalOrders = 0;
+          let totalRevenue = 0;
+          const statusCounts: Record<string, number> = {};
+          
+          for (const status of ['DELIVERED', 'DELIVERY', 'PROCESSING', 'PICKUP', 'CANCELLED']) {
+            const url = `https://api.partner.market.yandex.ru/campaigns/${campaignId}/orders?fromDate=${from}&toDate=${to}&status=${status}&page=1&pageSize=50`;
+            const resp = await fetchWithRetry(url, { headers });
+            if (resp.ok) {
+              const data = await resp.json();
+              const orders = data.orders || [];
+              statusCounts[status] = (data.pager?.total || orders.length);
+              totalOrders += statusCounts[status];
+              orders.forEach((o: any) => {
+                totalRevenue += (o.itemsTotal || 0);
+              });
+            }
+            await sleep(300);
+          }
+          
           result = {
             success: true,
             data: {
-              ordersStats: data.result || {},
+              ordersStats: { totalOrders, totalRevenue, statusCounts },
               campaignId,
             },
           };
-        } else {
-          // Try alternative stats endpoint
-          const offersResponse = await fetchWithRetry(
-            `https://api.partner.market.yandex.ru/campaigns/${campaignId}/stats/offers?limit=100`,
-            { headers }
-          );
-
-          if (offersResponse.ok) {
-            const offersData = await offersResponse.json();
-            result = {
-              success: true,
-              data: {
-                offersStats: offersData.offerStats || [],
-                total: offersData.paging?.total || 0,
-              },
-            };
-          } else {
-            result = { success: false, error: "Failed to fetch stats" };
-          }
+        } catch (e) {
+          console.error("Error fetching stats:", e);
+          result = { success: false, error: "Failed to fetch stats" };
         }
       } else if (dataType === "balance") {
         // Fetch balance/financial info
@@ -1032,11 +1034,11 @@ serve(async (req) => {
             console.log(`Reconciliation: found stocks for ${stockMap.size} SKUs`);
             await sleep(500);
             
-            // 3. Fetch ALL orders (last 90 days) with pagination
+            // 3. Fetch ALL orders (last 30 days — Yandex API max interval) with pagination
             const soldMap = new Map<string, number>();
             const returnedMap = new Map<string, number>();
-            const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
-            const ordFrom = ninetyDaysAgo.toISOString().split('T')[0];
+            const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+            const ordFrom = thirtyDaysAgo.toISOString().split('T')[0];
             const ordTo = new Date().toISOString().split('T')[0];
             
             // Also track PROCESSING orders — items are reserved/shipped
