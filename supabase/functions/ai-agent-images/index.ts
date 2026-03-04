@@ -602,6 +602,16 @@ async function generateLifestyleAngle(
   if (!resp.ok) {
     const errText = await resp.text();
     console.error(`${angleConfig.label} failed (${resp.status}): ${errText.substring(0, 200)}`);
+    
+    // Fallback to Lovable AI when OpenAI fails
+    if (resp.status === 400 || resp.status === 402 || resp.status === 429) {
+      console.log(`🔄 Falling back to Lovable AI for ${angleConfig.label}...`);
+      const fallbackResult = await generateImageWithLovableAI(prompt, imageUrl);
+      if (fallbackResult) {
+        console.log(`✅ ${angleConfig.label} generated (Lovable AI fallback)`);
+        return fallbackResult;
+      }
+    }
     return null;
   }
 
