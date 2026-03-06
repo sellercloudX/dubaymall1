@@ -110,18 +110,25 @@ export function MarketplaceAnalytics({ connectedMarketplaces, store }: Marketpla
       // Build product lookup from store for real names/images
       const productLookup = new Map<string, { name: string; image?: string }>();
       store.getProducts(mp).forEach((p: any) => {
-        if (p.offerId) productLookup.set(p.offerId, { name: p.name || p.offerId, image: p.pictures?.[0] || p.photo || p.images?.[0] });
-        if (p.shopSku) productLookup.set(p.shopSku, { name: p.name || p.shopSku, image: p.pictures?.[0] || p.photo || p.images?.[0] });
+        const info = { name: p.name || p.offerId, image: p.pictures?.[0] || p.photo || p.images?.[0] };
+        if (p.offerId) productLookup.set(String(p.offerId), info);
+        if (p.shopSku) productLookup.set(String(p.shopSku), info);
+        // WB uses nmID as identifier in orders
+        if (p.nmID) productLookup.set(String(p.nmID), info);
       });
 
       store.getOrders(mp)
         .filter(o => !['CANCELLED', 'RETURNED'].includes(o.status))
         .forEach(o => {
           (o.items || []).forEach((item: any) => {
-            const key = `${mp}:${item.offerId}`;
-            const lookup = productLookup.get(item.offerId) || productLookup.get(item.name);
-            const realName = lookup?.name || item.name || item.offerId;
-            const image = lookup?.image;
+            const key = `${mp}:${item.offerId || item.nmID || item.name}`;
+            // Try multiple keys: offerId, nmID, offerName, name
+            const lookup = productLookup.get(String(item.offerId)) 
+              || productLookup.get(String(item.nmID)) 
+              || productLookup.get(item.offerName) 
+              || productLookup.get(item.name);
+            const realName = lookup?.name || item.offerName || item.name || item.offerId || 'Nomsiz';
+            const image = lookup?.image || item.photo;
             const existing = productRevMap.get(key) || { name: realName, revenue: 0, orders: 0, marketplace: mp, image };
             existing.revenue += toDisplayUzs((item.price || 0) * (item.count || 1), mp);
             existing.orders += item.count || 1;

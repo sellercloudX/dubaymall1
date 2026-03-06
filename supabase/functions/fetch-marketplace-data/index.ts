@@ -1363,7 +1363,7 @@ serve(async (req) => {
           } else {
             const { page: qPage = 1 } = requestBody;
             const questionsResp = await fetchWithRetry(
-              `https://api.partner.market.yandex.ru/v1/businesses/${effectiveBusinessId}/goods-questions`,
+              `https://api.partner.market.yandex.ru/v2/businesses/${effectiveBusinessId}/goods-questions`,
               {
                 method: 'POST',
                 headers,
@@ -1633,19 +1633,30 @@ serve(async (req) => {
                   const firstSku = skus[0] || {};
                   const price = firstSku.fullPrice || firstSku.purchasePrice || card.price || 0;
                   
-                  // Uzum SKU has direct quantity fields: quantityActive, quantityFbs, etc.
+                  // Uzum SKU stock fields:
+                  // quantityActive = FBO (Uzum warehouse stock)
+                  // quantityFbs = FBS (seller's own stock)
+                  // skuAmountList = detailed warehouse breakdown (don't add on top of quantityActive)
                   let fboStock = 0;
                   let fbsStock = 0;
                   skus.forEach((sku: any) => {
-                    fboStock += (sku.quantityActive || 0);
-                    fbsStock += (sku.quantityFbs || 0);
-                    const amounts = sku.skuAmountList || sku.amounts || [];
-                    if (amounts.length > 0) {
-                      amounts.forEach((a: any) => {
-                        const amt = a.amount || a.available || 0;
-                        fboStock += amt;
-                      });
+                    const qtyActive = sku.quantityActive || 0;
+                    const qtyFbs = sku.quantityFbs || 0;
+                    
+                    // If quantityActive is available, use it directly as FBO
+                    // skuAmountList is a breakdown of the same data, don't double count
+                    if (qtyActive > 0) {
+                      fboStock += qtyActive;
+                    } else {
+                      // Fallback: use skuAmountList only if quantityActive is 0
+                      const amounts = sku.skuAmountList || sku.amounts || [];
+                      if (amounts.length > 0) {
+                        amounts.forEach((a: any) => {
+                          fboStock += (a.amount || a.available || 0);
+                        });
+                      }
                     }
+                    fbsStock += qtyFbs;
                   });
                   
                   const skuId = String(firstSku.skuId || '');
