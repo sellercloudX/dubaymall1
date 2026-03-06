@@ -60,13 +60,13 @@ export function DateRangeFilter({ from, to, onRangeChange, activePreset }: DateR
   };
 
   return (
-    <div className="flex items-center gap-1 flex-wrap">
+    <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
       {PRESETS.map(p => (
         <Button
           key={p.id}
           variant={activePreset === p.id ? 'default' : 'outline'}
           size="sm"
-          className="h-6 text-[10px] px-2 rounded-full"
+          className="h-7 text-[11px] px-2.5 rounded-full md:h-9 md:text-sm md:px-4"
           onClick={() => handlePreset(p.id)}
         >
           {p.label}
@@ -77,9 +77,9 @@ export function DateRangeFilter({ from, to, onRangeChange, activePreset }: DateR
           <Button
             variant={activePreset === 'custom' ? 'default' : 'outline'}
             size="sm"
-            className="h-6 text-[10px] px-2 gap-1 rounded-full"
+            className="h-7 text-[11px] px-2.5 gap-1 rounded-full md:h-9 md:text-sm md:px-4"
           >
-            <CalendarIcon className="h-2.5 w-2.5" />
+            <CalendarIcon className="h-3 w-3 md:h-4 md:w-4" />
             {activePreset === 'custom' && from && to ? (
               `${format(from, 'dd.MM')} — ${format(to, 'dd.MM')}`
             ) : (
@@ -102,7 +102,7 @@ export function DateRangeFilter({ from, to, onRangeChange, activePreset }: DateR
         </PopoverContent>
       </Popover>
       {activePreset === 'custom' && from && to && (
-        <Badge variant="outline" className="text-[10px]">
+        <Badge variant="outline" className="text-[10px] md:text-xs">
           {format(from, 'dd.MM.yyyy')} — {format(to, 'dd.MM.yyyy')}
         </Badge>
       )}
