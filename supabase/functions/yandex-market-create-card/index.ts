@@ -32,6 +32,10 @@ interface ProductInput {
   dimensions?: { length: number; width: number; height: number };
   keywords?: string[];
   bulletPoints?: string[];
+  sourceMarketplace?: string;
+  sourceCategory?: string;
+  sourceCategoryId?: number;
+  shopSku?: string;
 }
 
 interface PricingInput {
