@@ -1273,27 +1273,40 @@ serve(async (req) => {
               const feedbacks = reviewsData.result?.feedbacks || [];
               console.log(`Yandex reviews: ${feedbacks.length} on page ${reviewPage}`);
               
+              console.log("Yandex feedback sample:", JSON.stringify(feedbacks[0] || {}).substring(0, 500));
+              
               const mapped = feedbacks.map((fb: any) => {
-                // Build full text combining comment, pros, and cons
-                const commentText = fb.comment?.text || fb.text || "";
-                const pros = fb.comment?.pros || "";
-                const cons = fb.comment?.cons || "";
+                // Yandex API v2 goods-feedback response structure:
+                // identifiers: { orderId, offerId }
+                // author: string (name directly)
+                // description: { advantages, disadvantages, comment }
+                // statistics: { rating, commentsCount, recommended }
+                // media: { photos: string[], videos: string[] }
+                const desc = fb.description || {};
+                const commentText = desc.comment || fb.comment?.text || fb.text || "";
+                const pros = desc.advantages || fb.comment?.pros || "";
+                const cons = desc.disadvantages || fb.comment?.cons || "";
                 let fullText = commentText;
                 if (pros) fullText += (fullText ? '\n' : '') + '✅ ' + pros;
                 if (cons) fullText += (fullText ? '\n' : '') + '❌ ' + cons;
                 
+                const offerId = fb.identifiers?.offerId || fb.offer?.offerId || "";
+                // author can be a string or object
+                const userName = typeof fb.author === 'string' ? fb.author : (fb.author?.name || "Покупатель");
+                
                 return {
-                  id: fb.feedbackId || fb.id,
-                  offerId: fb.offer?.offerId || "",
-                  productName: fb.offer?.name || "",
-                  userName: fb.author?.name || "Покупатель",
+                  id: String(fb.feedbackId || fb.id),
+                  offerId,
+                  productName: fb.offer?.name || fb.productName || offerId || "",
+                  userName,
                   text: fullText || "(Matn yo'q)",
                   answer: fb.shop?.comment || null,
-                  rating: fb.grade?.overall || fb.rating || 0,
+                  rating: fb.statistics?.rating || fb.grade?.overall || fb.rating || 0,
                   createdAt: fb.createdAt || "",
-                  photos: (fb.media?.photos || []).map((p: any) => p.url || ""),
-                  isAnswered: !!fb.shop?.comment,
-                  orderId: fb.order?.id || null,
+                  photos: (fb.media?.photos || []).map((p: any) => typeof p === 'string' ? p : (p?.url || "")),
+                  isAnswered: !!fb.shop?.comment || fb.needReaction === false,
+                  orderId: fb.identifiers?.orderId || fb.order?.id || null,
+                  supplierArticle: offerId,
                 };
               });
               
