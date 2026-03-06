@@ -10,6 +10,7 @@ import { Star, MessageCircle, HelpCircle, Send, CheckCircle2, Clock, RefreshCw }
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { MarketplaceLogo, MARKETPLACE_SHORT_NAMES } from '@/lib/marketplaceConfig';
+import { MarketplaceFilterBar } from './MarketplaceFilterBar';
 
 interface ReviewItem {
   id: string;

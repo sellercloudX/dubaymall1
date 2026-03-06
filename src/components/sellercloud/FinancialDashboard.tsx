@@ -13,6 +13,7 @@ import {
 import { useCostPrices } from '@/hooks/useCostPrices';
 import { useMarketplaceTariffs, getTariffForProduct } from '@/hooks/useMarketplaceTariffs';
 import { DateRangeFilter, getPresetDates, type DatePreset } from './DateRangeFilter';
+import { MarketplaceFilterBar } from './MarketplaceFilterBar';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 
 interface FinancialDashboardProps {
