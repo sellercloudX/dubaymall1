@@ -21,7 +21,7 @@ import {
 import { MarketplaceLogo, MARKETPLACE_CONFIG } from '@/lib/marketplaceConfig';
 import { OnboardingWizard } from '@/components/sellercloud/OnboardingWizard';
 import { SellerCloudSidebar, sellerMenuItems } from '@/components/sellercloud/SellerCloudSidebar';
-import { TooltipProvider } from '@/components/ui/tooltip';
+
 
 // Lazy load heavy tab components
 const MarketplaceOAuth = lazy(() => import('@/components/sellercloud/MarketplaceOAuth').then(m => ({ default: m.MarketplaceOAuth })));
@@ -257,26 +257,25 @@ export default function SellerCloudX() {
   const formatRevenue = (r: number) => r >= 1000000 ? (r / 1000000).toFixed(1) + ' mln' : new Intl.NumberFormat('uz-UZ').format(r);
 
   return (
-    <TooltipProvider>
-      <div className="flex min-h-screen bg-background">
+      <div className="flex min-h-screen bg-background w-full">
         <SellerCloudSidebar
           activeTab={activeTab}
           onTabChange={handleTabChange}
           connectedMarketplaces={connectedMarketplaces}
         />
 
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           {/* Top bar */}
-          <header className="h-16 border-b border-border bg-card/80 backdrop-blur-sm flex items-center justify-between px-6 shrink-0 sticky top-0 z-20">
-            <div>
-              <h1 className="text-lg font-semibold text-foreground">{pageTitles[activeTab] || 'SellerCloudX'}</h1>
-              <p className="text-xs text-muted-foreground">SellerCloudX marketplace avtomatizatsiya</p>
+          <header className="h-16 border-b border-border bg-card/80 backdrop-blur-sm flex items-center justify-between px-4 lg:px-6 shrink-0 sticky top-0 z-20">
+            <div className="min-w-0">
+              <h1 className="text-base lg:text-lg font-semibold text-foreground truncate">{pageTitles[activeTab] || 'SellerCloudX'}</h1>
+              <p className="text-[11px] lg:text-xs text-muted-foreground truncate">SellerCloudX marketplace avtomatizatsiya</p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 lg:gap-3 shrink-0">
               {store.hasError && (
                 <Button variant="outline" size="sm" onClick={() => store.refetchAll()} disabled={store.isFetching}>
                   <RefreshCw className={`h-4 w-4 mr-1.5 ${store.isFetching ? 'animate-spin' : ''}`} />
-                  Yangilash
+                  <span className="hidden lg:inline">Yangilash</span>
                 </Button>
               )}
               <Badge variant="secondary" className="text-xs">Pro</Badge>
@@ -284,7 +283,7 @@ export default function SellerCloudX() {
           </header>
 
           {/* Stats bar */}
-          <div className="grid grid-cols-4 gap-4 px-6 py-4 border-b border-border bg-card/40">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 px-4 lg:px-6 py-3 lg:py-4 border-b border-border bg-card/40">
             <StatCard label="Ulangan marketplace" value={connectedMarketplaces.length} />
             <StatCard label="Jami mahsulotlar" value={store.totalProducts} />
             <StatCard label="Jami buyurtmalar" value={store.totalOrders} />
@@ -327,23 +326,22 @@ export default function SellerCloudX() {
           )}
 
           {/* Main content */}
-          <main className="flex-1 p-6 overflow-auto">
+          <main className="flex-1 p-4 lg:p-6 overflow-auto">
             <Suspense fallback={<TabLoader />}>
               {renderContent()}
             </Suspense>
           </main>
         </div>
       </div>
-    </TooltipProvider>
   );
 }
 
 // Small stat card for the top bar
 function StatCard({ label, value, highlight }: { label: string; value: string | number; highlight?: boolean }) {
   return (
-    <div className="flex flex-col gap-0.5">
-      <span className={`text-xl font-bold ${highlight ? 'text-primary' : 'text-foreground'}`}>{value}</span>
-      <span className="text-xs text-muted-foreground">{label}</span>
+    <div className="flex flex-col gap-0.5 min-w-0">
+      <span className={`text-lg lg:text-xl font-bold truncate ${highlight ? 'text-primary' : 'text-foreground'}`}>{value}</span>
+      <span className="text-[11px] lg:text-xs text-muted-foreground truncate">{label}</span>
     </div>
   );
 }

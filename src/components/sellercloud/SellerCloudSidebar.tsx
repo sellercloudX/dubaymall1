@@ -113,7 +113,7 @@ export function SellerCloudSidebar({ activeTab, onTabChange, connectedMarketplac
       )}
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-1">
+      <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-1 scrollbar-thin">
         {groups.map((group, gi) => {
           const groupItems = sellerMenuItems.filter(item => item.group === group);
           return (
