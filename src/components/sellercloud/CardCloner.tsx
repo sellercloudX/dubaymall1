@@ -240,7 +240,7 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
               recommendedPrice: convertedPrice,
               netProfit: Math.round(convertedPrice * 0.2),
             },
-            skipImageGeneration: validImages.length >= 4, // Only skip if we have enough images
+            skipImageGeneration: true, // Always reuse source images in clone mode
             cloneMode: true,
           },
         });
