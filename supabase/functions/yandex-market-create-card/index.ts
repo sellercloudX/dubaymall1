@@ -964,7 +964,7 @@ serve(async (req) => {
 
         // ═══ STEP 2: Find LEAF category from Yandex tree ═══
         // COST OPTIMIZATION: For clones, use cheaper Flash Lite for category detection
-        const leafCat = await findLeafCategory(creds.apiKey, product.name, product.description || "", LOVABLE_KEY);
+        const leafCat = await findLeafCategory(creds.apiKey, product.name, product.description || "", LOVABLE_KEY, product.sourceCategory || product.category, product.sourceMarketplace);
         console.log(`📂 Category: ${leafCat.name} (${leafCat.id})`);
 
         // ═══ STEP 3: Fetch category parameters ═══
