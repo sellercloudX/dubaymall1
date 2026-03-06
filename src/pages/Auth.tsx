@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
-import { Crown, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Crown, Eye, EyeOff, Loader2, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
 import { z } from 'zod';
