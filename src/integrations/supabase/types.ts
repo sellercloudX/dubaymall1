@@ -148,6 +148,42 @@ export type Database = {
         }
         Relationships: []
       }
+      balance_transactions: {
+        Row: {
+          amount: number
+          balance_after: number
+          created_at: string | null
+          description: string | null
+          feature_key: string | null
+          id: string
+          metadata: Json | null
+          transaction_type: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          balance_after: number
+          created_at?: string | null
+          description?: string | null
+          feature_key?: string | null
+          id?: string
+          metadata?: Json | null
+          transaction_type: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          balance_after?: number
+          created_at?: string | null
+          description?: string | null
+          feature_key?: string | null
+          id?: string
+          metadata?: Json | null
+          transaction_type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       banners: {
         Row: {
           clicks_count: number | null
@@ -777,6 +813,36 @@ export type Database = {
           },
         ]
       }
+      elegant_usage: {
+        Row: {
+          created_at: string | null
+          feature_key: string
+          id: string
+          updated_at: string | null
+          usage_count: number | null
+          usage_month: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          feature_key: string
+          id?: string
+          updated_at?: string | null
+          usage_count?: number | null
+          usage_month?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          feature_key?: string
+          id?: string
+          updated_at?: string | null
+          usage_count?: number | null
+          usage_month?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       favorites: {
         Row: {
           created_at: string
@@ -805,6 +871,60 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      feature_pricing: {
+        Row: {
+          base_price_uzs: number | null
+          category: string | null
+          created_at: string | null
+          description: string | null
+          elegant_limit: number | null
+          feature_key: string
+          feature_name: string
+          feature_name_ru: string | null
+          feature_name_uz: string | null
+          id: string
+          is_enabled: boolean | null
+          is_free: boolean | null
+          is_premium_only: boolean | null
+          sort_order: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          base_price_uzs?: number | null
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          elegant_limit?: number | null
+          feature_key: string
+          feature_name: string
+          feature_name_ru?: string | null
+          feature_name_uz?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          is_free?: boolean | null
+          is_premium_only?: boolean | null
+          sort_order?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          base_price_uzs?: number | null
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          elegant_limit?: number | null
+          feature_key?: string
+          feature_name?: string
+          feature_name_ru?: string | null
+          feature_name_uz?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          is_free?: boolean | null
+          is_premium_only?: boolean | null
+          sort_order?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       flash_sale_products: {
         Row: {
@@ -2594,6 +2714,36 @@ export type Database = {
         }
         Relationships: []
       }
+      user_balances: {
+        Row: {
+          balance_uzs: number | null
+          created_at: string | null
+          id: string
+          total_deposited: number | null
+          total_spent: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          balance_uzs?: number | null
+          created_at?: string | null
+          id?: string
+          total_deposited?: number | null
+          total_spent?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          balance_uzs?: number | null
+          created_at?: string | null
+          id?: string
+          total_deposited?: number | null
+          total_spent?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -3202,6 +3352,16 @@ export type Database = {
         Args: { p_months: number; p_subscription_id: string }
         Returns: undefined
       }
+      add_balance: {
+        Args: {
+          p_amount: number
+          p_description?: string
+          p_metadata?: Json
+          p_type?: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       calculate_order_financials: {
         Args: { p_order_id: string; p_platform_commission_percent?: number }
         Returns: Json
@@ -3222,6 +3382,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      check_feature_access: {
+        Args: { p_feature_key: string; p_user_id: string }
+        Returns: Json
+      }
       check_sellercloud_access: { Args: { p_user_id: string }; Returns: Json }
       create_notification: {
         Args: {
@@ -3234,6 +3398,15 @@ export type Database = {
         Returns: string
       }
       decrypt_credentials: { Args: { p_encrypted: string }; Returns: Json }
+      deduct_balance: {
+        Args: {
+          p_amount: number
+          p_description?: string
+          p_feature_key: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       encrypt_credentials: { Args: { p_credentials: Json }; Returns: string }
       generate_affiliate_code: { Args: never; Returns: string }
       generate_confirmation_code: { Args: never; Returns: string }

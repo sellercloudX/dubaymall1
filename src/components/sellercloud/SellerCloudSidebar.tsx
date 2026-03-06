@@ -4,7 +4,7 @@ import {
   ArrowDownUp, DollarSign, Bell, FileSpreadsheet, CreditCard,
   Calculator, Shield, Copy, AlertOctagon,
   MessageCircle, Activity, Megaphone, ChevronLeft, ChevronRight,
-  LogOut, LayoutDashboard, Sun, Moon,
+  LogOut, LayoutDashboard, Sun, Moon, Wallet,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -13,6 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { MarketplaceLogo, MARKETPLACE_CONFIG } from '@/lib/marketplaceConfig';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useUserBalance } from '@/hooks/useFeaturePricing';
 
 export interface SellerMenuItem {
   id: string;
@@ -64,6 +65,7 @@ export function SellerCloudSidebar({ activeTab, onTabChange, connectedMarketplac
   const { signOut } = useAuth();
   const navigate = useNavigate();
   const { resolvedTheme, setTheme } = useTheme();
+  const { balance } = useUserBalance();
 
   const groups = ['main', 'analytics', 'tools', 'settings'] as const;
 
@@ -174,6 +176,41 @@ export function SellerCloudSidebar({ activeTab, onTabChange, connectedMarketplac
           );
         })}
       </nav>
+
+      {/* Balance widget */}
+      {!collapsed && (
+        <div className="shrink-0 border-t border-border px-3 py-2.5">
+          <button
+            onClick={() => onTabChange('subscription')}
+            className="w-full rounded-lg bg-primary/5 border border-primary/20 p-2.5 hover:bg-primary/10 transition-colors text-left"
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <Wallet className="h-3.5 w-3.5 text-primary" />
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Balans</span>
+            </div>
+            <p className="text-base font-bold text-foreground">
+              {balance ? Number(balance.balance_uzs).toLocaleString() : '0'} <span className="text-xs font-normal text-muted-foreground">UZS</span>
+            </p>
+          </button>
+        </div>
+      )}
+      {collapsed && (
+        <div className="shrink-0 border-t border-border p-2">
+          <Tooltip delayDuration={0}>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => onTabChange('subscription')}
+                className="w-full flex items-center justify-center py-2 rounded-lg text-primary hover:bg-primary/10 transition-colors"
+              >
+                <Wallet className="h-[18px] w-[18px]" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="text-xs">
+              Balans: {balance ? Number(balance.balance_uzs).toLocaleString() : '0'} UZS
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      )}
 
       {/* Footer */}
       <div className="shrink-0 border-t border-border p-2 space-y-1">

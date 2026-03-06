@@ -3,7 +3,7 @@ import {
   TrendingUp, BarChart3, UsersRound, Users, UserCheck,
   Wallet, Zap, Settings, Bot, MessageCircle, Shield,
   LayoutDashboard, ChevronLeft, ChevronRight, Crown,
-  LogOut, Sun, Moon,
+  LogOut, Sun, Moon, DollarSign,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,6 +30,7 @@ export const adminMenuItems: AdminMenuItem[] = [
   { id: 'chat', label: 'Chat', icon: MessageCircle, permission: 'can_manage_users', group: 'management' },
   { id: 'finance', label: 'Daromad', icon: Wallet, permission: 'can_manage_finances', group: 'finance' },
   { id: 'sellercloud', label: 'SellerCloudX', icon: Crown, permission: 'can_manage_finances', group: 'finance' },
+  { id: 'pricing', label: 'Narxlar & Balans', icon: DollarSign, permission: 'can_manage_finances', group: 'finance' },
   { id: 'expenses', label: 'Xarajatlar', icon: Zap, permission: 'can_manage_finances', group: 'finance' },
   { id: 'admins', label: 'Adminlar', icon: Settings, superAdminOnly: true, group: 'system' },
   { id: 'ai-agent', label: 'AI Agent', icon: Bot, superAdminOnly: true, group: 'system' },

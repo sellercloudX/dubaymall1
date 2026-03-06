@@ -12,6 +12,7 @@ import { PlatformExpenses } from '@/components/admin/PlatformExpenses';
 import { PartnerAnalytics } from '@/components/admin/PartnerAnalytics';
 import { AIAgentDashboard } from '@/components/admin/AIAgentDashboard';
 import { AdminSupportChat } from '@/components/admin/AdminSupportChat';
+import { FeaturePricingManagement } from '@/components/admin/FeaturePricingManagement';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
@@ -36,6 +37,7 @@ const pageTitles: Record<string, string> = {
   chat: 'Support Chat',
   finance: 'Daromad',
   sellercloud: 'SellerCloudX',
+  pricing: 'Narxlar & Balans',
   expenses: 'Xarajatlar',
   admins: 'Adminlar boshqaruvi',
   'ai-agent': 'AI Agent Dashboard',
@@ -51,6 +53,7 @@ function AdminContent({ activeTab }: { activeTab: string }) {
     case 'chat': return <AdminSupportChat />;
     case 'finance': return <AdminFinancials />;
     case 'sellercloud': return <SellerCloudManagement />;
+    case 'pricing': return <FeaturePricingManagement />;
     case 'expenses': return <PlatformExpenses />;
     case 'admins': return <AdminsManagement />;
     case 'ai-agent': return <AIAgentDashboard />;
