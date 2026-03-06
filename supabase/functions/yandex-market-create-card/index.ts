@@ -338,8 +338,10 @@ async function findLeafCategory(
           model: "google/gemini-2.5-flash-lite",
           messages: [{ role: "user", content: `Mahsulot: "${productName}"
 Tavsif: "${productDesc || ''}"
+${sourceCategory ? `Manba marketplace kategoriyasi: "${sourceCategory}"` : ''}
 
 Bu mahsulotni Yandex Market kategoriyalarida topish uchun RUSCHA kalit so'zlar ber.
+${sourceCategory ? `MUHIM: Manba kategoriya "${sourceCategory}" — shu kategoriyaga mos ruscha so'zlarni ALBATTA qo'sh!` : ''}
 Faqat mahsulot TURINI bildiruvchi so'zlar (brend, model, rang emas).
 
 Masalan:
