@@ -32,6 +32,10 @@ interface ProductInput {
   dimensions?: { length: number; width: number; height: number };
   keywords?: string[];
   bulletPoints?: string[];
+  sourceMarketplace?: string;
+  sourceCategory?: string;
+  sourceCategoryId?: number;
+  shopSku?: string;
 }
 
 interface PricingInput {
@@ -283,7 +287,8 @@ async function getYandexCredentials(supabase: any, userId: string) {
 // ============ STEP 1: GET LEAF CATEGORY FROM YANDEX CATEGORY TREE ============
 
 async function findLeafCategory(
-  apiKey: string, productName: string, productDesc: string, lovableApiKey: string
+  apiKey: string, productName: string, productDesc: string, lovableApiKey: string,
+  sourceCategory?: string, sourceMarketplace?: string
 ): Promise<{ id: number; name: string }> {
   // 1. Fetch category tree from Yandex
   console.log("📂 Fetching Yandex category tree...");
@@ -333,8 +338,10 @@ async function findLeafCategory(
           model: "google/gemini-2.5-flash-lite",
           messages: [{ role: "user", content: `Mahsulot: "${productName}"
 Tavsif: "${productDesc || ''}"
+${sourceCategory ? `Manba marketplace kategoriyasi: "${sourceCategory}"` : ''}
 
 Bu mahsulotni Yandex Market kategoriyalarida topish uchun RUSCHA kalit so'zlar ber.
+${sourceCategory ? `MUHIM: Manba kategoriya "${sourceCategory}" — shu kategoriyaga mos ruscha so'zlarni ALBATTA qo'sh!` : ''}
 Faqat mahsulot TURINI bildiruvchi so'zlar (brend, model, rang emas).
 
 Masalan:
@@ -393,9 +400,11 @@ Javob FAQAT JSON array: ["so'z1", "so'z2", ...]` }],
 
 MAHSULOT NOMI: "${productName}"
 TAVSIF: "${productDesc || 'Yo\'q'}"
+${sourceCategory ? `MANBA MARKETPLACE KATEGORIYASI: "${sourceCategory}" (${sourceMarketplace || 'unknown'})` : ''}
 
 MUHIM QOIDALAR:
 - Kategoriya mahsulot TURIGA aniq mos bo'lishi SHART
+${sourceCategory ? `- Manba kategoriya "${sourceCategory}" — shunga ENG YAQIN Yandex kategoriyani tanla!` : ''}
 - "Par dazmol" va "Vakuum paketlash mashinasi" — BU BOSHQA NARSALAR!
 - Mahsulot nomidagi kalit so'zlarni sinchiklab tahlil qil
 - Masalan: "vakuumlovchi" → "Вакуумные упаковщики", "par dazmol" → "Парогенераторы"
@@ -503,6 +512,7 @@ MAHSULOT:
 - Nom: ${product.name}
 - Tavsif: ${product.description || "YO'Q — O'ZING YOZ!"}
 - Kategoriya: ${categoryName}
+${product.sourceCategory ? `- Manba marketplace kategoriyasi: ${product.sourceCategory}` : ''}
 - Brend: ${product.brand || "Nomdan aniqla"}
 - Rang: ${product.color || "Nomdan aniqla"}
 - Model: ${product.model || "Nomdan aniqla"}
@@ -955,7 +965,7 @@ serve(async (req) => {
 
         // ═══ STEP 2: Find LEAF category from Yandex tree ═══
         // COST OPTIMIZATION: For clones, use cheaper Flash Lite for category detection
-        const leafCat = await findLeafCategory(creds.apiKey, product.name, product.description || "", LOVABLE_KEY);
+        const leafCat = await findLeafCategory(creds.apiKey, product.name, product.description || "", LOVABLE_KEY, product.sourceCategory || product.category, product.sourceMarketplace);
         console.log(`📂 Category: ${leafCat.name} (${leafCat.id})`);
 
         // ═══ STEP 3: Fetch category parameters ═══

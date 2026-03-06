@@ -220,6 +220,10 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
       console.log(`[CardCloner] Calling edge function for ${targetMp}...`);
       
       if (targetMp === 'yandex') {
+        // Get full product data from store for richer context
+        const storeProducts = store.getProducts(product.marketplace);
+        const fullProduct = storeProducts.find(p => p.offerId === product.offerId);
+        
         const { data, error } = await supabase.functions.invoke('yandex-market-create-card', {
           body: {
             shopId: 'sellercloud',
@@ -230,6 +234,10 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
               costPrice,
               images: validImages,
               category: productCategory,
+              sourceMarketplace: product.marketplace,
+              sourceCategory: productCategory,
+              sourceCategoryId: fullProduct?.marketCategoryId,
+              shopSku: product.shopSku,
             },
             pricing: {
               costPrice,
