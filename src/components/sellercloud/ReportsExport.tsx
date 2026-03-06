@@ -95,13 +95,13 @@ export function ReportsExport({ connectedMarketplaces, store }: ReportsExportPro
               p.offerId,
               p.shopSku || '',
               String(toDisplayUzs(p.price || 0, mp)),
-              String(p.costPrice || ''),
+              String((p as any).costPrice || ''),
               String(p.stockFBO || 0),
               String(p.stockFBS || 0),
               String(total),
               `"${(p.category || '').replace(/"/g, '""')}"`,
               p.availability || (total > 0 ? 'active' : 'inactive'),
-              p.pictures?.[0] || p.photo || '',
+              p.pictures?.[0] || (p as any).photo || '',
             ]);
           }
         }
@@ -115,12 +115,12 @@ export function ReportsExport({ connectedMarketplaces, store }: ReportsExportPro
         const rows: string[][] = [];
         for (const mp of marketplacesToUse) {
           for (const o of store.getOrders(mp)) {
-            const buyer = o.buyer?.firstName ? `${o.buyer.firstName} ${o.buyer.lastName || ''}`.trim() : (o.region || '');
+            const buyer = o.buyer?.firstName ? `${o.buyer.firstName} ${o.buyer.lastName || ''}`.trim() : ((o as any).region || '');
             if (o.items && o.items.length > 0) {
               for (const item of o.items) {
                 rows.push([
                   mp, String(o.id), o.createdAt, o.status, `"${buyer}"`,
-                  `"${(item.name || item.offerName || item.offerId || '').replace(/"/g, '""')}"`,
+                  `"${(item.offerName || item.offerId || '').replace(/"/g, '""')}"`,
                   item.offerId || '',
                   String(item.count || 1),
                   String(toDisplayUzs(item.price || 0, mp)),
