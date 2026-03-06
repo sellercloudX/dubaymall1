@@ -16,7 +16,7 @@ import { toast } from 'sonner';
 import { useExchangeRate } from '@/hooks/useExchangeRate';
 import { 
   Loader2, Globe, Package, ShoppingCart, BarChart3, 
-  Scan, AlertTriangle, RefreshCw
+  Scan, AlertTriangle, RefreshCw, MessageCircle
 } from 'lucide-react';
 import { MarketplaceLogo, MARKETPLACE_CONFIG } from '@/lib/marketplaceConfig';
 import { OnboardingWizard } from '@/components/sellercloud/OnboardingWizard';
@@ -332,6 +332,17 @@ export default function SellerCloudX() {
             </Suspense>
           </main>
         </div>
+
+        {/* Floating support chat button */}
+        {activeTab !== 'support' && hasAccess && (
+          <button
+            onClick={() => handleTabChange('support')}
+            className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl hover:scale-105 transition-all flex items-center justify-center"
+            title="Admin bilan chat"
+          >
+            <MessageCircle className="h-6 w-6" />
+          </button>
+        )}
       </div>
   );
 }
