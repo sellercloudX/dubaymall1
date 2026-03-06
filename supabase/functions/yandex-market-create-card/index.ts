@@ -400,9 +400,11 @@ Javob FAQAT JSON array: ["so'z1", "so'z2", ...]` }],
 
 MAHSULOT NOMI: "${productName}"
 TAVSIF: "${productDesc || 'Yo\'q'}"
+${sourceCategory ? `MANBA MARKETPLACE KATEGORIYASI: "${sourceCategory}" (${sourceMarketplace || 'unknown'})` : ''}
 
 MUHIM QOIDALAR:
 - Kategoriya mahsulot TURIGA aniq mos bo'lishi SHART
+${sourceCategory ? `- Manba kategoriya "${sourceCategory}" — shunga ENG YAQIN Yandex kategoriyani tanla!` : ''}
 - "Par dazmol" va "Vakuum paketlash mashinasi" — BU BOSHQA NARSALAR!
 - Mahsulot nomidagi kalit so'zlarni sinchiklab tahlil qil
 - Masalan: "vakuumlovchi" → "Вакуумные упаковщики", "par dazmol" → "Парогенераторы"
