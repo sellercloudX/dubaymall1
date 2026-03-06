@@ -10,6 +10,7 @@ import { Star, MessageCircle, HelpCircle, Send, CheckCircle2, Clock, RefreshCw }
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { MarketplaceLogo, MARKETPLACE_SHORT_NAMES } from '@/lib/marketplaceConfig';
+import { MarketplaceFilterBar } from './MarketplaceFilterBar';
 
 interface ReviewItem {
   id: string;
@@ -160,14 +161,14 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
   return (
     <div className="space-y-4">
       {/* Marketplace selector */}
-      <div className="flex gap-2 flex-wrap">
-        {supportedMps.map(mp => (
-          <Button key={mp} size="sm" variant={selectedMp === mp ? 'default' : 'outline'} onClick={() => setSelectedMp(mp)}>
-            <MarketplaceLogo marketplace={mp} size={14} className="mr-1" />
-            {MARKETPLACE_SHORT_NAMES[mp] || mp}
-          </Button>
-        ))}
-        <Button size="sm" variant="ghost" onClick={fetchReviews} disabled={isLoading} className="ml-auto">
+      <div className="flex items-center gap-2 flex-wrap">
+        <MarketplaceFilterBar
+          connectedMarketplaces={supportedMps}
+          selectedMp={selectedMp}
+          onSelect={setSelectedMp}
+          showAll={false}
+        />
+        <Button size="sm" variant="ghost" onClick={fetchReviews} disabled={isLoading} className="ml-auto h-7 md:h-9">
           <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
         </Button>
       </div>
