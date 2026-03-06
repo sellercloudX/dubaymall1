@@ -216,7 +216,7 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
                 {/* Header */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium truncate">{item.productName || item.supplierArticle || 'Nomsiz'}</p>
+                    <p className="text-sm font-medium truncate">{item.productName || item.supplierArticle || item.offerId || 'Nomsiz'}</p>
                     {item.userName && <p className="text-xs text-muted-foreground">{item.userName}</p>}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">

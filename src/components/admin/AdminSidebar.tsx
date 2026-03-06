@@ -3,14 +3,14 @@ import {
   TrendingUp, BarChart3, UsersRound, Users, UserCheck,
   Wallet, Zap, Settings, Bot, MessageCircle, Shield,
   LayoutDashboard, ChevronLeft, ChevronRight, Crown,
-  LogOut,
+  LogOut, Sun, Moon,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { useTheme } from '@/contexts/ThemeContext';
 
 export interface AdminMenuItem {
   id: string;
@@ -53,6 +53,7 @@ export function AdminSidebar({ activeTab, onTabChange, hasPermission, isSuperAdm
   const [collapsed, setCollapsed] = useState(false);
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const { resolvedTheme, setTheme } = useTheme();
 
   const visibleItems = adminMenuItems.filter(item => {
     if (item.superAdminOnly && !isSuperAdmin) return false;
@@ -69,6 +70,10 @@ export function AdminSidebar({ activeTab, onTabChange, hasPermission, isSuperAdm
     navigate('/');
   };
 
+  const toggleTheme = () => {
+    setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');
+  };
+
   return (
     <aside
       className={cn(
@@ -76,7 +81,7 @@ export function AdminSidebar({ activeTab, onTabChange, hasPermission, isSuperAdm
         collapsed ? "w-[68px]" : "w-[260px]"
       )}
     >
-      {/* Header */}
+      {/* Header with collapse button */}
       <div className={cn(
         "flex items-center gap-3 px-4 h-16 border-b border-border shrink-0",
         collapsed && "justify-center px-2"
@@ -85,13 +90,26 @@ export function AdminSidebar({ activeTab, onTabChange, hasPermission, isSuperAdm
           <Shield className="h-5 w-5" />
         </div>
         {!collapsed && (
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <h2 className="text-sm font-bold truncate text-foreground">Admin Panel</h2>
             <p className="text-[11px] text-muted-foreground truncate">
               {isSuperAdmin ? 'Super Admin' : 'Admin'}
             </p>
           </div>
         )}
+        <Tooltip delayDuration={0}>
+          <TooltipTrigger asChild>
+            <button
+              onClick={() => setCollapsed(!collapsed)}
+              className="flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors shrink-0"
+            >
+              {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right" className="text-xs">
+            {collapsed ? 'Kengaytirish' : 'Yig\'ish'}
+          </TooltipContent>
+        </Tooltip>
       </div>
 
       {/* Navigation */}
@@ -144,6 +162,23 @@ export function AdminSidebar({ activeTab, onTabChange, hasPermission, isSuperAdm
 
       {/* Footer */}
       <div className="shrink-0 border-t border-border p-2 space-y-1">
+        {/* Dark mode toggle */}
+        <Tooltip delayDuration={0}>
+          <TooltipTrigger asChild>
+            <button
+              onClick={toggleTheme}
+              className={cn(
+                "w-full flex items-center gap-3 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors",
+                collapsed ? "justify-center px-2 py-2.5" : "px-3 py-2.5"
+              )}
+            >
+              {resolvedTheme === 'dark' ? <Sun className="h-[18px] w-[18px] shrink-0" /> : <Moon className="h-[18px] w-[18px] shrink-0" />}
+              {!collapsed && <span>{resolvedTheme === 'dark' ? 'Yorug\' rejim' : 'Qorong\'i rejim'}</span>}
+            </button>
+          </TooltipTrigger>
+          {collapsed && <TooltipContent side="right" className="text-xs">{resolvedTheme === 'dark' ? 'Yorug\' rejim' : 'Qorong\'i rejim'}</TooltipContent>}
+        </Tooltip>
+
         <Tooltip delayDuration={0}>
           <TooltipTrigger asChild>
             <button
@@ -161,17 +196,6 @@ export function AdminSidebar({ activeTab, onTabChange, hasPermission, isSuperAdm
             <TooltipContent side="right" className="text-xs">Chiqish</TooltipContent>
           )}
         </Tooltip>
-
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className={cn(
-            "w-full flex items-center gap-3 rounded-lg text-xs text-muted-foreground hover:bg-muted transition-colors",
-            collapsed ? "justify-center px-2 py-2" : "px-3 py-2"
-          )}
-        >
-          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-          {!collapsed && <span>Yig'ish</span>}
-        </button>
       </div>
     </aside>
   );
