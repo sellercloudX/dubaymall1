@@ -2,9 +2,9 @@ import { cn } from '@/lib/utils';
 import {
   Globe, Package, ShoppingCart, BarChart3, Scan,
   ArrowDownUp, DollarSign, Bell, FileSpreadsheet, CreditCard,
-  Calculator, Shield, Copy, AlertOctagon, Wrench,
+  Calculator, Shield, Copy, AlertOctagon,
   MessageCircle, Activity, Megaphone, ChevronLeft, ChevronRight,
-  LogOut, LayoutDashboard,
+  LogOut, LayoutDashboard, Sun, Moon,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -12,6 +12,7 @@ import { useNavigate } from 'react-router-dom';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { MarketplaceLogo, MARKETPLACE_CONFIG } from '@/lib/marketplaceConfig';
+import { useTheme } from '@/contexts/ThemeContext';
 
 export interface SellerMenuItem {
   id: string;
@@ -21,19 +22,16 @@ export interface SellerMenuItem {
 }
 
 export const sellerMenuItems: SellerMenuItem[] = [
-  // Main
   { id: 'marketplaces', label: 'Marketplacelar', icon: Globe, group: 'main' },
   { id: 'scanner', label: 'AI Scanner', icon: Scan, group: 'main' },
   { id: 'products', label: 'Mahsulotlar', icon: Package, group: 'main' },
   { id: 'orders', label: 'Buyurtmalar', icon: ShoppingCart, group: 'main' },
-  // Analytics
   { id: 'analytics', label: 'Umumiy analitika', icon: BarChart3, group: 'analytics' },
   { id: 'wb-analytics', label: 'WB Analitika', icon: Activity, group: 'analytics' },
   { id: 'financials', label: 'Moliya', icon: Calculator, group: 'analytics' },
   { id: 'abc', label: 'ABC-analiz', icon: BarChart3, group: 'analytics' },
   { id: 'cost-prices', label: 'Tannarx', icon: DollarSign, group: 'analytics' },
   { id: 'calculator', label: 'Kalkulyator', icon: Calculator, group: 'analytics' },
-  // Tools
   { id: 'inventory', label: 'Zaxira sinxron', icon: ArrowDownUp, group: 'tools' },
   { id: 'pricing', label: 'Narxlar', icon: DollarSign, group: 'tools' },
   { id: 'reviews', label: 'Sharhlar', icon: MessageCircle, group: 'tools' },
@@ -42,7 +40,6 @@ export const sellerMenuItems: SellerMenuItem[] = [
   { id: 'clone', label: 'Klonlash', icon: Copy, group: 'tools' },
   { id: 'problems', label: 'Muammolar', icon: AlertOctagon, group: 'tools' },
   { id: 'mxik', label: 'MXIK baza', icon: FileSpreadsheet, group: 'tools' },
-  // Settings
   { id: 'subscription', label: 'Obuna', icon: CreditCard, group: 'settings' },
   { id: 'reports', label: 'Hisobotlar', icon: FileSpreadsheet, group: 'settings' },
   { id: 'notifications', label: 'Bildirishnoma', icon: Bell, group: 'settings' },
@@ -66,12 +63,17 @@ export function SellerCloudSidebar({ activeTab, onTabChange, connectedMarketplac
   const [collapsed, setCollapsed] = useState(false);
   const { signOut } = useAuth();
   const navigate = useNavigate();
+  const { resolvedTheme, setTheme } = useTheme();
 
   const groups = ['main', 'analytics', 'tools', 'settings'] as const;
 
   const handleSignOut = async () => {
     await signOut();
     navigate('/');
+  };
+
+  const toggleTheme = () => {
+    setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');
   };
 
   return (
@@ -81,7 +83,7 @@ export function SellerCloudSidebar({ activeTab, onTabChange, connectedMarketplac
         collapsed ? "w-[68px]" : "w-[260px]"
       )}
     >
-      {/* Header */}
+      {/* Header with collapse button */}
       <div className={cn(
         "flex items-center gap-3 px-4 h-16 border-b border-border shrink-0",
         collapsed && "justify-center px-2"
@@ -90,11 +92,24 @@ export function SellerCloudSidebar({ activeTab, onTabChange, connectedMarketplac
           <LayoutDashboard className="h-5 w-5" />
         </div>
         {!collapsed && (
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <h2 className="text-sm font-bold truncate text-foreground">SellerCloudX</h2>
             <p className="text-[11px] text-muted-foreground truncate">Pro kabinet</p>
           </div>
         )}
+        <Tooltip delayDuration={0}>
+          <TooltipTrigger asChild>
+            <button
+              onClick={() => setCollapsed(!collapsed)}
+              className="flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors shrink-0"
+            >
+              {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right" className="text-xs">
+            {collapsed ? 'Kengaytirish' : 'Yig\'ish'}
+          </TooltipContent>
+        </Tooltip>
       </div>
 
       {/* Connected marketplaces */}
@@ -162,6 +177,23 @@ export function SellerCloudSidebar({ activeTab, onTabChange, connectedMarketplac
 
       {/* Footer */}
       <div className="shrink-0 border-t border-border p-2 space-y-1">
+        {/* Dark mode toggle */}
+        <Tooltip delayDuration={0}>
+          <TooltipTrigger asChild>
+            <button
+              onClick={toggleTheme}
+              className={cn(
+                "w-full flex items-center gap-3 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors",
+                collapsed ? "justify-center px-2 py-2" : "px-3 py-2"
+              )}
+            >
+              {resolvedTheme === 'dark' ? <Sun className="h-[18px] w-[18px] shrink-0" /> : <Moon className="h-[18px] w-[18px] shrink-0" />}
+              {!collapsed && <span className="text-[13px]">{resolvedTheme === 'dark' ? 'Yorug\' rejim' : 'Qorong\'i rejim'}</span>}
+            </button>
+          </TooltipTrigger>
+          {collapsed && <TooltipContent side="right" className="text-xs">{resolvedTheme === 'dark' ? 'Yorug\' rejim' : 'Qorong\'i rejim'}</TooltipContent>}
+        </Tooltip>
+
         <Tooltip delayDuration={0}>
           <TooltipTrigger asChild>
             <button
@@ -193,17 +225,6 @@ export function SellerCloudSidebar({ activeTab, onTabChange, connectedMarketplac
           </TooltipTrigger>
           {collapsed && <TooltipContent side="right" className="text-xs">Chiqish</TooltipContent>}
         </Tooltip>
-
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className={cn(
-            "w-full flex items-center gap-3 rounded-lg text-xs text-muted-foreground hover:bg-muted transition-colors",
-            collapsed ? "justify-center px-2 py-2" : "px-3 py-2"
-          )}
-        >
-          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-          {!collapsed && <span>Yig'ish</span>}
-        </button>
       </div>
     </aside>
   );
