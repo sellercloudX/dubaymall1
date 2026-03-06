@@ -854,15 +854,36 @@ serve(async (req) => {
       return new Response(JSON.stringify({ success: false, error: "Wildberries ulanmagan" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // 3-step credential resolution (matches fetch-marketplace-data logic)
     let apiKey = "";
     if (conn.encrypted_credentials) {
-      const { data, error } = await supabase.rpc("decrypt_credentials", { p_encrypted: conn.encrypted_credentials });
-      if (!error && data) {
-        const creds = typeof data === "string" ? JSON.parse(data) : data;
-        apiKey = creds?.apiKey || "";
+      // Step 1: Try decrypt via service_role client
+      try {
+        const adminSupabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+        const { data, error } = await adminSupabase.rpc("decrypt_credentials", { p_encrypted: conn.encrypted_credentials });
+        if (!error && data) {
+          const creds = typeof data === "string" ? JSON.parse(data) : data;
+          apiKey = creds?.apiKey || "";
+        }
+      } catch (e) {
+        console.warn("Decrypt RPC failed:", e);
       }
-    } else {
+      // Step 2: Base64 fallback
+      if (!apiKey) {
+        try {
+          const decoded = atob(conn.encrypted_credentials);
+          const creds = JSON.parse(decoded);
+          apiKey = creds?.apiKey || "";
+          if (apiKey) console.log("API key resolved via base64 fallback");
+        } catch (e) {
+          console.warn("Base64 fallback failed");
+        }
+      }
+    }
+    // Step 3: Plaintext credentials fallback
+    if (!apiKey) {
       apiKey = (conn.credentials as any)?.apiKey || "";
+      if (apiKey) console.log("API key resolved via plaintext credentials");
     }
 
     if (!apiKey) {
