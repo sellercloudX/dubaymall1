@@ -1379,16 +1379,22 @@ serve(async (req) => {
               const questions = questionsData.result?.questions || [];
               console.log(`Yandex questions: ${questions.length} on page ${qPage}`);
               
-              const mapped = questions.map((q: any) => ({
-                id: q.questionId || q.id,
-                offerId: q.offer?.offerId || "",
-                productName: q.offer?.name || q.productName || "",
-                userName: q.author?.name || "Покупатель",
-                text: q.text || q.question || "",
-                answer: q.answer?.text || q.shop?.answer || null,
-                createdAt: q.createdAt || "",
-                isAnswered: !!(q.answer?.text || q.shop?.answer),
-              }));
+              console.log("Yandex questions sample:", JSON.stringify(questions[0] || {}).substring(0, 500));
+              
+              const mapped = questions.map((q: any) => {
+                const offerId = q.identifiers?.offerId || q.offer?.offerId || "";
+                const userName = typeof q.author === 'string' ? q.author : (q.author?.name || "Покупатель");
+                return {
+                  id: String(q.questionId || q.id),
+                  offerId,
+                  productName: q.offer?.name || q.productName || offerId || "",
+                  userName,
+                  text: q.text || q.question || "",
+                  answer: q.answer?.text || q.shop?.answer || null,
+                  createdAt: q.createdAt || "",
+                  isAnswered: !!(q.answer?.text || q.shop?.answer),
+                };
+              });
               
               result = {
                 success: true,
