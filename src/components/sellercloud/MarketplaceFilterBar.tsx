@@ -28,15 +28,15 @@ export function MarketplaceFilterBar({
   if (connectedMarketplaces.length <= 1 && !showAll) return null;
 
   return (
-    <div className="flex gap-1.5 md:gap-2 flex-wrap">
+    <div className="flex gap-1.5 flex-wrap">
       {showAll && connectedMarketplaces.length > 1 && (
         <Button
           variant={selectedMp === 'all' ? 'default' : 'outline'}
           size="sm"
           onClick={() => onSelect('all')}
-          className="h-7 text-[11px] px-2.5 rounded-full md:h-9 md:text-sm md:px-4 md:gap-1.5"
+          className="h-7 text-[11px] px-2.5 rounded-full"
         >
-          <span className="md:mr-0.5">{allIcon}</span> {allLabel}
+          <span>{allIcon}</span> {allLabel}
         </Button>
       )}
       {connectedMarketplaces.map(mp => (
@@ -45,9 +45,9 @@ export function MarketplaceFilterBar({
           variant={selectedMp === mp ? 'default' : 'outline'}
           size="sm"
           onClick={() => onSelect(mp)}
-          className="h-7 text-[11px] px-2.5 rounded-full md:h-9 md:text-sm md:px-4 md:gap-1.5"
+          className="h-7 text-[11px] px-2.5 rounded-full"
         >
-          <MarketplaceLogo marketplace={mp} size={14} className="md:w-[18px] md:h-[18px]" />
+          <MarketplaceLogo marketplace={mp} size={14} />
           <span>{MARKETPLACE_SHORT_NAMES[mp] || mp}</span>
         </Button>
       ))}
