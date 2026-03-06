@@ -177,21 +177,12 @@ export function FinancialDashboard({
   return (
     <div className="space-y-4 md:space-y-6 overflow-hidden">
       {/* Marketplace Filter + Date Range */}
-      <div className="flex flex-col gap-3">
-        {connectedMarketplaces.length > 1 && (
-          <div className="flex gap-2 overflow-x-auto no-scrollbar">
-            <Button variant={selectedMp === 'all' ? 'default' : 'outline'} size="sm"
-              onClick={() => setSelectedMp('all')} className="shrink-0 text-xs">
-              📊 Umumiy
-            </Button>
-            {connectedMarketplaces.map(mp => (
-              <Button key={mp} variant={selectedMp === mp ? 'default' : 'outline'} size="sm"
-                onClick={() => setSelectedMp(mp)} className="shrink-0 text-xs">
-                <MarketplaceLogo marketplace={mp} size={14} className="mr-1" /> {MARKETPLACE_SHORT_NAMES[mp] || mp}
-              </Button>
-            ))}
-          </div>
-        )}
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:flex-wrap">
+        <MarketplaceFilterBar
+          connectedMarketplaces={connectedMarketplaces}
+          selectedMp={selectedMp}
+          onSelect={setSelectedMp}
+        />
         <DateRangeFilter
           from={dateFrom} to={dateTo} activePreset={datePreset}
           onRangeChange={(f, t, p) => { setDateFrom(f); setDateTo(t); setDatePreset(p); }}
