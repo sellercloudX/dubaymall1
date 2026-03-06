@@ -965,7 +965,7 @@ serve(async (req) => {
         // ═══ STEP 4: AI optimization ═══
         let ai: any = null;
         if (LOVABLE_KEY) {
-          const isClone = !!body.skipImageGeneration;
+          const isClone = !!body.cloneMode || !!body.skipImageGeneration;
           if (isClone) {
             console.log(`💰 Clone mode: using Flash instead of Pro for AI optimization`);
           }
