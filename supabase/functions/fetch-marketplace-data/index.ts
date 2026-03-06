@@ -467,8 +467,12 @@ serve(async (req) => {
               
               warehouseOffers.forEach((wh: any) => {
                 const whId = wh.warehouseId;
-                const isFBS = sellerWarehouseIds.has(whId) || sellerWarehouseIds.size === 0;
-                console.log(`  Warehouse ${whId} => ${isFBS ? 'FBS' : 'FBO'}`);
+                // Seller warehouses = FBS (seller fulfillment)
+                // Yandex warehouses (NOT in seller list) = FBO (marketplace fulfillment)
+                // IMPORTANT: If sellerWarehouseIds is empty (API failed), default to FBS
+                // because most sellers use FBS model and don't have FBO stock
+                const isFBS = sellerWarehouseIds.size === 0 || sellerWarehouseIds.has(whId);
+                console.log(`  Warehouse ${whId} => ${isFBS ? 'FBS' : 'FBO'} (seller warehouses: ${Array.from(sellerWarehouseIds).join(',') || 'none'})`);
                 
                 const offers = wh.offers || [];
                 offers.forEach((offer: any) => {
@@ -1363,7 +1367,7 @@ serve(async (req) => {
           } else {
             const { page: qPage = 1 } = requestBody;
             const questionsResp = await fetchWithRetry(
-              `https://api.partner.market.yandex.ru/v2/businesses/${effectiveBusinessId}/goods-questions`,
+              `https://api.partner.market.yandex.ru/v1/businesses/${effectiveBusinessId}/goods-questions`,
               {
                 method: 'POST',
                 headers,
