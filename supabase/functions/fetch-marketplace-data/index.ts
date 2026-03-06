@@ -1342,6 +1342,85 @@ serve(async (req) => {
           console.error("Yandex answer feedback error:", e);
           result = { success: false, error: "Error answering Yandex feedback" };
         }
+      } else if (dataType === "questions") {
+        // Yandex Market: Fetch product questions
+        try {
+          if (!effectiveBusinessId) {
+            result = { success: false, error: "Business ID required for questions" };
+          } else {
+            const { page: qPage = 1 } = requestBody;
+            const questionsResp = await fetchWithRetry(
+              `https://api.partner.market.yandex.ru/v1/businesses/${effectiveBusinessId}/goods-questions`,
+              {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                  page: qPage,
+                  pageSize: 50,
+                }),
+              }
+            );
+            
+            if (questionsResp.ok) {
+              const questionsData = await questionsResp.json();
+              const questions = questionsData.result?.questions || [];
+              console.log(`Yandex questions: ${questions.length} on page ${qPage}`);
+              
+              const mapped = questions.map((q: any) => ({
+                id: q.questionId || q.id,
+                offerId: q.offer?.offerId || "",
+                productName: q.offer?.name || q.productName || "",
+                userName: q.author?.name || "Покупатель",
+                text: q.text || q.question || "",
+                answer: q.answer?.text || q.shop?.answer || null,
+                createdAt: q.createdAt || "",
+                isAnswered: !!(q.answer?.text || q.shop?.answer),
+              }));
+              
+              result = {
+                success: true,
+                data: mapped,
+                total: questionsData.result?.paging?.total || mapped.length,
+              };
+            } else {
+              const errText = await questionsResp.text();
+              console.error("Yandex questions error:", questionsResp.status, errText);
+              result = { success: false, error: `Yandex questions failed: ${questionsResp.status}` };
+            }
+          }
+        } catch (e) {
+          console.error("Yandex questions error:", e);
+          result = { success: false, error: "Error fetching Yandex questions" };
+        }
+      } else if (dataType === "answer-question") {
+        // Yandex Market: Answer a question
+        try {
+          const { questionId, text } = requestBody;
+          if (!questionId || !text || !effectiveBusinessId) {
+            result = { success: false, error: "questionId, text and businessId required" };
+          } else {
+            const answerResp = await fetchWithRetry(
+              `https://api.partner.market.yandex.ru/v1/businesses/${effectiveBusinessId}/goods-questions/answers`,
+              {
+                method: "POST",
+                headers: { ...headers, "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  questionId: Number(questionId),
+                  answer: text,
+                }),
+              }
+            );
+            if (answerResp.ok) {
+              result = { success: true, message: "Javob yuborildi" };
+            } else {
+              const errText = await answerResp.text();
+              result = { success: false, error: `Yandex answer question failed: ${answerResp.status}`, details: errText };
+            }
+          }
+        } catch (e) {
+          console.error("Yandex answer question error:", e);
+          result = { success: false, error: "Error answering Yandex question" };
+        }
       }
 
       await supabase
