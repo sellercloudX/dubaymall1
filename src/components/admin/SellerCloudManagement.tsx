@@ -378,9 +378,133 @@ export function SellerCloudManagement() {
             </TabsContent>
 
             <TabsContent value="billing" className="mt-4">
+              {/* Per-user debt summary */}
+              {(() => {
+                const debtByUser: Record<string, { name: string; total: number; bills: any[] }> = {};
+                billings.filter((b: any) => b.status === 'pending' || b.status === 'overdue').forEach((b: any) => {
+                  if (!debtByUser[b.user_id]) {
+                    debtByUser[b.user_id] = { name: profilesMap[b.user_id] || b.user_id.slice(0, 8), total: 0, bills: [] };
+                  }
+                  debtByUser[b.user_id].total += b.balance_due;
+                  debtByUser[b.user_id].bills.push(b);
+                });
+                const debtUsers = Object.entries(debtByUser).filter(([, v]) => v.total > 0);
+                if (debtUsers.length === 0) return null;
+                return (
+                  <Card className="mb-4 border-destructive/30 bg-destructive/5">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-destructive" />Qarzdor hamkorlar ({debtUsers.length})</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {debtUsers.map(([userId, info]) => (
+                          <div key={userId} className="flex items-center justify-between p-2 rounded-lg bg-background border">
+                            <div>
+                              <span className="font-medium text-sm">{info.name}</span>
+                              <span className="text-xs text-muted-foreground ml-2">({info.bills.length} hisob)</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-bold text-destructive">{formatPrice(info.total)}</span>
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button size="sm" variant="outline" className="text-green-600 h-7 text-xs" onClick={() => {
+                                    setPaymentAmount(String(info.total));
+                                    setSelectedBilling(info.bills[0]);
+                                  }}>
+                                    <DollarSign className="h-3 w-3 mr-1" />Naqd qabul
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                  <DialogHeader>
+                                    <DialogTitle>Naqd to'lovni qabul qilish</DialogTitle>
+                                    <DialogDescription>
+                                      {info.name} - Jami qarzdorlik: {formatPrice(info.total)}
+                                    </DialogDescription>
+                                  </DialogHeader>
+                                  <div className="space-y-3">
+                                    <div>
+                                      <Label>To'lov summasi (so'm)</Label>
+                                      <Input type="number" placeholder="Summa" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} />
+                                    </div>
+                                    <div className="flex gap-2">
+                                      {[info.total, info.total / 2, info.bills[0]?.balance_due].filter(Boolean).map((amt, i) => (
+                                        <Button key={i} size="sm" variant="outline" onClick={() => setPaymentAmount(String(Math.round(amt)))}>
+                                          {formatPrice(Math.round(amt))}
+                                        </Button>
+                                      ))}
+                                    </div>
+                                    <div>
+                                      <Label>Izoh</Label>
+                                      <Textarea placeholder="Naqd to'lov qabul qilindi..." value={adminNotes} onChange={(e) => setAdminNotes(e.target.value)} />
+                                    </div>
+                                  </div>
+                                  <DialogFooter>
+                                    <Button onClick={async () => {
+                                      const amount = parseFloat(paymentAmount);
+                                      if (isNaN(amount) || amount <= 0) { toast.error('Summa kiriting'); return; }
+                                      let remaining = amount;
+                                      // Apply payment across bills oldest first
+                                      const sortedBills = [...info.bills].sort((a: any, b: any) => new Date(a.billing_period_start).getTime() - new Date(b.billing_period_start).getTime());
+                                      for (const bill of sortedBills) {
+                                        if (remaining <= 0) break;
+                                        const payable = Math.min(remaining, bill.balance_due);
+                                        await markBillingPaid(bill.id, payable);
+                                        remaining -= payable;
+                                      }
+                                      // Log to platform_revenue
+                                      await supabase.from('platform_revenue').insert({
+                                        source_type: 'cash_payment',
+                                        source_id: userId,
+                                        amount: amount,
+                                        description: `Naqd to'lov: ${info.name}. ${adminNotes || ''}`.trim(),
+                                      });
+                                      toast.success(`${formatPrice(amount)} qabul qilindi`);
+                                      setAdminNotes('');
+                                      setPaymentAmount('');
+                                      refetch();
+                                    }} className="bg-green-600 hover:bg-green-700">
+                                      <DollarSign className="h-4 w-4 mr-1" />Qabul qilish
+                                    </Button>
+                                  </DialogFooter>
+                                </DialogContent>
+                              </Dialog>
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button size="sm" variant="ghost" className="text-destructive h-7 text-xs" onClick={() => { setSelectedBilling(info.bills[0]); setWaiveReason(''); }}>
+                                    <Ban className="h-3 w-3 mr-1" />Bekor
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                  <DialogHeader>
+                                    <DialogTitle>Barcha qarzdorlikni bekor qilish</DialogTitle>
+                                    <DialogDescription>{info.name} - {formatPrice(info.total)}</DialogDescription>
+                                  </DialogHeader>
+                                  <Textarea placeholder="Bekor qilish sababi" value={waiveReason} onChange={(e) => setWaiveReason(e.target.value)} />
+                                  <DialogFooter>
+                                    <Button variant="destructive" onClick={async () => {
+                                      for (const bill of info.bills) {
+                                        await waiveBilling(bill.id, waiveReason || 'Admin tomonidan bekor qilindi');
+                                      }
+                                      toast.success('Qarzdorlik bekor qilindi');
+                                      setWaiveReason('');
+                                      refetch();
+                                    }}>Hammasini bekor qilish</Button>
+                                  </DialogFooter>
+                                </DialogContent>
+                              </Dialog>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })()}
+
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Hamkor</TableHead>
                     <TableHead>Davr</TableHead>
                     <TableHead>Savdo hajmi</TableHead>
                     <TableHead>To'lanishi kerak</TableHead>
@@ -393,6 +517,7 @@ export function SellerCloudManagement() {
                 <TableBody>
                   {billings.map((bill: any) => (
                     <TableRow key={bill.id}>
+                      <TableCell className="font-medium text-sm">{profilesMap[bill.user_id] || bill.user_id?.slice(0, 8)}</TableCell>
                       <TableCell>{format(new Date(bill.billing_period_start), 'MMM yyyy')}</TableCell>
                       <TableCell>{formatPrice(bill.total_sales_volume)}</TableCell>
                       <TableCell>{formatPrice(bill.total_due)}</TableCell>
@@ -416,7 +541,7 @@ export function SellerCloudManagement() {
                           <div className="flex gap-1">
                             <Dialog>
                               <DialogTrigger asChild>
-                                <Button size="sm" variant="outline" onClick={() => { setSelectedBilling(bill); setPaymentAmount(''); }}>
+                                <Button size="sm" variant="outline" onClick={() => { setSelectedBilling(bill); setPaymentAmount(String(bill.balance_due)); }}>
                                   <DollarSign className="h-3 w-3" />
                                 </Button>
                               </DialogTrigger>
