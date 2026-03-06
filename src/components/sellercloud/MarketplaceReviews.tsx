@@ -33,6 +33,7 @@ interface MarketplaceReviewsProps {
 type ReviewType = 'feedbacks' | 'questions';
 
 const SUPPORTED_REVIEW_MARKETPLACES = ['wildberries', 'yandex', 'uzum'];
+const MARKETPLACES_WITH_QUESTIONS = ['wildberries', 'yandex'];
 
 export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviewsProps) {
   const [reviewType, setReviewType] = useState<ReviewType>('feedbacks');
@@ -57,12 +58,14 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
     setIsLoading(true);
     try {
       let dataType: string = reviewType;
-      // Yandex and Uzum use 'reviews' dataType
-      if (selectedMp === 'yandex' || selectedMp === 'uzum') {
+      // Yandex: 'reviews' for feedbacks, 'questions' for questions
+      if (selectedMp === 'yandex') {
+        dataType = reviewType === 'questions' ? 'questions' : 'reviews';
+      }
+      // Uzum: always 'reviews'
+      if (selectedMp === 'uzum') {
         dataType = 'reviews';
       }
-      // WB: feedbacks or questions
-      // Yandex/Uzum: always 'reviews'
 
       const body: Record<string, any> = {
         marketplace: selectedMp,
@@ -114,8 +117,8 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
         text: answerText,
         feedbackId: itemId,
       };
-      // WB questions use different endpoint
-      if (selectedMp === 'wildberries' && reviewType === 'questions') {
+      // WB/Yandex questions use different endpoint
+      if (reviewType === 'questions') {
         body.dataType = 'answer-question';
         body.questionId = itemId;
         delete body.feedbackId;
@@ -169,8 +172,8 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
         </Button>
       </div>
 
-      {/* Type tabs (WB has separate feedbacks/questions) */}
-      {selectedMp === 'wildberries' && (
+      {/* Type tabs (WB and Yandex have separate feedbacks/questions) */}
+      {MARKETPLACES_WITH_QUESTIONS.includes(selectedMp) && (
         <Tabs value={reviewType} onValueChange={v => setReviewType(v as ReviewType)}>
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="feedbacks" className="gap-1.5">
@@ -225,7 +228,7 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
                 </div>
 
                 {/* Text */}
-                <p className="text-sm">{item.text}</p>
+                <p className="text-sm whitespace-pre-line leading-relaxed">{item.text}</p>
 
                 {/* Photos */}
                 {item.photos && item.photos.length > 0 && (
