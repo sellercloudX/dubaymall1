@@ -60,13 +60,13 @@ export function DateRangeFilter({ from, to, onRangeChange, activePreset }: DateR
   };
 
   return (
-    <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
+    <div className="flex items-center gap-1.5 flex-wrap">
       {PRESETS.map(p => (
         <Button
           key={p.id}
           variant={activePreset === p.id ? 'default' : 'outline'}
           size="sm"
-          className="h-7 text-[11px] px-2.5 rounded-full md:h-9 md:text-sm md:px-4"
+          className="h-7 text-[11px] px-2.5 rounded-full"
           onClick={() => handlePreset(p.id)}
         >
           {p.label}
@@ -77,7 +77,7 @@ export function DateRangeFilter({ from, to, onRangeChange, activePreset }: DateR
           <Button
             variant={activePreset === 'custom' ? 'default' : 'outline'}
             size="sm"
-            className="h-7 text-[11px] px-2.5 gap-1 rounded-full md:h-9 md:text-sm md:px-4"
+            className="h-7 text-[11px] px-2.5 gap-1 rounded-full"
           >
             <CalendarIcon className="h-3 w-3 md:h-4 md:w-4" />
             {activePreset === 'custom' && from && to ? (
