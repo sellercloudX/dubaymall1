@@ -105,16 +105,27 @@ export function MarketplaceAnalytics({ connectedMarketplaces, store }: Marketpla
     }));
 
     // Top products by revenue
-    const productRevMap = new Map<string, { name: string; revenue: number; orders: number; marketplace: string }>();
+    const productRevMap = new Map<string, { name: string; revenue: number; orders: number; marketplace: string; image?: string }>();
     connectedMarketplaces.forEach(mp => {
+      // Build product lookup from store for real names/images
+      const productLookup = new Map<string, { name: string; image?: string }>();
+      store.getProducts(mp).forEach((p: any) => {
+        if (p.offerId) productLookup.set(p.offerId, { name: p.name || p.offerId, image: p.pictures?.[0] || p.photo || p.images?.[0] });
+        if (p.shopSku) productLookup.set(p.shopSku, { name: p.name || p.shopSku, image: p.pictures?.[0] || p.photo || p.images?.[0] });
+      });
+
       store.getOrders(mp)
         .filter(o => !['CANCELLED', 'RETURNED'].includes(o.status))
         .forEach(o => {
           (o.items || []).forEach((item: any) => {
             const key = `${mp}:${item.offerId}`;
-            const existing = productRevMap.get(key) || { name: item.name || item.offerId, revenue: 0, orders: 0, marketplace: mp };
+            const lookup = productLookup.get(item.offerId) || productLookup.get(item.name);
+            const realName = lookup?.name || item.name || item.offerId;
+            const image = lookup?.image;
+            const existing = productRevMap.get(key) || { name: realName, revenue: 0, orders: 0, marketplace: mp, image };
             existing.revenue += toDisplayUzs((item.price || 0) * (item.count || 1), mp);
             existing.orders += item.count || 1;
+            if (!existing.image && image) existing.image = image;
             productRevMap.set(key, existing);
           });
         });
@@ -333,7 +344,18 @@ export function MarketplaceAnalytics({ connectedMarketplaces, store }: Marketpla
                   {topProducts.map((p, i) => (
                     <TableRow key={i}>
                       <TableCell className="font-medium text-muted-foreground">{i + 1}</TableCell>
-                      <TableCell className="max-w-[200px] md:max-w-[300px] truncate font-medium">{p.name}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {p.image ? (
+                            <img src={p.image} alt="" className="h-9 w-9 rounded object-cover shrink-0 border" />
+                          ) : (
+                            <div className="h-9 w-9 rounded bg-muted flex items-center justify-center shrink-0">
+                              <Package className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                          )}
+                          <span className="truncate max-w-[180px] md:max-w-[280px] font-medium text-sm">{p.name}</span>
+                        </div>
+                      </TableCell>
                       <TableCell className="text-center">
                         <MarketplaceLogo marketplace={p.marketplace} size={18} />
                       </TableCell>

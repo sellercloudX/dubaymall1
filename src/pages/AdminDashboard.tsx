@@ -134,6 +134,16 @@ export default function AdminDashboard() {
           <AdminContent activeTab={activeTab} />
         </main>
       </div>
+
+      {/* Floating chat button */}
+      {activeTab !== 'chat' && hasPermission('can_manage_users') && (
+        <button
+          onClick={() => setActiveTab('chat')}
+          className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl hover:scale-105 transition-all flex items-center justify-center"
+        >
+          <MessageCircle className="h-6 w-6" />
+        </button>
+      )}
     </div>
   );
 

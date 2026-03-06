@@ -5,6 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { 
   FileSpreadsheet, Download, Calendar as CalendarIcon, 
   BarChart3, Package, ShoppingCart, DollarSign, TrendingUp, Loader2
@@ -12,6 +14,7 @@ import {
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
+import { toDisplayUzs } from '@/lib/currency';
 
 interface ReportsExportProps {
   connectedMarketplaces: string[];
@@ -19,10 +22,11 @@ interface ReportsExportProps {
 }
 
 const REPORT_TYPES = [
-  { id: 'sales', name: 'Sotuvlar hisoboti', description: 'Barcha sotuvlar, daromad va foydalar', icon: DollarSign, formats: ['csv'] },
-  { id: 'products', name: 'Mahsulotlar hisoboti', description: 'Barcha mahsulotlar, zaxira va narxlar', icon: Package, formats: ['csv'] },
-  { id: 'orders', name: 'Buyurtmalar hisoboti', description: 'Barcha buyurtmalar va holati', icon: ShoppingCart, formats: ['csv'] },
-  { id: 'inventory', name: 'Zaxira hisoboti', description: 'Barcha marketplacedagi zaxiralar', icon: BarChart3, formats: ['csv'] },
+  { id: 'sales', name: 'Sotuvlar hisoboti', description: 'Batafsil sotuvlar: mahsulot nomi, soni, narxi, foyda', icon: DollarSign, formats: ['csv'] },
+  { id: 'products', name: 'Mahsulotlar hisoboti', description: 'Mahsulotlar, zaxiralar, narxlar, tannarx, foyda', icon: Package, formats: ['csv'] },
+  { id: 'orders', name: 'Buyurtmalar hisoboti', description: 'Buyurtmalar batafsil: mahsulotlar, statuslar, summalar', icon: ShoppingCart, formats: ['csv'] },
+  { id: 'inventory', name: 'Zaxira hisoboti', description: 'FBO/FBS zaxiralar, kamayish ogohlantirishi', icon: BarChart3, formats: ['csv'] },
+  { id: 'pnl', name: 'Foyda-Zarar (P&L)', description: 'Daromad, tannarx, komissiya, sof foyda', icon: TrendingUp, formats: ['csv'] },
 ];
 
 const MARKETPLACE_NAMES: Record<string, string> = {
@@ -80,33 +84,127 @@ export function ReportsExport({ connectedMarketplaces, store }: ReportsExportPro
       const dateStr = format(new Date(), 'yyyy-MM-dd');
       
       if (reportId === 'products') {
-        const headers = ['Marketplace', 'Nomi', 'Offer ID', 'SKU', 'Narxi', 'FBO', 'FBS', 'Jami zaxira', 'Holat'];
-        const rows: string[][] = [];
-        for (const mp of marketplacesToUse) {
-          for (const p of store.getProducts(mp)) {
-            rows.push([mp, `"${(p.name || '').replace(/"/g, '""')}"`, p.offerId, p.shopSku || '', String(p.price || 0), String(p.stockFBO || 0), String(p.stockFBS || 0), String((p.stockFBO || 0) + (p.stockFBS || 0)), p.availability || '']);
-          }
-        }
-        downloadCSV(`mahsulotlar-${dateStr}.csv`, headers, rows);
-      } else if (reportId === 'orders' || reportId === 'sales') {
-        const headers = ['Marketplace', 'Buyurtma ID', 'Sana', 'Holat', 'Mahsulotlar soni', 'Mahsulotlar summasi', 'Yetkazish', 'Jami'];
-        const rows: string[][] = [];
-        for (const mp of marketplacesToUse) {
-          for (const o of store.getOrders(mp)) {
-            rows.push([mp, String(o.id), o.createdAt, o.status, String(o.items?.length || 0), String(o.itemsTotalUZS || o.itemsTotal || 0), String(o.deliveryTotalUZS || o.deliveryTotal || 0), String(o.totalUZS || o.total || 0)]);
-          }
-        }
-        downloadCSV(`${reportId === 'sales' ? 'sotuvlar' : 'buyurtmalar'}-${dateStr}.csv`, headers, rows);
-      } else if (reportId === 'inventory') {
-        const headers = ['Marketplace', 'Nomi', 'SKU', 'FBO', 'FBS', 'Jami', 'Holat'];
+        const headers = ['Marketplace', 'Nomi', 'Offer ID', 'SKU', 'Narxi (so\'m)', 'Tannarxi', 'FBO', 'FBS', 'Jami zaxira', 'Kategoriya', 'Holat', 'Rasm URL'];
         const rows: string[][] = [];
         for (const mp of marketplacesToUse) {
           for (const p of store.getProducts(mp)) {
             const total = (p.stockFBO || 0) + (p.stockFBS || 0);
-            rows.push([mp, `"${(p.name || '').replace(/"/g, '""')}"`, p.shopSku || p.offerId, String(p.stockFBO || 0), String(p.stockFBS || 0), String(total), total === 0 ? 'Tugagan' : total < 10 ? 'Kam' : 'Yetarli']);
+            rows.push([
+              mp,
+              `"${(p.name || '').replace(/"/g, '""')}"`,
+              p.offerId,
+              p.shopSku || '',
+              String(toDisplayUzs(p.price || 0, mp)),
+              String((p as any).costPrice || ''),
+              String(p.stockFBO || 0),
+              String(p.stockFBS || 0),
+              String(total),
+              `"${(p.category || '').replace(/"/g, '""')}"`,
+              p.availability || (total > 0 ? 'active' : 'inactive'),
+              p.pictures?.[0] || (p as any).photo || '',
+            ]);
+          }
+        }
+        downloadCSV(`mahsulotlar-${dateStr}.csv`, headers, rows);
+      } else if (reportId === 'orders' || reportId === 'sales') {
+        const headers = [
+          'Marketplace', 'Buyurtma ID', 'Sana', 'Holat', 'Xaridor/Hudud',
+          'Mahsulot nomi', 'Offer ID', 'Soni', 'Narxi (so\'m)', 'Summa (so\'m)',
+          'Yetkazish (so\'m)', 'Jami (so\'m)'
+        ];
+        const rows: string[][] = [];
+        for (const mp of marketplacesToUse) {
+          for (const o of store.getOrders(mp)) {
+            const buyer = o.buyer?.firstName ? `${o.buyer.firstName} ${o.buyer.lastName || ''}`.trim() : ((o as any).region || '');
+            if (o.items && o.items.length > 0) {
+              for (const item of o.items) {
+                rows.push([
+                  mp, String(o.id), o.createdAt, o.status, `"${buyer}"`,
+                  `"${(item.offerName || item.offerId || '').replace(/"/g, '""')}"`,
+                  item.offerId || '',
+                  String(item.count || 1),
+                  String(toDisplayUzs(item.price || 0, mp)),
+                  String(toDisplayUzs((item.price || 0) * (item.count || 1), mp)),
+                  String(toDisplayUzs(o.deliveryTotal || 0, mp)),
+                  String(toDisplayUzs(o.total || 0, mp)),
+                ]);
+              }
+            } else {
+              rows.push([
+                mp, String(o.id), o.createdAt, o.status, `"${buyer}"`,
+                '', '', '', '',
+                String(toDisplayUzs(o.itemsTotal || 0, mp)),
+                String(toDisplayUzs(o.deliveryTotal || 0, mp)),
+                String(toDisplayUzs(o.total || 0, mp)),
+              ]);
+            }
+          }
+        }
+        downloadCSV(`${reportId === 'sales' ? 'sotuvlar' : 'buyurtmalar'}-${dateStr}.csv`, headers, rows);
+      } else if (reportId === 'inventory') {
+        const headers = ['Marketplace', 'Nomi', 'SKU', 'Offer ID', 'FBO', 'FBS', 'Jami', 'Narxi (so\'m)', 'Zaxira qiymati (so\'m)', 'Holat'];
+        const rows: string[][] = [];
+        for (const mp of marketplacesToUse) {
+          for (const p of store.getProducts(mp)) {
+            const total = (p.stockFBO || 0) + (p.stockFBS || 0);
+            const stockValue = total * toDisplayUzs(p.price || 0, mp);
+            const status = total === 0 ? 'Tugagan ❌' : total < 5 ? 'Kritik ⚠️' : total < 20 ? 'Kam' : 'Yetarli ✅';
+            rows.push([
+              mp,
+              `"${(p.name || '').replace(/"/g, '""')}"`,
+              p.shopSku || p.offerId,
+              p.offerId,
+              String(p.stockFBO || 0),
+              String(p.stockFBS || 0),
+              String(total),
+              String(toDisplayUzs(p.price || 0, mp)),
+              String(Math.round(stockValue)),
+              status,
+            ]);
           }
         }
         downloadCSV(`zaxira-${dateStr}.csv`, headers, rows);
+      } else if (reportId === 'pnl') {
+        // Profit & Loss report
+        const headers = ['Marketplace', 'Mahsulot nomi', 'Offer ID', 'Sotilgan soni', 'Daromad (so\'m)', 'Tannarxi (so\'m)', 'Yalpi foyda (so\'m)', 'Marja (%)'];
+        const rows: string[][] = [];
+        for (const mp of marketplacesToUse) {
+          const productMap = new Map<string, { name: string; qty: number; revenue: number; costPrice: number }>();
+          // Get cost prices from products
+          const costPrices = new Map<string, number>();
+          store.getProducts(mp).forEach((p: any) => {
+            if (p.costPrice) costPrices.set(p.offerId, p.costPrice);
+          });
+
+          store.getOrders(mp)
+            .filter(o => !['CANCELLED', 'RETURNED'].includes(o.status))
+            .forEach(o => {
+              (o.items || []).forEach((item: any) => {
+                const key = item.offerId || item.name;
+                const existing = productMap.get(key) || { name: item.name || item.offerId || '', qty: 0, revenue: 0, costPrice: costPrices.get(item.offerId) || 0 };
+                existing.qty += item.count || 1;
+                existing.revenue += toDisplayUzs((item.price || 0) * (item.count || 1), mp);
+                productMap.set(key, existing);
+              });
+            });
+
+          productMap.forEach((data, offerId) => {
+            const totalCost = data.costPrice * data.qty;
+            const profit = data.revenue - totalCost;
+            const margin = data.revenue > 0 ? ((profit / data.revenue) * 100).toFixed(1) : '0';
+            rows.push([
+              mp,
+              `"${data.name.replace(/"/g, '""')}"`,
+              offerId,
+              String(data.qty),
+              String(Math.round(data.revenue)),
+              String(Math.round(totalCost)),
+              String(Math.round(profit)),
+              margin + '%',
+            ]);
+          });
+        }
+        downloadCSV(`foyda-zarar-${dateStr}.csv`, headers, rows);
       }
       toast.success('Hisobot yuklab olindi!');
     } catch (err) {
