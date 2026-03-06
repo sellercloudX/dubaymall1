@@ -1257,7 +1257,7 @@ serve(async (req) => {
             const { page: reviewPage = 1 } = requestBody;
             // Yandex goods-feedback requires POST method
             const reviewsResp = await fetchWithRetry(
-              `https://api.partner.market.yandex.ru/businesses/${effectiveBusinessId}/goods-feedback`,
+              `https://api.partner.market.yandex.ru/v2/businesses/${effectiveBusinessId}/goods-feedback`,
               { 
                 method: 'POST',
                 headers,
@@ -1273,21 +1273,29 @@ serve(async (req) => {
               const feedbacks = reviewsData.result?.feedbacks || [];
               console.log(`Yandex reviews: ${feedbacks.length} on page ${reviewPage}`);
               
-              const mapped = feedbacks.map((fb: any) => ({
-                id: fb.feedbackId || fb.id,
-                offerId: fb.offer?.offerId || "",
-                productName: fb.offer?.name || "",
-                userName: fb.author?.name || "Покупатель",
-                text: fb.comment?.text || fb.text || "",
-                pros: fb.comment?.pros || "",
-                cons: fb.comment?.cons || "",
-                answer: fb.shop?.comment || null,
-                rating: fb.grade?.overall || fb.rating || 0,
-                createdAt: fb.createdAt || "",
-                photos: (fb.media?.photos || []).map((p: any) => p.url || ""),
-                isAnswered: !!fb.shop?.comment,
-                orderId: fb.order?.id || null,
-              }));
+              const mapped = feedbacks.map((fb: any) => {
+                // Build full text combining comment, pros, and cons
+                const commentText = fb.comment?.text || fb.text || "";
+                const pros = fb.comment?.pros || "";
+                const cons = fb.comment?.cons || "";
+                let fullText = commentText;
+                if (pros) fullText += (fullText ? '\n' : '') + '✅ ' + pros;
+                if (cons) fullText += (fullText ? '\n' : '') + '❌ ' + cons;
+                
+                return {
+                  id: fb.feedbackId || fb.id,
+                  offerId: fb.offer?.offerId || "",
+                  productName: fb.offer?.name || "",
+                  userName: fb.author?.name || "Покупатель",
+                  text: fullText || "(Matn yo'q)",
+                  answer: fb.shop?.comment || null,
+                  rating: fb.grade?.overall || fb.rating || 0,
+                  createdAt: fb.createdAt || "",
+                  photos: (fb.media?.photos || []).map((p: any) => p.url || ""),
+                  isAnswered: !!fb.shop?.comment,
+                  orderId: fb.order?.id || null,
+                };
+              });
               
               result = { 
                 success: true, 
@@ -1313,7 +1321,7 @@ serve(async (req) => {
             result = { success: false, error: "feedbackId, text and businessId required" };
           } else {
             const answerResp = await fetchWithRetry(
-              `https://api.partner.market.yandex.ru/businesses/${effectiveBusinessId}/goods-feedback/comments`,
+              `https://api.partner.market.yandex.ru/v2/businesses/${effectiveBusinessId}/goods-feedback/comments`,
               {
                 method: "POST",
                 headers: { ...headers, "Content-Type": "application/json" },
