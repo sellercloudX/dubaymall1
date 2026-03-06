@@ -1363,7 +1363,7 @@ serve(async (req) => {
           } else {
             const { page: qPage = 1 } = requestBody;
             const questionsResp = await fetchWithRetry(
-              `https://api.partner.market.yandex.ru/v1/businesses/${effectiveBusinessId}/goods-questions`,
+              `https://api.partner.market.yandex.ru/v2/businesses/${effectiveBusinessId}/goods-questions`,
               {
                 method: 'POST',
                 headers,
