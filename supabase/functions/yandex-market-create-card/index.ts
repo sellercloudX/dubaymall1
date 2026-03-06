@@ -287,7 +287,8 @@ async function getYandexCredentials(supabase: any, userId: string) {
 // ============ STEP 1: GET LEAF CATEGORY FROM YANDEX CATEGORY TREE ============
 
 async function findLeafCategory(
-  apiKey: string, productName: string, productDesc: string, lovableApiKey: string
+  apiKey: string, productName: string, productDesc: string, lovableApiKey: string,
+  sourceCategory?: string, sourceMarketplace?: string
 ): Promise<{ id: number; name: string }> {
   // 1. Fetch category tree from Yandex
   console.log("📂 Fetching Yandex category tree...");
