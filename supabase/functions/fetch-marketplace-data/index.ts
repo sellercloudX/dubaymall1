@@ -1257,7 +1257,7 @@ serve(async (req) => {
             const { page: reviewPage = 1 } = requestBody;
             // Yandex goods-feedback requires POST method
             const reviewsResp = await fetchWithRetry(
-              `https://api.partner.market.yandex.ru/businesses/${effectiveBusinessId}/goods-feedback`,
+              `https://api.partner.market.yandex.ru/v2/businesses/${effectiveBusinessId}/goods-feedback`,
               { 
                 method: 'POST',
                 headers,
@@ -1273,21 +1273,29 @@ serve(async (req) => {
               const feedbacks = reviewsData.result?.feedbacks || [];
               console.log(`Yandex reviews: ${feedbacks.length} on page ${reviewPage}`);
               
-              const mapped = feedbacks.map((fb: any) => ({
-                id: fb.feedbackId || fb.id,
-                offerId: fb.offer?.offerId || "",
-                productName: fb.offer?.name || "",
-                userName: fb.author?.name || "Покупатель",
-                text: fb.comment?.text || fb.text || "",
-                pros: fb.comment?.pros || "",
-                cons: fb.comment?.cons || "",
-                answer: fb.shop?.comment || null,
-                rating: fb.grade?.overall || fb.rating || 0,
-                createdAt: fb.createdAt || "",
-                photos: (fb.media?.photos || []).map((p: any) => p.url || ""),
-                isAnswered: !!fb.shop?.comment,
-                orderId: fb.order?.id || null,
-              }));
+              const mapped = feedbacks.map((fb: any) => {
+                // Build full text combining comment, pros, and cons
+                const commentText = fb.comment?.text || fb.text || "";
+                const pros = fb.comment?.pros || "";
+                const cons = fb.comment?.cons || "";
+                let fullText = commentText;
+                if (pros) fullText += (fullText ? '\n' : '') + '✅ ' + pros;
+                if (cons) fullText += (fullText ? '\n' : '') + '❌ ' + cons;
+                
+                return {
+                  id: fb.feedbackId || fb.id,
+                  offerId: fb.offer?.offerId || "",
+                  productName: fb.offer?.name || "",
+                  userName: fb.author?.name || "Покупатель",
+                  text: fullText || "(Matn yo'q)",
+                  answer: fb.shop?.comment || null,
+                  rating: fb.grade?.overall || fb.rating || 0,
+                  createdAt: fb.createdAt || "",
+                  photos: (fb.media?.photos || []).map((p: any) => p.url || ""),
+                  isAnswered: !!fb.shop?.comment,
+                  orderId: fb.order?.id || null,
+                };
+              });
               
               result = { 
                 success: true, 
@@ -1313,7 +1321,7 @@ serve(async (req) => {
             result = { success: false, error: "feedbackId, text and businessId required" };
           } else {
             const answerResp = await fetchWithRetry(
-              `https://api.partner.market.yandex.ru/businesses/${effectiveBusinessId}/goods-feedback/comments`,
+              `https://api.partner.market.yandex.ru/v2/businesses/${effectiveBusinessId}/goods-feedback/comments`,
               {
                 method: "POST",
                 headers: { ...headers, "Content-Type": "application/json" },
@@ -1333,6 +1341,85 @@ serve(async (req) => {
         } catch (e) {
           console.error("Yandex answer feedback error:", e);
           result = { success: false, error: "Error answering Yandex feedback" };
+        }
+      } else if (dataType === "questions") {
+        // Yandex Market: Fetch product questions
+        try {
+          if (!effectiveBusinessId) {
+            result = { success: false, error: "Business ID required for questions" };
+          } else {
+            const { page: qPage = 1 } = requestBody;
+            const questionsResp = await fetchWithRetry(
+              `https://api.partner.market.yandex.ru/v1/businesses/${effectiveBusinessId}/goods-questions`,
+              {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                  page: qPage,
+                  pageSize: 50,
+                }),
+              }
+            );
+            
+            if (questionsResp.ok) {
+              const questionsData = await questionsResp.json();
+              const questions = questionsData.result?.questions || [];
+              console.log(`Yandex questions: ${questions.length} on page ${qPage}`);
+              
+              const mapped = questions.map((q: any) => ({
+                id: q.questionId || q.id,
+                offerId: q.offer?.offerId || "",
+                productName: q.offer?.name || q.productName || "",
+                userName: q.author?.name || "Покупатель",
+                text: q.text || q.question || "",
+                answer: q.answer?.text || q.shop?.answer || null,
+                createdAt: q.createdAt || "",
+                isAnswered: !!(q.answer?.text || q.shop?.answer),
+              }));
+              
+              result = {
+                success: true,
+                data: mapped,
+                total: questionsData.result?.paging?.total || mapped.length,
+              };
+            } else {
+              const errText = await questionsResp.text();
+              console.error("Yandex questions error:", questionsResp.status, errText);
+              result = { success: false, error: `Yandex questions failed: ${questionsResp.status}` };
+            }
+          }
+        } catch (e) {
+          console.error("Yandex questions error:", e);
+          result = { success: false, error: "Error fetching Yandex questions" };
+        }
+      } else if (dataType === "answer-question") {
+        // Yandex Market: Answer a question
+        try {
+          const { questionId, text } = requestBody;
+          if (!questionId || !text || !effectiveBusinessId) {
+            result = { success: false, error: "questionId, text and businessId required" };
+          } else {
+            const answerResp = await fetchWithRetry(
+              `https://api.partner.market.yandex.ru/v1/businesses/${effectiveBusinessId}/goods-questions/answers`,
+              {
+                method: "POST",
+                headers: { ...headers, "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  questionId: Number(questionId),
+                  answer: text,
+                }),
+              }
+            );
+            if (answerResp.ok) {
+              result = { success: true, message: "Javob yuborildi" };
+            } else {
+              const errText = await answerResp.text();
+              result = { success: false, error: `Yandex answer question failed: ${answerResp.status}`, details: errText };
+            }
+          }
+        } catch (e) {
+          console.error("Yandex answer question error:", e);
+          result = { success: false, error: "Error answering Yandex question" };
         }
       }
 
