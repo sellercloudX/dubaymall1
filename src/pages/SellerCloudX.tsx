@@ -5,26 +5,23 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Navbar } from '@/components/Navbar';
 import { Footer } from '@/components/Footer';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
 import { useMarketplaceConnections } from '@/hooks/useMarketplaceConnections';
 import { useSellerCloudSubscription } from '@/hooks/useSellerCloudSubscription';
 import { useMarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 import { toDisplayUzs } from '@/lib/currency';
 import { toast } from 'sonner';
 import { useExchangeRate } from '@/hooks/useExchangeRate';
-import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Loader2, Globe, Package, ShoppingCart, BarChart3, 
-  Scan, Crown, Check, ArrowRight, ArrowDownUp, DollarSign,
-  Upload, Bell, FileSpreadsheet, CreditCard, Calculator, AlertTriangle,
-  Shield, Copy, AlertOctagon, Wrench, RefreshCw, Sparkles, MessageCircle, Activity, Megaphone
+  Scan, AlertTriangle, RefreshCw
 } from 'lucide-react';
 import { MarketplaceLogo, MARKETPLACE_CONFIG } from '@/lib/marketplaceConfig';
 import { OnboardingWizard } from '@/components/sellercloud/OnboardingWizard';
+import { SellerCloudSidebar, sellerMenuItems } from '@/components/sellercloud/SellerCloudSidebar';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
 // Lazy load heavy tab components
 const MarketplaceOAuth = lazy(() => import('@/components/sellercloud/MarketplaceOAuth').then(m => ({ default: m.MarketplaceOAuth })));
@@ -33,7 +30,6 @@ const MarketplaceOrders = lazy(() => import('@/components/sellercloud/Marketplac
 const MarketplaceAnalytics = lazy(() => import('@/components/sellercloud/MarketplaceAnalytics').then(m => ({ default: m.MarketplaceAnalytics })));
 const InventorySync = lazy(() => import('@/components/sellercloud/InventorySync').then(m => ({ default: m.InventorySync })));
 const PriceManager = lazy(() => import('@/components/sellercloud/PriceManager').then(m => ({ default: m.PriceManager })));
-
 const NotificationCenter = lazy(() => import('@/components/sellercloud/NotificationCenter').then(m => ({ default: m.NotificationCenter })));
 const ReportsExport = lazy(() => import('@/components/sellercloud/ReportsExport').then(m => ({ default: m.ReportsExport })));
 const SubscriptionBilling = lazy(() => import('@/components/sellercloud/SubscriptionBilling').then(m => ({ default: m.SubscriptionBilling })));
@@ -42,7 +38,6 @@ const ABCAnalysis = lazy(() => import('@/components/sellercloud/ABCAnalysis').th
 const MinPriceProtection = lazy(() => import('@/components/sellercloud/MinPriceProtection').then(m => ({ default: m.MinPriceProtection })));
 const CardCloner = lazy(() => import('@/components/sellercloud/CardCloner').then(m => ({ default: m.CardCloner })));
 const ProblematicProducts = lazy(() => import('@/components/sellercloud/ProblematicProducts').then(m => ({ default: m.ProblematicProducts })));
-
 const MxikImport = lazy(() => import('@/components/sellercloud/MxikImport').then(m => ({ default: m.MxikImport })));
 const ProfitCalculator = lazy(() => import('@/components/sellercloud/ProfitCalculator').then(m => ({ default: m.ProfitCalculator })));
 const CostPriceManager = lazy(() => import('@/components/sellercloud/CostPriceManager').then(m => ({ default: m.CostPriceManager })));
@@ -54,16 +49,40 @@ const SupportChat = lazy(() => import('@/components/sellercloud/SupportChat').th
 
 const TabLoader = () => <div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
 
+// Page titles for the top bar
+const pageTitles: Record<string, string> = {
+  marketplaces: 'Marketplacelar',
+  scanner: 'AI Scanner Pro',
+  products: 'Mahsulotlar',
+  orders: 'Buyurtmalar',
+  analytics: 'Umumiy analitika',
+  'wb-analytics': 'WB Analitika',
+  financials: 'Moliyaviy dashboard',
+  abc: 'ABC-analiz',
+  'cost-prices': 'Tannarx boshqaruvi',
+  calculator: 'Foyda kalkulyatori',
+  inventory: 'Zaxira sinxronlash',
+  pricing: 'Narx boshqaruvi',
+  reviews: 'Sharhlar va savollar',
+  ads: 'Reklama kampaniyalari',
+  'min-price': 'Min narx himoyasi',
+  clone: 'Karta klonlash',
+  problems: 'Muammoli mahsulotlar',
+  mxik: 'MXIK kodlar bazasi',
+  subscription: 'Obuna va to\'lov',
+  reports: 'Hisobotlar',
+  notifications: 'Bildirishnomalar',
+  support: 'Yordam markazi',
+};
+
 export default function SellerCloudX() {
   const { user, loading: authLoading } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   
-  // Load real exchange rate from CBU.uz
   useExchangeRate();
   
-  // Persist active tab in URL hash so it survives re-renders and refreshes
   const getInitialTab = () => {
     const hash = window.location.hash.replace('#', '');
     return hash || 'marketplaces';
@@ -75,7 +94,6 @@ export default function SellerCloudX() {
     window.history.replaceState(null, '', `#${value}`);
   };
   
-  // Listen for hash changes (e.g. back/forward)
   useEffect(() => {
     const onHashChange = () => {
       const hash = window.location.hash.replace('#', '');
@@ -84,6 +102,7 @@ export default function SellerCloudX() {
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
+
   const { 
     connections, 
     isLoading: connectionsLoading, 
@@ -94,20 +113,17 @@ export default function SellerCloudX() {
     refetch
   } = useMarketplaceConnections();
   
-   const {
-     subscription,
-     accessStatus,
-     totalDebt,
-     isLoading: subscriptionLoading,
-     createSubscription,
-   } = useSellerCloudSubscription();
+  const {
+    subscription,
+    accessStatus,
+    totalDebt,
+    isLoading: subscriptionLoading,
+    createSubscription,
+  } = useSellerCloudSubscription();
   
-   const connectedMarketplaces = useMemo(() => connections.map(c => c.marketplace), [connections]);
-   
-   // Centralized data store — fetches once, cached for all tabs
-   const store = useMarketplaceDataStore(connectedMarketplaces);
+  const connectedMarketplaces = useMemo(() => connections.map(c => c.marketplace), [connections]);
+  const store = useMarketplaceDataStore(connectedMarketplaces);
   
-  // Calculate revenue from actual order data with proper currency conversion
   const totalRevenue = (() => {
     const orders = store.allOrders;
     if (orders.length === 0) return connections.reduce((sum, c) => sum + (c.total_revenue || 0), 0);
@@ -160,7 +176,7 @@ export default function SellerCloudX() {
             onActivate={async () => {
               const result = await createSubscription('pro');
               if (result.success) {
-                toast.success('Obuna yaratildi! To\'lov sahifasiga o\'tyapsiz...');
+                toast.success('Obuna yaratildi!');
               } else {
                 toast.error(result.error || 'Xatolik yuz berdi');
               }
@@ -178,206 +194,169 @@ export default function SellerCloudX() {
     );
   }
 
+  // Render content based on active tab
+  const renderContent = () => {
+    // If no access, only show subscription & notifications
+    if (!hasAccess) {
+      if (activeTab === 'notifications') return <NotificationCenter />;
+      return <SubscriptionBilling totalSalesVolume={totalRevenue} />;
+    }
+
+    switch (activeTab) {
+      case 'marketplaces':
+        return <MarketplaceOAuth connections={connections} isLoading={connectionsLoading} connectMarketplace={connectMarketplace} disconnectMarketplace={disconnectMarketplace} syncMarketplace={syncMarketplace} onConnect={handleMarketplaceConnect} store={store} />;
+      case 'scanner':
+        return connectedMarketplaces.length > 0 
+          ? <AIScannerPro shopId="sellercloud" /> 
+          : <EmptyState icon={Scan} title="AI Scanner Pro" desc="Avval kamida bitta marketplace ulang" />;
+      case 'products':
+        return <MarketplaceProducts connectedMarketplaces={connectedMarketplaces} store={store} />;
+      case 'orders':
+        return <MarketplaceOrders connectedMarketplaces={connectedMarketplaces} store={store} />;
+      case 'analytics':
+        return <MarketplaceAnalytics connectedMarketplaces={connectedMarketplaces} store={store} />;
+      case 'wb-analytics':
+        return <WBSellerAnalytics connectedMarketplaces={connectedMarketplaces} />;
+      case 'financials':
+        return <FinancialDashboard connectedMarketplaces={connectedMarketplaces} store={store} monthlyFee={subscription?.monthly_fee || 499} commissionPercent={subscription?.commission_percent || 4} />;
+      case 'abc':
+        return <ABCAnalysis connectedMarketplaces={connectedMarketplaces} store={store} commissionPercent={subscription?.commission_percent || 4} />;
+      case 'cost-prices':
+        return <CostPriceManager connectedMarketplaces={connectedMarketplaces} store={store} />;
+      case 'calculator':
+        return <ProfitCalculator commissionPercent={subscription?.commission_percent || 4} />;
+      case 'inventory':
+        return <InventorySync connectedMarketplaces={connectedMarketplaces} store={store} />;
+      case 'pricing':
+        return <PriceManager connectedMarketplaces={connectedMarketplaces} store={store} />;
+      case 'reviews':
+        return <MarketplaceReviews connectedMarketplaces={connectedMarketplaces} />;
+      case 'ads':
+        return <WBAdsCampaigns connectedMarketplaces={connectedMarketplaces} />;
+      case 'min-price':
+        return <MinPriceProtection connectedMarketplaces={connectedMarketplaces} store={store} commissionPercent={subscription?.commission_percent || 4} />;
+      case 'clone':
+        return <CardCloner connectedMarketplaces={connectedMarketplaces} store={store} />;
+      case 'problems':
+        return <ProblematicProducts connectedMarketplaces={connectedMarketplaces} store={store} />;
+      case 'mxik':
+        return <MxikImport />;
+      case 'subscription':
+        return <SubscriptionBilling totalSalesVolume={totalRevenue} />;
+      case 'reports':
+        return <ReportsExport connectedMarketplaces={connectedMarketplaces} store={store} />;
+      case 'notifications':
+        return <NotificationCenter />;
+      case 'support':
+        return <SupportChat />;
+      default:
+        return <MarketplaceOAuth connections={connections} isLoading={connectionsLoading} connectMarketplace={connectMarketplace} disconnectMarketplace={disconnectMarketplace} syncMarketplace={syncMarketplace} onConnect={handleMarketplaceConnect} store={store} />;
+    }
+  };
+
+  const formatRevenue = (r: number) => r >= 1000000 ? (r / 1000000).toFixed(1) + ' mln' : new Intl.NumberFormat('uz-UZ').format(r);
+
   return (
-    <>
-      <Navbar />
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">
-              <Globe className="h-6 w-6 text-white" />
-            </div>
+    <TooltipProvider>
+      <div className="flex min-h-screen bg-background">
+        <SellerCloudSidebar
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+          connectedMarketplaces={connectedMarketplaces}
+        />
+
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Top bar */}
+          <header className="h-16 border-b border-border bg-card/80 backdrop-blur-sm flex items-center justify-between px-6 shrink-0 sticky top-0 z-20">
             <div>
-              <h1 className="text-2xl font-bold flex items-center gap-2">SellerCloudX<Badge variant="secondary" className="text-xs">Pro</Badge></h1>
-              <p className="text-sm text-muted-foreground">Marketplace avtomatizatsiya markazi</p>
+              <h1 className="text-lg font-semibold text-foreground">{pageTitles[activeTab] || 'SellerCloudX'}</h1>
+              <p className="text-xs text-muted-foreground">SellerCloudX marketplace avtomatizatsiya</p>
             </div>
+            <div className="flex items-center gap-3">
+              {store.hasError && (
+                <Button variant="outline" size="sm" onClick={() => store.refetchAll()} disabled={store.isFetching}>
+                  <RefreshCw className={`h-4 w-4 mr-1.5 ${store.isFetching ? 'animate-spin' : ''}`} />
+                  Yangilash
+                </Button>
+              )}
+              <Badge variant="secondary" className="text-xs">Pro</Badge>
+            </div>
+          </header>
+
+          {/* Stats bar */}
+          <div className="grid grid-cols-4 gap-4 px-6 py-4 border-b border-border bg-card/40">
+            <StatCard label="Ulangan marketplace" value={connectedMarketplaces.length} />
+            <StatCard label="Jami mahsulotlar" value={store.totalProducts} />
+            <StatCard label="Jami buyurtmalar" value={store.totalOrders} />
+            <StatCard label="Jami daromad (so'm)" value={formatRevenue(totalRevenue)} highlight />
           </div>
-          <div className="flex items-center gap-3">
-            {connectedMarketplaces.length > 0 && (
-              <div className="flex items-center gap-2">
-                {connectedMarketplaces.map(mp => (
-                  <div key={mp} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-muted/50 border">
-                    <MarketplaceLogo marketplace={mp} size={20} />
-                    <span className="text-xs font-medium text-muted-foreground">{MARKETPLACE_CONFIG[mp]?.name || mp}</span>
+
+          {/* Alerts */}
+          {accessStatus && !accessStatus.is_active && (
+            <div className="px-6 pt-4">
+              <Card className="border-destructive bg-destructive/5">
+                <CardContent className="pt-4 pb-4">
+                  <div className="flex items-start gap-4">
+                    <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-destructive text-sm">Akkount cheklangan</h4>
+                      <p className="text-xs text-muted-foreground mt-1">{accessStatus.message}</p>
+                      {totalDebt > 0 && <p className="font-medium text-sm mt-1">Qarzdorlik: {new Intl.NumberFormat('uz-UZ').format(totalDebt)} so'm</p>}
+                    </div>
+                    <Button variant="destructive" size="sm">To'lash</Button>
                   </div>
-                ))}
-              </div>
-            )}
-            <Button variant="outline" asChild><Link to="/">Bosh sahifa →</Link></Button>
-          </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {store.hasError && (
+            <div className="px-6 pt-4">
+              <Card className="border-destructive/50 bg-destructive/5">
+                <CardContent className="pt-4 pb-4">
+                  <div className="flex items-center gap-3">
+                    <AlertTriangle className="h-4 w-4 text-destructive" />
+                    <p className="text-xs text-muted-foreground flex-1">Ba'zi marketplace ma'lumotlari yuklanmadi.</p>
+                    <Button variant="outline" size="sm" onClick={() => store.refetchAll()} disabled={store.isFetching}>
+                      <RefreshCw className={`h-3.5 w-3.5 ${store.isFetching ? 'animate-spin' : ''}`} />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Main content */}
+          <main className="flex-1 p-6 overflow-auto">
+            <Suspense fallback={<TabLoader />}>
+              {renderContent()}
+            </Suspense>
+          </main>
         </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <Card><CardContent className="pt-4"><div className="text-2xl font-bold">{connectedMarketplaces.length}</div><div className="text-sm text-muted-foreground">Ulangan marketplace</div></CardContent></Card>
-          <Card><CardContent className="pt-4"><div className="text-2xl font-bold">{store.totalProducts}</div><div className="text-sm text-muted-foreground">Jami mahsulotlar</div></CardContent></Card>
-          <Card><CardContent className="pt-4"><div className="text-2xl font-bold">{store.totalOrders}</div><div className="text-sm text-muted-foreground">Jami buyurtmalar</div></CardContent></Card>
-          <Card><CardContent className="pt-4">
-            <div className="text-2xl font-bold text-primary">
-              {(() => { const r = totalRevenue; return r >= 1000000 ? (r/1000000).toFixed(1)+' mln' : new Intl.NumberFormat('uz-UZ').format(r); })()}
-            </div>
-            <div className="text-sm text-muted-foreground">Jami daromad (so'm)</div>
-          </CardContent></Card>
-        </div>
-
-        {accessStatus && !accessStatus.is_active && (
-          <Card className="border-destructive bg-destructive/5 mb-6"><CardContent className="pt-6">
-            <div className="flex items-start gap-4"><AlertTriangle className="h-6 w-6 text-destructive flex-shrink-0" />
-              <div className="flex-1">
-                <h4 className="font-semibold text-destructive">Akkount cheklangan</h4>
-                <p className="text-sm text-muted-foreground mt-1">{accessStatus.message}</p>
-                {totalDebt > 0 && <p className="font-medium mt-2">Qarzdorlik: {new Intl.NumberFormat('uz-UZ').format(totalDebt)} so'm</p>}
-                <p className="text-xs text-muted-foreground mt-2">To'lov qiling — avtomatik aktivlashadi. Yoki admin bilan bog'laning: <a href="https://t.me/sellercloudx_support" target="_blank" className="text-primary underline">@sellercloudx_support</a></p>
-              </div>
-              <Button variant="destructive" size="sm">To'lash</Button>
-            </div>
-          </CardContent></Card>
-        )}
-
-        {store.hasError && (
-          <Card className="border-destructive/50 bg-destructive/5 mb-6"><CardContent className="pt-6">
-            <div className="flex items-start gap-4"><AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
-              <div className="flex-1"><h4 className="font-semibold text-destructive text-sm">Ma'lumot yuklashda xatolik</h4>
-                <p className="text-xs text-muted-foreground mt-1">Ba'zi marketplace ma'lumotlari yuklanmadi. Qayta urinib ko'ring.</p>
-              </div>
-              <Button variant="outline" size="sm" onClick={() => store.refetchAll()} disabled={store.isFetching}>
-                <RefreshCw className={`h-4 w-4 ${store.isFetching ? 'animate-spin' : ''}`} />
-              </Button>
-            </div>
-          </CardContent></Card>
-        )}
-
-        {!hasAccess ? (
-          // When access is restricted, only show subscription tab
-          <Tabs defaultValue="subscription" className="space-y-6">
-            <TabsList className="flex flex-wrap h-auto gap-1 p-1">
-              <TabsTrigger value="subscription" className="gap-2"><CreditCard className="h-4 w-4" /><span className="hidden sm:inline">Obuna</span></TabsTrigger>
-              <TabsTrigger value="notifications" className="gap-2"><Bell className="h-4 w-4" /><span className="hidden sm:inline">Bildirishnoma</span></TabsTrigger>
-            </TabsList>
-            <TabsContent value="subscription"><Suspense fallback={<TabLoader />}><SubscriptionBilling totalSalesVolume={totalRevenue} /></Suspense></TabsContent>
-            <TabsContent value="notifications"><Suspense fallback={<TabLoader />}><NotificationCenter /></Suspense></TabsContent>
-          </Tabs>
-        ) : (
-          <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-            {/* Primary navigation - main sections */}
-            <TabsList className="flex flex-wrap h-auto gap-1.5 p-1.5 w-full">
-              <TabsTrigger value="marketplaces" className="gap-1.5 text-xs sm:text-sm"><Globe className="h-4 w-4 shrink-0" /><span className="hidden md:inline">Marketplacelar</span></TabsTrigger>
-              <TabsTrigger value="scanner" className="gap-1.5 text-xs sm:text-sm"><Scan className="h-4 w-4 shrink-0" /><span className="hidden md:inline">AI Scanner</span></TabsTrigger>
-              <TabsTrigger value="products" className="gap-1.5 text-xs sm:text-sm"><Package className="h-4 w-4 shrink-0" /><span className="hidden md:inline">Mahsulotlar</span></TabsTrigger>
-              <TabsTrigger value="orders" className="gap-1.5 text-xs sm:text-sm"><ShoppingCart className="h-4 w-4 shrink-0" /><span className="hidden md:inline">Buyurtmalar</span></TabsTrigger>
-              <TabsTrigger value="analytics" className="gap-1.5 text-xs sm:text-sm"><BarChart3 className="h-4 w-4 shrink-0" /><span className="hidden md:inline">Analitika</span></TabsTrigger>
-              <TabsTrigger value="tools" className="gap-1.5 text-xs sm:text-sm"><Wrench className="h-4 w-4 shrink-0" /><span className="hidden md:inline">Asboblar</span></TabsTrigger>
-              <TabsTrigger value="settings" className="gap-1.5 text-xs sm:text-sm"><CreditCard className="h-4 w-4 shrink-0" /><span className="hidden md:inline">Sozlamalar</span></TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="marketplaces">
-              <Suspense fallback={<TabLoader />}>
-                <MarketplaceOAuth connections={connections} isLoading={connectionsLoading} connectMarketplace={connectMarketplace} disconnectMarketplace={disconnectMarketplace} syncMarketplace={syncMarketplace} onConnect={handleMarketplaceConnect} store={store} />
-              </Suspense>
-            </TabsContent>
-            <TabsContent value="scanner">
-              <Suspense fallback={<TabLoader />}>
-                {connectedMarketplaces.length > 0 ? <AIScannerPro shopId="sellercloud" /> : (
-                  <Card><CardContent className="py-12 text-center"><Scan className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" /><h3 className="text-lg font-semibold mb-2">AI Scanner Pro</h3><p className="text-muted-foreground mb-4">Avval kamida bitta marketplace ulang</p></CardContent></Card>
-                )}
-              </Suspense>
-            </TabsContent>
-            <TabsContent value="products"><Suspense fallback={<TabLoader />}><MarketplaceProducts connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
-            <TabsContent value="orders"><Suspense fallback={<TabLoader />}><MarketplaceOrders connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
-            
-            {/* Analytics - sub-tabs */}
-            <TabsContent value="analytics">
-              <Suspense fallback={<TabLoader />}>
-                <AnalyticsSubTabs connectedMarketplaces={connectedMarketplaces} store={store} subscription={subscription} totalRevenue={totalRevenue} />
-              </Suspense>
-            </TabsContent>
-
-            {/* Tools - sub-tabs */}
-            <TabsContent value="tools" forceMount className="data-[state=inactive]:hidden">
-              <Suspense fallback={<TabLoader />}>
-                <ToolsSubTabs connectedMarketplaces={connectedMarketplaces} store={store} subscription={subscription} />
-              </Suspense>
-            </TabsContent>
-
-            {/* Settings - sub-tabs */}
-            <TabsContent value="settings">
-              <Suspense fallback={<TabLoader />}>
-                <SettingsSubTabs totalRevenue={totalRevenue} connectedMarketplaces={connectedMarketplaces} store={store} />
-              </Suspense>
-            </TabsContent>
-          </Tabs>
-        )}
       </div>
-      <Footer />
-    </>
+    </TooltipProvider>
   );
 }
 
-// Sub-tab components for grouped navigation
-function AnalyticsSubTabs({ connectedMarketplaces, store, subscription, totalRevenue }: { 
-  connectedMarketplaces: string[]; store: any; subscription: any; totalRevenue: number;
-}) {
+// Small stat card for the top bar
+function StatCard({ label, value, highlight }: { label: string; value: string | number; highlight?: boolean }) {
   return (
-    <Tabs defaultValue="overview" className="space-y-4">
-      <TabsList className="h-auto gap-1 p-1 flex-wrap">
-        <TabsTrigger value="overview" className="text-xs gap-1"><BarChart3 className="h-3.5 w-3.5" />Umumiy</TabsTrigger>
-        <TabsTrigger value="wb-analytics" className="text-xs gap-1"><Activity className="h-3.5 w-3.5" />WB Analitika</TabsTrigger>
-        <TabsTrigger value="financials" className="text-xs gap-1"><Calculator className="h-3.5 w-3.5" />Moliya</TabsTrigger>
-        <TabsTrigger value="abc" className="text-xs gap-1"><BarChart3 className="h-3.5 w-3.5" />ABC-analiz</TabsTrigger>
-        <TabsTrigger value="cost-prices" className="text-xs gap-1"><DollarSign className="h-3.5 w-3.5" />Tannarx</TabsTrigger>
-        <TabsTrigger value="calculator" className="text-xs gap-1"><Calculator className="h-3.5 w-3.5" />Kalkulyator</TabsTrigger>
-      </TabsList>
-      <TabsContent value="overview"><Suspense fallback={<TabLoader />}><MarketplaceAnalytics connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
-      <TabsContent value="wb-analytics"><Suspense fallback={<TabLoader />}><WBSellerAnalytics connectedMarketplaces={connectedMarketplaces} /></Suspense></TabsContent>
-      <TabsContent value="financials"><Suspense fallback={<TabLoader />}><FinancialDashboard connectedMarketplaces={connectedMarketplaces} store={store} monthlyFee={subscription?.monthly_fee || 499} commissionPercent={subscription?.commission_percent || 4} /></Suspense></TabsContent>
-      <TabsContent value="abc"><Suspense fallback={<TabLoader />}><ABCAnalysis connectedMarketplaces={connectedMarketplaces} store={store} commissionPercent={subscription?.commission_percent || 4} /></Suspense></TabsContent>
-      <TabsContent value="cost-prices"><Suspense fallback={<TabLoader />}><CostPriceManager connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
-      <TabsContent value="calculator"><Suspense fallback={<TabLoader />}><ProfitCalculator commissionPercent={subscription?.commission_percent || 4} /></Suspense></TabsContent>
-    </Tabs>
+    <div className="flex flex-col gap-0.5">
+      <span className={`text-xl font-bold ${highlight ? 'text-primary' : 'text-foreground'}`}>{value}</span>
+      <span className="text-xs text-muted-foreground">{label}</span>
+    </div>
   );
 }
 
-function ToolsSubTabs({ connectedMarketplaces, store, subscription }: { 
-  connectedMarketplaces: string[]; store: any; subscription: any;
-}) {
+// Empty state placeholder
+function EmptyState({ icon: Icon, title, desc }: { icon: React.ElementType; title: string; desc: string }) {
   return (
-    <Tabs defaultValue="inventory" className="space-y-4">
-      <TabsList className="h-auto gap-1 p-1 flex-wrap">
-        <TabsTrigger value="inventory" className="text-xs gap-1"><ArrowDownUp className="h-3.5 w-3.5" />Zaxira</TabsTrigger>
-        <TabsTrigger value="pricing" className="text-xs gap-1"><DollarSign className="h-3.5 w-3.5" />Narxlar</TabsTrigger>
-        <TabsTrigger value="reviews" className="text-xs gap-1"><MessageCircle className="h-3.5 w-3.5" />Sharhlar</TabsTrigger>
-        <TabsTrigger value="ads" className="text-xs gap-1"><Megaphone className="h-3.5 w-3.5" />Reklama</TabsTrigger>
-        <TabsTrigger value="min-price" className="text-xs gap-1"><Shield className="h-3.5 w-3.5" />Min narx</TabsTrigger>
-        <TabsTrigger value="clone" className="text-xs gap-1"><Copy className="h-3.5 w-3.5" />Klonlash</TabsTrigger>
-        <TabsTrigger value="problems" className="text-xs gap-1"><AlertOctagon className="h-3.5 w-3.5" />Muammolar</TabsTrigger>
-        <TabsTrigger value="mxik" className="text-xs gap-1"><FileSpreadsheet className="h-3.5 w-3.5" />MXIK baza</TabsTrigger>
-      </TabsList>
-      <TabsContent value="inventory"><Suspense fallback={<TabLoader />}><InventorySync connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
-      <TabsContent value="pricing"><Suspense fallback={<TabLoader />}><PriceManager connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
-      <TabsContent value="reviews"><Suspense fallback={<TabLoader />}><MarketplaceReviews connectedMarketplaces={connectedMarketplaces} /></Suspense></TabsContent>
-      <TabsContent value="ads"><Suspense fallback={<TabLoader />}><WBAdsCampaigns connectedMarketplaces={connectedMarketplaces} /></Suspense></TabsContent>
-      <TabsContent value="min-price"><Suspense fallback={<TabLoader />}><MinPriceProtection connectedMarketplaces={connectedMarketplaces} store={store} commissionPercent={subscription?.commission_percent || 4} /></Suspense></TabsContent>
-      <TabsContent value="clone"><Suspense fallback={<TabLoader />}><CardCloner connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
-      <TabsContent value="problems"><Suspense fallback={<TabLoader />}><ProblematicProducts connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
-      <TabsContent value="mxik"><Suspense fallback={<TabLoader />}><MxikImport /></Suspense></TabsContent>
-    </Tabs>
-  );
-}
-
-function SettingsSubTabs({ totalRevenue, connectedMarketplaces, store }: { 
-  totalRevenue: number; connectedMarketplaces: string[]; store: any;
-}) {
-  return (
-    <Tabs defaultValue="subscription" className="space-y-4">
-      <TabsList className="h-auto gap-1 p-1">
-        <TabsTrigger value="subscription" className="text-xs gap-1"><CreditCard className="h-3.5 w-3.5" />Obuna</TabsTrigger>
-        <TabsTrigger value="reports" className="text-xs gap-1"><FileSpreadsheet className="h-3.5 w-3.5" />Hisobotlar</TabsTrigger>
-        <TabsTrigger value="notifications" className="text-xs gap-1"><Bell className="h-3.5 w-3.5" />Bildirishnoma</TabsTrigger>
-        <TabsTrigger value="support" className="text-xs gap-1"><MessageCircle className="h-3.5 w-3.5" />Yordam</TabsTrigger>
-      </TabsList>
-      <TabsContent value="subscription"><Suspense fallback={<TabLoader />}><SubscriptionBilling totalSalesVolume={totalRevenue} /></Suspense></TabsContent>
-      <TabsContent value="reports"><Suspense fallback={<TabLoader />}><ReportsExport connectedMarketplaces={connectedMarketplaces} store={store} /></Suspense></TabsContent>
-      <TabsContent value="notifications"><Suspense fallback={<TabLoader />}><NotificationCenter /></Suspense></TabsContent>
-      <TabsContent value="support"><Suspense fallback={<TabLoader />}><SupportChat /></Suspense></TabsContent>
-    </Tabs>
+    <Card>
+      <CardContent className="py-12 text-center">
+        <Icon className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
+        <h3 className="text-lg font-semibold mb-2">{title}</h3>
+        <p className="text-muted-foreground">{desc}</p>
+      </CardContent>
+    </Card>
   );
 }
