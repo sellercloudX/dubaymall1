@@ -50,10 +50,10 @@ const categoryNames: Record<string, string> = {
 
 const PLAN_PRICES = {
   premium: {
-    amount_uzs: 1_300_000,
+    amount_uzs: 1_270_000, // ~$99/month
     label: 'Premium',
-    duration: '3 oy',
-    months: 3,
+    duration: '1 oy',
+    months: 1,
   },
   elegant: {
     amount_uzs: 6_400_000,
