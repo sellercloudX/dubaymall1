@@ -242,25 +242,39 @@ serve(async (req) => {
           const supplyId = supplyData.id || supplyData.supplyId;
           console.log(`WB supply created: ${supplyId}`);
 
-          // Step 2: Add orders to supply (one by one for v3, or batch for marketplace/v3)
-          const results = [];
-          for (const oid of ids) {
-            try {
-              const addResp = await fetch(`${wbBase}/api/v3/supplies/${supplyId}/orders/${Number(oid)}`, {
-                method: "PATCH", headers: wbHeaders,
-              });
-              const ok = addResp.ok || addResp.status === 204;
-              if (!ok) {
-                const errText = await addResp.text();
-                console.error(`WB add order ${oid} to supply:`, addResp.status, errText);
-                results.push({ orderId: oid, success: false, error: errText });
+          // Step 2: Add orders to supply — batch endpoint (up to 100 orders)
+          // New API: PATCH /api/marketplace/v3/supplies/{supplyId}/orders
+          const numIds = ids.map(Number);
+          const results: any[] = [];
+          try {
+            const addResp = await fetch(`${wbBase}/api/marketplace/v3/supplies/${supplyId}/orders`, {
+              method: "PATCH", headers: wbHeaders,
+              body: JSON.stringify({ orders: numIds }),
+            });
+            const ok = addResp.ok || addResp.status === 204;
+            if (!ok) {
+              const errText = await addResp.text();
+              console.error(`WB add orders to supply ${supplyId}:`, addResp.status, errText);
+              for (const oid of numIds) results.push({ orderId: oid, success: false, error: errText });
+            } else {
+              // Check response for per-order errors
+              let respData: any = null;
+              try { respData = await addResp.json(); } catch { /* 204 no body */ }
+              if (respData?.errors?.length) {
+                const errorMap = new Map(respData.errors.map((e: any) => [e.orderId || e.orderID, e.error || e.message]));
+                for (const oid of numIds) {
+                  if (errorMap.has(oid)) {
+                    results.push({ orderId: oid, success: false, error: errorMap.get(oid) });
+                  } else {
+                    results.push({ orderId: oid, success: true });
+                  }
+                }
               } else {
-                results.push({ orderId: oid, success: true });
+                for (const oid of numIds) results.push({ orderId: oid, success: true });
               }
-            } catch (e) {
-              results.push({ orderId: oid, success: false, error: String(e) });
             }
-            await sleep(300);
+          } catch (e) {
+            for (const oid of numIds) results.push({ orderId: oid, success: false, error: String(e) });
           }
           result = { success: true, supplyId, results };
           break;
