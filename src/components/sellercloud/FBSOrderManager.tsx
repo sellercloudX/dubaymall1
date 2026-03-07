@@ -61,6 +61,14 @@ const CANCEL_REASONS: Record<string, { value: string; label: string }[]> = {
   ],
 };
 
+// Label size presets
+const LABEL_SIZES = [
+  { key: '58x40', label: '58×40 mm (termal stiker)', width: 58, height: 40 },
+  { key: '80x50', label: '80×50 mm', width: 80, height: 50 },
+  { key: '100x150', label: '100×150 mm (A6)', width: 100, height: 150 },
+  { key: 'a4', label: 'A4 (210×297 mm)', width: 210, height: 297 },
+];
+
 export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManagerProps) {
   const [selectedMp, setSelectedMp] = useState(connectedMarketplaces[0] || '');
   const [activeTab, setActiveTab] = useState('new');
@@ -75,6 +83,13 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
   // WB supply dialog
   const [wbSupplyDialogOpen, setWbSupplyDialogOpen] = useState(false);
   const [wbSupplyName, setWbSupplyName] = useState('');
+  // Label print dialog
+  const [labelDialogOpen, setLabelDialogOpen] = useState(false);
+  const [labelData, setLabelData] = useState<{ type: 'sticker' | 'pdf'; stickers?: any[]; labels?: any[] } | null>(null);
+  const [labelSize, setLabelSize] = useState('58x40');
+  const [labelCopies, setLabelCopies] = useState(1);
+  const [labelAutocut, setLabelAutocut] = useState(true);
+  const labelPrintRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
   // Track optimistic status overrides that survive cache refetches
@@ -297,76 +312,49 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
   };
 
   // ===== LABELS =====
-  const openStickersPrintWindow = (stickers: { file: string; orderId?: string | number }[]) => {
+  const handlePrintFromDialog = () => {
+    if (!labelPrintRef.current) return;
+    const size = LABEL_SIZES.find(s => s.key === labelSize) || LABEL_SIZES[0];
     const printWindow = window.open('', '_blank', 'width=800,height=600');
     if (!printWindow) {
       toast.error("Popup bloklangan. Brauzerni sozlang.");
       return;
     }
-    const stickerImgs = stickers
-      .filter(s => s.file)
-      .map(s => `<div style="page-break-inside:avoid;margin:8px auto;text-align:center;">
-        <img src="data:image/png;base64,${s.file}" style="width:58mm;height:40mm;object-fit:contain;" />
-        <div style="font-size:10px;color:#666;margin-top:2px;">ID: ${s.orderId || '—'}</div>
-      </div>`)
-      .join('');
-    printWindow.document.write(`<!DOCTYPE html><html><head><title>Stikerlar</title>
+
+    const content = labelPrintRef.current.innerHTML;
+    printWindow.document.write(`<!DOCTYPE html><html><head><title>Etiketkalar</title>
       <style>
-        @media print { body{margin:0;padding:0;} div{page-break-inside:avoid;} }
-        body{font-family:sans-serif;padding:16px;}
-        .actions{display:flex;gap:8px;margin-bottom:16px;justify-content:center;}
-        .actions button{padding:8px 20px;font-size:14px;border-radius:6px;cursor:pointer;border:1px solid #ccc;background:#fff;}
-        .actions button.primary{background:#2563eb;color:#fff;border-color:#2563eb;}
-        @media print{.actions{display:none !important;}}
-      </style></head><body>
-      <div class="actions">
-        <button class="primary" onclick="window.print()">🖨️ Pechat qilish</button>
-      </div>
-      ${stickerImgs}
-    </body></html>`);
+        @page { size: ${size.width}mm ${size.height}mm; margin: 0; }
+        @media print { body{margin:0;padding:0;} .label-item{page-break-after:${labelAutocut ? 'always' : 'auto'};} }
+        body{font-family:sans-serif;margin:0;padding:0;}
+        .label-item{display:flex;align-items:center;justify-content:center;width:${size.width}mm;height:${size.height}mm;overflow:hidden;}
+        .label-item img{max-width:100%;max-height:100%;object-fit:contain;}
+        .label-item iframe{width:100%;height:100%;border:none;}
+      </style></head><body>${content}</body></html>`);
     printWindow.document.close();
+    setTimeout(() => {
+      printWindow.print();
+    }, 500);
   };
 
-  // Open PDF labels in a print window (for Yandex/Uzum multi-label)
-  const openPdfLabelsPrintWindow = (labels: { pdf: string; orderId: string | number }[]) => {
-    const printWindow = window.open('', '_blank', 'width=800,height=900');
-    if (!printWindow) {
-      toast.error("Popup bloklangan. Brauzerni sozlang.");
-      return;
+  const handleDownloadLabels = () => {
+    if (!labelData) return;
+    if (labelData.type === 'sticker' && labelData.stickers) {
+      labelData.stickers.forEach(s => {
+        const a = document.createElement('a');
+        a.href = `data:image/png;base64,${s.file}`;
+        a.download = `stiker_${s.orderId || 'unknown'}.png`;
+        a.click();
+      });
+    } else if (labelData.type === 'pdf' && labelData.labels) {
+      labelData.labels.forEach(l => {
+        const a = document.createElement('a');
+        a.href = `data:application/pdf;base64,${l.pdf}`;
+        a.download = `etiketka_${l.orderId}.pdf`;
+        a.click();
+      });
     }
-    const embedFrames = labels.map((l, i) => `
-      <div style="page-break-after:always;margin-bottom:16px;">
-        <div style="font-size:12px;color:#666;margin-bottom:4px;">Buyurtma #${l.orderId} (${i + 1}/${labels.length})</div>
-        <iframe src="data:application/pdf;base64,${l.pdf}" style="width:100%;height:calc(100vh - 120px);border:1px solid #ddd;border-radius:4px;"></iframe>
-      </div>`).join('');
-    
-    printWindow.document.write(`<!DOCTYPE html><html><head><title>Etiketkalar (${labels.length} ta)</title>
-      <style>
-        body{font-family:sans-serif;padding:16px;margin:0;}
-        .actions{display:flex;gap:8px;margin-bottom:16px;justify-content:center;flex-wrap:wrap;}
-        .actions button{padding:8px 20px;font-size:14px;border-radius:6px;cursor:pointer;border:1px solid #ccc;background:#fff;}
-        .actions button.primary{background:#2563eb;color:#fff;border-color:#2563eb;}
-        .actions button.download{background:#059669;color:#fff;border-color:#059669;}
-        @media print{.actions{display:none !important;} iframe{height:auto !important;}}
-      </style></head><body>
-      <div class="actions">
-        <button class="primary" onclick="window.print()">🖨️ Barchasini pechat qilish</button>
-        <button class="download" onclick="downloadAll()">📥 Barchasini yuklab olish</button>
-      </div>
-      ${embedFrames}
-      <script>
-        const labels = ${JSON.stringify(labels.map(l => ({ pdf: l.pdf, orderId: l.orderId })))};
-        function downloadAll() {
-          labels.forEach(l => {
-            const a = document.createElement('a');
-            a.href = 'data:application/pdf;base64,' + l.pdf;
-            a.download = 'label_' + l.orderId + '.pdf';
-            a.click();
-          });
-        }
-      </script>
-    </body></html>`);
-    printWindow.document.close();
+    toast.success("Yuklab olindi");
   };
 
   const handlePrintLabels = async () => {
@@ -385,18 +373,18 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
           toast.warning("Stikerlar topilmadi. Buyurtmalar yig'ish holatida ekanligini tekshiring.");
           return;
         }
-        openStickersPrintWindow(result.stickers);
-        toast.success(`${result.stickers.length} ta stiker tayyor — pechat qiling`);
+        setLabelData({ type: 'sticker', stickers: result.stickers });
+        setLabelSize('58x40');
+        setLabelDialogOpen(true);
       } else if (result?.labels) {
-        // Collect all successful labels
         const successLabels = result.labels.filter((l: any) => l.success && l.pdf);
         if (successLabels.length === 0) {
           toast.error("Etiketkalar yuklanmadi. Buyurtmalar yig'ish holatida ekanligini tekshiring.");
           return;
         }
-        // Open all in a single print window
-        openPdfLabelsPrintWindow(successLabels);
-        toast.success(`${successLabels.length} ta etiketka tayyor — pechat qiling`);
+        setLabelData({ type: 'pdf', labels: successLabels });
+        setLabelSize('100x150');
+        setLabelDialogOpen(true);
       } else {
         toast.success("Etiketka tayyor");
       }
@@ -778,6 +766,102 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
             <Button onClick={handleSubmitDropOff} disabled={isLoading || !selectedPoint || !selectedSlot}>
               {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <CheckCircle className="h-4 w-4 mr-1" />}
               Qabul qilish
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ===== Label Print Dialog ===== */}
+      <Dialog open={labelDialogOpen} onOpenChange={setLabelDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Printer className="h-5 w-5 text-primary" />
+              Etiketka / Stiker chop etish
+            </DialogTitle>
+            <DialogDescription>
+              {labelData?.type === 'sticker'
+                ? `${labelData.stickers?.length || 0} ta stiker tayyor`
+                : `${labelData?.labels?.length || 0} ta etiketka tayyor`}
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Print Settings */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3 bg-muted/30 rounded-lg border">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Qog'oz o'lchami</label>
+              <Select value={labelSize} onValueChange={setLabelSize}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {LABEL_SIZES.map(s => (
+                    <SelectItem key={s.key} value={s.key} className="text-xs">{s.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Nusxalar soni</label>
+              <Input
+                type="number"
+                min={1}
+                max={10}
+                value={labelCopies}
+                onChange={e => setLabelCopies(Math.max(1, Math.min(10, Number(e.target.value) || 1)))}
+                className="h-8 text-xs"
+              />
+            </div>
+            <div className="flex items-end gap-2">
+              <label className="flex items-center gap-2 text-xs cursor-pointer">
+                <Checkbox
+                  checked={labelAutocut}
+                  onCheckedChange={(v) => setLabelAutocut(!!v)}
+                />
+                <span>Har bir etiketkadan keyin kesish</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Preview */}
+          <div className="border rounded-lg p-3 bg-background max-h-[350px] overflow-y-auto">
+            <div className="text-xs font-medium text-muted-foreground mb-2">Ko'rib chiqish:</div>
+            <div ref={labelPrintRef} className="space-y-2">
+              {labelData?.type === 'sticker' && labelData.stickers?.map((s, i) =>
+                Array.from({ length: labelCopies }).map((_, ci) => (
+                  <div key={`${i}-${ci}`} className="label-item inline-block border border-dashed border-muted-foreground/30 p-1 rounded mr-2 mb-2">
+                    <img
+                      src={`data:image/png;base64,${s.file}`}
+                      alt={`Stiker ${s.orderId}`}
+                      className="max-w-[120px] max-h-[80px] object-contain"
+                    />
+                    <div className="text-[9px] text-muted-foreground text-center mt-0.5">#{s.orderId}</div>
+                  </div>
+                ))
+              )}
+              {labelData?.type === 'pdf' && labelData.labels?.map((l: any, i: number) =>
+                Array.from({ length: labelCopies }).map((_, ci) => (
+                  <div key={`${i}-${ci}`} className="label-item border border-dashed border-muted-foreground/30 rounded mb-2 p-2">
+                    <div className="text-xs text-muted-foreground mb-1">📄 Buyurtma #{l.orderId} {labelCopies > 1 ? `(nusxa ${ci + 1})` : ''}</div>
+                    <iframe
+                      src={`data:application/pdf;base64,${l.pdf}`}
+                      className="w-full h-[200px] border rounded"
+                      title={`Label ${l.orderId}`}
+                    />
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={handleDownloadLabels} className="gap-1.5">
+              <Package className="h-4 w-4" />
+              Yuklab olish
+            </Button>
+            <Button onClick={handlePrintFromDialog} className="gap-1.5">
+              <Printer className="h-4 w-4" />
+              🖨️ Pechat qilish
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -220,7 +220,7 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
     const totalCommission = delivered.reduce((s, e) => s + e.commission, 0);
     const totalLogistics = delivered.reduce((s, e) => s + e.logistics, 0);
     const totalNetProfit = delivered.reduce((s, e) => s + e.netProfit, 0);
-    const avgMargin = delivered.length > 0 ? delivered.reduce((s, e) => s + e.margin, 0) / delivered.length : 0;
+    const avgMargin = totalRevenue > 0 ? (totalNetProfit / totalRevenue) * 100 : 0;
 
     return {
       totalOrders: dateFiltered.length,
@@ -308,7 +308,7 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
         <KPICard icon={<DollarSign className="h-4 w-4" />} label="Tannarx" value={fmtPrice(stats.totalCost)} variant="neutral" />
         <KPICard icon={<TrendingDown className="h-4 w-4" />} label="Komissiya + logistika" value={fmtPrice(stats.totalCommission + stats.totalLogistics)} variant="loss" />
         <KPICard icon={<TrendingUp className="h-4 w-4" />} label="Sof foyda" value={fmtPrice(stats.totalNetProfit)} variant={stats.totalNetProfit >= 0 ? 'profit' : 'loss'} />
-        <KPICard icon={<BarChart3 className="h-4 w-4" />} label="O'rtacha marja" value={stats.avgMargin.toFixed(1) + '%'} variant={stats.avgMargin >= 15 ? 'profit' : stats.avgMargin >= 0 ? 'neutral' : 'loss'} />
+        <KPICard icon={<BarChart3 className="h-4 w-4" />} label="Marja" value={stats.avgMargin.toFixed(1) + '%'} variant={stats.avgMargin >= 15 ? 'profit' : stats.avgMargin >= 0 ? 'neutral' : 'loss'} />
       </div>
 
       {/* Status tabs */}
