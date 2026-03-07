@@ -75,12 +75,37 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
   // WB supply dialog
   const [wbSupplyDialogOpen, setWbSupplyDialogOpen] = useState(false);
   const [wbSupplyName, setWbSupplyName] = useState('');
+  const queryClient = useQueryClient();
 
   const {
     isLoading, actionInProgress, confirmOrders, cancelOrders, getLabels,
     getDropOffPoints, getTimeSlots, createInvoice, setDropOff,
     getSupplies, addToSupply, executeAction,
   } = useOrderManagement();
+
+  // Optimistically update order statuses in query cache
+  // This prevents orders from "disappearing" when marketplace API hasn't updated yet
+  const optimisticStatusUpdate = useCallback((
+    marketplace: string,
+    orderIds: (string | number)[],
+    newStatus: string
+  ) => {
+    const idSet = new Set(orderIds.map(id => String(id)));
+    queryClient.setQueriesData(
+      { queryKey: ['marketplace-orders', marketplace] },
+      (oldData: any) => {
+        if (!oldData?.data) return oldData;
+        return {
+          ...oldData,
+          data: oldData.data.map((order: any) =>
+            idSet.has(String(order.id))
+              ? { ...order, status: newStatus }
+              : order
+          ),
+        };
+      }
+    );
+  }, [queryClient]);
 
   const allOrders = store.getOrders(selectedMp);
 
