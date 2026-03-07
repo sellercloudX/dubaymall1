@@ -1975,9 +1975,9 @@ serve(async (req) => {
                          itemPhoto = fallbackPhoto.startsWith('http') ? fallbackPhoto : `https://images.uzum.uz/${fallbackPhoto.replace(/^\//, '')}`;
                        }
                      }
-                     if (items.indexOf(item) === 0) {
-                       console.log('[UZUM ORDER PHOTO DEBUG] Final itemPhoto:', itemPhoto || 'EMPTY');
-                     }
+                     if (isFirstItem) {
+                        console.log('[UZUM ORDER PHOTO] Final itemPhoto:', itemPhoto || 'EMPTY');
+                      }
                   } catch (photoErr) { 
                     console.error('[UZUM ORDER PHOTO ERROR]', photoErr);
                   }
