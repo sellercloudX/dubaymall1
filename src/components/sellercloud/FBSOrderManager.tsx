@@ -339,42 +339,48 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
       const successLabels = labelData.labels.filter((l: any) => l.success && l.pdf);
       if (successLabels.length === 0) { toast.error("Pechat uchun etiketka topilmadi"); return; }
 
-      // Single print window with all PDF pages rendered as images via canvas
-      const printWindow = window.open('', '_blank', 'width=800,height=600');
-      if (!printWindow) { toast.error("Popup bloklangan. Brauzerni sozlang."); return; }
-
-      // Build iframe-based approach: embed each PDF in a hidden iframe, extract for print
-      // Better approach: render PDFs as images in a single printable page
-      const pdfPages: string[] = [];
+      // Convert base64 PDF to blob and open in browser's native PDF viewer
+      // The native viewer has built-in print functionality that works reliably
+      const allPdfs: { blob: Blob; orderId: string }[] = [];
+      
       successLabels.forEach((l: any) => {
-        for (let c = 0; c < labelCopies; c++) {
-          pdfPages.push(`<div class="label-item">
-            <object data="data:application/pdf;base64,${l.pdf}" type="application/pdf" width="100%" height="100%">
-              <p>Buyurtma: ${l.orderId}</p>
-            </object>
-          </div>`);
+        try {
+          const binary = atob(l.pdf);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          const blob = new Blob([bytes], { type: 'application/pdf' });
+          allPdfs.push({ blob, orderId: l.orderId });
+        } catch (e) {
+          console.error('PDF decode error for order', l.orderId, e);
         }
       });
 
-      printWindow.document.write(`<!DOCTYPE html><html><head><title>Etiketkalar</title>
-        <style>
-          @page { size: ${size.width}mm ${size.height}mm; margin: 0; }
-          @media print { 
-            body{margin:0;padding:0;} 
-            .label-item{page-break-after:${labelAutocut ? 'always' : 'auto'};width:${size.width}mm;height:${size.height}mm;overflow:hidden;} 
-            .no-print{display:none!important;}
-          }
-          body{font-family:sans-serif;margin:0;padding:8px;background:#f5f5f5;}
-          .label-item{width:100%;height:${size.height}mm;min-height:200px;margin-bottom:8px;border:1px solid #ddd;background:#fff;}
-          .label-item object{width:100%;height:100%;border:none;}
-          .print-btn{position:fixed;top:16px;right:16px;z-index:999;padding:12px 24px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-size:16px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.2);}
-          .print-btn:hover{background:#1d4ed8;}
-        </style></head><body>
-        <button class="print-btn no-print" onclick="window.print()">🖨️ Pechat qilish</button>
-        ${pdfPages.join('')}
-      </body></html>`);
-      printWindow.document.close();
-      toast.success(`${successLabels.length} ta etiketka tayyor. Yangi oynada "Pechat qilish" tugmasini bosing.`);
+      if (allPdfs.length === 0) { toast.error("PDF yaratib bo'lmadi"); return; }
+
+      // Open each PDF (with copies) in native PDF viewer for reliable printing
+      let openCount = 0;
+      allPdfs.forEach((pdf, idx) => {
+        for (let c = 0; c < labelCopies; c++) {
+          setTimeout(() => {
+            const blobUrl = URL.createObjectURL(pdf.blob);
+            const opened = window.open(blobUrl, '_blank');
+            if (!opened) {
+              // Fallback: download if popup blocked
+              const a = document.createElement('a');
+              a.href = blobUrl;
+              a.download = `etiketka_${pdf.orderId}.pdf`;
+              a.click();
+              toast.warning(`Popup bloklangan. Etiketka #${pdf.orderId} yuklab olindi.`);
+            }
+            // Clean up after 2 minutes
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 120000);
+            openCount++;
+          }, (idx * labelCopies + c) * 600);
+        }
+      });
+
+      const totalLabels = allPdfs.length * labelCopies;
+      toast.success(`${totalLabels} ta etiketka ochilmoqda. Har bir tabda Ctrl+P bosib pechat qiling.`);
     }
   };
 
