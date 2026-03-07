@@ -770,6 +770,102 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ===== Label Print Dialog ===== */}
+      <Dialog open={labelDialogOpen} onOpenChange={setLabelDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Printer className="h-5 w-5 text-primary" />
+              Etiketka / Stiker chop etish
+            </DialogTitle>
+            <DialogDescription>
+              {labelData?.type === 'sticker'
+                ? `${labelData.stickers?.length || 0} ta stiker tayyor`
+                : `${labelData?.labels?.length || 0} ta etiketka tayyor`}
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Print Settings */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3 bg-muted/30 rounded-lg border">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Qog'oz o'lchami</label>
+              <Select value={labelSize} onValueChange={setLabelSize}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {LABEL_SIZES.map(s => (
+                    <SelectItem key={s.key} value={s.key} className="text-xs">{s.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Nusxalar soni</label>
+              <Input
+                type="number"
+                min={1}
+                max={10}
+                value={labelCopies}
+                onChange={e => setLabelCopies(Math.max(1, Math.min(10, Number(e.target.value) || 1)))}
+                className="h-8 text-xs"
+              />
+            </div>
+            <div className="flex items-end gap-2">
+              <label className="flex items-center gap-2 text-xs cursor-pointer">
+                <Checkbox
+                  checked={labelAutocut}
+                  onCheckedChange={(v) => setLabelAutocut(!!v)}
+                />
+                <span>Har bir etiketkadan keyin kesish</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Preview */}
+          <div className="border rounded-lg p-3 bg-background max-h-[350px] overflow-y-auto">
+            <div className="text-xs font-medium text-muted-foreground mb-2">Ko'rib chiqish:</div>
+            <div ref={labelPrintRef} className="space-y-2">
+              {labelData?.type === 'sticker' && labelData.stickers?.map((s, i) =>
+                Array.from({ length: labelCopies }).map((_, ci) => (
+                  <div key={`${i}-${ci}`} className="label-item inline-block border border-dashed border-muted-foreground/30 p-1 rounded mr-2 mb-2">
+                    <img
+                      src={`data:image/png;base64,${s.file}`}
+                      alt={`Stiker ${s.orderId}`}
+                      className="max-w-[120px] max-h-[80px] object-contain"
+                    />
+                    <div className="text-[9px] text-muted-foreground text-center mt-0.5">#{s.orderId}</div>
+                  </div>
+                ))
+              )}
+              {labelData?.type === 'pdf' && labelData.labels?.map((l: any, i: number) =>
+                Array.from({ length: labelCopies }).map((_, ci) => (
+                  <div key={`${i}-${ci}`} className="label-item border border-dashed border-muted-foreground/30 rounded mb-2 p-2">
+                    <div className="text-xs text-muted-foreground mb-1">📄 Buyurtma #{l.orderId} {labelCopies > 1 ? `(nusxa ${ci + 1})` : ''}</div>
+                    <iframe
+                      src={`data:application/pdf;base64,${l.pdf}`}
+                      className="w-full h-[200px] border rounded"
+                      title={`Label ${l.orderId}`}
+                    />
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={handleDownloadLabels} className="gap-1.5">
+              <Package className="h-4 w-4" />
+              Yuklab olish
+            </Button>
+            <Button onClick={handlePrintFromDialog} className="gap-1.5">
+              <Printer className="h-4 w-4" />
+              🖨️ Pechat qilish
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
