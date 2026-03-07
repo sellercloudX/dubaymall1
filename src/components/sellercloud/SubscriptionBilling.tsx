@@ -364,29 +364,59 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
                     <CreditCard className="h-5 w-5" /> Obuna holati
                   </CardTitle>
                   <CardDescription>
-                    {subscription.plan_type === 'pro' ? 'Free' : subscription.plan_type === 'enterprise' ? 'Enterprise' : 'Premium'} tarif
+                    {subscription.plan_type === 'pro' ? 'Free' : subscription.plan_type === 'enterprise' ? 'Elegant' : 'Premium'} tarif
                   </CardDescription>
                 </div>
                 {getStatusBadge()}
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="p-3 rounded-lg bg-muted/50">
                   <div className="text-xs text-muted-foreground flex items-center gap-1"><Calendar className="h-3 w-3" /> Boshlangan</div>
                   <div className="text-base font-bold mt-1">{format(new Date(subscription.started_at), 'dd.MM.yyyy')}</div>
                 </div>
                 <div className="p-3 rounded-lg bg-muted/50">
-                  <div className="text-xs text-muted-foreground flex items-center gap-1"><TrendingUp className="h-3 w-3" /> Model</div>
-                  <div className="text-base font-bold mt-1">Balans</div>
-                  <div className="text-[10px] text-muted-foreground">Pullik xizmatlar uchun</div>
-                </div>
-                <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
-                  <div className="text-xs text-muted-foreground flex items-center gap-1"><Receipt className="h-3 w-3" /> Sotuvdan foiz</div>
-                  <div className="text-base font-bold mt-1 text-primary">0%</div>
-                  <div className="text-[10px] text-muted-foreground">Olinmaydi</div>
+                  <div className="text-xs text-muted-foreground flex items-center gap-1"><TrendingUp className="h-3 w-3" /> Tarif</div>
+                  <div className="text-base font-bold mt-1">
+                    {subscription.plan_type === 'pro' ? 'Free' : subscription.plan_type === 'enterprise' ? 'Elegant' : 'Premium'}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">
+                    {subscription.plan_type === 'pro' ? 'Balans orqali xizmatlar' : subscription.plan_type === 'enterprise' ? 'Barcha xizmatlar bepul' : '30% chegirma'}
+                  </div>
                 </div>
               </div>
+
+              {/* Upgrade options */}
+              {subscription.plan_type === 'pro' && (
+                <div className="p-4 rounded-xl border border-border bg-muted/30 space-y-3">
+                  <h4 className="text-sm font-semibold flex items-center gap-2">
+                    <Crown className="h-4 w-4 text-amber-500" /> Tarifni oshirish
+                  </h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 rounded-lg border border-amber-200 bg-amber-500/5 space-y-2">
+                      <div className="flex items-center gap-1.5">
+                        <Badge className="bg-amber-500/10 text-amber-600 border-amber-200 text-[10px]">Premium</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">AI xizmatlar 30% arzon, aktivatsiya bepul</p>
+                      <p className="text-sm font-bold">$100-150 <span className="text-[10px] font-normal text-muted-foreground">/ 3 oy</span></p>
+                      <Button size="sm" variant="outline" className="w-full text-xs" onClick={() => window.open('https://t.me/sellercloudx_support', '_blank')}>
+                        Bog'lanish
+                      </Button>
+                    </div>
+                    <div className="p-3 rounded-lg border border-violet-200 bg-violet-500/5 space-y-2">
+                      <div className="flex items-center gap-1.5">
+                        <Badge className="bg-violet-500/10 text-violet-600 border-violet-200 text-[10px]">Elegant</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Barcha AI xizmatlar 0 so'm (limitli)</p>
+                      <p className="text-sm font-bold">$499 <span className="text-[10px] font-normal text-muted-foreground">/ oy</span></p>
+                      <Button size="sm" variant="outline" className="w-full text-xs" onClick={() => window.open('https://t.me/sellercloudx_support', '_blank')}>
+                        Bog'lanish
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
