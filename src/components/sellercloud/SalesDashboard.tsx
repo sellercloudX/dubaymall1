@@ -220,7 +220,7 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
     const totalCommission = delivered.reduce((s, e) => s + e.commission, 0);
     const totalLogistics = delivered.reduce((s, e) => s + e.logistics, 0);
     const totalNetProfit = delivered.reduce((s, e) => s + e.netProfit, 0);
-    const avgMargin = delivered.length > 0 ? delivered.reduce((s, e) => s + e.margin, 0) / delivered.length : 0;
+    const avgMargin = totalRevenue > 0 ? (totalNetProfit / totalRevenue) * 100 : 0;
 
     return {
       totalOrders: dateFiltered.length,
