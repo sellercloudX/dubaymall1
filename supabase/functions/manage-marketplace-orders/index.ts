@@ -120,27 +120,30 @@ serve(async (req) => {
 
         case "labels": {
           // GET /v1/fbs/order/{orderId}/labels/print — PDF binary
-          if (ids.length === 1) {
-            const resp = await fetch(`${base}/v1/fbs/order/${ids[0]}/labels/print`, { headers });
-            if (resp.ok) {
-              return pdfResponse(await resp.arrayBuffer(), `label_uzum_${ids[0]}.pdf`);
-            }
-            result = { success: false, error: `Label fetch failed: ${resp.status}`, details: await resp.text() };
-          } else {
-            const labels = [];
-            for (const oid of ids) {
+          // Always return JSON with base64 for consistent client handling
+          const labels = [];
+          for (const oid of ids) {
+            try {
               const resp = await fetch(`${base}/v1/fbs/order/${oid}/labels/print`, { headers });
               if (resp.ok) {
                 const buf = await resp.arrayBuffer();
-                const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+                const bytes = new Uint8Array(buf);
+                let binary = '';
+                for (let i = 0; i < bytes.length; i++) {
+                  binary += String.fromCharCode(bytes[i]);
+                }
+                const b64 = btoa(binary);
                 labels.push({ orderId: oid, pdf: b64, success: true });
               } else {
-                labels.push({ orderId: oid, success: false });
+                console.error(`Uzum label ${oid}:`, resp.status, await resp.text());
+                labels.push({ orderId: oid, success: false, error: `HTTP ${resp.status}` });
               }
-              await sleep(200);
+            } catch (e) {
+              labels.push({ orderId: oid, success: false, error: String(e) });
             }
-            result = { success: true, labels };
+            if (ids.length > 1) await sleep(200);
           }
+          result = { success: true, labels };
           break;
         }
 

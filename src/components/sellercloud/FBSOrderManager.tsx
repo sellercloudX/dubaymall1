@@ -313,7 +313,7 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
 
   // ===== LABELS =====
   const handlePrintFromDialog = () => {
-    if (!labelPrintRef.current) return;
+    if (!labelData) return;
     const size = LABEL_SIZES.find(s => s.key === labelSize) || LABEL_SIZES[0];
     const printWindow = window.open('', '_blank', 'width=800,height=600');
     if (!printWindow) {
@@ -321,20 +321,41 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
       return;
     }
 
-    const content = labelPrintRef.current.innerHTML;
-    printWindow.document.write(`<!DOCTYPE html><html><head><title>Etiketkalar</title>
-      <style>
-        @page { size: ${size.width}mm ${size.height}mm; margin: 0; }
-        @media print { body{margin:0;padding:0;} .label-item{page-break-after:${labelAutocut ? 'always' : 'auto'};} }
-        body{font-family:sans-serif;margin:0;padding:0;}
-        .label-item{display:flex;align-items:center;justify-content:center;width:${size.width}mm;height:${size.height}mm;overflow:hidden;}
-        .label-item img{max-width:100%;max-height:100%;object-fit:contain;}
-        .label-item iframe{width:100%;height:100%;border:none;}
-      </style></head><body>${content}</body></html>`);
-    printWindow.document.close();
-    setTimeout(() => {
-      printWindow.print();
-    }, 500);
+    if (labelData.type === 'sticker' && labelData.stickers) {
+      // PNG stickers - render as images
+      const images = labelData.stickers.flatMap(s =>
+        Array.from({ length: labelCopies }).map((_, ci) =>
+          `<div class="label-item"><img src="data:image/png;base64,${s.file}" /></div>`
+        )
+      ).join('');
+      printWindow.document.write(`<!DOCTYPE html><html><head><title>Stikerlar</title>
+        <style>
+          @page { size: ${size.width}mm ${size.height}mm; margin: 0; }
+          @media print { body{margin:0;padding:0;} .label-item{page-break-after:${labelAutocut ? 'always' : 'auto'};} }
+          body{font-family:sans-serif;margin:0;padding:0;}
+          .label-item{display:flex;align-items:center;justify-content:center;width:${size.width}mm;height:${size.height}mm;overflow:hidden;}
+          .label-item img{max-width:100%;max-height:100%;object-fit:contain;}
+        </style></head><body>${images}</body></html>`);
+      printWindow.document.close();
+      setTimeout(() => printWindow.print(), 500);
+    } else if (labelData.type === 'pdf' && labelData.labels) {
+      // PDF labels - embed each as an iframe and print
+      const pdfs = labelData.labels.flatMap((l: any) =>
+        Array.from({ length: labelCopies }).map((_, ci) =>
+          `<div class="label-item"><embed src="data:application/pdf;base64,${l.pdf}" type="application/pdf" width="100%" height="100%" /></div>`
+        )
+      ).join('');
+      printWindow.document.write(`<!DOCTYPE html><html><head><title>Etiketkalar</title>
+        <style>
+          @page { size: ${size.width}mm ${size.height}mm; margin: 2mm; }
+          @media print { body{margin:0;padding:0;} .label-item{page-break-after:${labelAutocut ? 'always' : 'auto'};} }
+          body{font-family:sans-serif;margin:0;padding:0;}
+          .label-item{width:${size.width}mm;height:${size.height}mm;overflow:hidden;}
+          embed{width:100%;height:100%;}
+        </style></head><body>${pdfs}</body></html>`);
+      printWindow.document.close();
+      setTimeout(() => printWindow.print(), 1000);
+    }
   };
 
   const handleDownloadLabels = () => {
@@ -842,12 +863,33 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
               {labelData?.type === 'pdf' && labelData.labels?.map((l: any, i: number) =>
                 Array.from({ length: labelCopies }).map((_, ci) => (
                   <div key={`${i}-${ci}`} className="label-item border border-dashed border-muted-foreground/30 rounded mb-2 p-2">
-                    <div className="text-xs text-muted-foreground mb-1">📄 Buyurtma #{l.orderId} {labelCopies > 1 ? `(nusxa ${ci + 1})` : ''}</div>
-                    <iframe
-                      src={`data:application/pdf;base64,${l.pdf}`}
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-muted-foreground">📄 Buyurtma #{l.orderId} {labelCopies > 1 ? `(nusxa ${ci + 1})` : ''}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 text-xs gap-1"
+                        onClick={() => {
+                          const a = document.createElement('a');
+                          a.href = `data:application/pdf;base64,${l.pdf}`;
+                          a.download = `etiketka_${l.orderId}.pdf`;
+                          a.click();
+                        }}
+                      >
+                        <Package className="h-3 w-3" /> Yuklab olish
+                      </Button>
+                    </div>
+                    <object
+                      data={`data:application/pdf;base64,${l.pdf}`}
+                      type="application/pdf"
                       className="w-full h-[200px] border rounded"
-                      title={`Label ${l.orderId}`}
-                    />
+                    >
+                      <div className="flex flex-col items-center justify-center h-[200px] bg-muted/50 rounded text-muted-foreground">
+                        <Printer className="h-8 w-8 mb-2" />
+                        <p className="text-xs">PDF ko'rish mumkin emas</p>
+                        <p className="text-[10px]">Yuklab oling yoki "Pechat qilish" tugmasini bosing</p>
+                      </div>
+                    </object>
                   </div>
                 ))
               )}
