@@ -160,47 +160,102 @@ async function cmdStart(chatId: number, firstName: string) {
       { reply_markup: adminMainMenu() }
     );
   } else {
-    await send(chatId,
-      `👋 <b>${firstName}</b>, bu SellerCloudX admin botidir.\n\n` +
-      `🔗 Admin sifatida ro'yxatdan o'tish:\n` +
-      `1. <code>/link email@example.com</code>\n` +
-      `2. <code>/admin</code>\n\n` +
-      `⚠️ Bu bot faqat adminlar uchun. Hamkorlar <b>sellercloudx.com</b> ilovasi orqali murojaat qiladi.`
-    );
+    // Check if already linked as partner
+    const { data: partnerLink } = await supabase
+      .from('telegram_chat_links')
+      .select('user_id')
+      .eq('telegram_chat_id', chatId)
+      .eq('is_admin', false)
+      .maybeSingle();
+
+    if (partnerLink) {
+      const profile = await getUserProfile(partnerLink.user_id);
+      await send(chatId,
+        `👋 <b>${profile?.full_name || firstName}</b>, xush kelibsiz!\n\n` +
+        `📱 Siz SellerCloudX bildirishnomalarini shu chatda olasiz:\n` +
+        `• 🛒 Yangi buyurtmalar\n` +
+        `• 📦 Kam qoldiq\n` +
+        `• ⭐ Sharhlar\n` +
+        `• ⚠️ Xatoliklar\n\n` +
+        `Sozlamalar: <b>sellercloudx.com → Bildirishnomalar</b>`,
+        { reply_markup: { inline_keyboard: [
+          [{ text: '🌐 Ilovaga o\'tish', url: 'https://sellercloudx.com/seller-cloud#notifications' }],
+          [{ text: '❌ Uzish', callback_data: 'partner_unlink' }],
+        ]} }
+      );
+    } else {
+      await send(chatId,
+        `👋 <b>${firstName}</b>, SellerCloudX botiga xush kelibsiz!\n\n` +
+        `🔗 <b>Akkauntni ulash:</b>\n` +
+        `1. <b>sellercloudx.com</b> ga kiring\n` +
+        `2. <b>Bildirishnomalar → Telegram</b> bo'limiga o'ting\n` +
+        `3. "Kod yaratish" tugmasini bosing\n` +
+        `4. Kodni shu botga yuboring: <code>/link KOD</code>\n\n` +
+        `📌 Admin bo'lsangiz: <code>/link email@example.com</code>`,
+        { reply_markup: { inline_keyboard: [[
+          { text: '🌐 sellercloudx.com', url: 'https://sellercloudx.com/seller-cloud#notifications' },
+        ]]} }
+      );
+    }
   }
 }
 
-async function cmdLink(chatId: number, email: string, username: string, firstName: string) {
-  if (!email || !email.includes('@')) {
-    await send(chatId, '❌ Email noto\'g\'ri.\nNamuna: <code>/link admin@example.com</code>');
+async function cmdLink(chatId: number, input: string, username: string, firstName: string) {
+  if (!input) {
+    await send(chatId, '❌ Noto\'g\'ri format.\n\nAdmin: <code>/link email@example.com</code>\nHamkor: <code>/link KOD</code> (ilovadan oling)');
     return;
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('user_id, full_name, phone, email')
-    .eq('email', email)
-    .maybeSingle();
+  let profile: any = null;
+  let isCodeLink = false;
 
-  if (!profile) {
-    await send(chatId, `❌ <b>${email}</b> topilmadi. Avval sellercloudx.com da ro'yxatdan o'ting.`);
-    return;
+  // Check if input is an email or a link code
+  if (input.includes('@')) {
+    // Email-based link (admin flow)
+    const { data } = await supabase
+      .from('profiles')
+      .select('user_id, full_name, phone, email')
+      .eq('email', input)
+      .maybeSingle();
+    profile = data;
+    if (!profile) {
+      await send(chatId, `❌ <b>${input}</b> topilmadi. Avval sellercloudx.com da ro'yxatdan o'ting.`);
+      return;
+    }
+  } else {
+    // Code-based link (partner flow)
+    isCodeLink = true;
+    const code = input.toUpperCase();
+    const { data } = await supabase
+      .from('profiles')
+      .select('user_id, full_name, phone, email')
+      .eq('telegram_link_code', code)
+      .maybeSingle();
+    profile = data;
+    if (!profile) {
+      await send(chatId, `❌ Kod topilmadi yoki muddati tugagan.\n\nIlovadan yangi kod oling: <b>Bildirishnomalar → Telegram</b>`);
+      return;
+    }
   }
 
-  // Upsert
+  // Upsert telegram_chat_links
   const { data: existing } = await supabase
     .from('telegram_chat_links')
     .select('id')
     .eq('user_id', profile.user_id)
     .maybeSingle();
 
+  const linkData: any = { 
+    telegram_chat_id: chatId, 
+    telegram_username: username, 
+    telegram_first_name: firstName,
+    is_admin: false,
+  };
+
   if (existing) {
-    await supabase.from('telegram_chat_links')
-      .update({ telegram_chat_id: chatId, telegram_username: username, telegram_first_name: firstName })
-      .eq('id', existing.id);
+    await supabase.from('telegram_chat_links').update(linkData).eq('id', existing.id);
   } else {
-    await supabase.from('telegram_chat_links')
-      .insert({ user_id: profile.user_id, telegram_chat_id: chatId, telegram_username: username, telegram_first_name: firstName });
+    await supabase.from('telegram_chat_links').insert({ user_id: profile.user_id, ...linkData });
   }
 
   // Check if admin
@@ -221,10 +276,33 @@ async function cmdLink(chatId: number, email: string, username: string, firstNam
       { reply_markup: adminMainMenu() }
     );
   } else {
+    // Partner linked — clear code, mark as linked
+    await supabase.from('profiles')
+      .update({ telegram_link_code: null, telegram_linked: true })
+      .eq('user_id', profile.user_id);
+
+    // Create default notification preferences
+    await supabase.from('notification_preferences')
+      .upsert({ 
+        user_id: profile.user_id, channel: 'telegram',
+        notify_new_orders: true, notify_low_stock: true,
+        notify_reviews: true, notify_sync_errors: true,
+        notify_subscription: true, is_enabled: true,
+      }, { onConflict: 'user_id,channel' });
+
     await send(chatId,
-      `✅ Akkaunt bog'landi: <b>${profile.full_name}</b>\n\n` +
-      `⚠️ Admin huquqi yo'q. Admin paneldan huquq berilishi kerak.\n` +
-      `Admin bo'lganingizdan so'ng /admin buyrug'ini bering.`
+      `✅ <b>Telegram ulandi!</b>\n\n` +
+      `👤 ${profile.full_name}\n📧 ${profile.email}\n\n` +
+      `📱 Endi quyidagi xabarlarni Telegramga olasiz:\n` +
+      `• 🛒 Yangi buyurtmalar\n` +
+      `• 📦 Kam qoldiq ogohlantirishlari\n` +
+      `• ⭐ Yangi sharhlar\n` +
+      `• ⚠️ Xatolik xabarlari\n\n` +
+      `Sozlamalarni ilovadan o'zgartirishingiz mumkin.\n` +
+      `<b>sellercloudx.com → Bildirishnomalar → Sozlamalar</b>`,
+      { reply_markup: { inline_keyboard: [[
+        { text: '🌐 Ilovaga o\'tish', url: 'https://sellercloudx.com/seller-cloud#notifications' },
+      ]]} }
     );
   }
 }
@@ -562,6 +640,25 @@ async function handleCallback(cq: any) {
     );
     return;
   }
+
+  // Partner unlink
+  if (data === 'partner_unlink') {
+    const { data: partnerLink } = await supabase
+      .from('telegram_chat_links')
+      .select('id, user_id')
+      .eq('telegram_chat_id', chatId)
+      .eq('is_admin', false)
+      .maybeSingle();
+
+    if (partnerLink) {
+      await supabase.from('telegram_chat_links').delete().eq('id', partnerLink.id);
+      await supabase.from('profiles').update({ telegram_linked: false }).eq('user_id', partnerLink.user_id);
+      await editMessage(chatId, msgId, '✅ Telegram uzildi. Qayta ulash uchun /start buyrug\'ini bering.');
+    } else {
+      await editMessage(chatId, msgId, '❌ Ulanish topilmadi.');
+    }
+    return;
+  }
 }
 
 // ==================== TEXT MESSAGE HANDLER ====================
@@ -570,13 +667,42 @@ async function handleText(chatId: number, text: string, username: string, firstN
   const admin = await isAdminChat(chatId);
 
   if (!admin) {
-    // Not admin — reject politely
+    // Check if partner linked
+    const { data: partnerLink } = await supabase
+      .from('telegram_chat_links')
+      .select('user_id')
+      .eq('telegram_chat_id', chatId)
+      .eq('is_admin', false)
+      .maybeSingle();
+
+    if (partnerLink) {
+      // Partner sending message to admin via Telegram
+      await supabase.from('support_messages').insert({
+        user_id: partnerLink.user_id, message: text, direction: 'partner_to_admin',
+      });
+
+      const profile = await getUserProfile(partnerLink.user_id);
+      const adminChatIds = await getAdminChatIds();
+      const partnerInfo = `👤 <b>${profile?.full_name || firstName}</b>\n📱 ${profile?.phone || 'N/A'}\n📧 ${profile?.email || 'N/A'}\n[UID:${partnerLink.user_id}]`;
+
+      for (const adminChatId of adminChatIds) {
+        await send(adminChatId,
+          `📩 <b>Yangi xabar (Telegram):</b>\n\n${partnerInfo}\n\n💬 ${text}\n\n<i>Javob: /reply ${partnerLink.user_id} [xabar]</i>`
+        );
+      }
+
+      await send(chatId, '✅ Xabar adminga yuborildi. Javobni shu yerda yoki ilovada olasiz.');
+      return;
+    }
+
+    // Not linked at all
     await send(chatId,
-      `⚠️ Bu bot faqat adminlar uchun.\n\n` +
-      `Hamkor bo'lsangiz, <b>sellercloudx.com</b> ilovasi orqali adminga murojaat qiling.\n\n` +
-      `Admin bo'lsangiz:\n1. <code>/link email@example.com</code>\n2. <code>/admin</code>`,
+      `⚠️ Akkaunt bog'lanmagan.\n\n` +
+      `🔗 Ulash uchun:\n1. <b>sellercloudx.com</b> → Bildirishnomalar → Telegram\n` +
+      `2. Kod oling va <code>/link KOD</code> yuboring\n\n` +
+      `📌 Admin: <code>/link email@example.com</code>`,
       { reply_markup: { inline_keyboard: [[
-        { text: '🌐 sellercloudx.com', url: 'https://sellercloudx.com' },
+        { text: '🌐 sellercloudx.com', url: 'https://sellercloudx.com/seller-cloud#notifications' },
       ]]} }
     );
     return;

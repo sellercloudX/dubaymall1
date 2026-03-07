@@ -1349,6 +1349,54 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_preferences: {
+        Row: {
+          channel: string
+          created_at: string | null
+          id: string
+          is_enabled: boolean | null
+          notify_low_stock: boolean | null
+          notify_new_orders: boolean | null
+          notify_price_changes: boolean | null
+          notify_promotions: boolean | null
+          notify_reviews: boolean | null
+          notify_subscription: boolean | null
+          notify_sync_errors: boolean | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          channel?: string
+          created_at?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          notify_low_stock?: boolean | null
+          notify_new_orders?: boolean | null
+          notify_price_changes?: boolean | null
+          notify_promotions?: boolean | null
+          notify_reviews?: boolean | null
+          notify_subscription?: boolean | null
+          notify_sync_errors?: boolean | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          channel?: string
+          created_at?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          notify_low_stock?: boolean | null
+          notify_new_orders?: boolean | null
+          notify_price_changes?: boolean | null
+          notify_promotions?: boolean | null
+          notify_reviews?: boolean | null
+          notify_subscription?: boolean | null
+          notify_sync_errors?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           created_at: string
@@ -1850,6 +1898,8 @@ export type Database = {
           phone: string | null
           preferred_language: Database["public"]["Enums"]["app_language"] | null
           region: string | null
+          telegram_link_code: string | null
+          telegram_linked: boolean | null
           updated_at: string
           user_id: string
         }
@@ -1866,6 +1916,8 @@ export type Database = {
             | Database["public"]["Enums"]["app_language"]
             | null
           region?: string | null
+          telegram_link_code?: string | null
+          telegram_linked?: boolean | null
           updated_at?: string
           user_id: string
         }
@@ -1882,6 +1934,8 @@ export type Database = {
             | Database["public"]["Enums"]["app_language"]
             | null
           region?: string | null
+          telegram_link_code?: string | null
+          telegram_linked?: boolean | null
           updated_at?: string
           user_id?: string
         }
