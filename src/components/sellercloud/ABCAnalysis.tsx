@@ -25,7 +25,6 @@ import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 interface ABCAnalysisProps {
   connectedMarketplaces: string[];
   store: MarketplaceDataStore;
-  commissionPercent?: number;
 }
 
 interface ProductPnL {
@@ -53,7 +52,7 @@ const ABC_COLORS = {
   C: { bg: 'bg-destructive/10', text: 'text-destructive', border: 'border-destructive/30', badge: 'bg-destructive' },
 };
 
-export function ABCAnalysis({ connectedMarketplaces, store, commissionPercent = 4 }: ABCAnalysisProps) {
+export function ABCAnalysis({ connectedMarketplaces, store }: ABCAnalysisProps) {
   const [selectedGroup, setSelectedGroup] = useState<'all' | 'A' | 'B' | 'C'>('all');
   const [selectedMp, setSelectedMp] = useState<string>('all');
   const [datePreset, setDatePreset] = useState<DatePreset>('30d');
