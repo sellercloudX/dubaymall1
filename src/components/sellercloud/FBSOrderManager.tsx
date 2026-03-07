@@ -89,6 +89,7 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
   const [labelSize, setLabelSize] = useState('58x40');
   const [labelCopies, setLabelCopies] = useState(1);
   const [labelAutocut, setLabelAutocut] = useState(true);
+  const [pdfBlobUrls, setPdfBlobUrls] = useState<Record<string, string>>({});
   const labelPrintRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
