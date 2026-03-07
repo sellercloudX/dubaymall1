@@ -1819,17 +1819,8 @@ serve(async (req) => {
               });
               // shopIds is required - pass each shop
               params.append("shopIds", String(currentOrderShopId));
-              
-              // dateFrom/dateTo are int64 timestamps (milliseconds)
-              // Default to last 90 days if not specified to avoid fetching ALL historical orders
-              const defaultFromDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
-              const effectiveFromDate = fromDate || defaultFromDate;
-              const effectiveToDate = toDate || new Date().toISOString();
-              
-              const tsFrom = new Date(effectiveFromDate).getTime();
-              if (!isNaN(tsFrom)) params.append("dateFrom", String(tsFrom));
-              const tsTo = new Date(effectiveToDate).getTime();
-              if (!isNaN(tsTo)) params.append("dateTo", String(tsTo));
+              // NOTE: Uzum v2 FBS orders API does NOT support dateFrom/dateTo params
+              // (sending them causes 0 results). We fetch all and filter server-side.
 
               console.log(`Uzum orders (${orderStatus}) page ${page}: ${uzumBaseUrl}/v2/fbs/orders?${params.toString()}`);
 
