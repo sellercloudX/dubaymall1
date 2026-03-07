@@ -308,7 +308,7 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
         <KPICard icon={<DollarSign className="h-4 w-4" />} label="Tannarx" value={fmtPrice(stats.totalCost)} variant="neutral" />
         <KPICard icon={<TrendingDown className="h-4 w-4" />} label="Komissiya + logistika" value={fmtPrice(stats.totalCommission + stats.totalLogistics)} variant="loss" />
         <KPICard icon={<TrendingUp className="h-4 w-4" />} label="Sof foyda" value={fmtPrice(stats.totalNetProfit)} variant={stats.totalNetProfit >= 0 ? 'profit' : 'loss'} />
-        <KPICard icon={<BarChart3 className="h-4 w-4" />} label="O'rtacha marja" value={stats.avgMargin.toFixed(1) + '%'} variant={stats.avgMargin >= 15 ? 'profit' : stats.avgMargin >= 0 ? 'neutral' : 'loss'} />
+        <KPICard icon={<BarChart3 className="h-4 w-4" />} label="Marja" value={stats.avgMargin.toFixed(1) + '%'} variant={stats.avgMargin >= 15 ? 'profit' : stats.avgMargin >= 0 ? 'neutral' : 'loss'} />
       </div>
 
       {/* Status tabs */}
