@@ -16,6 +16,7 @@ import { DateRangeFilter, getPresetDates, type DatePreset } from './DateRangeFil
 import { MarketplaceFilterBar } from './MarketplaceFilterBar';
 import { MarketplaceLogo, MARKETPLACE_SHORT_NAMES } from '@/lib/marketplaceConfig';
 import { toDisplayUzs, formatUzsFull } from '@/lib/currency';
+import { getOrderRevenueUzs, isExcludedOrder } from '@/lib/revenueCalculations';
 import { useCostPrices } from '@/hooks/useCostPrices';
 import { useMarketplaceTariffs, getTariffForProduct } from '@/hooks/useMarketplaceTariffs';
 import type { MarketplaceDataStore, MarketplaceOrder } from '@/hooks/useMarketplaceDataStore';
@@ -94,7 +95,7 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
       });
 
       for (const order of store.getOrders(mp)) {
-        const totalUzs = toDisplayUzs(order.total || order.itemsTotal || 0, mp);
+        const totalUzs = getOrderRevenueUzs(order, mp);
         
         // Calculate cost from items
         let costTotal = 0;
