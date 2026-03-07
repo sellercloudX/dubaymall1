@@ -401,7 +401,7 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
                 <div className={`p-5 rounded-xl border-2 space-y-3 ${(subscription.plan_type as string) === 'premium' ? 'border-amber-400 bg-amber-500/5' : 'border-border hover:border-amber-300 transition-colors'}`}>
                   <div className="flex items-center gap-2">
                     <Badge className="bg-amber-500/10 text-amber-600 border-amber-200">Premium</Badge>
-                    {subscription.plan_type === 'premium' && <Badge variant="secondary" className="text-[10px]">Hozirgi</Badge>}
+                    {(subscription.plan_type as string) === 'premium' && <Badge variant="secondary" className="text-[10px]">Hozirgi</Badge>}
                   </div>
                   <div>
                     <p className="text-2xl font-bold">{formatPrice(PLAN_PRICES.premium.amount_uzs)}</p>
@@ -416,7 +416,7 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
                     onClick={() => handleClickPayment('premium')} disabled={isProcessingPayment === 'premium'}>
                     {isProcessingPayment === 'premium'
                       ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Yuklanmoqda...</>
-                      : <><CreditCard className="h-4 w-4 mr-2" /> {subscription.plan_type === 'premium' ? 'Muddatni uzaytirish' : 'Click orqali to\'lash'}</>}
+                      : <><CreditCard className="h-4 w-4 mr-2" /> {(subscription.plan_type as string) === 'premium' ? 'Muddatni uzaytirish' : 'Click orqali to\'lash'}</>}
                   </Button>
                 </div>
 
