@@ -445,13 +445,16 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
         }, idx * 300);
       });
     } else if (labelData.type === 'pdf' && labelData.labels) {
-      labelData.labels.forEach((l, idx) => {
+      const successLabels = labelData.labels.filter((l: any) => l.success && l.pdf);
+      successLabels.forEach((l: any, idx: number) => {
         setTimeout(() => {
           const a = document.createElement('a');
           a.href = `data:application/pdf;base64,${l.pdf}`;
           a.download = `etiketka_${l.orderId}.pdf`;
+          document.body.appendChild(a);
           a.click();
-        }, idx * 300);
+          document.body.removeChild(a);
+        }, idx * 500);
       });
     }
     toast.success("Yuklab olindi");
