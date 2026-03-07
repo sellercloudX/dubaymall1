@@ -390,18 +390,37 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
   }
 
   // ========== HAS SUBSCRIPTION ==========
-  const getStatusBadge = () => {
-    if (!accessStatus) return null;
-    switch (accessStatus.reason) {
-      case 'active': return <Badge className="bg-primary text-primary-foreground"><CheckCircle2 className="h-3 w-3 mr-1" /> Faol</Badge>;
-      case 'trial': return <Badge variant="secondary"><Clock className="h-3 w-3 mr-1" /> Sinov</Badge>;
-      case 'admin_override': return <Badge className="bg-accent text-accent-foreground"><Crown className="h-3 w-3 mr-1" /> Premium</Badge>;
-      case 'debt': return <Badge variant="destructive"><AlertTriangle className="h-3 w-3 mr-1" /> Qarzdorlik</Badge>;
-      default: return <Badge variant="secondary"><XCircle className="h-3 w-3 mr-1" /> Nofaol</Badge>;
-    }
+  const getPlanLabel = (planType: string) => {
+    if (planType === 'pro' || planType === 'free') return 'Free';
+    if (planType === 'enterprise' || planType === 'elegant') return 'Elegant';
+    if (planType === 'premium') return 'Premium';
+    return planType;
   };
 
-  const currentPlanLabel = (subscription.plan_type as string) === 'pro' ? 'Free' : (subscription.plan_type as string) === 'enterprise' ? 'Elegant' : 'Premium';
+  const currentPlanLabel = getPlanLabel(subscription.plan_type as string);
+
+  const getPlanBadge = () => {
+    const colors: Record<string, string> = {
+      'Free': 'bg-muted text-muted-foreground',
+      'Premium': 'bg-amber-500/10 text-amber-600 border-amber-200',
+      'Elegant': 'bg-violet-500/10 text-violet-600 border-violet-200',
+    };
+    return <Badge className={colors[currentPlanLabel] || 'bg-muted'}>{currentPlanLabel}</Badge>;
+  };
+
+  const getStatusBadge = () => {
+    if (!accessStatus) return null;
+    const statusBadge = (() => {
+      switch (accessStatus.reason) {
+        case 'active': return <Badge className="bg-primary text-primary-foreground"><CheckCircle2 className="h-3 w-3 mr-1" /> Faol</Badge>;
+        case 'trial': return <Badge variant="secondary"><Clock className="h-3 w-3 mr-1" /> Sinov</Badge>;
+        case 'admin_override': return <Badge className="bg-primary text-primary-foreground"><Crown className="h-3 w-3 mr-1" /> Faol</Badge>;
+        case 'debt': return <Badge variant="destructive"><AlertTriangle className="h-3 w-3 mr-1" /> Qarzdorlik</Badge>;
+        default: return <Badge variant="secondary"><XCircle className="h-3 w-3 mr-1" /> Nofaol</Badge>;
+      }
+    })();
+    return <div className="flex items-center gap-1.5">{getPlanBadge()}{statusBadge}</div>;
+  };
 
   const featuresByCategory = features?.reduce((acc, f) => {
     if (!acc[f.category]) acc[f.category] = [];
