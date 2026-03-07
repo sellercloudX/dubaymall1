@@ -1971,7 +1971,14 @@ serve(async (req) => {
               };
             });
 
-            allOrders = [...allOrders, ...mapped];
+            // Deduplicate orders across shops
+            for (const order of mapped) {
+              const ordKey = String(order.id);
+              if (!orderIdsSeen.has(ordKey)) {
+                orderIdsSeen.add(ordKey);
+                allOrders.push(order);
+              }
+            }
 
             if (orderList.length < pageSize || !fetchAll) {
               hasMore = false;
