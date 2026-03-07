@@ -85,59 +85,9 @@ serve(async (req) => {
         continue;
       }
 
-      // 4. Calculate total marketplace sales for billing period
-      // Get all marketplace connections for this user
-      const { data: connections } = await supabase
-        .from('marketplace_connections')
-        .select('id, marketplace, total_revenue, orders_count')
-        .eq('user_id', sub.user_id)
-        .eq('is_active', true);
-
-      // Sum total_revenue from all marketplace connections as the sales volume
-      // This represents the total GMV across all connected marketplaces
-      let totalSalesVolume = 0;
-
-      if (connections && connections.length > 0) {
-        // Use order_financials for more accurate revenue tracking
-        const { data: orderFin } = await supabase
-          .from('order_financials')
-          .select('order_total')
-          .in('shop_id', connections.map(c => c.id))
-          .gte('created_at', periodStart.toISOString())
-          .lte('created_at', periodEnd.toISOString());
-
-        if (orderFin && orderFin.length > 0) {
-          totalSalesVolume = orderFin.reduce((sum, f) => sum + (f.order_total || 0), 0);
-        }
-
-        // If no order_financials, fall back to marketplace_orders_cache
-        if (totalSalesVolume === 0) {
-          const { data: cachedOrders } = await supabase
-            .from('marketplace_orders_cache')
-            .select('data')
-            .eq('user_id', sub.user_id)
-            .gte('created_at', periodStart.toISOString())
-            .lte('created_at', periodEnd.toISOString());
-
-          if (cachedOrders && cachedOrders.length > 0) {
-            totalSalesVolume = cachedOrders.reduce((sum, o) => {
-              const orderData = o.data as any;
-              return sum + (orderData?.totalUZS || orderData?.total || 0);
-            }, 0);
-          }
-        }
-
-        // Last resort: use connection total_revenue as approximation
-        if (totalSalesVolume === 0) {
-          totalSalesVolume = connections.reduce((sum, c) => sum + (c.total_revenue || 0), 0);
-        }
-      }
-
-      // 5. Calculate billing amounts
-      const commissionPercent = sub.commission_percent || 4;
+      // 4. Calculate billing amounts — NO sales commission, only monthly fee
       const monthlyFeeUZS = (sub.monthly_fee || 0) * USD_TO_UZS;
-      const commissionAmount = totalSalesVolume * (commissionPercent / 100);
-      const totalDue = monthlyFeeUZS + commissionAmount;
+      const totalDue = monthlyFeeUZS;
 
       // 6. Create billing record
       const { error: billErr } = await supabase
@@ -148,9 +98,9 @@ serve(async (req) => {
           billing_period_start: periodStart.toISOString(),
           billing_period_end: periodEnd.toISOString(),
           monthly_fee_amount: monthlyFeeUZS,
-          sales_commission_amount: commissionAmount,
-          total_sales_volume: totalSalesVolume,
-          commission_percent: commissionPercent,
+          sales_commission_amount: 0,
+          total_sales_volume: 0,
+          commission_percent: 0,
           total_due: totalDue,
           total_paid: 0,
           balance_due: totalDue,
@@ -165,24 +115,12 @@ serve(async (req) => {
         results.push({
           userId: sub.user_id,
           period: periodLabel,
-          totalSales: totalSalesVolume,
-          commission: commissionAmount,
           monthlyFee: monthlyFeeUZS,
           totalDue,
         });
-        console.log(`Billing created for user ${sub.user_id}: sales=${totalSalesVolume}, commission=${commissionAmount}, total=${totalDue}`);
+        console.log(`Billing created for user ${sub.user_id}: monthlyFee=${monthlyFeeUZS}, total=${totalDue}`);
 
-        // 7. Record platform revenue from commission
-        if (commissionAmount > 0) {
-          await supabase
-            .from('platform_revenue')
-            .insert({
-              amount: commissionAmount,
-              source_type: 'commission',
-              source_id: sub.id,
-              description: `Komissiya ${periodLabel}: ${commissionPercent}% x ${totalSalesVolume}`,
-            });
-        }
+        // 7. Record platform revenue from subscription
         if (monthlyFeeUZS > 0) {
           await supabase
             .from('platform_revenue')
