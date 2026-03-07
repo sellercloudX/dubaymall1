@@ -119,6 +119,68 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ==================== TOPUP: Create balance top-up payment ====================
+    if (action === "topup") {
+      const { user_id, amount_uzs, return_url } = body;
+
+      if (!user_id || !amount_uzs || amount_uzs < 300000) {
+        return new Response(JSON.stringify({ error: "Minimal summa: 300,000 so'm" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const merchantId = Deno.env.get("CLICK_MERCHANT_ID");
+      const serviceId = Deno.env.get("CLICK_SERVICE_ID");
+
+      if (!merchantId || !serviceId) {
+        return new Response(JSON.stringify({ error: "Click credentials not configured" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const orderNumber = "TOP-" + generateOrderNumber().slice(4);
+
+      const { data: payment, error: payErr } = await supabase
+        .from("sellercloud_payments")
+        .insert({
+          user_id,
+          amount: amount_uzs,
+          payment_method: "click",
+          payment_reference: orderNumber,
+          status: "pending",
+          notes: JSON.stringify({ type: "balance_topup", amount: amount_uzs }),
+        })
+        .select()
+        .single();
+
+      if (payErr) {
+        console.error("Payment insert error:", payErr);
+        return new Response(JSON.stringify({ error: "Failed to create payment" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const clickUrl = buildClickUrl({
+        merchantId,
+        serviceId,
+        amount: amount_uzs,
+        transactionParam: orderNumber,
+        returnUrl: return_url || "https://sellercloudx.lovable.app/seller-cloud?tab=balance",
+      });
+
+      return new Response(JSON.stringify({
+        success: true,
+        payment_url: clickUrl,
+        order_number: orderNumber,
+        payment_id: payment.id,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // ==================== CONFIRM: Called after Click payment success ====================
     if (action === "confirm") {
       const { order_number, click_trans_id } = body;
@@ -146,7 +208,6 @@ Deno.serve(async (req) => {
       }
 
       const notes = JSON.parse(payment.notes || "{}");
-      const planType = notes.plan_type;
 
       // Mark payment as completed
       await supabase
@@ -158,12 +219,39 @@ Deno.serve(async (req) => {
         })
         .eq("id", payment.id);
 
-      // Determine subscription duration based on plan
+      // ===== BALANCE TOP-UP =====
+      if (notes.type === "balance_topup") {
+        await supabase.rpc("add_balance", {
+          p_user_id: payment.user_id,
+          p_amount: payment.amount,
+          p_type: "deposit",
+          p_description: `Click orqali balans to'ldirish - ${order_number}`,
+          p_metadata: { click_trans_id, order_number },
+        });
+
+        await supabase.from("platform_revenue").insert({
+          source_type: "balance_topup",
+          source_id: payment.id,
+          amount: payment.amount,
+          description: `Balans to'ldirish - ${order_number}`,
+        });
+
+        return new Response(JSON.stringify({
+          success: true,
+          message: "Balans muvaffaqiyatli to'ldirildi",
+          type: "balance_topup",
+          amount: payment.amount,
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // ===== SUBSCRIPTION PAYMENT =====
+      const planType = notes.plan_type;
       let months = 1;
-      if (planType === "premium") months = 3;
+      if (planType === "premium") months = 1;
       if (planType === "enterprise" || planType === "elegant") months = 1;
 
-      // Check if user has subscription
       const { data: existingSub } = await supabase
         .from("sellercloud_subscriptions")
         .select("*")
@@ -173,7 +261,6 @@ Deno.serve(async (req) => {
         .single();
 
       if (existingSub) {
-        // Update existing subscription
         const currentUntil = existingSub.activated_until && new Date(existingSub.activated_until) > new Date()
           ? new Date(existingSub.activated_until)
           : new Date();
@@ -193,7 +280,6 @@ Deno.serve(async (req) => {
           })
           .eq("id", existingSub.id);
       } else {
-        // Create new subscription
         const activatedUntil = new Date();
         activatedUntil.setMonth(activatedUntil.getMonth() + months);
 
@@ -209,7 +295,6 @@ Deno.serve(async (req) => {
           });
       }
 
-      // Record platform revenue
       await supabase.from("platform_revenue").insert({
         source_type: "subscription",
         source_id: payment.id,

@@ -63,6 +63,111 @@ const PLAN_PRICES = {
   },
 };
 
+const TOPUP_OPTIONS = [300_000, 500_000, 1_000_000, 2_000_000, 5_000_000];
+
+function BalanceTopup({ userId }: { userId?: string }) {
+  const [selectedAmount, setSelectedAmount] = useState<number>(TOPUP_OPTIONS[0]);
+  const [customAmount, setCustomAmount] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [useCustom, setUseCustom] = useState(false);
+
+  const formatP = (p: number) => {
+    if (p >= 1_000_000) return (p / 1_000_000).toFixed(1) + ' mln';
+    return (p / 1_000).toFixed(0) + ' ming';
+  };
+
+  const amount = useCustom ? Number(customAmount) : selectedAmount;
+
+  const handleTopup = async () => {
+    if (!userId) { toast.error('Avval tizimga kiring'); return; }
+    if (!amount || amount < MIN_TOPUP_UZS) {
+      toast.error(`Minimal summa: ${MIN_TOPUP_UZS.toLocaleString()} so'm`);
+      return;
+    }
+    setIsProcessing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('click-payment', {
+        body: {
+          action: 'topup',
+          user_id: userId,
+          amount_uzs: amount,
+          return_url: window.location.origin + '/seller-cloud?tab=balance',
+        },
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'Xatolik');
+      toast.success("To'lov sahifasiga yo'naltirilmoqda...");
+      window.open(data.payment_url, '_blank');
+    } catch (err: any) {
+      toast.error("To'lov xatoligi: " + (err.message || "Qaytadan urinib ko'ring"));
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  return (
+    <div className="mt-6 p-4 rounded-xl border border-border bg-muted/30 space-y-4">
+      <h4 className="text-sm font-semibold flex items-center gap-2">
+        <DollarSign className="h-4 w-4" /> Balansni to'ldirish
+      </h4>
+      <p className="text-xs text-muted-foreground">
+        Minimal: <strong>{MIN_TOPUP_UZS.toLocaleString()} so'm</strong>
+      </p>
+
+      {/* Preset amounts */}
+      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+        {TOPUP_OPTIONS.map((opt) => (
+          <button
+            key={opt}
+            onClick={() => { setSelectedAmount(opt); setUseCustom(false); }}
+            className={`px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
+              !useCustom && selectedAmount === opt
+                ? 'border-primary bg-primary/10 text-primary'
+                : 'border-border hover:border-primary/50'
+            }`}
+          >
+            {formatP(opt)}
+          </button>
+        ))}
+      </div>
+
+      {/* Custom amount */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setUseCustom(!useCustom)}
+          className={`text-xs underline ${useCustom ? 'text-primary' : 'text-muted-foreground'}`}
+        >
+          Boshqa summa
+        </button>
+        {useCustom && (
+          <input
+            type="number"
+            value={customAmount}
+            onChange={(e) => setCustomAmount(e.target.value)}
+            placeholder="Summa kiriting"
+            min={MIN_TOPUP_UZS}
+            className="flex-1 h-9 rounded-lg border border-border bg-background px-3 text-sm"
+          />
+        )}
+      </div>
+
+      {/* Pay button */}
+      <Button
+        className="w-full"
+        size="lg"
+        onClick={handleTopup}
+        disabled={isProcessing || !amount || amount < MIN_TOPUP_UZS}
+      >
+        {isProcessing ? (
+          <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Yuklanmoqda...</>
+        ) : (
+          <><CreditCard className="h-4 w-4 mr-2" /> Click orqali {amount >= MIN_TOPUP_UZS ? `${amount.toLocaleString()} so'm` : ''} to'ldirish</>
+        )}
+      </Button>
+    </div>
+  );
+}
+
 export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingProps) {
   const { user } = useAuth();
   const { 
@@ -473,17 +578,7 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
                 </div>
               </div>
 
-              <div className="mt-6 p-4 rounded-xl border border-border bg-muted/30 space-y-3">
-                <h4 className="text-sm font-semibold flex items-center gap-2"><DollarSign className="h-4 w-4" /> Balansni to'ldirish</h4>
-                <p className="text-xs text-muted-foreground">Minimal: <strong>{MIN_TOPUP_UZS.toLocaleString()} so'm</strong></p>
-                <div className="flex gap-2">
-                  <Button variant="outline" className="flex-1" disabled><CreditCard className="h-4 w-4 mr-1" /> Click (tez kunda)</Button>
-                  <Button variant="outline" className="flex-1" disabled><Landmark className="h-4 w-4 mr-1" /> Uzum (tez kunda)</Button>
-                </div>
-                <p className="text-[10px] text-muted-foreground text-center">
-                  Hozircha admin orqali: <a href="https://t.me/sellercloudx_support" target="_blank" className="text-primary underline">@sellercloudx_support</a>
-                </p>
-              </div>
+              <BalanceTopup userId={user?.id} />
 
               <div className="mt-4 p-3 rounded-lg border border-border">
                 <div className="flex items-center justify-between">
