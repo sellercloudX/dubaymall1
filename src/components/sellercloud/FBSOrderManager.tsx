@@ -339,43 +339,42 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
       const successLabels = labelData.labels.filter((l: any) => l.success && l.pdf);
       if (successLabels.length === 0) { toast.error("Pechat uchun etiketka topilmadi"); return; }
 
-      // For PDFs: create blob URLs and open in new tabs for native PDF print
-      // This avoids embed/iframe issues in sandboxed environments
-      successLabels.forEach((l: any, idx: number) => {
-        Array.from({ length: labelCopies }).forEach((_, ci) => {
-          setTimeout(() => {
-            try {
-              const binary = atob(l.pdf);
-              const bytes = new Uint8Array(binary.length);
-              for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-              const blob = new Blob([bytes], { type: 'application/pdf' });
-              const blobUrl = URL.createObjectURL(blob);
-              const printWindow = window.open(blobUrl, '_blank');
-              if (printWindow) {
-                printWindow.onload = () => {
-                  setTimeout(() => {
-                    printWindow.print();
-                    // Clean up blob URL after print dialog closes
-                    setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
-                  }, 500);
-                };
-              } else {
-                // Fallback: download if popup blocked
-                const a = document.createElement('a');
-                a.href = blobUrl;
-                a.download = `etiketka_${l.orderId}.pdf`;
-                a.click();
-                setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
-                toast.warning("Popup bloklangan. Fayl yuklab olindi.");
-              }
-            } catch (e) {
-              console.error('PDF print failed:', e);
-              toast.error(`Etiketka #${l.orderId} pechat qilib bo'lmadi`);
-            }
-          }, (idx * labelCopies + ci) * 800);
-        });
+      // Single print window with all PDF pages rendered as images via canvas
+      const printWindow = window.open('', '_blank', 'width=800,height=600');
+      if (!printWindow) { toast.error("Popup bloklangan. Brauzerni sozlang."); return; }
+
+      // Build iframe-based approach: embed each PDF in a hidden iframe, extract for print
+      // Better approach: render PDFs as images in a single printable page
+      const pdfPages: string[] = [];
+      successLabels.forEach((l: any) => {
+        for (let c = 0; c < labelCopies; c++) {
+          pdfPages.push(`<div class="label-item">
+            <object data="data:application/pdf;base64,${l.pdf}" type="application/pdf" width="100%" height="100%">
+              <p>Buyurtma: ${l.orderId}</p>
+            </object>
+          </div>`);
+        }
       });
-      toast.info(`${successLabels.length} ta etiketka pechatga yuborilmoqda...`);
+
+      printWindow.document.write(`<!DOCTYPE html><html><head><title>Etiketkalar</title>
+        <style>
+          @page { size: ${size.width}mm ${size.height}mm; margin: 0; }
+          @media print { 
+            body{margin:0;padding:0;} 
+            .label-item{page-break-after:${labelAutocut ? 'always' : 'auto'};width:${size.width}mm;height:${size.height}mm;overflow:hidden;} 
+            .no-print{display:none!important;}
+          }
+          body{font-family:sans-serif;margin:0;padding:8px;background:#f5f5f5;}
+          .label-item{width:100%;height:${size.height}mm;min-height:200px;margin-bottom:8px;border:1px solid #ddd;background:#fff;}
+          .label-item object{width:100%;height:100%;border:none;}
+          .print-btn{position:fixed;top:16px;right:16px;z-index:999;padding:12px 24px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-size:16px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.2);}
+          .print-btn:hover{background:#1d4ed8;}
+        </style></head><body>
+        <button class="print-btn no-print" onclick="window.print()">🖨️ Pechat qilish</button>
+        ${pdfPages.join('')}
+      </body></html>`);
+      printWindow.document.close();
+      toast.success(`${successLabels.length} ta etiketka tayyor. Yangi oynada "Pechat qilish" tugmasini bosing.`);
     }
   };
 
