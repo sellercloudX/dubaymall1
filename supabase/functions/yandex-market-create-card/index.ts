@@ -827,29 +827,37 @@ serve(async (req) => {
     if (!products.length || !products[0])
       return new Response(JSON.stringify({ error: "Product required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-    // ═══ BILLING CHECK ═══
+    // ═══ BILLING CHECK (skip if called from scanner — scanner handles billing) ═══
+    const skipBilling = !!body.skipBilling;
     const isClone = !!body.cloneMode || !!body.skipImageGeneration;
     const featureKey = isClone ? 'clone-to-yandex' : 'yandex-card-create';
     const productCount = products.length;
+    let unitPrice = 0;
+    let accessCheck: any = null;
     
-    // Check access for first product (validates tier + balance)
-    const { data: accessCheck } = await supabase.rpc('check_feature_access', {
-      p_user_id: user.id, p_feature_key: featureKey,
-    });
-    
-    if (accessCheck && !accessCheck.allowed) {
-      const errorMsg = accessCheck.error === 'insufficient_balance' 
-        ? `Balans yetarli emas. Balansni kamida 300,000 so'm to'ldiring. Joriy balans: ${accessCheck.balance?.toLocaleString()} so'm`
-        : accessCheck.error === 'activation_required'
-        ? 'Platformadan foydalanish uchun oylik aktivatsiya (99,000 so\'m) talab etiladi. Obuna bo\'limiga o\'ting.'
-        : accessCheck.message || 'Ruxsat berilmadi';
-      return new Response(JSON.stringify({ error: errorMsg, billingError: accessCheck.error }), {
-        status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    if (!skipBilling) {
+      // Check access for first product (validates tier + balance)
+      const { data: ac } = await supabase.rpc('check_feature_access', {
+        p_user_id: user.id, p_feature_key: featureKey,
       });
+      accessCheck = ac;
+      
+      if (accessCheck && !accessCheck.allowed) {
+        const errorMsg = accessCheck.error === 'insufficient_balance' 
+          ? `Balans yetarli emas. Balansni kamida 300,000 so'm to'ldiring. Joriy balans: ${accessCheck.balance?.toLocaleString()} so'm`
+          : accessCheck.error === 'activation_required'
+          ? 'Platformadan foydalanish uchun oylik aktivatsiya (99,000 so\'m) talab etiladi. Obuna bo\'limiga o\'ting.'
+          : accessCheck.message || 'Ruxsat berilmadi';
+        return new Response(JSON.stringify({ error: errorMsg, billingError: accessCheck.error }), {
+          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      
+      unitPrice = accessCheck?.price || 0;
+      console.log(`💰 Billing: ${featureKey}, ${unitPrice} UZS x ${productCount}, tier: ${accessCheck?.tier}`);
+    } else {
+      console.log(`💰 Billing skipped (called from scanner pipeline)`);
     }
-    
-    const unitPrice = accessCheck?.price || 0;
-    console.log(`💰 Billing: ${featureKey}, ${unitPrice} UZS x ${productCount}, tier: ${accessCheck?.tier}`);
 
     let shopId = creds.shopId || body.shopId;
     if (!shopId || shopId === "sellercloud") {
@@ -1163,25 +1171,26 @@ serve(async (req) => {
       }
     }
 
-    // ═══ BILLING DEDUCT (only for successful cards) ═══
-    const successCount = results.filter(r => r.success).length;
-    if (unitPrice > 0 && successCount > 0) {
-      for (let i = 0; i < successCount; i++) {
-        await supabase.rpc('deduct_balance', {
-          p_user_id: user.id,
-          p_amount: unitPrice,
-          p_feature_key: featureKey,
-          p_description: `Yandex ${isClone ? 'klonlash' : 'kartochka yaratish'}: ${results.filter(r => r.success)[i]?.name?.substring(0, 50) || 'N/A'}`,
-        });
-      }
-      console.log(`💰 Billed: ${unitPrice * successCount} UZS for ${successCount} cards`);
-    } else if (accessCheck?.tier === 'elegant' && successCount > 0) {
-      // Track elegant usage
-      for (let i = 0; i < successCount; i++) {
-        await supabase.from('elegant_usage').upsert(
-          { user_id: user.id, feature_key: featureKey, usage_month: new Date().toISOString().slice(0, 7) + '-01', usage_count: (accessCheck.used || 0) + i + 1 },
-          { onConflict: 'user_id,feature_key,usage_month' }
-        );
+    // ═══ BILLING DEDUCT (skip if scanner handles it) ═══
+    if (!skipBilling) {
+      const successCount = results.filter(r => r.success).length;
+      if (unitPrice > 0 && successCount > 0) {
+        for (let i = 0; i < successCount; i++) {
+          await supabase.rpc('deduct_balance', {
+            p_user_id: user.id,
+            p_amount: unitPrice,
+            p_feature_key: featureKey,
+            p_description: `Yandex ${isClone ? 'klonlash' : 'kartochka yaratish'}: ${results.filter(r => r.success)[i]?.name?.substring(0, 50) || 'N/A'}`,
+          });
+        }
+        console.log(`💰 Billed: ${unitPrice * successCount} UZS for ${successCount} cards`);
+      } else if (accessCheck?.tier === 'elegant' && successCount > 0) {
+        for (let i = 0; i < successCount; i++) {
+          await supabase.from('elegant_usage').upsert(
+            { user_id: user.id, feature_key: featureKey, usage_month: new Date().toISOString().slice(0, 7) + '-01', usage_count: (accessCheck.used || 0) + i + 1 },
+            { onConflict: 'user_id,feature_key,usage_month' }
+          );
+        }
       }
     }
 
