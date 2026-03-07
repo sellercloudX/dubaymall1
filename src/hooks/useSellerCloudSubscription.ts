@@ -7,7 +7,6 @@ interface SellerCloudSubscription {
   user_id: string;
   plan_type: 'pro' | 'enterprise';
   monthly_fee: number;
-  commission_percent: number;
   is_active: boolean;
   is_trial: boolean;
   trial_ends_at: string | null;
@@ -29,9 +28,6 @@ interface SellerCloudBilling {
   billing_period_start: string;
   billing_period_end: string;
   monthly_fee_amount: number;
-  sales_commission_amount: number;
-  total_sales_volume: number;
-  commission_percent: number;
   total_due: number;
   total_paid: number;
   balance_due: number;
@@ -56,12 +52,10 @@ interface UseSellerCloudSubscriptionReturn {
   accessStatus: AccessStatus | null;
   isLoading: boolean;
   error: string | null;
-  createSubscription: (planType: 'pro' | 'enterprise', monthlyFee?: number, commissionPercent?: number) => Promise<{ success: boolean; error?: string }>;
+  createSubscription: (planType: 'pro' | 'enterprise', monthlyFee?: number) => Promise<{ success: boolean; error?: string }>;
   checkAccess: () => Promise<AccessStatus>;
   refetch: () => Promise<void>;
 }
-
-const USD_TO_UZS = 12800;
 
 export function useSellerCloudSubscription(): UseSellerCloudSubscriptionReturn {
   const { user } = useAuth();
@@ -83,7 +77,6 @@ export function useSellerCloudSubscription(): UseSellerCloudSubscriptionReturn {
     try {
       setIsLoading(true);
       
-      // Fetch subscription
       const { data: subData, error: subError } = await supabase
         .from('sellercloud_subscriptions')
         .select('*')
@@ -98,7 +91,6 @@ export function useSellerCloudSubscription(): UseSellerCloudSubscriptionReturn {
 
       setSubscription(subData as SellerCloudSubscription | null);
 
-      // Fetch billing history
       const { data: billingData, error: billingError } = await supabase
         .from('sellercloud_billing')
         .select('*')
@@ -108,7 +100,6 @@ export function useSellerCloudSubscription(): UseSellerCloudSubscriptionReturn {
       if (billingError) throw billingError;
       setBilling((billingData as SellerCloudBilling[]) || []);
 
-      // Check access status
       const status = await checkAccess();
       setAccessStatus(status);
 
@@ -140,10 +131,7 @@ export function useSellerCloudSubscription(): UseSellerCloudSubscriptionReturn {
       });
 
       if (error) throw error;
-      
-      // Safely cast the response
-      const result = data as unknown as AccessStatus;
-      return result;
+      return data as unknown as AccessStatus;
     } catch (err: any) {
       console.error('Error checking access:', err);
       return {
@@ -156,8 +144,7 @@ export function useSellerCloudSubscription(): UseSellerCloudSubscriptionReturn {
 
   const createSubscription = async (
     planType: 'pro' | 'enterprise',
-    monthlyFee: number = 499,
-    commissionPercent: number = planType === 'pro' ? 4 : 2
+    monthlyFee: number = 0
   ): Promise<{ success: boolean; error?: string }> => {
     if (!user) {
       return { success: false, error: 'Tizimga kirilmagan' };
@@ -170,9 +157,9 @@ export function useSellerCloudSubscription(): UseSellerCloudSubscriptionReturn {
           user_id: user.id,
           plan_type: planType,
           monthly_fee: monthlyFee,
-          commission_percent: commissionPercent,
-          is_trial: false,
-          is_active: false, // Admin tasdiqlashidan keyin aktiv bo'ladi
+          commission_percent: 0,
+          is_trial: true,
+          is_active: true,
         });
 
       if (error) throw error;
@@ -184,7 +171,6 @@ export function useSellerCloudSubscription(): UseSellerCloudSubscriptionReturn {
     }
   };
 
-  // Calculate total debt
   const totalDebt = billing
     .filter(b => b.status === 'pending' || b.status === 'overdue')
     .reduce((sum, b) => sum + b.balance_due, 0);
@@ -295,42 +281,6 @@ export function useSellerCloudAdmin() {
     return { success: !error, error: error?.message };
   };
 
-  const createBilling = async (
-    userId: string,
-    subscriptionId: string,
-    totalSales: number,
-    monthlyFee: number,
-    commissionPercent: number
-  ) => {
-    const monthlyFeeUZS = monthlyFee * USD_TO_UZS;
-    const commissionAmount = totalSales * (commissionPercent / 100);
-    const totalDue = monthlyFeeUZS + commissionAmount;
-
-    const now = new Date();
-    const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-    const { error } = await supabase
-      .from('sellercloud_billing')
-      .insert({
-        user_id: userId,
-        subscription_id: subscriptionId,
-        billing_period_start: periodStart.toISOString(),
-        billing_period_end: periodEnd.toISOString(),
-        monthly_fee_amount: monthlyFeeUZS,
-        sales_commission_amount: commissionAmount,
-        total_sales_volume: totalSales,
-        commission_percent: commissionPercent,
-        total_due: totalDue,
-        total_paid: 0,
-        balance_due: totalDue,
-        status: 'pending',
-      });
-
-    if (!error) await fetchAll();
-    return { success: !error, error: error?.message };
-  };
-
   return {
     subscriptions,
     billings,
@@ -340,6 +290,5 @@ export function useSellerCloudAdmin() {
     deactivateSubscription,
     waiveBilling,
     markBillingPaid,
-    createBilling,
   };
 }
