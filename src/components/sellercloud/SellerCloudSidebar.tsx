@@ -24,6 +24,7 @@ export interface SellerMenuItem {
 
 export const sellerMenuItems: SellerMenuItem[] = [
   { id: 'marketplaces', label: 'Marketplacelar', icon: Globe, group: 'main' },
+  { id: 'stores', label: 'Do\'konlar', icon: LayoutDashboard, group: 'main' },
   { id: 'scanner', label: 'AI Scanner', icon: Scan, group: 'main' },
   { id: 'products', label: 'Mahsulotlar', icon: Package, group: 'main' },
   { id: 'orders', label: 'Buyurtmalar', icon: ShoppingCart, group: 'main' },
