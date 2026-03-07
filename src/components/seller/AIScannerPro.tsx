@@ -595,6 +595,34 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
       }
 
       updateTaskProgress(5, 'completed');
+      
+      // ═══ BILLING DEDUCT: charge once for the whole scanner pipeline ═══
+      try {
+        const userId = (await supabase.auth.getUser()).data.user?.id;
+        if (userId) {
+          const { data: accessData } = await supabase.rpc('check_feature_access', {
+            p_user_id: userId,
+            p_feature_key: scannerFeatureKey,
+          });
+          const access = accessData as any;
+          if (access?.price > 0) {
+            await supabase.rpc('deduct_balance', {
+              p_user_id: userId,
+              p_amount: access.price,
+              p_feature_key: scannerFeatureKey,
+              p_description: `AI Scanner: ${normalizedProductName.substring(0, 50)} (${targetMarketplace})`,
+            });
+          } else if (access?.tier === 'elegant') {
+            await supabase.from('elegant_usage').upsert(
+              { user_id: userId, feature_key: scannerFeatureKey, usage_month: new Date().toISOString().slice(0, 7) + '-01', usage_count: (access.used || 0) + 1 },
+              { onConflict: 'user_id,feature_key,usage_month' }
+            );
+          }
+        }
+      } catch (billingErr) {
+        console.warn('Billing deduct failed:', billingErr);
+      }
+
       updateTaskStatus('completed', generatedInfos);
       toast.success(`"${normalizedProductName}" kartochkasi tayyor!`);
       
