@@ -153,18 +153,22 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
       if (override) {
         // API returned the order — check if API status matches override
         const apiStatusUpper = order.status?.toUpperCase();
+        const apiSubstatus = (order as any).substatus?.toUpperCase();
         const overrideStatusUpper = override.newStatus.toUpperCase();
-        // If API already shows a "later" status, remove override
-        const statusOrder = ['NEW', 'PACKING', 'SHIPPED', 'DELIVERY', 'DELIVERED', 'CANCELLED'];
-        const apiIdx = statusOrder.indexOf(apiStatusUpper);
-        const overrideIdx = statusOrder.indexOf(overrideStatusUpper);
+        const overrideSubstatus = override.newSubstatus?.toUpperCase();
+        
+        // If API already shows the target or a later status, remove override
+        const statusOrder = ['NEW', 'STARTED', 'PROCESSING', 'PACKING', 'READY_TO_SHIP', 'SHIPPED', 'DELIVERY', 'DELIVERED', 'CANCELLED'];
+        const apiIdx = statusOrder.indexOf(apiSubstatus || apiStatusUpper);
+        const overrideIdx = statusOrder.indexOf(overrideSubstatus || overrideStatusUpper);
         if (apiIdx >= overrideIdx && apiIdx >= 0) {
-          // API caught up or passed — use API status
           overrides.delete(id);
           orderMap.set(id, order);
         } else {
-          // API is behind — use override
-          orderMap.set(id, { ...order, status: override.newStatus });
+          // API is behind — use override (with substatus)
+          const updated = { ...order, status: override.newStatus } as any;
+          if (override.newSubstatus) updated.substatus = override.newSubstatus;
+          orderMap.set(id, updated);
         }
       } else {
         orderMap.set(id, order);
