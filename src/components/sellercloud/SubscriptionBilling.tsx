@@ -296,7 +296,7 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
     }
   };
 
-  const currentPlanLabel = subscription.plan_type === 'pro' ? 'Free' : subscription.plan_type === 'enterprise' ? 'Elegant' : 'Premium';
+  const currentPlanLabel = (subscription.plan_type as string) === 'pro' ? 'Free' : (subscription.plan_type as string) === 'enterprise' ? 'Elegant' : 'Premium';
 
   const featuresByCategory = features?.reduce((acc, f) => {
     if (!acc[f.category]) acc[f.category] = [];
