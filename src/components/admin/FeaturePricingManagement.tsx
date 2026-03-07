@@ -16,6 +16,11 @@ import {
 import { toast } from 'sonner';
 
 const categoryLabels: Record<string, { label: string; icon: React.ElementType }> = {
+  card_creation: { label: 'Kartochka yaratish', icon: Sparkles },
+  cloning: { label: 'Klonlash', icon: ArrowUpDown },
+  ai_images: { label: 'AI Rasmlar', icon: Sparkles },
+  ai_tools: { label: 'AI Asboblar', icon: Settings2 },
+  free: { label: 'Bepul xizmatlar', icon: Zap },
   ai: { label: 'AI funksiyalar', icon: Sparkles },
   tools: { label: 'Asboblar', icon: Settings2 },
   sync: { label: 'Sinxronlash', icon: ArrowUpDown },

@@ -827,6 +827,28 @@ serve(async (req) => {
     if (!products.length || !products[0])
       return new Response(JSON.stringify({ error: "Product required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
+    // ═══ BILLING CHECK ═══
+    const isClone = !!body.cloneMode || !!body.skipImageGeneration;
+    const featureKey = isClone ? 'clone-to-yandex' : 'yandex-card-create';
+    const productCount = products.length;
+    
+    // Check access for first product (validates tier + balance)
+    const { data: accessCheck } = await supabase.rpc('check_feature_access', {
+      p_user_id: user.id, p_feature_key: featureKey,
+    });
+    
+    if (accessCheck && !accessCheck.allowed) {
+      const errorMsg = accessCheck.error === 'insufficient_balance' 
+        ? `Balans yetarli emas. Kerak: ${(accessCheck.price * productCount).toLocaleString()} so'm, Balans: ${accessCheck.balance?.toLocaleString()} so'm`
+        : accessCheck.message || 'Ruxsat berilmadi';
+      return new Response(JSON.stringify({ error: errorMsg, billingError: accessCheck.error }), {
+        status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    
+    const unitPrice = accessCheck?.price || 0;
+    console.log(`💰 Billing: ${featureKey}, ${unitPrice} UZS x ${productCount}, tier: ${accessCheck?.tier}`);
+
     let shopId = creds.shopId || body.shopId;
     if (!shopId || shopId === "sellercloud") {
       const { data: s } = await supabase.from("shops").select("id").eq("owner_id", user.id).limit(1).single();
@@ -1139,12 +1161,35 @@ serve(async (req) => {
       }
     }
 
+    // ═══ BILLING DEDUCT (only for successful cards) ═══
+    const successCount = results.filter(r => r.success).length;
+    if (unitPrice > 0 && successCount > 0) {
+      for (let i = 0; i < successCount; i++) {
+        await supabase.rpc('deduct_balance', {
+          p_user_id: user.id,
+          p_amount: unitPrice,
+          p_feature_key: featureKey,
+          p_description: `Yandex ${isClone ? 'klonlash' : 'kartochka yaratish'}: ${results.filter(r => r.success)[i]?.name?.substring(0, 50) || 'N/A'}`,
+        });
+      }
+      console.log(`💰 Billed: ${unitPrice * successCount} UZS for ${successCount} cards`);
+    } else if (accessCheck?.tier === 'elegant' && successCount > 0) {
+      // Track elegant usage
+      for (let i = 0; i < successCount; i++) {
+        await supabase.from('elegant_usage').upsert(
+          { user_id: user.id, feature_key: featureKey, usage_month: new Date().toISOString().slice(0, 7) + '-01', usage_count: (accessCheck.used || 0) + i + 1 },
+          { onConflict: 'user_id,feature_key,usage_month' }
+        );
+      }
+    }
+
     return new Response(JSON.stringify({
       success: results.every(r => r.success),
       total: results.length,
-      successCount: results.filter(r => r.success).length,
+      successCount,
       failedCount: results.filter(r => !r.success).length,
       results,
+      billing: { featureKey, unitPrice, totalCharged: unitPrice * successCount, tier: accessCheck?.tier },
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (error) {

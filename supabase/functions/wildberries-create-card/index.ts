@@ -890,7 +890,30 @@ serve(async (req) => {
       return new Response(JSON.stringify({ success: false, error: "Wildberries API kaliti yo'q" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const { product, dimensions: manualDimensions } = await req.json();
+    const reqBody = await req.json();
+    const { product, dimensions: manualDimensions, cloneMode, skipImageGeneration } = reqBody;
+
+    // ═══ BILLING CHECK ═══
+    const adminSupabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const isClone = !!cloneMode || !!skipImageGeneration;
+    const featureKey = isClone ? 'clone-to-wb' : 'wb-card-create';
+    
+    const { data: accessCheck } = await adminSupabase.rpc('check_feature_access', {
+      p_user_id: user.id, p_feature_key: featureKey,
+    });
+    
+    if (accessCheck && !accessCheck.allowed) {
+      const errorMsg = accessCheck.error === 'insufficient_balance'
+        ? `Balans yetarli emas. Kerak: ${accessCheck.price?.toLocaleString()} so'm, Balans: ${accessCheck.balance?.toLocaleString()} so'm`
+        : accessCheck.message || 'Ruxsat berilmadi';
+      return new Response(JSON.stringify({ success: false, error: errorMsg, billingError: accessCheck.error }), {
+        status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    
+    const unitPrice = accessCheck?.price || 0;
+    console.log(`💰 Billing: ${featureKey}, ${unitPrice} UZS, tier: ${accessCheck?.tier}`);
+
     console.log(`\n========= WB CARD CREATION =========`);
     console.log(`Product: "${product.name}"`);
     console.log(`Category: "${product.category || 'none'}"`);
@@ -1065,6 +1088,22 @@ serve(async (req) => {
     console.log(`\n========= RESULT =========`);
     console.log(`vendorCode: ${vendorCode}, nmID: ${nmID || 'pending'}`);
 
+    // ═══ BILLING DEDUCT (successful card) ═══
+    if (unitPrice > 0) {
+      await adminSupabase.rpc('deduct_balance', {
+        p_user_id: user.id,
+        p_amount: unitPrice,
+        p_feature_key: featureKey,
+        p_description: `WB ${isClone ? 'klonlash' : 'kartochka yaratish'}: ${analysis.titleRu?.substring(0, 50) || product.name}`,
+      });
+      console.log(`💰 Billed: ${unitPrice} UZS`);
+    } else if (accessCheck?.tier === 'elegant') {
+      await adminSupabase.from('elegant_usage').upsert(
+        { user_id: user.id, feature_key: featureKey, usage_month: new Date().toISOString().slice(0, 7) + '-01', usage_count: (accessCheck.used || 0) + 1 },
+        { onConflict: 'user_id,feature_key,usage_month' }
+      );
+    }
+
     return new Response(JSON.stringify({
       success: true,
       vendorCode,
@@ -1083,6 +1122,7 @@ serve(async (req) => {
       descriptionLength: analysis.descriptionRu.length,
       barcode,
       wbResponse: wbData,
+      billing: { featureKey, charged: unitPrice, tier: accessCheck?.tier },
       note: nmID
         ? `Kartochka to'liq yaratildi: ${proxiedImages.length} rasm, ${filledCharcs.length} xususiyat${descriptionSet ? ', tavsif' : ''}${priceSet ? ', narx' : ''}`
         : 'Kartochka yaratildi lekin nmID topilmadi — rasmlar yuklanmadi. WB indeksatsiyasi 5-10 daqiqa olishi mumkin.',
