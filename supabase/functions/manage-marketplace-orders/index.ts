@@ -486,35 +486,34 @@ serve(async (req) => {
 
           case "labels": {
             // GET /v2/campaigns/{id}/orders/{id}/delivery/labels
-            if (ids.length === 1) {
-              const resp = await fetch(
-                `${yBase}/v2/campaigns/${cId}/orders/${ids[0]}/delivery/labels`,
-                { headers: { ...yHeaders, "Accept": "application/pdf" } }
-              );
-              if (resp.ok) {
-                return pdfResponse(await resp.arrayBuffer(), `label_yandex_${ids[0]}.pdf`);
-              }
-              result = { success: false, error: `Yandex labels: ${resp.status}`, details: await resp.text() };
-            } else {
-              // Multiple — fetch each as base64
-              const labels = [];
-              for (const oid of ids) {
+            // Always return JSON with base64 for consistent client handling
+            const labels = [];
+            for (const oid of ids) {
+              try {
                 const resp = await fetch(
                   `${yBase}/v2/campaigns/${cId}/orders/${oid}/delivery/labels`,
                   { headers: { ...yHeaders, "Accept": "application/pdf" } }
                 );
                 if (resp.ok) {
                   const buf = await resp.arrayBuffer();
-                  const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+                  const bytes = new Uint8Array(buf);
+                  let binary = '';
+                  for (let i = 0; i < bytes.length; i++) {
+                    binary += String.fromCharCode(bytes[i]);
+                  }
+                  const b64 = btoa(binary);
                   labels.push({ orderId: oid, pdf: b64, success: true });
                 } else {
-                  await resp.text();
-                  labels.push({ orderId: oid, success: false });
+                  const errText = await resp.text();
+                  console.error(`Yandex label ${oid}:`, resp.status, errText);
+                  labels.push({ orderId: oid, success: false, error: `HTTP ${resp.status}` });
                 }
-                await sleep(200);
+              } catch (e) {
+                labels.push({ orderId: oid, success: false, error: String(e) });
               }
-              result = { success: true, labels };
+              if (ids.length > 1) await sleep(200);
             }
+            result = { success: true, labels };
             break;
           }
 

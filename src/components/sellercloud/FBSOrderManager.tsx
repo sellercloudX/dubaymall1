@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -89,8 +89,37 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
   const [labelSize, setLabelSize] = useState('58x40');
   const [labelCopies, setLabelCopies] = useState(1);
   const [labelAutocut, setLabelAutocut] = useState(true);
+  const [pdfBlobUrls, setPdfBlobUrls] = useState<Record<string, string>>({});
   const labelPrintRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
+
+  // Create blob URLs for PDF labels so they render in iframes
+  useEffect(() => {
+    if (!labelData || labelData.type !== 'pdf' || !labelData.labels) {
+      Object.values(pdfBlobUrls).forEach(url => URL.revokeObjectURL(url));
+      setPdfBlobUrls({});
+      return;
+    }
+    const urls: Record<string, string> = {};
+    labelData.labels.forEach((l: any) => {
+      if (l.success && l.pdf) {
+        try {
+          const binary = atob(l.pdf);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          const blob = new Blob([bytes], { type: 'application/pdf' });
+          urls[String(l.orderId)] = URL.createObjectURL(blob);
+        } catch (e) {
+          console.error('PDF blob creation failed for', l.orderId, e);
+        }
+      }
+    });
+    setPdfBlobUrls(urls);
+    return () => {
+      Object.values(urls).forEach(url => URL.revokeObjectURL(url));
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [labelData]);
 
   // Track optimistic status overrides that survive cache refetches
   // Map<orderId, { newStatus, newSubstatus, timestamp, originalOrder }>
@@ -315,16 +344,13 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
   const handlePrintFromDialog = () => {
     if (!labelData) return;
     const size = LABEL_SIZES.find(s => s.key === labelSize) || LABEL_SIZES[0];
-    const printWindow = window.open('', '_blank', 'width=800,height=600');
-    if (!printWindow) {
-      toast.error("Popup bloklangan. Brauzerni sozlang.");
-      return;
-    }
 
     if (labelData.type === 'sticker' && labelData.stickers) {
-      // PNG stickers - render as images
+      // PNG stickers - open print window with images
+      const printWindow = window.open('', '_blank', 'width=800,height=600');
+      if (!printWindow) { toast.error("Popup bloklangan. Brauzerni sozlang."); return; }
       const images = labelData.stickers.flatMap(s =>
-        Array.from({ length: labelCopies }).map((_, ci) =>
+        Array.from({ length: labelCopies }).map(() =>
           `<div class="label-item"><img src="data:image/png;base64,${s.file}" /></div>`
         )
       ).join('');
@@ -339,22 +365,34 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
       printWindow.document.close();
       setTimeout(() => printWindow.print(), 500);
     } else if (labelData.type === 'pdf' && labelData.labels) {
-      // PDF labels - embed each as an iframe and print
-      const pdfs = labelData.labels.flatMap((l: any) =>
-        Array.from({ length: labelCopies }).map((_, ci) =>
-          `<div class="label-item"><embed src="data:application/pdf;base64,${l.pdf}" type="application/pdf" width="100%" height="100%" /></div>`
-        )
-      ).join('');
-      printWindow.document.write(`<!DOCTYPE html><html><head><title>Etiketkalar</title>
-        <style>
-          @page { size: ${size.width}mm ${size.height}mm; margin: 2mm; }
-          @media print { body{margin:0;padding:0;} .label-item{page-break-after:${labelAutocut ? 'always' : 'auto'};} }
-          body{font-family:sans-serif;margin:0;padding:0;}
-          .label-item{width:${size.width}mm;height:${size.height}mm;overflow:hidden;}
-          embed{width:100%;height:100%;}
-        </style></head><body>${pdfs}</body></html>`);
-      printWindow.document.close();
-      setTimeout(() => printWindow.print(), 1000);
+      // For PDFs - open blob URL directly for native PDF print
+      const successLabels = labelData.labels.filter((l: any) => l.success && l.pdf);
+      if (successLabels.length === 0) { toast.error("Pechat uchun etiketka topilmadi"); return; }
+
+      // Merge all PDFs into one print session: open first blob URL
+      // For single PDF, use blob URL directly
+      if (successLabels.length === 1) {
+        const blobUrl = pdfBlobUrls[String(successLabels[0].orderId)];
+        if (blobUrl) {
+          const printWindow = window.open(blobUrl, '_blank');
+          if (printWindow) {
+            printWindow.onload = () => setTimeout(() => printWindow.print(), 300);
+          }
+        } else {
+          toast.error("PDF yuklanmadi");
+        }
+      } else {
+        // Multiple PDFs - open each in sequence
+        successLabels.forEach((l: any, idx: number) => {
+          const blobUrl = pdfBlobUrls[String(l.orderId)];
+          if (blobUrl) {
+            setTimeout(() => {
+              const w = window.open(blobUrl, '_blank');
+              if (w) w.onload = () => setTimeout(() => w.print(), 300);
+            }, idx * 500);
+          }
+        });
+      }
     }
   };
 
@@ -860,8 +898,9 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
                   </div>
                 ))
               )}
-              {labelData?.type === 'pdf' && labelData.labels?.map((l: any, i: number) =>
-                Array.from({ length: labelCopies }).map((_, ci) => (
+              {labelData?.type === 'pdf' && labelData.labels?.map((l: any, i: number) => {
+                const blobUrl = pdfBlobUrls[String(l.orderId)];
+                return Array.from({ length: labelCopies }).map((_, ci) => (
                   <div key={`${i}-${ci}`} className="label-item border border-dashed border-muted-foreground/30 rounded mb-2 p-2">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-xs text-muted-foreground">📄 Buyurtma #{l.orderId} {labelCopies > 1 ? `(nusxa ${ci + 1})` : ''}</span>
@@ -879,20 +918,21 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
                         <Package className="h-3 w-3" /> Yuklab olish
                       </Button>
                     </div>
-                    <object
-                      data={`data:application/pdf;base64,${l.pdf}`}
-                      type="application/pdf"
-                      className="w-full h-[200px] border rounded"
-                    >
+                    {blobUrl ? (
+                      <iframe
+                        src={blobUrl}
+                        className="w-full h-[250px] border rounded bg-white"
+                        title={`Label ${l.orderId}`}
+                      />
+                    ) : (
                       <div className="flex flex-col items-center justify-center h-[200px] bg-muted/50 rounded text-muted-foreground">
                         <Printer className="h-8 w-8 mb-2" />
-                        <p className="text-xs">PDF ko'rish mumkin emas</p>
-                        <p className="text-[10px]">Yuklab oling yoki "Pechat qilish" tugmasini bosing</p>
+                        <p className="text-xs">PDF yuklanmoqda...</p>
                       </div>
-                    </object>
+                    )}
                   </div>
-                ))
-              )}
+                ));
+              })}
             </div>
           </div>
 
