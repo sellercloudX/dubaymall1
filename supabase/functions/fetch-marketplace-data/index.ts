@@ -1791,9 +1791,9 @@ serve(async (req) => {
 
           // Fetch all order statuses to get complete picture
           const orderStatuses = status ? [status] : [
-            'CREATED', 'PACKING', 'PENDING_DELIVERY', 'DELIVERING', 
+            'NEW', 'CREATED', 'PROCESSING', 'PACKING', 'PENDING_DELIVERY', 'DELIVERING', 
             'DELIVERED', 'ACCEPTED_AT_DP', 'DELIVERED_TO_CUSTOMER_DELIVERY_POINT',
-            'COMPLETED', 'CANCELED', 'PENDING_CANCELLATION', 'RETURNED'
+            'COMPLETED', 'CANCELED', 'PENDING_CANCELLATION', 'RETURNED', 'REJECTED'
           ];
 
           // Fetch orders from ALL shops, not just primary
@@ -1926,12 +1926,8 @@ serve(async (req) => {
                   let itemPhoto = '';
                    try {
                      if (item.photo) {
-                       // Log the raw photo structure for first item to debug
-                       if (items.indexOf(item) === 0) {
-                         console.log('[UZUM ORDER PHOTO DEBUG] Raw item.photo type:', typeof item.photo);
-                         console.log('[UZUM ORDER PHOTO DEBUG] Raw item.photo keys:', typeof item.photo === 'object' ? Object.keys(item.photo) : 'N/A');
-                         console.log('[UZUM ORDER PHOTO DEBUG] Raw item.photo JSON:', JSON.stringify(item.photo).substring(0, 500));
-                       }
+                        // Only log photo debug for very first order item globally
+                        const isFirstItem = allOrders.length === 0 && items.indexOf(item) === 0;
                        if (typeof item.photo === 'string') {
                         itemPhoto = item.photo.startsWith('http') ? item.photo : `https://images.uzum.uz/${item.photo.replace(/^\//, '')}`;
                        } else if (typeof item.photo === 'object') {
