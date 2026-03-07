@@ -121,13 +121,20 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
         const netProfit = grossProfit - commission + subsidyAmount;
         const margin = totalUzs > 0 ? (netProfit / totalUzs) * 100 : 0;
 
-        // Determine status category
+        // Determine status category (with Yandex substatus awareness)
         const s = (order.status || '').toUpperCase();
+        const sub = ((order as any).substatus || '').toUpperCase();
         let statusCategory = 'active';
-        for (const cat of STATUS_CATEGORIES.slice(1)) {
-          if (cat.statuses?.some(st => st.toUpperCase() === s)) {
-            statusCategory = cat.key;
-            break;
+        
+        // Yandex PROCESSING substatus mapping
+        if (mp === 'yandex' && s === 'PROCESSING') {
+          statusCategory = sub === 'STARTED' ? 'new' : 'assembly';
+        } else {
+          for (const cat of STATUS_CATEGORIES.slice(1)) {
+            if (cat.statuses?.some(st => st.toUpperCase() === s)) {
+              statusCategory = cat.key;
+              break;
+            }
           }
         }
 
