@@ -1871,16 +1871,26 @@ serve(async (req) => {
               // Fall back to orderId/id for internal dedup
               const displayOrderId = order.orderCode || order.orderNumber || order.code || order.orderId || order.id;
 
-              // Parse Uzum createdAt — may be Unix timestamp (ms) or ISO string
-              let uzumCreatedAt = order.createdAt || order.createDate || '';
-              if (typeof uzumCreatedAt === 'number') {
-                uzumCreatedAt = new Date(uzumCreatedAt > 1e12 ? uzumCreatedAt : uzumCreatedAt * 1000).toISOString();
-              } else if (uzumCreatedAt && !String(uzumCreatedAt).includes('T') && !isNaN(Number(uzumCreatedAt))) {
-                // Numeric string timestamp
-                const ts = Number(uzumCreatedAt);
+              // Parse Uzum createdAt — may be Unix timestamp (ms/s), numeric string, or ISO
+              // Uzum v2 FBS API often returns createdAt as Unix seconds (e.g. 1741234567)
+              const rawCreatedAt = order.createdAt || order.createDate || order.dateCreated || order.created_at || '';
+              let uzumCreatedAt = '';
+              if (typeof rawCreatedAt === 'number') {
+                uzumCreatedAt = new Date(rawCreatedAt > 1e12 ? rawCreatedAt : rawCreatedAt * 1000).toISOString();
+              } else if (rawCreatedAt && !isNaN(Number(rawCreatedAt))) {
+                const ts = Number(rawCreatedAt);
                 uzumCreatedAt = new Date(ts > 1e12 ? ts : ts * 1000).toISOString();
+              } else if (rawCreatedAt) {
+                // Try parsing as ISO or date string
+                const parsed = new Date(String(rawCreatedAt));
+                uzumCreatedAt = isNaN(parsed.getTime()) ? '' : parsed.toISOString();
               }
               if (!uzumCreatedAt) uzumCreatedAt = new Date().toISOString();
+              
+              // Debug: log first order's date parsing
+              if (allOrders.length === 0 && orderList.indexOf(order) === 0) {
+                console.log(`[UZUM DATE DEBUG] raw=${JSON.stringify(rawCreatedAt)} type=${typeof rawCreatedAt} → parsed=${uzumCreatedAt}`);
+              }
 
               return {
                 id: displayOrderId,
