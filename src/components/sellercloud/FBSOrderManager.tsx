@@ -152,8 +152,11 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
 
     try {
       await confirmOrders(selectedMp, ids);
+      // Optimistically move orders to assembly tab
+      optimisticStatusUpdate(selectedMp, ids, 'PACKING');
       setSelectedOrders(new Set());
-      store.refetchOrders(selectedMp);
+      // Delayed refetch to let marketplace API update
+      setTimeout(() => store.refetchOrders(selectedMp), 10000);
     } catch {}
   };
 
