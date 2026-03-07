@@ -364,6 +364,33 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
     };
 
     try {
+      // ═══ BILLING: One check for the entire scanner pipeline ═══
+      const scannerFeatureKey = targetMarketplace === 'wildberries' ? 'wb-card-create' : 'yandex-card-create';
+      try {
+        const { data: billingData, error: billingError } = await supabase.rpc('check_feature_access', {
+          p_user_id: (await supabase.auth.getUser()).data.user?.id,
+          p_feature_key: scannerFeatureKey,
+        });
+        
+        if (billingError) {
+          console.warn('Billing check error:', billingError);
+        } else {
+          const br = billingData as any;
+          if (br && !br.allowed) {
+            const errorMsg = br.error === 'insufficient_balance'
+              ? `Balans yetarli emas. Balansni kamida 300,000 so'm to'ldiring.`
+              : br.error === 'activation_required'
+              ? "Platformadan foydalanish uchun oylik aktivatsiya (99,000 so'm) talab etiladi."
+              : br.message || 'Ruxsat berilmadi';
+            toast.error(errorMsg);
+            updateTaskStatus('failed');
+            return;
+          }
+        }
+      } catch (billingErr) {
+        console.warn('Billing check failed, proceeding:', billingErr);
+      }
+
       // Step 1: Already done - mark complete
       updateTaskProgress(0, 'completed');
 
@@ -446,6 +473,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
               productName: normalizedProductName,
               category: analyzed?.category || '',
               features: analyzed?.features || [],
+              skipBilling: true, // Scanner handles billing
             },
           });
 
@@ -503,6 +531,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
             },
             skipImageGeneration: generatedInfos.length >= 2,
             cloneMode: false,
+            skipBilling: true, // Scanner handles billing
           },
         });
 
@@ -537,6 +566,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
               mxikName: mxikResult?.mxik_name,
             },
             skipImageGeneration: hasAiImages,
+            skipBilling: true, // Scanner handles billing
             pricing: {
               costPrice: pricingData.costPrice,
               recommendedPrice: pricingData.sellingPrice,
@@ -564,6 +594,34 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
       }
 
       updateTaskProgress(5, 'completed');
+      
+      // ═══ BILLING DEDUCT: charge once for the whole scanner pipeline ═══
+      try {
+        const userId = (await supabase.auth.getUser()).data.user?.id;
+        if (userId) {
+          const { data: accessData } = await supabase.rpc('check_feature_access', {
+            p_user_id: userId,
+            p_feature_key: scannerFeatureKey,
+          });
+          const access = accessData as any;
+          if (access?.price > 0) {
+            await supabase.rpc('deduct_balance', {
+              p_user_id: userId,
+              p_amount: access.price,
+              p_feature_key: scannerFeatureKey,
+              p_description: `AI Scanner: ${normalizedProductName.substring(0, 50)} (${targetMarketplace})`,
+            });
+          } else if (access?.tier === 'elegant') {
+            await supabase.from('elegant_usage').upsert(
+              { user_id: userId, feature_key: scannerFeatureKey, usage_month: new Date().toISOString().slice(0, 7) + '-01', usage_count: (access.used || 0) + 1 },
+              { onConflict: 'user_id,feature_key,usage_month' }
+            );
+          }
+        }
+      } catch (billingErr) {
+        console.warn('Billing deduct failed:', billingErr);
+      }
+
       updateTaskStatus('completed', generatedInfos);
       toast.success(`"${normalizedProductName}" kartochkasi tayyor!`);
       

@@ -893,28 +893,36 @@ serve(async (req) => {
     const reqBody = await req.json();
     const { product, dimensions: manualDimensions, cloneMode, skipImageGeneration } = reqBody;
 
-    // ═══ BILLING CHECK ═══
+    // ═══ BILLING CHECK (skip if called from scanner — scanner handles billing) ═══
     const adminSupabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const skipBilling = !!reqBody.skipBilling;
     const isClone = !!cloneMode || !!skipImageGeneration;
     const featureKey = isClone ? 'clone-to-wb' : 'wb-card-create';
+    let unitPrice = 0;
+    let accessCheck: any = null;
     
-    const { data: accessCheck } = await adminSupabase.rpc('check_feature_access', {
-      p_user_id: user.id, p_feature_key: featureKey,
-    });
-    
-    if (accessCheck && !accessCheck.allowed) {
-      const errorMsg = accessCheck.error === 'insufficient_balance'
-        ? `Balans yetarli emas. Balansni kamida 300,000 so'm to'ldiring. Joriy balans: ${accessCheck.balance?.toLocaleString()} so'm`
-        : accessCheck.error === 'activation_required'
-        ? 'Platformadan foydalanish uchun oylik aktivatsiya (99,000 so\'m) talab etiladi. Obuna bo\'limiga o\'ting.'
-        : accessCheck.message || 'Ruxsat berilmadi';
-      return new Response(JSON.stringify({ success: false, error: errorMsg, billingError: accessCheck.error }), {
-        status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    if (!skipBilling) {
+      const { data: ac } = await adminSupabase.rpc('check_feature_access', {
+        p_user_id: user.id, p_feature_key: featureKey,
       });
+      accessCheck = ac;
+      
+      if (accessCheck && !accessCheck.allowed) {
+        const errorMsg = accessCheck.error === 'insufficient_balance'
+          ? `Balans yetarli emas. Balansni kamida 300,000 so'm to'ldiring. Joriy balans: ${accessCheck.balance?.toLocaleString()} so'm`
+          : accessCheck.error === 'activation_required'
+          ? 'Platformadan foydalanish uchun oylik aktivatsiya (99,000 so\'m) talab etiladi. Obuna bo\'limiga o\'ting.'
+          : accessCheck.message || 'Ruxsat berilmadi';
+        return new Response(JSON.stringify({ success: false, error: errorMsg, billingError: accessCheck.error }), {
+          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      
+      unitPrice = accessCheck?.price || 0;
+      console.log(`💰 Billing: ${featureKey}, ${unitPrice} UZS, tier: ${accessCheck?.tier}`);
+    } else {
+      console.log(`💰 Billing skipped (called from scanner pipeline)`);
     }
-    
-    const unitPrice = accessCheck?.price || 0;
-    console.log(`💰 Billing: ${featureKey}, ${unitPrice} UZS, tier: ${accessCheck?.tier}`);
 
     console.log(`\n========= WB CARD CREATION =========`);
     console.log(`Product: "${product.name}"`);
@@ -1090,20 +1098,22 @@ serve(async (req) => {
     console.log(`\n========= RESULT =========`);
     console.log(`vendorCode: ${vendorCode}, nmID: ${nmID || 'pending'}`);
 
-    // ═══ BILLING DEDUCT (successful card) ═══
-    if (unitPrice > 0) {
-      await adminSupabase.rpc('deduct_balance', {
-        p_user_id: user.id,
-        p_amount: unitPrice,
-        p_feature_key: featureKey,
-        p_description: `WB ${isClone ? 'klonlash' : 'kartochka yaratish'}: ${analysis.titleRu?.substring(0, 50) || product.name}`,
-      });
-      console.log(`💰 Billed: ${unitPrice} UZS`);
-    } else if (accessCheck?.tier === 'elegant') {
-      await adminSupabase.from('elegant_usage').upsert(
-        { user_id: user.id, feature_key: featureKey, usage_month: new Date().toISOString().slice(0, 7) + '-01', usage_count: (accessCheck.used || 0) + 1 },
-        { onConflict: 'user_id,feature_key,usage_month' }
-      );
+    // ═══ BILLING DEDUCT (skip if scanner handles it) ═══
+    if (!skipBilling) {
+      if (unitPrice > 0) {
+        await adminSupabase.rpc('deduct_balance', {
+          p_user_id: user.id,
+          p_amount: unitPrice,
+          p_feature_key: featureKey,
+          p_description: `WB ${isClone ? 'klonlash' : 'kartochka yaratish'}: ${analysis.titleRu?.substring(0, 50) || product.name}`,
+        });
+        console.log(`💰 Billed: ${unitPrice} UZS`);
+      } else if (accessCheck?.tier === 'elegant') {
+        await adminSupabase.from('elegant_usage').upsert(
+          { user_id: user.id, feature_key: featureKey, usage_month: new Date().toISOString().slice(0, 7) + '-01', usage_count: (accessCheck.used || 0) + 1 },
+          { onConflict: 'user_id,feature_key,usage_month' }
+        );
+      }
     }
 
     return new Response(JSON.stringify({

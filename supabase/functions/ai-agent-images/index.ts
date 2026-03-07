@@ -1105,25 +1105,34 @@ serve(async (req) => {
       user_id: user.id, action_type: 'ai-agent-images', model_used: 'openai-gpt-image',
     });
 
-    // ═══ BILLING CHECK ═══
+    // ═══ BILLING CHECK (skip if called from scanner — scanner handles billing) ═══
+    const skipBilling = !!body?.skipBilling;
     const billingUserId = action === 'scanner-generate' ? user.id : (partnerId || user.id);
     const billingFeatureKey = action === 'scanner-generate' ? 'ai-scanner-images' : 'ai-image-generate';
-    const { data: accessCheck } = await adminSupabase.rpc('check_feature_access', {
-      p_user_id: billingUserId, p_feature_key: billingFeatureKey,
-    });
+    let imgUnitPrice = 0;
+    let accessCheck: any = null;
     
-    if (accessCheck && !accessCheck.allowed) {
-      const errorMsg = accessCheck.error === 'insufficient_balance'
-        ? `Balans yetarli emas. Balansni kamida 300,000 so'm to'ldiring. Joriy balans: ${accessCheck.balance?.toLocaleString()} so'm`
-        : accessCheck.error === 'activation_required'
-        ? 'Platformadan foydalanish uchun oylik aktivatsiya (99,000 so\'m) talab etiladi.'
-        : accessCheck.message || 'Ruxsat berilmadi';
-      return new Response(JSON.stringify({ error: errorMsg, billingError: accessCheck.error }), {
-        status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    if (!skipBilling) {
+      const { data: ac } = await adminSupabase.rpc('check_feature_access', {
+        p_user_id: billingUserId, p_feature_key: billingFeatureKey,
       });
+      accessCheck = ac;
+      
+      if (accessCheck && !accessCheck.allowed) {
+        const errorMsg = accessCheck.error === 'insufficient_balance'
+          ? `Balans yetarli emas. Balansni kamida 300,000 so'm to'ldiring. Joriy balans: ${accessCheck.balance?.toLocaleString()} so'm`
+          : accessCheck.error === 'activation_required'
+          ? 'Platformadan foydalanish uchun oylik aktivatsiya (99,000 so\'m) talab etiladi.'
+          : accessCheck.message || 'Ruxsat berilmadi';
+        return new Response(JSON.stringify({ error: errorMsg, billingError: accessCheck.error }), {
+          status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      imgUnitPrice = accessCheck?.price || 0;
+      console.log(`💰 Billing: ${billingFeatureKey}, ${imgUnitPrice} UZS, tier: ${accessCheck?.tier}`);
+    } else {
+      console.log(`💰 Billing skipped (called from scanner pipeline)`);
     }
-    const imgUnitPrice = accessCheck?.price || 0;
-    console.log(`💰 Billing: ${billingFeatureKey}, ${imgUnitPrice} UZS, tier: ${accessCheck?.tier}`);
 
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     if (!OPENAI_API_KEY) {
@@ -1260,17 +1269,19 @@ serve(async (req) => {
       pipelineResult.steps.forEach((s: any) => console.log(`  Step ${s.step}: ${s.name} → ${s.status}`));
       console.log(`${'='.repeat(60)}\n`);
 
-      // ═══ BILLING DEDUCT ═══
-      if (imgUnitPrice > 0 && totalGenerated > 0) {
-        await adminSupabase.rpc('deduct_balance', {
-          p_user_id: billingUserId, p_amount: imgUnitPrice, p_feature_key: billingFeatureKey,
-          p_description: `Rasm yaratish (${totalGenerated} ta): ${productName?.substring(0, 40) || 'N/A'}`,
-        });
-      } else if (accessCheck?.tier === 'elegant' && totalGenerated > 0) {
-        await adminSupabase.from('elegant_usage').upsert(
-          { user_id: billingUserId, feature_key: billingFeatureKey, usage_month: new Date().toISOString().slice(0, 7) + '-01', usage_count: (accessCheck.used || 0) + 1 },
-          { onConflict: 'user_id,feature_key,usage_month' }
-        );
+      // ═══ BILLING DEDUCT (skip if scanner handles it) ═══
+      if (!skipBilling) {
+        if (imgUnitPrice > 0 && totalGenerated > 0) {
+          await adminSupabase.rpc('deduct_balance', {
+            p_user_id: billingUserId, p_amount: imgUnitPrice, p_feature_key: billingFeatureKey,
+            p_description: `Rasm yaratish (${totalGenerated} ta): ${productName?.substring(0, 40) || 'N/A'}`,
+          });
+        } else if (accessCheck?.tier === 'elegant' && totalGenerated > 0) {
+          await adminSupabase.from('elegant_usage').upsert(
+            { user_id: billingUserId, feature_key: billingFeatureKey, usage_month: new Date().toISOString().slice(0, 7) + '-01', usage_count: (accessCheck.used || 0) + 1 },
+            { onConflict: 'user_id,feature_key,usage_month' }
+          );
+        }
       }
 
       return new Response(JSON.stringify({
@@ -1366,17 +1377,19 @@ serve(async (req) => {
       const allImages = [...(heroUrl ? [heroUrl] : []), ...angleUrls];
       console.log(`✅ Scanner pipeline complete: ${allImages.length}/2 images generated`);
 
-      // ═══ BILLING DEDUCT for scanner ═══
-      if (imgUnitPrice > 0 && allImages.length > 0) {
-        await adminSupabase.rpc('deduct_balance', {
-          p_user_id: billingUserId, p_amount: imgUnitPrice, p_feature_key: billingFeatureKey,
-          p_description: `Scanner rasm (${allImages.length} ta): ${productName?.substring(0, 40) || 'N/A'}`,
-        });
-      } else if (accessCheck?.tier === 'elegant' && allImages.length > 0) {
-        await adminSupabase.from('elegant_usage').upsert(
-          { user_id: billingUserId, feature_key: billingFeatureKey, usage_month: new Date().toISOString().slice(0, 7) + '-01', usage_count: (accessCheck.used || 0) + 1 },
-          { onConflict: 'user_id,feature_key,usage_month' }
-        );
+      // ═══ BILLING DEDUCT for scanner (skip if scanner handles it) ═══
+      if (!skipBilling) {
+        if (imgUnitPrice > 0 && allImages.length > 0) {
+          await adminSupabase.rpc('deduct_balance', {
+            p_user_id: billingUserId, p_amount: imgUnitPrice, p_feature_key: billingFeatureKey,
+            p_description: `Scanner rasm (${allImages.length} ta): ${productName?.substring(0, 40) || 'N/A'}`,
+          });
+        } else if (accessCheck?.tier === 'elegant' && allImages.length > 0) {
+          await adminSupabase.from('elegant_usage').upsert(
+            { user_id: billingUserId, feature_key: billingFeatureKey, usage_month: new Date().toISOString().slice(0, 7) + '-01', usage_count: (accessCheck.used || 0) + 1 },
+            { onConflict: 'user_id,feature_key,usage_month' }
+          );
+        }
       }
 
       return new Response(JSON.stringify({
