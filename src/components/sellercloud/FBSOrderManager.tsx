@@ -357,21 +357,18 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
           toast.warning("Stikerlar topilmadi. Buyurtmalar yig'ish holatida ekanligini tekshiring.");
           return;
         }
-        // Open print window with all stickers
         openStickersPrintWindow(result.stickers);
-        toast.success(`${result.stickers.length} ta stiker tayyor — pechat qiling yoki PDF saqlang`);
+        toast.success(`${result.stickers.length} ta stiker tayyor — pechat qiling`);
       } else if (result?.labels) {
-        // Multiple PDFs as base64
-        result.labels.forEach((l: any) => {
-          if (l.pdf && l.success) {
-            const link = document.createElement('a');
-            link.href = `data:application/pdf;base64,${l.pdf}`;
-            link.download = `label_${l.orderId}.pdf`;
-            link.click();
-          }
-        });
-        const successCount = result.labels.filter((l: any) => l.success).length;
-        toast.success(`${successCount} ta etiketka yuklandi`);
+        // Collect all successful labels
+        const successLabels = result.labels.filter((l: any) => l.success && l.pdf);
+        if (successLabels.length === 0) {
+          toast.error("Etiketkalar yuklanmadi. Buyurtmalar yig'ish holatida ekanligini tekshiring.");
+          return;
+        }
+        // Open all in a single print window
+        openPdfLabelsPrintWindow(successLabels);
+        toast.success(`${successLabels.length} ta etiketka tayyor — pechat qiling`);
       } else {
         toast.success("Etiketka tayyor");
       }
