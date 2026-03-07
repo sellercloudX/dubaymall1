@@ -316,167 +316,83 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
     if (!labelData) return;
     const size = LABEL_SIZES.find(s => s.key === labelSize) || LABEL_SIZES[0];
 
-    // Use hidden iframe for printing — avoids ERR_BLOCKED_BY_CLIENT in sandboxed environments
-    const printViaIframe = (htmlContent: string) => {
-      const iframe = document.createElement('iframe');
-      iframe.style.position = 'fixed';
-      iframe.style.left = '-9999px';
-      iframe.style.top = '-9999px';
-      iframe.style.width = '0';
-      iframe.style.height = '0';
-      iframe.style.border = 'none';
-      document.body.appendChild(iframe);
-
-      const doc = iframe.contentDocument || iframe.contentWindow?.document;
-      if (!doc) { toast.error("Pechat qilib bo'lmadi"); return; }
-
-      doc.open();
-      doc.write(htmlContent);
-      doc.close();
-
-      // Wait for content to render, then print
-      setTimeout(() => {
-        try {
-          iframe.contentWindow?.focus();
-          iframe.contentWindow?.print();
-        } catch (e) {
-          console.error('Print error:', e);
-          toast.error("Pechat xatolik. Etiketkani yuklab oling va qo'lda pechat qiling.");
-        }
-        // Cleanup after print dialog closes
-        setTimeout(() => {
-          try { document.body.removeChild(iframe); } catch {}
-        }, 5000);
-      }, 800);
-    };
-
     if (labelData.type === 'sticker' && labelData.stickers) {
-      // PNG stickers - render as images in hidden iframe
+      // PNG stickers: open a NEW WINDOW with only sticker images, then print
       const images = labelData.stickers.flatMap(s =>
         Array.from({ length: labelCopies }).map(() =>
           `<div class="label-item"><img src="data:image/png;base64,${s.file}" /></div>`
         )
       ).join('');
 
-      printViaIframe(`<!DOCTYPE html><html><head><title>Stikerlar</title>
+      const htmlContent = `<!DOCTYPE html><html><head><title>Stikerlar</title>
         <style>
           @page { size: ${size.width}mm ${size.height}mm; margin: 0; }
-          @media print { body{margin:0;padding:0;} .label-item{page-break-after:${labelAutocut ? 'always' : 'auto'};} }
-          body{font-family:sans-serif;margin:0;padding:0;}
-          .label-item{display:flex;align-items:center;justify-content:center;width:${size.width}mm;height:${size.height}mm;overflow:hidden;}
-          .label-item img{max-width:100%;max-height:100%;object-fit:contain;}
-        </style></head><body>${images}</body></html>`);
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: sans-serif; }
+          .label-item { 
+            display: flex; align-items: center; justify-content: center;
+            width: ${size.width}mm; height: ${size.height}mm; overflow: hidden;
+            ${labelAutocut ? 'page-break-after: always;' : ''}
+          }
+          .label-item img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        </style></head><body>${images}</body></html>`;
 
-      toast.success("Pechat oynasi ochilmoqda...");
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+        // Wait for images to load then trigger print
+        printWindow.onload = () => {
+          setTimeout(() => {
+            printWindow.print();
+          }, 500);
+        };
+        // Fallback if onload doesn't fire
+        setTimeout(() => {
+          try { printWindow.print(); } catch {}
+        }, 2000);
+        toast.success("Pechat oynasi ochildi");
+      } else {
+        // Popup blocked — fallback: download instead
+        toast.error("Popup bloklandi. Brauzer sozlamalarida popup'ga ruxsat bering yoki etiketkani yuklab oling.");
+      }
     } else if (labelData.type === 'pdf' && labelData.labels) {
       const successLabels = labelData.labels.filter((l: any) => l.success && l.pdf);
       if (successLabels.length === 0) { toast.error("Pechat uchun etiketka topilmadi"); return; }
 
-      // Convert base64 PDFs to Blob URLs (data: URIs are blocked by Chrome)
-      const blobUrls: string[] = [];
-      successLabels.forEach((l: any) => {
+      // PDF labels: convert to Blob URL and open in native browser PDF viewer
+      // Browser's native PDF viewer has its own perfect print button
+      let openedCount = 0;
+      successLabels.forEach((l: any, idx: number) => {
         const byteChars = atob(l.pdf);
         const byteArr = new Uint8Array(byteChars.length);
         for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
         const blob = new Blob([byteArr], { type: 'application/pdf' });
-        const url = URL.createObjectURL(blob);
-        for (let c = 0; c < labelCopies; c++) blobUrls.push(url);
-      });
+        const blobUrl = URL.createObjectURL(blob);
 
-      // Inject @media print styles to hide everything except our overlay
-      const printStyle = document.createElement('style');
-      printStyle.id = 'label-print-styles';
-      printStyle.textContent = `
-        @media print {
-          body > *:not(#pdf-print-overlay) { display: none !important; }
-          #pdf-print-overlay { position: static !important; }
-          #pdf-print-overlay [data-toolbar] { display: none !important; }
-          #pdf-print-overlay iframe { 
-            width: 100% !important; height: 100vh !important; 
-            page-break-after: always; border: none !important; 
-          }
-        }
-      `;
-      document.head.appendChild(printStyle);
-
-      // Create overlay
-      const overlay = document.createElement('div');
-      overlay.id = 'pdf-print-overlay';
-      overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;background:white;display:flex;flex-direction:column;';
-
-      const toolbar = document.createElement('div');
-      toolbar.setAttribute('data-toolbar', 'true');
-      toolbar.style.cssText = 'padding:12px 16px;background:#f8f9fa;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;';
-      toolbar.innerHTML = `
-        <span style="font-size:14px;font-weight:600;">📋 ${successLabels.length} ta etiketka (${labelCopies} nusxa)</span>
-        <div style="display:flex;gap:8px;">
-          <button id="pdf-print-btn" style="padding:8px 20px;background:#2563eb;color:white;border:none;border-radius:6px;font-size:14px;cursor:pointer;font-weight:600;">🖨️ Pechat qilish</button>
-          <button id="pdf-close-btn" style="padding:8px 16px;background:#6b7280;color:white;border:none;border-radius:6px;font-size:14px;cursor:pointer;">✕ Yopish</button>
-        </div>
-      `;
-
-      const container = document.createElement('div');
-      container.style.cssText = 'flex:1;overflow:auto;padding:8px;';
-
-      // Use blob URLs for iframes (not data: URIs — Chrome blocks those)
-      blobUrls.forEach((url) => {
-        const pdfFrame = document.createElement('iframe');
-        pdfFrame.style.cssText = 'width:100%;height:600px;border:1px solid #e5e7eb;margin-bottom:8px;border-radius:4px;';
-        pdfFrame.src = url;
-        container.appendChild(pdfFrame);
-      });
-
-      overlay.appendChild(toolbar);
-      overlay.appendChild(container);
-      document.body.appendChild(overlay);
-
-      // Print: open first PDF blob in new tab for native PDF printing
-      document.getElementById('pdf-print-btn')?.addEventListener('click', () => {
-        // For single PDF, open blob URL directly — browser's native PDF viewer prints perfectly
-        if (blobUrls.length === 1) {
-          const w = window.open(blobUrls[0], '_blank');
-          if (!w) {
-            // Fallback: use iframe print
-            const frame = container.querySelector('iframe');
-            if (frame?.contentWindow) {
-              frame.contentWindow.focus();
-              frame.contentWindow.print();
-            } else {
-              toast.error("Popup bloklandi. Etiketkani yuklab oling.");
+        // Open each PDF with delay to avoid popup blocking
+        for (let c = 0; c < labelCopies; c++) {
+          setTimeout(() => {
+            const w = window.open(blobUrl, '_blank');
+            if (w) {
+              openedCount++;
+            } else if (openedCount === 0) {
+              // All blocked — fallback to download
+              const a = document.createElement('a');
+              a.href = blobUrl;
+              a.download = `etiketka_${l.orderId}.pdf`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              toast.warning("Popup bloklandi. Etiketka yuklab olindi — qo'lda oching va pechat qiling.");
             }
-          }
-        } else {
-          // Multiple PDFs: try printing each iframe's content
-          const frames = container.querySelectorAll('iframe');
-          let printed = false;
-          frames.forEach((frame) => {
-            try {
-              if (frame.contentWindow) {
-                frame.contentWindow.focus();
-                frame.contentWindow.print();
-                printed = true;
-              }
-            } catch (e) {
-              console.warn('Frame print failed:', e);
-            }
-          });
-          if (!printed) {
-            // Fallback: download all PDFs
-            toast.info("Pechat imkonsiz. Etiketkalarni yuklab oling.");
-          }
+            // Cleanup blob URL after 2 minutes
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 120000);
+          }, (idx * labelCopies + c) * 600);
         }
       });
 
-      const cleanup = () => {
-        try { document.body.removeChild(overlay); } catch {}
-        try { document.head.removeChild(printStyle); } catch {}
-        // Revoke blob URLs after delay
-        setTimeout(() => blobUrls.forEach(u => URL.revokeObjectURL(u)), 60000);
-      };
-
-      document.getElementById('pdf-close-btn')?.addEventListener('click', cleanup);
-
-      toast.success("Etiketkalar tayyor. 🖨️ Pechat tugmasini bosing.");
+      toast.success("PDF etiketkalar brauzerda ochildi. Brauzerning 🖨️ pechat tugmasini bosing (Ctrl+P).");
     }
   };
 
