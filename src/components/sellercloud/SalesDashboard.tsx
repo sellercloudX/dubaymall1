@@ -30,10 +30,11 @@ type SortDir = 'asc' | 'desc';
 
 const STATUS_CATEGORIES = [
   { key: 'all', label: 'Hammasi', icon: ShoppingCart, color: '' },
-  { key: 'delivered', label: 'Qabul qilingan', icon: CheckCircle, color: 'text-emerald-600', statuses: ['DELIVERED', 'COMPLETED', 'ACCEPTED_AT_DP'] },
-  { key: 'active', label: "Yo'lda", icon: Truck, color: 'text-blue-500', statuses: ['DELIVERY', 'DELIVERING', 'PENDING_DELIVERY', 'PROCESSING', 'PACKING', 'READY_TO_SHIP'] },
-  { key: 'assembly', label: "Yig'ish mumkin", icon: Clock, color: 'text-amber-500', statuses: ['CREATED', 'new', 'confirm'] },
-  { key: 'cancelled', label: 'Bekor qilingan', icon: XCircle, color: 'text-destructive', statuses: ['CANCELLED', 'CANCELED', 'RETURNED', 'cancel'] },
+  { key: 'new', label: 'Yangi', icon: Package, color: 'text-orange-500', statuses: ['NEW', 'PENDING', 'RESERVED', 'UNPAID', 'CREATED'] },
+  { key: 'assembly', label: "Yig'ish", icon: Clock, color: 'text-amber-500', statuses: ['PACKING', 'CONFIRM', 'READY_TO_SHIP', 'ACCEPTED_AT_DP'] },
+  { key: 'active', label: "Yo'lda", icon: Truck, color: 'text-blue-500', statuses: ['DELIVERY', 'DELIVERING', 'PENDING_DELIVERY', 'PROCESSING', 'SHIPPED', 'PICKUP', 'DELIVERED_TO_CUSTOMER_DELIVERY_POINT'] },
+  { key: 'delivered', label: 'Yetkazildi', icon: CheckCircle, color: 'text-emerald-600', statuses: ['DELIVERED', 'COMPLETED'] },
+  { key: 'cancelled', label: 'Bekor', icon: XCircle, color: 'text-destructive', statuses: ['CANCELLED', 'CANCELED', 'RETURNED', 'CANCEL', 'PENDING_CANCELLATION', 'REJECTED'] },
 ];
 
 const formatNum = (n: number) => new Intl.NumberFormat('uz-UZ').format(Math.round(n));
