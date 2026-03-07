@@ -904,7 +904,9 @@ serve(async (req) => {
     
     if (accessCheck && !accessCheck.allowed) {
       const errorMsg = accessCheck.error === 'insufficient_balance'
-        ? `Balans yetarli emas. Kerak: ${accessCheck.price?.toLocaleString()} so'm, Balans: ${accessCheck.balance?.toLocaleString()} so'm`
+        ? `Balans yetarli emas. Balansni kamida 300,000 so'm to'ldiring. Joriy balans: ${accessCheck.balance?.toLocaleString()} so'm`
+        : accessCheck.error === 'activation_required'
+        ? 'Platformadan foydalanish uchun oylik aktivatsiya (99,000 so\'m) talab etiladi. Obuna bo\'limiga o\'ting.'
         : accessCheck.message || 'Ruxsat berilmadi';
       return new Response(JSON.stringify({ success: false, error: errorMsg, billingError: accessCheck.error }), {
         status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
