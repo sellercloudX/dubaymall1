@@ -93,6 +93,34 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
   const labelPrintRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
+  // Create blob URLs for PDF labels so they render in iframes
+  useEffect(() => {
+    if (!labelData || labelData.type !== 'pdf' || !labelData.labels) {
+      Object.values(pdfBlobUrls).forEach(url => URL.revokeObjectURL(url));
+      setPdfBlobUrls({});
+      return;
+    }
+    const urls: Record<string, string> = {};
+    labelData.labels.forEach((l: any) => {
+      if (l.success && l.pdf) {
+        try {
+          const binary = atob(l.pdf);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          const blob = new Blob([bytes], { type: 'application/pdf' });
+          urls[String(l.orderId)] = URL.createObjectURL(blob);
+        } catch (e) {
+          console.error('PDF blob creation failed for', l.orderId, e);
+        }
+      }
+    });
+    setPdfBlobUrls(urls);
+    return () => {
+      Object.values(urls).forEach(url => URL.revokeObjectURL(url));
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [labelData]);
+
   // Track optimistic status overrides that survive cache refetches
   // Map<orderId, { newStatus, newSubstatus, timestamp, originalOrder }>
   const optimisticOverridesRef = useRef<Map<string, { newStatus: string; newSubstatus?: string; timestamp: number; order: MarketplaceOrder }>>(new Map());
