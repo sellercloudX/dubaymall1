@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -74,12 +75,37 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
   // WB supply dialog
   const [wbSupplyDialogOpen, setWbSupplyDialogOpen] = useState(false);
   const [wbSupplyName, setWbSupplyName] = useState('');
+  const queryClient = useQueryClient();
 
   const {
     isLoading, actionInProgress, confirmOrders, cancelOrders, getLabels,
     getDropOffPoints, getTimeSlots, createInvoice, setDropOff,
     getSupplies, addToSupply, executeAction,
   } = useOrderManagement();
+
+  // Optimistically update order statuses in query cache
+  // This prevents orders from "disappearing" when marketplace API hasn't updated yet
+  const optimisticStatusUpdate = useCallback((
+    marketplace: string,
+    orderIds: (string | number)[],
+    newStatus: string
+  ) => {
+    const idSet = new Set(orderIds.map(id => String(id)));
+    queryClient.setQueriesData(
+      { queryKey: ['marketplace-orders', marketplace] },
+      (oldData: any) => {
+        if (!oldData?.data) return oldData;
+        return {
+          ...oldData,
+          data: oldData.data.map((order: any) =>
+            idSet.has(String(order.id))
+              ? { ...order, status: newStatus }
+              : order
+          ),
+        };
+      }
+    );
+  }, [queryClient]);
 
   const allOrders = store.getOrders(selectedMp);
 
@@ -126,8 +152,11 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
 
     try {
       await confirmOrders(selectedMp, ids);
+      // Optimistically move orders to assembly tab
+      optimisticStatusUpdate(selectedMp, ids, 'PACKING');
       setSelectedOrders(new Set());
-      store.refetchOrders(selectedMp);
+      // Delayed refetch to let marketplace API update
+      setTimeout(() => store.refetchOrders(selectedMp), 10000);
     } catch {}
   };
 
@@ -142,15 +171,21 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
         supplyName: wbSupplyName || undefined,
       });
       const successCount = result.results?.filter((r: any) => r.success).length || 0;
+      const successIds = result.results
+        ?.filter((r: any) => r.success)
+        ?.map((r: any) => r.orderId || r.id) || ids;
       if (result.supplyId) {
         toast.success(`Postavka ${result.supplyId} yaratildi. ${successCount}/${ids.length} buyurtma qo'shildi`);
       } else {
         toast.success(`${successCount}/${ids.length} buyurtma tasdiqlandi`);
       }
+      // Optimistically move confirmed orders to assembly tab
+      optimisticStatusUpdate('wildberries', successIds, 'PACKING');
       setWbSupplyDialogOpen(false);
       setWbSupplyName('');
       setSelectedOrders(new Set());
-      store.refetchOrders(selectedMp);
+      // Delayed refetch to let WB API update statuses
+      setTimeout(() => store.refetchOrders(selectedMp), 10000);
     } catch {}
   };
 
@@ -160,9 +195,10 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
     if (ids.length === 0) return;
     try {
       await cancelOrders(selectedMp, ids, cancelReason);
+      optimisticStatusUpdate(selectedMp, ids, 'CANCELLED');
       setCancelDialogOpen(false);
       setSelectedOrders(new Set());
-      store.refetchOrders(selectedMp);
+      setTimeout(() => store.refetchOrders(selectedMp), 10000);
     } catch {}
   };
 
