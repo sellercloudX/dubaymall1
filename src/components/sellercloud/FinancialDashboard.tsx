@@ -20,11 +20,8 @@ import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 interface FinancialDashboardProps {
   connectedMarketplaces: string[];
   store: MarketplaceDataStore;
-  monthlyFee?: number;
-  commissionPercent?: number;
 }
 
-const USD_TO_UZS = 12800;
 
 const MARKETPLACE_NAMES: Record<string, string> = {
   yandex: 'Yandex Market', uzum: 'Uzum Market', wildberries: 'WB', ozon: 'Ozon',
@@ -49,7 +46,7 @@ const MARKETPLACE_TAX: Record<string, number> = {
 };
 
 export function FinancialDashboard({ 
-  connectedMarketplaces, store, monthlyFee = 499, commissionPercent = 4
+  connectedMarketplaces, store
 }: FinancialDashboardProps) {
   const [datePreset, setDatePreset] = useState<DatePreset>('30d');
   const [dateFrom, setDateFrom] = useState<Date | undefined>(getPresetDates('30d').from);
@@ -131,8 +128,6 @@ export function FinancialDashboard({
 
     const totalRevenue = totalItemRevenue;
     const totalOrders = marketplaceBreakdown.reduce((s, m) => s + m.orders, 0);
-    const platformFee = monthlyFee * USD_TO_UZS;
-    const platformCommission = totalRevenue * (commissionPercent / 100);
     
     // Tax per marketplace
     let totalTax = 0;
@@ -143,14 +138,13 @@ export function FinancialDashboard({
 
     const totalExpenses = totalProductCost + totalMarketplaceFees + totalTax;
     const netProfit = totalRevenue - totalExpenses;
-    const sellerCloudTotal = platformFee + platformCommission;
     const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
     const costCoverage = totalProductCount > 0 ? Math.round((costPricesCovered / totalProductCount) * 100) : 0;
     const tariffCoverage = totalProductCount > 0 ? Math.round((realTariffCount / totalProductCount) * 100) : 0;
     const feePercent = totalRevenue > 0 ? ((totalMarketplaceFees / totalRevenue) * 100).toFixed(1) : '0';
 
-    return { totalRevenue, totalOrders, platformFee, platformCommission, sellerCloudTotal, totalMarketplaceFees, feePercent, totalTax, totalExpenses, netProfit, profitMargin, marketplaceBreakdown, totalProductCost, costCoverage, tariffCoverage, feesByMarketplace };
-  }, [activeMarketplaces, store.dataVersion, isLoading, monthlyFee, commissionPercent, getCostPrice, tariffUpdatedAt, dateFrom, dateTo, selectedMp]);
+    return { totalRevenue, totalOrders, totalMarketplaceFees, feePercent, totalTax, totalExpenses, netProfit, profitMargin, marketplaceBreakdown, totalProductCost, costCoverage, tariffCoverage, feesByMarketplace };
+  }, [activeMarketplaces, store.dataVersion, isLoading, getCostPrice, tariffUpdatedAt, dateFrom, dateTo, selectedMp]);
 
   const formatPrice = (price: number) => {
     if (Math.abs(price) >= 1000000) return (price / 1000000).toFixed(1) + ' mln';
@@ -314,17 +308,7 @@ export function FinancialDashboard({
               <div className="text-right shrink-0"><div className="font-bold text-sm whitespace-nowrap">{formatFullPrice(summary.totalTax)}</div></div>
             </div>
 
-            {/* Platform fees */}
-            <div className="flex items-center justify-between p-3 rounded-lg border border-dashed gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0"><Wallet className="h-4 w-4 text-primary" /></div>
-                <div className="min-w-0">
-                  <div className="font-medium text-sm truncate">SellerCloudX <Badge variant="outline" className="text-[10px] ml-1">PnL ga kirmaydi</Badge></div>
-                  <div className="text-xs text-muted-foreground">${monthlyFee}/oy + {commissionPercent}%</div>
-                </div>
-              </div>
-              <div className="text-right shrink-0"><div className="font-bold text-sm whitespace-nowrap text-muted-foreground">{formatFullPrice(summary.sellerCloudTotal)}</div></div>
-            </div>
+            {/* Platform info */}
 
             {/* Total */}
             <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border-2 border-primary/20 gap-2">

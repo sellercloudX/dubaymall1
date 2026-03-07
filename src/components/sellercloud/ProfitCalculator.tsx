@@ -7,11 +7,10 @@ import { Calculator, TrendingUp, TrendingDown, DollarSign, Percent, Truck, Loade
 import { supabase } from '@/integrations/supabase/client';
 
 interface ProfitCalculatorProps {
-  commissionPercent?: number;
   categoryId?: number;
 }
 
-export function ProfitCalculator({ commissionPercent = 4, categoryId }: ProfitCalculatorProps) {
+export function ProfitCalculator({ categoryId }: ProfitCalculatorProps) {
   const [sellingPrice, setSellingPrice] = useState(0);
   const [costPrice, setCostPrice] = useState(0);
   const [logistics, setLogistics] = useState(4000);
@@ -57,7 +56,7 @@ export function ProfitCalculator({ commissionPercent = 4, categoryId }: ProfitCa
   const autoCalculatePrice = () => {
     if (!costPrice || costPrice <= 0) return;
     const taxRate = 4;
-    const totalDeduction = (yandexCommissionPercent + taxRate + commissionPercent + targetMargin) / 100;
+    const totalDeduction = (yandexCommissionPercent + taxRate + targetMargin) / 100;
     if (totalDeduction >= 1) return;
     const calculated = (costPrice + logistics) / (1 - totalDeduction);
     setSellingPrice(Math.ceil(calculated / 100) * 100);
@@ -65,8 +64,7 @@ export function ProfitCalculator({ commissionPercent = 4, categoryId }: ProfitCa
 
   const yandexCommission = sellingPrice * (yandexCommissionPercent / 100);
   const tax = sellingPrice * 0.04;
-  const platformFee = sellingPrice * (commissionPercent / 100);
-  const totalExpenses = costPrice + yandexCommission + tax + platformFee + logistics;
+  const totalExpenses = costPrice + yandexCommission + tax + logistics;
   const netProfit = sellingPrice - totalExpenses;
   const profitMargin = sellingPrice > 0 ? (netProfit / sellingPrice) * 100 : 0;
   const roi = costPrice > 0 ? (netProfit / costPrice) * 100 : 0;
@@ -199,8 +197,7 @@ export function ProfitCalculator({ commissionPercent = 4, categoryId }: ProfitCa
             <div className="text-xs font-medium mb-2">Xarajatlar tarkibi</div>
             {[
               { label: 'Tovar tannarxi', value: costPrice, color: 'bg-orange-500' },
-              { label: `Yandex komissiya (${yandexCommissionPercent}%)`, value: yandexCommission, color: 'bg-yellow-500' },
-              { label: `SellerCloudX (${commissionPercent}%)`, value: platformFee, color: 'bg-blue-500' },
+              { label: `Marketplace komissiya (${yandexCommissionPercent}%)`, value: yandexCommission, color: 'bg-yellow-500' },
               { label: 'Soliq (4%)', value: tax, color: 'bg-purple-500' },
               { label: 'Logistika', value: logistics, color: 'bg-slate-500' },
             ].map(item => {

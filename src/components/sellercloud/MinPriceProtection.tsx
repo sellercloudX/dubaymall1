@@ -22,7 +22,6 @@ import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 interface MinPriceProtectionProps {
   connectedMarketplaces: string[];
   store: MarketplaceDataStore;
-  commissionPercent?: number;
 }
 
 interface ProtectedProduct {
@@ -37,7 +36,7 @@ const MARKETPLACE_NAMES: Record<string, string> = {
 };
 
 export function MinPriceProtection({
-  connectedMarketplaces, store, commissionPercent = 4
+  connectedMarketplaces, store
 }: MinPriceProtectionProps) {
   const [globalProtection, setGlobalProtection] = useState(true);
   const [defaultMargin, setDefaultMargin] = useState(10);

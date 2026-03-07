@@ -186,11 +186,11 @@ export default function SellerCloudMobile() {
       case 'orders':
         return <MobileOrders connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'abc-analysis':
-        return <div className="p-4"><ABCAnalysis connectedMarketplaces={connectedMarketplaces} store={store} commissionPercent={subscription?.commission_percent || 4} /></div>;
+        return <div className="p-4"><ABCAnalysis connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'cost-prices':
         return <div className="p-4"><CostPriceManager connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'min-price':
-        return <div className="p-4"><MinPriceProtection connectedMarketplaces={connectedMarketplaces} store={store} commissionPercent={subscription?.commission_percent || 4} /></div>;
+        return <div className="p-4"><MinPriceProtection connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'card-clone':
         return <div className="p-4"><CardCloner connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'uzum-card':
@@ -198,9 +198,9 @@ export default function SellerCloudMobile() {
       case 'problems':
         return <div className="p-4"><ProblematicProducts connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'financials':
-        return <div className="p-4"><FinancialDashboard connectedMarketplaces={connectedMarketplaces} store={store} monthlyFee={subscription?.monthly_fee || 499} commissionPercent={subscription?.commission_percent || 4} /></div>;
+        return <div className="p-4"><FinancialDashboard connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'calculator':
-        return <div className="p-4"><ProfitCalculator commissionPercent={subscription?.commission_percent || 4} /></div>;
+        return <div className="p-4"><ProfitCalculator /></div>;
       case 'inventory':
         return <div className="p-4"><InventorySync connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'pricing':

@@ -304,7 +304,7 @@ export function SellerCloudManagement() {
                         </TableCell>
                         <TableCell>
                           <div className="text-sm font-medium">${sub.monthly_fee}/oy</div>
-                          <div className="text-xs text-muted-foreground">+ {sub.commission_percent}% savdo</div>
+                          <div className="text-xs text-muted-foreground">Balans modeli</div>
                         </TableCell>
                         <TableCell>
                           {sub.activated_until ? (
@@ -636,7 +636,7 @@ export function SellerCloudManagement() {
             {activatingSub && (
               <div className="bg-muted p-3 rounded-lg text-sm space-y-1">
                 <p>Tarif: <strong>{activatingSub.plan_type === 'pro' ? 'Pro' : 'Individual'}</strong></p>
-                <p>To'lov: <strong>${activatingSub.monthly_fee}/oy + {activatingSub.commission_percent}%</strong></p>
+                <p>To'lov: <strong>${activatingSub.monthly_fee}/oy</strong></p>
               </div>
             )}
             <div className="grid grid-cols-2 gap-3">

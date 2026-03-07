@@ -165,7 +165,7 @@ export function PartnersDetails() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Tarif</p>
-                    <p className="font-medium">{selectedPartner.plan_type} (${selectedPartner.monthly_fee}/oy + {selectedPartner.commission_percent}%)</p>
+                    <p className="font-medium">{selectedPartner.plan_type} (${selectedPartner.monthly_fee}/oy)</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Boshlangan</p>
