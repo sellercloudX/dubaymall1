@@ -1784,6 +1784,7 @@ serve(async (req) => {
         // GET /v2/fbs/orders
         try {
           let allOrders: any[] = [];
+          const orderIdsSeen = new Set<string>();
           let page = 0;
           let hasMore = true;
           const pageSize = 50; // Uzum max 50 per page
