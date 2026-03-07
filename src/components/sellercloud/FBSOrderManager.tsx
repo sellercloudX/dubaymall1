@@ -31,11 +31,11 @@ interface FBSOrderManagerProps {
 // Unified FBS status tabs mapping marketplace-specific statuses
 const FBS_TABS = [
   { key: 'new', label: 'Yangilar', icon: Package,
-    statuses: ['CREATED', 'NEW', 'new', 'PROCESSING', 'STARTED'] },
+    statuses: ['CREATED', 'NEW', 'new', 'STARTED'] },
   { key: 'assembly', label: "Yig'ishdagi", icon: ClipboardList,
-    statuses: ['PACKING', 'CONFIRM', 'confirm', 'SORTED', 'sorted', 'READY_TO_SHIP', 'SHIP'] },
+    statuses: ['PROCESSING', 'PACKING', 'CONFIRM', 'confirm', 'SORTED', 'sorted', 'READY_TO_SHIP', 'SHIP'] },
   { key: 'shipping', label: 'Yetkazishda', icon: Truck,
-    statuses: ['PENDING_DELIVERY', 'DELIVERY', 'DELIVERING', 'COMPLETE', 'complete', 'SHIPPED'] },
+    statuses: ['PENDING_DELIVERY', 'DELIVERY', 'DELIVERING', 'COMPLETE', 'complete', 'SHIPPED', 'PICKUP'] },
   { key: 'delivered', label: 'Topshirilgan', icon: CheckCircle,
     statuses: ['DELIVERED', 'COMPLETED', 'RECEIVE', 'receive', 'ACCEPTED_AT_DP', 'DELIVERED_TO_CUSTOMER_DELIVERY_POINT'] },
   { key: 'cancelled', label: 'Bekor', icon: XCircle,
