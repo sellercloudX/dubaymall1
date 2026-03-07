@@ -1108,7 +1108,7 @@ serve(async (req) => {
     // ═══ BILLING CHECK (skip if called from scanner — scanner handles billing) ═══
     const skipBilling = !!body?.skipBilling;
     const billingUserId = action === 'scanner-generate' ? user.id : (partnerId || user.id);
-    const billingFeatureKey = action === 'scanner-generate' ? 'ai-scanner-images' : 'ai-image-generate';
+    const billingFeatureKey = 'ai-image-generate';
     let imgUnitPrice = 0;
     let accessCheck: any = null;
     
