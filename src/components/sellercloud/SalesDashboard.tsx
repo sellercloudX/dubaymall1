@@ -137,7 +137,7 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
     }
 
     return result;
-  }, [mpList, store.dataVersion, getCostPrice]);
+  }, [mpList, store.dataVersion, getCostPrice, tariffUpdatedAt]);
 
   // Filter by date range
   const dateFiltered = useMemo(() => {
