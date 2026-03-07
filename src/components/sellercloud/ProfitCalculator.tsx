@@ -197,8 +197,7 @@ export function ProfitCalculator({ categoryId }: ProfitCalculatorProps) {
             <div className="text-xs font-medium mb-2">Xarajatlar tarkibi</div>
             {[
               { label: 'Tovar tannarxi', value: costPrice, color: 'bg-orange-500' },
-              { label: `Yandex komissiya (${yandexCommissionPercent}%)`, value: yandexCommission, color: 'bg-yellow-500' },
-              { label: `SellerCloudX (${commissionPercent}%)`, value: platformFee, color: 'bg-blue-500' },
+              { label: `Marketplace komissiya (${yandexCommissionPercent}%)`, value: yandexCommission, color: 'bg-yellow-500' },
               { label: 'Soliq (4%)', value: tax, color: 'bg-purple-500' },
               { label: 'Logistika', value: logistics, color: 'bg-slate-500' },
             ].map(item => {
