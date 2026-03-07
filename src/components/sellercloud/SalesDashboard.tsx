@@ -368,7 +368,8 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
                               {product?.name || firstItem?.offerName || firstItem?.offerId || `#${e.order.id}`}
                             </div>
                             <div className="text-[10px] text-muted-foreground">
-                              {format(new Date(e.order.createdAt), 'dd.MM.yy HH:mm')}
+                              <span className="font-mono text-primary/70">#{String(e.order.id).slice(-8)}</span>
+                              {' · '}{format(new Date(e.order.createdAt), 'dd.MM.yy HH:mm')}
                               {e.order.items && e.order.items.length > 1 && ` · ${e.order.items.length} ta`}
                             </div>
                           </div>
