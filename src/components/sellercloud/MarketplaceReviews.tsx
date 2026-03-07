@@ -6,7 +6,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Star, MessageCircle, HelpCircle, Send, CheckCircle2, Clock, RefreshCw } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Star, MessageCircle, HelpCircle, Send, CheckCircle2, Clock, RefreshCw, Sparkles, Loader2, Settings2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { MarketplaceLogo, MARKETPLACE_SHORT_NAMES } from '@/lib/marketplaceConfig';
@@ -46,6 +48,14 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
   const [sendingAnswer, setSendingAnswer] = useState(false);
   const [selectedMp, setSelectedMp] = useState<string>('');
 
+  // AI Auto-Reply settings
+  const [aiEnabled, setAiEnabled] = useState(false);
+  const [aiLanguage, setAiLanguage] = useState<'uz' | 'ru'>('uz');
+  const [aiTone, setAiTone] = useState<'friendly' | 'formal' | 'brief'>('friendly');
+  const [aiGenerating, setAiGenerating] = useState<string | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [ratingFilter, setRatingFilter] = useState<number | null>(null);
+
   const supportedMps = connectedMarketplaces.filter(mp => SUPPORTED_REVIEW_MARKETPLACES.includes(mp));
 
   useEffect(() => {
@@ -59,11 +69,9 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
     setIsLoading(true);
     try {
       let dataType: string = reviewType;
-      // Yandex: 'reviews' for feedbacks, 'questions' for questions
       if (selectedMp === 'yandex') {
         dataType = reviewType === 'questions' ? 'questions' : 'reviews';
       }
-      // Uzum: always 'reviews'
       if (selectedMp === 'uzum') {
         dataType = 'reviews';
       }
@@ -74,26 +82,20 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
         take: 100,
       };
 
-      // WB API supports isAnswered natively
       if (selectedMp === 'wildberries') {
         body.isAnswered = showAnswered;
       }
 
-      console.log('Fetching reviews:', body);
-
       const { data, error } = await supabase.functions.invoke('fetch-marketplace-data', { body });
       if (error) throw error;
       if (data?.success === false) {
-        console.warn('Reviews fetch returned error:', data.error);
         toast.error(data.error || 'Sharhlarni yuklashda xato');
         setItems([]);
       } else {
         let results: ReviewItem[] = data?.data || [];
-        // Yandex/Uzum: filter isAnswered client-side since API doesn't support it
         if (selectedMp !== 'wildberries') {
           results = results.filter(item => item.isAnswered === showAnswered);
         }
-        console.log(`Reviews loaded: ${results.length} items (showAnswered=${showAnswered})`);
         setItems(results);
       }
     } catch (e: any) {
@@ -108,6 +110,11 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
     fetchReviews();
   }, [fetchReviews]);
 
+  // Filtered items by rating
+  const filteredItems = ratingFilter
+    ? items.filter(item => item.rating === ratingFilter)
+    : items;
+
   const handleAnswer = async (itemId: string) => {
     if (!answerText.trim()) return;
     setSendingAnswer(true);
@@ -118,7 +125,6 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
         text: answerText,
         feedbackId: itemId,
       };
-      // WB/Yandex questions use different endpoint
       if (reviewType === 'questions') {
         body.dataType = 'answer-question';
         body.questionId = itemId;
@@ -137,6 +143,80 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
     } finally {
       setSendingAnswer(false);
     }
+  };
+
+  // AI Generate Reply
+  const handleAIReply = async (item: ReviewItem) => {
+    setAiGenerating(item.id);
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-review-reply', {
+        body: {
+          reviewText: item.text,
+          productName: item.productName || item.supplierArticle || '',
+          rating: item.rating,
+          userName: item.userName,
+          language: aiLanguage,
+          tone: aiTone,
+          marketplace: selectedMp,
+        },
+      });
+
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'AI xato');
+
+      setAnsweringId(item.id);
+      setAnswerText(data.reply);
+      toast.success('AI javob tayyorladi — tekshirib yuboring');
+    } catch (e: any) {
+      console.error('AI reply error:', e);
+      toast.error(`AI javob yaratishda xato: ${e.message}`);
+    } finally {
+      setAiGenerating(null);
+    }
+  };
+
+  // Auto-reply all unanswered
+  const handleAutoReplyAll = async () => {
+    const unanswered = filteredItems.filter(i => !i.isAnswered);
+    if (unanswered.length === 0) return toast.info('Javob kutayotgan sharhlar yo\'q');
+    
+    toast.info(`${unanswered.length} ta sharhga AI javob tayyorlanmoqda...`);
+    let successCount = 0;
+
+    for (const item of unanswered) {
+      try {
+        const { data, error } = await supabase.functions.invoke('ai-review-reply', {
+          body: {
+            reviewText: item.text,
+            productName: item.productName || item.supplierArticle || '',
+            rating: item.rating,
+            userName: item.userName,
+            language: aiLanguage,
+            tone: aiTone,
+            marketplace: selectedMp,
+          },
+        });
+
+        if (error || !data?.success) continue;
+
+        // Auto-send
+        const body: any = {
+          marketplace: selectedMp,
+          dataType: reviewType === 'questions' ? 'answer-question' : 'answer-feedback',
+          text: data.reply,
+          ...(reviewType === 'questions' ? { questionId: item.id } : { feedbackId: item.id }),
+        };
+
+        const { error: sendError } = await supabase.functions.invoke('fetch-marketplace-data', { body });
+        if (!sendError) successCount++;
+
+        // Rate limit
+        await new Promise(r => setTimeout(r, 500));
+      } catch {}
+    }
+
+    toast.success(`${successCount}/${unanswered.length} ta sharhga javob yuborildi`);
+    fetchReviews();
   };
 
   const renderStars = (rating: number) => (
@@ -168,12 +248,64 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
           onSelect={setSelectedMp}
           showAll={false}
         />
-        <Button size="sm" variant="ghost" onClick={fetchReviews} disabled={isLoading} className="ml-auto h-7 md:h-9">
-          <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
-        </Button>
+        <div className="ml-auto flex items-center gap-2">
+          <Button size="sm" variant="ghost" onClick={() => setShowSettings(s => !s)} className="h-7 gap-1">
+            <Settings2 className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline text-xs">AI sozlama</span>
+          </Button>
+          <Button size="sm" variant="ghost" onClick={fetchReviews} disabled={isLoading} className="h-7">
+            <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
+          </Button>
+        </div>
       </div>
 
-      {/* Type tabs (WB and Yandex have separate feedbacks/questions) */}
+      {/* AI Settings Panel */}
+      {showSettings && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="p-3 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">AI Auto-Javob</span>
+              </div>
+              <Switch checked={aiEnabled} onCheckedChange={setAiEnabled} />
+            </div>
+            {aiEnabled && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[11px] text-muted-foreground font-medium">Til</label>
+                  <Select value={aiLanguage} onValueChange={v => setAiLanguage(v as any)}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="uz">🇺🇿 O'zbek</SelectItem>
+                      <SelectItem value="ru">🇷🇺 Русский</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] text-muted-foreground font-medium">Ohang</label>
+                  <Select value={aiTone} onValueChange={v => setAiTone(v as any)}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="friendly">😊 Do'stona</SelectItem>
+                      <SelectItem value="formal">🏢 Rasmiy</SelectItem>
+                      <SelectItem value="brief">⚡ Qisqa</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="col-span-2">
+                  <Button size="sm" onClick={handleAutoReplyAll} className="w-full gap-1.5" variant="default">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Barchasiga AI javob yuborish
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Type tabs */}
       {MARKETPLACES_WITH_QUESTIONS.includes(selectedMp) && (
         <Tabs value={reviewType} onValueChange={v => setReviewType(v as ReviewType)}>
           <TabsList className="grid w-full grid-cols-2">
@@ -187,15 +319,23 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
         </Tabs>
       )}
 
-      {/* Filter */}
-      <div className="flex gap-2">
-        <Button size="sm" variant={!showAnswered ? 'default' : 'outline'} onClick={() => setShowAnswered(false)}>
+      {/* Filter row: answered + rating */}
+      <div className="flex gap-2 flex-wrap">
+        <Button size="sm" variant={!showAnswered ? 'default' : 'outline'} onClick={() => setShowAnswered(false)} className="h-7 text-xs">
           <Clock className="h-3.5 w-3.5 mr-1" />Javobsiz
         </Button>
-        <Button size="sm" variant={showAnswered ? 'default' : 'outline'} onClick={() => setShowAnswered(true)}>
+        <Button size="sm" variant={showAnswered ? 'default' : 'outline'} onClick={() => setShowAnswered(true)} className="h-7 text-xs">
           <CheckCircle2 className="h-3.5 w-3.5 mr-1" />Javob berilgan
         </Button>
-        <Badge variant="secondary" className="ml-auto">{items.length} ta</Badge>
+        <div className="ml-auto flex items-center gap-1">
+          {[null, 5, 4, 3, 2, 1].map(r => (
+            <Button key={String(r)} size="sm" variant={ratingFilter === r ? 'default' : 'ghost'} className="h-7 px-2 text-xs"
+              onClick={() => setRatingFilter(r)}>
+              {r === null ? 'Hammasi' : <>{r} <Star className="h-3 w-3 fill-amber-400 text-amber-400 ml-0.5" /></>}
+            </Button>
+          ))}
+        </div>
+        <Badge variant="secondary" className="ml-1">{filteredItems.length} ta</Badge>
       </div>
 
       {/* List */}
@@ -203,7 +343,7 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
         <div className="space-y-3">
           {[1, 2, 3].map(i => <Skeleton key={i} className="h-28 w-full rounded-lg" />)}
         </div>
-      ) : items.length === 0 ? (
+      ) : filteredItems.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground">
             {showAnswered ? 'Javob berilgan sharhlar yo\'q' : 'Javob kutayotgan sharhlar yo\'q 🎉'}
@@ -211,7 +351,7 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
         </Card>
       ) : (
         <div className="space-y-3">
-          {items.map(item => (
+          {filteredItems.map(item => (
             <Card key={item.id} className="overflow-hidden">
               <CardContent className="p-3 space-y-2">
                 {/* Header */}
@@ -248,7 +388,7 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
                   </div>
                 )}
 
-                {/* Answer form — enabled for ALL marketplaces */}
+                {/* Answer form */}
                 {!item.isAnswered && (
                   <>
                     {answeringId === item.id ? (
@@ -269,9 +409,20 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
                         </div>
                       </div>
                     ) : (
-                      <Button size="sm" variant="outline" onClick={() => setAnsweringId(item.id)}>
-                        <MessageCircle className="h-3.5 w-3.5 mr-1" />Javob berish
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" onClick={() => setAnsweringId(item.id)}>
+                          <MessageCircle className="h-3.5 w-3.5 mr-1" />Javob berish
+                        </Button>
+                        {aiEnabled && (
+                          <Button size="sm" variant="secondary" onClick={() => handleAIReply(item)}
+                            disabled={aiGenerating === item.id}>
+                            {aiGenerating === item.id
+                              ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                              : <Sparkles className="h-3.5 w-3.5 mr-1" />}
+                            AI javob
+                          </Button>
+                        )}
+                      </div>
                     )}
                   </>
                 )}
