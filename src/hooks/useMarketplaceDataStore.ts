@@ -136,7 +136,7 @@ export function useMarketplaceDataStore(connectedMarketplaces: string[]) {
     // Fetch orders for each marketplace
     const orderQueries = useQueries({
       queries: connectedMarketplaces.map(mp => ({
-        queryKey: ['marketplace-orders', mp, 'v5-fresh'],
+        queryKey: ['marketplace-orders', mp, 'v6-nodate'],
         queryFn: async () => {
           // Pass 90-day date range to avoid fetching ALL historical orders
           const fromDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
