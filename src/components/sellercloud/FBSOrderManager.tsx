@@ -10,9 +10,10 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import {
   Package, CheckCircle, XCircle, Printer, Truck, RefreshCw, Loader2,
-  ClipboardList, MapPin, AlertTriangle,
+  ClipboardList, MapPin, AlertTriangle, Archive, Send, Info,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -26,16 +27,38 @@ interface FBSOrderManagerProps {
   store: MarketplaceDataStore;
 }
 
-// FBS Status tabs per marketplace
+// Unified FBS status tabs mapping marketplace-specific statuses
 const FBS_TABS = [
-  { key: 'new', label: 'Yangilar', statuses: ['CREATED', 'new', 'PROCESSING'], icon: Package },
-  { key: 'assembly', label: "Yig'ishdagi", statuses: ['PACKING', 'confirm', 'READY_TO_SHIP'], icon: ClipboardList },
-  { key: 'shipping', label: 'Yetkazishda', statuses: ['PENDING_DELIVERY', 'DELIVERY', 'DELIVERING', 'complete'], icon: Truck },
-  { key: 'delivered', label: 'Topshirilgan', statuses: ['DELIVERED', 'COMPLETED', 'ACCEPTED_AT_DP', 'DELIVERED_TO_CUSTOMER_DELIVERY_POINT'], icon: CheckCircle },
-  { key: 'cancelled', label: 'Bekor', statuses: ['CANCELLED', 'CANCELED', 'RETURNED', 'cancel'], icon: XCircle },
+  { key: 'new', label: 'Yangilar', icon: Package,
+    statuses: ['CREATED', 'new', 'PROCESSING', 'STARTED'] },
+  { key: 'assembly', label: "Yig'ishdagi", icon: ClipboardList,
+    statuses: ['PACKING', 'confirm', 'READY_TO_SHIP', 'SHIP'] },
+  { key: 'shipping', label: 'Yetkazishda', icon: Truck,
+    statuses: ['PENDING_DELIVERY', 'DELIVERY', 'DELIVERING', 'complete', 'SHIPPED'] },
+  { key: 'delivered', label: 'Topshirilgan', icon: CheckCircle,
+    statuses: ['DELIVERED', 'COMPLETED', 'ACCEPTED_AT_DP', 'DELIVERED_TO_CUSTOMER_DELIVERY_POINT'] },
+  { key: 'cancelled', label: 'Bekor', icon: XCircle,
+    statuses: ['CANCELLED', 'CANCELED', 'RETURNED', 'cancel', 'REJECTED'] },
 ];
 
 const normalizeOfferKey = (v?: string) => String(v || '').trim().toLowerCase();
+
+// Cancel reasons per marketplace
+const CANCEL_REASONS: Record<string, { value: string; label: string }[]> = {
+  uzum: [
+    { value: 'SELLER_CANCEL', label: 'Sotuvchi bekor qildi' },
+    { value: 'OUT_OF_STOCK', label: 'Tovar tugadi' },
+    { value: 'WRONG_PRICE', label: 'Narx xato' },
+  ],
+  wildberries: [
+    { value: 'cancel', label: 'Bekor qilish' },
+  ],
+  yandex: [
+    { value: 'SHOP_FAILED', label: 'Do\'kon tomonidan' },
+    { value: 'REPLACING_ORDER', label: 'Buyurtma almashtirildi' },
+    { value: 'PROCESSING_EXPIRED', label: 'Muddati o\'tdi' },
+  ],
+};
 
 export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManagerProps) {
   const [selectedMp, setSelectedMp] = useState(connectedMarketplaces[0] || '');
@@ -48,15 +71,18 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
   const [timeSlots, setTimeSlots] = useState<any[]>([]);
   const [selectedPoint, setSelectedPoint] = useState<string>('');
   const [selectedSlot, setSelectedSlot] = useState<string>('');
+  // WB supply dialog
+  const [wbSupplyDialogOpen, setWbSupplyDialogOpen] = useState(false);
+  const [wbSupplyName, setWbSupplyName] = useState('');
 
   const {
     isLoading, actionInProgress, confirmOrders, cancelOrders, getLabels,
     getDropOffPoints, getTimeSlots, createInvoice, setDropOff,
+    getSupplies, addToSupply, executeAction,
   } = useOrderManagement();
 
   const allOrders = store.getOrders(selectedMp);
 
-  // Group orders by FBS tab
   const ordersByTab = useMemo(() => {
     const map: Record<string, MarketplaceOrder[]> = {};
     for (const tab of FBS_TABS) {
@@ -87,9 +113,17 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
 
   const getSelectedIds = () => Array.from(selectedOrders);
 
+  // ===== CONFIRM =====
   const handleConfirm = async () => {
     const ids = getSelectedIds();
     if (ids.length === 0) return toast.warning("Buyurtma tanlang");
+
+    if (selectedMp === 'wildberries') {
+      // WB: show supply dialog — confirm = create supply + add orders
+      setWbSupplyDialogOpen(true);
+      return;
+    }
+
     try {
       await confirmOrders(selectedMp, ids);
       setSelectedOrders(new Set());
@@ -97,6 +131,30 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
     } catch {}
   };
 
+  // WB confirm via supply creation
+  const handleWbConfirmWithSupply = async () => {
+    const ids = getSelectedIds();
+    try {
+      const result = await executeAction({
+        marketplace: 'wildberries',
+        action: 'confirm',
+        orderIds: ids,
+        supplyName: wbSupplyName || undefined,
+      });
+      const successCount = result.results?.filter((r: any) => r.success).length || 0;
+      if (result.supplyId) {
+        toast.success(`Postavka ${result.supplyId} yaratildi. ${successCount}/${ids.length} buyurtma qo'shildi`);
+      } else {
+        toast.success(`${successCount}/${ids.length} buyurtma tasdiqlandi`);
+      }
+      setWbSupplyDialogOpen(false);
+      setWbSupplyName('');
+      setSelectedOrders(new Set());
+      store.refetchOrders(selectedMp);
+    } catch {}
+  };
+
+  // ===== CANCEL =====
   const handleCancel = async () => {
     const ids = getSelectedIds();
     if (ids.length === 0) return;
@@ -108,13 +166,23 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
     } catch {}
   };
 
+  // ===== LABELS =====
   const handlePrintLabels = async () => {
     const ids = getSelectedIds();
     if (ids.length === 0) return toast.warning("Buyurtma tanlang");
+
+    if (selectedMp === 'wildberries' && activeTab === 'new') {
+      return toast.warning("WB stikerlarini olish uchun avval buyurtmalarni tasdiqlang (postavkaga qo'shing)");
+    }
+
     try {
       const result = await getLabels(selectedMp, ids);
+      
       if (selectedMp === 'wildberries' && result?.stickers) {
-        // WB returns base64 PNG stickers
+        if (result.stickers.length === 0) {
+          toast.warning("Stikerlar topilmadi. Buyurtmalar yig'ish holatida ekanligini tekshiring.");
+          return;
+        }
         result.stickers.forEach((s: any) => {
           if (s.file) {
             const link = document.createElement('a');
@@ -124,12 +192,25 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
           }
         });
         toast.success(`${result.stickers.length} ta stiker yuklandi`);
+      } else if (result?.labels) {
+        // Multiple PDFs as base64
+        result.labels.forEach((l: any) => {
+          if (l.pdf && l.success) {
+            const link = document.createElement('a');
+            link.href = `data:application/pdf;base64,${l.pdf}`;
+            link.download = `label_${l.orderId}.pdf`;
+            link.click();
+          }
+        });
+        const successCount = result.labels.filter((l: any) => l.success).length;
+        toast.success(`${successCount} ta etiketka yuklandi`);
       } else {
         toast.success("Etiketka tayyor");
       }
     } catch {}
   };
 
+  // ===== DROP-OFF (Uzum only) =====
   const handleDropOff = async () => {
     const ids = getSelectedIds();
     if (ids.length === 0) return toast.warning("Buyurtma tanlang");
@@ -151,7 +232,6 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
   const handleSubmitDropOff = async () => {
     if (!selectedPoint || !selectedSlot) return toast.warning("Punkt va vaqtni tanlang");
     try {
-      // First create invoice, then set drop-off
       const invoiceResult = await createInvoice(getSelectedIds());
       const invId = invoiceResult.data?.invoiceId || invoiceResult.data?.id;
       if (invId) {
@@ -160,6 +240,15 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
       }
       setDropOffDialogOpen(false);
       setSelectedOrders(new Set());
+      store.refetchOrders(selectedMp);
+    } catch {}
+  };
+
+  // ===== WB DELIVER SUPPLY =====
+  const handleDeliverSupply = async (supplyId: string) => {
+    try {
+      await executeAction({ marketplace: 'wildberries', action: 'deliver-supply', supplyId });
+      toast.success("Postavka yetkazishga topshirildi");
       store.refetchOrders(selectedMp);
     } catch {}
   };
@@ -176,10 +265,18 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
 
   const getStatusColor = (status: string) => {
     const s = status?.toUpperCase();
-    if (['CANCELLED', 'CANCELED', 'RETURNED'].includes(s)) return 'destructive';
+    if (['CANCELLED', 'CANCELED', 'RETURNED', 'CANCEL', 'REJECTED'].includes(s)) return 'destructive';
     if (['DELIVERED', 'COMPLETED'].includes(s)) return 'default';
-    if (['PACKING', 'PROCESSING', 'READY_TO_SHIP'].includes(s)) return 'secondary';
+    if (['PACKING', 'PROCESSING', 'READY_TO_SHIP', 'CONFIRM'].includes(s)) return 'secondary';
+    if (['COMPLETE', 'DELIVERY', 'SHIPPED', 'DELIVERING'].includes(s)) return 'outline';
     return 'outline';
+  };
+
+  // Marketplace-specific action hints
+  const getConfirmLabel = () => {
+    if (selectedMp === 'wildberries') return 'Postavkaga qo\'shish';
+    if (selectedMp === 'yandex') return 'Qabul qilish';
+    return 'Tasdiqlash';
   };
 
   if (connectedMarketplaces.length === 0) {
@@ -210,6 +307,17 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
         </Button>
       </div>
 
+      {/* Marketplace-specific info banner */}
+      {selectedMp === 'wildberries' && activeTab === 'new' && (
+        <div className="flex items-start gap-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-sm">
+          <Info className="h-4 w-4 mt-0.5 text-blue-600 shrink-0" />
+          <div className="text-blue-800 dark:text-blue-200">
+            <strong>WB FBS:</strong> Buyurtmalarni tasdiqlash uchun ularni <strong>postavka</strong>ga qo'shing. 
+            Stikerlar faqat yig'ishdagi buyurtmalar uchun mavjud.
+          </div>
+        </div>
+      )}
+
       {/* FBS Status Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setSelectedOrders(new Set()); }}>
         <TabsList className="w-full justify-start overflow-x-auto">
@@ -230,7 +338,7 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
           <TabsContent key={tab.key} value={tab.key}>
             <Card>
               <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between flex-wrap gap-2">
                   <CardTitle className="text-base flex items-center gap-2">
                     {tab.label}
                     <Badge variant="outline">{currentOrders.length} ta</Badge>
@@ -238,27 +346,37 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
 
                   {/* Action buttons */}
                   {selectedOrders.size > 0 && (
-                    <div className="flex gap-2">
-                      {(activeTab === 'new') && (
+                    <div className="flex flex-wrap gap-2">
+                      {activeTab === 'new' && (
                         <Button size="sm" onClick={handleConfirm} disabled={isLoading}>
-                          {actionInProgress === 'confirm' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <CheckCircle className="h-4 w-4 mr-1" />}
-                          Tasdiqlash ({selectedOrders.size})
+                          {actionInProgress === 'confirm' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : 
+                           selectedMp === 'wildberries' ? <Archive className="h-4 w-4 mr-1" /> : <CheckCircle className="h-4 w-4 mr-1" />}
+                          {getConfirmLabel()} ({selectedOrders.size})
                         </Button>
                       )}
-                      {(activeTab === 'assembly' && selectedMp === 'uzum') && (
+
+                      {/* Labels - for assembly tab always, for new tab only non-WB */}
+                      {(activeTab === 'assembly' || (activeTab === 'new' && selectedMp !== 'wildberries')) && (
+                        <Button size="sm" variant="outline" onClick={handlePrintLabels} disabled={isLoading}>
+                          {actionInProgress === 'labels' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Printer className="h-4 w-4 mr-1" />}
+                          {selectedMp === 'wildberries' ? 'Stiker' : 'Etiketka'}
+                        </Button>
+                      )}
+
+                      {/* Uzum drop-off */}
+                      {activeTab === 'assembly' && selectedMp === 'uzum' && (
                         <Button size="sm" variant="outline" onClick={handleDropOff} disabled={isLoading}>
                           <MapPin className="h-4 w-4 mr-1" />
                           Topshirish punkti
                         </Button>
                       )}
+
+                      {/* Cancel */}
                       {(activeTab === 'new' || activeTab === 'assembly') && (
-                        <Button size="sm" variant="outline" onClick={handlePrintLabels} disabled={isLoading}>
-                          {actionInProgress === 'labels' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Printer className="h-4 w-4 mr-1" />}
-                          Etiketka
-                        </Button>
-                      )}
-                      {(activeTab === 'new' || activeTab === 'assembly') && (
-                        <Button size="sm" variant="destructive" onClick={() => setCancelDialogOpen(true)} disabled={isLoading}>
+                        <Button size="sm" variant="destructive" onClick={() => {
+                          setCancelReason(CANCEL_REASONS[selectedMp]?.[0]?.value || 'SELLER_CANCEL');
+                          setCancelDialogOpen(true);
+                        }} disabled={isLoading}>
                           <XCircle className="h-4 w-4 mr-1" />
                           Bekor ({selectedOrders.size})
                         </Button>
@@ -301,7 +419,7 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
                           className={`flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-muted/50 transition-colors ${selectedOrders.has(order.id) ? 'bg-primary/5' : ''}`}
                         >
                           <Checkbox checked={selectedOrders.has(order.id)} onCheckedChange={() => toggleSelect(order.id)} />
-                          <span className="w-24 font-mono text-sm">{order.id}</span>
+                          <span className="w-24 font-mono text-sm truncate">{order.id}</span>
                           <div className="flex-1 flex items-center gap-2 min-w-0">
                             <div className="w-8 h-8 rounded bg-muted flex items-center justify-center overflow-hidden shrink-0">
                               {imgUrl ? <img src={imgUrl} alt="" className="w-full h-full object-cover" onError={e => e.currentTarget.style.display = 'none'} />
@@ -342,7 +460,7 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
         ))}
       </Tabs>
 
-      {/* Cancel Dialog */}
+      {/* ===== Cancel Dialog ===== */}
       <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -357,10 +475,9 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
           <Select value={cancelReason} onValueChange={setCancelReason}>
             <SelectTrigger><SelectValue placeholder="Sabab" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="SELLER_CANCEL">Sotuvchi bekor qildi</SelectItem>
-              <SelectItem value="OUT_OF_STOCK">Tovar tugadi</SelectItem>
-              <SelectItem value="WRONG_PRICE">Narx xato</SelectItem>
-              <SelectItem value="OTHER">Boshqa sabab</SelectItem>
+              {(CANCEL_REASONS[selectedMp] || CANCEL_REASONS.uzum).map(r => (
+                <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <DialogFooter>
@@ -373,7 +490,42 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
         </DialogContent>
       </Dialog>
 
-      {/* Drop-off Point Dialog (Uzum) */}
+      {/* ===== WB Supply Confirm Dialog ===== */}
+      <Dialog open={wbSupplyDialogOpen} onOpenChange={setWbSupplyDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Archive className="h-5 w-5 text-primary" />
+              Postavka yaratish va buyurtmalarni qo'shish
+            </DialogTitle>
+            <DialogDescription>
+              {selectedOrders.size} ta buyurtma yangi postavkaga qo'shiladi va "Yig'ishda" holatiga o'tadi.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium">Postavka nomi (ixtiyoriy)</label>
+              <Input
+                placeholder={`SC-${new Date().toISOString().slice(0, 10)}`}
+                value={wbSupplyName}
+                onChange={e => setWbSupplyName(e.target.value)}
+              />
+            </div>
+            <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+              ℹ️ Postavka yaratilgandan so'ng, stikerlarni yuklab olishingiz mumkin bo'ladi.
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setWbSupplyDialogOpen(false)}>Bekor</Button>
+            <Button onClick={handleWbConfirmWithSupply} disabled={isLoading}>
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Send className="h-4 w-4 mr-1" />}
+              Postavka yaratish
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ===== Drop-off Point Dialog (Uzum) ===== */}
       <Dialog open={dropOffDialogOpen} onOpenChange={setDropOffDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
