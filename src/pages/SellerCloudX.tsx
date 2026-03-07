@@ -27,6 +27,7 @@ import { SellerCloudSidebar, sellerMenuItems } from '@/components/sellercloud/Se
 const MarketplaceOAuth = lazy(() => import('@/components/sellercloud/MarketplaceOAuth').then(m => ({ default: m.MarketplaceOAuth })));
 const MarketplaceProducts = lazy(() => import('@/components/sellercloud/MarketplaceProducts').then(m => ({ default: m.MarketplaceProducts })));
 const MarketplaceOrders = lazy(() => import('@/components/sellercloud/MarketplaceOrders').then(m => ({ default: m.MarketplaceOrders })));
+const FBSOrderManager = lazy(() => import('@/components/sellercloud/FBSOrderManager').then(m => ({ default: m.FBSOrderManager })));
 const MarketplaceAnalytics = lazy(() => import('@/components/sellercloud/MarketplaceAnalytics').then(m => ({ default: m.MarketplaceAnalytics })));
 const InventorySync = lazy(() => import('@/components/sellercloud/InventorySync').then(m => ({ default: m.InventorySync })));
 const PriceManager = lazy(() => import('@/components/sellercloud/PriceManager').then(m => ({ default: m.PriceManager })));
@@ -212,6 +213,8 @@ export default function SellerCloudX() {
       case 'products':
         return <MarketplaceProducts connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'orders':
+        return <FBSOrderManager connectedMarketplaces={connectedMarketplaces} store={store} />;
+      case 'orders-old':
         return <MarketplaceOrders connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'analytics':
         return <MarketplaceAnalytics connectedMarketplaces={connectedMarketplaces} store={store} />;
