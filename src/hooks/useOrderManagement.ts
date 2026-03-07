@@ -51,15 +51,6 @@ export function useOrderManagement() {
   }, [executeAction]);
 
   const getLabels = useCallback(async (marketplace: string, orderIds: (string | number)[]) => {
-    if (marketplace === 'uzum' && orderIds.length === 1) {
-      // Direct PDF download for single Uzum order
-      const { data, error } = await supabase.functions.invoke('manage-marketplace-orders', {
-        body: { marketplace, action: 'labels', orderIds },
-        // responseType: 'blob' not supported, handle in edge function
-      });
-      if (error) throw error;
-      return data;
-    }
     return executeAction({ marketplace, action: 'labels', orderIds });
   }, [executeAction]);
 

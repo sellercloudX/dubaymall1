@@ -842,12 +842,33 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
               {labelData?.type === 'pdf' && labelData.labels?.map((l: any, i: number) =>
                 Array.from({ length: labelCopies }).map((_, ci) => (
                   <div key={`${i}-${ci}`} className="label-item border border-dashed border-muted-foreground/30 rounded mb-2 p-2">
-                    <div className="text-xs text-muted-foreground mb-1">📄 Buyurtma #{l.orderId} {labelCopies > 1 ? `(nusxa ${ci + 1})` : ''}</div>
-                    <iframe
-                      src={`data:application/pdf;base64,${l.pdf}`}
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-muted-foreground">📄 Buyurtma #{l.orderId} {labelCopies > 1 ? `(nusxa ${ci + 1})` : ''}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 text-xs gap-1"
+                        onClick={() => {
+                          const a = document.createElement('a');
+                          a.href = `data:application/pdf;base64,${l.pdf}`;
+                          a.download = `etiketka_${l.orderId}.pdf`;
+                          a.click();
+                        }}
+                      >
+                        <Package className="h-3 w-3" /> Yuklab olish
+                      </Button>
+                    </div>
+                    <object
+                      data={`data:application/pdf;base64,${l.pdf}`}
+                      type="application/pdf"
                       className="w-full h-[200px] border rounded"
-                      title={`Label ${l.orderId}`}
-                    />
+                    >
+                      <div className="flex flex-col items-center justify-center h-[200px] bg-muted/50 rounded text-muted-foreground">
+                        <Printer className="h-8 w-8 mb-2" />
+                        <p className="text-xs">PDF ko'rish mumkin emas</p>
+                        <p className="text-[10px]">Yuklab oling yoki "Pechat qilish" tugmasini bosing</p>
+                      </div>
+                    </object>
                   </div>
                 ))
               )}
