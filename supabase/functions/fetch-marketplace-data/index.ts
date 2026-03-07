@@ -1849,16 +1849,15 @@ serve(async (req) => {
             
             console.log(`Uzum orders (${orderStatus}) page ${page}: ${orderList.length} orders`);
 
-            // Log first order item structure for debugging
+            // Log first order structure for debugging order numbers
             if (page === 0 && allOrders.length === 0 && orderList.length > 0) {
               const sampleOrder = orderList[0];
+              console.log(`[UZUM ORDER DEBUG] Order keys: ${JSON.stringify(Object.keys(sampleOrder))}`);
+              console.log(`[UZUM ORDER DEBUG] id=${sampleOrder.id}, orderId=${sampleOrder.orderId}, orderCode=${sampleOrder.orderCode}, orderNumber=${sampleOrder.orderNumber}, code=${sampleOrder.code}`);
               const sampleItems = sampleOrder.items || sampleOrder.orderItems || [];
               if (sampleItems.length > 0) {
                 const s = sampleItems[0];
                 console.log(`Uzum order item[0] keys: ${JSON.stringify(Object.keys(s))}`);
-                console.log(`Uzum order item[0] id=${s.id}, barcode=${s.barcode}, title=${s.title}, skuTitle=${s.skuTitle}`);
-                console.log(`Uzum order item[0] identifierInfo: ${JSON.stringify(s.identifierInfo || 'N/A')}`);
-                console.log(`Uzum order item[0] photo: ${JSON.stringify(typeof s.photo === 'object' ? Object.keys(s.photo || {}) : s.photo)}`);
               }
             }
 
@@ -1868,8 +1867,12 @@ serve(async (req) => {
                 return sum + ((item.price || item.amount || 0) * (item.quantity || item.count || 1));
               }, 0);
 
+              // Use orderCode/orderNumber for display (what seller sees in Uzum dashboard)
+              // Fall back to orderId/id for internal dedup
+              const displayOrderId = order.orderCode || order.orderNumber || order.code || order.orderId || order.id;
+
               return {
-                id: order.orderId || order.id,
+                id: displayOrderId,
                 status: order.status || orderStatus,
                 substatus: order.substatus || '',
                 createdAt: order.createdAt || order.createDate || new Date().toISOString(),
