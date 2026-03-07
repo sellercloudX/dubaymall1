@@ -16,16 +16,14 @@ import {
 import { toast } from 'sonner';
 
 const categoryLabels: Record<string, { label: string; icon: React.ElementType }> = {
-  card_creation: { label: 'Kartochka yaratish', icon: Sparkles },
-  cloning: { label: 'Klonlash', icon: ArrowUpDown },
-  ai_images: { label: 'AI Rasmlar', icon: Sparkles },
-  ai_tools: { label: 'AI Asboblar', icon: Settings2 },
-  free: { label: 'Bepul xizmatlar', icon: Zap },
-  ai: { label: 'AI funksiyalar', icon: Sparkles },
-  tools: { label: 'Asboblar', icon: Settings2 },
-  sync: { label: 'Sinxronlash', icon: ArrowUpDown },
-  analytics: { label: 'Analitika', icon: Zap },
-  management: { label: 'Boshqaruv', icon: Users },
+  card_creation: { label: '📦 Kartochka yaratish', icon: Sparkles },
+  cloning: { label: '🔄 Klonlash', icon: ArrowUpDown },
+  ai_tools: { label: '🤖 AI Asboblar', icon: Settings2 },
+  pricing: { label: '💰 Narx boshqarish', icon: DollarSign },
+  sync: { label: '🔗 Sinxronizatsiya', icon: ArrowUpDown },
+  analytics: { label: '📊 Analitika', icon: Zap },
+  management: { label: '⚙️ Boshqaruv', icon: Users },
+  activation: { label: '🔑 Aktivatsiya', icon: Crown },
 };
 
 function FeatureRow({ feature, onUpdate }: { feature: FeaturePrice; onUpdate: (id: string, updates: Partial<FeaturePrice>) => void }) {
