@@ -98,21 +98,25 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
         // Calculate cost from items
         let costTotal = 0;
         let itemCount = 0;
+        let totalFees = 0;
         (order.items || []).forEach(item => {
           const cpKey = (item.offerId || '').toLowerCase();
           const cp = costMap.get(cpKey) || 0;
           costTotal += cp * (item.count || 1);
           itemCount += item.count || 1;
+
+          // Use real tariffs (same as Finance & ABC Analysis)
+          const itemPrice = toDisplayUzs(item.price || 0, mp);
+          const tariff = getTariffForProduct(tariffMap, item.offerId, itemPrice, mp);
+          totalFees += tariff.totalFee * (item.count || 1);
         });
 
-        // Estimate marketplace fees
-        const commissionRate = mp === 'wildberries' ? 0.15 : mp === 'uzum' ? 0.12 : 0.08;
-        const commission = totalUzs * commissionRate;
-        const logistics = mp === 'wildberries' ? Math.min(totalUzs * 0.05, 15000) : 4000;
-        const subsidyAmount = 0; // Placeholder — can be enhanced with API data
+        const commission = totalFees;
+        const logistics = 0; // Already included in tariff.totalFee
+        const subsidyAmount = 0;
         
         const grossProfit = totalUzs - costTotal;
-        const netProfit = grossProfit - commission - logistics + subsidyAmount;
+        const netProfit = grossProfit - commission + subsidyAmount;
         const margin = totalUzs > 0 ? (netProfit / totalUzs) * 100 : 0;
 
         // Determine status category
