@@ -236,8 +236,11 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
     try {
       await confirmOrders(selectedMp, ids);
       // Optimistically move orders to assembly tab
-      const targetStatus = selectedMp === 'yandex' ? 'PROCESSING' : 'PACKING';
-      optimisticStatusUpdate(selectedMp, ids, targetStatus);
+      if (selectedMp === 'yandex') {
+        optimisticStatusUpdate(selectedMp, ids, 'PROCESSING', 'READY_TO_SHIP');
+      } else {
+        optimisticStatusUpdate(selectedMp, ids, 'PACKING');
+      }
       setSelectedOrders(new Set());
       // Delayed refetch to let marketplace API update
       setTimeout(() => store.refetchOrders(selectedMp), 30000);
