@@ -1819,15 +1819,17 @@ serve(async (req) => {
               });
               // shopIds is required - pass each shop
               params.append("shopIds", String(currentOrderShopId));
+              
               // dateFrom/dateTo are int64 timestamps (milliseconds)
-              if (fromDate) {
-                const ts = new Date(fromDate).getTime();
-                if (!isNaN(ts)) params.append("dateFrom", String(ts));
-              }
-              if (toDate) {
-                const ts = new Date(toDate).getTime();
-                if (!isNaN(ts)) params.append("dateTo", String(ts));
-              }
+              // Default to last 90 days if not specified to avoid fetching ALL historical orders
+              const defaultFromDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+              const effectiveFromDate = fromDate || defaultFromDate;
+              const effectiveToDate = toDate || new Date().toISOString();
+              
+              const tsFrom = new Date(effectiveFromDate).getTime();
+              if (!isNaN(tsFrom)) params.append("dateFrom", String(tsFrom));
+              const tsTo = new Date(effectiveToDate).getTime();
+              if (!isNaN(tsTo)) params.append("dateTo", String(tsTo));
 
               console.log(`Uzum orders (${orderStatus}) page ${page}: ${uzumBaseUrl}/v2/fbs/orders?${params.toString()}`);
 
@@ -1885,7 +1887,11 @@ serve(async (req) => {
                 const parsed = new Date(String(rawCreatedAt));
                 uzumCreatedAt = isNaN(parsed.getTime()) ? '' : parsed.toISOString();
               }
-              if (!uzumCreatedAt) uzumCreatedAt = new Date().toISOString();
+              // Don't fall back to current date — leave empty so frontend knows it's missing
+              if (!uzumCreatedAt) {
+                console.warn(`[UZUM DATE WARN] Order ${displayOrderId} has no date field, skipping fallback`);
+                uzumCreatedAt = ''; // Will be excluded by frontend date filter
+              }
               
               // Debug: log first order's date parsing
               if (allOrders.length === 0 && orderList.indexOf(order) === 0) {
