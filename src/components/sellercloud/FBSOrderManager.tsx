@@ -864,7 +864,6 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
                 ))
               )}
               {labelData?.type === 'pdf' && labelData.labels?.map((l: any, i: number) => {
-                const blobUrl = pdfBlobUrls[String(l.orderId)];
                 return Array.from({ length: labelCopies }).map((_, ci) => (
                   <div key={`${i}-${ci}`} className="label-item border border-dashed border-muted-foreground/30 rounded mb-2 p-2">
                     <div className="flex items-center justify-between mb-1">
@@ -883,18 +882,11 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
                         <Package className="h-3 w-3" /> Yuklab olish
                       </Button>
                     </div>
-                    {blobUrl ? (
-                      <iframe
-                        src={blobUrl}
-                        className="w-full h-[250px] border rounded bg-white"
-                        title={`Label ${l.orderId}`}
-                      />
-                    ) : (
-                      <div className="flex flex-col items-center justify-center h-[200px] bg-muted/50 rounded text-muted-foreground">
-                        <Printer className="h-8 w-8 mb-2" />
-                        <p className="text-xs">PDF yuklanmoqda...</p>
-                      </div>
-                    )}
+                    <embed
+                      src={`data:application/pdf;base64,${l.pdf}`}
+                      type="application/pdf"
+                      className="w-full h-[250px] border rounded bg-white"
+                    />
                   </div>
                 ));
               })}
