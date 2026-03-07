@@ -550,6 +550,8 @@ serve(async (req) => {
       user_id: user.id, action_type: 'ai-agent-fix', model_used: 'gemini-2.5-flash',
     });
 
+    // ═══ BILLING pre-check (will deduct per successful fix below) ═══
+
     let body: any;
     try {
       body = await req.json();
@@ -784,6 +786,28 @@ serve(async (req) => {
     const successCount = fixResults.filter(r => r.success).length;
     const verifiedCount = fixResults.filter(r => r.success && r.verified).length;
     const pendingCount = fixResults.filter(r => r.success && !r.verified).length;
+
+    // ═══ BILLING DEDUCT per successful fix ═══
+    if (successCount > 0 && partnerId) {
+      const fixFeatureKey = 'ai-card-fix';
+      for (let i = 0; i < successCount; i++) {
+        const { data: fixAccess } = await adminSupabase.rpc('check_feature_access', {
+          p_user_id: partnerId, p_feature_key: fixFeatureKey,
+        });
+        if (fixAccess?.allowed && fixAccess.price > 0) {
+          await adminSupabase.rpc('deduct_balance', {
+            p_user_id: partnerId, p_amount: fixAccess.price, p_feature_key: fixFeatureKey,
+            p_description: `AI Fix: ${fixResults.filter(r => r.success)[i]?.name?.substring(0, 50) || 'N/A'}`,
+          });
+        } else if (fixAccess?.tier === 'elegant') {
+          await adminSupabase.from('elegant_usage').upsert(
+            { user_id: partnerId, feature_key: fixFeatureKey, usage_month: new Date().toISOString().slice(0, 7) + '-01', usage_count: (fixAccess.used || 0) + i + 1 },
+            { onConflict: 'user_id,feature_key,usage_month' }
+          );
+        }
+      }
+      console.log(`💰 Billed ${successCount} fixes to partner ${partnerId}`);
+    }
 
     return new Response(JSON.stringify({
       success: true,

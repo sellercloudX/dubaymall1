@@ -1105,6 +1105,24 @@ serve(async (req) => {
       user_id: user.id, action_type: 'ai-agent-images', model_used: 'openai-gpt-image',
     });
 
+    // ═══ BILLING CHECK ═══
+    const billingUserId = action === 'scanner-generate' ? user.id : (partnerId || user.id);
+    const billingFeatureKey = action === 'scanner-generate' ? 'ai-scanner-images' : 'ai-image-generate';
+    const { data: accessCheck } = await adminSupabase.rpc('check_feature_access', {
+      p_user_id: billingUserId, p_feature_key: billingFeatureKey,
+    });
+    
+    if (accessCheck && !accessCheck.allowed) {
+      const errorMsg = accessCheck.error === 'insufficient_balance'
+        ? `Balans yetarli emas. Kerak: ${accessCheck.price?.toLocaleString()} so'm`
+        : accessCheck.message || 'Ruxsat berilmadi';
+      return new Response(JSON.stringify({ error: errorMsg, billingError: accessCheck.error }), {
+        status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const imgUnitPrice = accessCheck?.price || 0;
+    console.log(`💰 Billing: ${billingFeatureKey}, ${imgUnitPrice} UZS, tier: ${accessCheck?.tier}`);
+
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     if (!OPENAI_API_KEY) {
       return new Response(JSON.stringify({ error: 'OPENAI_API_KEY sozlanmagan' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -1240,6 +1258,19 @@ serve(async (req) => {
       pipelineResult.steps.forEach((s: any) => console.log(`  Step ${s.step}: ${s.name} → ${s.status}`));
       console.log(`${'='.repeat(60)}\n`);
 
+      // ═══ BILLING DEDUCT ═══
+      if (imgUnitPrice > 0 && totalGenerated > 0) {
+        await adminSupabase.rpc('deduct_balance', {
+          p_user_id: billingUserId, p_amount: imgUnitPrice, p_feature_key: billingFeatureKey,
+          p_description: `Rasm yaratish (${totalGenerated} ta): ${productName?.substring(0, 40) || 'N/A'}`,
+        });
+      } else if (accessCheck?.tier === 'elegant' && totalGenerated > 0) {
+        await adminSupabase.from('elegant_usage').upsert(
+          { user_id: billingUserId, feature_key: billingFeatureKey, usage_month: new Date().toISOString().slice(0, 7) + '-01', usage_count: (accessCheck.used || 0) + 1 },
+          { onConflict: 'user_id,feature_key,usage_month' }
+        );
+      }
+
       return new Response(JSON.stringify({
         success: true,
         imageUrl: cleanImageUrl,
@@ -1251,6 +1282,7 @@ serve(async (req) => {
         detection,
         pipeline: pipelineResult,
         marketplaceUpload: mpResult,
+        billing: { featureKey: billingFeatureKey, charged: imgUnitPrice, tier: accessCheck?.tier },
         message: mpResult.success
           ? `✅ ${totalGenerated} ta rasm yaratildi va marketplace'ga yuklandi`
           : `⚠️ ${totalGenerated} ta rasm yaratildi. MP: ${mpResult.message}`,
@@ -1332,6 +1364,19 @@ serve(async (req) => {
       const allImages = [...(heroUrl ? [heroUrl] : []), ...angleUrls];
       console.log(`✅ Scanner pipeline complete: ${allImages.length}/2 images generated`);
 
+      // ═══ BILLING DEDUCT for scanner ═══
+      if (imgUnitPrice > 0 && allImages.length > 0) {
+        await adminSupabase.rpc('deduct_balance', {
+          p_user_id: billingUserId, p_amount: imgUnitPrice, p_feature_key: billingFeatureKey,
+          p_description: `Scanner rasm (${allImages.length} ta): ${productName?.substring(0, 40) || 'N/A'}`,
+        });
+      } else if (accessCheck?.tier === 'elegant' && allImages.length > 0) {
+        await adminSupabase.from('elegant_usage').upsert(
+          { user_id: billingUserId, feature_key: billingFeatureKey, usage_month: new Date().toISOString().slice(0, 7) + '-01', usage_count: (accessCheck.used || 0) + 1 },
+          { onConflict: 'user_id,feature_key,usage_month' }
+        );
+      }
+
       return new Response(JSON.stringify({
         success: true,
         images: allImages,
@@ -1339,6 +1384,7 @@ serve(async (req) => {
         lifestyleUrls: angleUrls,
         totalImages: allImages.length,
         detection,
+        billing: { featureKey: billingFeatureKey, charged: imgUnitPrice, tier: accessCheck?.tier },
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
