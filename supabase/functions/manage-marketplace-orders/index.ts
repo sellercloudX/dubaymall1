@@ -49,20 +49,31 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Marketplace not connected" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    let credentials: any;
+    // Decrypt credentials - 3-level fallback matching fetch-marketplace-data
+    let credentials: { apiKey: string; campaignId?: string; businessId?: string; sellerId?: string };
+    
     if (connection.encrypted_credentials) {
       try {
-        const { data: decData } = await supabase.rpc("decrypt_credentials", { p_encrypted: connection.encrypted_credentials });
-        credentials = typeof decData === "string" ? JSON.parse(decData) : decData;
-      } catch {
-        try {
-          credentials = typeof connection.credentials === "string" ? JSON.parse(connection.credentials) : connection.credentials;
-        } catch {
-          credentials = connection.credentials;
+        const { data: decData, error: decError } = await supabase
+          .rpc("decrypt_credentials", { p_encrypted: connection.encrypted_credentials });
+        if (decError || !decData) {
+          console.warn("Decrypt failed, trying base64 fallback:", decError?.message);
+          try {
+            const decoded = atob(connection.encrypted_credentials);
+            credentials = JSON.parse(decoded);
+          } catch {
+            console.warn("Base64 fallback failed, using plain credentials");
+            credentials = connection.credentials as any;
+          }
+        } else {
+          credentials = typeof decData === "string" ? JSON.parse(decData) : decData;
         }
+      } catch (e) {
+        console.warn("Decrypt exception, falling back to plain credentials:", e);
+        credentials = connection.credentials as any;
       }
     } else {
-      credentials = typeof connection.credentials === "string" ? JSON.parse(connection.credentials) : connection.credentials;
+      credentials = connection.credentials as any;
     }
 
     const { apiKey, campaignId, businessId } = credentials || {};
