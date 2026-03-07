@@ -35,6 +35,7 @@ export const sellerMenuItems: SellerMenuItem[] = [
   { id: 'abc', label: 'ABC-analiz', icon: BarChart3, group: 'analytics' },
   { id: 'cost-prices', label: 'Tannarx', icon: DollarSign, group: 'analytics' },
   { id: 'calculator', label: 'Kalkulyator', icon: Calculator, group: 'analytics' },
+  { id: 'competitor', label: 'Raqobat narx', icon: ArrowDownUp, group: 'tools' },
   { id: 'inventory', label: 'Zaxira sinxron', icon: ArrowDownUp, group: 'tools' },
   { id: 'pricing', label: 'Narxlar', icon: DollarSign, group: 'tools' },
   { id: 'reviews', label: 'Sharhlar', icon: MessageCircle, group: 'tools' },

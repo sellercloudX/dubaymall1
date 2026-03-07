@@ -49,6 +49,7 @@ const WBAdsCampaigns = lazy(() => import('@/components/sellercloud/WBAdsCampaign
 const SupportChat = lazy(() => import('@/components/sellercloud/SupportChat').then(m => ({ default: m.SupportChat })));
 const SalesDashboard = lazy(() => import('@/components/sellercloud/SalesDashboard').then(m => ({ default: m.SalesDashboard })));
 const MultiStoreManager = lazy(() => import('@/components/sellercloud/MultiStoreManager').then(m => ({ default: m.MultiStoreManager })));
+const CompetitorPriceMonitor = lazy(() => import('@/components/sellercloud/CompetitorPriceMonitor').then(m => ({ default: m.CompetitorPriceMonitor })));
 
 const TabLoader = () => <div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
 
@@ -77,6 +78,7 @@ const pageTitles: Record<string, string> = {
   subscription: 'Obuna va to\'lov',
   reports: 'Hisobotlar',
   notifications: 'Bildirishnomalar',
+  competitor: 'Raqobat narx monitoring',
   support: 'Yordam markazi',
 };
 
