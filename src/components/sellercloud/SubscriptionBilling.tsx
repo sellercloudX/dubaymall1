@@ -23,7 +23,7 @@ import { PromoCodeInput, type PromoValidation } from './PromoCodeInput';
 import { notifyAffiliatePayment } from '@/lib/affiliateWebhook';
 
 interface SubscriptionBillingProps {
-  totalSalesVolume: number;
+  totalSalesVolume?: number;
 }
 
 const USD_TO_UZS = 12800;
@@ -267,8 +267,8 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <div className="text-3xl font-bold">$499<span className="text-lg font-normal text-muted-foreground">/oy</span></div>
-                  <div className="text-sm text-muted-foreground">+ savdodan 4%</div>
+                  <div className="text-3xl font-bold">Bepul</div>
+                  <div className="text-sm text-muted-foreground">Balans orqali pullik xizmatlar</div>
                 </div>
                 <ul className="space-y-2 text-sm">
                   <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" /> 4 ta marketplace</li>
@@ -291,7 +291,7 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
               <CardContent className="space-y-4">
                 <div>
                   <div className="text-3xl font-bold">Individual</div>
-                  <div className="text-sm text-muted-foreground">+ savdodan 2%</div>
+                  <div className="text-sm text-muted-foreground">Maxsus narxlar</div>
                 </div>
                 <ul className="space-y-2 text-sm">
                   <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" /> Pro'dagi barcha imkoniyatlar</li>
@@ -318,12 +318,11 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
               <div className="bg-muted p-4 rounded-lg max-h-60 overflow-y-auto text-sm space-y-2">
                 <p className="font-medium">SellerCloudX xizmat shartlari:</p>
                 <ul className="list-disc pl-4 space-y-1">
-                  <li>Oylik to'lov: <strong>${selectedPlan === 'pro' ? '499' : 'Individual'}</strong></li>
-                  <li>Savdodan komissiya: <strong>{selectedPlan === 'pro' ? '4%' : '2%'}</strong></li>
-                  <li>To'lovlar har oy boshida hisoblanadi</li>
-                  <li>Marketplace savdo pullari to'g'ridan-to'g'ri sizning hisobingizga tushadi</li>
-                  <li>Platforma xizmat haqini alohida hisob-kitob qiladi</li>
-                  <li>To'lanmagan hisob-kitoblar akkountni bloklashga olib keladi</li>
+                  <li>Bepul marketplace ulash va boshqarish</li>
+                  <li>Bepul analitika va hisobotlar</li>
+                  <li>Pullik AI xizmatlari balans orqali</li>
+                  <li>Balansni to'ldirish: kamida {MIN_TOPUP_UZS.toLocaleString()} so'm</li>
+                  <li>Sotuvdan hech qanday foiz olinmaydi</li>
                 </ul>
               </div>
               <div className="flex items-start gap-3 p-3 border rounded-lg">
@@ -417,8 +416,7 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
   }
 
   const monthlyFeeUZS = subscription.monthly_fee * USD_TO_UZS;
-  const commissionAmount = totalSalesVolume * (subscription.commission_percent / 100);
-  const currentBillingTotal = monthlyFeeUZS + commissionAmount;
+  const currentBillingTotal = monthlyFeeUZS;
 
   const getStatusBadge = () => {
     if (!accessStatus) return null;
@@ -530,9 +528,9 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
                   <div className="text-[10px] text-muted-foreground">{formatPrice(monthlyFeeUZS)}</div>
                 </div>
                 <div className="p-3 rounded-lg bg-muted/50">
-                  <div className="text-xs text-muted-foreground flex items-center gap-1"><TrendingUp className="h-3 w-3" /> Komissiya</div>
-                  <div className="text-lg font-bold mt-1">{subscription.commission_percent}%</div>
-                  <div className="text-[10px] text-muted-foreground">Savdodan</div>
+                  <div className="text-xs text-muted-foreground flex items-center gap-1"><TrendingUp className="h-3 w-3" /> Model</div>
+                  <div className="text-lg font-bold mt-1">Balans</div>
+                  <div className="text-[10px] text-muted-foreground">Xizmatlar uchun</div>
                 </div>
                 <div className="p-3 rounded-lg bg-muted/50">
                   <div className="text-xs text-muted-foreground flex items-center gap-1"><Calendar className="h-3 w-3" /> Holat</div>
@@ -574,11 +572,8 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
                   <span className="font-medium text-sm">{formatPrice(monthlyFeeUZS)}</span>
                 </div>
                 <div className="flex items-center justify-between py-2 border-b border-border">
-                  <div>
-                    <span className="text-sm text-muted-foreground">Savdodan komissiya ({subscription.commission_percent}%)</span>
-                    <div className="text-[10px] text-muted-foreground">Hajm: {formatPrice(totalSalesVolume)}</div>
-                  </div>
-                  <span className="font-medium text-sm">{formatPrice(commissionAmount)}</span>
+                  <span className="text-sm text-muted-foreground">Savdodan komissiya</span>
+                  <span className="font-medium text-sm text-primary">0% — Olinmaydi ✓</span>
                 </div>
                 <div className="flex items-center justify-between py-2 text-base font-bold">
                   <span>Jami</span>
