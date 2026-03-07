@@ -398,7 +398,7 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
             <CardContent>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Premium */}
-                <div className={`p-5 rounded-xl border-2 space-y-3 ${subscription.plan_type === 'premium' ? 'border-amber-400 bg-amber-500/5' : 'border-border hover:border-amber-300 transition-colors'}`}>
+                <div className={`p-5 rounded-xl border-2 space-y-3 ${(subscription.plan_type as string) === 'premium' ? 'border-amber-400 bg-amber-500/5' : 'border-border hover:border-amber-300 transition-colors'}`}>
                   <div className="flex items-center gap-2">
                     <Badge className="bg-amber-500/10 text-amber-600 border-amber-200">Premium</Badge>
                     {subscription.plan_type === 'premium' && <Badge variant="secondary" className="text-[10px]">Hozirgi</Badge>}
