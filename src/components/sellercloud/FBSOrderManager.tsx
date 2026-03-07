@@ -313,7 +313,7 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
 
   // ===== LABELS =====
   const handlePrintFromDialog = () => {
-    if (!labelPrintRef.current) return;
+    if (!labelData) return;
     const size = LABEL_SIZES.find(s => s.key === labelSize) || LABEL_SIZES[0];
     const printWindow = window.open('', '_blank', 'width=800,height=600');
     if (!printWindow) {
@@ -321,20 +321,41 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
       return;
     }
 
-    const content = labelPrintRef.current.innerHTML;
-    printWindow.document.write(`<!DOCTYPE html><html><head><title>Etiketkalar</title>
-      <style>
-        @page { size: ${size.width}mm ${size.height}mm; margin: 0; }
-        @media print { body{margin:0;padding:0;} .label-item{page-break-after:${labelAutocut ? 'always' : 'auto'};} }
-        body{font-family:sans-serif;margin:0;padding:0;}
-        .label-item{display:flex;align-items:center;justify-content:center;width:${size.width}mm;height:${size.height}mm;overflow:hidden;}
-        .label-item img{max-width:100%;max-height:100%;object-fit:contain;}
-        .label-item iframe{width:100%;height:100%;border:none;}
-      </style></head><body>${content}</body></html>`);
-    printWindow.document.close();
-    setTimeout(() => {
-      printWindow.print();
-    }, 500);
+    if (labelData.type === 'sticker' && labelData.stickers) {
+      // PNG stickers - render as images
+      const images = labelData.stickers.flatMap(s =>
+        Array.from({ length: labelCopies }).map((_, ci) =>
+          `<div class="label-item"><img src="data:image/png;base64,${s.file}" /></div>`
+        )
+      ).join('');
+      printWindow.document.write(`<!DOCTYPE html><html><head><title>Stikerlar</title>
+        <style>
+          @page { size: ${size.width}mm ${size.height}mm; margin: 0; }
+          @media print { body{margin:0;padding:0;} .label-item{page-break-after:${labelAutocut ? 'always' : 'auto'};} }
+          body{font-family:sans-serif;margin:0;padding:0;}
+          .label-item{display:flex;align-items:center;justify-content:center;width:${size.width}mm;height:${size.height}mm;overflow:hidden;}
+          .label-item img{max-width:100%;max-height:100%;object-fit:contain;}
+        </style></head><body>${images}</body></html>`);
+      printWindow.document.close();
+      setTimeout(() => printWindow.print(), 500);
+    } else if (labelData.type === 'pdf' && labelData.labels) {
+      // PDF labels - embed each as an iframe and print
+      const pdfs = labelData.labels.flatMap((l: any) =>
+        Array.from({ length: labelCopies }).map((_, ci) =>
+          `<div class="label-item"><embed src="data:application/pdf;base64,${l.pdf}" type="application/pdf" width="100%" height="100%" /></div>`
+        )
+      ).join('');
+      printWindow.document.write(`<!DOCTYPE html><html><head><title>Etiketkalar</title>
+        <style>
+          @page { size: ${size.width}mm ${size.height}mm; margin: 2mm; }
+          @media print { body{margin:0;padding:0;} .label-item{page-break-after:${labelAutocut ? 'always' : 'auto'};} }
+          body{font-family:sans-serif;margin:0;padding:0;}
+          .label-item{width:${size.width}mm;height:${size.height}mm;overflow:hidden;}
+          embed{width:100%;height:100%;}
+        </style></head><body>${pdfs}</body></html>`);
+      printWindow.document.close();
+      setTimeout(() => printWindow.print(), 1000);
+    }
   };
 
   const handleDownloadLabels = () => {
