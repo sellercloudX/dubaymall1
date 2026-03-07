@@ -2020,15 +2020,29 @@ serve(async (req) => {
             } // end for shops
           } // end for statuses
 
+          // Server-side date filtering — Uzum API may ignore dateFrom/dateTo params
+          // so we filter manually to ensure only requested date range is returned
+          const effectiveFrom = fromDate ? new Date(fromDate).getTime() : Date.now() - 90 * 24 * 60 * 60 * 1000;
+          const effectiveTo = toDate ? new Date(toDate).getTime() : Date.now();
+          
+          const dateFilteredOrders = allOrders.filter((o: any) => {
+            if (!o.createdAt) return false;
+            const orderTime = new Date(o.createdAt).getTime();
+            if (isNaN(orderTime)) return false;
+            return orderTime >= effectiveFrom && orderTime <= effectiveTo;
+          });
+          
+          console.log(`Uzum orders before date filter: ${allOrders.length}, after: ${dateFilteredOrders.length} (${new Date(effectiveFrom).toISOString()} to ${new Date(effectiveTo).toISOString()})`);
+
           // Calculate total revenue from non-cancelled orders
-          const activeUzumOrders = allOrders.filter((o: any) => !['CANCELED', 'CANCELLED', 'RETURNED'].includes(o.status));
+          const activeUzumOrders = dateFilteredOrders.filter((o: any) => !['CANCELED', 'CANCELLED', 'RETURNED'].includes(o.status));
           const uzumTotalRevenue = activeUzumOrders.reduce((sum: number, o: any) => sum + (o.totalUZS || o.total || 0), 0);
           
-          console.log(`Uzum total orders: ${allOrders.length}, active: ${activeUzumOrders.length}, revenue: ${uzumTotalRevenue}`);
+          console.log(`Uzum final orders: ${dateFilteredOrders.length}, active: ${activeUzumOrders.length}, revenue: ${uzumTotalRevenue}`);
           result = {
             success: true,
-            data: allOrders,
-            total: allOrders.length,
+            data: dateFilteredOrders,
+            total: dateFilteredOrders.length,
           };
 
           // Update connection with orders count and revenue
