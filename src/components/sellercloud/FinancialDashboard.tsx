@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { MarketplaceLogo, MARKETPLACE_SHORT_NAMES } from '@/lib/marketplaceConfig';
 import { toDisplayUzs } from '@/lib/currency';
+import { isExcludedOrder } from '@/lib/revenueCalculations';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
@@ -76,7 +77,7 @@ export function FinancialDashboard({
     const marketplaceBreakdown = activeMarketplaces.map(marketplace => {
       const orders = store.getOrders(marketplace);
       const activeOrders = orders.filter(o => {
-        if (['CANCELLED', 'RETURNED'].includes(o.status)) return false;
+        if (isExcludedOrder(o)) return false;
         if (dateFrom || dateTo) {
           const orderDate = new Date(o.createdAt);
           if (dateFrom && orderDate < dateFrom) return false;

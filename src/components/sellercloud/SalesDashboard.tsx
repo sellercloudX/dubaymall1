@@ -16,6 +16,7 @@ import { DateRangeFilter, getPresetDates, type DatePreset } from './DateRangeFil
 import { MarketplaceFilterBar } from './MarketplaceFilterBar';
 import { MarketplaceLogo, MARKETPLACE_SHORT_NAMES } from '@/lib/marketplaceConfig';
 import { toDisplayUzs, formatUzsFull } from '@/lib/currency';
+import { getOrderRevenueUzs, isExcludedOrder } from '@/lib/revenueCalculations';
 import { useCostPrices } from '@/hooks/useCostPrices';
 import { useMarketplaceTariffs, getTariffForProduct } from '@/hooks/useMarketplaceTariffs';
 import type { MarketplaceDataStore, MarketplaceOrder } from '@/hooks/useMarketplaceDataStore';
@@ -30,8 +31,8 @@ type SortDir = 'asc' | 'desc';
 
 const STATUS_CATEGORIES = [
   { key: 'all', label: 'Hammasi', icon: ShoppingCart, color: '' },
-  { key: 'new', label: 'Yangi', icon: Package, color: 'text-orange-500', statuses: ['NEW', 'PENDING', 'RESERVED', 'UNPAID', 'CREATED'] },
-  { key: 'assembly', label: "Yig'ish", icon: Clock, color: 'text-amber-500', statuses: ['PROCESSING', 'PACKING', 'CONFIRM', 'READY_TO_SHIP', 'ACCEPTED_AT_DP'] },
+  { key: 'new', label: 'Yangi', icon: Package, color: 'text-orange-500', statuses: ['NEW', 'PENDING', 'RESERVED', 'UNPAID', 'CREATED', 'STARTED'] },
+  { key: 'assembly', label: "Yig'ish", icon: Clock, color: 'text-amber-500', statuses: ['PROCESSING', 'PACKING', 'CONFIRM', 'READY_TO_SHIP', 'ACCEPTED_AT_DP', 'ACCEPTED'] },
   { key: 'active', label: "Yo'lda", icon: Truck, color: 'text-blue-500', statuses: ['DELIVERY', 'DELIVERING', 'PENDING_DELIVERY', 'SHIPPED', 'PICKUP', 'DELIVERED_TO_CUSTOMER_DELIVERY_POINT'] },
   { key: 'delivered', label: 'Yetkazildi', icon: CheckCircle, color: 'text-emerald-600', statuses: ['DELIVERED', 'COMPLETED'] },
   { key: 'cancelled', label: 'Bekor', icon: XCircle, color: 'text-destructive', statuses: ['CANCELLED', 'CANCELED', 'RETURNED', 'CANCEL', 'PENDING_CANCELLATION', 'REJECTED'] },
@@ -94,7 +95,7 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
       });
 
       for (const order of store.getOrders(mp)) {
-        const totalUzs = toDisplayUzs(order.total || order.itemsTotal || 0, mp);
+        const totalUzs = getOrderRevenueUzs(order, mp);
         
         // Calculate cost from items
         let costTotal = 0;
@@ -120,13 +121,20 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
         const netProfit = grossProfit - commission + subsidyAmount;
         const margin = totalUzs > 0 ? (netProfit / totalUzs) * 100 : 0;
 
-        // Determine status category
+        // Determine status category (with Yandex substatus awareness)
         const s = (order.status || '').toUpperCase();
+        const sub = ((order as any).substatus || '').toUpperCase();
         let statusCategory = 'active';
-        for (const cat of STATUS_CATEGORIES.slice(1)) {
-          if (cat.statuses?.some(st => st.toUpperCase() === s)) {
-            statusCategory = cat.key;
-            break;
+        
+        // Yandex PROCESSING substatus mapping
+        if (mp === 'yandex' && s === 'PROCESSING') {
+          statusCategory = sub === 'STARTED' ? 'new' : 'assembly';
+        } else {
+          for (const cat of STATUS_CATEGORIES.slice(1)) {
+            if (cat.statuses?.some(st => st.toUpperCase() === s)) {
+              statusCategory = cat.key;
+              break;
+            }
           }
         }
 
