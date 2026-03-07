@@ -1871,11 +1871,22 @@ serve(async (req) => {
               // Fall back to orderId/id for internal dedup
               const displayOrderId = order.orderCode || order.orderNumber || order.code || order.orderId || order.id;
 
+              // Parse Uzum createdAt — may be Unix timestamp (ms) or ISO string
+              let uzumCreatedAt = order.createdAt || order.createDate || '';
+              if (typeof uzumCreatedAt === 'number') {
+                uzumCreatedAt = new Date(uzumCreatedAt > 1e12 ? uzumCreatedAt : uzumCreatedAt * 1000).toISOString();
+              } else if (uzumCreatedAt && !String(uzumCreatedAt).includes('T') && !isNaN(Number(uzumCreatedAt))) {
+                // Numeric string timestamp
+                const ts = Number(uzumCreatedAt);
+                uzumCreatedAt = new Date(ts > 1e12 ? ts : ts * 1000).toISOString();
+              }
+              if (!uzumCreatedAt) uzumCreatedAt = new Date().toISOString();
+
               return {
                 id: displayOrderId,
                 status: order.status || orderStatus,
                 substatus: order.substatus || '',
-                createdAt: order.createdAt || order.createDate || new Date().toISOString(),
+                createdAt: uzumCreatedAt,
                 total: order.totalPrice || order.totalAmount || itemsTotal,
                 totalUZS: order.totalPrice || order.totalAmount || itemsTotal,
                 itemsTotal,
