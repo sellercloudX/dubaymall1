@@ -77,20 +77,37 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
   const [wbSupplyName, setWbSupplyName] = useState('');
   const queryClient = useQueryClient();
 
+  // Track optimistic status overrides that survive cache refetches
+  // Map<orderId, { newStatus, timestamp, originalOrder }>
+  const optimisticOverridesRef = useRef<Map<string, { newStatus: string; timestamp: number; order: MarketplaceOrder }>>(new Map());
+
   const {
     isLoading, actionInProgress, confirmOrders, cancelOrders, getLabels,
     getDropOffPoints, getTimeSlots, createInvoice, setDropOff,
     getSupplies, addToSupply, executeAction,
   } = useOrderManagement();
 
-  // Optimistically update order statuses in query cache
-  // This prevents orders from "disappearing" when marketplace API hasn't updated yet
+  // Optimistically update order statuses — stores overrides in a ref that persists across refetches
   const optimisticStatusUpdate = useCallback((
     marketplace: string,
     orderIds: (string | number)[],
     newStatus: string
   ) => {
+    const allMpOrders = store.getOrders(marketplace);
     const idSet = new Set(orderIds.map(id => String(id)));
+    
+    // Save original orders with new status to ref
+    for (const order of allMpOrders) {
+      if (idSet.has(String(order.id))) {
+        optimisticOverridesRef.current.set(String(order.id), {
+          newStatus,
+          timestamp: Date.now(),
+          order: { ...order, status: newStatus },
+        });
+      }
+    }
+
+    // Also update query cache for immediate effect
     queryClient.setQueriesData(
       { queryKey: ['marketplace-orders', marketplace] },
       (oldData: any) => {
@@ -105,19 +122,67 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
         };
       }
     );
-  }, [queryClient]);
+  }, [queryClient, store]);
 
   const allOrders = store.getOrders(selectedMp);
+
+  // Merge API orders with optimistic overrides
+  // Overrides persist for 2 minutes to survive API propagation delays
+  const mergedOrders = useMemo(() => {
+    const overrides = optimisticOverridesRef.current;
+    const now = Date.now();
+    const OVERRIDE_TTL = 2 * 60 * 1000; // 2 minutes
+    
+    // Clean expired overrides
+    for (const [id, entry] of overrides) {
+      if (now - entry.timestamp > OVERRIDE_TTL) overrides.delete(id);
+    }
+    
+    // Build merged list: apply overrides to existing orders, add missing ones
+    const orderMap = new Map<string, MarketplaceOrder>();
+    for (const order of allOrders) {
+      const id = String(order.id);
+      const override = overrides.get(id);
+      if (override) {
+        // API returned the order — check if API status matches override
+        const apiStatusUpper = order.status?.toUpperCase();
+        const overrideStatusUpper = override.newStatus.toUpperCase();
+        // If API already shows a "later" status, remove override
+        const statusOrder = ['NEW', 'PACKING', 'SHIPPED', 'DELIVERY', 'DELIVERED', 'CANCELLED'];
+        const apiIdx = statusOrder.indexOf(apiStatusUpper);
+        const overrideIdx = statusOrder.indexOf(overrideStatusUpper);
+        if (apiIdx >= overrideIdx && apiIdx >= 0) {
+          // API caught up or passed — use API status
+          overrides.delete(id);
+          orderMap.set(id, order);
+        } else {
+          // API is behind — use override
+          orderMap.set(id, { ...order, status: override.newStatus });
+        }
+      } else {
+        orderMap.set(id, order);
+      }
+    }
+    
+    // Add any optimistic orders not in API response (disappeared during propagation)
+    for (const [id, entry] of overrides) {
+      if (!orderMap.has(id)) {
+        orderMap.set(id, entry.order);
+      }
+    }
+    
+    return Array.from(orderMap.values());
+  }, [allOrders]);
 
   const ordersByTab = useMemo(() => {
     const map: Record<string, MarketplaceOrder[]> = {};
     for (const tab of FBS_TABS) {
-      map[tab.key] = allOrders.filter(o =>
+      map[tab.key] = mergedOrders.filter(o =>
         tab.statuses.some(s => o.status?.toUpperCase() === s.toUpperCase())
       );
     }
     return map;
-  }, [allOrders]);
+  }, [mergedOrders]);
 
   const currentOrders = ordersByTab[activeTab] || [];
 
