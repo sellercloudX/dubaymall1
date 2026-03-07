@@ -373,9 +373,8 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
           p_feature_key: scannerFeatureKey,
         });
         
-        if (billingError) {
-          console.warn('Billing check error:', billingError);
-        } else if (billingResult && !billingResult.allowed) {
+        const billingResult = billingData as any;
+        if (billingResult && !billingResult.allowed) {
           const errorMsg = billingResult.error === 'insufficient_balance'
             ? `Balans yetarli emas. Balansni kamida 300,000 so'm to'ldiring.`
             : billingResult.error === 'activation_required'
