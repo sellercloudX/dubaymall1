@@ -474,6 +474,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
               productName: normalizedProductName,
               category: analyzed?.category || '',
               features: analyzed?.features || [],
+              skipBilling: true, // Scanner handles billing
             },
           });
 
@@ -531,6 +532,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
             },
             skipImageGeneration: generatedInfos.length >= 2,
             cloneMode: false,
+            skipBilling: true, // Scanner handles billing
           },
         });
 
@@ -565,6 +567,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
               mxikName: mxikResult?.mxik_name,
             },
             skipImageGeneration: hasAiImages,
+            skipBilling: true, // Scanner handles billing
             pricing: {
               costPrice: pricingData.costPrice,
               recommendedPrice: pricingData.sellingPrice,
