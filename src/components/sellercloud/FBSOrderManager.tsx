@@ -869,13 +869,23 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
               )}
               {labelData?.type === 'pdf' && labelData.labels?.map((l: any, i: number) => {
                 return Array.from({ length: labelCopies }).map((_, ci) => (
-                  <div key={`${i}-${ci}`} className="label-item border border-dashed border-muted-foreground/30 rounded mb-2 p-2">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs text-muted-foreground">📄 Buyurtma #{l.orderId} {labelCopies > 1 ? `(nusxa ${ci + 1})` : ''}</span>
+                  <div key={`${i}-${ci}`} className="label-item border border-dashed border-muted-foreground/30 rounded mb-2 p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-10 h-10 rounded bg-primary/10 flex items-center justify-center">
+                          <Printer className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium">Buyurtma #{l.orderId}</div>
+                          <div className="text-[10px] text-muted-foreground">
+                            PDF etiketka tayyor {labelCopies > 1 ? `• nusxa ${ci + 1}` : ''}
+                          </div>
+                        </div>
+                      </div>
                       <Button
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
-                        className="h-6 text-xs gap-1"
+                        className="h-7 text-xs gap-1"
                         onClick={() => {
                           const a = document.createElement('a');
                           a.href = `data:application/pdf;base64,${l.pdf}`;
@@ -886,11 +896,6 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
                         <Package className="h-3 w-3" /> Yuklab olish
                       </Button>
                     </div>
-                    <embed
-                      src={`data:application/pdf;base64,${l.pdf}`}
-                      type="application/pdf"
-                      className="w-full h-[250px] border rounded bg-white"
-                    />
                   </div>
                 ));
               })}
