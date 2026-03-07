@@ -766,7 +766,6 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
     </div>
   );
 }
-  const { user } = useAuth();
   const { 
     subscription, 
     billing, 
