@@ -177,9 +177,20 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
   const ordersByTab = useMemo(() => {
     const map: Record<string, MarketplaceOrder[]> = {};
     for (const tab of FBS_TABS) {
-      map[tab.key] = mergedOrders.filter(o =>
-        tab.statuses.some(s => o.status?.toUpperCase() === s.toUpperCase())
-      );
+      map[tab.key] = mergedOrders.filter(o => {
+        const status = o.status?.toUpperCase();
+        const substatus = (o as any).substatus?.toUpperCase();
+        
+        // Yandex special: PROCESSING/STARTED = new, PROCESSING/READY_TO_SHIP = assembly
+        if (status === 'PROCESSING' && substatus === 'STARTED') {
+          return tab.key === 'new';
+        }
+        if (status === 'PROCESSING' && substatus === 'READY_TO_SHIP') {
+          return tab.key === 'assembly';
+        }
+        
+        return tab.statuses.some(s => status === s.toUpperCase());
+      });
     }
     return map;
   }, [mergedOrders]);
