@@ -1894,13 +1894,16 @@ serve(async (req) => {
                 console.log(`[UZUM DATE DEBUG] raw=${JSON.stringify(rawCreatedAt)} type=${typeof rawCreatedAt} → parsed=${uzumCreatedAt}`);
               }
 
+              // Uzum API uses 'price' for order total (NOT 'totalPrice')
+              const orderTotal = order.price || order.totalPrice || order.totalAmount || itemsTotal;
+              
               return {
                 id: displayOrderId,
                 status: order.status || orderStatus,
                 substatus: order.substatus || '',
                 createdAt: uzumCreatedAt,
-                total: order.totalPrice || order.totalAmount || itemsTotal,
-                totalUZS: order.totalPrice || order.totalAmount || itemsTotal,
+                total: orderTotal,
+                totalUZS: orderTotal,
                 itemsTotal,
                 itemsTotalUZS: itemsTotal,
                 deliveryTotal: order.deliveryPrice || 0,
