@@ -47,15 +47,19 @@ const MarketplaceReviews = lazy(() => import('@/components/sellercloud/Marketpla
 const WBSellerAnalytics = lazy(() => import('@/components/sellercloud/WBSellerAnalytics').then(m => ({ default: m.WBSellerAnalytics })));
 const WBAdsCampaigns = lazy(() => import('@/components/sellercloud/WBAdsCampaigns').then(m => ({ default: m.WBAdsCampaigns })));
 const SupportChat = lazy(() => import('@/components/sellercloud/SupportChat').then(m => ({ default: m.SupportChat })));
+const SalesDashboard = lazy(() => import('@/components/sellercloud/SalesDashboard').then(m => ({ default: m.SalesDashboard })));
+const MultiStoreManager = lazy(() => import('@/components/sellercloud/MultiStoreManager').then(m => ({ default: m.MultiStoreManager })));
 
 const TabLoader = () => <div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
 
 // Page titles for the top bar
 const pageTitles: Record<string, string> = {
   marketplaces: 'Marketplacelar',
+  stores: 'Do\'konlar boshqaruvi',
   scanner: 'AI Scanner Pro',
   products: 'Mahsulotlar',
   orders: 'Buyurtmalar',
+  sales: 'Sotuvlar hisoboti',
   analytics: 'Umumiy analitika',
   'wb-analytics': 'WB Analitika',
   financials: 'Moliyaviy dashboard',
@@ -206,6 +210,8 @@ export default function SellerCloudX() {
     switch (activeTab) {
       case 'marketplaces':
         return <MarketplaceOAuth connections={connections} isLoading={connectionsLoading} connectMarketplace={connectMarketplace} disconnectMarketplace={disconnectMarketplace} syncMarketplace={syncMarketplace} onConnect={handleMarketplaceConnect} store={store} />;
+      case 'stores':
+        return <MultiStoreManager connectedMarketplaces={connectedMarketplaces} onStoreChange={() => refetch()} />;
       case 'scanner':
         return connectedMarketplaces.length > 0 
           ? <AIScannerPro shopId="sellercloud" /> 
@@ -214,6 +220,8 @@ export default function SellerCloudX() {
         return <MarketplaceProducts connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'orders':
         return <FBSOrderManager connectedMarketplaces={connectedMarketplaces} store={store} />;
+      case 'sales':
+        return <SalesDashboard connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'orders-old':
         return <MarketplaceOrders connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'analytics':

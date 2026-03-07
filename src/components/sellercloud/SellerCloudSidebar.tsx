@@ -24,9 +24,11 @@ export interface SellerMenuItem {
 
 export const sellerMenuItems: SellerMenuItem[] = [
   { id: 'marketplaces', label: 'Marketplacelar', icon: Globe, group: 'main' },
+  { id: 'stores', label: 'Do\'konlar', icon: LayoutDashboard, group: 'main' },
   { id: 'scanner', label: 'AI Scanner', icon: Scan, group: 'main' },
   { id: 'products', label: 'Mahsulotlar', icon: Package, group: 'main' },
   { id: 'orders', label: 'Buyurtmalar', icon: ShoppingCart, group: 'main' },
+  { id: 'sales', label: 'Sotuvlar', icon: DollarSign, group: 'main' },
   { id: 'analytics', label: 'Umumiy analitika', icon: BarChart3, group: 'analytics' },
   { id: 'wb-analytics', label: 'WB Analitika', icon: Activity, group: 'analytics' },
   { id: 'financials', label: 'Moliya', icon: Calculator, group: 'analytics' },
