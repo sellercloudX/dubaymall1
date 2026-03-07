@@ -198,18 +198,18 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   Premium
-                  <Badge className="bg-amber-500/10 text-amber-600 border-amber-200 text-[10px]">30% chegirma</Badge>
+                  <Badge className="bg-amber-500/10 text-amber-600 border-amber-200 text-[10px]">40% chegirma</Badge>
                 </CardTitle>
                 <CardDescription>Faol sotuvchilar uchun</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
                   <div className="text-3xl font-bold">{formatPrice(PLAN_PRICES.premium.amount_uzs)}</div>
-                  <div className="text-xs text-muted-foreground mt-1">3 oylik to'lov, aktivatsiya bepul</div>
+                  <div className="text-xs text-muted-foreground mt-1">Oylik to'lov, aktivatsiya bepul</div>
                 </div>
                 <ul className="space-y-2 text-sm">
                   <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-amber-500 shrink-0" /> Free'dagi barcha imkoniyatlar</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-amber-500 shrink-0" /> AI xizmatlar 30% arzon</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-amber-500 shrink-0" /> Pullik xizmatlar 40% arzon, cheksiz</li>
                   <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-amber-500 shrink-0" /> Oylik aktivatsiya bepul</li>
                   <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-amber-500 shrink-0" /> Ustuvor qo'llab-quvvatlash</li>
                 </ul>
@@ -408,7 +408,7 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
                     <p className="text-xs text-muted-foreground">{PLAN_PRICES.premium.duration}lik to'lov</p>
                   </div>
                   <ul className="space-y-1.5 text-xs text-muted-foreground">
-                    <li className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-amber-500" /> AI xizmatlar 30% arzon</li>
+                    <li className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-amber-500" /> Pullik xizmatlar 40% arzon, cheksiz</li>
                     <li className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-amber-500" /> Oylik aktivatsiya bepul</li>
                     <li className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-amber-500" /> Ustuvor qo'llab-quvvatlash</li>
                   </ul>
@@ -571,7 +571,7 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
                 </div>
                 <div className="text-center">
                   <Badge className="bg-amber-500/10 text-amber-600 border-amber-200 text-[10px] mb-1">Premium</Badge>
-                  <p className="text-[10px] text-muted-foreground">30% chegirma</p>
+                  <p className="text-[10px] text-muted-foreground">40% chegirma</p>
                 </div>
                 <div className="text-center">
                   <Badge className="bg-violet-500/10 text-violet-600 border-violet-200 text-[10px] mb-1">Elegant</Badge>
