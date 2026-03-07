@@ -218,7 +218,8 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
     try {
       await confirmOrders(selectedMp, ids);
       // Optimistically move orders to assembly tab
-      optimisticStatusUpdate(selectedMp, ids, 'PACKING');
+      const targetStatus = selectedMp === 'yandex' ? 'PROCESSING' : 'PACKING';
+      optimisticStatusUpdate(selectedMp, ids, targetStatus);
       setSelectedOrders(new Set());
       // Delayed refetch to let marketplace API update
       setTimeout(() => store.refetchOrders(selectedMp), 30000);
@@ -281,7 +282,7 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
         <div style="font-size:10px;color:#666;margin-top:2px;">ID: ${s.orderId || '—'}</div>
       </div>`)
       .join('');
-    printWindow.document.write(`<!DOCTYPE html><html><head><title>WB Stikerlar</title>
+    printWindow.document.write(`<!DOCTYPE html><html><head><title>Stikerlar</title>
       <style>
         @media print { body{margin:0;padding:0;} div{page-break-inside:avoid;} }
         body{font-family:sans-serif;padding:16px;}
@@ -292,11 +293,49 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
       </style></head><body>
       <div class="actions">
         <button class="primary" onclick="window.print()">🖨️ Pechat qilish</button>
-        <button onclick="downloadPdf()">📥 PDF yuklash</button>
       </div>
       ${stickerImgs}
+    </body></html>`);
+    printWindow.document.close();
+  };
+
+  // Open PDF labels in a print window (for Yandex/Uzum multi-label)
+  const openPdfLabelsPrintWindow = (labels: { pdf: string; orderId: string | number }[]) => {
+    const printWindow = window.open('', '_blank', 'width=800,height=900');
+    if (!printWindow) {
+      toast.error("Popup bloklangan. Brauzerni sozlang.");
+      return;
+    }
+    const embedFrames = labels.map((l, i) => `
+      <div style="page-break-after:always;margin-bottom:16px;">
+        <div style="font-size:12px;color:#666;margin-bottom:4px;">Buyurtma #${l.orderId} (${i + 1}/${labels.length})</div>
+        <iframe src="data:application/pdf;base64,${l.pdf}" style="width:100%;height:calc(100vh - 120px);border:1px solid #ddd;border-radius:4px;"></iframe>
+      </div>`).join('');
+    
+    printWindow.document.write(`<!DOCTYPE html><html><head><title>Etiketkalar (${labels.length} ta)</title>
+      <style>
+        body{font-family:sans-serif;padding:16px;margin:0;}
+        .actions{display:flex;gap:8px;margin-bottom:16px;justify-content:center;flex-wrap:wrap;}
+        .actions button{padding:8px 20px;font-size:14px;border-radius:6px;cursor:pointer;border:1px solid #ccc;background:#fff;}
+        .actions button.primary{background:#2563eb;color:#fff;border-color:#2563eb;}
+        .actions button.download{background:#059669;color:#fff;border-color:#059669;}
+        @media print{.actions{display:none !important;} iframe{height:auto !important;}}
+      </style></head><body>
+      <div class="actions">
+        <button class="primary" onclick="window.print()">🖨️ Barchasini pechat qilish</button>
+        <button class="download" onclick="downloadAll()">📥 Barchasini yuklab olish</button>
+      </div>
+      ${embedFrames}
       <script>
-        function downloadPdf(){window.print();}
+        const labels = ${JSON.stringify(labels.map(l => ({ pdf: l.pdf, orderId: l.orderId })))};
+        function downloadAll() {
+          labels.forEach(l => {
+            const a = document.createElement('a');
+            a.href = 'data:application/pdf;base64,' + l.pdf;
+            a.download = 'label_' + l.orderId + '.pdf';
+            a.click();
+          });
+        }
       </script>
     </body></html>`);
     printWindow.document.close();
