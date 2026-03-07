@@ -263,7 +263,7 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
       optimisticStatusUpdate(selectedMp, ids, 'CANCELLED');
       setCancelDialogOpen(false);
       setSelectedOrders(new Set());
-      setTimeout(() => store.refetchOrders(selectedMp), 10000);
+      setTimeout(() => store.refetchOrders(selectedMp), 30000);
     } catch {}
   };
 
