@@ -372,62 +372,109 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
       const successLabels = labelData.labels.filter((l: any) => l.success && l.pdf);
       if (successLabels.length === 0) { toast.error("Pechat uchun etiketka topilmadi"); return; }
 
-      // For PDF labels: embed each PDF in an iframe using object/embed tags
-      // Since hidden iframe PDF rendering is unreliable, we use a visible approach:
-      // Create a full-page overlay iframe with PDF embedded for printing
-      const pdfEmbeds = successLabels.flatMap((l: any) =>
-        Array.from({ length: labelCopies }).map(() =>
-          `<div class="label-page">
-            <embed src="data:application/pdf;base64,${l.pdf}" type="application/pdf" 
-              style="width:100%;height:100%;" />
-          </div>`
-        )
-      ).join('');
+      // Convert base64 PDFs to Blob URLs (data: URIs are blocked by Chrome)
+      const blobUrls: string[] = [];
+      successLabels.forEach((l: any) => {
+        const byteChars = atob(l.pdf);
+        const byteArr = new Uint8Array(byteChars.length);
+        for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
+        const blob = new Blob([byteArr], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        for (let c = 0; c < labelCopies; c++) blobUrls.push(url);
+      });
 
-      // Create a visible overlay for PDF printing since hidden iframe can't render PDFs
+      // Inject @media print styles to hide everything except our overlay
+      const printStyle = document.createElement('style');
+      printStyle.id = 'label-print-styles';
+      printStyle.textContent = `
+        @media print {
+          body > *:not(#pdf-print-overlay) { display: none !important; }
+          #pdf-print-overlay { position: static !important; }
+          #pdf-print-overlay [data-toolbar] { display: none !important; }
+          #pdf-print-overlay iframe { 
+            width: 100% !important; height: 100vh !important; 
+            page-break-after: always; border: none !important; 
+          }
+        }
+      `;
+      document.head.appendChild(printStyle);
+
+      // Create overlay
       const overlay = document.createElement('div');
       overlay.id = 'pdf-print-overlay';
       overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;background:white;display:flex;flex-direction:column;';
-      
+
       const toolbar = document.createElement('div');
+      toolbar.setAttribute('data-toolbar', 'true');
       toolbar.style.cssText = 'padding:12px 16px;background:#f8f9fa;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;';
       toolbar.innerHTML = `
         <span style="font-size:14px;font-weight:600;">📋 ${successLabels.length} ta etiketka (${labelCopies} nusxa)</span>
         <div style="display:flex;gap:8px;">
-          <button id="pdf-print-btn" style="padding:8px 20px;background:#2563eb;color:white;border:none;border-radius:6px;font-size:14px;cursor:pointer;">🖨️ Pechat qilish</button>
+          <button id="pdf-print-btn" style="padding:8px 20px;background:#2563eb;color:white;border:none;border-radius:6px;font-size:14px;cursor:pointer;font-weight:600;">🖨️ Pechat qilish</button>
           <button id="pdf-close-btn" style="padding:8px 16px;background:#6b7280;color:white;border:none;border-radius:6px;font-size:14px;cursor:pointer;">✕ Yopish</button>
         </div>
       `;
 
       const container = document.createElement('div');
-      container.style.cssText = 'flex:1;overflow:auto;';
-      
-      // For each PDF, create an iframe with the PDF
-      successLabels.forEach((l: any) => {
-        for (let c = 0; c < labelCopies; c++) {
-          const pdfFrame = document.createElement('iframe');
-          pdfFrame.style.cssText = 'width:100%;height:500px;border:1px solid #e5e7eb;margin-bottom:8px;';
-          pdfFrame.src = `data:application/pdf;base64,${l.pdf}`;
-          container.appendChild(pdfFrame);
-        }
+      container.style.cssText = 'flex:1;overflow:auto;padding:8px;';
+
+      // Use blob URLs for iframes (not data: URIs — Chrome blocks those)
+      blobUrls.forEach((url) => {
+        const pdfFrame = document.createElement('iframe');
+        pdfFrame.style.cssText = 'width:100%;height:600px;border:1px solid #e5e7eb;margin-bottom:8px;border-radius:4px;';
+        pdfFrame.src = url;
+        container.appendChild(pdfFrame);
       });
 
       overlay.appendChild(toolbar);
       overlay.appendChild(container);
       document.body.appendChild(overlay);
 
-      // Print button handler
+      // Print: open first PDF blob in new tab for native PDF printing
       document.getElementById('pdf-print-btn')?.addEventListener('click', () => {
-        // Hide overlay toolbar during print
-        toolbar.style.display = 'none';
-        window.print();
-        toolbar.style.display = 'flex';
+        // For single PDF, open blob URL directly — browser's native PDF viewer prints perfectly
+        if (blobUrls.length === 1) {
+          const w = window.open(blobUrls[0], '_blank');
+          if (!w) {
+            // Fallback: use iframe print
+            const frame = container.querySelector('iframe');
+            if (frame?.contentWindow) {
+              frame.contentWindow.focus();
+              frame.contentWindow.print();
+            } else {
+              toast.error("Popup bloklandi. Etiketkani yuklab oling.");
+            }
+          }
+        } else {
+          // Multiple PDFs: try printing each iframe's content
+          const frames = container.querySelectorAll('iframe');
+          let printed = false;
+          frames.forEach((frame) => {
+            try {
+              if (frame.contentWindow) {
+                frame.contentWindow.focus();
+                frame.contentWindow.print();
+                printed = true;
+              }
+            } catch (e) {
+              console.warn('Frame print failed:', e);
+            }
+          });
+          if (!printed) {
+            // Fallback: download all PDFs
+            toast.info("Pechat imkonsiz. Etiketkalarni yuklab oling.");
+          }
+        }
       });
 
-      // Close button handler  
-      document.getElementById('pdf-close-btn')?.addEventListener('click', () => {
+      const cleanup = () => {
         try { document.body.removeChild(overlay); } catch {}
-      });
+        try { document.head.removeChild(printStyle); } catch {}
+        // Revoke blob URLs after delay
+        setTimeout(() => blobUrls.forEach(u => URL.revokeObjectURL(u)), 60000);
+      };
+
+      document.getElementById('pdf-close-btn')?.addEventListener('click', cleanup);
 
       toast.success("Etiketkalar tayyor. 🖨️ Pechat tugmasini bosing.");
     }
