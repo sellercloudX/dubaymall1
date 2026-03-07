@@ -167,6 +167,8 @@ function BalanceTopup({ userId }: { userId?: string }) {
     </div>
   );
 }
+
+export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingProps) {
   const { user } = useAuth();
   const { 
     subscription, billing, totalDebt, accessStatus, isLoading,
