@@ -640,6 +640,25 @@ async function handleCallback(cq: any) {
     );
     return;
   }
+
+  // Partner unlink
+  if (data === 'partner_unlink') {
+    const { data: partnerLink } = await supabase
+      .from('telegram_chat_links')
+      .select('id, user_id')
+      .eq('telegram_chat_id', chatId)
+      .eq('is_admin', false)
+      .maybeSingle();
+
+    if (partnerLink) {
+      await supabase.from('telegram_chat_links').delete().eq('id', partnerLink.id);
+      await supabase.from('profiles').update({ telegram_linked: false }).eq('user_id', partnerLink.user_id);
+      await editMessage(chatId, msgId, '✅ Telegram uzildi. Qayta ulash uchun /start buyrug\'ini bering.');
+    } else {
+      await editMessage(chatId, msgId, '❌ Ulanish topilmadi.');
+    }
+    return;
+  }
 }
 
 // ==================== TEXT MESSAGE HANDLER ====================
@@ -648,13 +667,42 @@ async function handleText(chatId: number, text: string, username: string, firstN
   const admin = await isAdminChat(chatId);
 
   if (!admin) {
-    // Not admin — reject politely
+    // Check if partner linked
+    const { data: partnerLink } = await supabase
+      .from('telegram_chat_links')
+      .select('user_id')
+      .eq('telegram_chat_id', chatId)
+      .eq('is_admin', false)
+      .maybeSingle();
+
+    if (partnerLink) {
+      // Partner sending message to admin via Telegram
+      await supabase.from('support_messages').insert({
+        user_id: partnerLink.user_id, message: text, direction: 'partner_to_admin',
+      });
+
+      const profile = await getUserProfile(partnerLink.user_id);
+      const adminChatIds = await getAdminChatIds();
+      const partnerInfo = `👤 <b>${profile?.full_name || firstName}</b>\n📱 ${profile?.phone || 'N/A'}\n📧 ${profile?.email || 'N/A'}\n[UID:${partnerLink.user_id}]`;
+
+      for (const adminChatId of adminChatIds) {
+        await send(adminChatId,
+          `📩 <b>Yangi xabar (Telegram):</b>\n\n${partnerInfo}\n\n💬 ${text}\n\n<i>Javob: /reply ${partnerLink.user_id} [xabar]</i>`
+        );
+      }
+
+      await send(chatId, '✅ Xabar adminga yuborildi. Javobni shu yerda yoki ilovada olasiz.');
+      return;
+    }
+
+    // Not linked at all
     await send(chatId,
-      `⚠️ Bu bot faqat adminlar uchun.\n\n` +
-      `Hamkor bo'lsangiz, <b>sellercloudx.com</b> ilovasi orqali adminga murojaat qiling.\n\n` +
-      `Admin bo'lsangiz:\n1. <code>/link email@example.com</code>\n2. <code>/admin</code>`,
+      `⚠️ Akkaunt bog'lanmagan.\n\n` +
+      `🔗 Ulash uchun:\n1. <b>sellercloudx.com</b> → Bildirishnomalar → Telegram\n` +
+      `2. Kod oling va <code>/link KOD</code> yuboring\n\n` +
+      `📌 Admin: <code>/link email@example.com</code>`,
       { reply_markup: { inline_keyboard: [[
-        { text: '🌐 sellercloudx.com', url: 'https://sellercloudx.com' },
+        { text: '🌐 sellercloudx.com', url: 'https://sellercloudx.com/seller-cloud#notifications' },
       ]]} }
     );
     return;
