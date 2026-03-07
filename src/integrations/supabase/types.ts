@@ -2425,6 +2425,9 @@ export type Database = {
         Row: {
           activated_by: string | null
           activated_until: string | null
+          activation_fee_uzs: number | null
+          activation_paid_until: string | null
+          activation_trial_ends: string | null
           admin_notes: string | null
           admin_override: boolean
           commission_percent: number
@@ -2451,6 +2454,9 @@ export type Database = {
         Insert: {
           activated_by?: string | null
           activated_until?: string | null
+          activation_fee_uzs?: number | null
+          activation_paid_until?: string | null
+          activation_trial_ends?: string | null
           admin_notes?: string | null
           admin_override?: boolean
           commission_percent?: number
@@ -2477,6 +2483,9 @@ export type Database = {
         Update: {
           activated_by?: string | null
           activated_until?: string | null
+          activation_fee_uzs?: number | null
+          activation_paid_until?: string | null
+          activation_trial_ends?: string | null
           admin_notes?: string | null
           admin_override?: boolean
           commission_percent?: number

@@ -3,6 +3,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
+export const MIN_TOPUP_UZS = 300_000;
+export const ACTIVATION_FEE_UZS = 99_000;
+export const TRIAL_DAYS = 7;
+
 export interface FeaturePrice {
   id: string;
   feature_key: string;
@@ -141,6 +145,30 @@ export function useUserBalance() {
     return { ...result, price: access.price, tier: access.tier };
   };
 
+  const payActivation = async () => {
+    if (!user) return { success: false, error: 'not_authenticated' };
+    // Deduct activation fee from balance
+    const { data, error } = await supabase.rpc('deduct_balance', {
+      p_user_id: user.id,
+      p_amount: ACTIVATION_FEE_UZS,
+      p_feature_key: 'monthly-activation',
+      p_description: 'Oylik aktivatsiya to\'lovi',
+    });
+    if (error) throw error;
+    const result = data as any;
+    if (result.success) {
+      // Update subscription activation_paid_until
+      await supabase
+        .from('sellercloud_subscriptions')
+        .update({ activation_paid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() })
+        .eq('user_id', user.id);
+      queryClient.invalidateQueries({ queryKey: ['user-balance'] });
+      queryClient.invalidateQueries({ queryKey: ['balance-transactions'] });
+      toast.success('Oylik aktivatsiya muvaffaqiyatli to\'landi!');
+    }
+    return result;
+  };
+
   return {
     balance,
     isLoading,
@@ -148,6 +176,7 @@ export function useUserBalance() {
     loadingTx,
     checkFeatureAccess,
     deductBalance,
+    payActivation,
     refetch: () => queryClient.invalidateQueries({ queryKey: ['user-balance'] }),
   };
 }

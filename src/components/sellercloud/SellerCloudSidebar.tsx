@@ -13,7 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { MarketplaceLogo, MARKETPLACE_CONFIG } from '@/lib/marketplaceConfig';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useUserBalance } from '@/hooks/useFeaturePricing';
+import { useUserBalance, MIN_TOPUP_UZS } from '@/hooks/useFeaturePricing';
 
 export interface SellerMenuItem {
   id: string;
@@ -190,6 +190,9 @@ export function SellerCloudSidebar({ activeTab, onTabChange, connectedMarketplac
             </div>
             <p className="text-base font-bold text-foreground">
               {balance ? Number(balance.balance_uzs).toLocaleString() : '0'} <span className="text-xs font-normal text-muted-foreground">UZS</span>
+            </p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">
+              Min. to'ldirish: {MIN_TOPUP_UZS.toLocaleString()} so'm
             </p>
           </button>
         </div>
