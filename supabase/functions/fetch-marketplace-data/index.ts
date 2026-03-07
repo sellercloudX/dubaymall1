@@ -1784,6 +1784,7 @@ serve(async (req) => {
         // GET /v2/fbs/orders
         try {
           let allOrders: any[] = [];
+          const orderIdsSeen = new Set<string>();
           let page = 0;
           let hasMore = true;
           const pageSize = 50; // Uzum max 50 per page
@@ -1795,12 +1796,20 @@ serve(async (req) => {
             'COMPLETED', 'CANCELED', 'PENDING_CANCELLATION', 'RETURNED'
           ];
 
+          // Fetch orders from ALL shops, not just primary
+          const orderShopIds = allShopIds.length > 0 ? allShopIds : (uzumShopId ? [String(uzumShopId)] : []);
+          
           for (let si = 0; si < orderStatuses.length; si++) {
             const orderStatus = orderStatuses[si];
             // Add delay between status queries to avoid 429 rate limits
             if (si > 0) await sleep(500);
-            page = 0;
-            hasMore = true;
+            
+            for (let shopIdx = 0; shopIdx < orderShopIds.length; shopIdx++) {
+              const currentOrderShopId = orderShopIds[shopIdx];
+              if (shopIdx > 0) await sleep(300); // Delay between shops
+              
+              page = 0;
+              hasMore = true;
 
             while (hasMore) {
               const params = new URLSearchParams({
@@ -1808,10 +1817,8 @@ serve(async (req) => {
                 page: String(page),
                 status: orderStatus,
               });
-              // shopIds is required - pass as array param
-              if (uzumShopId) {
-                params.append("shopIds", String(uzumShopId));
-              }
+              // shopIds is required - pass each shop
+              params.append("shopIds", String(currentOrderShopId));
               // dateFrom/dateTo are int64 timestamps (milliseconds)
               if (fromDate) {
                 const ts = new Date(fromDate).getTime();
@@ -1964,7 +1971,14 @@ serve(async (req) => {
               };
             });
 
-            allOrders = [...allOrders, ...mapped];
+            // Deduplicate orders across shops
+            for (const order of mapped) {
+              const ordKey = String(order.id);
+              if (!orderIdsSeen.has(ordKey)) {
+                orderIdsSeen.add(ordKey);
+                allOrders.push(order);
+              }
+            }
 
             if (orderList.length < pageSize || !fetchAll) {
               hasMore = false;
@@ -1973,6 +1987,7 @@ serve(async (req) => {
               await sleep(300);
             }
             } // end while
+            } // end for shops
           } // end for statuses
 
           // Calculate total revenue from non-cancelled orders

@@ -147,16 +147,16 @@ export function useMarketplaceDataStore(connectedMarketplaces: string[]) {
             total: result.data?.length || 0,
           };
         },
-        staleTime: 1000 * 60 * 30, // 30 min — prevent refetch on mount
-        gcTime: 1000 * 60 * 60 * 24,
-        refetchOnWindowFocus: false,
-        refetchOnMount: false, // Don't refetch when component mounts
-        refetchInterval: false, // No auto-refresh — only manual refresh
-        retry: 2,
-       retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10000),
-       networkMode: 'offlineFirst' as const,
-     })),
-   });
+         staleTime: 1000 * 60 * 5, // 5 min — keep orders fresher
+         gcTime: 1000 * 60 * 60 * 24,
+         refetchOnWindowFocus: false,
+         refetchOnMount: 'always' as const, // Always refetch orders on mount for fresh data
+         refetchInterval: 1000 * 60 * 10, // Auto-refresh every 10 min
+         retry: 2,
+        retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10000),
+        networkMode: 'offlineFirst' as const,
+      })),
+    });
    
    // Only return memoizedMarketplaces to stabilize query keys
    // This prevents infinite loops when connectedMarketplaces array changes
