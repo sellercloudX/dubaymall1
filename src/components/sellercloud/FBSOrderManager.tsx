@@ -193,11 +193,14 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
         const substatus = (o as any).substatus?.toUpperCase();
         
         // Yandex special: PROCESSING/STARTED = new, PROCESSING/READY_TO_SHIP = assembly
-        if (status === 'PROCESSING' && substatus === 'STARTED') {
-          return tab.key === 'new';
-        }
-        if (status === 'PROCESSING' && substatus === 'READY_TO_SHIP') {
+        if (selectedMp === 'yandex' && status === 'PROCESSING') {
+          if (substatus === 'STARTED') return tab.key === 'new';
+          if (substatus === 'READY_TO_SHIP' || substatus === 'SHIPPED') return tab.key === 'assembly';
+          // PROCESSING without recognized substatus → assembly
           return tab.key === 'assembly';
+        }
+        if (selectedMp === 'yandex' && status === 'DELIVERY') {
+          return tab.key === 'shipping';
         }
         
         return tab.statuses.some(s => status === s.toUpperCase());
