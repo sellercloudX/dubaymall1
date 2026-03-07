@@ -364,18 +364,22 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
   const handleDownloadLabels = () => {
     if (!labelData) return;
     if (labelData.type === 'sticker' && labelData.stickers) {
-      labelData.stickers.forEach(s => {
-        const a = document.createElement('a');
-        a.href = `data:image/png;base64,${s.file}`;
-        a.download = `stiker_${s.orderId || 'unknown'}.png`;
-        a.click();
+      labelData.stickers.forEach((s, idx) => {
+        setTimeout(() => {
+          const a = document.createElement('a');
+          a.href = `data:image/png;base64,${s.file}`;
+          a.download = `stiker_${s.orderId || 'unknown'}.png`;
+          a.click();
+        }, idx * 300);
       });
     } else if (labelData.type === 'pdf' && labelData.labels) {
-      labelData.labels.forEach(l => {
-        const a = document.createElement('a');
-        a.href = `data:application/pdf;base64,${l.pdf}`;
-        a.download = `etiketka_${l.orderId}.pdf`;
-        a.click();
+      labelData.labels.forEach((l, idx) => {
+        setTimeout(() => {
+          const a = document.createElement('a');
+          a.href = `data:application/pdf;base64,${l.pdf}`;
+          a.download = `etiketka_${l.orderId}.pdf`;
+          a.click();
+        }, idx * 300);
       });
     }
     toast.success("Yuklab olindi");
