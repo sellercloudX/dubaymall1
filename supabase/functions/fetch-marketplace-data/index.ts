@@ -1851,15 +1851,20 @@ serve(async (req) => {
             
             console.log(`Uzum orders (${orderStatus}) page ${page}: ${orderList.length} orders`);
 
-            // Log first order structure for debugging order numbers
-            if (page === 0 && allOrders.length === 0 && orderList.length > 0) {
+            // Log first order structure for debugging — for EVERY shop's first batch
+            if (page === 0 && orderList.length > 0) {
               const sampleOrder = orderList[0];
-              console.log(`[UZUM ORDER DEBUG] Order keys: ${JSON.stringify(Object.keys(sampleOrder))}`);
-              console.log(`[UZUM ORDER DEBUG] id=${sampleOrder.id}, orderId=${sampleOrder.orderId}, orderCode=${sampleOrder.orderCode}, orderNumber=${sampleOrder.orderNumber}, code=${sampleOrder.code}`);
-              const sampleItems = sampleOrder.items || sampleOrder.orderItems || [];
-              if (sampleItems.length > 0) {
-                const s = sampleItems[0];
-                console.log(`Uzum order item[0] keys: ${JSON.stringify(Object.keys(s))}`);
+              console.log(`[UZUM ORDER KEYS] shop=${currentOrderShopId} status=${orderStatus} keys=${JSON.stringify(Object.keys(sampleOrder))}`);
+              // Log ALL date-related fields
+              const dateFields = ['createdAt', 'createDate', 'dateCreated', 'created_at', 'orderDate', 'date', 'updatedAt', 'updateDate', 'completedAt', 'deliveredAt', 'acceptDate', 'statusDate'];
+              const dateValues: Record<string, any> = {};
+              for (const f of dateFields) {
+                if (sampleOrder[f] !== undefined) dateValues[f] = sampleOrder[f];
+              }
+              console.log(`[UZUM DATE FIELDS] shop=${currentOrderShopId} status=${orderStatus}: ${JSON.stringify(dateValues)}`);
+              if (Object.keys(dateValues).length === 0) {
+                // No known date field found — dump first 500 chars of order
+                console.log(`[UZUM ORDER RAW] ${JSON.stringify(sampleOrder).substring(0, 800)}`);
               }
             }
 
