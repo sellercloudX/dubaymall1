@@ -53,15 +53,20 @@ serve(async (req) => {
     if (connection.encrypted_credentials) {
       try {
         const { data: decData } = await supabase.rpc("decrypt_credentials", { p_encrypted: connection.encrypted_credentials });
-        credentials = decData;
+        credentials = typeof decData === "string" ? JSON.parse(decData) : decData;
       } catch {
-        credentials = connection.credentials;
+        try {
+          credentials = typeof connection.credentials === "string" ? JSON.parse(connection.credentials) : connection.credentials;
+        } catch {
+          credentials = connection.credentials;
+        }
       }
     } else {
-      credentials = connection.credentials;
+      credentials = typeof connection.credentials === "string" ? JSON.parse(connection.credentials) : connection.credentials;
     }
 
     const { apiKey, campaignId, businessId } = credentials || {};
+    console.log(`[manage-orders] marketplace=${marketplace}, action=${body.action}, hasApiKey=${!!apiKey}, keyLen=${apiKey?.length || 0}`);
     let result: any = { success: false };
 
     // ========== UZUM MARKET ==========
