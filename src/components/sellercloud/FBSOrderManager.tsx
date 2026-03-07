@@ -171,11 +171,16 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
         supplyName: wbSupplyName || undefined,
       });
       const successCount = result.results?.filter((r: any) => r.success).length || 0;
+      const successIds = result.results
+        ?.filter((r: any) => r.success)
+        ?.map((r: any) => r.orderId || r.id) || ids;
       if (result.supplyId) {
         toast.success(`Postavka ${result.supplyId} yaratildi. ${successCount}/${ids.length} buyurtma qo'shildi`);
       } else {
         toast.success(`${successCount}/${ids.length} buyurtma tasdiqlandi`);
       }
+      // Optimistically move confirmed orders to assembly tab
+      optimisticStatusUpdate('wildberries', successIds, 'PACKING');
       setWbSupplyDialogOpen(false);
       setWbSupplyName('');
       setSelectedOrders(new Set());
