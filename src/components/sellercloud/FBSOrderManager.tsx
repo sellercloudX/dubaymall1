@@ -221,7 +221,7 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
       optimisticStatusUpdate(selectedMp, ids, 'PACKING');
       setSelectedOrders(new Set());
       // Delayed refetch to let marketplace API update
-      setTimeout(() => store.refetchOrders(selectedMp), 10000);
+      setTimeout(() => store.refetchOrders(selectedMp), 30000);
     } catch {}
   };
 
@@ -250,7 +250,7 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
       setWbSupplyName('');
       setSelectedOrders(new Set());
       // Delayed refetch to let WB API update statuses
-      setTimeout(() => store.refetchOrders(selectedMp), 10000);
+      setTimeout(() => store.refetchOrders(selectedMp), 30000);
     } catch {}
   };
 
