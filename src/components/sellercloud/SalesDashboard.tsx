@@ -248,6 +248,7 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
       case 'delivered': return <CheckCircle className="h-3.5 w-3.5 text-emerald-600" />;
       case 'cancelled': return <XCircle className="h-3.5 w-3.5 text-destructive" />;
       case 'assembly': return <Clock className="h-3.5 w-3.5 text-amber-500" />;
+      case 'new': return <Package className="h-3.5 w-3.5 text-orange-500" />;
       default: return <Truck className="h-3.5 w-3.5 text-blue-500" />;
     }
   };
