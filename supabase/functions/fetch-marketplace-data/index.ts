@@ -1979,6 +1979,7 @@ serve(async (req) => {
               await sleep(300);
             }
             } // end while
+            } // end for shops
           } // end for statuses
 
           // Calculate total revenue from non-cancelled orders
