@@ -224,13 +224,13 @@ export default function SellerCloudX() {
       case 'wb-analytics':
         return <WBSellerAnalytics connectedMarketplaces={connectedMarketplaces} />;
       case 'financials':
-        return <FinancialDashboard connectedMarketplaces={connectedMarketplaces} store={store} monthlyFee={subscription?.monthly_fee || 499} commissionPercent={subscription?.commission_percent || 4} />;
+        return <FinancialDashboard connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'abc':
-        return <ABCAnalysis connectedMarketplaces={connectedMarketplaces} store={store} commissionPercent={subscription?.commission_percent || 4} />;
+        return <ABCAnalysis connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'cost-prices':
         return <CostPriceManager connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'calculator':
-        return <ProfitCalculator commissionPercent={subscription?.commission_percent || 4} />;
+        return <ProfitCalculator />;
       case 'competitor':
         return <CompetitorPriceMonitor connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'inventory':
@@ -242,7 +242,7 @@ export default function SellerCloudX() {
       case 'ads':
         return <WBAdsCampaigns connectedMarketplaces={connectedMarketplaces} />;
       case 'min-price':
-        return <MinPriceProtection connectedMarketplaces={connectedMarketplaces} store={store} commissionPercent={subscription?.commission_percent || 4} />;
+        return <MinPriceProtection connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'clone':
         return <CardCloner connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'problems':
