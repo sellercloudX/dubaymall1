@@ -245,11 +245,11 @@ serve(async (req) => {
       const wbHeaders = { "Authorization": apiKey, "Content-Type": "application/json" };
 
       if (action === "labels") {
-        // POST /api/v3/orders/stickers
+        // POST /api/v3/orders/stickers — type/width/height are query params, body is only orders
         const ids = orderIds || [orderId];
-        const resp = await fetch("https://marketplace-api.wildberries.ru/api/v3/orders/stickers", {
+        const resp = await fetch("https://marketplace-api.wildberries.ru/api/v3/orders/stickers?type=png&width=58&height=40", {
           method: "POST", headers: wbHeaders,
-          body: JSON.stringify({ orders: ids.map(Number), type: "png", width: 58, height: 40 }),
+          body: JSON.stringify({ orders: ids.map(Number) }),
         });
         if (resp.ok) {
           const data = await resp.json();
