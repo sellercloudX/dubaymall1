@@ -61,6 +61,14 @@ const CANCEL_REASONS: Record<string, { value: string; label: string }[]> = {
   ],
 };
 
+// Label size presets
+const LABEL_SIZES = [
+  { key: '58x40', label: '58×40 mm (termal stiker)', width: 58, height: 40 },
+  { key: '80x50', label: '80×50 mm', width: 80, height: 50 },
+  { key: '100x150', label: '100×150 mm (A6)', width: 100, height: 150 },
+  { key: 'a4', label: 'A4 (210×297 mm)', width: 210, height: 297 },
+];
+
 export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManagerProps) {
   const [selectedMp, setSelectedMp] = useState(connectedMarketplaces[0] || '');
   const [activeTab, setActiveTab] = useState('new');
@@ -75,6 +83,13 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
   // WB supply dialog
   const [wbSupplyDialogOpen, setWbSupplyDialogOpen] = useState(false);
   const [wbSupplyName, setWbSupplyName] = useState('');
+  // Label print dialog
+  const [labelDialogOpen, setLabelDialogOpen] = useState(false);
+  const [labelData, setLabelData] = useState<{ type: 'sticker' | 'pdf'; stickers?: any[]; labels?: any[] } | null>(null);
+  const [labelSize, setLabelSize] = useState('58x40');
+  const [labelCopies, setLabelCopies] = useState(1);
+  const [labelAutocut, setLabelAutocut] = useState(true);
+  const labelPrintRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
   // Track optimistic status overrides that survive cache refetches
