@@ -160,13 +160,43 @@ async function cmdStart(chatId: number, firstName: string) {
       { reply_markup: adminMainMenu() }
     );
   } else {
-    await send(chatId,
-      `👋 <b>${firstName}</b>, bu SellerCloudX admin botidir.\n\n` +
-      `🔗 Admin sifatida ro'yxatdan o'tish:\n` +
-      `1. <code>/link email@example.com</code>\n` +
-      `2. <code>/admin</code>\n\n` +
-      `⚠️ Bu bot faqat adminlar uchun. Hamkorlar <b>sellercloudx.com</b> ilovasi orqali murojaat qiladi.`
-    );
+    // Check if already linked as partner
+    const { data: partnerLink } = await supabase
+      .from('telegram_chat_links')
+      .select('user_id')
+      .eq('telegram_chat_id', chatId)
+      .eq('is_admin', false)
+      .maybeSingle();
+
+    if (partnerLink) {
+      const profile = await getUserProfile(partnerLink.user_id);
+      await send(chatId,
+        `👋 <b>${profile?.full_name || firstName}</b>, xush kelibsiz!\n\n` +
+        `📱 Siz SellerCloudX bildirishnomalarini shu chatda olasiz:\n` +
+        `• 🛒 Yangi buyurtmalar\n` +
+        `• 📦 Kam qoldiq\n` +
+        `• ⭐ Sharhlar\n` +
+        `• ⚠️ Xatoliklar\n\n` +
+        `Sozlamalar: <b>sellercloudx.com → Bildirishnomalar</b>`,
+        { reply_markup: { inline_keyboard: [
+          [{ text: '🌐 Ilovaga o\'tish', url: 'https://sellercloudx.com/seller-cloud#notifications' }],
+          [{ text: '❌ Uzish', callback_data: 'partner_unlink' }],
+        ]} }
+      );
+    } else {
+      await send(chatId,
+        `👋 <b>${firstName}</b>, SellerCloudX botiga xush kelibsiz!\n\n` +
+        `🔗 <b>Akkauntni ulash:</b>\n` +
+        `1. <b>sellercloudx.com</b> ga kiring\n` +
+        `2. <b>Bildirishnomalar → Telegram</b> bo'limiga o'ting\n` +
+        `3. "Kod yaratish" tugmasini bosing\n` +
+        `4. Kodni shu botga yuboring: <code>/link KOD</code>\n\n` +
+        `📌 Admin bo'lsangiz: <code>/link email@example.com</code>`,
+        { reply_markup: { inline_keyboard: [[
+          { text: '🌐 sellercloudx.com', url: 'https://sellercloudx.com/seller-cloud#notifications' },
+        ]]} }
+      );
+    }
   }
 }
 
