@@ -203,6 +203,40 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
   };
 
   // ===== LABELS =====
+  const openStickersPrintWindow = (stickers: { file: string; orderId?: string | number }[]) => {
+    const printWindow = window.open('', '_blank', 'width=800,height=600');
+    if (!printWindow) {
+      toast.error("Popup bloklangan. Brauzerni sozlang.");
+      return;
+    }
+    const stickerImgs = stickers
+      .filter(s => s.file)
+      .map(s => `<div style="page-break-inside:avoid;margin:8px auto;text-align:center;">
+        <img src="data:image/png;base64,${s.file}" style="width:58mm;height:40mm;object-fit:contain;" />
+        <div style="font-size:10px;color:#666;margin-top:2px;">ID: ${s.orderId || '—'}</div>
+      </div>`)
+      .join('');
+    printWindow.document.write(`<!DOCTYPE html><html><head><title>WB Stikerlar</title>
+      <style>
+        @media print { body{margin:0;padding:0;} div{page-break-inside:avoid;} }
+        body{font-family:sans-serif;padding:16px;}
+        .actions{display:flex;gap:8px;margin-bottom:16px;justify-content:center;}
+        .actions button{padding:8px 20px;font-size:14px;border-radius:6px;cursor:pointer;border:1px solid #ccc;background:#fff;}
+        .actions button.primary{background:#2563eb;color:#fff;border-color:#2563eb;}
+        @media print{.actions{display:none !important;}}
+      </style></head><body>
+      <div class="actions">
+        <button class="primary" onclick="window.print()">🖨️ Pechat qilish</button>
+        <button onclick="downloadPdf()">📥 PDF yuklash</button>
+      </div>
+      ${stickerImgs}
+      <script>
+        function downloadPdf(){window.print();}
+      </script>
+    </body></html>`);
+    printWindow.document.close();
+  };
+
   const handlePrintLabels = async () => {
     const ids = getSelectedIds();
     if (ids.length === 0) return toast.warning("Buyurtma tanlang");
@@ -219,15 +253,9 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
           toast.warning("Stikerlar topilmadi. Buyurtmalar yig'ish holatida ekanligini tekshiring.");
           return;
         }
-        result.stickers.forEach((s: any) => {
-          if (s.file) {
-            const link = document.createElement('a');
-            link.href = `data:image/png;base64,${s.file}`;
-            link.download = `sticker_${s.orderId || 'wb'}.png`;
-            link.click();
-          }
-        });
-        toast.success(`${result.stickers.length} ta stiker yuklandi`);
+        // Open print window with all stickers
+        openStickersPrintWindow(result.stickers);
+        toast.success(`${result.stickers.length} ta stiker tayyor — pechat qiling yoki PDF saqlang`);
       } else if (result?.labels) {
         // Multiple PDFs as base64
         result.labels.forEach((l: any) => {
