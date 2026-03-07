@@ -312,76 +312,49 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
   };
 
   // ===== LABELS =====
-  const openStickersPrintWindow = (stickers: { file: string; orderId?: string | number }[]) => {
+  const handlePrintFromDialog = () => {
+    if (!labelPrintRef.current) return;
+    const size = LABEL_SIZES.find(s => s.key === labelSize) || LABEL_SIZES[0];
     const printWindow = window.open('', '_blank', 'width=800,height=600');
     if (!printWindow) {
       toast.error("Popup bloklangan. Brauzerni sozlang.");
       return;
     }
-    const stickerImgs = stickers
-      .filter(s => s.file)
-      .map(s => `<div style="page-break-inside:avoid;margin:8px auto;text-align:center;">
-        <img src="data:image/png;base64,${s.file}" style="width:58mm;height:40mm;object-fit:contain;" />
-        <div style="font-size:10px;color:#666;margin-top:2px;">ID: ${s.orderId || '—'}</div>
-      </div>`)
-      .join('');
-    printWindow.document.write(`<!DOCTYPE html><html><head><title>Stikerlar</title>
+
+    const content = labelPrintRef.current.innerHTML;
+    printWindow.document.write(`<!DOCTYPE html><html><head><title>Etiketkalar</title>
       <style>
-        @media print { body{margin:0;padding:0;} div{page-break-inside:avoid;} }
-        body{font-family:sans-serif;padding:16px;}
-        .actions{display:flex;gap:8px;margin-bottom:16px;justify-content:center;}
-        .actions button{padding:8px 20px;font-size:14px;border-radius:6px;cursor:pointer;border:1px solid #ccc;background:#fff;}
-        .actions button.primary{background:#2563eb;color:#fff;border-color:#2563eb;}
-        @media print{.actions{display:none !important;}}
-      </style></head><body>
-      <div class="actions">
-        <button class="primary" onclick="window.print()">🖨️ Pechat qilish</button>
-      </div>
-      ${stickerImgs}
-    </body></html>`);
+        @page { size: ${size.width}mm ${size.height}mm; margin: 0; }
+        @media print { body{margin:0;padding:0;} .label-item{page-break-after:${labelAutocut ? 'always' : 'auto'};} }
+        body{font-family:sans-serif;margin:0;padding:0;}
+        .label-item{display:flex;align-items:center;justify-content:center;width:${size.width}mm;height:${size.height}mm;overflow:hidden;}
+        .label-item img{max-width:100%;max-height:100%;object-fit:contain;}
+        .label-item iframe{width:100%;height:100%;border:none;}
+      </style></head><body>${content}</body></html>`);
     printWindow.document.close();
+    setTimeout(() => {
+      printWindow.print();
+    }, 500);
   };
 
-  // Open PDF labels in a print window (for Yandex/Uzum multi-label)
-  const openPdfLabelsPrintWindow = (labels: { pdf: string; orderId: string | number }[]) => {
-    const printWindow = window.open('', '_blank', 'width=800,height=900');
-    if (!printWindow) {
-      toast.error("Popup bloklangan. Brauzerni sozlang.");
-      return;
+  const handleDownloadLabels = () => {
+    if (!labelData) return;
+    if (labelData.type === 'sticker' && labelData.stickers) {
+      labelData.stickers.forEach(s => {
+        const a = document.createElement('a');
+        a.href = `data:image/png;base64,${s.file}`;
+        a.download = `stiker_${s.orderId || 'unknown'}.png`;
+        a.click();
+      });
+    } else if (labelData.type === 'pdf' && labelData.labels) {
+      labelData.labels.forEach(l => {
+        const a = document.createElement('a');
+        a.href = `data:application/pdf;base64,${l.pdf}`;
+        a.download = `etiketka_${l.orderId}.pdf`;
+        a.click();
+      });
     }
-    const embedFrames = labels.map((l, i) => `
-      <div style="page-break-after:always;margin-bottom:16px;">
-        <div style="font-size:12px;color:#666;margin-bottom:4px;">Buyurtma #${l.orderId} (${i + 1}/${labels.length})</div>
-        <iframe src="data:application/pdf;base64,${l.pdf}" style="width:100%;height:calc(100vh - 120px);border:1px solid #ddd;border-radius:4px;"></iframe>
-      </div>`).join('');
-    
-    printWindow.document.write(`<!DOCTYPE html><html><head><title>Etiketkalar (${labels.length} ta)</title>
-      <style>
-        body{font-family:sans-serif;padding:16px;margin:0;}
-        .actions{display:flex;gap:8px;margin-bottom:16px;justify-content:center;flex-wrap:wrap;}
-        .actions button{padding:8px 20px;font-size:14px;border-radius:6px;cursor:pointer;border:1px solid #ccc;background:#fff;}
-        .actions button.primary{background:#2563eb;color:#fff;border-color:#2563eb;}
-        .actions button.download{background:#059669;color:#fff;border-color:#059669;}
-        @media print{.actions{display:none !important;} iframe{height:auto !important;}}
-      </style></head><body>
-      <div class="actions">
-        <button class="primary" onclick="window.print()">🖨️ Barchasini pechat qilish</button>
-        <button class="download" onclick="downloadAll()">📥 Barchasini yuklab olish</button>
-      </div>
-      ${embedFrames}
-      <script>
-        const labels = ${JSON.stringify(labels.map(l => ({ pdf: l.pdf, orderId: l.orderId })))};
-        function downloadAll() {
-          labels.forEach(l => {
-            const a = document.createElement('a');
-            a.href = 'data:application/pdf;base64,' + l.pdf;
-            a.download = 'label_' + l.orderId + '.pdf';
-            a.click();
-          });
-        }
-      </script>
-    </body></html>`);
-    printWindow.document.close();
+    toast.success("Yuklab olindi");
   };
 
   const handlePrintLabels = async () => {
@@ -400,18 +373,18 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
           toast.warning("Stikerlar topilmadi. Buyurtmalar yig'ish holatida ekanligini tekshiring.");
           return;
         }
-        openStickersPrintWindow(result.stickers);
-        toast.success(`${result.stickers.length} ta stiker tayyor — pechat qiling`);
+        setLabelData({ type: 'sticker', stickers: result.stickers });
+        setLabelSize('58x40');
+        setLabelDialogOpen(true);
       } else if (result?.labels) {
-        // Collect all successful labels
         const successLabels = result.labels.filter((l: any) => l.success && l.pdf);
         if (successLabels.length === 0) {
           toast.error("Etiketkalar yuklanmadi. Buyurtmalar yig'ish holatida ekanligini tekshiring.");
           return;
         }
-        // Open all in a single print window
-        openPdfLabelsPrintWindow(successLabels);
-        toast.success(`${successLabels.length} ta etiketka tayyor — pechat qiling`);
+        setLabelData({ type: 'pdf', labels: successLabels });
+        setLabelSize('100x150');
+        setLabelDialogOpen(true);
       } else {
         toast.success("Etiketka tayyor");
       }
