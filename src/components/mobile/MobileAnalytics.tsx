@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 import { MarketplaceLogo } from '@/lib/marketplaceConfig';
 import { toDisplayUzs } from '@/lib/currency';
+import { getOrderRevenueUzs, isExcludedOrder, buildOrderMarketplaceMap } from '@/lib/revenueCalculations';
 
 interface MobileAnalyticsProps {
   connections: any[];
@@ -23,14 +24,11 @@ export function MobileAnalytics({ connections, connectedMarketplaces, store }: M
     const totalOrders = allOrders.length;
     
     // Build order→marketplace map for efficient currency conversion
-    const orderMpMap = new Map<number, string>();
-    connectedMarketplaces.forEach(mp => {
-      store.getOrders(mp).forEach(o => orderMpMap.set(o.id, mp));
-    });
+    const orderMpMap = buildOrderMarketplaceMap(store.getOrders, connectedMarketplaces);
     
-    const validOrders = allOrders.filter(o => !['CANCELLED', 'RETURNED'].includes(o.status));
+    const validOrders = allOrders.filter(o => !isExcludedOrder(o));
     const totalRevenue = validOrders.reduce((sum, o) => {
-      return sum + toDisplayUzs(o.total || 0, orderMpMap.get(o.id) || '');
+      return sum + getOrderRevenueUzs(o, orderMpMap.get(o.id) || '');
     }, 0);
     const avgCheck = validOrders.length > 0 ? Math.round(totalRevenue / validOrders.length) : 0;
     const pendingOrders = allOrders.filter(o => o.status === 'PENDING').length;

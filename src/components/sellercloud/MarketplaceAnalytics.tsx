@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, AreaChart, Area } from 'recharts';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 import { toDisplayUzs } from '@/lib/currency';
+import { getOrderRevenueUzs, isExcludedOrder } from '@/lib/revenueCalculations';
 
 interface MarketplaceAnalyticsProps {
   connectedMarketplaces: string[];
@@ -46,8 +47,8 @@ export function MarketplaceAnalytics({ connectedMarketplaces, store }: Marketpla
       const orders = store.getOrders(marketplace);
       const productsCount = products.length;
       const ordersCount = orders.length;
-      const activeOrders = orders.filter(o => !['CANCELLED', 'RETURNED'].includes(o.status));
-      const totalRevenue = activeOrders.reduce((sum, order) => sum + toDisplayUzs(order.total || 0, marketplace), 0);
+      const activeOrders = orders.filter(o => !isExcludedOrder(o));
+      const totalRevenue = activeOrders.reduce((sum, order) => sum + getOrderRevenueUzs(order, marketplace), 0);
       const cancelledOrders = orders.filter(o => ['CANCELLED', 'RETURNED'].includes(o.status)).length;
       const cancelRate = ordersCount > 0 ? ((cancelledOrders / ordersCount) * 100).toFixed(1) : '0';
 
@@ -91,11 +92,11 @@ export function MarketplaceAnalytics({ connectedMarketplaces, store }: Marketpla
     }
     connectedMarketplaces.forEach(mp => {
       store.getOrders(mp)
-        .filter(o => !['CANCELLED', 'RETURNED'].includes(o.status))
+        .filter(o => !isExcludedOrder(o))
         .forEach(o => {
           const day = new Date(o.createdAt).toISOString().split('T')[0];
           if (dailyMap.has(day)) {
-            dailyMap.set(day, (dailyMap.get(day) || 0) + toDisplayUzs(o.total || 0, mp));
+            dailyMap.set(day, (dailyMap.get(day) || 0) + getOrderRevenueUzs(o, mp));
           }
         });
     });
@@ -118,7 +119,7 @@ export function MarketplaceAnalytics({ connectedMarketplaces, store }: Marketpla
       });
 
       store.getOrders(mp)
-        .filter(o => !['CANCELLED', 'RETURNED'].includes(o.status))
+        .filter(o => !isExcludedOrder(o))
         .forEach(o => {
           (o.items || []).forEach((item: any) => {
             const key = `${mp}:${item.offerId || item.nmID || item.name}`;
