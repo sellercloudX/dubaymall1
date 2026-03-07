@@ -78,8 +78,8 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
   const queryClient = useQueryClient();
 
   // Track optimistic status overrides that survive cache refetches
-  // Map<orderId, { newStatus, timestamp, originalOrder }>
-  const optimisticOverridesRef = useRef<Map<string, { newStatus: string; timestamp: number; order: MarketplaceOrder }>>(new Map());
+  // Map<orderId, { newStatus, newSubstatus, timestamp, originalOrder }>
+  const optimisticOverridesRef = useRef<Map<string, { newStatus: string; newSubstatus?: string; timestamp: number; order: MarketplaceOrder }>>(new Map());
 
   const {
     isLoading, actionInProgress, confirmOrders, cancelOrders, getLabels,
@@ -91,7 +91,8 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
   const optimisticStatusUpdate = useCallback((
     marketplace: string,
     orderIds: (string | number)[],
-    newStatus: string
+    newStatus: string,
+    newSubstatus?: string,
   ) => {
     const allMpOrders = store.getOrders(marketplace);
     const idSet = new Set(orderIds.map(id => String(id)));
@@ -99,10 +100,13 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
     // Save original orders with new status to ref
     for (const order of allMpOrders) {
       if (idSet.has(String(order.id))) {
+        const updatedOrder = { ...order, status: newStatus } as any;
+        if (newSubstatus) updatedOrder.substatus = newSubstatus;
         optimisticOverridesRef.current.set(String(order.id), {
           newStatus,
+          newSubstatus,
           timestamp: Date.now(),
-          order: { ...order, status: newStatus },
+          order: updatedOrder,
         });
       }
     }
@@ -114,11 +118,14 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
         if (!oldData?.data) return oldData;
         return {
           ...oldData,
-          data: oldData.data.map((order: any) =>
-            idSet.has(String(order.id))
-              ? { ...order, status: newStatus }
-              : order
-          ),
+          data: oldData.data.map((order: any) => {
+            if (idSet.has(String(order.id))) {
+              const updated = { ...order, status: newStatus };
+              if (newSubstatus) updated.substatus = newSubstatus;
+              return updated;
+            }
+            return order;
+          }),
         };
       }
     );
