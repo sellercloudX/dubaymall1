@@ -47,6 +47,7 @@ const MarketplaceReviews = lazy(() => import('@/components/sellercloud/Marketpla
 const WBSellerAnalytics = lazy(() => import('@/components/sellercloud/WBSellerAnalytics').then(m => ({ default: m.WBSellerAnalytics })));
 const WBAdsCampaigns = lazy(() => import('@/components/sellercloud/WBAdsCampaigns').then(m => ({ default: m.WBAdsCampaigns })));
 const SupportChat = lazy(() => import('@/components/sellercloud/SupportChat').then(m => ({ default: m.SupportChat })));
+const SalesDashboard = lazy(() => import('@/components/sellercloud/SalesDashboard').then(m => ({ default: m.SalesDashboard })));
 
 const TabLoader = () => <div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
 
@@ -56,6 +57,7 @@ const pageTitles: Record<string, string> = {
   scanner: 'AI Scanner Pro',
   products: 'Mahsulotlar',
   orders: 'Buyurtmalar',
+  sales: 'Sotuvlar hisoboti',
   analytics: 'Umumiy analitika',
   'wb-analytics': 'WB Analitika',
   financials: 'Moliyaviy dashboard',
@@ -214,6 +216,8 @@ export default function SellerCloudX() {
         return <MarketplaceProducts connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'orders':
         return <FBSOrderManager connectedMarketplaces={connectedMarketplaces} store={store} />;
+      case 'sales':
+        return <SalesDashboard connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'orders-old':
         return <MarketplaceOrders connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'analytics':
