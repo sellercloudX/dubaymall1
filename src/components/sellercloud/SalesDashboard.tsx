@@ -76,6 +76,7 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
   const ITEMS_PER_PAGE = 30;
 
   const { getCostPrice } = useCostPrices();
+  const { data: tariffMap, dataUpdatedAt: tariffUpdatedAt } = useMarketplaceTariffs(connectedMarketplaces, store);
 
   const mpList = selectedMp === 'all' ? connectedMarketplaces : [selectedMp];
 
