@@ -3320,6 +3320,61 @@ serve(async (req) => {
             }
           }
 
+          // 1.5. Get ALL orders (including assembly/shipping) via GET /api/v3/orders
+          // This endpoint returns orders that have been added to supplies
+          await sleep(300);
+          try {
+            const sevenDaysAgo = Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000);
+            let nextCursor = 0;
+            let allOrdersPage = 0;
+            const maxPages = 5;
+            
+            while (allOrdersPage < maxPages) {
+              const allOrdersUrl = `https://marketplace-api.wildberries.ru/api/v3/orders?limit=200&next=${nextCursor}&dateFrom=${sevenDaysAgo}`;
+              const allOrdersResp = await fetch(allOrdersUrl, { headers: wbHeaders });
+              
+              if (!allOrdersResp.ok) {
+                console.warn(`WB all orders fetch failed: ${allOrdersResp.status}`);
+                break;
+              }
+              
+              const allOrdersData = await allOrdersResp.json();
+              const pageOrders = allOrdersData.orders || [];
+              console.log(`WB all orders page ${allOrdersPage}: ${pageOrders.length} orders`);
+              
+              for (const o of pageOrders) {
+                const key = `all-${o.id}`;
+                // Skip if already added from new orders
+                if (orderIdsSeen.has(`new-${o.id}`) || orderIdsSeen.has(key)) continue;
+                orderIdsSeen.add(key);
+                
+                // Map supplierStatus to our unified statuses
+                // WB supplierStatus values: new, confirm, complete, cancel, deliver, receive, reject
+                let status = "NEW";
+                const ss = (o.supplierStatus || "").toLowerCase();
+                if (ss === "confirm" || ss === "sorted") status = "PACKING";
+                else if (ss === "complete") status = "SHIPPED";
+                else if (ss === "cancel" || ss === "rejected" || ss === "reject") status = "CANCELLED";
+                else if (ss === "deliver" || ss === "delivering") status = "DELIVERY";
+                else if (ss === "receive") status = "DELIVERED";
+                else if (ss === "new") status = "NEW"; // already handled above
+                
+                // Skip "new" status orders as they're from the dedicated endpoint
+                if (status === "NEW") continue;
+                
+                allOrders.push(mapWBOrder(o, status, true));
+              }
+              
+              // Pagination
+              nextCursor = allOrdersData.next || 0;
+              if (pageOrders.length < 200 || nextCursor === 0) break;
+              allOrdersPage++;
+              await sleep(200);
+            }
+          } catch (e) {
+            console.warn("WB all orders fetch error (non-fatal):", e);
+          }
+
           // 2. Get recent orders via Statistics API (prices are returned in RUB, keep as-is)
           await sleep(300);
           const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
