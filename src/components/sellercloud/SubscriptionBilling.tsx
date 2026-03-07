@@ -473,17 +473,7 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
                 </div>
               </div>
 
-              <div className="mt-6 p-4 rounded-xl border border-border bg-muted/30 space-y-3">
-                <h4 className="text-sm font-semibold flex items-center gap-2"><DollarSign className="h-4 w-4" /> Balansni to'ldirish</h4>
-                <p className="text-xs text-muted-foreground">Minimal: <strong>{MIN_TOPUP_UZS.toLocaleString()} so'm</strong></p>
-                <div className="flex gap-2">
-                  <Button variant="outline" className="flex-1" disabled><CreditCard className="h-4 w-4 mr-1" /> Click (tez kunda)</Button>
-                  <Button variant="outline" className="flex-1" disabled><Landmark className="h-4 w-4 mr-1" /> Uzum (tez kunda)</Button>
-                </div>
-                <p className="text-[10px] text-muted-foreground text-center">
-                  Hozircha admin orqali: <a href="https://t.me/sellercloudx_support" target="_blank" className="text-primary underline">@sellercloudx_support</a>
-                </p>
-              </div>
+              <BalanceTopup userId={user?.id} />
 
               <div className="mt-4 p-3 rounded-lg border border-border">
                 <div className="flex items-center justify-between">
