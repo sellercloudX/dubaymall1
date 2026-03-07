@@ -238,6 +238,8 @@ export default function SellerCloudX() {
         return <CostPriceManager connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'calculator':
         return <ProfitCalculator commissionPercent={subscription?.commission_percent || 4} />;
+      case 'competitor':
+        return <CompetitorPriceMonitor connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'inventory':
         return <InventorySync connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'pricing':
