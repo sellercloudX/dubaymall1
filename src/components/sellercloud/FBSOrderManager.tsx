@@ -31,11 +31,11 @@ interface FBSOrderManagerProps {
 // Unified FBS status tabs mapping marketplace-specific statuses
 const FBS_TABS = [
   { key: 'new', label: 'Yangilar', icon: Package,
-    statuses: ['CREATED', 'NEW', 'new', 'PROCESSING', 'STARTED'] },
+    statuses: ['CREATED', 'NEW', 'new', 'STARTED'] },
   { key: 'assembly', label: "Yig'ishdagi", icon: ClipboardList,
-    statuses: ['PACKING', 'CONFIRM', 'confirm', 'SORTED', 'sorted', 'READY_TO_SHIP', 'SHIP'] },
+    statuses: ['PROCESSING', 'PACKING', 'CONFIRM', 'confirm', 'SORTED', 'sorted', 'READY_TO_SHIP', 'SHIP'] },
   { key: 'shipping', label: 'Yetkazishda', icon: Truck,
-    statuses: ['PENDING_DELIVERY', 'DELIVERY', 'DELIVERING', 'COMPLETE', 'complete', 'SHIPPED'] },
+    statuses: ['PENDING_DELIVERY', 'DELIVERY', 'DELIVERING', 'COMPLETE', 'complete', 'SHIPPED', 'PICKUP'] },
   { key: 'delivered', label: 'Topshirilgan', icon: CheckCircle,
     statuses: ['DELIVERED', 'COMPLETED', 'RECEIVE', 'receive', 'ACCEPTED_AT_DP', 'DELIVERED_TO_CUSTOMER_DELIVERY_POINT'] },
   { key: 'cancelled', label: 'Bekor', icon: XCircle,
@@ -78,8 +78,8 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
   const queryClient = useQueryClient();
 
   // Track optimistic status overrides that survive cache refetches
-  // Map<orderId, { newStatus, timestamp, originalOrder }>
-  const optimisticOverridesRef = useRef<Map<string, { newStatus: string; timestamp: number; order: MarketplaceOrder }>>(new Map());
+  // Map<orderId, { newStatus, newSubstatus, timestamp, originalOrder }>
+  const optimisticOverridesRef = useRef<Map<string, { newStatus: string; newSubstatus?: string; timestamp: number; order: MarketplaceOrder }>>(new Map());
 
   const {
     isLoading, actionInProgress, confirmOrders, cancelOrders, getLabels,
@@ -91,7 +91,8 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
   const optimisticStatusUpdate = useCallback((
     marketplace: string,
     orderIds: (string | number)[],
-    newStatus: string
+    newStatus: string,
+    newSubstatus?: string,
   ) => {
     const allMpOrders = store.getOrders(marketplace);
     const idSet = new Set(orderIds.map(id => String(id)));
@@ -99,10 +100,13 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
     // Save original orders with new status to ref
     for (const order of allMpOrders) {
       if (idSet.has(String(order.id))) {
+        const updatedOrder = { ...order, status: newStatus } as any;
+        if (newSubstatus) updatedOrder.substatus = newSubstatus;
         optimisticOverridesRef.current.set(String(order.id), {
           newStatus,
+          newSubstatus,
           timestamp: Date.now(),
-          order: { ...order, status: newStatus },
+          order: updatedOrder,
         });
       }
     }
@@ -114,11 +118,14 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
         if (!oldData?.data) return oldData;
         return {
           ...oldData,
-          data: oldData.data.map((order: any) =>
-            idSet.has(String(order.id))
-              ? { ...order, status: newStatus }
-              : order
-          ),
+          data: oldData.data.map((order: any) => {
+            if (idSet.has(String(order.id))) {
+              const updated = { ...order, status: newStatus };
+              if (newSubstatus) updated.substatus = newSubstatus;
+              return updated;
+            }
+            return order;
+          }),
         };
       }
     );
@@ -146,18 +153,22 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
       if (override) {
         // API returned the order — check if API status matches override
         const apiStatusUpper = order.status?.toUpperCase();
+        const apiSubstatus = (order as any).substatus?.toUpperCase();
         const overrideStatusUpper = override.newStatus.toUpperCase();
-        // If API already shows a "later" status, remove override
-        const statusOrder = ['NEW', 'PACKING', 'SHIPPED', 'DELIVERY', 'DELIVERED', 'CANCELLED'];
-        const apiIdx = statusOrder.indexOf(apiStatusUpper);
-        const overrideIdx = statusOrder.indexOf(overrideStatusUpper);
+        const overrideSubstatus = override.newSubstatus?.toUpperCase();
+        
+        // If API already shows the target or a later status, remove override
+        const statusOrder = ['NEW', 'STARTED', 'PROCESSING', 'PACKING', 'READY_TO_SHIP', 'SHIPPED', 'DELIVERY', 'DELIVERED', 'CANCELLED'];
+        const apiIdx = statusOrder.indexOf(apiSubstatus || apiStatusUpper);
+        const overrideIdx = statusOrder.indexOf(overrideSubstatus || overrideStatusUpper);
         if (apiIdx >= overrideIdx && apiIdx >= 0) {
-          // API caught up or passed — use API status
           overrides.delete(id);
           orderMap.set(id, order);
         } else {
-          // API is behind — use override
-          orderMap.set(id, { ...order, status: override.newStatus });
+          // API is behind — use override (with substatus)
+          const updated = { ...order, status: override.newStatus } as any;
+          if (override.newSubstatus) updated.substatus = override.newSubstatus;
+          orderMap.set(id, updated);
         }
       } else {
         orderMap.set(id, order);
@@ -177,9 +188,20 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
   const ordersByTab = useMemo(() => {
     const map: Record<string, MarketplaceOrder[]> = {};
     for (const tab of FBS_TABS) {
-      map[tab.key] = mergedOrders.filter(o =>
-        tab.statuses.some(s => o.status?.toUpperCase() === s.toUpperCase())
-      );
+      map[tab.key] = mergedOrders.filter(o => {
+        const status = o.status?.toUpperCase();
+        const substatus = (o as any).substatus?.toUpperCase();
+        
+        // Yandex special: PROCESSING/STARTED = new, PROCESSING/READY_TO_SHIP = assembly
+        if (status === 'PROCESSING' && substatus === 'STARTED') {
+          return tab.key === 'new';
+        }
+        if (status === 'PROCESSING' && substatus === 'READY_TO_SHIP') {
+          return tab.key === 'assembly';
+        }
+        
+        return tab.statuses.some(s => status === s.toUpperCase());
+      });
     }
     return map;
   }, [mergedOrders]);
@@ -218,7 +240,11 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
     try {
       await confirmOrders(selectedMp, ids);
       // Optimistically move orders to assembly tab
-      optimisticStatusUpdate(selectedMp, ids, 'PACKING');
+      if (selectedMp === 'yandex') {
+        optimisticStatusUpdate(selectedMp, ids, 'PROCESSING', 'READY_TO_SHIP');
+      } else {
+        optimisticStatusUpdate(selectedMp, ids, 'PACKING');
+      }
       setSelectedOrders(new Set());
       // Delayed refetch to let marketplace API update
       setTimeout(() => store.refetchOrders(selectedMp), 30000);
@@ -281,7 +307,7 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
         <div style="font-size:10px;color:#666;margin-top:2px;">ID: ${s.orderId || '—'}</div>
       </div>`)
       .join('');
-    printWindow.document.write(`<!DOCTYPE html><html><head><title>WB Stikerlar</title>
+    printWindow.document.write(`<!DOCTYPE html><html><head><title>Stikerlar</title>
       <style>
         @media print { body{margin:0;padding:0;} div{page-break-inside:avoid;} }
         body{font-family:sans-serif;padding:16px;}
@@ -292,11 +318,49 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
       </style></head><body>
       <div class="actions">
         <button class="primary" onclick="window.print()">🖨️ Pechat qilish</button>
-        <button onclick="downloadPdf()">📥 PDF yuklash</button>
       </div>
       ${stickerImgs}
+    </body></html>`);
+    printWindow.document.close();
+  };
+
+  // Open PDF labels in a print window (for Yandex/Uzum multi-label)
+  const openPdfLabelsPrintWindow = (labels: { pdf: string; orderId: string | number }[]) => {
+    const printWindow = window.open('', '_blank', 'width=800,height=900');
+    if (!printWindow) {
+      toast.error("Popup bloklangan. Brauzerni sozlang.");
+      return;
+    }
+    const embedFrames = labels.map((l, i) => `
+      <div style="page-break-after:always;margin-bottom:16px;">
+        <div style="font-size:12px;color:#666;margin-bottom:4px;">Buyurtma #${l.orderId} (${i + 1}/${labels.length})</div>
+        <iframe src="data:application/pdf;base64,${l.pdf}" style="width:100%;height:calc(100vh - 120px);border:1px solid #ddd;border-radius:4px;"></iframe>
+      </div>`).join('');
+    
+    printWindow.document.write(`<!DOCTYPE html><html><head><title>Etiketkalar (${labels.length} ta)</title>
+      <style>
+        body{font-family:sans-serif;padding:16px;margin:0;}
+        .actions{display:flex;gap:8px;margin-bottom:16px;justify-content:center;flex-wrap:wrap;}
+        .actions button{padding:8px 20px;font-size:14px;border-radius:6px;cursor:pointer;border:1px solid #ccc;background:#fff;}
+        .actions button.primary{background:#2563eb;color:#fff;border-color:#2563eb;}
+        .actions button.download{background:#059669;color:#fff;border-color:#059669;}
+        @media print{.actions{display:none !important;} iframe{height:auto !important;}}
+      </style></head><body>
+      <div class="actions">
+        <button class="primary" onclick="window.print()">🖨️ Barchasini pechat qilish</button>
+        <button class="download" onclick="downloadAll()">📥 Barchasini yuklab olish</button>
+      </div>
+      ${embedFrames}
       <script>
-        function downloadPdf(){window.print();}
+        const labels = ${JSON.stringify(labels.map(l => ({ pdf: l.pdf, orderId: l.orderId })))};
+        function downloadAll() {
+          labels.forEach(l => {
+            const a = document.createElement('a');
+            a.href = 'data:application/pdf;base64,' + l.pdf;
+            a.download = 'label_' + l.orderId + '.pdf';
+            a.click();
+          });
+        }
       </script>
     </body></html>`);
     printWindow.document.close();
@@ -318,21 +382,18 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
           toast.warning("Stikerlar topilmadi. Buyurtmalar yig'ish holatida ekanligini tekshiring.");
           return;
         }
-        // Open print window with all stickers
         openStickersPrintWindow(result.stickers);
-        toast.success(`${result.stickers.length} ta stiker tayyor — pechat qiling yoki PDF saqlang`);
+        toast.success(`${result.stickers.length} ta stiker tayyor — pechat qiling`);
       } else if (result?.labels) {
-        // Multiple PDFs as base64
-        result.labels.forEach((l: any) => {
-          if (l.pdf && l.success) {
-            const link = document.createElement('a');
-            link.href = `data:application/pdf;base64,${l.pdf}`;
-            link.download = `label_${l.orderId}.pdf`;
-            link.click();
-          }
-        });
-        const successCount = result.labels.filter((l: any) => l.success).length;
-        toast.success(`${successCount} ta etiketka yuklandi`);
+        // Collect all successful labels
+        const successLabels = result.labels.filter((l: any) => l.success && l.pdf);
+        if (successLabels.length === 0) {
+          toast.error("Etiketkalar yuklanmadi. Buyurtmalar yig'ish holatida ekanligini tekshiring.");
+          return;
+        }
+        // Open all in a single print window
+        openPdfLabelsPrintWindow(successLabels);
+        toast.success(`${successLabels.length} ta etiketka tayyor — pechat qiling`);
       } else {
         toast.success("Etiketka tayyor");
       }
