@@ -316,10 +316,11 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
     if (!labelData) return;
     const size = LABEL_SIZES.find(s => s.key === labelSize) || LABEL_SIZES[0];
 
+    // Universal approach: open a print window with embedded content (no blob URLs)
+    const printWindow = window.open('', '_blank', 'width=800,height=600');
+    if (!printWindow) { toast.error("Popup bloklangan. Brauzerni sozlang."); return; }
+
     if (labelData.type === 'sticker' && labelData.stickers) {
-      // PNG stickers - open print window with images
-      const printWindow = window.open('', '_blank', 'width=800,height=600');
-      if (!printWindow) { toast.error("Popup bloklangan. Brauzerni sozlang."); return; }
       const images = labelData.stickers.flatMap(s =>
         Array.from({ length: labelCopies }).map(() =>
           `<div class="label-item"><img src="data:image/png;base64,${s.file}" /></div>`
@@ -336,34 +337,27 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
       printWindow.document.close();
       setTimeout(() => printWindow.print(), 500);
     } else if (labelData.type === 'pdf' && labelData.labels) {
-      // For PDFs - open blob URL directly for native PDF print
       const successLabels = labelData.labels.filter((l: any) => l.success && l.pdf);
-      if (successLabels.length === 0) { toast.error("Pechat uchun etiketka topilmadi"); return; }
+      if (successLabels.length === 0) { printWindow.close(); toast.error("Pechat uchun etiketka topilmadi"); return; }
 
-      // Merge all PDFs into one print session: open first blob URL
-      // For single PDF, use blob URL directly
-      if (successLabels.length === 1) {
-        const blobUrl = pdfBlobUrls[String(successLabels[0].orderId)];
-        if (blobUrl) {
-          const printWindow = window.open(blobUrl, '_blank');
-          if (printWindow) {
-            printWindow.onload = () => setTimeout(() => printWindow.print(), 300);
-          }
-        } else {
-          toast.error("PDF yuklanmadi");
-        }
-      } else {
-        // Multiple PDFs - open each in sequence
-        successLabels.forEach((l: any, idx: number) => {
-          const blobUrl = pdfBlobUrls[String(l.orderId)];
-          if (blobUrl) {
-            setTimeout(() => {
-              const w = window.open(blobUrl, '_blank');
-              if (w) w.onload = () => setTimeout(() => w.print(), 300);
-            }, idx * 500);
-          }
-        });
-      }
+      // Embed all PDFs as iframes with data URIs in a single print window
+      const embeds = successLabels.flatMap((l: any) =>
+        Array.from({ length: labelCopies }).map((_, ci) =>
+          `<div class="label-item">
+            <embed src="data:application/pdf;base64,${l.pdf}" type="application/pdf" width="100%" height="100%" />
+          </div>`
+        )
+      ).join('');
+      printWindow.document.write(`<!DOCTYPE html><html><head><title>Etiketkalar</title>
+        <style>
+          @page { size: ${size.width}mm ${size.height}mm; margin: 0; }
+          @media print { body{margin:0;padding:0;} .label-item{page-break-after:${labelAutocut ? 'always' : 'auto'};} }
+          body{margin:0;padding:0;font-family:sans-serif;}
+          .label-item{width:${size.width}mm;height:${size.height}mm;overflow:hidden;}
+          embed{width:100%;height:100%;}
+        </style></head><body>${embeds}</body></html>`);
+      printWindow.document.close();
+      setTimeout(() => printWindow.print(), 1000);
     }
   };
 
