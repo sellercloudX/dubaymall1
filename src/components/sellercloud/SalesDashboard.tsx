@@ -17,6 +17,7 @@ import { MarketplaceFilterBar } from './MarketplaceFilterBar';
 import { MarketplaceLogo, MARKETPLACE_SHORT_NAMES } from '@/lib/marketplaceConfig';
 import { toDisplayUzs, formatUzsFull } from '@/lib/currency';
 import { useCostPrices } from '@/hooks/useCostPrices';
+import { useMarketplaceTariffs, getTariffForProduct } from '@/hooks/useMarketplaceTariffs';
 import type { MarketplaceDataStore, MarketplaceOrder } from '@/hooks/useMarketplaceDataStore';
 
 interface SalesDashboardProps {
