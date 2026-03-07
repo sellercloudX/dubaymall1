@@ -184,7 +184,8 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
       setWbSupplyDialogOpen(false);
       setWbSupplyName('');
       setSelectedOrders(new Set());
-      store.refetchOrders(selectedMp);
+      // Delayed refetch to let WB API update statuses
+      setTimeout(() => store.refetchOrders(selectedMp), 10000);
     } catch {}
   };
 
