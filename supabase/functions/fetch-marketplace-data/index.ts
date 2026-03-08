@@ -1925,9 +1925,9 @@ serve(async (req) => {
                   // Extract photo URL - item.photo can be various structures
                   let itemPhoto = '';
                    try {
+                     // Only log photo debug for very first order item globally
+                     const isFirstItem = allOrders.length === 0 && items.indexOf(item) === 0;
                      if (item.photo) {
-                        // Only log photo debug for very first order item globally
-                        const isFirstItem = allOrders.length === 0 && items.indexOf(item) === 0;
                        if (typeof item.photo === 'string') {
                         itemPhoto = item.photo.startsWith('http') ? item.photo : `https://images.uzum.uz/${item.photo.replace(/^\//, '')}`;
                        } else if (typeof item.photo === 'object') {
