@@ -8,6 +8,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { checkBillingAccess, handleEdgeFunctionBillingError } from '@/lib/billingCheck';
 import {
   Sparkles, Shield, AlertTriangle, CheckCircle2, XCircle,
   Zap, RefreshCw, Play, Loader2, ChevronDown, ChevronUp,

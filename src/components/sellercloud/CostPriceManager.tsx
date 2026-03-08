@@ -14,6 +14,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useCostPrices } from '@/hooks/useCostPrices';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { checkBillingAccess, handleEdgeFunctionBillingError } from '@/lib/billingCheck';
 import { toDisplayUzs, toMarketplaceCurrency, isRubMarketplace } from '@/lib/currency';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 
