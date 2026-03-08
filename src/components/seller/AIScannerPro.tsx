@@ -367,29 +367,9 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
     try {
       // ═══ BILLING: One check for the entire scanner pipeline ═══
       const scannerFeatureKey = targetMarketplace === 'wildberries' ? 'wb-card-create' : 'yandex-card-create';
-      try {
-        const { data: billingData, error: billingError } = await supabase.rpc('check_feature_access', {
-          p_user_id: (await supabase.auth.getUser()).data.user?.id,
-          p_feature_key: scannerFeatureKey,
-        });
-        
-        if (billingError) {
-          console.warn('Billing check error:', billingError);
-        } else {
-          const br = billingData as any;
-          if (br && !br.allowed) {
-            const errorMsg = br.error === 'insufficient_balance'
-              ? `Balans yetarli emas. Balansni kamida 300,000 so'm to'ldiring.`
-              : br.error === 'activation_required'
-              ? "Platformadan foydalanish uchun oylik aktivatsiya (99,000 so'm) talab etiladi."
-              : br.message || 'Ruxsat berilmadi';
-            toast.error(errorMsg);
-            updateTaskStatus('failed');
-            return;
-          }
-        }
-      } catch (billingErr) {
-        console.warn('Billing check failed, proceeding:', billingErr);
+      if (!(await checkBillingAccess(scannerFeatureKey))) {
+        updateTaskStatus('failed');
+        return;
       }
 
       // Step 1: Already done - mark complete
