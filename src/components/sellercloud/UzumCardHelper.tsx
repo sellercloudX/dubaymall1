@@ -163,7 +163,13 @@ export function UzumCardHelper({ connectedMarketplaces, store }: UzumCardHelperP
           }),
         ]);
 
-        if (cardResult.error) throw cardResult.error;
+        if (cardResult.error) {
+          if (handleEdgeFunctionBillingError(cardResult.error, cardResult.data)) {
+            errs.push(`${product.name}: Balans yetarli emas`);
+            continue;
+          }
+          throw cardResult.error;
+        }
         if (cardResult.data?.error) throw new Error(cardResult.data.error);
         
         const mxikCode = common.ikpu || mxikResult.data?.mxik_code || '';
