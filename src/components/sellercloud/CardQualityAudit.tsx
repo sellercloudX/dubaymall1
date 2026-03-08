@@ -127,6 +127,10 @@ export function CardQualityAudit({ connectedMarketplaces, store }: CardQualityAu
   // Fix single card
   const fixCard = useCallback(async (offerId: string) => {
     if (!auditedMarketplace) return;
+    
+    // Pre-flight billing check
+    if (!(await checkBillingAccess('card-auto-fix'))) return;
+    
     setFixResults(prev => new Map(prev).set(offerId, { offerId, status: 'fixing' }));
 
     try {
@@ -134,7 +138,13 @@ export function CardQualityAudit({ connectedMarketplaces, store }: CardQualityAu
         body: { action: 'auto-fix', marketplace: auditedMarketplace, offerId },
       });
 
-      if (error) throw error;
+      if (error) {
+        if (handleEdgeFunctionBillingError(error, data)) {
+          setFixResults(prev => new Map(prev).set(offerId, { offerId, status: 'error', message: 'Balans yetarli emas' }));
+          return;
+        }
+        throw error;
+      }
       if (!data.success) throw new Error(data.error);
 
       const msg = data.data.message || 'Tuzatildi ✅';

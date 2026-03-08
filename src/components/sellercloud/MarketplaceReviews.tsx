@@ -187,6 +187,9 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
     const unanswered = filteredItems.filter(i => !i.isAnswered);
     if (unanswered.length === 0) return toast.info('Javob kutayotgan sharhlar yo\'q');
     
+    // Pre-flight billing check before batch
+    if (!(await checkBillingAccess('ai-review-reply'))) return;
+    
     toast.info(`${unanswered.length} ta sharhga AI javob tayyorlanmoqda...`);
     let successCount = 0;
 
@@ -204,7 +207,11 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
           },
         });
 
-        if (error || !data?.success) continue;
+        if (error) {
+          if (handleEdgeFunctionBillingError(error, data)) break; // Stop batch on billing error
+          continue;
+        }
+        if (!data?.success) continue;
 
         // Auto-send
         const body: any = {
