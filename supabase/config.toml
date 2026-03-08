@@ -116,3 +116,9 @@ verify_jwt = false
 
 [functions.telegram-send]
 verify_jwt = false
+
+[functions.ai-review-reply]
+verify_jwt = false
+
+[functions.manage-marketplace-orders]
+verify_jwt = false
