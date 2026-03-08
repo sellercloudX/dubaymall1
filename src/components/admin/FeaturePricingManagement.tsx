@@ -273,19 +273,19 @@ export function FeaturePricingManagement() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
               <div>
                 <div className="flex items-center gap-1.5 mb-1">
-                  <Badge variant="secondary">Bepul</Badge>
+                  <Badge variant="secondary">Free (99k/oy)</Badge>
                 </div>
-                <p className="text-xs text-muted-foreground">Balans hisobidan to'liq narxda foydalanadi</p>
+                <p className="text-xs text-muted-foreground">1 kun sinov, keyin 99,000 so'm/oy aktivatsiya. Balansdan to'liq narxda</p>
               </div>
               <div>
                 <div className="flex items-center gap-1.5 mb-1">
-                  <Badge className="bg-amber-500/10 text-amber-600 border-amber-200">Premium $149/3oy</Badge>
+                  <Badge className="bg-amber-500/10 text-amber-600 border-amber-200">Premium 1,270,000/oy</Badge>
                 </div>
-                <p className="text-xs text-muted-foreground">Barcha pullik funksiyalardan 30% chegirmada</p>
+                <p className="text-xs text-muted-foreground">Aktivatsiya bepul, pullik funksiyalardan 40% chegirma</p>
               </div>
               <div>
                 <div className="flex items-center gap-1.5 mb-1">
-                  <Badge className="bg-violet-500/10 text-violet-600 border-violet-200">Elegant $499/oy</Badge>
+                  <Badge className="bg-violet-500/10 text-violet-600 border-violet-200">Elegant 6,400,000/oy</Badge>
                 </div>
                 <p className="text-xs text-muted-foreground">Barcha funksiyalar 0 so'm, oylik limitlar bilan</p>
               </div>
