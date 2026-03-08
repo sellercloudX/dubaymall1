@@ -148,6 +148,9 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
 
   // AI Generate Reply
   const handleAIReply = async (item: ReviewItem) => {
+    // Pre-flight billing check
+    if (!(await checkBillingAccess('ai-review-reply'))) return;
+    
     setAiGenerating(item.id);
     try {
       const { data, error } = await supabase.functions.invoke('ai-review-reply', {
@@ -162,7 +165,10 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        if (handleEdgeFunctionBillingError(error, data)) return;
+        throw error;
+      }
       if (!data?.success) throw new Error(data?.error || 'AI xato');
 
       setAnsweringId(item.id);
