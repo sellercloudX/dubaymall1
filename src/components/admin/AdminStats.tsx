@@ -11,14 +11,18 @@ export function AdminStats() {
     staleTime: 0,
     refetchOnMount: 'always',
     queryFn: async () => {
-      const [usersRes, subsRes, aiRes] = await Promise.all([
+      const [usersRes, subsRes, aiRes, revenueRes] = await Promise.all([
         supabase.from('profiles').select('*', { count: 'exact', head: true }),
-        supabase.from('sellercloud_subscriptions').select('id, is_active, monthly_fee'),
+        supabase.from('sellercloud_subscriptions').select('id, is_active, monthly_fee, plan_type'),
         supabase.from('ai_usage_log').select('estimated_cost_usd'),
+        supabase.from('platform_revenue').select('amount').gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()),
       ]);
 
       const activeSubs = subsRes.data?.filter(s => s.is_active) || [];
-      const mrr = activeSubs.reduce((sum, s) => sum + (s.monthly_fee || 0) * USD_RATE, 0);
+      // MRR: use real plan prices, not monthly_fee field (which is often 0 for legacy)
+      const PLAN_MRR: Record<string, number> = { premium: 1_270_000, enterprise: 6_400_000, elegant: 6_400_000 };
+      const mrr = activeSubs.reduce((sum, s) => sum + (PLAN_MRR[(s as any).plan_type] || 99_000), 0);
+      const monthlyRevenue = revenueRes.data?.reduce((sum, r) => sum + (r.amount || 0), 0) || 0;
       const aiCost = aiRes.data?.reduce((sum, a) => sum + (a.estimated_cost_usd || 0), 0) || 0;
 
       return {
