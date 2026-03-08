@@ -14,7 +14,6 @@ import { MarketplaceLogo, MARKETPLACE_CONFIG } from '@/lib/marketplaceConfig';
 
 interface OnboardingWizardProps {
   onActivate: () => void;
-  onContactAdmin: () => void;
   onGoHome?: () => void;
 }
 
@@ -26,17 +25,14 @@ const content = {
     skipToActivate: "To'g'ridan-to'g'ri aktivlashtirish",
     next: "Keyingi",
     prev: "Oldingi",
-    activateNow: "Hoziroq aktivlashtirish",
-    contactAdmin: "Admin bilan bog'lanish",
-    payAndActivate: "To'lab aktivlashtirish",
+    activateNow: "Hoziroq boshlash",
+    payAndActivate: "Bepul boshlash (1 kun sinov)",
     step: "qadam",
     of: "/",
     finalTitle: "Tayyor! Keling boshlaymiz 🚀",
-    finalDesc: "Akkauntingizni aktivlashtiring va barcha imkoniyatlardan foydalaning",
-    activateOption1Title: "💳 To'lov qilib aktivlashtirish",
-    activateOption1Desc: "Click yoki Uzum Bank orqali to'lov qiling — akkaunt avtomatik aktivlashadi.",
-    activateOption2Title: "📞 Admin bilan bog'lanish",
-    activateOption2Desc: "Telegram orqali admin bilan bog'laning — akkauntingizni aktivlashtiradi.",
+    finalDesc: "1 kunlik bepul sinov — hech qanday to'lov talab etilmaydi",
+    activateOption1Title: "🚀 Hoziroq bepul boshlang",
+    activateOption1Desc: "1 kunlik bepul sinov davri. Barcha asosiy funksiyalar ochiq. Sinov tugagandan so'ng oylik 99,000 so'm aktivatsiya to'lovi.",
     telegramLink: "@sellercloudx_support",
     features: [
       {
@@ -105,21 +101,21 @@ const content = {
       },
     ],
     pricing: {
-      title: "Narxlar",
-      pro: "Pro tarif",
-      proPrice: "$499/oy",
-      proDesc: "Kichik va o'rta biznes uchun",
-      proCommission: "+ savdodan 4%",
-      enterprise: "Enterprise",
-      enterprisePrice: "Individual",
-      enterpriseDesc: "Yirik kompaniyalar uchun",
-      enterpriseCommission: "+ savdodan 2%",
+      title: "Tariflar",
+      pro: "Asosiy tarif",
+      proPrice: "99,000 so'm/oy",
+      proDesc: "Aktivatsiya + bepul funksiyalar. AI xizmatlar balansdan.",
+      proCommission: "Komissiya 0%",
+      enterprise: "Premium",
+      enterprisePrice: "1,270,000 so'm/oy",
+      enterpriseDesc: "Bepul aktivatsiya + AI xizmatlariga 40% chegirma",
+      enterpriseCommission: "Komissiya 0%",
       whyWorth: "Nima uchun arziydi?",
       savings: [
+        "1 kunlik bepul sinov — hech narsa to'lamaysiz",
         "Kuniga 3-4 soat tejash = oyiga $1,500+",
-        "Zarar tovarlarni topib, oyiga $2,000+ saqlash",
-        "Overselling hal — qaytarishlar kamayadi",
         "AI kartochka — 10x tezroq tovar qo'shish",
+        "20+ asbob bitta platformada",
       ]
     }
   },
@@ -130,18 +126,14 @@ const content = {
     skipToActivate: "Сразу активировать",
     next: "Далее",
     prev: "Назад",
-    activateNow: "Активировать",
-    contactAdmin: "Связаться с админом",
-    payAndActivate: "Оплатить",
+    activateNow: "Начать сейчас",
+    payAndActivate: "Начать бесплатно (1 день)",
     step: "шаг",
     of: "/",
     finalTitle: "Готово! Давайте начнём 🚀",
-    finalDesc: "Активируйте аккаунт и пользуйтесь всеми возможностями",
-    activateOption1Title: "💳 Активация через оплату",
-    activateOption1Desc: "Оплатите через Click или Uzum Bank — аккаунт активируется автоматически.",
-    activateOption2Title: "📞 Связаться с админом",
-    activateOption2Desc: "Свяжитесь с админом в Telegram — он активирует ваш аккаунт.",
-    telegramLink: "@sellercloudx_support",
+    finalDesc: "1 день бесплатного пробного периода — оплата не требуется",
+    activateOption1Title: "🚀 Начните бесплатно прямо сейчас",
+    activateOption1Desc: "1 день бесплатного пробного периода. Все основные функции открыты. После — 99,000 сум/мес активация.",
     features: [
       {
         icon: "globe",
@@ -209,21 +201,21 @@ const content = {
       },
     ],
     pricing: {
-      title: "Цены",
-      pro: "Тариф Pro",
-      proPrice: "$499/мес",
-      proDesc: "Для малого и среднего бизнеса",
-      proCommission: "+ 4% от продаж",
-      enterprise: "Enterprise",
-      enterprisePrice: "Индивидуально",
-      enterpriseDesc: "Для крупных компаний",
-      enterpriseCommission: "+ 2% от продаж",
+      title: "Тарифы",
+      pro: "Базовый тариф",
+      proPrice: "99,000 сум/мес",
+      proDesc: "Активация + бесплатные функции. AI услуги с баланса.",
+      proCommission: "Комиссия 0%",
+      enterprise: "Premium",
+      enterprisePrice: "1,270,000 сум/мес",
+      enterpriseDesc: "Бесплатная активация + скидка 40% на AI услуги",
+      enterpriseCommission: "Комиссия 0%",
       whyWorth: "Почему это выгодно?",
       savings: [
-        "Экономия 3-4 часа/день = $1,500+/мес",
-        "Выявление убыточных товаров = $2,000+/мес",
-        "Решение оверселлинга — меньше возвратов",
-        "ИИ карточки — товары в 10x быстрее",
+        "1 день бесплатного пробного периода",
+        "Экономия 3-4 часа в день = $1,500+/мес",
+        "AI карточки — товары в 10x быстрее",
+        "20+ инструментов в одной платформе",
       ]
     }
   },
@@ -234,18 +226,14 @@ const content = {
     skipToActivate: "Skip to activation",
     next: "Next",
     prev: "Back",
-    activateNow: "Activate now",
-    contactAdmin: "Contact admin",
-    payAndActivate: "Pay & activate",
+    activateNow: "Start now",
+    payAndActivate: "Start free (1-day trial)",
     step: "step",
     of: "/",
     finalTitle: "Ready! Let's go 🚀",
-    finalDesc: "Activate your account and unlock all features",
-    activateOption1Title: "💳 Pay to activate",
-    activateOption1Desc: "Pay via Click or Uzum Bank — auto-activation in minutes!",
-    activateOption2Title: "📞 Contact admin",
-    activateOption2Desc: "Reach out via Telegram — they'll activate your account.",
-    telegramLink: "@sellercloudx_support",
+    finalDesc: "1-day free trial — no payment required",
+    activateOption1Title: "🚀 Start free right now",
+    activateOption1Desc: "1-day free trial. All basic features unlocked. After trial: 99,000 UZS/month activation.",
     features: [
       {
         icon: "globe",
@@ -314,20 +302,20 @@ const content = {
     ],
     pricing: {
       title: "Pricing",
-      pro: "Pro plan",
-      proPrice: "$499/mo",
-      proDesc: "For small & medium businesses",
-      proCommission: "+ 4% of sales",
-      enterprise: "Enterprise",
-      enterprisePrice: "Custom",
-      enterpriseDesc: "For large companies",
-      enterpriseCommission: "+ 2% of sales",
+      pro: "Basic plan",
+      proPrice: "99,000 UZS/mo",
+      proDesc: "Activation + free features. AI services from balance.",
+      proCommission: "0% commission",
+      enterprise: "Premium",
+      enterprisePrice: "1,270,000 UZS/mo",
+      enterpriseDesc: "Free activation + 40% discount on AI services",
+      enterpriseCommission: "0% commission",
       whyWorth: "Why it's worth it?",
       savings: [
+        "1-day free trial — no payment needed",
         "Save 3-4 hours daily = $1,500+/month",
-        "Find loss-making products = $2,000+/month",
-        "Solve overselling — fewer returns",
         "AI cards — 10x faster product listing",
+        "20+ tools in one platform",
       ]
     }
   }
@@ -346,7 +334,7 @@ const featureIcons: Record<string, any> = {
 
 const marketplaceKeys = ['uzum', 'wildberries', 'yandex', 'ozon'];
 
-export function OnboardingWizard({ onActivate, onContactAdmin, onGoHome }: OnboardingWizardProps) {
+export function OnboardingWizard({ onActivate, onGoHome }: OnboardingWizardProps) {
   const { language } = useLanguage();
   const lang = (language || 'uz') as 'uz' | 'ru' | 'en';
   const t = content[lang] || content.uz;
@@ -559,18 +547,6 @@ export function OnboardingWizard({ onActivate, onContactAdmin, onGoHome }: Onboa
               <p className="text-[11px] text-muted-foreground mt-0.5">{t.activateOption1Desc}</p>
               <Button className="w-full mt-2 gap-1" size="sm">
                 {t.payAndActivate} <ArrowRight className="h-3.5 w-3.5" />
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="active:scale-[0.98] transition-transform cursor-pointer" onClick={onContactAdmin}>
-            <CardContent className="p-3">
-              <h3 className="font-bold text-sm">{t.activateOption2Title}</h3>
-              <p className="text-[11px] text-muted-foreground mt-0.5">{t.activateOption2Desc}</p>
-              <Button variant="outline" className="w-full mt-2 gap-1" size="sm" asChild>
-                <a href="https://t.me/sellercloudx_support" target="_blank" rel="noopener">
-                  {t.contactAdmin} <ChevronRight className="h-3.5 w-3.5" />
-                </a>
               </Button>
             </CardContent>
           </Card>
