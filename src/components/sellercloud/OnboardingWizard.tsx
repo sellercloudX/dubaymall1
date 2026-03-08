@@ -14,7 +14,6 @@ import { MarketplaceLogo, MARKETPLACE_CONFIG } from '@/lib/marketplaceConfig';
 
 interface OnboardingWizardProps {
   onActivate: () => void;
-  onContactAdmin: () => void;
   onGoHome?: () => void;
 }
 
