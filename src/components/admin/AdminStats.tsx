@@ -30,6 +30,7 @@ export function AdminStats() {
         activeSubs: activeSubs.length,
         totalSubs: subsRes.data?.length || 0,
         mrr,
+        monthlyRevenue,
         aiCost,
         aiActions: aiRes.data?.length || 0,
       };
