@@ -256,15 +256,9 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
         
         if (error) {
           console.error(`Yandex clone error for "${product.name}":`, error);
-          // FunctionsHttpError: context is the parsed response body (or empty)
+          if (handleEdgeFunctionBillingError(error, data)) throw new Error('billing_error');
           const errorBody = data || error?.context || {};
-          const billingErr = errorBody?.billingError;
-          if (billingErr === 'insufficient_balance' || billingErr === 'activation_required') {
-            toast.error(errorBody.error || 'Balans yetarli emas. Balansni to\'ldiring.');
-            throw new Error('billing_error');
-          }
-          const msg = errorBody?.error || error.message || 'Edge function xatosi';
-          toast.error(`${product.name.slice(0, 30)}: ${typeof msg === 'string' ? msg.slice(0, 120) : 'Xatolik'}`);
+          toast.error(`${product.name.slice(0, 30)}: ${errorBody?.error || error.message || 'Xatolik'}`);
           return false;
         }
         if (!data?.success) {
