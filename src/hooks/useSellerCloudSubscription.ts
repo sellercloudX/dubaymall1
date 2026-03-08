@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { TRIAL_DAYS, ACTIVATION_FEE_UZS } from '@/hooks/useFeaturePricing';
 
 interface SellerCloudSubscription {
   id: string;
@@ -151,6 +152,7 @@ export function useSellerCloudSubscription(): UseSellerCloudSubscriptionReturn {
     }
 
     try {
+      const trialEnd = new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString();
       const { error } = await supabase
         .from('sellercloud_subscriptions')
         .insert({
@@ -160,6 +162,8 @@ export function useSellerCloudSubscription(): UseSellerCloudSubscriptionReturn {
           commission_percent: 0,
           is_trial: true,
           is_active: true,
+          activation_trial_ends: trialEnd,
+          activation_fee_uzs: ACTIVATION_FEE_UZS,
         });
 
       if (error) throw error;
