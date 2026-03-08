@@ -173,7 +173,7 @@ export function ActivationsManagement() {
                             {planBadge}
                             <select
                               className="text-[10px] border rounded px-1 py-0.5 bg-background w-20"
-                              value={planType}
+                              value={isElegant ? 'enterprise' : planType}
                               onChange={async (e) => {
                                 const newPlan = e.target.value;
                                 const { error } = await supabase
@@ -182,14 +182,14 @@ export function ActivationsManagement() {
                                   .eq('id', sub.id);
                                 if (error) toast.error('Xatolik: ' + error.message);
                                 else {
-                                  toast.success(`Tarif ${newPlan} ga o'zgartirildi`);
+                                  toast.success(`Tarif ${newPlan === 'enterprise' ? 'Elegant' : newPlan === 'premium' ? 'Premium' : 'Free'} ga o'zgartirildi`);
                                   queryClient.invalidateQueries({ queryKey: ['admin-cloud-subscriptions'] });
                                 }
                               }}
                             >
                               <option value="pro">Free</option>
                               <option value="premium">Premium</option>
-                              <option value="elegant">Elegant</option>
+                              <option value="enterprise">Elegant</option>
                             </select>
                           </div>
                         </TableCell>
