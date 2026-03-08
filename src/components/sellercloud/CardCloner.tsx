@@ -371,6 +371,28 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
       console.log('[CardCloner] No products or targets selected, returning');
       return;
     }
+
+    // Pre-flight billing check — prevent 402 errors before starting
+    if (user) {
+      const featureKey = targetMarketplaces.includes('yandex') ? 'clone-to-yandex' 
+        : targetMarketplaces.includes('wildberries') ? 'clone-to-wildberries' 
+        : 'clone-to-uzum';
+      const { data: accessCheck } = await supabase.rpc('check_feature_access', {
+        p_user_id: user.id,
+        p_feature_key: featureKey,
+      });
+      if (accessCheck && !accessCheck.allowed) {
+        if (accessCheck.error === 'insufficient_balance') {
+          toast.error(`Balans yetarli emas (${accessCheck.balance?.toLocaleString()} so'm). Balansni kamida 300,000 so'm to'ldiring.`);
+        } else if (accessCheck.error === 'activation_required') {
+          toast.error('Oylik aktivatsiya (99,000 so\'m) talab etiladi. Obuna bo\'limiga o\'ting.');
+        } else {
+          toast.error(accessCheck.message || 'Ruxsat berilmadi');
+        }
+        return;
+      }
+    }
+
     // Build all clone tasks
     const cloneTasks: { product: CloneableProduct; target: string }[] = [];
     let skipped = 0;
