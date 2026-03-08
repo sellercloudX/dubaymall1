@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -467,14 +467,13 @@ function KPICard({ icon, label, value, variant = 'neutral' }: { icon: React.Reac
   );
 }
 
-function SortButton({ label, field, current, dir, onClick, className = '' }: {
+const SortButton = React.forwardRef<HTMLButtonElement, {
   label: string; field: SortField; current: SortField; dir: SortDir; onClick: (f: SortField) => void; className?: string;
-}) {
-  return (
-    <button className={`flex items-center gap-0.5 hover:text-foreground transition-colors ${current === field ? 'text-foreground' : ''} ${className}`}
-      onClick={() => onClick(field)}>
-      {label}
-      {current === field && <ArrowUpDown className="h-3 w-3" />}
-    </button>
-  );
-}
+}>(({ label, field, current, dir, onClick, className = '' }, ref) => (
+  <button ref={ref} className={`flex items-center gap-0.5 hover:text-foreground transition-colors ${current === field ? 'text-foreground' : ''} ${className}`}
+    onClick={() => onClick(field)}>
+    {label}
+    {current === field && <ArrowUpDown className="h-3 w-3" />}
+  </button>
+));
+SortButton.displayName = 'SortButton';

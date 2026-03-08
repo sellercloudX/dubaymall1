@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { FileSpreadsheet, Search, Sparkles, Download, Package, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { checkBillingAccess, handleEdgeFunctionBillingError } from '@/lib/billingCheck';
 import ExcelJS from 'exceljs';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 
@@ -124,6 +125,9 @@ export function UzumCardHelper({ connectedMarketplaces, store }: UzumCardHelperP
 
   // Generate AI content + auto MXIK for each product then build Excel
   const handleGenerate = async () => {
+    // Pre-flight billing check
+    if (!(await checkBillingAccess('prepare-uzum-card'))) return;
+
     setStep('generating');
     setProgress(0);
     setErrors([]);
@@ -159,7 +163,13 @@ export function UzumCardHelper({ connectedMarketplaces, store }: UzumCardHelperP
           }),
         ]);
 
-        if (cardResult.error) throw cardResult.error;
+        if (cardResult.error) {
+          if (handleEdgeFunctionBillingError(cardResult.error, cardResult.data)) {
+            errs.push(`${product.name}: Balans yetarli emas`);
+            continue;
+          }
+          throw cardResult.error;
+        }
         if (cardResult.data?.error) throw new Error(cardResult.data.error);
         
         const mxikCode = common.ikpu || mxikResult.data?.mxik_code || '';
