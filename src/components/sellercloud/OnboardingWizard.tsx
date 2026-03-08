@@ -550,18 +550,6 @@ export function OnboardingWizard({ onActivate, onGoHome }: OnboardingWizardProps
               </Button>
             </CardContent>
           </Card>
-
-          <Card className="active:scale-[0.98] transition-transform cursor-pointer" onClick={onContactAdmin}>
-            <CardContent className="p-3">
-              <h3 className="font-bold text-sm">{t.activateOption2Title}</h3>
-              <p className="text-[11px] text-muted-foreground mt-0.5">{t.activateOption2Desc}</p>
-              <Button variant="outline" className="w-full mt-2 gap-1" size="sm" asChild>
-                <a href="https://t.me/sellercloudx_support" target="_blank" rel="noopener">
-                  {t.contactAdmin} <ChevronRight className="h-3.5 w-3.5" />
-                </a>
-              </Button>
-            </CardContent>
-          </Card>
         </div>
       </div>
 
