@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { useFeaturePricing, useAdminFeaturePricing, type FeaturePrice } from '@/hooks/useFeaturePricing';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -131,12 +133,56 @@ function AdminBalanceTopup({ allBalances }: { allBalances: any[] }) {
   const [description, setDescription] = useState('');
   const [search, setSearch] = useState('');
 
+  // Fetch profiles to show names
+  const { data: profiles } = useQuery({
+    queryKey: ['admin-balance-profiles'],
+    queryFn: async () => {
+      const userIds = allBalances.map(b => b.user_id);
+      if (userIds.length === 0) return [];
+      const { data } = await supabase
+        .from('profiles')
+        .select('user_id, full_name, phone')
+        .in('user_id', userIds);
+      return data || [];
+    },
+    enabled: allBalances.length > 0,
+  });
+
+  // Fetch subscriptions to show plan type
+  const { data: subscriptions } = useQuery({
+    queryKey: ['admin-balance-subs'],
+    queryFn: async () => {
+      const userIds = allBalances.map(b => b.user_id);
+      if (userIds.length === 0) return [];
+      const { data } = await supabase
+        .from('sellercloud_subscriptions')
+        .select('user_id, plan_type, is_active')
+        .in('user_id', userIds);
+      return data || [];
+    },
+    enabled: allBalances.length > 0,
+  });
+
+  const getProfile = (uid: string) => profiles?.find(p => p.user_id === uid);
+  const getSub = (uid: string) => subscriptions?.find(s => s.user_id === uid);
+
   const handleTopup = () => {
     if (!userId || !amount) return;
     addBalanceToUser.mutate({ userId, amount: Number(amount), description });
     setAmount('');
     setDescription('');
   };
+
+  const filteredBalances = search
+    ? allBalances.filter(b => {
+        const profile = getProfile(b.user_id);
+        return (profile?.full_name || '').toLowerCase().includes(search.toLowerCase()) ||
+          (profile?.phone || '').includes(search) ||
+          b.user_id.includes(search);
+      })
+    : allBalances;
+
+  const selectedProfile = userId ? getProfile(userId) : null;
 
   return (
     <Card>
@@ -148,13 +194,16 @@ function AdminBalanceTopup({ allBalances }: { allBalances: any[] }) {
       <CardContent className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
-            <Label className="text-xs">Foydalanuvchi ID</Label>
+            <Label className="text-xs">Foydalanuvchi</Label>
             <Input
               value={userId}
               onChange={(e) => setUserId(e.target.value)}
-              placeholder="user UUID"
+              placeholder="user UUID yoki ro'yxatdan tanlang"
               className="h-9 text-sm"
             />
+            {selectedProfile && (
+              <p className="text-xs text-primary mt-1">✓ {selectedProfile.full_name || selectedProfile.phone || 'Noma\'lum'}</p>
+            )}
           </div>
           <div>
             <Label className="text-xs">Summa (UZS)</Label>
@@ -165,6 +214,14 @@ function AdminBalanceTopup({ allBalances }: { allBalances: any[] }) {
               type="number"
               className="h-9 text-sm"
             />
+            <div className="flex gap-1 mt-1">
+              {[300000, 500000, 1000000, 5000000].map(v => (
+                <Button key={v} size="sm" variant="ghost" className="h-5 text-[10px] px-1.5"
+                  onClick={() => setAmount(String(v))}>
+                  {v >= 1000000 ? `${v / 1000000} mln` : `${v / 1000} ming`}
+                </Button>
+              ))}
+            </div>
           </div>
           <div>
             <Label className="text-xs">Izoh</Label>
@@ -176,7 +233,7 @@ function AdminBalanceTopup({ allBalances }: { allBalances: any[] }) {
             />
           </div>
         </div>
-        <Button onClick={handleTopup} disabled={addBalanceToUser.isPending} className="w-full sm:w-auto">
+        <Button onClick={handleTopup} disabled={addBalanceToUser.isPending || !userId || !amount} className="w-full sm:w-auto">
           <DollarSign className="h-4 w-4 mr-1" /> Balans to'ldirish
         </Button>
 
@@ -187,29 +244,59 @@ function AdminBalanceTopup({ allBalances }: { allBalances: any[] }) {
               <div className="flex items-center gap-2 mb-3">
                 <h4 className="text-sm font-medium">Barcha balanslar</h4>
                 <Badge variant="secondary">{allBalances.length}</Badge>
+                <Input
+                  placeholder="Ism yoki telefon..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="h-7 text-xs max-w-[200px] ml-auto"
+                />
               </div>
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {allBalances.map((b: any) => (
-                  <div key={b.id} className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/30 text-sm">
-                    <div>
-                      <p className="font-mono text-xs text-muted-foreground">{b.user_id.slice(0, 8)}...</p>
+              <div className="space-y-2 max-h-80 overflow-y-auto">
+                {filteredBalances.map((b: any) => {
+                  const profile = getProfile(b.user_id);
+                  const sub = getSub(b.user_id);
+                  const planType = sub?.plan_type?.toLowerCase();
+                  return (
+                    <div key={b.id} className={`flex items-center justify-between p-3 rounded-lg border text-sm ${userId === b.user_id ? 'border-primary bg-primary/5' : 'border-border bg-muted/30'}`}>
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm truncate">
+                          {profile?.full_name || 'Noma\'lum'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {profile?.phone || b.user_id.slice(0, 12) + '...'}
+                        </p>
+                        <div className="flex items-center gap-1 mt-0.5">
+                          {planType === 'elegant' && (
+                            <Badge className="bg-violet-500/10 text-violet-600 border-violet-200 text-[10px] px-1.5">Elegant</Badge>
+                          )}
+                          {planType === 'premium' && (
+                            <Badge className="bg-amber-500/10 text-amber-600 border-amber-200 text-[10px] px-1.5">Premium</Badge>
+                          )}
+                          {planType === 'pro' && (
+                            <Badge variant="secondary" className="text-[10px] px-1.5">Free</Badge>
+                          )}
+                          {sub?.is_active && (
+                            <Badge className="bg-emerald-500/10 text-emerald-600 text-[10px] px-1.5">Faol</Badge>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="font-bold">{Number(b.balance_uzs).toLocaleString()} <span className="text-xs font-normal text-muted-foreground">UZS</span></p>
+                        <p className="text-[10px] text-muted-foreground">
+                          +{Number(b.total_deposited).toLocaleString()} / -{Number(b.total_spent).toLocaleString()}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant={userId === b.user_id ? 'default' : 'outline'}
+                        className="h-7 text-xs ml-2 shrink-0"
+                        onClick={() => setUserId(b.user_id)}
+                      >
+                        {userId === b.user_id ? '✓' : 'Tanlash'}
+                      </Button>
                     </div>
-                    <div className="text-right">
-                      <p className="font-bold">{Number(b.balance_uzs).toLocaleString()} UZS</p>
-                      <p className="text-[10px] text-muted-foreground">
-                        Kirim: {Number(b.total_deposited).toLocaleString()} | Chiqim: {Number(b.total_spent).toLocaleString()}
-                      </p>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 text-xs ml-2"
-                      onClick={() => setUserId(b.user_id)}
-                    >
-                      Tanlash
-                    </Button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </>

@@ -210,16 +210,18 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
   const paginated = sorted.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   // Aggregated stats
+  // Use all non-cancelled orders for revenue (consistent with Financial Dashboard)
   const stats = useMemo(() => {
+    const nonCancelled = dateFiltered.filter(e => e.statusCategory !== 'cancelled');
     const delivered = dateFiltered.filter(e => e.statusCategory === 'delivered');
     const cancelled = dateFiltered.filter(e => e.statusCategory === 'cancelled');
     const active = dateFiltered.filter(e => !['delivered', 'cancelled'].includes(e.statusCategory));
 
-    const totalRevenue = delivered.reduce((s, e) => s + e.totalUzs, 0);
-    const totalCost = delivered.reduce((s, e) => s + e.costTotal, 0);
-    const totalCommission = delivered.reduce((s, e) => s + e.commission, 0);
-    const totalLogistics = delivered.reduce((s, e) => s + e.logistics, 0);
-    const totalNetProfit = delivered.reduce((s, e) => s + e.netProfit, 0);
+    const totalRevenue = nonCancelled.reduce((s, e) => s + e.totalUzs, 0);
+    const totalCost = nonCancelled.reduce((s, e) => s + e.costTotal, 0);
+    const totalCommission = nonCancelled.reduce((s, e) => s + e.commission, 0);
+    const totalLogistics = nonCancelled.reduce((s, e) => s + e.logistics, 0);
+    const totalNetProfit = nonCancelled.reduce((s, e) => s + e.netProfit, 0);
     const avgMargin = totalRevenue > 0 ? (totalNetProfit / totalRevenue) * 100 : 0;
 
     return {
