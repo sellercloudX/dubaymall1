@@ -255,7 +255,15 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
         
         if (error) {
           console.error(`Yandex clone error for "${product.name}":`, error);
-          toast.error(`${product.name.slice(0, 30)}: ${error.message || 'Edge function xatosi'}`);
+          // Handle billing errors (402) — body is in error.context or data
+          const billingMsg = data?.error || data?.billingError 
+            || (typeof error === 'object' && error?.context?.json?.error)
+            || error.message || 'Edge function xatosi';
+          if (data?.billingError === 'insufficient_balance' || data?.billingError === 'activation_required') {
+            toast.error(data.error || 'Balans yetarli emas. Balansni to\'ldiring.');
+            throw new Error('billing_error'); // Stop batch processing
+          }
+          toast.error(`${product.name.slice(0, 30)}: ${typeof billingMsg === 'string' ? billingMsg.slice(0, 120) : 'Xatolik'}`);
           return false;
         }
         if (!data?.success) {
