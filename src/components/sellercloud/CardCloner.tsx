@@ -255,12 +255,10 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
         
         if (error) {
           console.error(`Yandex clone error for "${product.name}":`, error);
-          // For FunctionsHttpError (402 etc), parse the response body
-          let errorBody: any = data;
-          if (!errorBody && error?.context instanceof Response) {
-            try { errorBody = await error.context.json(); } catch {}
-          }
-          if (errorBody?.billingError === 'insufficient_balance' || errorBody?.billingError === 'activation_required') {
+          // FunctionsHttpError: context is the parsed response body (or empty)
+          const errorBody = data || error?.context || {};
+          const billingErr = errorBody?.billingError;
+          if (billingErr === 'insufficient_balance' || billingErr === 'activation_required') {
             toast.error(errorBody.error || 'Balans yetarli emas. Balansni to\'ldiring.');
             throw new Error('billing_error');
           }
@@ -298,10 +296,7 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
         
         if (error) {
           console.error(`WB clone error for "${product.name}":`, error);
-          let errorBody: any = data;
-          if (!errorBody && error?.context instanceof Response) {
-            try { errorBody = await error.context.json(); } catch {}
-          }
+          const errorBody = data || error?.context || {};
           if (errorBody?.billingError === 'insufficient_balance' || errorBody?.billingError === 'activation_required') {
             toast.error(errorBody.error || 'Balans yetarli emas. Balansni to\'ldiring.');
             throw new Error('billing_error');
@@ -335,10 +330,7 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
         
         if (error) {
           console.error(`Uzum clone error for "${product.name}":`, error);
-          let errorBody: any = data;
-          if (!errorBody && error?.context instanceof Response) {
-            try { errorBody = await error.context.json(); } catch {}
-          }
+          const errorBody = data || error?.context || {};
           if (errorBody?.billingError === 'insufficient_balance' || errorBody?.billingError === 'activation_required') {
             toast.error(errorBody.error || 'Balans yetarli emas. Balansni to\'ldiring.');
             throw new Error('billing_error');
@@ -379,6 +371,29 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
       console.log('[CardCloner] No products or targets selected, returning');
       return;
     }
+
+    // Pre-flight billing check — prevent 402 errors before starting
+    if (user) {
+      const featureKey = targetMarketplaces.includes('yandex') ? 'clone-to-yandex' 
+        : targetMarketplaces.includes('wildberries') ? 'clone-to-wildberries' 
+        : 'clone-to-uzum';
+      const { data: accessCheck } = await supabase.rpc('check_feature_access', {
+        p_user_id: user.id,
+        p_feature_key: featureKey,
+      });
+      const ac = accessCheck as any;
+      if (ac && !ac.allowed) {
+        if (ac.error === 'insufficient_balance') {
+          toast.error(`Balans yetarli emas (${ac.balance?.toLocaleString()} so'm). Balansni kamida 300,000 so'm to'ldiring.`);
+        } else if (ac.error === 'activation_required') {
+          toast.error('Oylik aktivatsiya (99,000 so\'m) talab etiladi. Obuna bo\'limiga o\'ting.');
+        } else {
+          toast.error(ac.message || 'Ruxsat berilmadi');
+        }
+        return;
+      }
+    }
+
     // Build all clone tasks
     const cloneTasks: { product: CloneableProduct; target: string }[] = [];
     let skipped = 0;
