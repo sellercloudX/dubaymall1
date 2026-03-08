@@ -112,7 +112,7 @@ JAVOB:`;
     await supabase.from("ai_usage_log").insert({
       user_id: user.id,
       action_type: "review_reply",
-      model_used: "gemini-2.5-flash",
+      model_used: "gemini-3-flash-preview",
       tokens_input: prompt.length,
       tokens_output: reply.length,
       metadata: { marketplace, rating, language },
