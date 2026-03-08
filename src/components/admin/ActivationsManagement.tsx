@@ -151,7 +151,8 @@ export function ActivationsManagement() {
                 <TableBody>
                   {filteredCloud?.map((sub: any) => {
                     const planType = (sub.plan_type || 'pro').toLowerCase();
-                    const planBadge = planType === 'elegant'
+                    const isElegant = planType === 'elegant' || planType === 'enterprise';
+                    const planBadge = isElegant
                       ? <Badge className="bg-violet-500/10 text-violet-600 border-violet-200">Elegant</Badge>
                       : planType === 'premium'
                       ? <Badge className="bg-amber-500/10 text-amber-600 border-amber-200">Premium</Badge>
@@ -172,7 +173,7 @@ export function ActivationsManagement() {
                             {planBadge}
                             <select
                               className="text-[10px] border rounded px-1 py-0.5 bg-background w-20"
-                              value={planType}
+                              value={isElegant ? 'enterprise' : planType}
                               onChange={async (e) => {
                                 const newPlan = e.target.value;
                                 const { error } = await supabase
@@ -181,14 +182,14 @@ export function ActivationsManagement() {
                                   .eq('id', sub.id);
                                 if (error) toast.error('Xatolik: ' + error.message);
                                 else {
-                                  toast.success(`Tarif ${newPlan} ga o'zgartirildi`);
+                                  toast.success(`Tarif ${newPlan === 'enterprise' ? 'Elegant' : newPlan === 'premium' ? 'Premium' : 'Free'} ga o'zgartirildi`);
                                   queryClient.invalidateQueries({ queryKey: ['admin-cloud-subscriptions'] });
                                 }
                               }}
                             >
                               <option value="pro">Free</option>
                               <option value="premium">Premium</option>
-                              <option value="elegant">Elegant</option>
+                              <option value="enterprise">Elegant</option>
                             </select>
                           </div>
                         </TableCell>
