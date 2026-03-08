@@ -133,9 +133,6 @@ export default function SellerCloudMobile() {
               toast.error(result.error || 'Xatolik yuz berdi');
             }
           }}
-          onContactAdmin={() => {
-            window.open('https://t.me/sellercloudx_support', '_blank');
-          }}
           onGoHome={() => navigate('/')}
         />
       </div>
