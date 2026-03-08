@@ -298,11 +298,15 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
         
         if (error) {
           console.error(`WB clone error for "${product.name}":`, error);
-          if (data?.billingError === 'insufficient_balance' || data?.billingError === 'activation_required') {
-            toast.error(data.error || 'Balans yetarli emas. Balansni to\'ldiring.');
+          let errorBody: any = data;
+          if (!errorBody && error?.context instanceof Response) {
+            try { errorBody = await error.context.json(); } catch {}
+          }
+          if (errorBody?.billingError === 'insufficient_balance' || errorBody?.billingError === 'activation_required') {
+            toast.error(errorBody.error || 'Balans yetarli emas. Balansni to\'ldiring.');
             throw new Error('billing_error');
           }
-          toast.error(`${product.name.slice(0, 30)}: ${data?.error || error.message || 'Edge function xatosi'}`);
+          toast.error(`${product.name.slice(0, 30)}: ${errorBody?.error || error.message || 'Edge function xatosi'}`);
           return false;
         }
         if (!data?.success) {
