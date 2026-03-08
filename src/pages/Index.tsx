@@ -503,10 +503,6 @@ export default function Index() {
             <a href="#faq" className="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">
               FAQ
             </a>
-            <a href="#bloggers" className="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium flex items-center gap-1">
-              <Heart className="h-3.5 w-3.5" />
-              {txt.bloggerNav}
-            </a>
           </div>
 
           <div className="flex items-center gap-1 sm:gap-2">
