@@ -16,42 +16,31 @@ import {
 import {
   TrendingDown, TrendingUp, Minus, RefreshCw, Loader2, Search,
   Bell, Zap, BarChart3, Eye, AlertTriangle, ArrowDown, ArrowUp,
-  Settings, Plus, Trash2, Target
+  Settings, Plus, Trash2, Target, Package
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { MarketplaceLogo, MARKETPLACE_NAMES } from '@/lib/marketplaceConfig';
 
-interface TrackedProduct {
+interface ProductPriceData {
   id: string;
   marketplace: string;
   offerId: string;
   productName: string;
   myPrice: number;
-  competitorPrices: CompetitorPrice[];
-  minCompetitorPrice: number;
-  maxCompetitorPrice: number;
-  avgCompetitorPrice: number;
+  originalPrice: number;
+  discount: number;
+  stockCount: number;
+  category: string;
+  pictures: string[];
+}
+
+interface CrossListedProduct {
+  offerId: string;
+  productName: string;
+  prices: { marketplace: string; price: number }[];
+  minPrice: number;
+  maxPrice: number;
   priceDiffPercent: number;
-  autoRepriceEnabled: boolean;
-  minAllowedPrice: number;
-  repriceStrategy: 'match_lowest' | 'undercut_1' | 'undercut_5' | 'stay_above_avg';
-  lastChecked: string;
-  priceHistory: PricePoint[];
-}
-
-interface CompetitorPrice {
-  sellerName: string;
-  price: number;
-  rating: number;
-  hasDelivery: boolean;
-  lastSeen: string;
-}
-
-interface PricePoint {
-  date: string;
-  myPrice: number;
-  minCompPrice: number;
-  avgCompPrice: number;
 }
 
 interface AutoRepriceRule {
@@ -73,44 +62,41 @@ export function CompetitorPriceMonitor({ connectedMarketplaces, store }: Competi
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('monitor');
   const [isLoading, setIsLoading] = useState(false);
-  const [products, setProducts] = useState<TrackedProduct[]>([]);
+  const [products, setProducts] = useState<ProductPriceData[]>([]);
+  const [crossListed, setCrossListed] = useState<CrossListedProduct[]>([]);
   const [rules, setRules] = useState<AutoRepriceRule[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMarketplace, setSelectedMarketplace] = useState<string>('all');
   const [isSyncing, setIsSyncing] = useState(false);
-  const [ruleDialogOpen, setRuleDialogOpen] = useState(false);
-  const [editRule, setEditRule] = useState<AutoRepriceRule | null>(null);
 
   // Rule form
+  const [ruleDialogOpen, setRuleDialogOpen] = useState(false);
+  const [editRule, setEditRule] = useState<AutoRepriceRule | null>(null);
   const [ruleMarketplace, setRuleMarketplace] = useState('');
   const [ruleStrategy, setRuleStrategy] = useState('match_lowest');
   const [ruleMinPercent, setRuleMinPercent] = useState(5);
   const [ruleMaxUndercut, setRuleMaxUndercut] = useState(3);
   const [ruleActive, setRuleActive] = useState(true);
 
-  // Load tracked products from marketplace data
+  // Load real product data from store
   const loadProducts = useCallback(async () => {
     if (!connectedMarketplaces.length) return;
     setIsLoading(true);
 
     try {
-      const allProducts: TrackedProduct[] = [];
+      const allProducts: ProductPriceData[] = [];
 
       for (const mp of connectedMarketplaces) {
-        // Fetch products with prices from store cache
         const marketplaceProducts = store?.products?.[mp] || [];
 
-        for (const prod of marketplaceProducts.slice(0, 50)) {
+        for (const prod of marketplaceProducts) {
           const myPrice = prod.price || prod.basicPrice || 0;
           if (myPrice <= 0) continue;
 
-          // Generate realistic competitor data based on marketplace patterns
-          const competitorPrices = generateCompetitorPrices(myPrice, mp);
-          const prices = competitorPrices.map(c => c.price);
-          const minComp = prices.length > 0 ? Math.min(...prices) : myPrice;
-          const maxComp = prices.length > 0 ? Math.max(...prices) : myPrice;
-          const avgComp = prices.length > 0 ? prices.reduce((a, b) => a + b, 0) / prices.length : myPrice;
-          const diffPercent = avgComp > 0 ? ((myPrice - avgComp) / avgComp * 100) : 0;
+          const originalPrice = prod.originalPrice || prod.basicPrice || myPrice;
+          const discount = originalPrice > myPrice
+            ? Math.round((1 - myPrice / originalPrice) * 100)
+            : (prod.discount || 0);
 
           allProducts.push({
             id: `${mp}-${prod.offerId || prod.nmId || prod.id}`,
@@ -118,21 +104,43 @@ export function CompetitorPriceMonitor({ connectedMarketplaces, store }: Competi
             offerId: prod.offerId || String(prod.nmId || prod.id),
             productName: prod.name || prod.title || `Mahsulot #${prod.offerId || prod.nmId}`,
             myPrice,
-            competitorPrices,
-            minCompetitorPrice: minComp,
-            maxCompetitorPrice: maxComp,
-            avgCompetitorPrice: Math.round(avgComp),
-            priceDiffPercent: Math.round(diffPercent * 10) / 10,
-            autoRepriceEnabled: false,
-            minAllowedPrice: Math.round(myPrice * 0.85),
-            repriceStrategy: 'match_lowest',
-            lastChecked: new Date().toISOString(),
-            priceHistory: generatePriceHistory(myPrice, minComp, avgComp),
+            originalPrice,
+            discount,
+            stockCount: prod.stockCount ?? prod.stockFBO ?? prod.stockFBS ?? 0,
+            category: prod.category || prod.subjectName || '',
+            pictures: prod.pictures || [],
           });
         }
       }
 
       setProducts(allProducts);
+
+      // Find cross-listed products (same offerId across marketplaces)
+      const offerMap = new Map<string, { marketplace: string; price: number; name: string }[]>();
+      for (const p of allProducts) {
+        const key = p.offerId.toLowerCase().replace(/[-_\s]/g, '');
+        if (!offerMap.has(key)) offerMap.set(key, []);
+        offerMap.get(key)!.push({ marketplace: p.marketplace, price: p.myPrice, name: p.productName });
+      }
+
+      const crossListedItems: CrossListedProduct[] = [];
+      offerMap.forEach((entries, key) => {
+        if (entries.length > 1) {
+          const prices = entries.map(e => e.price);
+          const minP = Math.min(...prices);
+          const maxP = Math.max(...prices);
+          crossListedItems.push({
+            offerId: key,
+            productName: entries[0].name,
+            prices: entries.map(e => ({ marketplace: e.marketplace, price: e.price })),
+            minPrice: minP,
+            maxPrice: maxP,
+            priceDiffPercent: minP > 0 ? Math.round((maxP - minP) / minP * 100) : 0,
+          });
+        }
+      });
+      setCrossListed(crossListedItems.sort((a, b) => b.priceDiffPercent - a.priceDiffPercent));
+
     } catch (e: any) {
       console.error('Load products error:', e);
       toast.error('Mahsulotlarni yuklashda xatolik');
@@ -143,15 +151,15 @@ export function CompetitorPriceMonitor({ connectedMarketplaces, store }: Competi
 
   useEffect(() => { loadProducts(); }, [loadProducts]);
 
-  // Fetch competitor prices via edge function
+  // Sync fresh data from marketplace APIs
   const handleSyncPrices = async () => {
     setIsSyncing(true);
-    toast.info('Raqobatchilar narxlari tekshirilmoqda...');
+    toast.info('Marketplace narxlari yangilanmoqda...');
 
     try {
       for (const mp of connectedMarketplaces) {
         await supabase.functions.invoke('fetch-marketplace-data', {
-          body: { marketplace: mp, dataType: 'products', limit: 100 },
+          body: { marketplace: mp, dataType: 'products', limit: 200 },
         });
       }
       await loadProducts();
@@ -166,23 +174,35 @@ export function CompetitorPriceMonitor({ connectedMarketplaces, store }: Competi
   // Filter products
   const filteredProducts = products.filter(p => {
     if (selectedMarketplace !== 'all' && p.marketplace !== selectedMarketplace) return false;
-    if (searchQuery && !p.productName.toLowerCase().includes(searchQuery.toLowerCase()) && !p.offerId.includes(searchQuery)) return false;
+    if (searchQuery && !p.productName.toLowerCase().includes(searchQuery.toLowerCase()) && !p.offerId.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     return true;
   });
 
   // Stats
-  const cheaperCount = products.filter(p => p.priceDiffPercent > 5).length;
-  const competitiveCount = products.filter(p => Math.abs(p.priceDiffPercent) <= 5).length;
-  const expensiveCount = products.filter(p => p.priceDiffPercent < -5).length;
+  const totalProducts = products.length;
+  const withDiscount = products.filter(p => p.discount > 0).length;
+  const lowStock = products.filter(p => p.stockCount > 0 && p.stockCount < 10).length;
+  const outOfStock = products.filter(p => p.stockCount === 0).length;
 
-  const getPriceBadge = (diffPercent: number) => {
-    if (diffPercent > 10) return <Badge variant="destructive" className="text-[10px]"><TrendingUp className="h-3 w-3 mr-0.5" />+{diffPercent}% qimmat</Badge>;
-    if (diffPercent > 5) return <Badge className="text-[10px] bg-amber-500/20 text-amber-700 border-amber-300"><ArrowUp className="h-3 w-3 mr-0.5" />+{diffPercent}%</Badge>;
-    if (diffPercent < -5) return <Badge className="text-[10px] bg-emerald-500/20 text-emerald-700 border-emerald-300"><ArrowDown className="h-3 w-3 mr-0.5" />{diffPercent}% arzon</Badge>;
-    return <Badge variant="secondary" className="text-[10px]"><Minus className="h-3 w-3 mr-0.5" />Raqobatbardosh</Badge>;
-  };
+  // Category price analysis
+  const categoryPrices = new Map<string, { total: number; count: number; min: number; max: number }>();
+  products.forEach(p => {
+    if (!p.category) return;
+    const cat = categoryPrices.get(p.category) || { total: 0, count: 0, min: Infinity, max: 0 };
+    cat.total += p.myPrice;
+    cat.count++;
+    cat.min = Math.min(cat.min, p.myPrice);
+    cat.max = Math.max(cat.max, p.myPrice);
+    categoryPrices.set(p.category, cat);
+  });
 
   const formatPrice = (p: number) => new Intl.NumberFormat('uz-UZ').format(Math.round(p));
+
+  const getStockBadge = (stock: number) => {
+    if (stock === 0) return <Badge variant="destructive" className="text-[10px]">Tugagan</Badge>;
+    if (stock < 10) return <Badge className="text-[10px] bg-amber-500/20 text-amber-700 border-amber-300">Kam: {stock}</Badge>;
+    return <Badge variant="secondary" className="text-[10px]">{stock} dona</Badge>;
+  };
 
   const handleSaveRule = () => {
     const newRule: AutoRepriceRule = {
@@ -211,37 +231,36 @@ export function CompetitorPriceMonitor({ connectedMarketplaces, store }: Competi
         <div>
           <h2 className="text-lg font-semibold flex items-center gap-2">
             <Target className="h-5 w-5 text-primary" />
-            Raqobatchi narx monitoring
+            Narx monitoring va tahlil
           </h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {products.length} mahsulot kuzatilmoqda • Real-vaqtda narx tahlili
+            {totalProducts} mahsulot • {connectedMarketplaces.length} marketplace
           </p>
         </div>
         <Button size="sm" onClick={handleSyncPrices} disabled={isSyncing} className="gap-1.5">
           <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
-          Narxlarni yangilash
+          Yangilash
         </Button>
       </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <KPICard icon={Eye} label="Kuzatilmoqda" value={products.length} color="text-primary" />
-        <KPICard icon={TrendingUp} label="Qimmatroq" value={cheaperCount} color="text-destructive" />
-        <KPICard icon={Minus} label="Raqobatbardosh" value={competitiveCount} color="text-emerald-600" />
-        <KPICard icon={TrendingDown} label="Arzonroq" value={expensiveCount} color="text-blue-600" />
+        <KPICard icon={Package} label="Jami mahsulot" value={totalProducts} color="text-primary" />
+        <KPICard icon={TrendingDown} label="Chegirmada" value={withDiscount} color="text-emerald-600" />
+        <KPICard icon={AlertTriangle} label="Kam qolgan" value={lowStock} color="text-amber-600" />
+        <KPICard icon={TrendingUp} label="Tugagan" value={outOfStock} color="text-destructive" />
       </div>
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="monitor">📊 Monitoring</TabsTrigger>
+          <TabsTrigger value="monitor">📊 Narxlar</TabsTrigger>
+          <TabsTrigger value="cross">🔄 Kross-narx ({crossListed.length})</TabsTrigger>
           <TabsTrigger value="reprice">⚡ Avto-narxlash</TabsTrigger>
-          <TabsTrigger value="alerts">🔔 Bildirishnomalar</TabsTrigger>
         </TabsList>
 
         {/* Monitor Tab */}
         <TabsContent value="monitor" className="space-y-3">
-          {/* Filters */}
           <div className="flex gap-2 flex-wrap">
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-2.5 top-2 h-4 w-4 text-muted-foreground" />
@@ -266,7 +285,6 @@ export function CompetitorPriceMonitor({ connectedMarketplaces, store }: Competi
             </Select>
           </div>
 
-          {/* Products table */}
           {isLoading ? (
             <div className="py-12 text-center"><Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" /></div>
           ) : filteredProducts.length === 0 ? (
@@ -278,11 +296,10 @@ export function CompetitorPriceMonitor({ connectedMarketplaces, store }: Competi
                   <TableRow>
                     <TableHead className="text-xs w-[50px]">MP</TableHead>
                     <TableHead className="text-xs min-w-[200px]">Mahsulot</TableHead>
-                    <TableHead className="text-xs text-right">Mening narx</TableHead>
-                    <TableHead className="text-xs text-right">Min raqobat</TableHead>
-                    <TableHead className="text-xs text-right">O'rtacha</TableHead>
-                    <TableHead className="text-xs text-center">Farq</TableHead>
-                    <TableHead className="text-xs text-center">Raqobat</TableHead>
+                    <TableHead className="text-xs text-right">Narx</TableHead>
+                    <TableHead className="text-xs text-right">Asl narx</TableHead>
+                    <TableHead className="text-xs text-center">Chegirma</TableHead>
+                    <TableHead className="text-xs text-center">Qoldiq</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -296,20 +313,69 @@ export function CompetitorPriceMonitor({ connectedMarketplaces, store }: Competi
                         </div>
                       </TableCell>
                       <TableCell className="text-right font-medium text-xs">{formatPrice(prod.myPrice)}</TableCell>
-                      <TableCell className="text-right text-xs">
-                        <span className={prod.minCompetitorPrice < prod.myPrice ? 'text-destructive font-medium' : 'text-emerald-600'}>
-                          {formatPrice(prod.minCompetitorPrice)}
-                        </span>
+                      <TableCell className="text-right text-xs text-muted-foreground">
+                        {prod.originalPrice !== prod.myPrice ? formatPrice(prod.originalPrice) : '—'}
                       </TableCell>
-                      <TableCell className="text-right text-xs">{formatPrice(prod.avgCompetitorPrice)}</TableCell>
-                      <TableCell className="text-center">{getPriceBadge(prod.priceDiffPercent)}</TableCell>
                       <TableCell className="text-center">
-                        <Badge variant="outline" className="text-[10px]">{prod.competitorPrices.length} sotuvchi</Badge>
+                        {prod.discount > 0 ? (
+                          <Badge className="text-[10px] bg-emerald-500/20 text-emerald-700 border-emerald-300">
+                            -{prod.discount}%
+                          </Badge>
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground">—</span>
+                        )}
                       </TableCell>
+                      <TableCell className="text-center">{getStockBadge(prod.stockCount)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Cross-listed products Tab */}
+        <TabsContent value="cross" className="space-y-3">
+          {crossListed.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center">
+                <BarChart3 className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
+                <h4 className="font-semibold mb-1">Kross-marketplace mahsulotlar topilmadi</h4>
+                <p className="text-xs text-muted-foreground">Bir xil offerId bilan bir necha marketplace'da joylashtirilgan mahsulotlar bo'lsa, narx taqqoslash ko'rsatiladi</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                Bir necha marketplace'da joylashtirilgan {crossListed.length} ta mahsulotning narx farqi
+              </p>
+              {crossListed.map(item => (
+                <Card key={item.offerId}>
+                  <CardContent className="p-3">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div>
+                        <p className="text-sm font-medium">{item.productName}</p>
+                        <p className="text-[10px] text-muted-foreground">{item.offerId}</p>
+                      </div>
+                      {item.priceDiffPercent > 0 && (
+                        <Badge variant={item.priceDiffPercent > 15 ? 'destructive' : 'secondary'} className="text-[10px]">
+                          {item.priceDiffPercent}% farq
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex gap-3 flex-wrap">
+                      {item.prices.map(p => (
+                        <div key={p.marketplace} className="flex items-center gap-1.5 px-2 py-1 rounded bg-muted/50">
+                          <MarketplaceLogo marketplace={p.marketplace} size={16} />
+                          <span className={`text-xs font-medium ${p.price === item.minPrice ? 'text-emerald-600' : p.price === item.maxPrice ? 'text-destructive' : ''}`}>
+                            {formatPrice(p.price)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           )}
         </TabsContent>
@@ -319,7 +385,7 @@ export function CompetitorPriceMonitor({ connectedMarketplaces, store }: Competi
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-semibold text-sm">Avto-narxlash qoidalari</h3>
-              <p className="text-xs text-muted-foreground">Raqobatchilar narxiga qarab avtomatik narx moslashtirish</p>
+              <p className="text-xs text-muted-foreground">Narxlarni avtomatik moslashtirish qoidalari</p>
             </div>
             <Button size="sm" onClick={() => { setEditRule(null); setRuleMarketplace(connectedMarketplaces[0] || ''); setRuleDialogOpen(true); }}>
               <Plus className="h-4 w-4 mr-1" /> Qoida qo'shish
@@ -373,32 +439,6 @@ export function CompetitorPriceMonitor({ connectedMarketplaces, store }: Competi
             </div>
           )}
         </TabsContent>
-
-        {/* Alerts Tab */}
-        <TabsContent value="alerts" className="space-y-3">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2"><Bell className="h-4 w-4" /> Narx o'zgarishlari</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {products.filter(p => Math.abs(p.priceDiffPercent) > 10).slice(0, 10).map(p => (
-                <div key={p.id} className="flex items-center gap-3 p-2 rounded-lg bg-muted/50 text-sm">
-                  <MarketplaceLogo marketplace={p.marketplace} size={20} />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs font-medium truncate">{p.productName}</div>
-                    <div className="text-[10px] text-muted-foreground">
-                      Sizning: {formatPrice(p.myPrice)} • Eng arzon: {formatPrice(p.minCompetitorPrice)}
-                    </div>
-                  </div>
-                  {getPriceBadge(p.priceDiffPercent)}
-                </div>
-              ))}
-              {products.filter(p => Math.abs(p.priceDiffPercent) > 10).length === 0 && (
-                <p className="text-xs text-muted-foreground text-center py-4">Hozircha muhim narx o'zgarishlari yo'q ✅</p>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
 
       {/* Rule Dialog */}
@@ -406,7 +446,7 @@ export function CompetitorPriceMonitor({ connectedMarketplaces, store }: Competi
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><Zap className="h-5 w-5 text-primary" /> Avto-narxlash qoidasi</DialogTitle>
-            <DialogDescription>Raqobatchi narxiga asoslangan avtomatik narx moslashtirish</DialogDescription>
+            <DialogDescription>Narxlarni avtomatik moslashtirish qoidalarini yarating</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
@@ -459,7 +499,7 @@ export function CompetitorPriceMonitor({ connectedMarketplaces, store }: Competi
   );
 }
 
-// Helper components & functions
+// Helper components
 function KPICard({ icon: Icon, label, value, color }: { icon: any; label: string; value: number; color: string }) {
   return (
     <Card>
@@ -482,40 +522,4 @@ function getStrategyLabel(s: string) {
     stay_above_avg: 'O\'rtachadan yuqori',
   };
   return map[s] || s;
-}
-
-function generateCompetitorPrices(myPrice: number, marketplace: string): CompetitorPrice[] {
-  const count = 3 + Math.floor(Math.random() * 5);
-  const sellers = ['TopSeller', 'MegaShop', 'BestPrice', 'SuperMart', 'ShopExpress', 'PrimeStore', 'FastDeal'];
-  const result: CompetitorPrice[] = [];
-
-  for (let i = 0; i < count; i++) {
-    const variance = (Math.random() - 0.4) * 0.3; // -12% to +18%
-    const price = Math.round(myPrice * (1 + variance));
-    result.push({
-      sellerName: sellers[i % sellers.length] + '_' + marketplace,
-      price: Math.max(price, Math.round(myPrice * 0.7)),
-      rating: 3.5 + Math.random() * 1.5,
-      hasDelivery: Math.random() > 0.3,
-      lastSeen: new Date().toISOString(),
-    });
-  }
-
-  return result.sort((a, b) => a.price - b.price);
-}
-
-function generatePriceHistory(myPrice: number, minComp: number, avgComp: number): PricePoint[] {
-  const history: PricePoint[] = [];
-  for (let i = 30; i >= 0; i -= 3) {
-    const date = new Date();
-    date.setDate(date.getDate() - i);
-    const variance = (Math.random() - 0.5) * 0.1;
-    history.push({
-      date: date.toISOString().split('T')[0],
-      myPrice: Math.round(myPrice * (1 + variance * 0.3)),
-      minCompPrice: Math.round(minComp * (1 + variance)),
-      avgCompPrice: Math.round(avgComp * (1 + variance * 0.6)),
-    });
-  }
-  return history;
 }
