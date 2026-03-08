@@ -334,7 +334,7 @@ const featureIcons: Record<string, any> = {
 
 const marketplaceKeys = ['uzum', 'wildberries', 'yandex', 'ozon'];
 
-export function OnboardingWizard({ onActivate, onContactAdmin, onGoHome }: OnboardingWizardProps) {
+export function OnboardingWizard({ onActivate, onGoHome }: OnboardingWizardProps) {
   const { language } = useLanguage();
   const lang = (language || 'uz') as 'uz' | 'ru' | 'en';
   const t = content[lang] || content.uz;
