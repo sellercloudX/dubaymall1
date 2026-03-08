@@ -74,9 +74,14 @@ export function ABCAnalysis({ connectedMarketplaces, store }: ABCAnalysisProps) 
       const orders = store.getOrders(marketplace);
       const taxRate = MARKETPLACE_TAX[marketplace] ?? 0.04;
 
-      const salesMap = new Map<string, { qty: number; revenue: number }>();
+      // Build product lookup by offerId
+      const productMap = new Map<string, typeof productsList[0]>();
+      productsList.forEach(p => productMap.set(p.offerId, p));
+
+      const salesMap = new Map<string, { qty: number; revenue: number; name?: string; photo?: string }>();
       const activeOrders = orders.filter(o => {
-        if (['CANCELLED', 'RETURNED'].includes(o.status)) return false;
+        const st = (o.status || '').toUpperCase();
+        if (['CANCELLED', 'CANCELED', 'RETURNED', 'REJECTED'].includes(st)) return false;
         if (dateFrom || dateTo) {
           const orderDate = new Date(o.createdAt);
           if (dateFrom && orderDate < dateFrom) return false;
@@ -90,26 +95,32 @@ export function ABCAnalysis({ connectedMarketplaces, store }: ABCAnalysisProps) 
           if (!key) return;
           const existing = salesMap.get(key) || { qty: 0, revenue: 0 };
           existing.qty += item.count || 1;
-          // Always convert from native currency — never trust priceUZS (may be RUB for WB)
           const itemPrice = toDisplayUzs(item.price || 0, marketplace);
           existing.revenue += itemPrice * (item.count || 1);
+          // Capture name/photo for orphan items (not in product list)
+          if (!existing.name && (item.offerName || item.offerId)) {
+            existing.name = item.offerName || item.offerId;
+          }
+          if (!existing.photo && (item as any).photo) {
+            existing.photo = (item as any).photo;
+          }
           salesMap.set(key, existing);
         });
       });
 
+      // Track which offerIds we've processed
+      const processedOfferIds = new Set<string>();
+
       productsList.forEach(product => {
+        processedOfferIds.add(product.offerId);
         const sales = salesMap.get(product.offerId) || { qty: 0, revenue: 0 };
-        // Convert product price to UZS
         const priceUzs = toDisplayUzs(product.price || 0, marketplace);
         const totalRevenue = sales.revenue || sales.qty * priceUzs;
         
-        // Cost price: for WB stored in RUB, convert to UZS
         const rawCostPrice = getCostPrice(marketplace, product.offerId);
         const costPriceUzs = rawCostPrice !== null ? toDisplayUzs(rawCostPrice, marketplace) : null;
         const productCost = costPriceUzs !== null ? costPriceUzs * sales.qty : 0;
         
-        const avgSoldPrice = sales.qty > 0 ? sales.revenue / sales.qty : priceUzs;
-        // Tariffs are already in UZS (WB tariffs converted in useMarketplaceTariffs)
         const tariff = getTariffForProduct(tariffMap, product.offerId, priceUzs, marketplace);
         const marketplaceFees = tariff.totalFee * sales.qty;
         
@@ -128,6 +139,36 @@ export function ABCAnalysis({ connectedMarketplaces, store }: ABCAnalysisProps) 
           abcGroup: 'C', revenueShare: 0,
           isRealTariff: tariff.isReal,
           imageUrl: product.pictures?.[0],
+        });
+      });
+
+      // Add orphan order items (items not in product list but present in orders)
+      salesMap.forEach((sales, offerId) => {
+        if (processedOfferIds.has(offerId)) return;
+        if (sales.qty === 0) return;
+        
+        const avgPrice = sales.revenue / sales.qty;
+        const rawCostPrice = getCostPrice(marketplace, offerId);
+        const costPriceUzs = rawCostPrice !== null ? toDisplayUzs(rawCostPrice, marketplace) : null;
+        const productCost = costPriceUzs !== null ? costPriceUzs * sales.qty : 0;
+        
+        const tariff = getTariffForProduct(tariffMap, offerId, avgPrice, marketplace);
+        const marketplaceFees = tariff.totalFee * sales.qty;
+        const taxAmount = sales.revenue * taxRate;
+        const totalCosts = productCost + marketplaceFees + taxAmount;
+        const netProfit = sales.revenue - totalCosts;
+        const profitMargin = sales.revenue > 0 ? (netProfit / sales.revenue) * 100 : 0;
+
+        allProducts.push({
+          id: offerId, name: sales.name || offerId,
+          sku: offerId, marketplace, price: avgPrice,
+          totalSold: sales.qty, totalRevenue: sales.revenue, estimatedCost: totalCosts,
+          commissionAmount: tariff.commission * sales.qty,
+          logisticsCost: tariff.logistics * sales.qty,
+          netProfit, profitMargin,
+          abcGroup: 'C', revenueShare: 0,
+          isRealTariff: tariff.isReal,
+          imageUrl: sales.photo,
         });
       });
     }
