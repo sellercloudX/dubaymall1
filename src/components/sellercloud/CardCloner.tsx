@@ -255,15 +255,17 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
         
         if (error) {
           console.error(`Yandex clone error for "${product.name}":`, error);
-          // Handle billing errors (402) — body is in error.context or data
-          const billingMsg = data?.error || data?.billingError 
-            || (typeof error === 'object' && error?.context?.json?.error)
-            || error.message || 'Edge function xatosi';
-          if (data?.billingError === 'insufficient_balance' || data?.billingError === 'activation_required') {
-            toast.error(data.error || 'Balans yetarli emas. Balansni to\'ldiring.');
-            throw new Error('billing_error'); // Stop batch processing
+          // For FunctionsHttpError (402 etc), parse the response body
+          let errorBody: any = data;
+          if (!errorBody && error?.context instanceof Response) {
+            try { errorBody = await error.context.json(); } catch {}
           }
-          toast.error(`${product.name.slice(0, 30)}: ${typeof billingMsg === 'string' ? billingMsg.slice(0, 120) : 'Xatolik'}`);
+          if (errorBody?.billingError === 'insufficient_balance' || errorBody?.billingError === 'activation_required') {
+            toast.error(errorBody.error || 'Balans yetarli emas. Balansni to\'ldiring.');
+            throw new Error('billing_error');
+          }
+          const msg = errorBody?.error || error.message || 'Edge function xatosi';
+          toast.error(`${product.name.slice(0, 30)}: ${typeof msg === 'string' ? msg.slice(0, 120) : 'Xatolik'}`);
           return false;
         }
         if (!data?.success) {
