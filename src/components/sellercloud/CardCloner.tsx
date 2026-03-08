@@ -10,6 +10,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Copy, ArrowRight, Globe, Package, Search, Check, X, Loader2, Image, RefreshCw, Zap, Store, AlertTriangle, Filter } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { checkBillingAccess, handleEdgeFunctionBillingError } from '@/lib/billingCheck';
 import { backgroundTaskManager } from '@/lib/backgroundTaskManager';
 import { useBackgroundTasks } from '@/hooks/useBackgroundTasks';
 import { useAuth } from '@/contexts/AuthContext';
