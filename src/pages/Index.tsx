@@ -765,78 +765,100 @@ export default function Index() {
              <p className="text-muted-foreground text-base sm:text-lg">{txt.pricingDesc}</p>
            </FadeInSection>
 
-          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            {/* Premium */}
+          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+            {/* FREE */}
             <FadeInSection>
               <Card className="relative border-2 border-primary/30 shadow-xl overflow-hidden h-full hover:shadow-2xl transition-shadow">
                 <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-primary to-accent" />
-                <CardContent className="p-8 md:p-10">
-                  <Badge className="mb-5 bg-primary/10 text-primary border-primary/20">
+                <CardContent className="p-6 md:p-8">
+                  <Badge className="mb-4 bg-primary/10 text-primary border-primary/20">
                     <Star className="h-3 w-3 mr-1" />
-                    {language === 'uz' ? 'TAVSIYA' : language === 'ru' ? 'РЕКОМЕНДУЕМ' : 'RECOMMENDED'}
+                    {language === 'uz' ? 'BEPUL BOSHLASH' : language === 'ru' ? 'НАЧАТЬ БЕСПЛАТНО' : 'START FREE'}
                   </Badge>
-                   <h3 className="text-lg sm:text-xl md:text-2xl font-bold mb-2 sm:mb-1 font-display">{txt.proPlan}</h3>
-                   <div className="flex items-baseline gap-1 mb-2 sm:mb-1">
-                     <span className="text-4xl sm:text-5xl md:text-6xl font-bold text-primary font-display">{txt.proPrice}</span>
-                     <span className="text-muted-foreground text-sm sm:text-base md:text-lg">{txt.perMonth}</span>
-                   </div>
-                   <p className="text-xs sm:text-sm text-muted-foreground mb-1">{txt.proPriceUzs}{txt.perMonth}</p>
-                   <p className="text-xs sm:text-sm text-muted-foreground mb-6 sm:mb-8">{txt.commission}</p>
-                   <ul className="space-y-3 sm:space-y-4 mb-8 sm:mb-10">
-                     {txt.proFeatures.map((f, i) => (
-                       <li key={i} className="flex items-start gap-2 sm:gap-3 text-xs sm:text-sm">
-                         <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5 sm:mt-0">
-                           <CheckCircle className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-primary" />
-                         </div>
-                         <span className="font-medium leading-snug">{f}</span>
-                       </li>
-                     ))}
-                   </ul>
+                  <h3 className="text-xl font-bold mb-1 font-display">{txt.pricingFreeTitle}</h3>
+                  <div className="flex items-baseline gap-1 mb-1">
+                    <span className="text-4xl font-bold text-primary font-display">{txt.pricingFreePrice}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-6">{txt.pricingFreeDesc}</p>
+                  <ul className="space-y-3 mb-8">
+                    {txt.pricingFreeFeatures.map((f, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm">
+                        <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <CheckCircle className="h-3.5 w-3.5 text-primary" />
+                        </div>
+                        <span className="font-medium">{f}</span>
+                      </li>
+                    ))}
+                  </ul>
                   <Button className="w-full shadow-lg shadow-primary/20" size="lg" asChild>
                     <Link to="/auth?mode=register">
-                      {txt.startPro}
-                      <ArrowRight className="ml-2 h-4 w-4" />
+                      {txt.startPro} <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
                   </Button>
-                  <p className="text-xs text-center text-muted-foreground mt-3">{txt.guarantee}</p>
                 </CardContent>
               </Card>
             </FadeInSection>
 
-            {/* Individual */}
-            <FadeInSection delay={150}>
-              <Card className="border shadow-sm h-full hover:shadow-lg transition-shadow">
-                <CardContent className="p-8 md:p-10">
-                  <Badge variant="outline" className="mb-5">VIP</Badge>
-                   <h3 className="text-lg sm:text-xl md:text-2xl font-bold mb-2 sm:mb-1 font-display">{txt.entPlan}</h3>
-                   <div className="flex items-baseline gap-1 mb-3 sm:mb-2">
-                     <span className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold font-display">{txt.entPrice}</span>
-                   </div>
-                   <p className="text-xs sm:text-sm text-muted-foreground mb-5 sm:mb-6">{txt.commissionEnt}</p>
-                  
-                   <div className="mb-5 sm:mb-6">
-                     <p className="text-xs sm:text-sm font-semibold mb-2">{txt.entFor}</p>
-                     <ul className="space-y-1 sm:space-y-1.5">
-                       {txt.entForList.map((item, i) => (
-                         <li key={i} className="text-xs sm:text-sm text-muted-foreground flex items-start gap-2">
-                           <span className="text-primary mt-0.5">•</span>
-                           <span>{item}</span>
-                         </li>
-                       ))}
-                     </ul>
-                   </div>
+            {/* PREMIUM */}
+            <FadeInSection delay={100}>
+              <Card className="relative border-2 border-amber-300/50 shadow-xl overflow-hidden h-full hover:shadow-2xl transition-shadow">
+                <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-400 to-amber-600" />
+                <CardContent className="p-6 md:p-8">
+                  <Badge className="mb-4 bg-amber-500/10 text-amber-600 border-amber-200">
+                    <Crown className="h-3 w-3 mr-1" />
+                    Premium
+                  </Badge>
+                  <h3 className="text-xl font-bold mb-1 font-display">{txt.pricingPremiumTitle}</h3>
+                  <div className="flex items-baseline gap-1 mb-1">
+                    <span className="text-3xl font-bold font-display">{txt.pricingPremiumPrice}</span>
+                    <span className="text-muted-foreground text-sm">{txt.perMonth}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-6">{txt.pricingPremiumDesc}</p>
+                  <ul className="space-y-3 mb-8">
+                    {txt.pricingPremiumFeatures.map((f, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm">
+                        <div className="w-5 h-5 rounded-full bg-amber-500/10 flex items-center justify-center flex-shrink-0">
+                          <CheckCircle className="h-3.5 w-3.5 text-amber-500" />
+                        </div>
+                        <span className="font-medium">{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button className="w-full bg-amber-500 hover:bg-amber-600 text-white" size="lg" asChild>
+                    <Link to="/auth?mode=register">
+                      {txt.startPro} <ArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            </FadeInSection>
 
-                   <ul className="space-y-3 sm:space-y-4 mb-8 sm:mb-10">
-                     {txt.entFeatures.map((f, i) => (
-                       <li key={i} className="flex items-start gap-2 sm:gap-3 text-xs sm:text-sm">
-                         <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-muted flex items-center justify-center flex-shrink-0 mt-0.5 sm:mt-0">
-                           <CheckCircle className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-muted-foreground" />
-                         </div>
-                         <span>{f}</span>
-                       </li>
-                     ))}
-                   </ul>
-                  <Button variant="outline" className="w-full" size="lg" asChild>
+            {/* ELEGANT */}
+            <FadeInSection delay={200}>
+              <Card className="relative border-2 border-violet-300/50 shadow-xl overflow-hidden h-full hover:shadow-2xl transition-shadow">
+                <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-violet-400 to-violet-600" />
+                <CardContent className="p-6 md:p-8">
+                  <Badge className="mb-4 bg-violet-500/10 text-violet-600 border-violet-200">
+                    <Sparkles className="h-3 w-3 mr-1" />
+                    Elegant
+                  </Badge>
+                  <h3 className="text-xl font-bold mb-1 font-display">{txt.pricingElegantTitle}</h3>
+                  <div className="flex items-baseline gap-1 mb-1">
+                    <span className="text-3xl font-bold font-display">{txt.pricingElegantPrice}</span>
+                    <span className="text-muted-foreground text-sm">{txt.perMonth}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-6">{txt.pricingElegantDesc}</p>
+                  <ul className="space-y-3 mb-8">
+                    {txt.pricingElegantFeatures.map((f, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm">
+                        <div className="w-5 h-5 rounded-full bg-violet-500/10 flex items-center justify-center flex-shrink-0">
+                          <CheckCircle className="h-3.5 w-3.5 text-violet-500" />
+                        </div>
+                        <span className="font-medium">{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button className="w-full bg-violet-500 hover:bg-violet-600 text-white" size="lg" asChild>
                     <a href="https://t.me/sellercloudx" target="_blank" rel="noopener noreferrer">
                       <MessageCircle className="mr-2 h-4 w-4" />
                       {txt.contactSales}
@@ -885,110 +907,7 @@ export default function Index() {
         </div>
       </section>
 
-      {/* ━━━ Bloggers / Sellzen Section ━━━ */}
-      <section id="bloggers" className="py-24 md:py-32">
-        <div className="container mx-auto px-4">
-          <FadeInSection className="text-center mb-16">
-            <Badge variant="outline" className="mb-4 px-4 py-1.5">
-              <Heart className="h-3 w-3 mr-1.5" />
-              {txt.bloggerNav}
-            </Badge>
-            <h2 className="text-3xl md:text-5xl font-bold mb-3 font-display">
-              {txt.bloggerTitle}
-            </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto text-lg">{txt.bloggerSubtitle}</p>
-          </FadeInSection>
 
-          <div className="grid md:grid-cols-2 gap-8 md:gap-12 max-w-5xl mx-auto items-center">
-            <FadeInSection>
-              <div className="space-y-6">
-                <p className="text-muted-foreground leading-relaxed">{txt.bloggerDesc}</p>
-                
-                {/* 4 Steps */}
-                <div className="space-y-3">
-                  {[txt.bloggerStep1, txt.bloggerStep2, txt.bloggerStep3, txt.bloggerStep4].map((step, i) => (
-                    <div key={i} className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                        <span className="text-primary font-bold text-sm">{i + 1}</span>
-                      </div>
-                      <p className="text-sm font-medium pt-1.5">{step}</p>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Bonus breakdown */}
-                <div className="rounded-xl border-2 border-primary/20 p-4 space-y-3 bg-primary/5">
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <Badge className="bg-primary text-primary-foreground">{txt.bloggerBonus1}</Badge>
-                    <Badge className="bg-primary text-primary-foreground">{txt.bloggerBonus2}</Badge>
-                    <Badge className="bg-primary text-primary-foreground">{txt.bloggerBonus3}</Badge>
-                  </div>
-                  <div className="text-center font-bold text-lg text-primary">{txt.bloggerBonusTotal}</div>
-                </div>
-
-                <Button size="lg" className="shadow-lg shadow-primary/20 group w-full md:w-auto" asChild>
-                  <a href="https://sellzen.online" target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="mr-2 h-4 w-4" />
-                    {txt.bloggerCta}
-                    <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                  </a>
-                </Button>
-              </div>
-            </FadeInSection>
-
-            <FadeInSection delay={200}>
-              <Card className="border-2 border-primary/20 shadow-xl bg-gradient-to-br from-primary/5 to-accent/5">
-                <CardContent className="p-6 md:p-8 space-y-5">
-                  <div className="text-center">
-                    <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
-                      <Coins className="h-8 w-8 text-primary" />
-                    </div>
-                    <div className="text-3xl md:text-4xl font-bold font-display text-primary mb-1">$125</div>
-                    <p className="text-muted-foreground text-sm">{txt.bloggerBonusTotal}</p>
-                  </div>
-                  
-                  <div className="space-y-2 text-sm">
-                    <div className="flex items-start gap-2 p-2.5 rounded-lg bg-muted/50">
-                      <span className="text-primary font-bold shrink-0">💰</span>
-                      <span>{txt.bloggerWeekly}</span>
-                    </div>
-                    <div className="flex items-start gap-2 p-2.5 rounded-lg bg-muted/50">
-                      <span className="text-primary font-bold shrink-0">🏆</span>
-                      <span>{txt.bloggerMonthly}</span>
-                    </div>
-                    <div className="flex items-start gap-2 p-2.5 rounded-lg bg-muted/50">
-                      <span className="text-primary font-bold shrink-0">📸</span>
-                      <span>{txt.bloggerInstagram}</span>
-                    </div>
-                  </div>
-
-                  <div className="border-t pt-4 text-center">
-                    <Badge className="bg-primary/10 text-primary border-primary/20 text-sm px-4 py-1.5">
-                      <TrendingUp className="h-3.5 w-3.5 mr-1.5" />
-                      {txt.bloggerEarning}
-                    </Badge>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-3 text-center pt-2">
-                    <div>
-                      <div className="text-2xl font-bold font-display">$0</div>
-                      <div className="text-[10px] text-muted-foreground">{language === 'uz' ? 'Sarmoya' : language === 'ru' ? 'Вложения' : 'Investment'}</div>
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold font-display">4</div>
-                      <div className="text-[10px] text-muted-foreground">{language === 'uz' ? 'Oddiy qadam' : language === 'ru' ? 'Простых шага' : 'Easy steps'}</div>
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold font-display">$2.5K</div>
-                      <div className="text-[10px] text-muted-foreground">{language === 'uz' ? 'Oylik max' : language === 'ru' ? 'Макс/месяц' : 'Max/month'}</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </FadeInSection>
-          </div>
-        </div>
-      </section>
 
       {/* ━━━ FAQ ━━━ */}
       <section id="faq" className="py-24 md:py-32 bg-muted/30">
