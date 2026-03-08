@@ -147,9 +147,6 @@ export default function SellerCloudMobile() {
             setShowPaymentBypass(true);
             setActiveTab('subscription' as any);
           }}
-          onContactAdmin={() => {
-            window.open('https://t.me/sellercloudx_support', '_blank');
-          }}
           onGoHome={() => navigate('/')}
         />
       </div>

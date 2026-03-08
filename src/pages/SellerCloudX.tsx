@@ -181,9 +181,6 @@ export default function SellerCloudX() {
                 toast.error(result.error || 'Xatolik yuz berdi');
               }
             }}
-            onContactAdmin={() => {
-              window.open('https://t.me/sellercloudx_support', '_blank');
-            }}
           />
           <div className="text-center mt-6">
             <Button variant="ghost" asChild><Link to="/">← Bosh sahifaga qaytish</Link></Button>
