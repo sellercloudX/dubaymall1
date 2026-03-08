@@ -92,6 +92,10 @@ export function CardQualityAudit({ connectedMarketplaces, store }: CardQualityAu
   // Run audit
   const runAudit = useCallback(async (marketplace?: string) => {
     const mp = marketplace || (connectedMarketplaces.length === 1 ? connectedMarketplaces[0] : 'yandex');
+    
+    // Pre-flight billing check
+    if (!(await checkBillingAccess('card-quality-audit'))) return;
+    
     setIsAuditing(true);
     setAuditResults([]);
     setSummary(null);
@@ -103,7 +107,10 @@ export function CardQualityAudit({ connectedMarketplaces, store }: CardQualityAu
         body: { action: 'audit', marketplace: mp },
       });
 
-      if (error) throw error;
+      if (error) {
+        if (handleEdgeFunctionBillingError(error, data)) return;
+        throw error;
+      }
       if (!data.success) throw new Error(data.error);
 
       setAuditResults(data.data || []);
