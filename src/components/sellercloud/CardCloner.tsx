@@ -10,6 +10,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Copy, ArrowRight, Globe, Package, Search, Check, X, Loader2, Image, RefreshCw, Zap, Store, AlertTriangle, Filter } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { checkBillingAccess, handleEdgeFunctionBillingError } from '@/lib/billingCheck';
 import { backgroundTaskManager } from '@/lib/backgroundTaskManager';
 import { useBackgroundTasks } from '@/hooks/useBackgroundTasks';
 import { useAuth } from '@/contexts/AuthContext';
@@ -255,15 +256,9 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
         
         if (error) {
           console.error(`Yandex clone error for "${product.name}":`, error);
-          // FunctionsHttpError: context is the parsed response body (or empty)
+          if (handleEdgeFunctionBillingError(error, data)) throw new Error('billing_error');
           const errorBody = data || error?.context || {};
-          const billingErr = errorBody?.billingError;
-          if (billingErr === 'insufficient_balance' || billingErr === 'activation_required') {
-            toast.error(errorBody.error || 'Balans yetarli emas. Balansni to\'ldiring.');
-            throw new Error('billing_error');
-          }
-          const msg = errorBody?.error || error.message || 'Edge function xatosi';
-          toast.error(`${product.name.slice(0, 30)}: ${typeof msg === 'string' ? msg.slice(0, 120) : 'Xatolik'}`);
+          toast.error(`${product.name.slice(0, 30)}: ${errorBody?.error || error.message || 'Xatolik'}`);
           return false;
         }
         if (!data?.success) {
@@ -296,12 +291,9 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
         
         if (error) {
           console.error(`WB clone error for "${product.name}":`, error);
+          if (handleEdgeFunctionBillingError(error, data)) throw new Error('billing_error');
           const errorBody = data || error?.context || {};
-          if (errorBody?.billingError === 'insufficient_balance' || errorBody?.billingError === 'activation_required') {
-            toast.error(errorBody.error || 'Balans yetarli emas. Balansni to\'ldiring.');
-            throw new Error('billing_error');
-          }
-          toast.error(`${product.name.slice(0, 30)}: ${errorBody?.error || error.message || 'Edge function xatosi'}`);
+          toast.error(`${product.name.slice(0, 30)}: ${errorBody?.error || error.message || 'Xatolik'}`);
           return false;
         }
         if (!data?.success) {
@@ -330,12 +322,9 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
         
         if (error) {
           console.error(`Uzum clone error for "${product.name}":`, error);
+          if (handleEdgeFunctionBillingError(error, data)) throw new Error('billing_error');
           const errorBody = data || error?.context || {};
-          if (errorBody?.billingError === 'insufficient_balance' || errorBody?.billingError === 'activation_required') {
-            toast.error(errorBody.error || 'Balans yetarli emas. Balansni to\'ldiring.');
-            throw new Error('billing_error');
-          }
-          toast.error(`${product.name.slice(0, 30)}: ${errorBody?.error || error.message || 'Edge function xatosi'}`);
+          toast.error(`${product.name.slice(0, 30)}: ${errorBody?.error || error.message || 'Xatolik'}`);
           return false;
         }
         if (!data?.success) {
@@ -373,26 +362,10 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
     }
 
     // Pre-flight billing check — prevent 402 errors before starting
-    if (user) {
-      const featureKey = targetMarketplaces.includes('yandex') ? 'clone-to-yandex' 
-        : targetMarketplaces.includes('wildberries') ? 'clone-to-wildberries' 
-        : 'clone-to-uzum';
-      const { data: accessCheck } = await supabase.rpc('check_feature_access', {
-        p_user_id: user.id,
-        p_feature_key: featureKey,
-      });
-      const ac = accessCheck as any;
-      if (ac && !ac.allowed) {
-        if (ac.error === 'insufficient_balance') {
-          toast.error(`Balans yetarli emas (${ac.balance?.toLocaleString()} so'm). Balansni kamida 300,000 so'm to'ldiring.`);
-        } else if (ac.error === 'activation_required') {
-          toast.error('Oylik aktivatsiya (99,000 so\'m) talab etiladi. Obuna bo\'limiga o\'ting.');
-        } else {
-          toast.error(ac.message || 'Ruxsat berilmadi');
-        }
-        return;
-      }
-    }
+    const featureKey = targetMarketplaces.includes('yandex') ? 'clone-to-yandex' 
+      : targetMarketplaces.includes('wildberries') ? 'clone-to-wildberries' 
+      : 'clone-to-uzum';
+    if (!(await checkBillingAccess(featureKey, user?.id))) return;
 
     // Build all clone tasks
     const cloneTasks: { product: CloneableProduct; target: string }[] = [];

@@ -8,6 +8,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { checkBillingAccess, handleEdgeFunctionBillingError } from '@/lib/billingCheck';
 import {
   Sparkles, Shield, AlertTriangle, CheckCircle2, XCircle,
   Zap, RefreshCw, Play, Loader2, ChevronDown, ChevronUp,
@@ -91,6 +92,10 @@ export function CardQualityAudit({ connectedMarketplaces, store }: CardQualityAu
   // Run audit
   const runAudit = useCallback(async (marketplace?: string) => {
     const mp = marketplace || (connectedMarketplaces.length === 1 ? connectedMarketplaces[0] : 'yandex');
+    
+    // Pre-flight billing check
+    if (!(await checkBillingAccess('card-quality-audit'))) return;
+    
     setIsAuditing(true);
     setAuditResults([]);
     setSummary(null);
@@ -102,7 +107,10 @@ export function CardQualityAudit({ connectedMarketplaces, store }: CardQualityAu
         body: { action: 'audit', marketplace: mp },
       });
 
-      if (error) throw error;
+      if (error) {
+        if (handleEdgeFunctionBillingError(error, data)) return;
+        throw error;
+      }
       if (!data.success) throw new Error(data.error);
 
       setAuditResults(data.data || []);
@@ -119,6 +127,10 @@ export function CardQualityAudit({ connectedMarketplaces, store }: CardQualityAu
   // Fix single card
   const fixCard = useCallback(async (offerId: string) => {
     if (!auditedMarketplace) return;
+    
+    // Pre-flight billing check
+    if (!(await checkBillingAccess('card-auto-fix'))) return;
+    
     setFixResults(prev => new Map(prev).set(offerId, { offerId, status: 'fixing' }));
 
     try {
@@ -126,7 +138,13 @@ export function CardQualityAudit({ connectedMarketplaces, store }: CardQualityAu
         body: { action: 'auto-fix', marketplace: auditedMarketplace, offerId },
       });
 
-      if (error) throw error;
+      if (error) {
+        if (handleEdgeFunctionBillingError(error, data)) {
+          setFixResults(prev => new Map(prev).set(offerId, { offerId, status: 'error', message: 'Balans yetarli emas' }));
+          return;
+        }
+        throw error;
+      }
       if (!data.success) throw new Error(data.error);
 
       const msg = data.data.message || 'Tuzatildi ✅';

@@ -14,6 +14,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useCostPrices } from '@/hooks/useCostPrices';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { checkBillingAccess, handleEdgeFunctionBillingError } from '@/lib/billingCheck';
 import { toDisplayUzs, toMarketplaceCurrency, isRubMarketplace } from '@/lib/currency';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 
@@ -63,6 +64,12 @@ export function CostPriceManager({ connectedMarketplaces, store }: CostPriceMana
 
       toast.info(`AI yordamida ${wbProducts.length} ta WB mahsulotni ${yandexProducts.length} ta Yandex mahsulot bilan solishtirilmoqda...`);
 
+      // Pre-flight billing check
+      if (!(await checkBillingAccess('ai-product-matching'))) {
+        setImporting(false);
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke('match-products-ai', {
         body: {
           wbProducts: wbProducts.map(p => ({ name: p.name, offerId: p.offerId })),
@@ -70,7 +77,10 @@ export function CostPriceManager({ connectedMarketplaces, store }: CostPriceMana
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        if (handleEdgeFunctionBillingError(error, data)) { setImporting(false); return; }
+        throw error;
+      }
 
       if (data?.matches > 0) {
         await refetch();
