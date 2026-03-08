@@ -381,13 +381,14 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
         p_user_id: user.id,
         p_feature_key: featureKey,
       });
-      if (accessCheck && !accessCheck.allowed) {
-        if (accessCheck.error === 'insufficient_balance') {
-          toast.error(`Balans yetarli emas (${accessCheck.balance?.toLocaleString()} so'm). Balansni kamida 300,000 so'm to'ldiring.`);
-        } else if (accessCheck.error === 'activation_required') {
+      const ac = accessCheck as any;
+      if (ac && !ac.allowed) {
+        if (ac.error === 'insufficient_balance') {
+          toast.error(`Balans yetarli emas (${ac.balance?.toLocaleString()} so'm). Balansni kamida 300,000 so'm to'ldiring.`);
+        } else if (ac.error === 'activation_required') {
           toast.error('Oylik aktivatsiya (99,000 so\'m) talab etiladi. Obuna bo\'limiga o\'ting.');
         } else {
-          toast.error(accessCheck.message || 'Ruxsat berilmadi');
+          toast.error(ac.message || 'Ruxsat berilmadi');
         }
         return;
       }
