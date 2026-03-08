@@ -374,26 +374,10 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
     }
 
     // Pre-flight billing check — prevent 402 errors before starting
-    if (user) {
-      const featureKey = targetMarketplaces.includes('yandex') ? 'clone-to-yandex' 
-        : targetMarketplaces.includes('wildberries') ? 'clone-to-wildberries' 
-        : 'clone-to-uzum';
-      const { data: accessCheck } = await supabase.rpc('check_feature_access', {
-        p_user_id: user.id,
-        p_feature_key: featureKey,
-      });
-      const ac = accessCheck as any;
-      if (ac && !ac.allowed) {
-        if (ac.error === 'insufficient_balance') {
-          toast.error(`Balans yetarli emas (${ac.balance?.toLocaleString()} so'm). Balansni kamida 300,000 so'm to'ldiring.`);
-        } else if (ac.error === 'activation_required') {
-          toast.error('Oylik aktivatsiya (99,000 so\'m) talab etiladi. Obuna bo\'limiga o\'ting.');
-        } else {
-          toast.error(ac.message || 'Ruxsat berilmadi');
-        }
-        return;
-      }
-    }
+    const featureKey = targetMarketplaces.includes('yandex') ? 'clone-to-yandex' 
+      : targetMarketplaces.includes('wildberries') ? 'clone-to-wildberries' 
+      : 'clone-to-uzum';
+    if (!(await checkBillingAccess(featureKey, user?.id))) return;
 
     // Build all clone tasks
     const cloneTasks: { product: CloneableProduct; target: string }[] = [];
