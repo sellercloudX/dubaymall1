@@ -11,7 +11,7 @@ import {
   Bot, DollarSign, LineChart, Clock, Users, Star, 
   ChevronRight, Crown, TrendingUp, AlertTriangle,
   Play, Sparkles, Shield, Rocket, Send, MessageCircle,
-  ChevronDown, Lock, FileCheck, ExternalLink, Coins, Heart
+  ChevronDown, Lock, FileCheck, Crown, Sparkles
 } from 'lucide-react';
 import React, { useState, useEffect, useRef, ReactNode } from 'react';
 import heroDashboard from '@/assets/hero-dashboard.png';
@@ -200,23 +200,18 @@ const T = {
     faq5a: 'Agar 60 kun ichida savdolaringiz o\'smasa, to\'langan summani qaytarib olamiz. Bu bizning sifatga ishonchimiz.',
     faq6q: 'Ma\'lumotlarim xavfsizmi?',
     faq6a: 'Ha. API kalitlaringiz shifrlangan holda saqlanadi. SSL himoyasi va GDPR standartlariga muvofiq ishlaymiz.',
-    bloggerNav: 'Blogerlar uchun',
-    bloggerTitle: 'SellerCloudX bilan pul ishlang!',
-    bloggerSubtitle: 'Blogger sifatida hamkor bo\'ling, promo kodingiz orqali yangi mijozlar olib keling va har bir mijozdan $125 gacha bonus oling',
-    bloggerDesc: 'Hech qanday investitsiya kerak emas! Promo kodingiz orqali SellerCloudX ga yangi mijozlar olib keling — har bir mijoz uchun 3 oy davomida bonus oling. Qo\'shimcha haftalik va oylik mega bonuslar ham bor!',
-    bloggerStep1: 'Bepul hamkor sifatida ro\'yxatdan o\'ting',
-    bloggerStep2: 'O\'zingizga xos promo kod yarating (masalan: ALI05)',
-    bloggerStep3: 'SellerCloudX haqida kontent yarating va ulashing',
-    bloggerStep4: 'Har bir mijoz uchun 3 oy bonus + mega bonuslar oling',
-    bloggerBonus1: '1-oy: $50',
-    bloggerBonus2: '2-oy: $50',
-    bloggerBonus3: '3-oy: $25',
-    bloggerBonusTotal: '= Har bir mijozdan $125',
-    bloggerWeekly: 'Haftalik bonus: 10+ mijoz = +$150, 15+ mijoz = +$250',
-    bloggerMonthly: 'Oylik mega bonus: 35+ mijoz = +$1,000, 55+ mijoz = +$2,500',
-    bloggerInstagram: 'Instagram Challenge: Har kuni 1 video = oyiga $100 bonus',
-    bloggerCta: 'Sellzen.online da hamkor bo\'lish',
-    bloggerEarning: 'Oyiga $2,500 gacha ishlash mumkin',
+    pricingFreeTitle: 'Free',
+    pricingFreePrice: 'Bepul',
+    pricingFreeDesc: '1 kunlik sinov, keyin 99,000 so\'m/oy aktivatsiya',
+    pricingFreeFeatures: ['4 ta marketplace ulash', 'Analitika va hisobotlar', 'Buyurtmalarni boshqarish', 'AI xizmatlar — balans orqali'],
+    pricingPremiumTitle: 'Premium',
+    pricingPremiumPrice: '1 270 000 so\'m',
+    pricingPremiumDesc: 'Oylik to\'lov, aktivatsiya bepul',
+    pricingPremiumFeatures: ['Free\'dagi barcha imkoniyatlar', 'AI xizmatlar 40% arzon, cheksiz', 'Oylik aktivatsiya bepul', 'Ustuvor qo\'llab-quvvatlash'],
+    pricingElegantTitle: 'Elegant',
+    pricingElegantPrice: '6 400 000 so\'m',
+    pricingElegantDesc: 'Barcha xizmatlar bepul (limitli)',
+    pricingElegantFeatures: ['Premium\'dagi barcha imkoniyatlar', 'AI xizmatlar 0 so\'m', 'Shaxsiy menejer', 'API kirish + SLA'],
   },
   ru: {
     badge: '🚀 Платформа #1 для маркетплейсов Узбекистана',
@@ -313,23 +308,18 @@ const T = {
     faq5a: 'Если за 60 дней ваши продажи не вырастут, мы вернём оплаченную сумму. Это наша уверенность в качестве.',
     faq6q: 'Мои данные в безопасности?',
     faq6a: 'Да. API-ключи хранятся в зашифрованном виде. SSL-защита и соответствие стандартам GDPR.',
-    bloggerNav: 'Для блогеров',
-    bloggerTitle: 'Зарабатывайте с SellerCloudX!',
-    bloggerSubtitle: 'Станьте партнёром, привлекайте клиентов по промо-коду и получайте до $125 за каждого',
-    bloggerDesc: 'Никаких вложений! Привлекайте новых клиентов в SellerCloudX через свой промо-код — получайте бонус за каждого клиента 3 месяца подряд. Плюс еженедельные и ежемесячные мега-бонусы!',
-    bloggerStep1: 'Зарегистрируйтесь бесплатно как партнёр',
-    bloggerStep2: 'Создайте уникальный промо-код (например: ALI05)',
-    bloggerStep3: 'Создавайте контент о SellerCloudX и делитесь',
-    bloggerStep4: 'Получайте бонус 3 месяца за каждого + мега-бонусы',
-    bloggerBonus1: '1-й мес: $50',
-    bloggerBonus2: '2-й мес: $50',
-    bloggerBonus3: '3-й мес: $25',
-    bloggerBonusTotal: '= $125 за каждого клиента',
-    bloggerWeekly: 'Еженедельный бонус: 10+ клиентов = +$150, 15+ = +$250',
-    bloggerMonthly: 'Ежемесячный мега-бонус: 35+ клиентов = +$1,000, 55+ = +$2,500',
-    bloggerInstagram: 'Instagram Challenge: 1 видео в день = $100/месяц бонус',
-    bloggerCta: 'Стать партнёром на Sellzen.online',
-    bloggerEarning: 'До $2,500 в месяц',
+    pricingFreeTitle: 'Free',
+    pricingFreePrice: 'Бесплатно',
+    pricingFreeDesc: '1 день пробный, затем 99 000 сум/мес активация',
+    pricingFreeFeatures: ['4 маркетплейса', 'Аналитика и отчёты', 'Управление заказами', 'AI-сервисы — через баланс'],
+    pricingPremiumTitle: 'Premium',
+    pricingPremiumPrice: '1 270 000 сум',
+    pricingPremiumDesc: 'Ежемесячная оплата, активация бесплатно',
+    pricingPremiumFeatures: ['Все возможности Free', 'AI-сервисы на 40% дешевле, безлимит', 'Активация бесплатно', 'Приоритетная поддержка'],
+    pricingElegantTitle: 'Elegant',
+    pricingElegantPrice: '6 400 000 сум',
+    pricingElegantDesc: 'Все сервисы бесплатно (с лимитами)',
+    pricingElegantFeatures: ['Все возможности Premium', 'AI-сервисы 0 сум', 'Персональный менеджер', 'Доступ к API + SLA'],
   },
   en: {
     badge: '🚀 #1 Marketplace Automation Platform in Uzbekistan',
@@ -426,23 +416,18 @@ const T = {
     faq5a: 'If your sales don\'t grow within 60 days, we refund the paid amount. That\'s our confidence in quality.',
     faq6q: 'Is my data secure?',
     faq6a: 'Yes. API keys are stored encrypted. SSL protection and GDPR compliance.',
-    bloggerNav: 'For Bloggers',
-    bloggerTitle: 'Earn with SellerCloudX!',
-    bloggerSubtitle: 'Become a partner, bring new clients via your promo code and earn up to $125 per client',
-    bloggerDesc: 'No investment needed! Bring new clients to SellerCloudX with your promo code — earn bonuses for each client for 3 months straight. Plus weekly and monthly mega bonuses!',
-    bloggerStep1: 'Sign up free as a partner',
-    bloggerStep2: 'Create your unique promo code (e.g., ALI05)',
-    bloggerStep3: 'Create content about SellerCloudX and share',
-    bloggerStep4: 'Earn 3-month bonuses per client + mega bonuses',
-    bloggerBonus1: 'Month 1: $50',
-    bloggerBonus2: 'Month 2: $50',
-    bloggerBonus3: 'Month 3: $25',
-    bloggerBonusTotal: '= $125 per client',
-    bloggerWeekly: 'Weekly bonus: 10+ clients = +$150, 15+ = +$250',
-    bloggerMonthly: 'Monthly mega bonus: 35+ clients = +$1,000, 55+ = +$2,500',
-    bloggerInstagram: 'Instagram Challenge: 1 video/day = $100/month bonus',
-    bloggerCta: 'Become a partner on Sellzen.online',
-    bloggerEarning: 'Earn up to $2,500/month',
+    pricingFreeTitle: 'Free',
+    pricingFreePrice: 'Free',
+    pricingFreeDesc: '1-day trial, then 99,000 UZS/month activation',
+    pricingFreeFeatures: ['4 marketplaces', 'Analytics & reports', 'Order management', 'AI services — via balance'],
+    pricingPremiumTitle: 'Premium',
+    pricingPremiumPrice: '1,270,000 UZS',
+    pricingPremiumDesc: 'Monthly payment, activation free',
+    pricingPremiumFeatures: ['All Free features', 'AI services 40% cheaper, unlimited', 'Activation free', 'Priority support'],
+    pricingElegantTitle: 'Elegant',
+    pricingElegantPrice: '6,400,000 UZS',
+    pricingElegantDesc: 'All services free (with limits)',
+    pricingElegantFeatures: ['All Premium features', 'AI services 0 UZS', 'Dedicated manager', 'API access + SLA'],
   },
 };
 
@@ -517,10 +502,6 @@ export default function Index() {
             </a>
             <a href="#faq" className="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">
               FAQ
-            </a>
-            <a href="#bloggers" className="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium flex items-center gap-1">
-              <Heart className="h-3.5 w-3.5" />
-              {txt.bloggerNav}
             </a>
           </div>
 
@@ -784,78 +765,100 @@ export default function Index() {
              <p className="text-muted-foreground text-base sm:text-lg">{txt.pricingDesc}</p>
            </FadeInSection>
 
-          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            {/* Premium */}
+          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+            {/* FREE */}
             <FadeInSection>
               <Card className="relative border-2 border-primary/30 shadow-xl overflow-hidden h-full hover:shadow-2xl transition-shadow">
                 <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-primary to-accent" />
-                <CardContent className="p-8 md:p-10">
-                  <Badge className="mb-5 bg-primary/10 text-primary border-primary/20">
+                <CardContent className="p-6 md:p-8">
+                  <Badge className="mb-4 bg-primary/10 text-primary border-primary/20">
                     <Star className="h-3 w-3 mr-1" />
-                    {language === 'uz' ? 'TAVSIYA' : language === 'ru' ? 'РЕКОМЕНДУЕМ' : 'RECOMMENDED'}
+                    {language === 'uz' ? 'BEPUL BOSHLASH' : language === 'ru' ? 'НАЧАТЬ БЕСПЛАТНО' : 'START FREE'}
                   </Badge>
-                   <h3 className="text-lg sm:text-xl md:text-2xl font-bold mb-2 sm:mb-1 font-display">{txt.proPlan}</h3>
-                   <div className="flex items-baseline gap-1 mb-2 sm:mb-1">
-                     <span className="text-4xl sm:text-5xl md:text-6xl font-bold text-primary font-display">{txt.proPrice}</span>
-                     <span className="text-muted-foreground text-sm sm:text-base md:text-lg">{txt.perMonth}</span>
-                   </div>
-                   <p className="text-xs sm:text-sm text-muted-foreground mb-1">{txt.proPriceUzs}{txt.perMonth}</p>
-                   <p className="text-xs sm:text-sm text-muted-foreground mb-6 sm:mb-8">{txt.commission}</p>
-                   <ul className="space-y-3 sm:space-y-4 mb-8 sm:mb-10">
-                     {txt.proFeatures.map((f, i) => (
-                       <li key={i} className="flex items-start gap-2 sm:gap-3 text-xs sm:text-sm">
-                         <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5 sm:mt-0">
-                           <CheckCircle className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-primary" />
-                         </div>
-                         <span className="font-medium leading-snug">{f}</span>
-                       </li>
-                     ))}
-                   </ul>
+                  <h3 className="text-xl font-bold mb-1 font-display">{txt.pricingFreeTitle}</h3>
+                  <div className="flex items-baseline gap-1 mb-1">
+                    <span className="text-4xl font-bold text-primary font-display">{txt.pricingFreePrice}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-6">{txt.pricingFreeDesc}</p>
+                  <ul className="space-y-3 mb-8">
+                    {txt.pricingFreeFeatures.map((f, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm">
+                        <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <CheckCircle className="h-3.5 w-3.5 text-primary" />
+                        </div>
+                        <span className="font-medium">{f}</span>
+                      </li>
+                    ))}
+                  </ul>
                   <Button className="w-full shadow-lg shadow-primary/20" size="lg" asChild>
                     <Link to="/auth?mode=register">
-                      {txt.startPro}
-                      <ArrowRight className="ml-2 h-4 w-4" />
+                      {txt.startPro} <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
                   </Button>
-                  <p className="text-xs text-center text-muted-foreground mt-3">{txt.guarantee}</p>
                 </CardContent>
               </Card>
             </FadeInSection>
 
-            {/* Individual */}
-            <FadeInSection delay={150}>
-              <Card className="border shadow-sm h-full hover:shadow-lg transition-shadow">
-                <CardContent className="p-8 md:p-10">
-                  <Badge variant="outline" className="mb-5">VIP</Badge>
-                   <h3 className="text-lg sm:text-xl md:text-2xl font-bold mb-2 sm:mb-1 font-display">{txt.entPlan}</h3>
-                   <div className="flex items-baseline gap-1 mb-3 sm:mb-2">
-                     <span className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold font-display">{txt.entPrice}</span>
-                   </div>
-                   <p className="text-xs sm:text-sm text-muted-foreground mb-5 sm:mb-6">{txt.commissionEnt}</p>
-                  
-                   <div className="mb-5 sm:mb-6">
-                     <p className="text-xs sm:text-sm font-semibold mb-2">{txt.entFor}</p>
-                     <ul className="space-y-1 sm:space-y-1.5">
-                       {txt.entForList.map((item, i) => (
-                         <li key={i} className="text-xs sm:text-sm text-muted-foreground flex items-start gap-2">
-                           <span className="text-primary mt-0.5">•</span>
-                           <span>{item}</span>
-                         </li>
-                       ))}
-                     </ul>
-                   </div>
+            {/* PREMIUM */}
+            <FadeInSection delay={100}>
+              <Card className="relative border-2 border-amber-300/50 shadow-xl overflow-hidden h-full hover:shadow-2xl transition-shadow">
+                <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-400 to-amber-600" />
+                <CardContent className="p-6 md:p-8">
+                  <Badge className="mb-4 bg-amber-500/10 text-amber-600 border-amber-200">
+                    <Crown className="h-3 w-3 mr-1" />
+                    Premium
+                  </Badge>
+                  <h3 className="text-xl font-bold mb-1 font-display">{txt.pricingPremiumTitle}</h3>
+                  <div className="flex items-baseline gap-1 mb-1">
+                    <span className="text-3xl font-bold font-display">{txt.pricingPremiumPrice}</span>
+                    <span className="text-muted-foreground text-sm">{txt.perMonth}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-6">{txt.pricingPremiumDesc}</p>
+                  <ul className="space-y-3 mb-8">
+                    {txt.pricingPremiumFeatures.map((f, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm">
+                        <div className="w-5 h-5 rounded-full bg-amber-500/10 flex items-center justify-center flex-shrink-0">
+                          <CheckCircle className="h-3.5 w-3.5 text-amber-500" />
+                        </div>
+                        <span className="font-medium">{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button className="w-full bg-amber-500 hover:bg-amber-600 text-white" size="lg" asChild>
+                    <Link to="/auth?mode=register">
+                      {txt.startPro} <ArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            </FadeInSection>
 
-                   <ul className="space-y-3 sm:space-y-4 mb-8 sm:mb-10">
-                     {txt.entFeatures.map((f, i) => (
-                       <li key={i} className="flex items-start gap-2 sm:gap-3 text-xs sm:text-sm">
-                         <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-muted flex items-center justify-center flex-shrink-0 mt-0.5 sm:mt-0">
-                           <CheckCircle className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-muted-foreground" />
-                         </div>
-                         <span>{f}</span>
-                       </li>
-                     ))}
-                   </ul>
-                  <Button variant="outline" className="w-full" size="lg" asChild>
+            {/* ELEGANT */}
+            <FadeInSection delay={200}>
+              <Card className="relative border-2 border-violet-300/50 shadow-xl overflow-hidden h-full hover:shadow-2xl transition-shadow">
+                <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-violet-400 to-violet-600" />
+                <CardContent className="p-6 md:p-8">
+                  <Badge className="mb-4 bg-violet-500/10 text-violet-600 border-violet-200">
+                    <Sparkles className="h-3 w-3 mr-1" />
+                    Elegant
+                  </Badge>
+                  <h3 className="text-xl font-bold mb-1 font-display">{txt.pricingElegantTitle}</h3>
+                  <div className="flex items-baseline gap-1 mb-1">
+                    <span className="text-3xl font-bold font-display">{txt.pricingElegantPrice}</span>
+                    <span className="text-muted-foreground text-sm">{txt.perMonth}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-6">{txt.pricingElegantDesc}</p>
+                  <ul className="space-y-3 mb-8">
+                    {txt.pricingElegantFeatures.map((f, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm">
+                        <div className="w-5 h-5 rounded-full bg-violet-500/10 flex items-center justify-center flex-shrink-0">
+                          <CheckCircle className="h-3.5 w-3.5 text-violet-500" />
+                        </div>
+                        <span className="font-medium">{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button className="w-full bg-violet-500 hover:bg-violet-600 text-white" size="lg" asChild>
                     <a href="https://t.me/sellercloudx" target="_blank" rel="noopener noreferrer">
                       <MessageCircle className="mr-2 h-4 w-4" />
                       {txt.contactSales}
@@ -904,110 +907,7 @@ export default function Index() {
         </div>
       </section>
 
-      {/* ━━━ Bloggers / Sellzen Section ━━━ */}
-      <section id="bloggers" className="py-24 md:py-32">
-        <div className="container mx-auto px-4">
-          <FadeInSection className="text-center mb-16">
-            <Badge variant="outline" className="mb-4 px-4 py-1.5">
-              <Heart className="h-3 w-3 mr-1.5" />
-              {txt.bloggerNav}
-            </Badge>
-            <h2 className="text-3xl md:text-5xl font-bold mb-3 font-display">
-              {txt.bloggerTitle}
-            </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto text-lg">{txt.bloggerSubtitle}</p>
-          </FadeInSection>
 
-          <div className="grid md:grid-cols-2 gap-8 md:gap-12 max-w-5xl mx-auto items-center">
-            <FadeInSection>
-              <div className="space-y-6">
-                <p className="text-muted-foreground leading-relaxed">{txt.bloggerDesc}</p>
-                
-                {/* 4 Steps */}
-                <div className="space-y-3">
-                  {[txt.bloggerStep1, txt.bloggerStep2, txt.bloggerStep3, txt.bloggerStep4].map((step, i) => (
-                    <div key={i} className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                        <span className="text-primary font-bold text-sm">{i + 1}</span>
-                      </div>
-                      <p className="text-sm font-medium pt-1.5">{step}</p>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Bonus breakdown */}
-                <div className="rounded-xl border-2 border-primary/20 p-4 space-y-3 bg-primary/5">
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <Badge className="bg-primary text-primary-foreground">{txt.bloggerBonus1}</Badge>
-                    <Badge className="bg-primary text-primary-foreground">{txt.bloggerBonus2}</Badge>
-                    <Badge className="bg-primary text-primary-foreground">{txt.bloggerBonus3}</Badge>
-                  </div>
-                  <div className="text-center font-bold text-lg text-primary">{txt.bloggerBonusTotal}</div>
-                </div>
-
-                <Button size="lg" className="shadow-lg shadow-primary/20 group w-full md:w-auto" asChild>
-                  <a href="https://sellzen.online" target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="mr-2 h-4 w-4" />
-                    {txt.bloggerCta}
-                    <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                  </a>
-                </Button>
-              </div>
-            </FadeInSection>
-
-            <FadeInSection delay={200}>
-              <Card className="border-2 border-primary/20 shadow-xl bg-gradient-to-br from-primary/5 to-accent/5">
-                <CardContent className="p-6 md:p-8 space-y-5">
-                  <div className="text-center">
-                    <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
-                      <Coins className="h-8 w-8 text-primary" />
-                    </div>
-                    <div className="text-3xl md:text-4xl font-bold font-display text-primary mb-1">$125</div>
-                    <p className="text-muted-foreground text-sm">{txt.bloggerBonusTotal}</p>
-                  </div>
-                  
-                  <div className="space-y-2 text-sm">
-                    <div className="flex items-start gap-2 p-2.5 rounded-lg bg-muted/50">
-                      <span className="text-primary font-bold shrink-0">💰</span>
-                      <span>{txt.bloggerWeekly}</span>
-                    </div>
-                    <div className="flex items-start gap-2 p-2.5 rounded-lg bg-muted/50">
-                      <span className="text-primary font-bold shrink-0">🏆</span>
-                      <span>{txt.bloggerMonthly}</span>
-                    </div>
-                    <div className="flex items-start gap-2 p-2.5 rounded-lg bg-muted/50">
-                      <span className="text-primary font-bold shrink-0">📸</span>
-                      <span>{txt.bloggerInstagram}</span>
-                    </div>
-                  </div>
-
-                  <div className="border-t pt-4 text-center">
-                    <Badge className="bg-primary/10 text-primary border-primary/20 text-sm px-4 py-1.5">
-                      <TrendingUp className="h-3.5 w-3.5 mr-1.5" />
-                      {txt.bloggerEarning}
-                    </Badge>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-3 text-center pt-2">
-                    <div>
-                      <div className="text-2xl font-bold font-display">$0</div>
-                      <div className="text-[10px] text-muted-foreground">{language === 'uz' ? 'Sarmoya' : language === 'ru' ? 'Вложения' : 'Investment'}</div>
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold font-display">4</div>
-                      <div className="text-[10px] text-muted-foreground">{language === 'uz' ? 'Oddiy qadam' : language === 'ru' ? 'Простых шага' : 'Easy steps'}</div>
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold font-display">$2.5K</div>
-                      <div className="text-[10px] text-muted-foreground">{language === 'uz' ? 'Oylik max' : language === 'ru' ? 'Макс/месяц' : 'Max/month'}</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </FadeInSection>
-          </div>
-        </div>
-      </section>
 
       {/* ━━━ FAQ ━━━ */}
       <section id="faq" className="py-24 md:py-32 bg-muted/30">
