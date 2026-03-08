@@ -40,7 +40,6 @@ serve(async (req) => {
     }
 
     const cleanReview = String(reviewText).slice(0, 2000);
-    const cleanProduct = String(productName || "").slice(0, 200);
     const cleanUser = String(userName || "").slice(0, 100);
     const toneStyle = tone === "formal" ? "rasmiy va professional" : tone === "friendly" ? "samimiy va do'stona" : "qisqa va aniq";
 
@@ -50,25 +49,50 @@ serve(async (req) => {
     const uzCyrillicSpecific = (cleanReview.match(/[ўқғҳ]/gi) || []).length;
     
     let detectedLang: string;
+    let langInstruction: string;
     if (uzCyrillicSpecific > 0 || (latinCount > cyrillicCount && cleanReview.match(/[oʻ']/))) {
       detectedLang = "Uzbek";
+      langInstruction = "O'zbek tilida javob yoz";
     } else if (cyrillicCount > latinCount) {
       detectedLang = "Russian";
+      langInstruction = "Ответ напиши на русском языке";
     } else {
-      detectedLang = "Uzbek"; // default
+      detectedLang = "Uzbek";
+      langInstruction = "O'zbek tilida javob yoz";
     }
 
     let prompt: string;
 
     if (isQuestion) {
-      // Question-specific prompt - deep analysis
-      prompt = `Sen marketplace sotuvchisi uchun xaridorlarning savollariga javob yozuvchi mutaxassis yordamchisan.
+      if (detectedLang === "Russian") {
+        prompt = `Ты — профессиональный помощник продавца на маркетплейсе. Твоя задача — писать ответы на вопросы покупателей.
+
+ВАЖНЫЕ ПРАВИЛА:
+- ${langInstruction}
+- Тон: ${tone === "formal" ? "официальный и профессиональный" : tone === "friendly" ? "дружелюбный и теплый" : "краткий и точный"}
+- Глубоко проанализируй вопрос: что именно спрашивает покупатель? О каком товаре идёт речь?
+- Называй товар как "наш товар" или "данный товар", НЕ используй артикул или SKU
+- Если вопрос о характеристиках — дай полезный ответ на основе контекста
+- Если вопрос о доставке, возврате, гарантии — напомни правила маркетплейса
+- 2-4 предложения, не более 150 слов
+- Не пиши спам или рекламу
+- Верни ТОЛЬКО текст ответа
+
+МАРКЕТПЛЕЙС: ${marketplace || "marketplace"}
+${cleanUser ? `ПОКУПАТЕЛЬ: ${cleanUser}` : ""}
+
+ВОПРОС:
+"${cleanReview}"
+
+ОТВЕТ:`;
+      } else {
+        prompt = `Sen marketplace sotuvchisi uchun xaridorlarning savollariga javob yozuvchi mutaxassis yordamchisan.
 
 MUHIM QOIDALAR:
-- Javobni ${detectedLang} tilida yoz (savolning tilini aniqlading)
+- ${langInstruction}
 - Ohang: ${toneStyle}
 - Savolni chuqur tahlil qil: xaridor nimani so'ramoqda? Qanday mahsulot haqida gap ketmoqda?
-- Mahsulot nomi va kontekstni hisobga olib, aniq va foydali javob ber
+- Mahsulotni "mahsulotimiz" yoki "ushbu mahsulot" deb nomlang, SKU yoki artikul nomini ISHLATMANG
 - Agar savol mahsulot xususiyatlari haqida bo'lsa, mavjud ma'lumotlardan foydalanib javob ber
 - Agar savol yetkazib berish, qaytarish, kafolat haqida bo'lsa, marketplace qoidalarini eslatib o't
 - 2-4 gap, 150 so'zdan oshmasin
@@ -76,43 +100,74 @@ MUHIM QOIDALAR:
 - Faqat javob matnini qaytar
 
 MARKETPLACE: ${marketplace || "marketplace"}
-MAHSULOT: ${cleanProduct}
 ${cleanUser ? `XARIDOR: ${cleanUser}` : ""}
 
 SAVOL MATNI:
 "${cleanReview}"
 
 JAVOB:`;
+      }
     } else {
       // Review-specific prompt with rating-aware behavior
-      let ratingGuidance = "";
-      if (rating && rating >= 4) {
-        ratingGuidance = `- Bu IJOBIY sharh (${rating}/5 yulduz). Xaridorga samimiy minnatdorchilik bildir. Mahsulotdan mamnun bo'lgani uchun xursand ekanligingni bildir. Yana xarid qilishga taklif qil.`;
-      } else if (rating && rating === 3) {
-        ratingGuidance = `- Bu O'RTACHA sharh (3/5 yulduz). Fikr uchun rahmat de. Qanday qilib mahsulot/xizmatni yaxshilash mumkinligini so'ra. Kamchiliklarni tuzatishga tayyor ekanligingni bildir.`;
-      } else if (rating && rating <= 2) {
-        ratingGuidance = `- Bu SALBIY sharh (${rating}/5 yulduz). Avvalo noqulay tajriba uchun SAMIMIY UZR SO'RA. Muammoni hal qilish uchun barcha kuchimiz bilan harakat qilayotganimizni bildir. Kafolat yoki almashtirish imkoniyatini taklif qil. Xaridorning ishonchini qaytarishga intil.`;
-      }
+      if (detectedLang === "Russian") {
+        let ratingGuidance = "";
+        if (rating && rating >= 4) {
+          ratingGuidance = `- Это ПОЛОЖИТЕЛЬНЫЙ отзыв (${rating}/5 звёзд). Искренне поблагодари покупателя. Вырази радость, что наш товар понравился. Пригласи за новыми покупками.`;
+        } else if (rating && rating === 3) {
+          ratingGuidance = `- Это СРЕДНИЙ отзыв (3/5 звёзд). Поблагодари за обратную связь. Спроси, как можно улучшить товар/сервис. Покажи готовность исправить недостатки.`;
+        } else if (rating && rating <= 2) {
+          ratingGuidance = `- Это НЕГАТИВНЫЙ отзыв (${rating}/5 звёзд). СНАЧАЛА ИСКРЕННЕ ИЗВИНИСЬ за неприятный опыт. Покажи, что мы делаем всё возможное для решения проблемы. Предложи гарантийную замену. Постарайся вернуть доверие покупателя.`;
+        }
 
-      prompt = `Sen marketplace sotuvchisi uchun sharhlarga javob yozuvchi professional yordamchisan.
+        prompt = `Ты — профессиональный помощник продавца на маркетплейсе. Твоя задача — писать ответы на отзывы покупателей.
+
+ВАЖНЫЕ ПРАВИЛА:
+- ${langInstruction}
+- Тон: ${tone === "formal" ? "официальный и профессиональный" : tone === "friendly" ? "дружелюбный и теплый" : "краткий и точный"}
+${ratingGuidance}
+- ${cleanUser ? `Обращайся к покупателю "${cleanUser}"` : "Обращайся к покупателю уважительно"}
+- Называй товар как "наш товар" или "данный товар", НЕ используй артикул или SKU
+- 2-4 предложения, не более 150 слов
+- Естественный текст, как будто написано человеком
+- Не пиши спам или рекламу
+- Верни ТОЛЬКО текст ответа, ничего лишнего
+
+МАРКЕТПЛЕЙС: ${marketplace || "marketplace"}
+ОЦЕНКА: ${rating || "N/A"}/5
+ОТЗЫВ:
+"${cleanReview}"
+
+ОТВЕТ:`;
+      } else {
+        let ratingGuidance = "";
+        if (rating && rating >= 4) {
+          ratingGuidance = `- Bu IJOBIY sharh (${rating}/5 yulduz). Xaridorga samimiy minnatdorchilik bildir. Mahsulotimizdan mamnun bo'lgani uchun xursand ekanligingni bildir. Yana xarid qilishga taklif qil.`;
+        } else if (rating && rating === 3) {
+          ratingGuidance = `- Bu O'RTACHA sharh (3/5 yulduz). Fikr uchun rahmat de. Qanday qilib mahsulot/xizmatni yaxshilash mumkinligini so'ra. Kamchiliklarni tuzatishga tayyor ekanligingni bildir.`;
+        } else if (rating && rating <= 2) {
+          ratingGuidance = `- Bu SALBIY sharh (${rating}/5 yulduz). Avvalo noqulay tajriba uchun SAMIMIY UZR SO'RA. Muammoni hal qilish uchun barcha kuchimiz bilan harakat qilayotganimizni bildir. Kafolat yoki almashtirish imkoniyatini taklif qil. Xaridorning ishonchini qaytarishga intil.`;
+        }
+
+        prompt = `Sen marketplace sotuvchisi uchun sharhlarga javob yozuvchi professional yordamchisan.
 
 MUHIM QOIDALAR:
-- Javobni ${detectedLang} tilida yoz (sharhning tilini aniqlading)
+- ${langInstruction}
 - Ohang: ${toneStyle}
 ${ratingGuidance}
 - ${cleanUser ? `Xaridorni "${cleanUser}" deb murojaat qil` : "Xaridorga hurmat bilan murojaat qil"}
+- Mahsulotni "mahsulotimiz" yoki "ushbu mahsulot" deb nomlang, SKU yoki artikul nomini ISHLATMANG
 - 2-4 gap, 150 so'zdan oshmasin
 - Natural va inson tomonidan yozilgandek bo'lsin
 - Spam yoki reklama yozma
 - Faqat javob matnini qaytar, boshqa hech narsa qo'shma
 
 MARKETPLACE: ${marketplace || "marketplace"}
-MAHSULOT: ${cleanProduct}
 BAHO: ${rating || "N/A"}/5
 SHARH MATNI:
 "${cleanReview}"
 
 JAVOB:`;
+      }
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
