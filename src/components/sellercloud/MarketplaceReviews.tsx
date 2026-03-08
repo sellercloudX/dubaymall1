@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { checkBillingAccess, handleEdgeFunctionBillingError } from '@/lib/billingCheck';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
@@ -9,10 +9,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Star, MessageCircle, HelpCircle, Send, CheckCircle2, Clock, RefreshCw, Sparkles, Loader2, Settings2 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Star, MessageCircle, HelpCircle, Send, CheckCircle2, Clock, RefreshCw, Sparkles, Loader2, Settings2, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { MarketplaceLogo, MARKETPLACE_SHORT_NAMES } from '@/lib/marketplaceConfig';
 import { MarketplaceFilterBar } from './MarketplaceFilterBar';
 
 interface ReviewItem {
@@ -51,11 +51,18 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
 
   // AI Auto-Reply settings
   const [aiEnabled, setAiEnabled] = useState(false);
-  const [aiLanguage, setAiLanguage] = useState<'uz' | 'ru'>('uz');
   const [aiTone, setAiTone] = useState<'friendly' | 'formal' | 'brief'>('friendly');
   const [aiGenerating, setAiGenerating] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [ratingFilter, setRatingFilter] = useState<number | null>(null);
+
+  // Auto-reply rating config: which ratings to auto-reply
+  const [autoReplyRatings, setAutoReplyRatings] = useState<Set<number>>(new Set([1, 2, 3, 4, 5]));
+  
+  // Continuous monitoring
+  const [autoMonitor, setAutoMonitor] = useState(false);
+  const monitorIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const previousItemIdsRef = useRef<Set<string>>(new Set());
 
   const supportedMps = connectedMarketplaces.filter(mp => SUPPORTED_REVIEW_MARKETPLACES.includes(mp));
 
@@ -111,6 +118,64 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
     fetchReviews();
   }, [fetchReviews]);
 
+  // Continuous monitoring: poll for new reviews and auto-reply
+  useEffect(() => {
+    if (autoMonitor && aiEnabled) {
+      // Store current IDs
+      previousItemIdsRef.current = new Set(items.map(i => i.id));
+      
+      monitorIntervalRef.current = setInterval(async () => {
+        try {
+          let dataType: string = reviewType;
+          if (selectedMp === 'yandex') dataType = reviewType === 'questions' ? 'questions' : 'reviews';
+          if (selectedMp === 'uzum') dataType = 'reviews';
+
+          const body: Record<string, any> = { marketplace: selectedMp, dataType, take: 100 };
+          if (selectedMp === 'wildberries') body.isAnswered = false;
+
+          const { data } = await supabase.functions.invoke('fetch-marketplace-data', { body });
+          if (!data?.data) return;
+
+          let results: ReviewItem[] = data.data;
+          if (selectedMp !== 'wildberries') {
+            results = results.filter(item => !item.isAnswered);
+          }
+
+          // Find truly new items
+          const newItems = results.filter(item => !previousItemIdsRef.current.has(item.id));
+          
+          if (newItems.length > 0) {
+            toast.info(`${newItems.length} ta yangi ${reviewType === 'questions' ? 'savol' : 'sharh'} topildi!`);
+            
+            // Auto-reply to new items matching rating filter
+            for (const item of newItems) {
+              const rating = item.rating || 0;
+              if (reviewType === 'questions' || autoReplyRatings.has(rating)) {
+                await autoReplyToItem(item);
+                await new Promise(r => setTimeout(r, 800));
+              }
+            }
+
+            // Update IDs and refresh list
+            previousItemIdsRef.current = new Set(results.map(i => i.id));
+            fetchReviews();
+          }
+        } catch (e) {
+          console.error('Monitor error:', e);
+        }
+      }, 60000); // Check every 60 seconds
+
+      return () => {
+        if (monitorIntervalRef.current) clearInterval(monitorIntervalRef.current);
+      };
+    } else {
+      if (monitorIntervalRef.current) {
+        clearInterval(monitorIntervalRef.current);
+        monitorIntervalRef.current = null;
+      }
+    }
+  }, [autoMonitor, aiEnabled, selectedMp, reviewType, autoReplyRatings]);
+
   // Filtered items by rating
   const filteredItems = ratingFilter
     ? items.filter(item => item.rating === ratingFilter)
@@ -148,7 +213,6 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
 
   // AI Generate Reply
   const handleAIReply = async (item: ReviewItem) => {
-    // Pre-flight billing check
     if (!(await checkBillingAccess('ai-review-reply'))) return;
     
     setAiGenerating(item.id);
@@ -159,9 +223,9 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
           productName: item.productName || item.supplierArticle || '',
           rating: item.rating,
           userName: item.userName,
-          language: aiLanguage,
           tone: aiTone,
           marketplace: selectedMp,
+          isQuestion: reviewType === 'questions',
         },
       });
 
@@ -182,55 +246,73 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
     }
   };
 
-  // Auto-reply all unanswered
+  // Auto-reply single item (used by both bulk and monitor)
+  const autoReplyToItem = async (item: ReviewItem): Promise<boolean> => {
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-review-reply', {
+        body: {
+          reviewText: item.text,
+          productName: item.productName || item.supplierArticle || '',
+          rating: item.rating,
+          userName: item.userName,
+          tone: aiTone,
+          marketplace: selectedMp,
+          isQuestion: reviewType === 'questions',
+        },
+      });
+
+      if (error) {
+        if (handleEdgeFunctionBillingError(error, data)) return false;
+        return false;
+      }
+      if (!data?.success) return false;
+
+      const body: any = {
+        marketplace: selectedMp,
+        dataType: reviewType === 'questions' ? 'answer-question' : 'answer-feedback',
+        text: data.reply,
+        ...(reviewType === 'questions' ? { questionId: item.id } : { feedbackId: item.id }),
+      };
+
+      const { error: sendError } = await supabase.functions.invoke('fetch-marketplace-data', { body });
+      return !sendError;
+    } catch {
+      return false;
+    }
+  };
+
+  // Auto-reply all unanswered matching rating filter
   const handleAutoReplyAll = async () => {
     const unanswered = filteredItems.filter(i => !i.isAnswered);
-    if (unanswered.length === 0) return toast.info('Javob kutayotgan sharhlar yo\'q');
+    // For reviews, filter by selected ratings
+    const toReply = reviewType === 'questions' 
+      ? unanswered 
+      : unanswered.filter(i => autoReplyRatings.has(i.rating || 0));
+
+    if (toReply.length === 0) return toast.info('Javob kutayotgan sharhlar yo\'q');
     
-    // Pre-flight billing check before batch
     if (!(await checkBillingAccess('ai-review-reply'))) return;
     
-    toast.info(`${unanswered.length} ta sharhga AI javob tayyorlanmoqda...`);
+    toast.info(`${toReply.length} ta ${reviewType === 'questions' ? 'savolga' : 'sharhga'} AI javob tayyorlanmoqda...`);
     let successCount = 0;
 
-    for (const item of unanswered) {
-      try {
-        const { data, error } = await supabase.functions.invoke('ai-review-reply', {
-          body: {
-            reviewText: item.text,
-            productName: item.productName || item.supplierArticle || '',
-            rating: item.rating,
-            userName: item.userName,
-            language: aiLanguage,
-            tone: aiTone,
-            marketplace: selectedMp,
-          },
-        });
-
-        if (error) {
-          if (handleEdgeFunctionBillingError(error, data)) break; // Stop batch on billing error
-          continue;
-        }
-        if (!data?.success) continue;
-
-        // Auto-send
-        const body: any = {
-          marketplace: selectedMp,
-          dataType: reviewType === 'questions' ? 'answer-question' : 'answer-feedback',
-          text: data.reply,
-          ...(reviewType === 'questions' ? { questionId: item.id } : { feedbackId: item.id }),
-        };
-
-        const { error: sendError } = await supabase.functions.invoke('fetch-marketplace-data', { body });
-        if (!sendError) successCount++;
-
-        // Rate limit
-        await new Promise(r => setTimeout(r, 500));
-      } catch {}
+    for (const item of toReply) {
+      const ok = await autoReplyToItem(item);
+      if (ok) successCount++;
+      await new Promise(r => setTimeout(r, 500));
     }
 
-    toast.success(`${successCount}/${unanswered.length} ta sharhga javob yuborildi`);
+    toast.success(`${successCount}/${toReply.length} ta javob yuborildi`);
     fetchReviews();
+  };
+
+  const toggleAutoReplyRating = (rating: number) => {
+    setAutoReplyRatings(prev => {
+      const next = new Set(prev);
+      if (next.has(rating)) next.delete(rating);
+      else next.add(rating);
+      return next;
+    });
   };
 
   const renderStars = (rating: number) => (
@@ -285,34 +367,62 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
               <Switch checked={aiEnabled} onCheckedChange={setAiEnabled} />
             </div>
             {aiEnabled && (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[11px] text-muted-foreground font-medium">Til</label>
-                  <Select value={aiLanguage} onValueChange={v => setAiLanguage(v as any)}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="uz">🇺🇿 O'zbek</SelectItem>
-                      <SelectItem value="ru">🇷🇺 Русский</SelectItem>
-                    </SelectContent>
-                  </Select>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[11px] text-muted-foreground font-medium">Ohang</label>
+                    <Select value={aiTone} onValueChange={v => setAiTone(v as any)}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="friendly">😊 Do'stona</SelectItem>
+                        <SelectItem value="formal">🏢 Rasmiy</SelectItem>
+                        <SelectItem value="brief">⚡ Qisqa</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] text-muted-foreground font-medium">Til</label>
+                    <p className="text-xs text-muted-foreground mt-1">🌐 Avtomatik (sharh tilida javob)</p>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[11px] text-muted-foreground font-medium">Ohang</label>
-                  <Select value={aiTone} onValueChange={v => setAiTone(v as any)}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="friendly">😊 Do'stona</SelectItem>
-                      <SelectItem value="formal">🏢 Rasmiy</SelectItem>
-                      <SelectItem value="brief">⚡ Qisqa</SelectItem>
-                    </SelectContent>
-                  </Select>
+
+                {/* Rating-based auto-reply config */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] text-muted-foreground font-medium">Qaysi baholarga javob berish:</label>
+                  <div className="flex gap-2 flex-wrap">
+                    {[5, 4, 3, 2, 1].map(r => (
+                      <label key={r} className="flex items-center gap-1.5 cursor-pointer">
+                        <Checkbox
+                          checked={autoReplyRatings.has(r)}
+                          onCheckedChange={() => toggleAutoReplyRating(r)}
+                          className="h-4 w-4"
+                        />
+                        <span className="text-xs flex items-center gap-0.5">
+                          {r} <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                        </span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
-                <div className="col-span-2">
-                  <Button size="sm" onClick={handleAutoReplyAll} className="w-full gap-1.5" variant="default">
-                    <Sparkles className="h-3.5 w-3.5" />
-                    Barchasiga AI javob yuborish
-                  </Button>
+
+                {/* Continuous monitoring */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Eye className="h-3.5 w-3.5 text-primary" />
+                    <span className="text-xs font-medium">Doimiy kuzatuv (har 1 daqiqa)</span>
+                  </div>
+                  <Switch checked={autoMonitor} onCheckedChange={setAutoMonitor} />
                 </div>
+                {autoMonitor && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Yangi sharhlar/savollar kelganda avtomatik AI javob yuboriladi
+                  </p>
+                )}
+
+                <Button size="sm" onClick={handleAutoReplyAll} className="w-full gap-1.5" variant="default">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Barchasiga AI javob yuborish ({autoReplyRatings.size > 0 ? `${[...autoReplyRatings].sort().join(',')}⭐` : 'tanlang'})
+                </Button>
               </div>
             )}
           </CardContent>
@@ -333,7 +443,7 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
         </Tabs>
       )}
 
-      {/* Filter row: answered + rating */}
+      {/* Filter row */}
       <div className="flex gap-2 flex-wrap">
         <Button size="sm" variant={!showAnswered ? 'default' : 'outline'} onClick={() => setShowAnswered(false)} className="h-7 text-xs">
           <Clock className="h-3.5 w-3.5 mr-1" />Javobsiz
@@ -368,7 +478,6 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
           {filteredItems.map(item => (
             <Card key={item.id} className="overflow-hidden">
               <CardContent className="p-3 space-y-2">
-                {/* Header */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium truncate">{item.productName || item.supplierArticle || item.offerId || 'Nomsiz'}</p>
@@ -382,10 +491,8 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
                   </div>
                 </div>
 
-                {/* Text */}
                 <p className="text-sm whitespace-pre-line leading-relaxed">{item.text}</p>
 
-                {/* Photos */}
                 {item.photos && item.photos.length > 0 && (
                   <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
                     {item.photos.filter(Boolean).slice(0, 4).map((url, i) => (
@@ -394,7 +501,6 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
                   </div>
                 )}
 
-                {/* Answer */}
                 {item.answer && (
                   <div className="bg-muted/50 rounded-lg p-2">
                     <p className="text-xs text-muted-foreground mb-0.5">Sizning javobingiz:</p>
@@ -402,7 +508,6 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
                   </div>
                 )}
 
-                {/* Answer form */}
                 {!item.isAnswered && (
                   <>
                     {answeringId === item.id ? (
