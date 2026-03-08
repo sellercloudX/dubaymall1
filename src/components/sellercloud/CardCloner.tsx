@@ -255,7 +255,15 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
         
         if (error) {
           console.error(`Yandex clone error for "${product.name}":`, error);
-          toast.error(`${product.name.slice(0, 30)}: ${error.message || 'Edge function xatosi'}`);
+          // Handle billing errors (402) — body is in error.context or data
+          const billingMsg = data?.error || data?.billingError 
+            || (typeof error === 'object' && error?.context?.json?.error)
+            || error.message || 'Edge function xatosi';
+          if (data?.billingError === 'insufficient_balance' || data?.billingError === 'activation_required') {
+            toast.error(data.error || 'Balans yetarli emas. Balansni to\'ldiring.');
+            throw new Error('billing_error'); // Stop batch processing
+          }
+          toast.error(`${product.name.slice(0, 30)}: ${typeof billingMsg === 'string' ? billingMsg.slice(0, 120) : 'Xatolik'}`);
           return false;
         }
         if (!data?.success) {
@@ -288,7 +296,11 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
         
         if (error) {
           console.error(`WB clone error for "${product.name}":`, error);
-          toast.error(`${product.name.slice(0, 30)}: ${error.message || 'Edge function xatosi'}`);
+          if (data?.billingError === 'insufficient_balance' || data?.billingError === 'activation_required') {
+            toast.error(data.error || 'Balans yetarli emas. Balansni to\'ldiring.');
+            throw new Error('billing_error');
+          }
+          toast.error(`${product.name.slice(0, 30)}: ${data?.error || error.message || 'Edge function xatosi'}`);
           return false;
         }
         if (!data?.success) {
@@ -317,7 +329,11 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
         
         if (error) {
           console.error(`Uzum clone error for "${product.name}":`, error);
-          toast.error(`${product.name.slice(0, 30)}: ${error.message || 'Edge function xatosi'}`);
+          if (data?.billingError === 'insufficient_balance' || data?.billingError === 'activation_required') {
+            toast.error(data.error || 'Balans yetarli emas. Balansni to\'ldiring.');
+            throw new Error('billing_error');
+          }
+          toast.error(`${product.name.slice(0, 30)}: ${data?.error || error.message || 'Edge function xatosi'}`);
           return false;
         }
         if (!data?.success) {
@@ -335,6 +351,9 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
       toast.error(`${MARKETPLACE_INFO[targetMp]?.name || targetMp}: Kartochka yaratish qo'llab-quvvatlanmaydi`);
       return false;
     } catch (err: any) {
+      if (err?.message === 'billing_error') {
+        throw err; // Re-throw to stop batch processing
+      }
       console.error(`Clone to ${targetMp} failed:`, err?.message || err);
       return false;
     }
@@ -396,6 +415,16 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
         const results = await Promise.allSettled(
           batch.map(({ product, target }) => cloneToMarketplace(product, target).then(ok => ({ ok, product, target })))
         );
+        // Check if any result is a billing error — stop all processing
+        const billingError = results.find(r => r.status === 'rejected' && r.reason?.message === 'billing_error');
+        if (billingError) {
+          backgroundTaskManager.updateTask(taskId, {
+            status: 'failed',
+            message: 'Balans yetarli emas. Balansni to\'ldiring.',
+          });
+          return; // Stop batch processing entirely
+        }
+
         for (const r of results) {
           if (r.status === 'fulfilled' && r.value.ok) {
             success++;
