@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { FileSpreadsheet, Search, Sparkles, Download, Package, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { checkBillingAccess, handleEdgeFunctionBillingError } from '@/lib/billingCheck';
 import ExcelJS from 'exceljs';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 
