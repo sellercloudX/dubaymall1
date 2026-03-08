@@ -11,7 +11,7 @@ import {
   Bot, DollarSign, LineChart, Clock, Users, Star, 
   ChevronRight, Crown, TrendingUp, AlertTriangle,
   Play, Sparkles, Shield, Rocket, Send, MessageCircle,
-  ChevronDown, Lock, FileCheck, ExternalLink, Coins, Heart
+  ChevronDown, Lock, FileCheck, Crown, Sparkles
 } from 'lucide-react';
 import React, { useState, useEffect, useRef, ReactNode } from 'react';
 import heroDashboard from '@/assets/hero-dashboard.png';
