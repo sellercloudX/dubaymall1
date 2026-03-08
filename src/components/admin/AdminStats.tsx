@@ -56,7 +56,7 @@ export function AdminStats() {
   const statItems = [
     { label: 'Foydalanuvchilar', value: stats?.usersCount || 0, icon: Users, color: 'text-blue-500', sub: `${conversionRate}% konversiya` },
     { label: 'Faol obunalar', value: `${stats?.activeSubs || 0}/${stats?.totalSubs || 0}`, icon: Crown, color: 'text-amber-500', sub: `${stats?.totalSubs ? ((stats.activeSubs / stats.totalSubs) * 100).toFixed(0) : 0}% faol` },
-    { label: 'MRR', value: `${((stats?.mrr || 0) / 1e6).toFixed(1)} mln`, icon: DollarSign, color: 'text-emerald-500', sub: `ARR: ${((stats?.mrr || 0) * 12 / 1e6).toFixed(1)} mln` },
+    { label: 'MRR (kutilayotgan)', value: `${((stats?.mrr || 0) / 1e6).toFixed(1)} mln`, icon: DollarSign, color: 'text-emerald-500', sub: `Bu oy: ${((stats?.monthlyRevenue || 0) / 1e6).toFixed(1)} mln so'm` },
     { label: 'AI rasxodi', value: `$${(stats?.aiCost || 0).toFixed(2)}`, icon: Zap, color: 'text-orange-500', sub: `${stats?.aiActions || 0} amal` },
   ];
 
