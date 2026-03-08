@@ -302,20 +302,20 @@ const content = {
     ],
     pricing: {
       title: "Pricing",
-      pro: "Pro plan",
-      proPrice: "$499/mo",
-      proDesc: "For small & medium businesses",
-      proCommission: "+ 4% of sales",
-      enterprise: "Enterprise",
-      enterprisePrice: "Custom",
-      enterpriseDesc: "For large companies",
-      enterpriseCommission: "+ 2% of sales",
+      pro: "Basic plan",
+      proPrice: "99,000 UZS/mo",
+      proDesc: "Activation + free features. AI services from balance.",
+      proCommission: "0% commission",
+      enterprise: "Premium",
+      enterprisePrice: "1,270,000 UZS/mo",
+      enterpriseDesc: "Free activation + 40% discount on AI services",
+      enterpriseCommission: "0% commission",
       whyWorth: "Why it's worth it?",
       savings: [
+        "1-day free trial — no payment needed",
         "Save 3-4 hours daily = $1,500+/month",
-        "Find loss-making products = $2,000+/month",
-        "Solve overselling — fewer returns",
         "AI cards — 10x faster product listing",
+        "20+ tools in one platform",
       ]
     }
   }
