@@ -151,7 +151,8 @@ export function ActivationsManagement() {
                 <TableBody>
                   {filteredCloud?.map((sub: any) => {
                     const planType = (sub.plan_type || 'pro').toLowerCase();
-                    const planBadge = planType === 'elegant'
+                    const isElegant = planType === 'elegant' || planType === 'enterprise';
+                    const planBadge = isElegant
                       ? <Badge className="bg-violet-500/10 text-violet-600 border-violet-200">Elegant</Badge>
                       : planType === 'premium'
                       ? <Badge className="bg-amber-500/10 text-amber-600 border-amber-200">Premium</Badge>
