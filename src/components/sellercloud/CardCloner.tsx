@@ -415,6 +415,16 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
         const results = await Promise.allSettled(
           batch.map(({ product, target }) => cloneToMarketplace(product, target).then(ok => ({ ok, product, target })))
         );
+        // Check if any result is a billing error — stop all processing
+        const billingError = results.find(r => r.status === 'rejected' && r.reason?.message === 'billing_error');
+        if (billingError) {
+          backgroundTaskManager.updateTask(taskId, {
+            status: 'failed',
+            message: 'Balans yetarli emas. Balansni to\'ldiring.',
+          });
+          return; // Stop batch processing entirely
+        }
+
         for (const r of results) {
           if (r.status === 'fulfilled' && r.value.ok) {
             success++;
