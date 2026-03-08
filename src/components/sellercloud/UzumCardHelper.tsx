@@ -125,6 +125,9 @@ export function UzumCardHelper({ connectedMarketplaces, store }: UzumCardHelperP
 
   // Generate AI content + auto MXIK for each product then build Excel
   const handleGenerate = async () => {
+    // Pre-flight billing check
+    if (!(await checkBillingAccess('prepare-uzum-card'))) return;
+
     setStep('generating');
     setProgress(0);
     setErrors([]);
