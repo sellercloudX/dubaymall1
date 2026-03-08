@@ -322,12 +322,9 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
         
         if (error) {
           console.error(`Uzum clone error for "${product.name}":`, error);
+          if (handleEdgeFunctionBillingError(error, data)) throw new Error('billing_error');
           const errorBody = data || error?.context || {};
-          if (errorBody?.billingError === 'insufficient_balance' || errorBody?.billingError === 'activation_required') {
-            toast.error(errorBody.error || 'Balans yetarli emas. Balansni to\'ldiring.');
-            throw new Error('billing_error');
-          }
-          toast.error(`${product.name.slice(0, 30)}: ${errorBody?.error || error.message || 'Edge function xatosi'}`);
+          toast.error(`${product.name.slice(0, 30)}: ${errorBody?.error || error.message || 'Xatolik'}`);
           return false;
         }
         if (!data?.success) {
