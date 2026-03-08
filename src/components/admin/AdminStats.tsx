@@ -3,8 +3,6 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Users, Crown, Zap, DollarSign } from 'lucide-react';
 
-const USD_RATE = 12800;
-
 export function AdminStats() {
   const { data: stats, isLoading } = useQuery({
     queryKey: ['admin-stats-v2'],
