@@ -351,6 +351,9 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
       toast.error(`${MARKETPLACE_INFO[targetMp]?.name || targetMp}: Kartochka yaratish qo'llab-quvvatlanmaydi`);
       return false;
     } catch (err: any) {
+      if (err?.message === 'billing_error') {
+        throw err; // Re-throw to stop batch processing
+      }
       console.error(`Clone to ${targetMp} failed:`, err?.message || err);
       return false;
     }
