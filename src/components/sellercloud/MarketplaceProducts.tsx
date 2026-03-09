@@ -38,6 +38,7 @@ export function MarketplaceProducts({ connectedMarketplaces, store }: Marketplac
   const products = store.getProducts(selectedMarketplace);
   const isLoading = store.isLoadingProducts;
   const total = products.length;
+  const { data: tariffMap } = useMarketplaceTariffs(connectedMarketplaces, store);
 
   const filteredProducts = products.filter(p => 
     p.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
