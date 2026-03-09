@@ -471,11 +471,11 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
       )}
 
       <Tabs defaultValue="subscription">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="subscription" className="gap-1.5 text-xs"><Crown className="h-3.5 w-3.5" /> Obuna</TabsTrigger>
-          <TabsTrigger value="balance" className="gap-1.5 text-xs"><Wallet className="h-3.5 w-3.5" /> Balans</TabsTrigger>
-          <TabsTrigger value="transactions" className="gap-1.5 text-xs"><History className="h-3.5 w-3.5" /> Tarix</TabsTrigger>
-          <TabsTrigger value="pricing" className="gap-1.5 text-xs"><DollarSign className="h-3.5 w-3.5" /> Narxlar</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-4 h-auto">
+          <TabsTrigger value="subscription" className="gap-1 text-[10px] sm:text-xs px-1 sm:px-3 py-2 flex-col sm:flex-row"><Crown className="h-3.5 w-3.5 shrink-0" /><span className="truncate">Obuna</span></TabsTrigger>
+          <TabsTrigger value="balance" className="gap-1 text-[10px] sm:text-xs px-1 sm:px-3 py-2 flex-col sm:flex-row"><Wallet className="h-3.5 w-3.5 shrink-0" /><span className="truncate">Balans</span></TabsTrigger>
+          <TabsTrigger value="transactions" className="gap-1 text-[10px] sm:text-xs px-1 sm:px-3 py-2 flex-col sm:flex-row"><History className="h-3.5 w-3.5 shrink-0" /><span className="truncate">Tarix</span></TabsTrigger>
+          <TabsTrigger value="pricing" className="gap-1 text-[10px] sm:text-xs px-1 sm:px-3 py-2 flex-col sm:flex-row"><DollarSign className="h-3.5 w-3.5 shrink-0" /><span className="truncate">Narxlar</span></TabsTrigger>
         </TabsList>
 
         {/* TAB 1: SUBSCRIPTION */}
@@ -491,20 +491,20 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-3 gap-3">
-                <div className="p-3 rounded-lg bg-muted/50">
-                  <div className="text-xs text-muted-foreground flex items-center gap-1"><Calendar className="h-3 w-3" /> Boshlangan</div>
-                  <div className="text-base font-bold mt-1">{format(new Date(subscription.started_at), 'dd.MM.yyyy')}</div>
+              <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                <div className="p-2.5 sm:p-3 rounded-lg bg-muted/50">
+                  <div className="text-[10px] sm:text-xs text-muted-foreground flex items-center gap-1"><Calendar className="h-3 w-3 shrink-0" /> <span className="truncate">Boshlangan</span></div>
+                  <div className="text-sm sm:text-base font-bold mt-1">{format(new Date(subscription.started_at), 'dd.MM.yy')}</div>
                 </div>
-                <div className="p-3 rounded-lg bg-muted/50">
-                  <div className="text-xs text-muted-foreground flex items-center gap-1"><Clock className="h-3 w-3" /> Tugash</div>
-                  <div className="text-base font-bold mt-1">
-                    {subscription.activated_until ? format(new Date(subscription.activated_until), 'dd.MM.yyyy') : '—'}
+                <div className="p-2.5 sm:p-3 rounded-lg bg-muted/50">
+                  <div className="text-[10px] sm:text-xs text-muted-foreground flex items-center gap-1"><Clock className="h-3 w-3 shrink-0" /> <span className="truncate">Tugash</span></div>
+                  <div className="text-sm sm:text-base font-bold mt-1">
+                    {subscription.activated_until ? format(new Date(subscription.activated_until), 'dd.MM.yy') : '—'}
                   </div>
                 </div>
-                <div className="p-3 rounded-lg bg-muted/50">
-                  <div className="text-xs text-muted-foreground flex items-center gap-1"><TrendingUp className="h-3 w-3" /> Tarif</div>
-                  <div className="text-base font-bold mt-1">{currentPlanLabel}</div>
+                <div className="p-2.5 sm:p-3 rounded-lg bg-muted/50">
+                  <div className="text-[10px] sm:text-xs text-muted-foreground flex items-center gap-1"><TrendingUp className="h-3 w-3 shrink-0" /> <span className="truncate">Tarif</span></div>
+                  <div className="text-sm sm:text-base font-bold mt-1">{currentPlanLabel}</div>
                 </div>
               </div>
             </CardContent>
@@ -579,21 +579,20 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
               <CardDescription>AI funksiyalar va pullik xizmatlar uchun</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 text-center">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Joriy balans</p>
-                  <p className="text-2xl font-bold text-primary mt-1">{balance ? Number(balance.balance_uzs).toLocaleString() : '0'}</p>
-                  <p className="text-[10px] text-muted-foreground">UZS</p>
+                  <p className="text-xl sm:text-2xl font-bold text-primary mt-1">{balance ? Number(balance.balance_uzs).toLocaleString() : '0'} <span className="text-xs font-normal text-muted-foreground">UZS</span></p>
                 </div>
-                <div className="p-4 rounded-xl bg-muted/50 text-center">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Jami kirim</p>
-                  <p className="text-lg font-bold mt-1">{balance ? Number(balance.total_deposited).toLocaleString() : '0'}</p>
-                  <p className="text-[10px] text-muted-foreground">UZS</p>
-                </div>
-                <div className="p-4 rounded-xl bg-muted/50 text-center">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Jami chiqim</p>
-                  <p className="text-lg font-bold mt-1">{balance ? Number(balance.total_spent).toLocaleString() : '0'}</p>
-                  <p className="text-[10px] text-muted-foreground">UZS</p>
+                <div className="grid grid-cols-2 sm:grid-cols-1 gap-3 sm:contents">
+                  <div className="p-3 sm:p-4 rounded-xl bg-muted/50 text-center">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Jami kirim</p>
+                    <p className="text-base sm:text-lg font-bold mt-1">{balance ? Number(balance.total_deposited).toLocaleString() : '0'} <span className="text-[10px] font-normal text-muted-foreground">UZS</span></p>
+                  </div>
+                  <div className="p-3 sm:p-4 rounded-xl bg-muted/50 text-center">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Jami chiqim</p>
+                    <p className="text-base sm:text-lg font-bold mt-1">{balance ? Number(balance.total_spent).toLocaleString() : '0'} <span className="text-[10px] font-normal text-muted-foreground">UZS</span></p>
+                  </div>
                 </div>
               </div>
 
