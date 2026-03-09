@@ -437,51 +437,57 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
       }
       updateTaskProgress(3, 'completed');
 
-      // Step 5: AI Agent Image Pipeline — Hero Infographic + Lifestyle (OpenAI gpt-image-1)
-      const generatedInfos: string[] = [];
-      // CRITICAL: Only use storage URLs (not base64) for ai-agent-images — base64 exceeds 2000 char limit
+      // Step 5: AI Agent Image Pipeline — SellZen (primary) + OpenAI/Gemini (fallback)
+      // NON-BLOCKING: Start image generation, but don't wait — card creation proceeds immediately
+      let generatedInfos: string[] = [];
       const bestImageForInfographic = referenceImageUrl;
+      
+      // Start image generation as a background promise (30-70s per image via SellZen)
+      let imagePromise: Promise<string[]> | null = null;
       
       if (shouldGenerateInfographics && bestImageForInfographic) {
         updateTaskProgress(4, 'running');
+        
+        imagePromise = (async (): Promise<string[]> => {
+          try {
+            console.log('🖼️ Calling ai-agent-images (SellZen primary):', bestImageForInfographic.substring(0, 80));
+            const { data: imgData, error: imgError } = await supabase.functions.invoke('ai-agent-images', {
+              body: {
+                action: 'scanner-generate',
+                referenceImageUrl: bestImageForInfographic,
+                productName: normalizedProductName,
+                category: analyzed?.category || '',
+                features: analyzed?.features || [],
+                skipBilling: true,
+              },
+            });
 
-        try {
-          console.log('🖼️ Calling ai-agent-images with URL:', bestImageForInfographic.substring(0, 80));
-          const { data: imgData, error: imgError } = await supabase.functions.invoke('ai-agent-images', {
-            body: {
-              action: 'scanner-generate',
-              referenceImageUrl: bestImageForInfographic,
-              productName: normalizedProductName,
-              category: analyzed?.category || '',
-              features: analyzed?.features || [],
-              skipBilling: true, // Scanner handles billing
-            },
-          });
-
-          if (!imgError && imgData?.success && imgData.images?.length > 0) {
-            generatedInfos.push(...imgData.images);
-            setBackgroundTasks(prev => prev.map(task => 
-              task.id === taskId ? { ...task, generatedImages: [...imgData.images] } : task
-            ));
-            console.log(`✅ AI Agent pipeline: ${imgData.totalImages} ta rasm yaratildi`);
-            updateTaskProgress(4, 'completed');
-          } else if (!imgError && imgData?.success && imgData.images?.length === 0) {
-            // Images returned 0 — OpenAI billing limit or similar issue
-            // This is a WARNING, not an error — continue to card creation
-            console.warn('AI Agent images: 0 images returned (billing limit?), proceeding to card creation');
-            toast.warning('Rasmlar yaratilmadi (limit), kartochka reference rasm bilan yaratiladi');
-            updateTaskProgress(4, 'completed'); // Mark as completed, not failed
-          } else {
-            const errMsg = imgError?.message || imgData?.error || 'Unknown image error';
-            console.warn('AI Agent images failed:', errMsg);
-            toast.error(`Rasm yaratish xatosi: ${errMsg}`);
+            if (!imgError && imgData?.success && imgData.images?.length > 0) {
+              setBackgroundTasks(prev => prev.map(task => 
+                task.id === taskId ? { ...task, generatedImages: [...imgData.images] } : task
+              ));
+              console.log(`✅ AI Agent pipeline: ${imgData.totalImages} ta rasm yaratildi`);
+              updateTaskProgress(4, 'completed');
+              return imgData.images;
+            } else if (!imgError && imgData?.success && imgData.images?.length === 0) {
+              console.warn('AI Agent images: 0 images returned, proceeding with reference');
+              toast.warning('Rasmlar yaratilmadi (limit), kartochka reference rasm bilan yaratiladi');
+              updateTaskProgress(4, 'completed');
+              return [];
+            } else {
+              const errMsg = imgError?.message || imgData?.error || 'Unknown image error';
+              console.warn('AI Agent images failed:', errMsg);
+              toast.error(`Rasm yaratish xatosi: ${errMsg}`);
+              updateTaskProgress(4, 'failed');
+              return [];
+            }
+          } catch (imgErr: any) {
+            console.error('AI Agent images error:', imgErr);
+            toast.error(`Rasm yaratish xatosi: ${imgErr?.message || 'Noma\'lum xato'}`);
             updateTaskProgress(4, 'failed');
+            return [];
           }
-        } catch (imgErr: any) {
-          console.error('AI Agent images error:', imgErr);
-          toast.error(`Rasm yaratish xatosi: ${imgErr?.message || 'Noma\'lum xato'}`);
-          updateTaskProgress(4, 'failed');
-        }
+        })();
       } else {
         if (shouldGenerateInfographics && !bestImageForInfographic) {
           console.warn('⚠️ No reference image URL — skipping image generation');
@@ -490,10 +496,33 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
         updateTaskProgress(4, 'completed');
       }
 
-      // Step 6: Create marketplace card based on target
+      // Step 6: Create marketplace card — DON'T WAIT for images
+      // Card creation starts immediately with reference image
+      // If images finish before card creation completes, they'll be used
       updateTaskProgress(5, 'running');
       
-      // Use only AI-generated images for the card; reference image is for AI only
+      // Wait for images with a short timeout — if SellZen is fast enough, use AI images
+      // Otherwise proceed with reference image and images will be available for manual update
+      if (imagePromise) {
+        try {
+          // Give SellZen up to 120 seconds — it typically takes 30-70s per image (parallel)
+          const raceResult = await Promise.race([
+            imagePromise,
+            new Promise<string[]>((resolve) => setTimeout(() => resolve([]), 120000)),
+          ]);
+          if (raceResult.length > 0) {
+            generatedInfos = raceResult;
+            console.log(`✅ Images ready before card creation: ${generatedInfos.length} ta`);
+          } else {
+            console.log('⏳ Images still generating, creating card with reference image...');
+            toast.info('Rasmlar yaratilmoqda... Kartochka reference rasm bilan yaratiladi');
+          }
+        } catch {
+          console.warn('Image wait failed, proceeding with reference');
+        }
+      }
+      
+      // Use AI-generated images if available, otherwise reference image
       const cardImages = generatedInfos.length > 0 ? generatedInfos : (referenceImageUrl ? [referenceImageUrl] : []);
       
       if (targetMarketplace === 'wildberries') {

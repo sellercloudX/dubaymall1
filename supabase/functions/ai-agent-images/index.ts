@@ -8,6 +8,94 @@ const corsHeaders = {
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
+// =====================================================
+// SELLZEN AI — Primary image provider (2 parallel images)
+// =====================================================
+async function generateWithSellZen(
+  imageBase64: string,
+  productName: string,
+  category: string,
+  mode: 'modelli' | 'modelsiz',
+  style: 'infografika' | 'tabiiy' | 'lifestyle',
+  scene: 'studiya' | 'tabiat' | 'minimalist' | 'premium',
+  apiKey: string,
+): Promise<string | null> {
+  try {
+    // Map category to SellZen categories
+    const cat = (category || '').toLowerCase();
+    let sellzenCategory = 'home';
+    if (cat.includes('elektr') || cat.includes('techni') || cat.includes('электрон') || cat.includes('gadget')) sellzenCategory = 'electronics';
+    else if (cat.includes('kiyim') || cat.includes('fashion') || cat.includes('одежд') || cat.includes('обувь') || cat.includes('sport') || cat.includes('спорт')) sellzenCategory = 'clothing';
+    else if (cat.includes('kosmet') || cat.includes('beauty') || cat.includes('parfum') || cat.includes('косметик') || cat.includes('духи')) sellzenCategory = 'cosmetics';
+    else if (cat.includes('auto') || cat.includes('mashina') || cat.includes('avto') || cat.includes('авто')) sellzenCategory = 'auto';
+
+    console.log(`🎨 SellZen [${mode}/${style}/${scene}] cat=${sellzenCategory}`);
+
+    const body: Record<string, string> = {
+      imageBase64,
+      mode,
+      style,
+      scene,
+      language: 'ru', // Russian for marketplace text
+      category: sellzenCategory,
+      productDetails: productName.substring(0, 500),
+    };
+
+    const response = await fetch(
+      'https://qqqzkrldaaqogwjvfgcg.supabase.co/functions/v1/api-generate',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
+        body: JSON.stringify(body),
+      }
+    );
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error(`SellZen error ${response.status}: ${errText.substring(0, 200)}`);
+      return null;
+    }
+
+    const data = await response.json();
+    if (data.status === 'success') {
+      const imageResult = data.imageUrl || data.generatedImage;
+      if (imageResult) {
+        console.log(`✅ SellZen [${mode}] image generated`);
+        return imageResult;
+      }
+    }
+    console.warn(`SellZen [${mode}] unexpected response:`, data.status);
+    return null;
+  } catch (e) {
+    console.error(`SellZen [${mode}] error:`, (e as Error).message);
+    return null;
+  }
+}
+
+/**
+ * Generate 2 images via SellZen in PARALLEL:
+ * 1. modelli + infografika (hero infographic with model)
+ * 2. modelsiz + studiya (clean studio shot)
+ * Returns: [heroUrl, studioUrl] (either can be null)
+ */
+async function generateSellZenDualImages(
+  imageBase64: string,
+  productName: string,
+  category: string,
+  apiKey: string,
+): Promise<[string | null, string | null]> {
+  console.log('🚀 SellZen: Starting 2 parallel image generation...');
+  
+  const [heroResult, studioResult] = await Promise.all([
+    generateWithSellZen(imageBase64, productName, category, 'modelli', 'infografika', 'premium', apiKey),
+    generateWithSellZen(imageBase64, productName, category, 'modelsiz', 'tabiiy', 'studiya', apiKey),
+  ]);
+
+  const count = (heroResult ? 1 : 0) + (studioResult ? 1 : 0);
+  console.log(`✅ SellZen parallel done: ${count}/2 images`);
+  return [heroResult, studioResult];
+}
+
 async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3): Promise<Response> {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
@@ -871,6 +959,26 @@ async function downloadImage(url: string): Promise<Uint8Array | null> {
   }
 }
 
+// Convert URL image to base64 data URI for SellZen API
+async function imageUrlToBase64(url: string): Promise<string | null> {
+  try {
+    if (url.startsWith('data:')) return url; // Already base64
+    const resp = await fetch(url);
+    if (!resp.ok) return null;
+    const buffer = await resp.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    const contentType = resp.headers.get('content-type') || 'image/jpeg';
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return `data:${contentType};base64,${btoa(binary)}`;
+  } catch (e) {
+    console.error("imageUrlToBase64 error:", e);
+    return null;
+  }
+}
+
 async function uploadToStorage(supabase: any, imageSource: string, partnerId: string, productId: string): Promise<string | null> {
   try {
     let bytes: Uint8Array;
@@ -1189,46 +1297,68 @@ serve(async (req) => {
       const cleanImageUrl = await uploadToStorage(adminSupabase, workingImageUrl, partnerId, offerId || 'product');
       pipelineResult.imageUrl = cleanImageUrl;
 
-      // ── STEP 4: Generate 4 Professional Images ──
-      // Image 1: Infographic Hero (styled background, negative space for text overlay)
-      // Images 2-4: 3 different angle lifestyle shots
+      // ── STEP 4: Generate 2 Professional Images ──
+      // Image 1: Infographic Hero (modelli + infografika) via SellZen
+      // Image 2: Clean studio shot (modelsiz + studiya) via SellZen
+      // Fallback: OpenAI/Gemini if SellZen fails
       
-      console.log("🎨 STEP 4: Generating 2 images (1 infographic + 1 lifestyle)...");
-
-      // 4a: Infographic Hero
-      let heroImage = await generateHeroImage(
-        workingImageUrl, detection, categoryStyle, OPENAI_API_KEY
-      );
+      console.log("🎨 STEP 4: Generating 2 images (SellZen primary, OpenAI/Gemini fallback)...");
 
       let heroUrl: string | null = null;
-      if (heroImage) {
-        heroUrl = await uploadToStorage(adminSupabase, heroImage, partnerId, `${offerId || 'card'}-hero`);
-        pipelineResult.steps.push({ step: "4a", name: "Infographic Hero", status: "✅" });
-      } else {
-        pipelineResult.steps.push({ step: "4a", name: "Infographic Hero", status: "❌ Failed" });
+      let studioUrl: string | null = null;
+      const supplementaryUrls: string[] = [];
+
+      // ═══ Try SellZen first (2 parallel requests) ═══
+      const SELLZEN_API_KEY = Deno.env.get("SELLZEN_API_KEY");
+      if (SELLZEN_API_KEY && workingImageUrl) {
+        // Convert URL to base64 for SellZen
+        const imgBase64 = await imageUrlToBase64(workingImageUrl);
+        if (imgBase64) {
+          const [sellzenHero, sellzenStudio] = await generateSellZenDualImages(
+            imgBase64, productName || detection?.product_name || 'Product', detectedCategory, SELLZEN_API_KEY
+          );
+          
+          if (sellzenHero) {
+            heroUrl = await uploadToStorage(adminSupabase, sellzenHero, partnerId, `${offerId || 'card'}-hero`);
+            pipelineResult.steps.push({ step: "4a", name: "Hero (SellZen modelli)", status: "✅" });
+          }
+          if (sellzenStudio) {
+            const stUrl = await uploadToStorage(adminSupabase, sellzenStudio, partnerId, `${offerId || 'card'}-studio`);
+            if (stUrl) { studioUrl = stUrl; supplementaryUrls.push(stUrl); }
+            pipelineResult.steps.push({ step: "4b", name: "Studio (SellZen modelsiz)", status: "✅" });
+          }
+        }
+      }
+
+      // ═══ Fallback to OpenAI/Gemini for missing images ═══
+      if (!heroUrl) {
+        console.log("🔄 Hero fallback: OpenAI/Gemini...");
+        const heroImage = await generateHeroImage(workingImageUrl, detection, categoryStyle, OPENAI_API_KEY);
+        if (heroImage) {
+          heroUrl = await uploadToStorage(adminSupabase, heroImage, partnerId, `${offerId || 'card'}-hero`);
+          pipelineResult.steps.push({ step: "4a", name: "Hero (Fallback)", status: "✅" });
+        } else {
+          pipelineResult.steps.push({ step: "4a", name: "Hero", status: "❌ Failed" });
+        }
+      }
+
+      if (supplementaryUrls.length === 0) {
+        console.log("🔄 Lifestyle fallback: OpenAI/Gemini...");
+        const lifestyleAngle = LIFESTYLE_ANGLES[2];
+        const lifestyleImage = await generateLifestyleAngle(workingImageUrl, detection, lifestyleAngle, OPENAI_API_KEY);
+        if (lifestyleImage) {
+          const lifestyleUrl = await uploadToStorage(adminSupabase, lifestyleImage, partnerId, `${offerId || 'card'}-lifestyle`);
+          if (lifestyleUrl) { supplementaryUrls.push(lifestyleUrl); }
+          pipelineResult.steps.push({ step: "4b", name: "Lifestyle (Fallback)", status: "✅" });
+        } else {
+          pipelineResult.steps.push({ step: "4b", name: "Lifestyle", status: "❌ Failed" });
+        }
       }
 
       pipelineResult.cardUrl = heroUrl;
-
-      // 4b: Single lifestyle image (lifestyle_context — most impactful)
-      const supplementaryUrls: string[] = [];
-      
-      console.log("🔄 Generating 1 lifestyle image...");
-      const lifestyleAngle = LIFESTYLE_ANGLES[2]; // lifestyle_context
-      const lifestyleImage = await generateLifestyleAngle(workingImageUrl, detection, lifestyleAngle, OPENAI_API_KEY);
-      if (lifestyleImage) {
-        const lifestyleUrl = await uploadToStorage(adminSupabase, lifestyleImage, partnerId, `${offerId || 'card'}-lifestyle`);
-        if (lifestyleUrl) {
-          supplementaryUrls.push(lifestyleUrl);
-          pipelineResult.steps.push({ step: "4b", name: "Lifestyle", status: "✅" });
-        }
-      } else {
-        pipelineResult.steps.push({ step: "4b", name: "Lifestyle", status: "❌ Failed" });
-      }
-
       pipelineResult.supplementaryImages = supplementaryUrls;
       const totalGenerated = (heroUrl ? 1 : 0) + supplementaryUrls.length;
-      console.log(`✅ Generated ${totalGenerated} total images (target: 4)`);
+      console.log(`✅ Generated ${totalGenerated} total images (target: 2)`);
 
       // ── Skip Step 5 (Quality Control) to save timeout budget for 4 images ──
       pipelineResult.steps.push({ step: 5, name: "Quality Control", status: "⏭ Skipped (4-image mode)" });
@@ -1348,32 +1478,59 @@ serve(async (req) => {
       const categoryStyle = getCategoryStyle(detectedCategory);
       console.log(`📦 Scanner category: ${detectedCategory} → Style: ${categoryStyle.visual_style}`);
 
-      // Step 2: Generate Hero Infographic
-      console.log("🎨 Scanner: Generating Hero Infographic...");
-      const heroImage = await generateHeroImage(referenceImageUrl, detection, categoryStyle, OPENAI_API_KEY);
+      // Step 2+3: Generate 2 images via SellZen (parallel), fallback to OpenAI/Gemini
       let heroUrl: string | null = null;
-      if (heroImage) {
-        heroUrl = await uploadToStorage(adminSupabase, heroImage, userId, `scanner-hero-${Date.now()}`);
-        console.log("✅ Scanner Hero Infographic uploaded");
-      } else {
-        console.error("❌ Scanner Hero Infographic failed");
-      }
+      let studioUrl: string | null = null;
 
-      // Step 3: Generate 1 Lifestyle image (cost-optimized: 2 instead of 4)
-      console.log("🔄 Scanner: Generating 1 lifestyle image...");
-      const lifestyleAngle = LIFESTYLE_ANGLES[2]; // lifestyle_context
-      let lifestyleUrl: string | null = null;
-      try {
-        const img = await generateLifestyleAngle(referenceImageUrl, detection, lifestyleAngle, OPENAI_API_KEY);
-        if (img) {
-          lifestyleUrl = await uploadToStorage(adminSupabase, img, userId, `scanner-lifestyle-${Date.now()}`);
-          console.log("✅ Scanner Lifestyle uploaded");
+      const SELLZEN_API_KEY = Deno.env.get("SELLZEN_API_KEY");
+      if (SELLZEN_API_KEY && referenceImageUrl) {
+        console.log("🚀 Scanner: SellZen dual-image generation (parallel)...");
+        const imgBase64 = await imageUrlToBase64(referenceImageUrl);
+        if (imgBase64) {
+          const [sellzenHero, sellzenStudio] = await generateSellZenDualImages(
+            imgBase64, 
+            detection?.product_name || productName || 'Product',
+            detectedCategory, 
+            SELLZEN_API_KEY
+          );
+          if (sellzenHero) {
+            heroUrl = await uploadToStorage(adminSupabase, sellzenHero, userId, `scanner-hero-${Date.now()}`);
+            console.log("✅ Scanner Hero (SellZen modelli) uploaded");
+          }
+          if (sellzenStudio) {
+            studioUrl = await uploadToStorage(adminSupabase, sellzenStudio, userId, `scanner-studio-${Date.now()}`);
+            console.log("✅ Scanner Studio (SellZen modelsiz) uploaded");
+          }
         }
-      } catch (e) {
-        console.error("❌ Scanner Lifestyle error:", (e as any).message);
       }
 
-      const angleUrls = lifestyleUrl ? [lifestyleUrl] : [];
+      // ═══ Fallback to OpenAI/Gemini for missing images ═══
+      if (!heroUrl) {
+        console.log("🔄 Scanner Hero fallback: OpenAI/Gemini...");
+        const heroImage = await generateHeroImage(referenceImageUrl, detection, categoryStyle, OPENAI_API_KEY);
+        if (heroImage) {
+          heroUrl = await uploadToStorage(adminSupabase, heroImage, userId, `scanner-hero-${Date.now()}`);
+          console.log("✅ Scanner Hero (fallback) uploaded");
+        } else {
+          console.error("❌ Scanner Hero failed (all providers)");
+        }
+      }
+
+      if (!studioUrl) {
+        console.log("🔄 Scanner Lifestyle fallback: OpenAI/Gemini...");
+        const lifestyleAngle = LIFESTYLE_ANGLES[2];
+        try {
+          const img = await generateLifestyleAngle(referenceImageUrl, detection, lifestyleAngle, OPENAI_API_KEY);
+          if (img) {
+            studioUrl = await uploadToStorage(adminSupabase, img, userId, `scanner-lifestyle-${Date.now()}`);
+            console.log("✅ Scanner Lifestyle (fallback) uploaded");
+          }
+        } catch (e) {
+          console.error("❌ Scanner Lifestyle error:", (e as any).message);
+        }
+      }
+
+      const angleUrls = studioUrl ? [studioUrl] : [];
       const allImages = [...(heroUrl ? [heroUrl] : []), ...angleUrls];
       console.log(`✅ Scanner pipeline complete: ${allImages.length}/2 images generated`);
 
