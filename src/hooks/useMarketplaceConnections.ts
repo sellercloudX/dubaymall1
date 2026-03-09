@@ -46,7 +46,7 @@ export function useMarketplaceConnections(): UseMarketplaceConnectionsReturn {
     try {
       setIsLoading(true);
       const { data, error: fetchError } = await supabase
-        .from('marketplace_connections')
+        .from('marketplace_connections_safe')
         .select('*')
         .eq('user_id', user.id)
         .eq('is_active', true);

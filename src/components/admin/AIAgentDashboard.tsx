@@ -1404,7 +1404,7 @@ export function AIAgentDashboard() {
       const pageSize = 500;
       while (true) {
         const { data: batch } = await supabase
-          .from('marketplace_connections')
+          .from('marketplace_connections_safe')
           .select('user_id, marketplace, is_active')
           .eq('is_active', true)
           .range(from, from + pageSize - 1);
