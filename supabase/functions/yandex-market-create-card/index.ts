@@ -294,7 +294,7 @@ async function findLeafCategory(
   console.log("📂 Fetching Yandex category tree...");
   let tree: any = null;
   try {
-    const resp = await fetch(`${YANDEX_API}/categories/tree`, {
+    const resp = await fetch(`${YANDEX_API}/v2/categories/tree`, {
       method: "POST",
       headers: { "Api-Key": apiKey, "Content-Type": "application/json" },
       body: JSON.stringify({ language: "RU" }),
@@ -456,7 +456,7 @@ JAVOB: Faqat bitta ID raqam yoz, hech narsa qo'shma:`;
 
 async function fetchCategoryParameters(apiKey: string, categoryId: number): Promise<any[]> {
   try {
-    const resp = await fetch(`${YANDEX_API}/category/${categoryId}/parameters`, {
+    const resp = await fetch(`${YANDEX_API}/v2/category/${categoryId}/parameters`, {
       method: "POST",
       headers: { "Api-Key": apiKey, "Content-Type": "application/json" },
       body: JSON.stringify({}),
