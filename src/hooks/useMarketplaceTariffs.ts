@@ -255,6 +255,10 @@ export function useMarketplaceTariffs(
               offers: sendBatch.map(o => ({
                 categoryId: o.categoryId,
                 price: o.price,
+                length: o.length,
+                width: o.width,
+                height: o.height,
+                weight: o.weight,
               })),
             },
           });
