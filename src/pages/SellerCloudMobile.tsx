@@ -68,7 +68,7 @@ export default function SellerCloudMobile() {
   
   const [activeTab, setActiveTabRaw] = useState<MobileTabType>('analytics');
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
-  const [showPaymentBypass, setShowPaymentBypass] = useState(false);
+  
   
   const setActiveTab = useCallback((tab: MobileTabType) => {
     setActiveTabRaw(tab);
