@@ -68,7 +68,7 @@ export default function SellerCloudMobile() {
   
   const [activeTab, setActiveTabRaw] = useState<MobileTabType>('analytics');
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
-  const [showPaymentBypass, setShowPaymentBypass] = useState(false);
+  
   
   const setActiveTab = useCallback((tab: MobileTabType) => {
     setActiveTabRaw(tab);
@@ -139,23 +139,19 @@ export default function SellerCloudMobile() {
     );
   }
 
-  if (accessStatus && !accessStatus.is_active && !showPaymentBypass) {
-    return (
-      <div className="min-h-screen bg-background p-4 pb-20 overflow-y-auto">
-        <OnboardingWizard 
-          onActivate={async () => {
-            setShowPaymentBypass(true);
-            setActiveTab('subscription' as any);
-          }}
-          onGoHome={() => navigate('/')}
-        />
-      </div>
-    );
-  }
+  const hasAccess = accessStatus?.is_active ?? false;
+
+  // Free tabs accessible without active subscription
+  const mobileFreeTabs = new Set(['marketplaces', 'products', 'orders', 'subscription', 'notifications', 'mxik', 'calculator', 'reports']);
 
   const isMoreActive = !primaryTabIds.includes(activeTab);
 
   const renderContent = () => {
+    // If no access and tab is paid, show subscription
+    if (!hasAccess && !mobileFreeTabs.has(activeTab)) {
+      return <div className="p-4"><SubscriptionBilling totalSalesVolume={totalRevenue} /></div>;
+    }
+
     switch (activeTab) {
       case 'marketplaces':
         return (

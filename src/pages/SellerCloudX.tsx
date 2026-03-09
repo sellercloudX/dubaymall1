@@ -192,11 +192,16 @@ export default function SellerCloudX() {
     );
   }
 
+  // Free tabs accessible without active subscription (viewing data, basic tools)
+  const freeTabs = new Set([
+    'marketplaces', 'products', 'orders', 'subscription', 'notifications', 
+    'support', 'mxik', 'calculator', 'reports'
+  ]);
+
   // Render content based on active tab
   const renderContent = () => {
-    // If no access, only show subscription & notifications
-    if (!hasAccess) {
-      if (activeTab === 'notifications') return <NotificationCenter />;
+    // If no access and tab is paid, redirect to subscription
+    if (!hasAccess && !freeTabs.has(activeTab)) {
       return <SubscriptionBilling totalSalesVolume={totalRevenue} />;
     }
 
@@ -299,16 +304,16 @@ export default function SellerCloudX() {
           {/* Alerts */}
           {accessStatus && !accessStatus.is_active && (
             <div className="px-6 pt-4">
-              <Card className="border-destructive bg-destructive/5">
+              <Card className="border-yellow-500/50 bg-yellow-500/5">
                 <CardContent className="pt-4 pb-4">
                   <div className="flex items-start gap-4">
-                    <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+                    <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
-                      <h4 className="font-semibold text-destructive text-sm">Akkount cheklangan</h4>
-                      <p className="text-xs text-muted-foreground mt-1">{accessStatus.message}</p>
+                      <h4 className="font-semibold text-yellow-700 dark:text-yellow-400 text-sm">Bepul rejada foydalanmoqdasiz</h4>
+                      <p className="text-xs text-muted-foreground mt-1">Bepul funksiyalardan foydalanishingiz mumkin. Pullik xizmatlar uchun aktivatsiya talab etiladi.</p>
                       {totalDebt > 0 && <p className="font-medium text-sm mt-1">Qarzdorlik: {new Intl.NumberFormat('uz-UZ').format(totalDebt)} so'm</p>}
                     </div>
-                    <Button variant="destructive" size="sm">To'lash</Button>
+                    <Button variant="outline" size="sm" onClick={() => handleTabChange('subscription')}>Obuna</Button>
                   </div>
                 </CardContent>
               </Card>
@@ -340,7 +345,7 @@ export default function SellerCloudX() {
         </div>
 
         {/* Floating support chat button */}
-        {activeTab !== 'support' && hasAccess && (
+        {activeTab !== 'support' && (
           <button
             onClick={() => handleTabChange('support')}
             className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl hover:scale-105 transition-all flex items-center justify-center"
