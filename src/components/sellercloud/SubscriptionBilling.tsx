@@ -471,11 +471,11 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
       )}
 
       <Tabs defaultValue="subscription">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="subscription" className="gap-1.5 text-xs"><Crown className="h-3.5 w-3.5" /> Obuna</TabsTrigger>
-          <TabsTrigger value="balance" className="gap-1.5 text-xs"><Wallet className="h-3.5 w-3.5" /> Balans</TabsTrigger>
-          <TabsTrigger value="transactions" className="gap-1.5 text-xs"><History className="h-3.5 w-3.5" /> Tarix</TabsTrigger>
-          <TabsTrigger value="pricing" className="gap-1.5 text-xs"><DollarSign className="h-3.5 w-3.5" /> Narxlar</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-4 h-auto">
+          <TabsTrigger value="subscription" className="gap-1 text-[10px] sm:text-xs px-1 sm:px-3 py-2 flex-col sm:flex-row"><Crown className="h-3.5 w-3.5 shrink-0" /><span className="truncate">Obuna</span></TabsTrigger>
+          <TabsTrigger value="balance" className="gap-1 text-[10px] sm:text-xs px-1 sm:px-3 py-2 flex-col sm:flex-row"><Wallet className="h-3.5 w-3.5 shrink-0" /><span className="truncate">Balans</span></TabsTrigger>
+          <TabsTrigger value="transactions" className="gap-1 text-[10px] sm:text-xs px-1 sm:px-3 py-2 flex-col sm:flex-row"><History className="h-3.5 w-3.5 shrink-0" /><span className="truncate">Tarix</span></TabsTrigger>
+          <TabsTrigger value="pricing" className="gap-1 text-[10px] sm:text-xs px-1 sm:px-3 py-2 flex-col sm:flex-row"><DollarSign className="h-3.5 w-3.5 shrink-0" /><span className="truncate">Narxlar</span></TabsTrigger>
         </TabsList>
 
         {/* TAB 1: SUBSCRIPTION */}
