@@ -158,7 +158,8 @@ export function useMarketplaceTariffs(
             if (!tariffError && tariffData?.success) {
               commissionRows.forEach((t: any) => {
                 const subject = (t.subjectName || t.parentName || '').toLowerCase();
-                const commission = t.kgvpMarketplace || t.paidStorageKgvp || t.commission || 0;
+                // WB API may return kgvpMarketplace or kgvpMarketplaceUz depending on region
+                const commission = t.kgvpMarketplace || t.kgvpMarketplaceUz || t.kgvpSupplier || t.kgvpSupplierUz || t.paidStorageKgvp || t.paidStorageKgvpUz || t.commission || 0;
                 if (subject && commission > 0) {
                   commissionBySubject.set(subject, commission / 100); // convert % to decimal
                 }
