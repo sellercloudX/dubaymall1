@@ -146,22 +146,51 @@ serve(async (req) => {
         };
       }
 
-      // 2. Get products count
+      // 2. Get products count using modern Business API
       try {
-        const offersResponse = await fetch(
-          `https://api.partner.market.yandex.ru/campaigns/${campaignId}/offer-mapping-entries?limit=1`,
-          {
-            headers: {
-              "Api-Key": apiKey,
-              "Content-Type": "application/json",
-            },
+        // First try to get businessId from campaign
+        let connBusinessId = "";
+        try {
+          const bizResp = await fetch(
+            `https://api.partner.market.yandex.ru/campaigns/${campaignId}`,
+            { headers: { "Api-Key": apiKey, "Content-Type": "application/json" } }
+          );
+          if (bizResp.ok) {
+            const bizData = await bizResp.json();
+            connBusinessId = bizData.campaign?.business?.id?.toString() || "";
           }
-        );
+        } catch (_) {}
 
-        if (offersResponse.ok) {
-          const offersData: YandexOffersResponse = await offersResponse.json();
-          productsCount = offersData.paging?.total || 0;
-          console.log("Products count:", productsCount);
+        if (connBusinessId) {
+          // Use Business API (modern, not deprecated)
+          const offersResponse = await fetch(
+            `https://api.partner.market.yandex.ru/v2/businesses/${connBusinessId}/offer-mappings?limit=1`,
+            {
+              method: 'POST',
+              headers: { "Api-Key": apiKey, "Content-Type": "application/json" },
+              body: JSON.stringify({}),
+            }
+          );
+          if (offersResponse.ok) {
+            const offersData = await offersResponse.json();
+            productsCount = offersData.result?.paging?.total || 0;
+            console.log("Products count (business API):", productsCount);
+          }
+        } else {
+          // Fallback to campaign offers API
+          const offersResponse = await fetch(
+            `https://api.partner.market.yandex.ru/campaigns/${campaignId}/offers`,
+            {
+              method: 'POST',
+              headers: { "Api-Key": apiKey, "Content-Type": "application/json" },
+              body: JSON.stringify({ limit: 1 }),
+            }
+          );
+          if (offersResponse.ok) {
+            const offersData = await offersResponse.json();
+            productsCount = offersData.result?.paging?.total || offersData.result?.offers?.length || 0;
+            console.log("Products count (campaign API):", productsCount);
+          }
         }
       } catch (e) {
         console.error("Products fetch error:", e);
