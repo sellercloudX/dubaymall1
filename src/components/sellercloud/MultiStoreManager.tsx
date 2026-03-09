@@ -50,6 +50,18 @@ const TAX_OPTIONS = [
   { value: 25, label: 'Yuqori stavka (25%)' },
 ];
 
+/** Map raw Yandex/API state values to readable labels */
+function normalizeState(raw?: string): string {
+  if (!raw) return 'CONNECTED';
+  const s = raw.toUpperCase();
+  const map: Record<string, string> = {
+    'CONNECTED': 'CONNECTED', '1': 'CONNECTED', 'ON': 'CONNECTED', 'ACTIVE': 'CONNECTED',
+    'PENDING_VALIDATION': 'CONNECTED', 'CONNECTION_ERROR': 'ERROR',
+    'OFF': 'OFF', 'DISABLED': 'OFF', 'SUSPENDED': 'SUSPENDED',
+  };
+  return map[s] || (s === 'UNKNOWN' ? 'CONNECTED' : s);
+}
+
 export function MultiStoreManager({ connectedMarketplaces, onStoreChange }: MultiStoreManagerProps) {
   const { user } = useAuth();
   const [stores, setStores] = useState<StoreInfo[]>([]);
