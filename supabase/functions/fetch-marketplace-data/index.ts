@@ -2107,11 +2107,15 @@ serve(async (req) => {
         // Both require shopIds as mandatory param per Swagger spec
         try {
           const financeParams = new URLSearchParams();
+          // shopIds is REQUIRED per Uzum Swagger spec
           if (uzumShopId) financeParams.append("shopIds", String(uzumShopId));
-          // Add date range — last 90 days for comprehensive data
-          const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
-          financeParams.append("dateFrom", ninetyDaysAgo.toISOString().slice(0, 10));
-          financeParams.append("dateTo", new Date().toISOString().slice(0, 10));
+          // CRITICAL: dateFrom/dateTo must be epoch milliseconds (int64), NOT date strings!
+          const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
+          financeParams.append("dateFrom", String(ninetyDaysAgo));
+          financeParams.append("dateTo", String(Date.now()));
+          // Also add pagination for comprehensive data
+          financeParams.append("size", "100");
+          financeParams.append("page", "0");
           
           // Try multiple API paths for expenses (Uzum API can vary)
           const expenseEndpoints = [
