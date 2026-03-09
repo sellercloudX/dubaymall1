@@ -491,20 +491,20 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-3 gap-3">
-                <div className="p-3 rounded-lg bg-muted/50">
-                  <div className="text-xs text-muted-foreground flex items-center gap-1"><Calendar className="h-3 w-3" /> Boshlangan</div>
-                  <div className="text-base font-bold mt-1">{format(new Date(subscription.started_at), 'dd.MM.yyyy')}</div>
+              <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                <div className="p-2.5 sm:p-3 rounded-lg bg-muted/50">
+                  <div className="text-[10px] sm:text-xs text-muted-foreground flex items-center gap-1"><Calendar className="h-3 w-3 shrink-0" /> <span className="truncate">Boshlangan</span></div>
+                  <div className="text-sm sm:text-base font-bold mt-1">{format(new Date(subscription.started_at), 'dd.MM.yy')}</div>
                 </div>
-                <div className="p-3 rounded-lg bg-muted/50">
-                  <div className="text-xs text-muted-foreground flex items-center gap-1"><Clock className="h-3 w-3" /> Tugash</div>
-                  <div className="text-base font-bold mt-1">
-                    {subscription.activated_until ? format(new Date(subscription.activated_until), 'dd.MM.yyyy') : '—'}
+                <div className="p-2.5 sm:p-3 rounded-lg bg-muted/50">
+                  <div className="text-[10px] sm:text-xs text-muted-foreground flex items-center gap-1"><Clock className="h-3 w-3 shrink-0" /> <span className="truncate">Tugash</span></div>
+                  <div className="text-sm sm:text-base font-bold mt-1">
+                    {subscription.activated_until ? format(new Date(subscription.activated_until), 'dd.MM.yy') : '—'}
                   </div>
                 </div>
-                <div className="p-3 rounded-lg bg-muted/50">
-                  <div className="text-xs text-muted-foreground flex items-center gap-1"><TrendingUp className="h-3 w-3" /> Tarif</div>
-                  <div className="text-base font-bold mt-1">{currentPlanLabel}</div>
+                <div className="p-2.5 sm:p-3 rounded-lg bg-muted/50">
+                  <div className="text-[10px] sm:text-xs text-muted-foreground flex items-center gap-1"><TrendingUp className="h-3 w-3 shrink-0" /> <span className="truncate">Tarif</span></div>
+                  <div className="text-sm sm:text-base font-bold mt-1">{currentPlanLabel}</div>
                 </div>
               </div>
             </CardContent>
