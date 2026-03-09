@@ -879,7 +879,8 @@ serve(async (req) => {
           netProfit: Math.round(product.price * 0.2),
         };
 
-        const sku = generateSKU(product.name);
+        // Preserve original SKU from source marketplace if provided
+        const sku = product.shopSku || generateSKU(product.name);
         const barcode = product.barcode || generateEAN13();
 
         // ═══ STEP 1: Handle images ═══

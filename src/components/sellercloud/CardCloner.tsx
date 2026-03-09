@@ -283,6 +283,7 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
               costPrice,
               images: validImages,
               category: productCategory,
+              shopSku: product.shopSku, // Preserve original SKU
             },
             skipImageGeneration: validImages.length >= 4,
             cloneMode: true,
@@ -315,6 +316,7 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
               costPrice: costPrice,
               images: validImages,
               category: productCategory,
+              shopSku: product.shopSku, // Preserve original SKU
             },
             cloneMode: true,
           },

@@ -892,6 +892,7 @@ serve(async (req) => {
 
     const reqBody = await req.json();
     const { product, dimensions: manualDimensions, cloneMode, skipImageGeneration } = reqBody;
+    const sourceShopSku = product?.shopSku || '';
 
     // ═══ BILLING CHECK (skip if called from scanner — scanner handles billing) ═══
     const adminSupabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
@@ -970,7 +971,8 @@ serve(async (req) => {
     // Per official WB API docs: title, description are VARIANT-LEVEL fields (NOT characteristics)
     // Price goes in sizes[].price, images uploaded separately via v3/media/save after nmID
     console.log(`\n--- STEP 4: Create Card ---`);
-    const vendorCode = generateVendorCode(product.name);
+    // Preserve original SKU from source marketplace if provided
+    let vendorCode = sourceShopSku || generateVendorCode(product.name);
 
     const UZS_TO_RUB_RATE = 140;
     const rawPrice = Math.round(product.price || 0);
@@ -1013,13 +1015,37 @@ serve(async (req) => {
     const wbData = await wbResp.json();
 
     if (!wbResp.ok || wbData.error) {
-      console.error("WB API error:", JSON.stringify(wbData).substring(0, 500));
+      const wbErrStr = JSON.stringify(wbData).substring(0, 500);
+      console.error("WB API error:", wbErrStr);
 
+      // If vendorCode already exists (duplicate SKU), append suffix and retry
+      const isDuplicate = /vendorCode|артикул.*существует|already exists|дублирует/i.test(wbErrStr);
+      if (isDuplicate && sourceShopSku) {
+        const suffix = `-${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
+        vendorCode = sourceShopSku + suffix;
+        console.log(`⚠️ Duplicate vendorCode, retrying with suffix: ${vendorCode}`);
+        variant.vendorCode = vendorCode;
+        const dupRetryResp = await wbFetch(`${WB_API}/content/v2/cards/upload`, {
+          method: "POST",
+          headers: { Authorization: apiKey, "Content-Type": "application/json" },
+          body: JSON.stringify([{ subjectID: subject.subjectID, variants: [variant] }]),
+        });
+        const dupRetryData = await dupRetryResp.json();
+        if (dupRetryResp.ok && !dupRetryData.error) {
+          console.log(`✅ Retry with suffixed vendorCode succeeded: ${vendorCode}`);
+        } else {
+          return new Response(JSON.stringify({
+            success: false, error: dupRetryData?.errorText || "WB API xatosi (duplikat SKU)",
+            wbResponse: dupRetryData,
+          }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+      }
       // Retry without characteristics if they caused the error
-      if (JSON.stringify(wbData).match(/характеристик|characteristic|Invalid/i)) {
+      else if (/характеристик|characteristic|Invalid/i.test(wbErrStr)) {
         console.log("Retrying without AI characteristics...");
         variant.characteristics = [];
         variant.vendorCode = vendorCode + "-R";
+        vendorCode = variant.vendorCode;
         const retryPayload = [{ subjectID: subject.subjectID, variants: [variant] }];
         const retryResp = await wbFetch(`${WB_API}/content/v2/cards/upload`, {
           method: "POST",
