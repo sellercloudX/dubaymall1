@@ -253,6 +253,7 @@ JSON formatda quyidagilarni ber: name_uz, name_ru, description_uz, description_r
     }
 
     // Try creating product via Uzum API
+    const productSku = product.shopSku || `SCX-${Date.now().toString(36).toUpperCase()}`;
     const productPayload = {
       title: cardContent.name_uz || product.name,
       titleRu: cardContent.name_ru || product.name,
@@ -261,6 +262,7 @@ JSON formatda quyidagilarni ber: name_uz, name_ru, description_uz, description_r
       price: Math.round(product.price * 100), // Uzum uses tiyin
       images: proxiedImages.length > 0 ? proxiedImages : (images.length > 0 ? images : []),
       shopId: shopId ? Number(shopId) : undefined,
+      sku: productSku,
       characteristics: (cardContent.properties || []).map((p: any) => ({
         title: p.name,
         value: p.value,
