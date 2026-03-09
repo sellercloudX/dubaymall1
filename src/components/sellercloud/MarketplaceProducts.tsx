@@ -238,6 +238,27 @@ export function MarketplaceProducts({ connectedMarketplaces, store }: Marketplac
                       <TableCell className="text-right font-medium whitespace-nowrap">
                         {formatPrice(product.price)}
                       </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        {(() => {
+                          const price = product.price || 0;
+                          const priceUzs = toDisplayUzs(price, selectedMarketplace);
+                          const tariff = getTariffForProduct(tariffMap, product.offerId, priceUzs, selectedMarketplace);
+                          const tariffInfo = tariffMap?.get(product.offerId);
+                          const commPct = tariffInfo?.commissionPercent;
+                          return (
+                            <div className="flex flex-col items-end">
+                              <span className="text-sm font-medium">
+                                {commPct !== undefined ? `${commPct.toFixed(1)}%` : '—'}
+                              </span>
+                              {tariff.isReal ? (
+                                <Badge variant="outline" className="text-[9px] px-1 py-0 border-primary/30 text-primary">Real</Badge>
+                              ) : commPct !== undefined ? (
+                                <Badge variant="outline" className="text-[9px] px-1 py-0 border-muted-foreground/30 text-muted-foreground">Taxminiy</Badge>
+                              ) : null}
+                            </div>
+                          );
+                        })()}
+                      </TableCell>
                       <TableCell className="text-center">
                         <Badge variant={(product.stockFBO || 0) > 0 ? 'outline' : 'secondary'} className="whitespace-nowrap">
                           {product.stockFBO || 0}
