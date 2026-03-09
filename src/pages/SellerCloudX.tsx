@@ -354,14 +354,15 @@ export default function SellerCloudX() {
 }
 
 // Small stat card for the top bar
-function StatCard({ label, value, highlight }: { label: string; value: string | number; highlight?: boolean }) {
-  return (
-    <div className="flex flex-col gap-0.5 min-w-0">
+const StatCard = React.forwardRef<HTMLDivElement, { label: string; value: string | number; highlight?: boolean }>(
+  ({ label, value, highlight }, ref) => (
+    <div ref={ref} className="flex flex-col gap-0.5 min-w-0">
       <span className={`text-lg lg:text-xl font-bold truncate ${highlight ? 'text-primary' : 'text-foreground'}`}>{value}</span>
       <span className="text-[11px] lg:text-xs text-muted-foreground truncate">{label}</span>
     </div>
-  );
-}
+  )
+);
+StatCard.displayName = 'StatCard';
 
 // Empty state placeholder
 function EmptyState({ icon: Icon, title, desc }: { icon: React.ElementType; title: string; desc: string }) {
