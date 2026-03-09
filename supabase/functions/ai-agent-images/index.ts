@@ -87,8 +87,8 @@ async function generateSellZenDualImages(
   console.log('🚀 SellZen: Starting 2 parallel image generation...');
   
   const [heroResult, studioResult] = await Promise.all([
-    generateWithSellZen(imageBase64, productName, category, 'modelli', 'infografika', 'premium', apiKey),
-    generateWithSellZen(imageBase64, productName, category, 'modelsiz', 'tabiiy', 'studiya', apiKey),
+    generateWithSellZen(imageBase64, productName, category, 'modelli', 'infografika', 'minimalist', apiKey),
+    generateWithSellZen(imageBase64, productName, category, 'modelsiz', 'lifestyle', 'minimalist', apiKey),
   ]);
 
   const count = (heroResult ? 1 : 0) + (studioResult ? 1 : 0);
