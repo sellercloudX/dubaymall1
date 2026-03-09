@@ -304,16 +304,16 @@ export default function SellerCloudX() {
           {/* Alerts */}
           {accessStatus && !accessStatus.is_active && (
             <div className="px-6 pt-4">
-              <Card className="border-destructive bg-destructive/5">
+              <Card className="border-yellow-500/50 bg-yellow-500/5">
                 <CardContent className="pt-4 pb-4">
                   <div className="flex items-start gap-4">
-                    <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+                    <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
-                      <h4 className="font-semibold text-destructive text-sm">Akkount cheklangan</h4>
-                      <p className="text-xs text-muted-foreground mt-1">{accessStatus.message}</p>
+                      <h4 className="font-semibold text-yellow-700 dark:text-yellow-400 text-sm">Bepul rejada foydalanmoqdasiz</h4>
+                      <p className="text-xs text-muted-foreground mt-1">Bepul funksiyalardan foydalanishingiz mumkin. Pullik xizmatlar uchun aktivatsiya talab etiladi.</p>
                       {totalDebt > 0 && <p className="font-medium text-sm mt-1">Qarzdorlik: {new Intl.NumberFormat('uz-UZ').format(totalDebt)} so'm</p>}
                     </div>
-                    <Button variant="destructive" size="sm">To'lash</Button>
+                    <Button variant="outline" size="sm" onClick={() => handleTabChange('subscription')}>Obuna</Button>
                   </div>
                 </CardContent>
               </Card>
