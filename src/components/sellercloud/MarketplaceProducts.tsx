@@ -8,9 +8,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
 } from '@/components/ui/table';
-import { Package, Plus, RefreshCw, Loader2, Image, AlertCircle } from 'lucide-react';
+import { Package, Plus, RefreshCw, Loader2, Image, AlertCircle, Percent } from 'lucide-react';
 import type { MarketplaceDataStore, MarketplaceProduct } from '@/hooks/useMarketplaceDataStore';
 import { toDisplayUzs, formatUzs } from '@/lib/currency';
+import { useMarketplaceTariffs, getTariffForProduct } from '@/hooks/useMarketplaceTariffs';
 
 interface MarketplaceProductsProps {
   connectedMarketplaces: string[];
@@ -37,6 +38,7 @@ export function MarketplaceProducts({ connectedMarketplaces, store }: Marketplac
   const products = store.getProducts(selectedMarketplace);
   const isLoading = store.isLoadingProducts;
   const total = products.length;
+  const { data: tariffMap } = useMarketplaceTariffs(connectedMarketplaces, store);
 
   const filteredProducts = products.filter(p => 
     p.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -195,6 +197,7 @@ export function MarketplaceProducts({ connectedMarketplaces, store }: Marketplac
                     <TableHead className="min-w-[200px]">Mahsulot</TableHead>
                     <TableHead className="w-32">SKU</TableHead>
                     <TableHead className="w-36 text-right">Narxi</TableHead>
+                    <TableHead className="w-28 text-right">Komissiya</TableHead>
                     <TableHead className="w-24 text-center">FBO</TableHead>
                     <TableHead className="w-24 text-center">FBS</TableHead>
                     <TableHead className="w-28 text-center">Holat</TableHead>
@@ -234,6 +237,27 @@ export function MarketplaceProducts({ connectedMarketplaces, store }: Marketplac
                       </TableCell>
                       <TableCell className="text-right font-medium whitespace-nowrap">
                         {formatPrice(product.price)}
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        {(() => {
+                          const price = product.price || 0;
+                          const priceUzs = toDisplayUzs(price, selectedMarketplace);
+                          const tariff = getTariffForProduct(tariffMap, product.offerId, priceUzs, selectedMarketplace);
+                          const tariffInfo = tariffMap?.get(product.offerId);
+                          const commPct = tariffInfo?.commissionPercent;
+                          return (
+                            <div className="flex flex-col items-end">
+                              <span className="text-sm font-medium">
+                                {commPct !== undefined ? `${commPct.toFixed(1)}%` : '—'}
+                              </span>
+                              {tariff.isReal ? (
+                                <Badge variant="outline" className="text-[9px] px-1 py-0 border-primary/30 text-primary">Real</Badge>
+                              ) : commPct !== undefined ? (
+                                <Badge variant="outline" className="text-[9px] px-1 py-0 border-muted-foreground/30 text-muted-foreground">Taxminiy</Badge>
+                              ) : null}
+                            </div>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell className="text-center">
                         <Badge variant={(product.stockFBO || 0) > 0 ? 'outline' : 'secondary'} className="whitespace-nowrap">
