@@ -50,6 +50,18 @@ const TAX_OPTIONS = [
   { value: 25, label: 'Yuqori stavka (25%)' },
 ];
 
+/** Map raw Yandex/API state values to readable labels */
+function normalizeState(raw?: string): string {
+  if (!raw) return 'CONNECTED';
+  const s = raw.toUpperCase();
+  const map: Record<string, string> = {
+    'CONNECTED': 'CONNECTED', '1': 'CONNECTED', 'ON': 'CONNECTED', 'ACTIVE': 'CONNECTED',
+    'PENDING_VALIDATION': 'CONNECTED', 'CONNECTION_ERROR': 'ERROR',
+    'OFF': 'OFF', 'DISABLED': 'OFF', 'SUSPENDED': 'SUSPENDED',
+  };
+  return map[s] || (s === 'UNKNOWN' ? 'CONNECTED' : s);
+}
+
 export function MultiStoreManager({ connectedMarketplaces, onStoreChange }: MultiStoreManagerProps) {
   const { user } = useAuth();
   const [stores, setStores] = useState<StoreInfo[]>([]);
@@ -95,7 +107,7 @@ export function MultiStoreManager({ connectedMarketplaces, onStoreChange }: Mult
           ordersCount: conn.orders_count || 0,
           totalRevenue: conn.total_revenue || 0,
           lastSyncAt: conn.last_sync_at,
-          state: acct?.state || 'UNKNOWN',
+          state: normalizeState(acct?.state),
         };
       });
 
@@ -355,8 +367,10 @@ export function MultiStoreManager({ connectedMarketplaces, onStoreChange }: Mult
                   <Badge variant="outline" className="text-[10px]">
                     <Percent className="h-3 w-3 mr-0.5" /> {store.taxRate}%
                   </Badge>
-                  <Badge variant={store.state === 'CONNECTED' ? 'default' : 'secondary'} className="text-[10px]">
-                    {store.state === 'CONNECTED' ? <><CheckCircle className="h-3 w-3 mr-0.5" /> API OK</> : <><XCircle className="h-3 w-3 mr-0.5" /> {store.state}</>}
+                  <Badge variant={store.state === 'CONNECTED' ? 'default' : store.state === 'ERROR' ? 'destructive' : 'secondary'} className="text-[10px]">
+                    {store.state === 'CONNECTED' ? <><CheckCircle className="h-3 w-3 mr-0.5" /> Ulangan</> : 
+                     store.state === 'ERROR' ? <><XCircle className="h-3 w-3 mr-0.5" /> Xatolik</> :
+                     <><AlertTriangle className="h-3 w-3 mr-0.5" /> {store.state}</>}
                   </Badge>
                 </div>
 
