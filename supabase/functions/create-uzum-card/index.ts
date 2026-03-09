@@ -13,6 +13,7 @@ interface ProductInput {
   costPrice: number;
   images?: string[];
   category?: string;
+  shopSku?: string;
 }
 
 interface CreateUzumCardRequest {
