@@ -18,14 +18,14 @@ const MARKETPLACE_NAMES: Record<string, string> = {
   ozon: 'Ozon',
 };
 
-export function MarketplaceFilterBar({
+export const MarketplaceFilterBar = React.forwardRef<HTMLDivElement, MarketplaceFilterBarProps>(({
   connectedMarketplaces,
   selectedMp,
   onSelect,
   showAll = true,
   allLabel = 'Umumiy',
   allIcon = '📊',
-}: MarketplaceFilterBarProps) {
+}, ref) => {
   if (connectedMarketplaces.length <= 1 && !showAll) return null;
 
   return (
