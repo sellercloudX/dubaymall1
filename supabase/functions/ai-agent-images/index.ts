@@ -1458,32 +1458,59 @@ serve(async (req) => {
       const categoryStyle = getCategoryStyle(detectedCategory);
       console.log(`📦 Scanner category: ${detectedCategory} → Style: ${categoryStyle.visual_style}`);
 
-      // Step 2: Generate Hero Infographic
-      console.log("🎨 Scanner: Generating Hero Infographic...");
-      const heroImage = await generateHeroImage(referenceImageUrl, detection, categoryStyle, OPENAI_API_KEY);
+      // Step 2+3: Generate 2 images via SellZen (parallel), fallback to OpenAI/Gemini
       let heroUrl: string | null = null;
-      if (heroImage) {
-        heroUrl = await uploadToStorage(adminSupabase, heroImage, userId, `scanner-hero-${Date.now()}`);
-        console.log("✅ Scanner Hero Infographic uploaded");
-      } else {
-        console.error("❌ Scanner Hero Infographic failed");
-      }
+      let studioUrl: string | null = null;
 
-      // Step 3: Generate 1 Lifestyle image (cost-optimized: 2 instead of 4)
-      console.log("🔄 Scanner: Generating 1 lifestyle image...");
-      const lifestyleAngle = LIFESTYLE_ANGLES[2]; // lifestyle_context
-      let lifestyleUrl: string | null = null;
-      try {
-        const img = await generateLifestyleAngle(referenceImageUrl, detection, lifestyleAngle, OPENAI_API_KEY);
-        if (img) {
-          lifestyleUrl = await uploadToStorage(adminSupabase, img, userId, `scanner-lifestyle-${Date.now()}`);
-          console.log("✅ Scanner Lifestyle uploaded");
+      const SELLZEN_API_KEY = Deno.env.get("SELLZEN_API_KEY");
+      if (SELLZEN_API_KEY && referenceImageUrl) {
+        console.log("🚀 Scanner: SellZen dual-image generation (parallel)...");
+        const imgBase64 = await imageUrlToBase64(referenceImageUrl);
+        if (imgBase64) {
+          const [sellzenHero, sellzenStudio] = await generateSellZenDualImages(
+            imgBase64, 
+            detection?.product_name || productName || 'Product',
+            detectedCategory, 
+            SELLZEN_API_KEY
+          );
+          if (sellzenHero) {
+            heroUrl = await uploadToStorage(adminSupabase, sellzenHero, userId, `scanner-hero-${Date.now()}`);
+            console.log("✅ Scanner Hero (SellZen modelli) uploaded");
+          }
+          if (sellzenStudio) {
+            studioUrl = await uploadToStorage(adminSupabase, sellzenStudio, userId, `scanner-studio-${Date.now()}`);
+            console.log("✅ Scanner Studio (SellZen modelsiz) uploaded");
+          }
         }
-      } catch (e) {
-        console.error("❌ Scanner Lifestyle error:", (e as any).message);
       }
 
-      const angleUrls = lifestyleUrl ? [lifestyleUrl] : [];
+      // ═══ Fallback to OpenAI/Gemini for missing images ═══
+      if (!heroUrl) {
+        console.log("🔄 Scanner Hero fallback: OpenAI/Gemini...");
+        const heroImage = await generateHeroImage(referenceImageUrl, detection, categoryStyle, OPENAI_API_KEY);
+        if (heroImage) {
+          heroUrl = await uploadToStorage(adminSupabase, heroImage, userId, `scanner-hero-${Date.now()}`);
+          console.log("✅ Scanner Hero (fallback) uploaded");
+        } else {
+          console.error("❌ Scanner Hero failed (all providers)");
+        }
+      }
+
+      if (!studioUrl) {
+        console.log("🔄 Scanner Lifestyle fallback: OpenAI/Gemini...");
+        const lifestyleAngle = LIFESTYLE_ANGLES[2];
+        try {
+          const img = await generateLifestyleAngle(referenceImageUrl, detection, lifestyleAngle, OPENAI_API_KEY);
+          if (img) {
+            studioUrl = await uploadToStorage(adminSupabase, img, userId, `scanner-lifestyle-${Date.now()}`);
+            console.log("✅ Scanner Lifestyle (fallback) uploaded");
+          }
+        } catch (e) {
+          console.error("❌ Scanner Lifestyle error:", (e as any).message);
+        }
+      }
+
+      const angleUrls = studioUrl ? [studioUrl] : [];
       const allImages = [...(heroUrl ? [heroUrl] : []), ...angleUrls];
       console.log(`✅ Scanner pipeline complete: ${allImages.length}/2 images generated`);
 
