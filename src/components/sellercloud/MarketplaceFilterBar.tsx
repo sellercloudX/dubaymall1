@@ -29,7 +29,7 @@ export const MarketplaceFilterBar = React.forwardRef<HTMLDivElement, Marketplace
   if (connectedMarketplaces.length <= 1 && !showAll) return null;
 
   return (
-    <div className="flex gap-1.5 flex-wrap">
+    <div ref={ref} className="flex gap-1.5 flex-wrap">
       {showAll && connectedMarketplaces.length > 1 && (
         <Button
           variant={selectedMp === 'all' ? 'default' : 'outline'}
