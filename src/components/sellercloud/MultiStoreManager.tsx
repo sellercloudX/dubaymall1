@@ -367,8 +367,10 @@ export function MultiStoreManager({ connectedMarketplaces, onStoreChange }: Mult
                   <Badge variant="outline" className="text-[10px]">
                     <Percent className="h-3 w-3 mr-0.5" /> {store.taxRate}%
                   </Badge>
-                  <Badge variant={store.state === 'CONNECTED' ? 'default' : 'secondary'} className="text-[10px]">
-                    {store.state === 'CONNECTED' ? <><CheckCircle className="h-3 w-3 mr-0.5" /> API OK</> : <><XCircle className="h-3 w-3 mr-0.5" /> {store.state}</>}
+                  <Badge variant={store.state === 'CONNECTED' ? 'default' : store.state === 'ERROR' ? 'destructive' : 'secondary'} className="text-[10px]">
+                    {store.state === 'CONNECTED' ? <><CheckCircle className="h-3 w-3 mr-0.5" /> Ulangan</> : 
+                     store.state === 'ERROR' ? <><XCircle className="h-3 w-3 mr-0.5" /> Xatolik</> :
+                     <><AlertTriangle className="h-3 w-3 mr-0.5" /> {store.state}</>}
                   </Badge>
                 </div>
 
