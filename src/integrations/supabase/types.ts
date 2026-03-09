@@ -3474,6 +3474,7 @@ export type Database = {
       generate_affiliate_code: { Args: never; Returns: string }
       generate_confirmation_code: { Args: never; Returns: string }
       generate_delivery_otp: { Args: { p_order_id: string }; Returns: string }
+      generate_expiry_warnings: { Args: never; Returns: undefined }
       generate_order_number: { Args: never; Returns: string }
       get_product_rating: {
         Args: { p_product_id: string }
