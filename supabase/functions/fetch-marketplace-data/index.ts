@@ -247,7 +247,7 @@ serve(async (req) => {
         let pageToken: string | undefined;
         let prevPageToken: string | undefined;
         let currentPage = 0;
-        const pageLimit = fetchAll ? 100 : Math.min(limit, 100); // Yandex max 100 per request
+        const pageLimit = fetchAll ? 100 : Math.max(Math.min(limit, 100), 50); // Yandex max 100 per request, min 50 for useful results
 
         // Fetch products with pagination
         do {
@@ -531,11 +531,11 @@ serve(async (req) => {
       } else if (dataType === "orders") {
         // Fetch orders from Yandex Market
         // Yandex API allows max 30-day intervals, so we split into 30-day chunks
-        // to fetch up to 365 days of data for client-side date filtering
+        // Default to 90 days lookback (matches client-side date range)
         const today = new Date();
-        const requestedDays = 365;
+        const defaultDays = 90;
         const chunkDays = 30;
-        const startDate = fromDate ? new Date(fromDate) : new Date(today.getTime() - requestedDays * 24 * 60 * 60 * 1000);
+        const startDate = fromDate ? new Date(fromDate) : new Date(today.getTime() - defaultDays * 24 * 60 * 60 * 1000);
         const endDate = toDate ? new Date(toDate) : today;
 
         let allOrders: YandexOrder[] = [];

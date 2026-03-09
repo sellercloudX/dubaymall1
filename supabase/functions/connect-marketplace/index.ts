@@ -146,50 +146,100 @@ serve(async (req) => {
         };
       }
 
-      // 2. Get products count
+      // 2. Get products count using modern Business API
       try {
-        const offersResponse = await fetch(
-          `https://api.partner.market.yandex.ru/campaigns/${campaignId}/offer-mapping-entries?limit=1`,
-          {
-            headers: {
-              "Api-Key": apiKey,
-              "Content-Type": "application/json",
-            },
+        // First try to get businessId from campaign
+        let connBusinessId = "";
+        try {
+          const bizResp = await fetch(
+            `https://api.partner.market.yandex.ru/campaigns/${campaignId}`,
+            { headers: { "Api-Key": apiKey, "Content-Type": "application/json" } }
+          );
+          if (bizResp.ok) {
+            const bizData = await bizResp.json();
+            connBusinessId = bizData.campaign?.business?.id?.toString() || "";
           }
-        );
+        } catch (_) {}
 
-        if (offersResponse.ok) {
-          const offersData: YandexOffersResponse = await offersResponse.json();
-          productsCount = offersData.paging?.total || 0;
-          console.log("Products count:", productsCount);
+        if (connBusinessId) {
+          // Use Business API (modern, not deprecated)
+          const offersResponse = await fetch(
+            `https://api.partner.market.yandex.ru/v2/businesses/${connBusinessId}/offer-mappings?limit=1`,
+            {
+              method: 'POST',
+              headers: { "Api-Key": apiKey, "Content-Type": "application/json" },
+              body: JSON.stringify({}),
+            }
+          );
+          if (offersResponse.ok) {
+            const offersData = await offersResponse.json();
+            productsCount = offersData.result?.paging?.total || 0;
+            console.log("Products count (business API):", productsCount);
+          }
+        } else {
+          // Fallback to campaign offers API
+          const offersResponse = await fetch(
+            `https://api.partner.market.yandex.ru/campaigns/${campaignId}/offers`,
+            {
+              method: 'POST',
+              headers: { "Api-Key": apiKey, "Content-Type": "application/json" },
+              body: JSON.stringify({ limit: 1 }),
+            }
+          );
+          if (offersResponse.ok) {
+            const offersData = await offersResponse.json();
+            productsCount = offersData.result?.paging?.total || offersData.result?.offers?.length || 0;
+            console.log("Products count (campaign API):", productsCount);
+          }
         }
       } catch (e) {
         console.error("Products fetch error:", e);
       }
 
-      // 3. Get orders count and revenue
+      // 3. Get orders count and revenue (last 90 days)
       try {
         const today = new Date();
-        const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-        const fromDate = thirtyDaysAgo.toISOString().split('T')[0];
+        const ninetyDaysAgo = new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000);
+        const fromDate = ninetyDaysAgo.toISOString().split('T')[0];
         const toDate = today.toISOString().split('T')[0];
 
-        const ordersResponse = await fetch(
-          `https://api.partner.market.yandex.ru/campaigns/${campaignId}/orders?fromDate=${fromDate}&toDate=${toDate}&status=PROCESSING,DELIVERY,DELIVERED`,
-          {
-            headers: {
-              "Api-Key": apiKey,
-              "Content-Type": "application/json",
-            },
-          }
-        );
+        let allOrders: any[] = [];
+        // Fetch in 30-day chunks (Yandex API limit)
+        let chunkEnd = new Date(today);
+        const chunkDays = 30;
+        while (chunkEnd > ninetyDaysAgo) {
+          let chunkStart = new Date(chunkEnd.getTime() - chunkDays * 24 * 60 * 60 * 1000);
+          if (chunkStart < ninetyDaysAgo) chunkStart = ninetyDaysAgo;
+          
+          const cFrom = chunkStart.toISOString().split('T')[0];
+          const cTo = chunkEnd.toISOString().split('T')[0];
+          
+          const ordersResponse = await fetch(
+            `https://api.partner.market.yandex.ru/campaigns/${campaignId}/orders?fromDate=${cFrom}&toDate=${cTo}&pageSize=50`,
+            {
+              headers: {
+                "Api-Key": apiKey,
+                "Content-Type": "application/json",
+              },
+            }
+          );
 
-        if (ordersResponse.ok) {
-          const ordersData: YandexOrdersResponse = await ordersResponse.json();
-          ordersCount = ordersData.orders?.length || 0;
-          totalRevenue = ordersData.orders?.reduce((sum, order) => sum + (order.total || 0), 0) || 0;
-          console.log("Orders count:", ordersCount, "Revenue:", totalRevenue);
+          if (ordersResponse.ok) {
+            const ordersData = await ordersResponse.json();
+            const orders = ordersData.orders || [];
+            const pager = ordersData.pager || {};
+            allOrders.push(...orders);
+            console.log(`Orders chunk ${cFrom}-${cTo}: ${pager.total || orders.length} orders`);
+          }
+          
+          chunkEnd = new Date(chunkStart.getTime() - 1);
         }
+
+        // Calculate totals from non-cancelled orders
+        const activeOrders = allOrders.filter(o => !['CANCELLED', 'RETURNED'].includes(o.status));
+        ordersCount = activeOrders.length;
+        totalRevenue = activeOrders.reduce((sum, order) => sum + (order.buyerTotal || order.buyerItemsTotal || order.itemsTotal || order.total || 0), 0);
+        console.log("Orders count:", ordersCount, "Revenue:", totalRevenue);
       } catch (e) {
         console.error("Orders fetch error:", e);
       }
