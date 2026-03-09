@@ -16,7 +16,7 @@ import { toast } from 'sonner';
 import { useExchangeRate } from '@/hooks/useExchangeRate';
 import { 
   Loader2, Globe, Package, ShoppingCart, BarChart3, 
-  Scan, AlertTriangle, RefreshCw, MessageCircle
+  Scan, AlertTriangle, RefreshCw, MessageCircle, CreditCard
 } from 'lucide-react';
 import { MarketplaceLogo, MARKETPLACE_CONFIG } from '@/lib/marketplaceConfig';
 import { OnboardingWizard } from '@/components/sellercloud/OnboardingWizard';
