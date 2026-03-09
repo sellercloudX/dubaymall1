@@ -46,22 +46,39 @@ export function ActivationsManagement() {
     }
   });
 
+  const [activationMonths, setActivationMonths] = useState<number>(1);
+  const [showActivateDialog, setShowActivateDialog] = useState(false);
+  const [activatingSubId, setActivatingSubId] = useState<string | null>(null);
+
   const handleApproveCloud = async (subscriptionId: string) => {
+    // Show duration dialog instead of direct activation
+    setActivatingSubId(subscriptionId);
+    setActivationMonths(1);
+    setShowActivateDialog(true);
+  };
+
+  const confirmActivation = async () => {
+    if (!activatingSubId) return;
     try {
+      const activatedUntil = new Date();
+      activatedUntil.setMonth(activatedUntil.getMonth() + activationMonths);
+
       const { error } = await supabase
         .from('sellercloud_subscriptions')
         .update({
           is_active: true,
           admin_override: true,
-          admin_notes: 'Admin tomonidan aktivlashtirildi',
+          activated_until: activatedUntil.toISOString(),
+          admin_notes: `Admin: ${activationMonths} oyga aktivlashtirildi`,
         })
-        .eq('id', subscriptionId);
+        .eq('id', activatingSubId);
 
       if (error) throw error;
-      toast.success('SellerCloudX aktivlashtirildi');
+      toast.success(`${activationMonths} oyga aktivlashtirildi`);
       queryClient.invalidateQueries({ queryKey: ['admin-cloud-subscriptions'] });
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
-      setShowDetailDialog(false);
+      setShowActivateDialog(false);
+      setActivatingSubId(null);
     } catch (err: any) {
       toast.error('Xatolik: ' + err.message);
     }
@@ -237,6 +254,46 @@ export function ActivationsManagement() {
           </TabsContent>
         </Tabs>
       </CardContent>
+
+      {/* Activation Duration Dialog */}
+      <Dialog open={showActivateDialog} onOpenChange={setShowActivateDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Aktivatsiya muddatini tanlang</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-muted-foreground">
+              Muddatsiz aktivatsiya yo'q. Qat'iy muddat belgilang:
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { label: '1 oy', months: 1 },
+                { label: '3 oy', months: 3 },
+                { label: '6 oy', months: 6 },
+                { label: '1 yil', months: 12 },
+              ].map(opt => (
+                <Button
+                  key={opt.months}
+                  variant={activationMonths === opt.months ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setActivationMonths(opt.months)}
+                >
+                  {opt.label}
+                </Button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Muddat tugagandan so'ng akkaunt avtomatik bloklanadi.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowActivateDialog(false)}>Bekor qilish</Button>
+            <Button onClick={confirmActivation}>
+              <CheckCircle className="h-4 w-4 mr-1" /> {activationMonths} oyga aktivlashtirish
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

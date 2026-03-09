@@ -39,11 +39,15 @@ interface SellerCloudBilling {
 
 interface AccessStatus {
   is_active: boolean;
-  reason: 'active' | 'trial' | 'admin_override' | 'debt' | 'inactive' | 'no_subscription';
+  reason: 'active' | 'trial' | 'admin_override' | 'debt' | 'inactive' | 'no_subscription' | 'expired';
   message: string;
   total_debt?: number;
   trial_ends_at?: string;
   subscription?: SellerCloudSubscription;
+  blocked?: boolean;
+  expires_at?: string;
+  days_left?: number;
+  warning?: boolean;
 }
 
 interface UseSellerCloudSubscriptionReturn {
