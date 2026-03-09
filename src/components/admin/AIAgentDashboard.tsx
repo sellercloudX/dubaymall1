@@ -1345,7 +1345,7 @@ function FinancialOverviewTab({ selectedPartnerId }: any) {
     queryFn: async () => {
       const [subsRes, connectionsRes, aiUsageRes] = await Promise.all([
         supabase.from('sellercloud_subscriptions').select('*').eq('user_id', selectedPartnerId).order('created_at', { ascending: false }).limit(1),
-        supabase.from('marketplace_connections').select('marketplace, total_revenue, orders_count, products_count').eq('user_id', selectedPartnerId).eq('is_active', true),
+        supabase.from('marketplace_connections_safe').select('marketplace, total_revenue, orders_count, products_count').eq('user_id', selectedPartnerId).eq('is_active', true),
         supabase.from('ai_usage_log').select('*').eq('user_id', selectedPartnerId).order('created_at', { ascending: false }).limit(50),
       ]);
       const subscription = subsRes.data?.[0];
