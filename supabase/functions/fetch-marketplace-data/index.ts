@@ -247,7 +247,7 @@ serve(async (req) => {
         let pageToken: string | undefined;
         let prevPageToken: string | undefined;
         let currentPage = 0;
-        const pageLimit = fetchAll ? 100 : Math.min(limit, 100); // Yandex max 100 per request
+        const pageLimit = fetchAll ? 100 : Math.max(Math.min(limit, 100), 50); // Yandex max 100 per request, min 50 for useful results
 
         // Fetch products with pagination
         do {
