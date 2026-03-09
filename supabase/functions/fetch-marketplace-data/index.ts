@@ -50,6 +50,10 @@ interface YandexProduct {
   stockFBO?: number;
   stockFBS?: number;
   stockCount?: number;
+  weightKg?: number;
+  lengthCm?: number;
+  widthCm?: number;
+  heightCm?: number;
 }
 
 interface YandexOrder {

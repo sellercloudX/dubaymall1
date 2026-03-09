@@ -15,6 +15,11 @@ export interface MarketplaceProduct {
   stockFBO?: number;
   stockFBS?: number;
   stockCount?: number;
+  // Product dimensions for tariff calculation
+  weightKg?: number;
+  lengthCm?: number;
+  widthCm?: number;
+  heightCm?: number;
 }
 
 export interface MarketplaceOrder {
