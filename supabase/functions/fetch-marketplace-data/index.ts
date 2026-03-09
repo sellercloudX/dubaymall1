@@ -1777,10 +1777,13 @@ serve(async (req) => {
                     return `${UZUM_CDN_BASE}/${url}`;
                   });
 
-                  // Extract REAL commission from product catalog (Uzum returns per-product commission)
-                  const cardCommission = card.commission || {};
-                  const realCommissionPercent = cardCommission.percent || cardCommission.value || 
-                                                cardCommission.commissionPercent || 0;
+                  // Extract REAL commission from product catalog
+                  // Uzum returns commission in `commissionDto.minCommission` / `commissionDto.maxCommission` (e.g. 17 = 17%)
+                  // `commission` field is always null in Uzum API
+                  const commDto = card.commissionDto || {};
+                  const realCommissionPercent = commDto.minCommission || commDto.maxCommission || 
+                                                commDto.commission || commDto.percent || commDto.value ||
+                                                (card.commission?.percent || card.commission?.value || 0);
                   
                   // Extract dimensional group for logistics calculation
                   const dimGroup = card.dimensionalGroup || firstSku.dimensionalGroup || {};
