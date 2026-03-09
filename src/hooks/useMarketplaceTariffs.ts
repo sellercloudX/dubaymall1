@@ -219,19 +219,27 @@ export function useMarketplaceTariffs(
         if (mp !== 'yandex') continue;
 
         // Yandex: fetch real tariffs from API
-        const batch: Array<{ categoryId: number; price: number; offerId: string }> = [];
+        const batch: Array<{ categoryId: number; price: number; offerId: string; length?: number; width?: number; height?: number; weight?: number }> = [];
         const seen = new Set<string>();
 
         for (const p of products) {
           const catId = p.marketCategoryId || 0;
           const price = p.price || 0;
-          const catKey = `${catId}-${price}`;
+          const catKey = `${catId}-${price}-${p.weightKg || 0}`;
           
           if (seen.has(catKey)) continue;
           seen.add(catKey);
           
           if (catId > 0 && price > 0) {
-            batch.push({ categoryId: catId, price, offerId: p.offerId });
+            batch.push({
+              categoryId: catId,
+              price,
+              offerId: p.offerId,
+              length: p.lengthCm,
+              width: p.widthCm,
+              height: p.heightCm,
+              weight: p.weightKg,
+            });
           }
         }
 
