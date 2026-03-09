@@ -3241,6 +3241,13 @@ serve(async (req) => {
                 });
               });
 
+              // Extract dimensions from card.dimensions (WB Content API v2)
+              const dims = card.dimensions || {};
+              const weightKg = (dims.weight || card.weight || 0) / 1000; // WB stores in grams
+              const lengthCm = dims.length || card.length || 0;
+              const widthCm = dims.width || card.width || 0;
+              const heightCm = dims.height || card.height || 0;
+
               allCards.push({
                 offerId: card.vendorCode || String(card.nmID),
                 name: card.title || card.subjectName || "",
@@ -3259,6 +3266,11 @@ serve(async (req) => {
                 rating: card.rating || 0,
                 feedbacks: card.feedbackCount || card.mediaCount || 0,
                 _barcodes: barcodes, // Internal: used for stock enrichment
+                // Dimensions for tariff/logistics calculation
+                weightKg: weightKg > 0 ? weightKg : undefined,
+                lengthCm: lengthCm > 0 ? lengthCm : undefined,
+                widthCm: widthCm > 0 ? widthCm : undefined,
+                heightCm: heightCm > 0 ? heightCm : undefined,
               });
             }
 
