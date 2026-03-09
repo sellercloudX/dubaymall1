@@ -180,12 +180,15 @@ export function useMarketplaceTariffs(
             const priceRub = p.price || 0;
             if (priceRub <= 0) continue;
             
-            // Find real commission for this product's category
+            // Find real commission for this product
+            // Priority: 1) per-product commissionPercent from API, 2) category match from tariffs, 3) fallback 15%
             const productCategory = (p.category || '').toLowerCase();
             let commissionPercent = 0.15; // fallback 15%
             
-            // Try exact match first, then partial match
-            if (commissionBySubject.has(productCategory)) {
+            // Use real commission from product if available (enriched server-side)
+            if (p.commissionPercent && p.commissionPercent > 0) {
+              commissionPercent = p.commissionPercent / 100; // API returns as whole number (e.g. 15 = 15%)
+            } else if (commissionBySubject.has(productCategory)) {
               commissionPercent = commissionBySubject.get(productCategory)!;
             } else {
               // Try partial match
