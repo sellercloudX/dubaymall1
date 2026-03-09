@@ -8,9 +8,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
 } from '@/components/ui/table';
-import { Package, Plus, RefreshCw, Loader2, Image, AlertCircle } from 'lucide-react';
+import { Package, Plus, RefreshCw, Loader2, Image, AlertCircle, Percent } from 'lucide-react';
 import type { MarketplaceDataStore, MarketplaceProduct } from '@/hooks/useMarketplaceDataStore';
 import { toDisplayUzs, formatUzs } from '@/lib/currency';
+import { useMarketplaceTariffs, getTariffForProduct } from '@/hooks/useMarketplaceTariffs';
 
 interface MarketplaceProductsProps {
   connectedMarketplaces: string[];
