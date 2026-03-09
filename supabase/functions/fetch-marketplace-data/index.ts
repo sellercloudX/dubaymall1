@@ -50,6 +50,10 @@ interface YandexProduct {
   stockFBO?: number;
   stockFBS?: number;
   stockCount?: number;
+  weightKg?: number;
+  lengthCm?: number;
+  widthCm?: number;
+  heightCm?: number;
 }
 
 interface YandexOrder {
@@ -322,6 +326,8 @@ serve(async (req) => {
               let stockFBO = 0;
               let stockFBS = 0;
               
+              const dims = offer.weightDimensions || {};
+              
               newProductsOnPage++;
               productMap.set(offerId, {
                 offerId,
@@ -336,6 +342,10 @@ serve(async (req) => {
                 stockFBO,
                 stockFBS,
                 stockCount: stockFBO + stockFBS,
+                weightKg: dims.weight ? dims.weight / 1000 : undefined,
+                lengthCm: dims.length || undefined,
+                widthCm: dims.width || undefined,
+                heightCm: dims.height || undefined,
               });
             });
           } else {
@@ -373,6 +383,9 @@ serve(async (req) => {
                               offer.category || 
                               '';
               
+              // Extract dimensions from offer or mapping
+              const dims = offer.weightDimensions || mapping.weightDimensions || {};
+              
               newProductsOnPage++;
               productMap.set(offerId, {
                 offerId,
@@ -387,6 +400,10 @@ serve(async (req) => {
                 stockFBO,
                 stockFBS,
                 stockCount: stockFBO + stockFBS,
+                weightKg: dims.weight ? dims.weight / 1000 : undefined, // Yandex returns grams
+                lengthCm: dims.length || undefined,
+                widthCm: dims.width || undefined,
+                heightCm: dims.height || undefined,
               });
             });
           }
