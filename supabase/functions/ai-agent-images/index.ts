@@ -8,6 +8,94 @@ const corsHeaders = {
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
+// =====================================================
+// SELLZEN AI — Primary image provider (2 parallel images)
+// =====================================================
+async function generateWithSellZen(
+  imageBase64: string,
+  productName: string,
+  category: string,
+  mode: 'modelli' | 'modelsiz',
+  style: 'infografika' | 'tabiiy' | 'lifestyle',
+  scene: 'studiya' | 'tabiat' | 'minimalist' | 'premium',
+  apiKey: string,
+): Promise<string | null> {
+  try {
+    // Map category to SellZen categories
+    const cat = (category || '').toLowerCase();
+    let sellzenCategory = 'home';
+    if (cat.includes('elektr') || cat.includes('techni') || cat.includes('электрон') || cat.includes('gadget')) sellzenCategory = 'electronics';
+    else if (cat.includes('kiyim') || cat.includes('fashion') || cat.includes('одежд') || cat.includes('обувь') || cat.includes('sport') || cat.includes('спорт')) sellzenCategory = 'clothing';
+    else if (cat.includes('kosmet') || cat.includes('beauty') || cat.includes('parfum') || cat.includes('косметик') || cat.includes('духи')) sellzenCategory = 'cosmetics';
+    else if (cat.includes('auto') || cat.includes('mashina') || cat.includes('avto') || cat.includes('авто')) sellzenCategory = 'auto';
+
+    console.log(`🎨 SellZen [${mode}/${style}/${scene}] cat=${sellzenCategory}`);
+
+    const body: Record<string, string> = {
+      imageBase64,
+      mode,
+      style,
+      scene,
+      language: 'ru', // Russian for marketplace text
+      category: sellzenCategory,
+      productDetails: productName.substring(0, 500),
+    };
+
+    const response = await fetch(
+      'https://qqqzkrldaaqogwjvfgcg.supabase.co/functions/v1/api-generate',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
+        body: JSON.stringify(body),
+      }
+    );
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error(`SellZen error ${response.status}: ${errText.substring(0, 200)}`);
+      return null;
+    }
+
+    const data = await response.json();
+    if (data.status === 'success') {
+      const imageResult = data.imageUrl || data.generatedImage;
+      if (imageResult) {
+        console.log(`✅ SellZen [${mode}] image generated`);
+        return imageResult;
+      }
+    }
+    console.warn(`SellZen [${mode}] unexpected response:`, data.status);
+    return null;
+  } catch (e) {
+    console.error(`SellZen [${mode}] error:`, (e as Error).message);
+    return null;
+  }
+}
+
+/**
+ * Generate 2 images via SellZen in PARALLEL:
+ * 1. modelli + infografika (hero infographic with model)
+ * 2. modelsiz + studiya (clean studio shot)
+ * Returns: [heroUrl, studioUrl] (either can be null)
+ */
+async function generateSellZenDualImages(
+  imageBase64: string,
+  productName: string,
+  category: string,
+  apiKey: string,
+): Promise<[string | null, string | null]> {
+  console.log('🚀 SellZen: Starting 2 parallel image generation...');
+  
+  const [heroResult, studioResult] = await Promise.all([
+    generateWithSellZen(imageBase64, productName, category, 'modelli', 'infografika', 'premium', apiKey),
+    generateWithSellZen(imageBase64, productName, category, 'modelsiz', 'tabiiy', 'studiya', apiKey),
+  ]);
+
+  const count = (heroResult ? 1 : 0) + (studioResult ? 1 : 0);
+  console.log(`✅ SellZen parallel done: ${count}/2 images`);
+  return [heroResult, studioResult];
+}
+
 async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3): Promise<Response> {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
