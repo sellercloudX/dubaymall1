@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, forwardRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { checkBillingAccess, handleEdgeFunctionBillingError } from '@/lib/billingCheck';
 import { Card, CardContent } from '@/components/ui/card';
@@ -39,7 +39,7 @@ type ReviewType = 'feedbacks' | 'questions';
 const SUPPORTED_REVIEW_MARKETPLACES = ['wildberries', 'yandex', 'uzum'];
 const MARKETPLACES_WITH_QUESTIONS = ['wildberries', 'yandex'];
 
-export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviewsProps) {
+export const MarketplaceReviews = forwardRef<HTMLDivElement, MarketplaceReviewsProps>(function MarketplaceReviews({ connectedMarketplaces }, ref) {
   const [reviewType, setReviewType] = useState<ReviewType>('feedbacks');
   const [showAnswered, setShowAnswered] = useState(false);
   const [items, setItems] = useState<ReviewItem[]>([]);
@@ -335,7 +335,7 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
   }
 
   return (
-    <div className="space-y-4">
+    <div ref={ref} className="space-y-4">
       {/* Marketplace selector */}
       <div className="flex items-center gap-2 flex-wrap">
         <MarketplaceFilterBar
@@ -552,4 +552,4 @@ export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviews
       )}
     </div>
   );
-}
+});

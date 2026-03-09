@@ -184,7 +184,7 @@ JAVOB:`;
         "Authorization": `Bearer ${LOVABLE_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-lite",
+        model: "google/gemini-3-flash-preview",
         messages: [{ role: "user", content: prompt }],
         max_tokens: 300,
         temperature: 0.7,
@@ -222,7 +222,7 @@ JAVOB:`;
     await supabase.from("ai_usage_log").insert({
       user_id: user.id,
       action_type: "review_reply",
-      model_used: "gemini-2.5-flash-lite",
+      model_used: "gemini-3-flash-preview",
       tokens_input: prompt.length,
       tokens_output: reply.length,
       metadata: { marketplace, rating, detectedLang, isQuestion },

@@ -1,3 +1,4 @@
+import React from 'react';
 import { Button } from '@/components/ui/button';
 import { MarketplaceLogo, MARKETPLACE_SHORT_NAMES } from '@/lib/marketplaceConfig';
 
@@ -17,18 +18,18 @@ const MARKETPLACE_NAMES: Record<string, string> = {
   ozon: 'Ozon',
 };
 
-export function MarketplaceFilterBar({
+export const MarketplaceFilterBar = React.forwardRef<HTMLDivElement, MarketplaceFilterBarProps>(({
   connectedMarketplaces,
   selectedMp,
   onSelect,
   showAll = true,
   allLabel = 'Umumiy',
   allIcon = '📊',
-}: MarketplaceFilterBarProps) {
+}, ref) => {
   if (connectedMarketplaces.length <= 1 && !showAll) return null;
 
   return (
-    <div className="flex gap-1.5 flex-wrap">
+    <div ref={ref} className="flex gap-1.5 flex-wrap">
       {showAll && connectedMarketplaces.length > 1 && (
         <Button
           variant={selectedMp === 'all' ? 'default' : 'outline'}
@@ -53,4 +54,6 @@ export function MarketplaceFilterBar({
       ))}
     </div>
   );
-}
+});
+
+MarketplaceFilterBar.displayName = 'MarketplaceFilterBar';
