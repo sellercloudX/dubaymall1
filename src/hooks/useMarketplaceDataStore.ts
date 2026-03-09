@@ -20,6 +20,9 @@ export interface MarketplaceProduct {
   lengthCm?: number;
   widthCm?: number;
   heightCm?: number;
+  // Real commission from marketplace product catalog (Uzum)
+  commissionPercent?: number;
+  dimensionalGroup?: string;
 }
 
 export interface MarketplaceOrder {
