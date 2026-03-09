@@ -1630,6 +1630,19 @@ serve(async (req) => {
                   const s = items[0];
                   console.log(`Uzum product[0] ALL keys: ${JSON.stringify(Object.keys(s))}`);
                   console.log(`Uzum product[0] title: ${s.title || s.name}, productId: ${s.productId || s.id}`);
+                  // Log commission-related fields exhaustively
+                  ['commission', 'commissionPercent', 'commissionRate', 'categoryCommission', 'sellerCommission', 'fee', 'feePercent', 'serviceFee', 'tariff'].forEach(k => {
+                    if (s[k] !== undefined) console.log(`Uzum product[0].${k}: ${JSON.stringify(s[k]).substring(0, 500)}`);
+                  });
+                  // Log ALL fields with "commis" or "fee" or "tariff" in name
+                  Object.keys(s).forEach(k => {
+                    const kl = k.toLowerCase();
+                    if (kl.includes('commis') || kl.includes('fee') || kl.includes('tariff') || kl.includes('percent') || kl.includes('rate')) {
+                      console.log(`Uzum product[0] MATCH .${k}: ${JSON.stringify(s[k]).substring(0, 300)}`);
+                    }
+                  });
+                  // Log category fields (commission is often per-category)
+                  if (s.category) console.log(`Uzum product[0].category: ${JSON.stringify(s.category).substring(0, 500)}`);
                   // Log photo-related fields exhaustively
                   ['photos', 'images', 'photoList', 'photo', 'photoUrl', 'previewImage', 'mainPhoto', 'imageUrl'].forEach(k => {
                     if (s[k] !== undefined) console.log(`Uzum product[0].${k}: ${JSON.stringify(s[k]).substring(0, 500)}`);
@@ -1638,6 +1651,13 @@ serve(async (req) => {
                   const skuSample = (s.skuList || s.skus || [])[0];
                   if (skuSample) {
                     console.log(`Uzum SKU[0] ALL keys: ${JSON.stringify(Object.keys(skuSample))}`);
+                    // Log commission fields on SKU
+                    Object.keys(skuSample).forEach(k => {
+                      const kl = k.toLowerCase();
+                      if (kl.includes('commis') || kl.includes('fee') || kl.includes('tariff') || kl.includes('percent')) {
+                        console.log(`Uzum SKU[0] MATCH .${k}: ${JSON.stringify(skuSample[k]).substring(0, 300)}`);
+                      }
+                    });
                     console.log(`Uzum SKU[0] barCode=${skuSample.barCode}, barcode=${skuSample.barcode}, article=${skuSample.article}, vendorCode=${skuSample.vendorCode}, sellerItemCode=${skuSample.sellerItemCode}, skuId=${skuSample.skuId}, skuTitle=${skuSample.skuTitle}`);
                     ['photos', 'photoList', 'photo', 'photoUrl', 'previewImage', 'image', 'imageUrl'].forEach(k => {
                       if (skuSample[k] !== undefined) console.log(`Uzum SKU[0].${k}: ${JSON.stringify(skuSample[k]).substring(0, 500)}`);
