@@ -892,6 +892,7 @@ serve(async (req) => {
 
     const reqBody = await req.json();
     const { product, dimensions: manualDimensions, cloneMode, skipImageGeneration } = reqBody;
+    const sourceShopSku = product?.shopSku || '';
 
     // ═══ BILLING CHECK (skip if called from scanner — scanner handles billing) ═══
     const adminSupabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
