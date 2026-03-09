@@ -95,7 +95,7 @@ export function MultiStoreManager({ connectedMarketplaces, onStoreChange }: Mult
           ordersCount: conn.orders_count || 0,
           totalRevenue: conn.total_revenue || 0,
           lastSyncAt: conn.last_sync_at,
-          state: acct?.state || 'UNKNOWN',
+          state: normalizeState(acct?.state),
         };
       });
 

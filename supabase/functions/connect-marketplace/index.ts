@@ -119,10 +119,19 @@ serve(async (req) => {
         if (campaignResponse.ok) {
           const campaignData: YandexCampaignResponse = await campaignResponse.json();
           isValid = true;
+          // Map Yandex state to readable status
+          const rawState = String(campaignData.campaign?.state || "");
+          const stateMap: Record<string, string> = {
+            "1": "CONNECTED", "ON": "CONNECTED", "ACTIVE": "CONNECTED",
+            "2": "OFF", "OFF": "OFF", "DISABLED": "OFF",
+            "3": "SUSPENDED", "SUSPENDED": "SUSPENDED",
+            "": "CONNECTED", // No state = API responded OK = connected
+          };
+          const mappedState = stateMap[rawState.toUpperCase()] || (rawState ? rawState : "CONNECTED");
           accountInfo = {
             campaignId: campaignId,
             campaignName: campaignData.campaign?.domain || "Yandex Market Store",
-            state: campaignData.campaign?.state || "UNKNOWN",
+            state: mappedState,
             clientId: campaignData.campaign?.clientId,
           };
           console.log("Campaign validated:", accountInfo.campaignName);
