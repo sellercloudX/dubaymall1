@@ -113,9 +113,10 @@ export function useMarketplaceTariffs(
               });
             } else {
               // Use REAL commission from product catalog if available, else fallback to tier
+              // Uzum API returns commissionPercent as whole number (e.g. 17 = 17%)
               const hasRealCommission = p.commissionPercent && p.commissionPercent > 0;
               const commissionPercent = hasRealCommission 
-                ? p.commissionPercent! / 100  // API returns as whole number (e.g. 15 = 15%)
+                ? p.commissionPercent! / 100  // Convert 17 → 0.17
                 : getUzumCommissionPercent(price);
               const commission = price * commissionPercent;
               // Logistics based on dimensional group if available
