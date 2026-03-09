@@ -1757,6 +1757,15 @@ serve(async (req) => {
                     return `${UZUM_CDN_BASE}/${url}`;
                   });
 
+                  // Extract REAL commission from product catalog (Uzum returns per-product commission)
+                  const cardCommission = card.commission || {};
+                  const realCommissionPercent = cardCommission.percent || cardCommission.value || 
+                                                cardCommission.commissionPercent || 0;
+                  
+                  // Extract dimensional group for logistics calculation
+                  const dimGroup = card.dimensionalGroup || firstSku.dimensionalGroup || {};
+                  const dimGroupName = typeof dimGroup === 'string' ? dimGroup : (dimGroup.name || dimGroup.title || '');
+                  
                   return {
                     offerId: String(card.productId || card.id || firstSku.skuId || ''),
                     name: card.title || card.name || '',
@@ -1771,6 +1780,9 @@ serve(async (req) => {
                     stockFBS: fbsStock,
                     stockCount: fboStock + fbsStock,
                     shopId: currentShopId,
+                    // Real commission and dimensional data from Uzum product catalog
+                    commissionPercent: realCommissionPercent,
+                    dimensionalGroup: dimGroupName,
                   };
                 });
 
@@ -2107,11 +2119,15 @@ serve(async (req) => {
         // Both require shopIds as mandatory param per Swagger spec
         try {
           const financeParams = new URLSearchParams();
+          // shopIds is REQUIRED per Uzum Swagger spec
           if (uzumShopId) financeParams.append("shopIds", String(uzumShopId));
-          // Add date range — last 90 days for comprehensive data
-          const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
-          financeParams.append("dateFrom", ninetyDaysAgo.toISOString().slice(0, 10));
-          financeParams.append("dateTo", new Date().toISOString().slice(0, 10));
+          // CRITICAL: dateFrom/dateTo must be epoch milliseconds (int64), NOT date strings!
+          const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
+          financeParams.append("dateFrom", String(ninetyDaysAgo));
+          financeParams.append("dateTo", String(Date.now()));
+          // Also add pagination for comprehensive data
+          financeParams.append("size", "100");
+          financeParams.append("page", "0");
           
           // Try multiple API paths for expenses (Uzum API can vary)
           const expenseEndpoints = [
@@ -3653,9 +3669,17 @@ serve(async (req) => {
 
           if (commResp.ok) {
             const commData = await commResp.json();
-            commissions = Array.isArray(commData?.report) ? commData.report : [];
+            // WB API returns commissions in report array or directly as array
+            commissions = Array.isArray(commData?.report) ? commData.report 
+              : Array.isArray(commData) ? commData 
+              : [];
+            console.log(`WB commissions API: ${commissions.length} entries, sample keys: ${commissions[0] ? JSON.stringify(Object.keys(commissions[0])) : 'none'}`);
+            if (commissions[0]) {
+              console.log(`WB commission sample: subjectName=${commissions[0].subjectName}, kgvpMarketplace=${commissions[0].kgvpMarketplace}, kgvpSupplier=${commissions[0].kgvpSupplier}`);
+            }
           } else {
-            await commResp.text();
+            const errText = await commResp.text();
+            console.warn(`WB commissions API failed: ${commResp.status}, ${errText.substring(0, 200)}`);
           }
 
           if (boxResp.ok) {

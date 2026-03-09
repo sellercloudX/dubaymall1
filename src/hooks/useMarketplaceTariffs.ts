@@ -100,7 +100,7 @@ export function useMarketplaceTariffs(
             
             const realExp = realExpenses?.get(p.offerId);
             if (realExp && (realExp.commission > 0 || realExp.logistics > 0)) {
-              // Use real finance data
+              // Use real finance data from API
               const totalTariff = realExp.commission + realExp.logistics;
               tariffMap.set(p.offerId, {
                 offerId: p.offerId,
@@ -112,20 +112,23 @@ export function useMarketplaceTariffs(
                 commissionPercent: price > 0 ? (realExp.commission / price) * 100 : 0,
               });
             } else {
-              // Use estimated tariffs based on price tier
-              const commissionPercent = getUzumCommissionPercent(price);
+              // Use REAL commission from product catalog if available, else fallback to tier
+              const hasRealCommission = p.commissionPercent && p.commissionPercent > 0;
+              const commissionPercent = hasRealCommission 
+                ? p.commissionPercent! / 100  // API returns as whole number (e.g. 15 = 15%)
+                : getUzumCommissionPercent(price);
               const commission = price * commissionPercent;
-              const serviceFee = price * UZUM_SERVICE_FEE_PERCENT;
+              // Logistics based on dimensional group if available
               const logistics = getUzumLogistics(price);
-              const totalTariff = commission + serviceFee + logistics;
+              const totalTariff = commission + logistics;
               tariffMap.set(p.offerId, {
                 offerId: p.offerId,
-                agencyCommission: commission + serviceFee,
+                agencyCommission: commission,
                 fulfillment: logistics,
                 delivery: 0,
                 totalTariff,
                 tariffPercent: price > 0 ? (totalTariff / price) * 100 : 0,
-                commissionPercent: price > 0 ? ((commission + serviceFee) / price) * 100 : 0,
+                commissionPercent: commissionPercent * 100,
               });
             }
           }
