@@ -552,4 +552,4 @@ export const MarketplaceReviews = forwardRef<HTMLDivElement, MarketplaceReviewsP
       )}
     </div>
   );
-}
+});
