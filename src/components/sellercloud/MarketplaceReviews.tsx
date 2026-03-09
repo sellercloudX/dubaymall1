@@ -335,7 +335,7 @@ export const MarketplaceReviews = forwardRef<HTMLDivElement, MarketplaceReviewsP
   }
 
   return (
-    <div className="space-y-4">
+    <div ref={ref} className="space-y-4">
       {/* Marketplace selector */}
       <div className="flex items-center gap-2 flex-wrap">
         <MarketplaceFilterBar
