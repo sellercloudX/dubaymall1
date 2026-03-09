@@ -140,9 +140,9 @@ export default function SellerCloudMobile() {
   }
 
   const hasAccess = accessStatus?.is_active ?? false;
-
-  // Free tabs accessible without active subscription
-  const mobileFreeTabs = new Set(['marketplaces', 'products', 'orders', 'subscription', 'notifications', 'mxik', 'calculator', 'reports']);
+  const isBlocked = (accessStatus as any)?.blocked === true;
+  const daysLeft = (accessStatus as any)?.days_left as number | undefined;
+  const expiryWarning = (accessStatus as any)?.warning === true;
 
   const isMoreActive = !primaryTabIds.includes(activeTab);
 
