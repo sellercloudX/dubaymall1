@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, forwardRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { checkBillingAccess, handleEdgeFunctionBillingError } from '@/lib/billingCheck';
 import { Card, CardContent } from '@/components/ui/card';
