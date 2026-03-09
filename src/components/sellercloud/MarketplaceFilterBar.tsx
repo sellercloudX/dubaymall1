@@ -54,4 +54,6 @@ export const MarketplaceFilterBar = React.forwardRef<HTMLDivElement, Marketplace
       ))}
     </div>
   );
-}
+});
+
+MarketplaceFilterBar.displayName = 'MarketplaceFilterBar';
