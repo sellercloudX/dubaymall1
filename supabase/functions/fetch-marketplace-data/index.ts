@@ -3669,9 +3669,17 @@ serve(async (req) => {
 
           if (commResp.ok) {
             const commData = await commResp.json();
-            commissions = Array.isArray(commData?.report) ? commData.report : [];
+            // WB API returns commissions in report array or directly as array
+            commissions = Array.isArray(commData?.report) ? commData.report 
+              : Array.isArray(commData) ? commData 
+              : [];
+            console.log(`WB commissions API: ${commissions.length} entries, sample keys: ${commissions[0] ? JSON.stringify(Object.keys(commissions[0])) : 'none'}`);
+            if (commissions[0]) {
+              console.log(`WB commission sample: subjectName=${commissions[0].subjectName}, kgvpMarketplace=${commissions[0].kgvpMarketplace}, kgvpSupplier=${commissions[0].kgvpSupplier}`);
+            }
           } else {
-            await commResp.text();
+            const errText = await commResp.text();
+            console.warn(`WB commissions API failed: ${commResp.status}, ${errText.substring(0, 200)}`);
           }
 
           if (boxResp.ok) {
