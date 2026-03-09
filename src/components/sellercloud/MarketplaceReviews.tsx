@@ -39,7 +39,7 @@ type ReviewType = 'feedbacks' | 'questions';
 const SUPPORTED_REVIEW_MARKETPLACES = ['wildberries', 'yandex', 'uzum'];
 const MARKETPLACES_WITH_QUESTIONS = ['wildberries', 'yandex'];
 
-export function MarketplaceReviews({ connectedMarketplaces }: MarketplaceReviewsProps) {
+export const MarketplaceReviews = forwardRef<HTMLDivElement, MarketplaceReviewsProps>(function MarketplaceReviews({ connectedMarketplaces }, ref) {
   const [reviewType, setReviewType] = useState<ReviewType>('feedbacks');
   const [showAnswered, setShowAnswered] = useState(false);
   const [items, setItems] = useState<ReviewItem[]>([]);
