@@ -3404,6 +3404,56 @@ serve(async (req) => {
             console.warn("WB prices enrichment failed:", e);
           }
 
+          // Enrich with real commission rates from Tariffs API
+          try {
+            await sleep(300);
+            const commResp = await fetch("https://common-api.wildberries.ru/api/v1/tariffs/commission", {
+              headers: wbHeaders,
+            });
+            if (commResp.ok) {
+              const commData = await commResp.json();
+              const commissions = Array.isArray(commData?.report) ? commData.report 
+                : Array.isArray(commData) ? commData : [];
+              
+              // Build map: subjectName (lowercase) → commission %
+              const commMap = new Map<string, number>();
+              const parentMap = new Map<string, number>();
+              commissions.forEach((t: any) => {
+                const rate = t.kgvpMarketplace || t.kgvpMarketplaceUz || t.kgvpSupplier || t.kgvpSupplierUz || 0;
+                if (t.subjectName && rate > 0) commMap.set(t.subjectName.toLowerCase(), rate);
+                if (t.parentName && rate > 0 && !parentMap.has(t.parentName.toLowerCase())) {
+                  parentMap.set(t.parentName.toLowerCase(), rate);
+                }
+              });
+              
+              let matched = 0;
+              allCards.forEach(card => {
+                const cat = (card.category || '').toLowerCase();
+                if (!cat) return;
+                // Exact match by subjectName
+                let rate = commMap.get(cat);
+                // Fallback: partial match
+                if (!rate) {
+                  for (const [subject, r] of commMap) {
+                    if (cat.includes(subject) || subject.includes(cat)) { rate = r; break; }
+                  }
+                }
+                // Fallback: parent category
+                if (!rate) rate = parentMap.get(cat);
+                if (rate) {
+                  card.commissionPercent = rate;
+                  matched++;
+                }
+              });
+              console.log(`WB commission enrichment: ${commMap.size} categories, ${matched}/${allCards.length} products matched`);
+            } else {
+              const errText = await commResp.text();
+              console.warn(`WB commissions API failed during products: ${commResp.status}, ${errText.substring(0, 200)}`);
+            }
+          } catch (e) {
+            console.warn("WB commission enrichment failed:", e);
+          }
+
           console.log(`WB total products: ${allCards.length}`);
 
           // Remove internal fields before returning
