@@ -579,21 +579,20 @@ export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingPro
               <CardDescription>AI funksiyalar va pullik xizmatlar uchun</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 text-center">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Joriy balans</p>
-                  <p className="text-2xl font-bold text-primary mt-1">{balance ? Number(balance.balance_uzs).toLocaleString() : '0'}</p>
-                  <p className="text-[10px] text-muted-foreground">UZS</p>
+                  <p className="text-xl sm:text-2xl font-bold text-primary mt-1">{balance ? Number(balance.balance_uzs).toLocaleString() : '0'} <span className="text-xs font-normal text-muted-foreground">UZS</span></p>
                 </div>
-                <div className="p-4 rounded-xl bg-muted/50 text-center">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Jami kirim</p>
-                  <p className="text-lg font-bold mt-1">{balance ? Number(balance.total_deposited).toLocaleString() : '0'}</p>
-                  <p className="text-[10px] text-muted-foreground">UZS</p>
-                </div>
-                <div className="p-4 rounded-xl bg-muted/50 text-center">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Jami chiqim</p>
-                  <p className="text-lg font-bold mt-1">{balance ? Number(balance.total_spent).toLocaleString() : '0'}</p>
-                  <p className="text-[10px] text-muted-foreground">UZS</p>
+                <div className="grid grid-cols-2 sm:grid-cols-1 gap-3 sm:contents">
+                  <div className="p-3 sm:p-4 rounded-xl bg-muted/50 text-center">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Jami kirim</p>
+                    <p className="text-base sm:text-lg font-bold mt-1">{balance ? Number(balance.total_deposited).toLocaleString() : '0'} <span className="text-[10px] font-normal text-muted-foreground">UZS</span></p>
+                  </div>
+                  <div className="p-3 sm:p-4 rounded-xl bg-muted/50 text-center">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Jami chiqim</p>
+                    <p className="text-base sm:text-lg font-bold mt-1">{balance ? Number(balance.total_spent).toLocaleString() : '0'} <span className="text-[10px] font-normal text-muted-foreground">UZS</span></p>
+                  </div>
                 </div>
               </div>
 
