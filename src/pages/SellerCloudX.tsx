@@ -192,11 +192,16 @@ export default function SellerCloudX() {
     );
   }
 
+  // Free tabs accessible without active subscription (viewing data, basic tools)
+  const freeTabs = new Set([
+    'marketplaces', 'products', 'orders', 'subscription', 'notifications', 
+    'support', 'mxik', 'calculator', 'reports'
+  ]);
+
   // Render content based on active tab
   const renderContent = () => {
-    // If no access, only show subscription & notifications
-    if (!hasAccess) {
-      if (activeTab === 'notifications') return <NotificationCenter />;
+    // If no access and tab is paid, redirect to subscription
+    if (!hasAccess && !freeTabs.has(activeTab)) {
       return <SubscriptionBilling totalSalesVolume={totalRevenue} />;
     }
 
