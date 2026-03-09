@@ -1757,6 +1757,15 @@ serve(async (req) => {
                     return `${UZUM_CDN_BASE}/${url}`;
                   });
 
+                  // Extract REAL commission from product catalog (Uzum returns per-product commission)
+                  const cardCommission = card.commission || {};
+                  const realCommissionPercent = cardCommission.percent || cardCommission.value || 
+                                                cardCommission.commissionPercent || 0;
+                  
+                  // Extract dimensional group for logistics calculation
+                  const dimGroup = card.dimensionalGroup || firstSku.dimensionalGroup || {};
+                  const dimGroupName = typeof dimGroup === 'string' ? dimGroup : (dimGroup.name || dimGroup.title || '');
+                  
                   return {
                     offerId: String(card.productId || card.id || firstSku.skuId || ''),
                     name: card.title || card.name || '',
@@ -1771,6 +1780,9 @@ serve(async (req) => {
                     stockFBS: fbsStock,
                     stockCount: fboStock + fbsStock,
                     shopId: currentShopId,
+                    // Real commission and dimensional data from Uzum product catalog
+                    commissionPercent: realCommissionPercent,
+                    dimensionalGroup: dimGroupName,
                   };
                 });
 
