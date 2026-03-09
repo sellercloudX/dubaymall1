@@ -147,6 +147,11 @@ export default function SellerCloudMobile() {
   const isMoreActive = !primaryTabIds.includes(activeTab);
 
   const renderContent = () => {
+    // If no access and tab is paid, show subscription
+    if (!hasAccess && !mobileFreeTabs.has(activeTab)) {
+      return <div className="p-4"><SubscriptionBilling totalSalesVolume={totalRevenue} /></div>;
+    }
+
     switch (activeTab) {
       case 'marketplaces':
         return (
