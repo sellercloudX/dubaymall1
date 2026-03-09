@@ -195,16 +195,29 @@ export default function SellerCloudX() {
     );
   }
 
-  // Free tabs accessible without active subscription (viewing data, basic tools)
-  const freeTabs = new Set([
-    'marketplaces', 'products', 'orders', 'subscription', 'notifications', 
-    'support', 'mxik', 'calculator', 'reports'
-  ]);
-
   // Render content based on active tab
   const renderContent = () => {
-    // If no access and tab is paid, redirect to subscription
-    if (!hasAccess && !freeTabs.has(activeTab)) {
+    // STRICT: If blocked (expired/no payment), only allow subscription tab
+    if (isBlocked && activeTab !== 'subscription') {
+      return (
+        <Card className="mx-auto max-w-lg mt-8 border-destructive/50">
+          <CardContent className="p-8 text-center space-y-4">
+            <AlertTriangle className="h-12 w-12 text-destructive mx-auto" />
+            <h2 className="text-xl font-bold">Akkaunt bloklangan</h2>
+            <p className="text-muted-foreground">
+              Obuna muddatingiz tugagan. Platformadan foydalanish uchun to'lovni amalga oshiring.
+              Qarzga xizmat ko'rsatilmaydi.
+            </p>
+            <Button onClick={() => handleTabChange('subscription')} className="mt-2">
+              <CreditCard className="h-4 w-4 mr-2" /> To'lov qilish
+            </Button>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    // If no access (but not hard-blocked yet), restrict paid tabs
+    if (!hasAccess && !['subscription', 'support'].includes(activeTab)) {
       return <SubscriptionBilling totalSalesVolume={totalRevenue} />;
     }
 

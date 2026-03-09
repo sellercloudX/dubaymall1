@@ -147,8 +147,28 @@ export default function SellerCloudMobile() {
   const isMoreActive = !primaryTabIds.includes(activeTab);
 
   const renderContent = () => {
-    // If no access and tab is paid, show subscription
-    if (!hasAccess && !mobileFreeTabs.has(activeTab)) {
+    // STRICT: If blocked, only allow subscription tab
+    if (isBlocked && activeTab !== 'subscription') {
+      return (
+        <div className="p-4">
+          <Card className="border-destructive/50">
+            <CardContent className="p-6 text-center space-y-3">
+              <Lock className="h-10 w-10 text-destructive mx-auto" />
+              <h2 className="text-lg font-bold">Akkaunt bloklangan</h2>
+              <p className="text-sm text-muted-foreground">
+                Obuna muddatingiz tugagan. To'lov qiling.
+              </p>
+              <Button size="sm" onClick={() => setActiveTab('subscription')}>
+                To'lov qilish
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
+    // If no access, restrict paid tabs
+    if (!hasAccess && !['subscription', 'notifications'].includes(activeTab)) {
       return <div className="p-4"><SubscriptionBilling totalSalesVolume={totalRevenue} /></div>;
     }
 
