@@ -1172,9 +1172,10 @@ serve(async (req) => {
       }
     }
 
+    const successCount = results.filter(r => r.success).length;
+
     // ═══ BILLING DEDUCT (skip if scanner handles it) ═══
     if (!skipBilling) {
-      const successCount = results.filter(r => r.success).length;
       if (unitPrice > 0 && successCount > 0) {
         for (let i = 0; i < successCount; i++) {
           await supabase.rpc('deduct_balance', {
