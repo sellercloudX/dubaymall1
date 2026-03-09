@@ -155,6 +155,9 @@ export default function SellerCloudX() {
   }, [user, authLoading, navigate]);
   
   const hasAccess = accessStatus?.is_active ?? false;
+  const isBlocked = accessStatus?.blocked === true;
+  const daysLeft = accessStatus?.days_left as number | undefined;
+  const expiryWarning = accessStatus?.warning === true;
 
   if (authLoading || subscriptionLoading) {
     return (
