@@ -959,6 +959,26 @@ async function downloadImage(url: string): Promise<Uint8Array | null> {
   }
 }
 
+// Convert URL image to base64 data URI for SellZen API
+async function imageUrlToBase64(url: string): Promise<string | null> {
+  try {
+    if (url.startsWith('data:')) return url; // Already base64
+    const resp = await fetch(url);
+    if (!resp.ok) return null;
+    const buffer = await resp.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    const contentType = resp.headers.get('content-type') || 'image/jpeg';
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return `data:${contentType};base64,${btoa(binary)}`;
+  } catch (e) {
+    console.error("imageUrlToBase64 error:", e);
+    return null;
+  }
+}
+
 async function uploadToStorage(supabase: any, imageSource: string, partnerId: string, productId: string): Promise<string | null> {
   try {
     let bytes: Uint8Array;
