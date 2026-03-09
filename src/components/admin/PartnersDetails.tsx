@@ -42,7 +42,7 @@ export function PartnersDetails() {
             .order('created_at', { ascending: false });
 
           const { data: connections } = await supabase
-            .from('marketplace_connections')
+            .from('marketplace_connections_safe')
             .select('marketplace, is_active, total_revenue, products_count, orders_count')
             .eq('user_id', sub.user_id);
 

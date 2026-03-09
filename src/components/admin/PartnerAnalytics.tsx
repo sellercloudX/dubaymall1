@@ -38,7 +38,7 @@ export function PartnerAnalytics() {
 
       const [profilesRes, connectionsRes, aiRes, billingsRes] = await Promise.all([
         supabase.from('profiles').select('user_id, full_name, phone, city, region, address').in('user_id', userIds),
-        supabase.from('marketplace_connections').select('user_id, marketplace, is_active, total_revenue, products_count, orders_count').in('user_id', userIds),
+        supabase.from('marketplace_connections_safe').select('user_id, marketplace, is_active, total_revenue, products_count, orders_count').in('user_id', userIds),
         supabase.from('ai_usage_log').select('user_id, estimated_cost_usd, action_type').in('user_id', userIds),
         supabase.from('sellercloud_billing').select('user_id, balance_due, total_paid, status').in('user_id', userIds),
       ]);

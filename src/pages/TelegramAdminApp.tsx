@@ -107,7 +107,7 @@ export default function TelegramAdminApp() {
       supabase.from('sellercloud_subscriptions').select('*', { count: 'exact', head: true }).eq('is_active', true),
       supabase.from('support_messages').select('*', { count: 'exact', head: true }),
       supabase.from('support_messages').select('*', { count: 'exact', head: true }).eq('direction', 'partner_to_admin').eq('is_read', false),
-      supabase.from('marketplace_connections').select('*', { count: 'exact', head: true }).eq('is_active', true),
+      supabase.from('marketplace_connections_safe').select('*', { count: 'exact', head: true }).eq('is_active', true),
       supabase.from('profiles').select('*', { count: 'exact', head: true }).gte('created_at', new Date(new Date().setHours(0,0,0,0)).toISOString()),
     ]);
 

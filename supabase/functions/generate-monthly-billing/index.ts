@@ -18,15 +18,47 @@ serve(async (req) => {
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+    // --- Authentication & Authorization ---
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: "Invalid token" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { data: adminPerm } = await supabase
+      .from("admin_permissions")
+      .select("is_super_admin")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (!adminPerm?.is_super_admin) {
+      return new Response(JSON.stringify({ error: "Admin access required" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    // --- End Auth ---
+
     // Determine billing month: previous calendar month
     const now = new Date();
     const billingYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
-    const billingMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1; // 0-indexed
+    const billingMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
     const periodStart = new Date(billingYear, billingMonth, 1);
     const periodEnd = new Date(billingYear, billingMonth + 1, 0, 23, 59, 59, 999);
 
     const periodLabel = `${billingYear}-${String(billingMonth + 1).padStart(2, '0')}`;
-    console.log(`Generating monthly billing for period: ${periodLabel} (${periodStart.toISOString()} - ${periodEnd.toISOString()})`);
+    console.log(`Generating monthly billing for period: ${periodLabel} by admin ${user.id}`);
 
     // 1. Get all active subscriptions
     const { data: subscriptions, error: subErr } = await supabase
@@ -73,23 +105,19 @@ serve(async (req) => {
     const results: any[] = [];
 
     for (const sub of subscriptions) {
-      // Skip if already billed for this period
       if (alreadyBilled.has(sub.user_id)) {
         console.log(`User ${sub.user_id} already billed for ${periodLabel}, skipping`);
         continue;
       }
 
-      // Skip free access users
       if (sub.free_access) {
         console.log(`User ${sub.user_id} has free access, skipping`);
         continue;
       }
 
-      // 4. Calculate billing amounts — NO sales commission, only monthly fee
       const monthlyFeeUZS = (sub.monthly_fee || 0) * USD_TO_UZS;
       const totalDue = monthlyFeeUZS;
 
-      // 6. Create billing record
       const { error: billErr } = await supabase
         .from('sellercloud_billing')
         .insert({
@@ -120,7 +148,6 @@ serve(async (req) => {
         });
         console.log(`Billing created for user ${sub.user_id}: monthlyFee=${monthlyFeeUZS}, total=${totalDue}`);
 
-        // 7. Record platform revenue from subscription
         if (monthlyFeeUZS > 0) {
           await supabase
             .from('platform_revenue')
