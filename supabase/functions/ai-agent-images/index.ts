@@ -1277,46 +1277,68 @@ serve(async (req) => {
       const cleanImageUrl = await uploadToStorage(adminSupabase, workingImageUrl, partnerId, offerId || 'product');
       pipelineResult.imageUrl = cleanImageUrl;
 
-      // ── STEP 4: Generate 4 Professional Images ──
-      // Image 1: Infographic Hero (styled background, negative space for text overlay)
-      // Images 2-4: 3 different angle lifestyle shots
+      // ── STEP 4: Generate 2 Professional Images ──
+      // Image 1: Infographic Hero (modelli + infografika) via SellZen
+      // Image 2: Clean studio shot (modelsiz + studiya) via SellZen
+      // Fallback: OpenAI/Gemini if SellZen fails
       
-      console.log("🎨 STEP 4: Generating 2 images (1 infographic + 1 lifestyle)...");
-
-      // 4a: Infographic Hero
-      let heroImage = await generateHeroImage(
-        workingImageUrl, detection, categoryStyle, OPENAI_API_KEY
-      );
+      console.log("🎨 STEP 4: Generating 2 images (SellZen primary, OpenAI/Gemini fallback)...");
 
       let heroUrl: string | null = null;
-      if (heroImage) {
-        heroUrl = await uploadToStorage(adminSupabase, heroImage, partnerId, `${offerId || 'card'}-hero`);
-        pipelineResult.steps.push({ step: "4a", name: "Infographic Hero", status: "✅" });
-      } else {
-        pipelineResult.steps.push({ step: "4a", name: "Infographic Hero", status: "❌ Failed" });
+      let studioUrl: string | null = null;
+      const supplementaryUrls: string[] = [];
+
+      // ═══ Try SellZen first (2 parallel requests) ═══
+      const SELLZEN_API_KEY = Deno.env.get("SELLZEN_API_KEY");
+      if (SELLZEN_API_KEY && workingImageUrl) {
+        // Convert URL to base64 for SellZen
+        const imgBase64 = await imageUrlToBase64(workingImageUrl);
+        if (imgBase64) {
+          const [sellzenHero, sellzenStudio] = await generateSellZenDualImages(
+            imgBase64, productName || detection?.product_name || 'Product', detectedCategory, SELLZEN_API_KEY
+          );
+          
+          if (sellzenHero) {
+            heroUrl = await uploadToStorage(adminSupabase, sellzenHero, partnerId, `${offerId || 'card'}-hero`);
+            pipelineResult.steps.push({ step: "4a", name: "Hero (SellZen modelli)", status: "✅" });
+          }
+          if (sellzenStudio) {
+            const stUrl = await uploadToStorage(adminSupabase, sellzenStudio, partnerId, `${offerId || 'card'}-studio`);
+            if (stUrl) { studioUrl = stUrl; supplementaryUrls.push(stUrl); }
+            pipelineResult.steps.push({ step: "4b", name: "Studio (SellZen modelsiz)", status: "✅" });
+          }
+        }
+      }
+
+      // ═══ Fallback to OpenAI/Gemini for missing images ═══
+      if (!heroUrl) {
+        console.log("🔄 Hero fallback: OpenAI/Gemini...");
+        const heroImage = await generateHeroImage(workingImageUrl, detection, categoryStyle, OPENAI_API_KEY);
+        if (heroImage) {
+          heroUrl = await uploadToStorage(adminSupabase, heroImage, partnerId, `${offerId || 'card'}-hero`);
+          pipelineResult.steps.push({ step: "4a", name: "Hero (Fallback)", status: "✅" });
+        } else {
+          pipelineResult.steps.push({ step: "4a", name: "Hero", status: "❌ Failed" });
+        }
+      }
+
+      if (supplementaryUrls.length === 0) {
+        console.log("🔄 Lifestyle fallback: OpenAI/Gemini...");
+        const lifestyleAngle = LIFESTYLE_ANGLES[2];
+        const lifestyleImage = await generateLifestyleAngle(workingImageUrl, detection, lifestyleAngle, OPENAI_API_KEY);
+        if (lifestyleImage) {
+          const lifestyleUrl = await uploadToStorage(adminSupabase, lifestyleImage, partnerId, `${offerId || 'card'}-lifestyle`);
+          if (lifestyleUrl) { supplementaryUrls.push(lifestyleUrl); }
+          pipelineResult.steps.push({ step: "4b", name: "Lifestyle (Fallback)", status: "✅" });
+        } else {
+          pipelineResult.steps.push({ step: "4b", name: "Lifestyle", status: "❌ Failed" });
+        }
       }
 
       pipelineResult.cardUrl = heroUrl;
-
-      // 4b: Single lifestyle image (lifestyle_context — most impactful)
-      const supplementaryUrls: string[] = [];
-      
-      console.log("🔄 Generating 1 lifestyle image...");
-      const lifestyleAngle = LIFESTYLE_ANGLES[2]; // lifestyle_context
-      const lifestyleImage = await generateLifestyleAngle(workingImageUrl, detection, lifestyleAngle, OPENAI_API_KEY);
-      if (lifestyleImage) {
-        const lifestyleUrl = await uploadToStorage(adminSupabase, lifestyleImage, partnerId, `${offerId || 'card'}-lifestyle`);
-        if (lifestyleUrl) {
-          supplementaryUrls.push(lifestyleUrl);
-          pipelineResult.steps.push({ step: "4b", name: "Lifestyle", status: "✅" });
-        }
-      } else {
-        pipelineResult.steps.push({ step: "4b", name: "Lifestyle", status: "❌ Failed" });
-      }
-
       pipelineResult.supplementaryImages = supplementaryUrls;
       const totalGenerated = (heroUrl ? 1 : 0) + supplementaryUrls.length;
-      console.log(`✅ Generated ${totalGenerated} total images (target: 4)`);
+      console.log(`✅ Generated ${totalGenerated} total images (target: 2)`);
 
       // ── Skip Step 5 (Quality Control) to save timeout budget for 4 images ──
       pipelineResult.steps.push({ step: 5, name: "Quality Control", status: "⏭ Skipped (4-image mode)" });
