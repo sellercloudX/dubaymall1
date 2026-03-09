@@ -971,7 +971,8 @@ serve(async (req) => {
     // Per official WB API docs: title, description are VARIANT-LEVEL fields (NOT characteristics)
     // Price goes in sizes[].price, images uploaded separately via v3/media/save after nmID
     console.log(`\n--- STEP 4: Create Card ---`);
-    const vendorCode = generateVendorCode(product.name);
+    // Preserve original SKU from source marketplace if provided
+    let vendorCode = sourceShopSku || generateVendorCode(product.name);
 
     const UZS_TO_RUB_RATE = 140;
     const rawPrice = Math.round(product.price || 0);

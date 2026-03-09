@@ -316,6 +316,7 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
               costPrice: costPrice,
               images: validImages,
               category: productCategory,
+              shopSku: product.shopSku, // Preserve original SKU
             },
             cloneMode: true,
           },
