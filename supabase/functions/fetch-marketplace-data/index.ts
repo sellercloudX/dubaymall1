@@ -326,6 +326,8 @@ serve(async (req) => {
               let stockFBO = 0;
               let stockFBS = 0;
               
+              const dims = offer.weightDimensions || {};
+              
               newProductsOnPage++;
               productMap.set(offerId, {
                 offerId,
@@ -340,6 +342,10 @@ serve(async (req) => {
                 stockFBO,
                 stockFBS,
                 stockCount: stockFBO + stockFBS,
+                weightKg: dims.weight ? dims.weight / 1000 : undefined,
+                lengthCm: dims.length || undefined,
+                widthCm: dims.width || undefined,
+                heightCm: dims.height || undefined,
               });
             });
           } else {
