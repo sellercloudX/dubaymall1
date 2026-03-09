@@ -377,6 +377,9 @@ serve(async (req) => {
                               offer.category || 
                               '';
               
+              // Extract dimensions from offer or mapping
+              const dims = offer.weightDimensions || mapping.weightDimensions || {};
+              
               newProductsOnPage++;
               productMap.set(offerId, {
                 offerId,
@@ -391,6 +394,10 @@ serve(async (req) => {
                 stockFBO,
                 stockFBS,
                 stockCount: stockFBO + stockFBS,
+                weightKg: dims.weight ? dims.weight / 1000 : undefined, // Yandex returns grams
+                lengthCm: dims.length || undefined,
+                widthCm: dims.width || undefined,
+                heightCm: dims.height || undefined,
               });
             });
           }
