@@ -55,7 +55,7 @@ export function MobileAnalytics({ connections, connectedMarketplaces, store }: M
       .slice(0, 5);
 
     return { totalProducts, totalOrders, totalRevenue, avgCheck, pendingOrders, processingOrders, deliveredOrders, cancelledOrders, lowStockProducts, outOfStockProducts, topProducts };
-  }, [store.dataVersion]);
+  }, [store.dataVersion, connectedMarketplaces]);
 
   const formatPrice = (price: number) => {
     if (price >= 1000000) return (price / 1000000).toFixed(1) + ' mln';

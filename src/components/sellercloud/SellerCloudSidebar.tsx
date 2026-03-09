@@ -163,10 +163,12 @@ export function SellerCloudSidebar({ activeTab, onTabChange, connectedMarketplac
                   </button>
                 );
 
-                if (collapsed) {
+              if (collapsed) {
                   return (
                     <Tooltip key={item.id} delayDuration={0}>
-                      <TooltipTrigger asChild>{btn}</TooltipTrigger>
+                      <TooltipTrigger asChild>
+                        <div>{btn}</div>
+                      </TooltipTrigger>
                       <TooltipContent side="right" className="text-xs">
                         {item.label}
                       </TooltipContent>
