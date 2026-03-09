@@ -197,9 +197,12 @@ export function useMarketplaceTariffs(
               }
             }
 
-            const estimatedVolumeLiters = priceRub > 7000 ? 8 : priceRub > 3000 ? 3 : 1.2;
+            // Use real dimensions if available, else estimate by price
+            const volumeLiters = (p.lengthCm && p.widthCm && p.heightCm)
+              ? (p.lengthCm * p.widthCm * p.heightCm) / 1000
+              : (priceRub > 7000 ? 8 : priceRub > 3000 ? 3 : 1.2);
             const logisticsFromApiRub = wbLogisticsBaseRub > 0
-              ? wbLogisticsBaseRub + (wbLogisticsLiterRub * estimatedVolumeLiters)
+              ? wbLogisticsBaseRub + (wbLogisticsLiterRub * volumeLiters)
               : 0;
             const logisticsRub = logisticsFromApiRub > 0
               ? logisticsFromApiRub
