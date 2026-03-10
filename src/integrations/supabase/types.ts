@@ -2800,6 +2800,83 @@ export type Database = {
         }
         Relationships: []
       }
+      team_activity_log: {
+        Row: {
+          action: string
+          created_at: string | null
+          details: Json | null
+          id: string
+          team_member_id: string | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          team_member_id?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          team_member_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_activity_log_team_member_id_fkey"
+            columns: ["team_member_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_members: {
+        Row: {
+          accepted_at: string | null
+          created_at: string | null
+          id: string
+          invited_at: string | null
+          invited_email: string | null
+          member_user_id: string
+          owner_user_id: string
+          permissions: Json
+          role: string
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string | null
+          id?: string
+          invited_at?: string | null
+          invited_email?: string | null
+          member_user_id: string
+          owner_user_id: string
+          permissions?: Json
+          role?: string
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string | null
+          id?: string
+          invited_at?: string | null
+          invited_email?: string | null
+          member_user_id?: string
+          owner_user_id?: string
+          permissions?: Json
+          role?: string
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       telegram_chat_links: {
         Row: {
           created_at: string
@@ -3542,6 +3619,10 @@ export type Database = {
         Returns: Json
       }
       check_sellercloud_access: { Args: { p_user_id: string }; Returns: Json }
+      check_team_permission: {
+        Args: { p_owner_id: string; p_permission: string; p_user_id: string }
+        Returns: boolean
+      }
       create_notification: {
         Args: {
           p_message: string

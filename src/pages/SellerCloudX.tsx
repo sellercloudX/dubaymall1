@@ -55,6 +55,8 @@ const CompetitorPriceMonitor = lazy(() => import('@/components/sellercloud/Compe
 const UnitEconomyDashboard = lazy(() => import('@/components/sellercloud/UnitEconomyDashboard').then(m => ({ default: m.UnitEconomyDashboard })));
 const StockForecast = lazy(() => import('@/components/sellercloud/StockForecast').then(m => ({ default: m.StockForecast })));
 const SEOMonitor = lazy(() => import('@/components/sellercloud/SEOMonitor').then(m => ({ default: m.SEOMonitor })));
+const MarketplaceProductAnalytics = lazy(() => import('@/components/sellercloud/MarketplaceProductAnalytics').then(m => ({ default: m.MarketplaceProductAnalytics })));
+const TeamManager = lazy(() => import('@/components/sellercloud/TeamManager').then(m => ({ default: m.TeamManager })));
 
 const TabLoader = React.forwardRef<HTMLDivElement>((_, ref) => <div ref={ref} className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>);
 TabLoader.displayName = 'TabLoader';
@@ -67,6 +69,7 @@ const pageTitles: Record<string, string> = {
   products: 'Mahsulotlar',
   orders: 'Buyurtmalar',
   sales: 'Sotuvlar hisoboti',
+  'product-analytics': 'Mahsulot analitika',
   analytics: 'Umumiy analitika',
   'wb-analytics': 'WB Analitika',
   'wb-keywords': 'WB Qidiruv so\'zlari',
@@ -90,6 +93,7 @@ const pageTitles: Record<string, string> = {
   'unit-economy': 'Unit-economy (SKU)',
   'stock-forecast': 'Zaxira prognozi',
   'seo-monitor': 'SEO Monitor',
+  team: 'Jamoa boshqaruvi',
 };
 
 export default function SellerCloudX() {
@@ -250,6 +254,8 @@ export default function SellerCloudX() {
         return <MarketplaceOrders connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'analytics':
         return <MarketplaceAnalytics connectedMarketplaces={connectedMarketplaces} store={store} />;
+      case 'product-analytics':
+        return <MarketplaceProductAnalytics connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'wb-analytics':
         return <WBSellerAnalytics connectedMarketplaces={connectedMarketplaces} />;
       case 'wb-keywords':
@@ -286,6 +292,8 @@ export default function SellerCloudX() {
         return <ProblematicProducts connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'mxik':
         return <MxikImport />;
+      case 'team':
+        return <TeamManager />;
       case 'subscription':
         return <SubscriptionBilling totalSalesVolume={totalRevenue} />;
       case 'reports':
