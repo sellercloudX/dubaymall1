@@ -46,9 +46,9 @@ const ProfitCalculator = lazy(() => import('@/components/sellercloud/ProfitCalcu
 const CostPriceManager = lazy(() => import('@/components/sellercloud/CostPriceManager').then(m => ({ default: m.CostPriceManager })));
 const AIScannerPro = lazy(() => import('@/components/seller/AIScannerPro').then(m => ({ default: m.AIScannerPro })));
 const MarketplaceReviews = lazy(() => import('@/components/sellercloud/MarketplaceReviews').then(m => ({ default: m.MarketplaceReviews })));
-const WBSellerAnalytics = lazy(() => import('@/components/sellercloud/WBSellerAnalytics').then(m => ({ default: m.WBSellerAnalytics })));
-const WBAdsCampaigns = lazy(() => import('@/components/sellercloud/WBAdsCampaigns').then(m => ({ default: m.WBAdsCampaigns })));
-const WBSearchKeywords = lazy(() => import('@/components/sellercloud/WBSearchKeywords').then(m => ({ default: m.WBSearchKeywords })));
+const MarketplaceSellerAnalytics = lazy(() => import('@/components/sellercloud/MarketplaceSellerAnalytics').then(m => ({ default: m.MarketplaceSellerAnalytics })));
+const MarketplaceAdsCampaigns = lazy(() => import('@/components/sellercloud/MarketplaceAdsCampaigns').then(m => ({ default: m.MarketplaceAdsCampaigns })));
+const MarketplaceSearchKeywords = lazy(() => import('@/components/sellercloud/MarketplaceSearchKeywords').then(m => ({ default: m.MarketplaceSearchKeywords })));
 const SupportChat = lazy(() => import('@/components/sellercloud/SupportChat').then(m => ({ default: m.SupportChat })));
 const SalesDashboard = lazy(() => import('@/components/sellercloud/SalesDashboard').then(m => ({ default: m.SalesDashboard })));
 const MultiStoreManager = lazy(() => import('@/components/sellercloud/MultiStoreManager').then(m => ({ default: m.MultiStoreManager })));
