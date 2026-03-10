@@ -25,6 +25,7 @@ const menuCategories: MenuCategory[] = [
     title: '💰 Moliya',
     items: [
       { id: 'financials', icon: DollarSign, label: 'Moliya', color: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' },
+      { id: 'sales', icon: BarChart3, label: 'Sotuvlar', color: 'bg-lime-500/15 text-lime-600 dark:text-lime-400' },
       { id: 'calculator', icon: Calculator, label: 'Kalkulyator', color: 'bg-blue-500/15 text-blue-600 dark:text-blue-400' },
       { id: 'cost-prices', icon: Coins, label: 'Tannarx', color: 'bg-amber-500/15 text-amber-600 dark:text-amber-400' },
       { id: 'pricing', icon: Tag, label: 'Narxlar', color: 'bg-violet-500/15 text-violet-600 dark:text-violet-400' },
@@ -36,6 +37,7 @@ const menuCategories: MenuCategory[] = [
       { id: 'abc-analysis', icon: BarChart3, label: 'ABC-analiz', color: 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400' },
       { id: 'seller-analytics', icon: Activity, label: 'WB Analitika', color: 'bg-sky-500/15 text-sky-600 dark:text-sky-400' },
       { id: 'wb-keywords', icon: Search, label: 'WB Qidiruv', color: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' },
+      { id: 'competitor', icon: ArrowDownUp, label: 'Raqobat', color: 'bg-fuchsia-500/15 text-fuchsia-600 dark:text-fuchsia-400' },
       { id: 'reviews', icon: MessageCircle, label: 'Sharhlar', color: 'bg-pink-500/15 text-pink-600 dark:text-pink-400' },
       { id: 'ads', icon: Megaphone, label: 'Reklama', color: 'bg-orange-500/15 text-orange-600 dark:text-orange-400' },
     ],
@@ -43,6 +45,7 @@ const menuCategories: MenuCategory[] = [
   {
     title: '🛠 Asboblar',
     items: [
+      { id: 'stores', icon: LayoutDashboard, label: "Do'konlar", color: 'bg-blue-500/15 text-blue-600 dark:text-blue-400' },
       { id: 'inventory', icon: ArrowDownUp, label: 'Qoldiq', color: 'bg-teal-500/15 text-teal-600 dark:text-teal-400' },
       { id: 'min-price', icon: Shield, label: 'Min narx', color: 'bg-red-500/15 text-red-600 dark:text-red-400' },
       { id: 'card-clone', icon: Copy, label: 'Klonlash', color: 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400' },
@@ -57,6 +60,7 @@ const menuCategories: MenuCategory[] = [
       { id: 'reports', icon: FileSpreadsheet, label: 'Hisobotlar', color: 'bg-gray-500/15 text-gray-600 dark:text-gray-400' },
       { id: 'notifications', icon: Bell, label: 'Bildirishnoma', color: 'bg-yellow-500/15 text-yellow-600 dark:text-yellow-400' },
       { id: 'subscription', icon: CreditCard, label: 'Obuna', color: 'bg-primary/15 text-primary' },
+      { id: 'support', icon: MessageCircle, label: 'Yordam', color: 'bg-green-500/15 text-green-600 dark:text-green-400' },
     ],
   },
 ];
