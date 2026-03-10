@@ -60,7 +60,7 @@ export function MarketplaceSellerAnalytics({ connectedMarketplaces, store }: Pro
     for (const mp of mpList) {
       const orders = store.getOrders(mp).filter(o => {
         if (isExcludedOrder(o)) return false;
-        const d = new Date(o.date);
+        const d = new Date(o.createdAt);
         return d >= periodStart && d <= now;
       });
       const products = store.getProducts(mp);
@@ -68,9 +68,10 @@ export function MarketplaceSellerAnalytics({ connectedMarketplaces, store }: Pro
       // Count orders per product
       const productOrderMap = new Map<string, { count: number; revenue: number }>();
       for (const o of orders) {
-        const key = o.offerId || o.id;
+        const key = o.items?.[0]?.offerId || String(o.id);
         const prev = productOrderMap.get(key) || { count: 0, revenue: 0 };
-        prev.count += (o.quantity || 1);
+        const qty = o.items?.reduce((s, i) => s + i.count, 0) || 1;
+        prev.count += qty;
         prev.revenue += toDisplayUzs(o.total || 0, mp);
         productOrderMap.set(key, prev);
       }
