@@ -48,12 +48,12 @@ export function uzsToRub(uzs: number): number {
   return uzs / _rubToUzs;
 }
 
-/** Format price in UZS (so'm) for display — rounds to integer */
+/** Format price in UZS (so'm) for display — always rounds to whole so'm (no tiyinlar) */
 export function formatUzs(amount: number): string {
   const rounded = Math.round(amount);
-  if (Math.abs(rounded) >= 1_000_000) return (rounded / 1_000_000).toFixed(1) + ' mln';
+  if (Math.abs(rounded) >= 1_000_000) return (Math.round(rounded / 100_000) / 10).toFixed(1) + ' mln';
   if (Math.abs(rounded) >= 1_000) return Math.round(rounded / 1_000) + ' ming';
-  return new Intl.NumberFormat('uz-UZ').format(rounded);
+  return new Intl.NumberFormat('uz-UZ', { maximumFractionDigits: 0 }).format(rounded);
 }
 
 /** Format price with "so'm" suffix */
