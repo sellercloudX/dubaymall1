@@ -71,6 +71,7 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
   const [dateFrom, setDateFrom] = useState<Date | undefined>(getPresetDates('30d').from);
   const [dateTo, setDateTo] = useState<Date | undefined>(getPresetDates('30d').to);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [fulfillmentFilter, setFulfillmentFilter] = useState<'all' | 'FBO' | 'FBS'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
@@ -180,14 +181,19 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
     ? dateFiltered
     : dateFiltered.filter(e => e.statusCategory === statusFilter);
 
+  // Filter by fulfillment type (FBO/FBS)
+  const fulfillmentFiltered = fulfillmentFilter === 'all'
+    ? statusFiltered
+    : statusFiltered.filter(e => (e.order as any).fulfillmentType === fulfillmentFilter);
+
   // Filter by search
   const searchFiltered = searchQuery
-    ? statusFiltered.filter(e => {
+    ? fulfillmentFiltered.filter(e => {
         const q = searchQuery.toLowerCase();
         return String(e.order.id).includes(q) ||
           (e.order.items || []).some(i => (i.offerName || i.offerId || '').toLowerCase().includes(q));
       })
-    : statusFiltered;
+    : fulfillmentFiltered;
 
   // Sort
   const sorted = useMemo(() => {
@@ -224,6 +230,12 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
     const totalNetProfit = nonCancelled.reduce((s, e) => s + e.netProfit, 0);
     const avgMargin = totalRevenue > 0 ? (totalNetProfit / totalRevenue) * 100 : 0;
 
+    // FBO/FBS breakdown
+    const fboOrders = nonCancelled.filter(e => (e.order as any).fulfillmentType === 'FBO');
+    const fbsOrders = nonCancelled.filter(e => (e.order as any).fulfillmentType !== 'FBO');
+    const fboRevenue = fboOrders.reduce((s, e) => s + e.totalUzs, 0);
+    const fbsRevenue = fbsOrders.reduce((s, e) => s + e.totalUzs, 0);
+
     return {
       totalOrders: dateFiltered.length,
       deliveredCount: delivered.length,
@@ -231,6 +243,8 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
       activeCount: active.length,
       totalRevenue, totalCost, totalCommission, totalLogistics, totalNetProfit, avgMargin,
       cancelRate: dateFiltered.length > 0 ? (cancelled.length / dateFiltered.length * 100) : 0,
+      fboCount: fboOrders.length, fbsCount: fbsOrders.length,
+      fboRevenue, fbsRevenue,
     };
   }, [dateFiltered]);
 
@@ -329,6 +343,27 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
         })}
       </div>
 
+      {/* FBO/FBS Filter + Stats */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-0.5">
+          {(['all', 'FBO', 'FBS'] as const).map(ft => (
+            <Button key={ft} variant={fulfillmentFilter === ft ? 'default' : 'ghost'}
+              size="sm" className="h-6 text-[11px] px-2.5 rounded-md"
+              onClick={() => { setFulfillmentFilter(ft); setCurrentPage(1); }}>
+              {ft === 'all' ? 'Hammasi' : ft}
+              {ft === 'FBO' && stats.fboCount > 0 && <Badge variant="secondary" className="ml-1 h-4 text-[9px] px-1">{stats.fboCount}</Badge>}
+              {ft === 'FBS' && stats.fbsCount > 0 && <Badge variant="secondary" className="ml-1 h-4 text-[9px] px-1">{stats.fbsCount}</Badge>}
+            </Button>
+          ))}
+        </div>
+        {stats.fboCount > 0 && (
+          <div className="flex items-center gap-3 text-[11px] text-muted-foreground ml-2">
+            <span>FBO: <strong className="text-foreground">{fmtPrice(stats.fboRevenue)}</strong></span>
+            <span>FBS: <strong className="text-foreground">{fmtPrice(stats.fbsRevenue)}</strong></span>
+          </div>
+        )}
+      </div>
+
       {/* Search + Export */}
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
@@ -397,6 +432,7 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
                               <span className="font-mono text-primary/70">#{String(e.order.id)}</span>
                               {' · '}{format(new Date(e.order.createdAt), 'dd.MM.yy HH:mm')}
                               {e.order.items && e.order.items.length > 1 && ` · ${e.order.items.length} ta`}
+                              {(e.order as any).fulfillmentType && <Badge variant="outline" className="ml-1 text-[8px] px-1 h-3.5">{(e.order as any).fulfillmentType}</Badge>}
                             </div>
                           </div>
                         </div>

@@ -36,6 +36,7 @@ export interface MarketplaceOrder {
   itemsTotalUZS: number;
   deliveryTotal: number;
   deliveryTotalUZS: number;
+  fulfillmentType?: 'FBO' | 'FBS';
   // WB-specific financial fields
   spp?: number; // WB seller price penalty (скидка WB), %
   forPay?: number; // WB actual payout to seller (после всех вычетов)

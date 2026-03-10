@@ -137,6 +137,17 @@ function mapWBOrder(o: any, defaultStatus: string, fromNewApi = false) {
   // Use best available price: convertedFinalPrice > finishedPrice > priceWithDisc > raw
   const bestPrice = convertedFinal || (finishedPrice > 0 ? finishedPrice : price);
 
+  // Determine fulfillment type:
+  // FBS (seller fulfillment) = orders from /api/v3/orders (marketplace API)
+  // FBO = orders from stats/sales API where warehouseName indicates WB warehouse
+  // deliveryType: "fbs" or "dbs" = FBS, "fbo" = FBO
+  const dt = (o.deliveryType || '').toLowerCase();
+  const wh = (o.warehouseName || '').toLowerCase();
+  // WB FBO warehouses contain keywords like "коледино", "подольск", "электросталь", "казань", etc.
+  const wbFboKeywords = ['коледино', 'подольск', 'электросталь', 'казань', 'краснодар', 'екатеринбург', 'новосибирск', 'хабаровск', 'тула', 'wb'];
+  const isFBO = dt === 'fbo' || (!fromNewApi && wbFboKeywords.some(kw => wh.includes(kw)));
+  const fulfillmentType = isFBO ? 'FBO' : 'FBS';
+
   return {
     id: orderId,
     status: defaultStatus,
@@ -147,6 +158,7 @@ function mapWBOrder(o: any, defaultStatus: string, fromNewApi = false) {
     itemsTotalUZS: bestPrice,
     deliveryTotal: 0,
     deliveryTotalUZS: 0,
+    fulfillmentType,
     // WB-level financial fields
     spp: spp > 0 ? spp : undefined,
     forPay: forPay > 0 ? forPay : undefined,
@@ -664,6 +676,15 @@ serve(async (req) => {
                 }
               }
 
+              // Determine fulfillment type from delivery info
+              // FBY (FBO) = Yandex fulfillment, FBS = seller fulfillment
+              const deliveryPartnerType = order.delivery?.deliveryPartnerType || '';
+              const deliveryServiceId = order.delivery?.deliveryServiceId;
+              // YANDEX_MARKET = FBO (FBY), SHOP = FBS
+              const fulfillmentType = (deliveryPartnerType === 'YANDEX_MARKET' || order.delivery?.type === 'DELIVERY') && !order.delivery?.shipments?.some((s: any) => s.shipmentType === 'IMPORT')
+                ? (deliveryPartnerType === 'YANDEX_MARKET' ? 'FBO' : 'FBS')
+                : 'FBS';
+
               return {
                 id: order.id,
                 status: order.status,
@@ -677,6 +698,7 @@ serve(async (req) => {
                 deliveryTotalUZS: deliveryTotal,
                 paymentType: order.paymentType,
                 paymentMethod: order.paymentMethod,
+                fulfillmentType,
                 buyer: {
                   firstName: order.buyer?.firstName || '',
                   lastName: order.buyer?.lastName || '',
@@ -1998,6 +2020,7 @@ serve(async (req) => {
                 createdAt: uzumCreatedAt,
                 total: orderTotal,
                 totalUZS: orderTotal,
+                fulfillmentType: 'FBS' as const, // Uzum FBS endpoint
                 itemsTotal,
                 itemsTotalUZS: itemsTotal,
                 deliveryTotal: order.deliveryPrice || 0,
@@ -3637,6 +3660,11 @@ serve(async (req) => {
               const spp = o.spp || 0; // WB buyer discount %
               const forPay = o.forPay || 0; // actual seller payout
 
+              // Determine FBO/FBS from warehouseName
+              const statsWh = (o.warehouseName || '').toLowerCase();
+              const statsFboKw = ['коледино', 'подольск', 'электросталь', 'казань', 'краснодар', 'екатеринбург', 'новосибирск', 'хабаровск', 'тула', 'wb'];
+              const statsIsFBO = statsFboKw.some(kw => statsWh.includes(kw));
+
               allOrders.push({
                 id: cleanId || o.nmId || Math.random(),
                 status,
@@ -3647,6 +3675,7 @@ serve(async (req) => {
                 itemsTotalUZS: price,
                 deliveryTotal: 0,
                 deliveryTotalUZS: 0,
+                fulfillmentType: statsIsFBO ? 'FBO' : 'FBS',
                 spp: spp > 0 ? spp : undefined,
                 forPay: forPay > 0 ? forPay : undefined,
                 items: [{
@@ -3701,6 +3730,11 @@ serve(async (req) => {
               const spp = sale.spp || 0;
               const forPay = sale.forPay || 0;
               
+              // Determine FBO/FBS from warehouseName
+              const saleWh = (sale.warehouseName || '').toLowerCase();
+              const saleFboKw = ['коледино', 'подольск', 'электросталь', 'казань', 'краснодар', 'екатеринбург', 'новосибирск', 'хабаровск', 'тула', 'wb'];
+              const saleIsFBO = saleFboKw.some(kw => saleWh.includes(kw));
+
               salesAdded++;
               allOrders.push({
                 id: sale.odid || sale.saleID || sale.srid,
@@ -3712,6 +3746,7 @@ serve(async (req) => {
                 itemsTotalUZS: price,
                 deliveryTotal: 0,
                 deliveryTotalUZS: 0,
+                fulfillmentType: saleIsFBO ? 'FBO' : 'FBS',
                 spp: spp > 0 ? spp : undefined,
                 forPay: forPay > 0 ? forPay : undefined,
                 items: [{
