@@ -46,6 +46,7 @@ const AIScannerPro = lazy(() => import('@/components/seller/AIScannerPro').then(
 const MarketplaceReviews = lazy(() => import('@/components/sellercloud/MarketplaceReviews').then(m => ({ default: m.MarketplaceReviews })));
 const WBSellerAnalytics = lazy(() => import('@/components/sellercloud/WBSellerAnalytics').then(m => ({ default: m.WBSellerAnalytics })));
 const WBAdsCampaigns = lazy(() => import('@/components/sellercloud/WBAdsCampaigns').then(m => ({ default: m.WBAdsCampaigns })));
+const WBSearchKeywords = lazy(() => import('@/components/sellercloud/WBSearchKeywords').then(m => ({ default: m.WBSearchKeywords })));
 const SupportChat = lazy(() => import('@/components/sellercloud/SupportChat').then(m => ({ default: m.SupportChat })));
 const SalesDashboard = lazy(() => import('@/components/sellercloud/SalesDashboard').then(m => ({ default: m.SalesDashboard })));
 const MultiStoreManager = lazy(() => import('@/components/sellercloud/MultiStoreManager').then(m => ({ default: m.MultiStoreManager })));
@@ -64,6 +65,7 @@ const pageTitles: Record<string, string> = {
   sales: 'Sotuvlar hisoboti',
   analytics: 'Umumiy analitika',
   'wb-analytics': 'WB Analitika',
+  'wb-keywords': 'WB Qidiruv so\'zlari',
   financials: 'Moliyaviy dashboard',
   abc: 'ABC-analiz',
   'cost-prices': 'Tannarx boshqaruvi',
@@ -242,6 +244,8 @@ export default function SellerCloudX() {
         return <MarketplaceAnalytics connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'wb-analytics':
         return <WBSellerAnalytics connectedMarketplaces={connectedMarketplaces} />;
+      case 'wb-keywords':
+        return <WBSearchKeywords connectedMarketplaces={connectedMarketplaces} />;
       case 'financials':
         return <FinancialDashboard connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'abc':

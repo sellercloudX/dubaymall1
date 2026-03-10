@@ -43,6 +43,7 @@ const MxikImport = lazy(() => import('@/components/sellercloud/MxikImport').then
 const MarketplaceReviews = lazy(() => import('@/components/sellercloud/MarketplaceReviews').then(m => ({ default: m.MarketplaceReviews })));
 const WBSellerAnalytics = lazy(() => import('@/components/sellercloud/WBSellerAnalytics').then(m => ({ default: m.WBSellerAnalytics })));
 const WBAdsCampaigns = lazy(() => import('@/components/sellercloud/WBAdsCampaigns').then(m => ({ default: m.WBAdsCampaigns })));
+const WBSearchKeywords = lazy(() => import('@/components/sellercloud/WBSearchKeywords').then(m => ({ default: m.WBSearchKeywords })));
 
 // Lightweight tab loading skeleton
 function TabLoader() {
@@ -227,6 +228,8 @@ export default function SellerCloudMobile() {
         return <div className="p-4"><MarketplaceReviews connectedMarketplaces={connectedMarketplaces} /></div>;
       case 'seller-analytics':
         return <div className="p-4"><WBSellerAnalytics connectedMarketplaces={connectedMarketplaces} /></div>;
+      case 'wb-keywords':
+        return <div className="p-4"><WBSearchKeywords connectedMarketplaces={connectedMarketplaces} /></div>;
       case 'ads':
         return <div className="p-4"><WBAdsCampaigns connectedMarketplaces={connectedMarketplaces} /></div>;
       default:

@@ -4,7 +4,7 @@ import {
   ArrowDownUp, DollarSign, Bell, FileSpreadsheet, CreditCard,
   Calculator, Shield, Copy, AlertOctagon,
   MessageCircle, Activity, Megaphone, ChevronLeft, ChevronRight,
-  LogOut, LayoutDashboard, Sun, Moon, Wallet,
+  LogOut, LayoutDashboard, Sun, Moon, Wallet, Search,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -31,6 +31,7 @@ export const sellerMenuItems: SellerMenuItem[] = [
   { id: 'sales', label: 'Sotuvlar', icon: DollarSign, group: 'main' },
   { id: 'analytics', label: 'Umumiy analitika', icon: BarChart3, group: 'analytics' },
   { id: 'wb-analytics', label: 'WB Analitika', icon: Activity, group: 'analytics' },
+  { id: 'wb-keywords', label: 'WB Qidiruv', icon: Search, group: 'analytics' },
   { id: 'financials', label: 'Moliya', icon: Calculator, group: 'analytics' },
   { id: 'abc', label: 'ABC-analiz', icon: BarChart3, group: 'analytics' },
   { id: 'cost-prices', label: 'Tannarx', icon: DollarSign, group: 'analytics' },

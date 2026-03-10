@@ -4729,6 +4729,157 @@ serve(async (req) => {
           console.error("WB ads action error:", e);
           result = { success: false, error: "Error performing ads action" };
         }
+      } else if (dataType === "search-queries") {
+        // WB Search Report — search texts and positions for seller's products
+        try {
+          const { period = 7 } = requestBody;
+          const endDate = new Date();
+          const startDate = new Date(endDate.getTime() - period * 24 * 60 * 60 * 1000);
+          const beginStr = startDate.toISOString().split('T')[0];
+          const endStr = endDate.toISOString().split('T')[0];
+
+          // Step 1: Get search texts for all products
+          const searchTextsResp = await fetch(
+            "https://seller-analytics-api.wildberries.ru/api/v2/search-report/product/search-texts",
+            {
+              method: "POST",
+              headers: wbHeaders,
+              body: JSON.stringify({
+                period: { begin: beginStr, end: endStr },
+                page: 1,
+              }),
+            }
+          );
+
+          if (searchTextsResp.ok) {
+            const searchData = await safeJson(searchTextsResp, { data: {} });
+            const products = searchData.data?.products || [];
+            console.log(`WB search queries: ${products.length} products with search data`);
+
+            // Aggregate all search texts across products
+            const keywordMap = new Map<string, {
+              text: string;
+              totalFrequency: number;
+              totalOrders: number;
+              totalClicks: number;
+              avgPosition: number;
+              posCount: number;
+              productCount: number;
+            }>();
+
+            const productKeywords: any[] = [];
+
+            for (const product of products) {
+              const nmID = product.nmID;
+              const texts = product.searchTexts || product.texts || [];
+              
+              const prodData = {
+                nmID,
+                vendorCode: product.vendorCode || '',
+                title: product.title || product.name || '',
+                photo: product.photo || '',
+                topKeywords: [] as any[],
+              };
+
+              for (const t of texts) {
+                const text = (t.text || t.query || '').toLowerCase().trim();
+                if (!text) continue;
+                
+                const freq = t.frequency || t.count || 0;
+                const orders = t.ordersCount || t.orders || 0;
+                const clicks = t.clicks || t.openCardCount || 0;
+                const position = t.avgPosition || t.position || 0;
+
+                prodData.topKeywords.push({ text, frequency: freq, orders, clicks, position });
+
+                const existing = keywordMap.get(text);
+                if (existing) {
+                  existing.totalFrequency += freq;
+                  existing.totalOrders += orders;
+                  existing.totalClicks += clicks;
+                  if (position > 0) { existing.avgPosition += position; existing.posCount++; }
+                  existing.productCount++;
+                } else {
+                  keywordMap.set(text, {
+                    text,
+                    totalFrequency: freq,
+                    totalOrders: orders,
+                    totalClicks: clicks,
+                    avgPosition: position,
+                    posCount: position > 0 ? 1 : 0,
+                    productCount: 1,
+                  });
+                }
+              }
+
+              prodData.topKeywords.sort((a: any, b: any) => b.frequency - a.frequency);
+              prodData.topKeywords = prodData.topKeywords.slice(0, 20);
+              productKeywords.push(prodData);
+            }
+
+            // Build aggregated keyword list
+            const keywords = Array.from(keywordMap.values())
+              .map(k => ({
+                ...k,
+                avgPosition: k.posCount > 0 ? Math.round(k.avgPosition / k.posCount) : 0,
+              }))
+              .sort((a, b) => b.totalFrequency - a.totalFrequency)
+              .slice(0, 200);
+
+            // Step 2: Try to get orders-by-search-text (positions)
+            let positionsData: any[] = [];
+            try {
+              await sleep(300);
+              const posResp = await fetch(
+                "https://seller-analytics-api.wildberries.ru/api/v2/search-report/product/orders",
+                {
+                  method: "POST",
+                  headers: wbHeaders,
+                  body: JSON.stringify({
+                    period: { begin: beginStr, end: endStr },
+                    page: 1,
+                  }),
+                }
+              );
+              if (posResp.ok) {
+                const posData = await safeJson(posResp, { data: {} });
+                positionsData = posData.data?.products || [];
+              }
+            } catch (posErr: any) {
+              console.warn("WB search positions error:", posErr?.message);
+            }
+
+            const summary = {
+              totalKeywords: keywords.length,
+              totalProducts: productKeywords.length,
+              topKeyword: keywords[0]?.text || '',
+              topKeywordFreq: keywords[0]?.totalFrequency || 0,
+              keywordsWithOrders: keywords.filter(k => k.totalOrders > 0).length,
+              totalSearchOrders: keywords.reduce((s, k) => s + k.totalOrders, 0),
+            };
+
+            result = {
+              success: true,
+              keywords,
+              productKeywords: productKeywords.slice(0, 50),
+              positions: positionsData.slice(0, 50),
+              summary,
+              period: { from: beginStr, to: endStr },
+            };
+          } else {
+            const errText = await searchTextsResp.text();
+            console.error("WB search queries error:", searchTextsResp.status, errText);
+            // May require Jam subscription
+            if (searchTextsResp.status === 403) {
+              result = { success: false, error: "WB Jam obunasi talab etiladi (search-report)", requiresJam: true };
+            } else {
+              result = { success: false, error: `WB search queries failed: ${searchTextsResp.status}` };
+            }
+          }
+        } catch (e) {
+          console.error("WB search queries error:", e);
+          result = { success: false, error: "Error fetching WB search queries" };
+        }
       }
 
       // Update connection with latest sync time
