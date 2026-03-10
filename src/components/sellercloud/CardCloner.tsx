@@ -367,7 +367,7 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
     for (const product of selectedProducts) {
       for (const target of targetMarketplaces) {
         const alreadyCloned = isAlreadyCloned(product, target);
-        console.log(`[CardCloner] ${product.offerId} → ${target}: alreadyCloned=${alreadyCloned}`);
+        
         if (alreadyCloned) {
           skipped++;
         } else {
