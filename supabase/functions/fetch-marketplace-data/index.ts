@@ -108,10 +108,9 @@ function mapWBOrder(o: any, defaultStatus: string, fromNewApi = false) {
   // New orders: divide by 10000 (hundredths of kopecks → RUB)
   const price = fromNewApi ? rawPrice / 10000 : rawPrice;
   
-  // FBS assembly: convertedFinalPrice (seller's currency × 100) or finalPrice (sale currency × 100)
-  const convertedFinal = fromNewApi && o.convertedFinalPrice 
-    ? o.convertedFinalPrice / 100 
-    : undefined;
+  // IMPORTANT: convertedFinalPrice is in SELLER'S LOCAL CURRENCY (UZS for UZ sellers) × 100.
+  // We must NOT use it as the main price because all WB prices in our system are normalized to RUB.
+  // Using it would cause ~140x inflation when client converts RUB→UZS again.
   
   // Build buyer info from available data
   const region = fromNewApi 
@@ -131,19 +130,16 @@ function mapWBOrder(o: any, defaultStatus: string, fromNewApi = false) {
   const spp = o.spp || 0;
   // forPay: actual amount seller receives after ALL deductions
   const forPay = o.forPay || 0;
-  // finishedPrice: price buyer actually paid (after WB discount)
+  // finishedPrice: price buyer actually paid (after WB discount) — always in RUB
   const finishedPrice = o.finishedPrice || 0;
 
-  // Use best available price: convertedFinalPrice > finishedPrice > priceWithDisc > raw
-  const bestPrice = convertedFinal || (finishedPrice > 0 ? finishedPrice : price);
+  // Use best available RUB price: finishedPrice > priceWithDisc > raw price
+  // DO NOT use convertedFinalPrice here — it's in seller's local currency (UZS), not RUB
+  const bestPrice = finishedPrice > 0 ? finishedPrice : price;
 
   // Determine fulfillment type:
-  // FBS (seller fulfillment) = orders from /api/v3/orders (marketplace API)
-  // FBO = orders from stats/sales API where warehouseName indicates WB warehouse
-  // deliveryType: "fbs" or "dbs" = FBS, "fbo" = FBO
   const dt = (o.deliveryType || '').toLowerCase();
   const wh = (o.warehouseName || '').toLowerCase();
-  // WB FBO warehouses contain keywords like "коледино", "подольск", "электросталь", "казань", etc.
   const wbFboKeywords = ['коледино', 'подольск', 'электросталь', 'казань', 'краснодар', 'екатеринбург', 'новосибирск', 'хабаровск', 'тула', 'wb'];
   const isFBO = dt === 'fbo' || (!fromNewApi && wbFboKeywords.some(kw => wh.includes(kw)));
   const fulfillmentType = isFBO ? 'FBO' : 'FBS';
@@ -159,7 +155,6 @@ function mapWBOrder(o: any, defaultStatus: string, fromNewApi = false) {
     deliveryTotal: 0,
     deliveryTotalUZS: 0,
     fulfillmentType,
-    // WB-level financial fields
     spp: spp > 0 ? spp : undefined,
     forPay: forPay > 0 ? forPay : undefined,
     items: [{
@@ -169,7 +164,6 @@ function mapWBOrder(o: any, defaultStatus: string, fromNewApi = false) {
       price: bestPrice,
       priceUZS: bestPrice,
       nmID: o.nmId || undefined,
-      // Item-level WB financial details
       spp: spp > 0 ? spp : undefined,
       finishedPrice: finishedPrice > 0 ? finishedPrice : undefined,
       forPay: forPay > 0 ? forPay : undefined,
@@ -178,7 +172,6 @@ function mapWBOrder(o: any, defaultStatus: string, fromNewApi = false) {
     nmID: o.nmId,
     warehouseName: o.warehouseName || "",
     deliveryType: o.deliveryType || "",
-    // WB sticker ID (DBS orders, Feb 2026+)
     wbStickerId: o.wbStickerId || undefined,
     scanPrice: fromNewApi && o.scanPrice ? o.scanPrice / 100 : undefined,
   };
