@@ -288,7 +288,7 @@ export default function SellerCloudX() {
       case 'reviews':
         return <MarketplaceReviews connectedMarketplaces={connectedMarketplaces} />;
       case 'ads':
-        return <WBAdsCampaigns connectedMarketplaces={connectedMarketplaces} />;
+        return <MarketplaceAdsCampaigns connectedMarketplaces={connectedMarketplaces} />;
       case 'min-price':
         return <MinPriceProtection connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'clone':
