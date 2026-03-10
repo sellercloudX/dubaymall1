@@ -21,7 +21,7 @@
            filter: `shop_id=eq.${shopId}`,
          },
          (payload) => {
-           console.log('Product change:', payload.eventType);
+           
            
            // Invalidate and refetch
            queryClient.invalidateQueries({ queryKey: ['products', 'shop', shopId] });
