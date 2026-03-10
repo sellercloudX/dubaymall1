@@ -4653,7 +4653,7 @@ serve(async (req) => {
                       }
                     );
                     if (statsResp.ok) {
-                      const statsData = await statsResp.json();
+                      const statsData = await safeJson(statsResp, []);
                       if (statsData?.[0]) {
                         const days = statsData[0].days || [];
                         const totals = {
