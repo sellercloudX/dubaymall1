@@ -724,4 +724,4 @@ export const SubscriptionBilling = forwardRef<HTMLDivElement, SubscriptionBillin
       </Tabs>
     </div>
   );
-}
+});
