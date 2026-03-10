@@ -137,6 +137,17 @@ function mapWBOrder(o: any, defaultStatus: string, fromNewApi = false) {
   // Use best available price: convertedFinalPrice > finishedPrice > priceWithDisc > raw
   const bestPrice = convertedFinal || (finishedPrice > 0 ? finishedPrice : price);
 
+  // Determine fulfillment type:
+  // FBS (seller fulfillment) = orders from /api/v3/orders (marketplace API)
+  // FBO = orders from stats/sales API where warehouseName indicates WB warehouse
+  // deliveryType: "fbs" or "dbs" = FBS, "fbo" = FBO
+  const dt = (o.deliveryType || '').toLowerCase();
+  const wh = (o.warehouseName || '').toLowerCase();
+  // WB FBO warehouses contain keywords like "коледино", "подольск", "электросталь", "казань", etc.
+  const wbFboKeywords = ['коледино', 'подольск', 'электросталь', 'казань', 'краснодар', 'екатеринбург', 'новосибирск', 'хабаровск', 'тула', 'wb'];
+  const isFBO = dt === 'fbo' || (!fromNewApi && wbFboKeywords.some(kw => wh.includes(kw)));
+  const fulfillmentType = isFBO ? 'FBO' : 'FBS';
+
   return {
     id: orderId,
     status: defaultStatus,
@@ -147,6 +158,7 @@ function mapWBOrder(o: any, defaultStatus: string, fromNewApi = false) {
     itemsTotalUZS: bestPrice,
     deliveryTotal: 0,
     deliveryTotalUZS: 0,
+    fulfillmentType,
     // WB-level financial fields
     spp: spp > 0 ? spp : undefined,
     forPay: forPay > 0 ? forPay : undefined,
