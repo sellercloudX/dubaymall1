@@ -102,14 +102,18 @@ interface YandexOrder {
 // Helper to map WB order object to unified format
 // New Orders API returns prices in "сотые доли копеек" (hundredths of kopecks = value × 10000)
 // Statistics/Sales APIs return prices directly in RUB
+// 2026 update: FBS assembly tasks include convertedFinalPrice, currencyCode fields
 function mapWBOrder(o: any, defaultStatus: string, fromNewApi = false) {
   const rawPrice = o.convertedPrice || o.price || o.salePrice || 0;
   // New orders: divide by 10000 (hundredths of kopecks → RUB)
   const price = fromNewApi ? rawPrice / 10000 : rawPrice;
   
+  // FBS assembly: convertedFinalPrice (seller's currency × 100) or finalPrice (sale currency × 100)
+  const convertedFinal = fromNewApi && o.convertedFinalPrice 
+    ? o.convertedFinalPrice / 100 
+    : undefined;
+  
   // Build buyer info from available data
-  // New orders: address object with province/city
-  // Stats/Sales: regionName, oblast, countryName
   const region = fromNewApi 
     ? (o.address?.province || o.address?.city || o.regionName || '')
     : (o.regionName || o.oblast || '');
@@ -123,28 +127,48 @@ function mapWBOrder(o: any, defaultStatus: string, fromNewApi = false) {
     ? (o.id || o.rid)
     : (o.odid || o.orderID || o.id || o.rid);
 
+  // SPP (WB discount to buyer): available in stats/sales APIs
+  const spp = o.spp || 0;
+  // forPay: actual amount seller receives after ALL deductions
+  const forPay = o.forPay || 0;
+  // finishedPrice: price buyer actually paid (after WB discount)
+  const finishedPrice = o.finishedPrice || 0;
+
+  // Use best available price: convertedFinalPrice > finishedPrice > priceWithDisc > raw
+  const bestPrice = convertedFinal || (finishedPrice > 0 ? finishedPrice : price);
+
   return {
     id: orderId,
     status: defaultStatus,
     createdAt: o.createdAt || o.dateCreated || o.date || new Date().toISOString(),
-    total: price,
-    totalUZS: price,
-    itemsTotal: price,
-    itemsTotalUZS: price,
+    total: bestPrice,
+    totalUZS: bestPrice,
+    itemsTotal: bestPrice,
+    itemsTotalUZS: bestPrice,
     deliveryTotal: 0,
     deliveryTotalUZS: 0,
+    // WB-level financial fields
+    spp: spp > 0 ? spp : undefined,
+    forPay: forPay > 0 ? forPay : undefined,
     items: [{
       offerId: o.article || o.supplierArticle || "",
       offerName: o.subject || o.category || "",
       count: 1,
-      price: price,
-      priceUZS: price,
+      price: bestPrice,
+      priceUZS: bestPrice,
       nmID: o.nmId || undefined,
+      // Item-level WB financial details
+      spp: spp > 0 ? spp : undefined,
+      finishedPrice: finishedPrice > 0 ? finishedPrice : undefined,
+      forPay: forPay > 0 ? forPay : undefined,
     }],
     buyer: { firstName: buyerLocation, lastName: "" },
     nmID: o.nmId,
     warehouseName: o.warehouseName || "",
     deliveryType: o.deliveryType || "",
+    // WB sticker ID (DBS orders, Feb 2026+)
+    wbStickerId: o.wbStickerId || undefined,
+    scanPrice: fromNewApi && o.scanPrice ? o.scanPrice / 100 : undefined,
   };
 }
 
