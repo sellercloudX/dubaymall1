@@ -264,6 +264,12 @@ export default function SellerCloudX() {
         return <ProfitCalculator />;
       case 'competitor':
         return <CompetitorPriceMonitor connectedMarketplaces={connectedMarketplaces} store={store} />;
+      case 'unit-economy':
+        return <UnitEconomyDashboard connectedMarketplaces={connectedMarketplaces} store={store} />;
+      case 'stock-forecast':
+        return <StockForecast connectedMarketplaces={connectedMarketplaces} store={store} />;
+      case 'seo-monitor':
+        return <SEOMonitor connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'inventory':
         return <InventorySync connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'pricing':
