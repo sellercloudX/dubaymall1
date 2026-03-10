@@ -3236,7 +3236,7 @@ serve(async (req) => {
               break;
             }
 
-            const data = await resp.json();
+            const data = await safeJson(resp, { cards: [] });
             const cards = data.cards || [];
             console.log(`WB cards page ${pageNum}: ${cards.length} cards (total cursor: ${data.cursor?.total})`);
 
