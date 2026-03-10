@@ -188,12 +188,12 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
 
   // Filter by search
   const searchFiltered = searchQuery
-    ? statusFiltered.filter(e => {
+    ? fulfillmentFiltered.filter(e => {
         const q = searchQuery.toLowerCase();
         return String(e.order.id).includes(q) ||
           (e.order.items || []).some(i => (i.offerName || i.offerId || '').toLowerCase().includes(q));
       })
-    : statusFiltered;
+    : fulfillmentFiltered;
 
   // Sort
   const sorted = useMemo(() => {
