@@ -4566,7 +4566,7 @@ serve(async (req) => {
           });
 
           if (adsResp.ok) {
-            const adsData = await adsResp.json();
+            const adsData = await safeJson(adsResp, { adverts: [] });
             const adverts = adsData.adverts || [];
             console.log(`WB ads: ${adverts.length} campaign groups`);
 
@@ -4604,7 +4604,7 @@ serve(async (req) => {
                   body: JSON.stringify(activeIds),
                 });
                 if (detailResp.ok) {
-                  const details = await detailResp.json();
+                  const details = await safeJson(detailResp, []);
                   const detailMap = new Map<number, any>();
                   (Array.isArray(details) ? details : []).forEach((d: any) => {
                     detailMap.set(d.advertId, d);
@@ -4653,7 +4653,7 @@ serve(async (req) => {
                       }
                     );
                     if (statsResp.ok) {
-                      const statsData = await statsResp.json();
+                      const statsData = await safeJson(statsResp, []);
                       if (statsData?.[0]) {
                         const days = statsData[0].days || [];
                         const totals = {
@@ -4719,6 +4719,7 @@ serve(async (req) => {
               { method: "GET", headers: wbHeaders }
             );
             if (resp.ok || resp.status === 204) {
+              await resp.text(); // consume body
               result = { success: true, message: `Kampaniya ${action === 'pause' ? 'to\'xtatildi' : 'ishga tushirildi'}` };
             } else {
               const errText = await resp.text();
@@ -4745,6 +4746,7 @@ serve(async (req) => {
               }
             );
             if (resp.ok || resp.status === 204) {
+              await resp.text(); // consume body
               result = { success: true, message: `Byudjet yangilandi: ${dailyBudget} ₽` };
             } else {
               const errText = await resp.text();
@@ -4776,6 +4778,7 @@ serve(async (req) => {
               }
             );
             if (resp.ok || resp.status === 204) {
+              await resp.text(); // consume body
               result = { success: true, message: `CPM yangilandi: ${cpm} ₽` };
             } else {
               const errText = await resp.text();

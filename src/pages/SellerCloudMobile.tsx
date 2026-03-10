@@ -43,7 +43,7 @@ const MxikImport = lazy(() => import('@/components/sellercloud/MxikImport').then
 const MarketplaceReviews = lazy(() => import('@/components/sellercloud/MarketplaceReviews').then(m => ({ default: m.MarketplaceReviews })));
 const WBSellerAnalytics = lazy(() => import('@/components/sellercloud/WBSellerAnalytics').then(m => ({ default: m.WBSellerAnalytics })));
 const WBAdsCampaigns = lazy(() => import('@/components/sellercloud/WBAdsCampaigns').then(m => ({ default: m.WBAdsCampaigns })));
-const WBSearchKeywords = lazy(() => import('@/components/sellercloud/WBSearchKeywords').then(m => ({ default: m.WBSearchKeywords })));
+const MobileTrendHunter = lazy(() => import('@/components/mobile/MobileTrendHunter').then(m => ({ default: m.MobileTrendHunter })));
 
 // Lightweight tab loading skeleton
 function TabLoader() {
@@ -229,7 +229,7 @@ export default function SellerCloudMobile() {
       case 'seller-analytics':
         return <div className="p-4"><WBSellerAnalytics connectedMarketplaces={connectedMarketplaces} /></div>;
       case 'wb-keywords':
-        return <div className="p-4"><WBSearchKeywords connectedMarketplaces={connectedMarketplaces} /></div>;
+        return <MobileTrendHunter />;
       case 'ads':
         return <div className="p-4"><WBAdsCampaigns connectedMarketplaces={connectedMarketplaces} /></div>;
       default:
@@ -250,10 +250,10 @@ export default function SellerCloudMobile() {
               const labels: Record<string, string> = {
                 'financials': '💰 Moliya', 'calculator': '🧮 Kalkulyator', 'cost-prices': '💲 Tannarx',
                 'pricing': '🏷 Narxlar', 'abc-analysis': '📊 ABC-analiz', 'seller-analytics': '📈 WB Analitika',
-                'reviews': '💬 Sharhlar', 'ads': '📢 Reklama', 'inventory': '📦 Qoldiq',
-                'min-price': '🛡 Min narx', 'card-clone': '📋 Klonlash', 'uzum-card': '✨ Uzum Card',
-                'problems': '⚠️ Muammolar', 'mxik': '📄 MXIK baza', 'reports': '📑 Hisobotlar',
-                'notifications': '🔔 Bildirishnoma', 'subscription': '💳 Obuna',
+                'wb-keywords': '🔍 WB Qidiruv', 'reviews': '💬 Sharhlar', 'ads': '📢 Reklama',
+                'inventory': '📦 Qoldiq', 'min-price': '🛡 Min narx', 'card-clone': '📋 Klonlash',
+                'uzum-card': '✨ Uzum Card', 'problems': '⚠️ Muammolar', 'mxik': '📄 MXIK baza',
+                'reports': '📑 Hisobotlar', 'notifications': '🔔 Bildirishnoma', 'subscription': '💳 Obuna',
               };
               return labels[activeTab] || activeTab;
             })()}
