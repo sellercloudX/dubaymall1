@@ -4,7 +4,7 @@ import {
   ArrowDownUp, DollarSign, Bell, FileSpreadsheet, CreditCard,
   Calculator, Shield, Copy, AlertOctagon,
   MessageCircle, Activity, Megaphone, ChevronLeft, ChevronRight,
-  LogOut, LayoutDashboard, Sun, Moon, Wallet,
+  LogOut, LayoutDashboard, Sun, Moon, Wallet, Search,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
