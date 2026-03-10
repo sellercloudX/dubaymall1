@@ -3498,8 +3498,8 @@ serve(async (req) => {
           const newOrdersResp = await fetch("https://marketplace-api.wildberries.ru/api/v3/orders/new", {
             headers: wbHeaders,
           });
-          if (newOrdersResp.ok) {
-            const newData = await newOrdersResp.json();
+           if (newOrdersResp.ok || newOrdersResp.status === 204) {
+             const newData = await safeJson(newOrdersResp, { orders: [] });
             const newOrders = newData.orders || [];
             console.log(`WB new orders: ${newOrders.length}`);
             for (const o of newOrders) {
