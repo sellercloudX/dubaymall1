@@ -4566,7 +4566,7 @@ serve(async (req) => {
           });
 
           if (adsResp.ok) {
-            const adsData = await adsResp.json();
+            const adsData = await safeJson(adsResp, { adverts: [] });
             const adverts = adsData.adverts || [];
             console.log(`WB ads: ${adverts.length} campaign groups`);
 
