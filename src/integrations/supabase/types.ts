@@ -2085,6 +2085,98 @@ export type Database = {
         }
         Relationships: []
       }
+      repricing_log: {
+        Row: {
+          created_at: string
+          id: string
+          marketplace: string
+          new_price: number
+          offer_id: string
+          old_price: number
+          product_name: string | null
+          reason: string | null
+          rule_id: string | null
+          status: string
+          strategy: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          marketplace: string
+          new_price: number
+          offer_id: string
+          old_price: number
+          product_name?: string | null
+          reason?: string | null
+          rule_id?: string | null
+          status?: string
+          strategy: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          marketplace?: string
+          new_price?: number
+          offer_id?: string
+          old_price?: number
+          product_name?: string | null
+          reason?: string | null
+          rule_id?: string | null
+          status?: string
+          strategy?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "repricing_log_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "repricing_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      repricing_rules: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          last_executed_at: string | null
+          marketplace: string
+          max_undercut: number
+          min_price_percent: number
+          strategy: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_executed_at?: string | null
+          marketplace: string
+          max_undercut?: number
+          min_price_percent?: number
+          strategy?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_executed_at?: string | null
+          marketplace?: string
+          max_undercut?: number
+          min_price_percent?: number
+          strategy?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       reviews: {
         Row: {
           comment: string | null
