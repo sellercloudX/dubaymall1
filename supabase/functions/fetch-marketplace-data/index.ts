@@ -4115,8 +4115,8 @@ serve(async (req) => {
             { headers: wbHeaders }
           );
 
-          if (reportResp.ok) {
-            const reportData = await reportResp.json();
+           if (reportResp.ok || reportResp.status === 204) {
+             const reportData = await safeJson(reportResp, []);
             const entries = Array.isArray(reportData) ? reportData : [];
             console.log(`WB financial report: ${entries.length} entries`);
 
