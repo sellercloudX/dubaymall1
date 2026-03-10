@@ -181,6 +181,11 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
     ? dateFiltered
     : dateFiltered.filter(e => e.statusCategory === statusFilter);
 
+  // Filter by fulfillment type (FBO/FBS)
+  const fulfillmentFiltered = fulfillmentFilter === 'all'
+    ? statusFiltered
+    : statusFiltered.filter(e => (e.order as any).fulfillmentType === fulfillmentFilter);
+
   // Filter by search
   const searchFiltered = searchQuery
     ? statusFiltered.filter(e => {
