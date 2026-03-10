@@ -168,15 +168,15 @@ export function useMarketplaceDataStore(connectedMarketplaces: string[]) {
             total: result.data?.length || 0,
           };
         },
-         staleTime: 1000 * 60 * 5, // 5 min — keep orders fresher
-         gcTime: 1000 * 60 * 60 * 24,
+         staleTime: 1000 * 60 * 2, // 2 min — orders must be very fresh
+         gcTime: 1000 * 60 * 60, // 1h cache
          refetchOnWindowFocus: false,
          refetchOnMount: 'always' as const, // Always refetch orders on mount for fresh data
-         refetchInterval: 1000 * 60 * 10, // Auto-refresh every 10 min
+         refetchInterval: 1000 * 60 * 5, // Auto-refresh every 5 min
          retry: 2,
         retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10000),
-        networkMode: 'offlineFirst' as const,
-      })),
+        networkMode: 'online' as const, // Force network fetch for real-time data
+       })),
     });
    
    // Only return memoizedMarketplaces to stabilize query keys

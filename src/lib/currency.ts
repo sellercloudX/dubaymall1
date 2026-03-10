@@ -28,9 +28,10 @@ export const RUB_TO_UZS = 140;
 
 export const isRubMarketplace = (mp: string) => mp === 'wildberries';
 
-/** Convert marketplace-native amount to UZS for display in SellerCloudX */
+/** Convert marketplace-native amount to UZS for display in SellerCloudX — always rounded to whole so'm */
 export function toDisplayUzs(amount: number, marketplace: string): number {
-  return isRubMarketplace(marketplace) ? amount * _rubToUzs : amount;
+  const result = isRubMarketplace(marketplace) ? amount * _rubToUzs : amount;
+  return Math.round(result);
 }
 
 /** Convert UZS amount to marketplace-native currency (RUB for WB, UZS for others) */
