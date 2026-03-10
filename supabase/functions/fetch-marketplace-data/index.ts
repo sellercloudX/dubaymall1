@@ -664,6 +664,15 @@ serve(async (req) => {
                 }
               }
 
+              // Determine fulfillment type from delivery info
+              // FBY (FBO) = Yandex fulfillment, FBS = seller fulfillment
+              const deliveryPartnerType = order.delivery?.deliveryPartnerType || '';
+              const deliveryServiceId = order.delivery?.deliveryServiceId;
+              // YANDEX_MARKET = FBO (FBY), SHOP = FBS
+              const fulfillmentType = (deliveryPartnerType === 'YANDEX_MARKET' || order.delivery?.type === 'DELIVERY') && !order.delivery?.shipments?.some((s: any) => s.shipmentType === 'IMPORT')
+                ? (deliveryPartnerType === 'YANDEX_MARKET' ? 'FBO' : 'FBS')
+                : 'FBS';
+
               return {
                 id: order.id,
                 status: order.status,
@@ -677,6 +686,7 @@ serve(async (req) => {
                 deliveryTotalUZS: deliveryTotal,
                 paymentType: order.paymentType,
                 paymentMethod: order.paymentMethod,
+                fulfillmentType,
                 buyer: {
                   firstName: order.buyer?.firstName || '',
                   lastName: order.buyer?.lastName || '',
