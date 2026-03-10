@@ -466,7 +466,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
               setBackgroundTasks(prev => prev.map(task => 
                 task.id === taskId ? { ...task, generatedImages: [...imgData.images] } : task
               ));
-              console.log(`✅ AI Agent pipeline: ${imgData.totalImages} ta rasm yaratildi`);
+              
               updateTaskProgress(4, 'completed');
               return imgData.images;
             } else if (!imgError && imgData?.success && imgData.images?.length === 0) {
