@@ -65,6 +65,7 @@ const pageTitles: Record<string, string> = {
   sales: 'Sotuvlar hisoboti',
   analytics: 'Umumiy analitika',
   'wb-analytics': 'WB Analitika',
+  'wb-keywords': 'WB Qidiruv so\'zlari',
   financials: 'Moliyaviy dashboard',
   abc: 'ABC-analiz',
   'cost-prices': 'Tannarx boshqaruvi',
