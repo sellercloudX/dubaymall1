@@ -3978,7 +3978,7 @@ serve(async (req) => {
                 }),
               });
               if (!cardsResp.ok) { await cardsResp.text(); break; }
-              const cardsData = await cardsResp.json();
+              const cardsData = await safeJson(cardsResp, { cards: [] });
               const cards = cardsData.cards || [];
               for (const card of cards) {
                 if (card.vendorCode && card.nmID) {
