@@ -3712,7 +3712,7 @@ serve(async (req) => {
           if (!whResp.ok) {
             result = { success: false, error: "Failed to fetch warehouses" };
           } else {
-            const warehouses = await whResp.json();
+             const warehouses = await safeJson(whResp, []);
             const stockData: any[] = [];
             
             for (const wh of (Array.isArray(warehouses) ? warehouses : []).slice(0, 10)) {
