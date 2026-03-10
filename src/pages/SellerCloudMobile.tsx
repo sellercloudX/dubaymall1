@@ -229,7 +229,7 @@ export default function SellerCloudMobile() {
       case 'seller-analytics':
         return <div className="p-4"><WBSellerAnalytics connectedMarketplaces={connectedMarketplaces} /></div>;
       case 'wb-keywords':
-        return <div className="p-4"><WBSearchKeywords connectedMarketplaces={connectedMarketplaces} /></div>;
+        return <MobileTrendHunter />;
       case 'ads':
         return <div className="p-4"><WBAdsCampaigns connectedMarketplaces={connectedMarketplaces} /></div>;
       default:
