@@ -588,7 +588,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
           },
         });
 
-        console.log('Yandex Card creation result:', JSON.stringify(cardResult)?.substring(0, 500));
+        
         if (error) {
           const errDetail = cardResult?.error || error.message || 'Yandex xatosi';
           throw new Error(`Yandex: ${errDetail}`);

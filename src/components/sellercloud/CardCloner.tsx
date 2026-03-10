@@ -377,7 +377,7 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
     }
 
     const total = cloneTasks.length + skipped;
-    console.log('[CardCloner] Tasks built', { total, cloneTasks: cloneTasks.length, skipped });
+    
     if (cloneTasks.length === 0) {
       toast.info(`Barcha ${skipped} ta mahsulot allaqachon mavjud`);
       return;
