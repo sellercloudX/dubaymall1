@@ -175,4 +175,4 @@ export const SupportChat = forwardRef<HTMLDivElement, {}>(function SupportChat(_
       </CardContent>
     </Card>
   );
-}
+});
