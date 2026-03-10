@@ -108,34 +108,10 @@ function mapWBOrder(o: any, defaultStatus: string, fromNewApi = false) {
   // New orders: divide by 10000 (hundredths of kopecks → RUB)
   const price = fromNewApi ? rawPrice / 10000 : rawPrice;
   
-  // FBS assembly: convertedFinalPrice (seller's currency × 100) or finalPrice (sale currency × 100)
-  const convertedFinal = fromNewApi && o.convertedFinalPrice 
-    ? o.convertedFinalPrice / 100 
-    : undefined;
-  
-  // Build buyer info from available data
-  const region = fromNewApi 
-    ? (o.address?.province || o.address?.city || o.regionName || '')
-    : (o.regionName || o.oblast || '');
-  const city = fromNewApi ? (o.address?.city || '') : '';
-  const buyerLocation = city && region && city !== region 
-    ? `${region}, ${city}` 
-    : (region || '');
-
-  // Order ID: prefer numeric odid/orderID for cleaner display
-  const orderId = fromNewApi 
-    ? (o.id || o.rid)
-    : (o.odid || o.orderID || o.id || o.rid);
-
-  // SPP (WB discount to buyer): available in stats/sales APIs
-  const spp = o.spp || 0;
-  // forPay: actual amount seller receives after ALL deductions
-  const forPay = o.forPay || 0;
-  // finishedPrice: price buyer actually paid (after WB discount)
-  const finishedPrice = o.finishedPrice || 0;
-
-  // Use best available price: convertedFinalPrice > finishedPrice > priceWithDisc > raw
-  const bestPrice = convertedFinal || (finishedPrice > 0 ? finishedPrice : price);
+  // IMPORTANT: convertedFinalPrice is in SELLER'S LOCAL CURRENCY (UZS for UZ sellers) × 100.
+  // We must NOT use it as the main price because all WB prices in our system are normalized to RUB.
+  // Using convertedFinalPrice would cause ~140x inflation when client converts RUB→UZS again.
+  // We only store it for reference but use RUB-based price for calculations.
 
   // Determine fulfillment type:
   // FBS (seller fulfillment) = orders from /api/v3/orders (marketplace API)
