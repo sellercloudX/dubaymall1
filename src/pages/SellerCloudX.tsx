@@ -134,6 +134,7 @@ export default function SellerCloudX() {
   
   const connectedMarketplaces = useMemo(() => connections.map(c => c.marketplace), [connections]);
   const store = useMarketplaceDataStore(connectedMarketplaces);
+  useAutoNotifications(connectedMarketplaces, store);
   
   const totalRevenue = useMemo(() => {
     if (store.allOrders.length === 0) return connections.reduce((sum, c) => sum + (c.total_revenue || 0), 0);
