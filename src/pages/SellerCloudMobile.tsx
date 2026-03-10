@@ -250,10 +250,10 @@ export default function SellerCloudMobile() {
               const labels: Record<string, string> = {
                 'financials': '💰 Moliya', 'calculator': '🧮 Kalkulyator', 'cost-prices': '💲 Tannarx',
                 'pricing': '🏷 Narxlar', 'abc-analysis': '📊 ABC-analiz', 'seller-analytics': '📈 WB Analitika',
-                'reviews': '💬 Sharhlar', 'ads': '📢 Reklama', 'inventory': '📦 Qoldiq',
-                'min-price': '🛡 Min narx', 'card-clone': '📋 Klonlash', 'uzum-card': '✨ Uzum Card',
-                'problems': '⚠️ Muammolar', 'mxik': '📄 MXIK baza', 'reports': '📑 Hisobotlar',
-                'notifications': '🔔 Bildirishnoma', 'subscription': '💳 Obuna',
+                'wb-keywords': '🔍 WB Qidiruv', 'reviews': '💬 Sharhlar', 'ads': '📢 Reklama',
+                'inventory': '📦 Qoldiq', 'min-price': '🛡 Min narx', 'card-clone': '📋 Klonlash',
+                'uzum-card': '✨ Uzum Card', 'problems': '⚠️ Muammolar', 'mxik': '📄 MXIK baza',
+                'reports': '📑 Hisobotlar', 'notifications': '🔔 Bildirishnoma', 'subscription': '💳 Obuna',
               };
               return labels[activeTab] || activeTab;
             })()}
