@@ -93,6 +93,7 @@ const pageTitles: Record<string, string> = {
   'unit-economy': 'Unit-economy (SKU)',
   'stock-forecast': 'Zaxira prognozi',
   'seo-monitor': 'SEO Monitor',
+  team: 'Jamoa boshqaruvi',
 };
 
 export default function SellerCloudX() {
