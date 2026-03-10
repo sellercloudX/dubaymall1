@@ -450,7 +450,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
         
         imagePromise = (async (): Promise<string[]> => {
           try {
-            console.log('🖼️ Calling ai-agent-images (SellZen primary):', bestImageForInfographic.substring(0, 80));
+            
             const { data: imgData, error: imgError } = await supabase.functions.invoke('ai-agent-images', {
               body: {
                 action: 'scanner-generate',
