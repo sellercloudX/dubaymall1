@@ -430,7 +430,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
         });
         if (mxikData?.mxik_code) {
           mxikResult = mxikData;
-          console.log(`✅ MXIK: ${mxikData.mxik_code} (${mxikData.mxik_name}) confidence: ${mxikData.confidence}%`);
+          
         }
       } catch (e) {
         console.warn('MXIK lookup failed:', e);
