@@ -168,7 +168,7 @@ function BalanceTopup({ userId }: { userId?: string }) {
   );
 }
 
-export function SubscriptionBilling({ totalSalesVolume }: SubscriptionBillingProps) {
+export const SubscriptionBilling = forwardRef<HTMLDivElement, SubscriptionBillingProps>(function SubscriptionBilling({ totalSalesVolume }, ref) {
   const { user } = useAuth();
   const { 
     subscription, billing, totalDebt, accessStatus, isLoading,
