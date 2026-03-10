@@ -4171,8 +4171,8 @@ serve(async (req) => {
             headers: wbHeaders,
             body: JSON.stringify({ settings: { cursor: { limit: 100 }, filter: { withPhoto: -1 } } }),
           });
-          if (cardsResp.ok) {
-            const cd = await cardsResp.json();
+           if (cardsResp.ok || cardsResp.status === 204) {
+             const cd = await safeJson(cardsResp, { cards: [] });
             (cd.cards || []).forEach((c: any) => {
               productMap.set(c.vendorCode || String(c.nmID), {
                 name: c.title || c.subjectName || "",
