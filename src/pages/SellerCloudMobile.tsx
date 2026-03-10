@@ -100,7 +100,10 @@ export default function SellerCloudMobile() {
    const connectedMarketplaces = useMemo(() => connections.map(c => c.marketplace), [connections]);
    
    // Centralized data store — fetches once, cached for all tabs
-   const store = useMarketplaceDataStore(connectedMarketplaces);
+    const store = useMarketplaceDataStore(connectedMarketplaces);
+    
+    // Auto-dispatch Telegram notifications for new orders / low stock
+    useAutoNotifications(connectedMarketplaces, store);
    
    // Calculate revenue from actual order data with proper currency conversion
    const totalRevenue = useMemo(() => {
