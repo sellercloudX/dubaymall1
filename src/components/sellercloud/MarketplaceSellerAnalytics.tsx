@@ -148,7 +148,7 @@ export function MarketplaceSellerAnalytics({ connectedMarketplaces, store }: Pro
       {/* Marketplace filter */}
       <MarketplaceFilterBar
         connectedMarketplaces={connectedMarketplaces}
-        selectedMarketplace={selectedMp}
+        selectedMp={selectedMp}
         onSelect={setSelectedMp}
       />
 
