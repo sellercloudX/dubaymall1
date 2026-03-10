@@ -160,14 +160,16 @@ export function FinancialDashboard({
   }, [activeMarketplaces, store.dataVersion, isLoading, getCostPrice, tariffUpdatedAt, dateFrom, dateTo, selectedMp]);
 
   const formatPrice = (price: number) => {
-    if (Math.abs(price) >= 1000000) return (price / 1000000).toFixed(1) + ' mln';
-    if (Math.abs(price) >= 1000) return (price / 1000).toFixed(0) + ' ming';
-    return new Intl.NumberFormat('uz-UZ').format(price);
+    const rounded = Math.round(price);
+    if (Math.abs(rounded) >= 1000000) return (Math.round(rounded / 100000) / 10).toFixed(1) + ' mln';
+    if (Math.abs(rounded) >= 1000) return Math.round(rounded / 1000) + ' ming';
+    return new Intl.NumberFormat('uz-UZ', { maximumFractionDigits: 0 }).format(rounded);
   };
 
   const formatFullPrice = (price: number) => {
-    if (Math.abs(price) >= 1000000) return (price / 1000000).toFixed(2) + ' mln so\'m';
-    return new Intl.NumberFormat('uz-UZ').format(price) + ' so\'m';
+    const rounded = Math.round(price);
+    if (Math.abs(rounded) >= 1000000) return (Math.round(rounded / 100000) / 10).toFixed(1) + ' mln so\'m';
+    return new Intl.NumberFormat('uz-UZ', { maximumFractionDigits: 0 }).format(rounded) + ' so\'m';
   };
 
   if (connectedMarketplaces.length === 0) {

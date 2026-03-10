@@ -28,9 +28,10 @@ export const RUB_TO_UZS = 140;
 
 export const isRubMarketplace = (mp: string) => mp === 'wildberries';
 
-/** Convert marketplace-native amount to UZS for display in SellerCloudX */
+/** Convert marketplace-native amount to UZS for display in SellerCloudX — always rounded to whole so'm */
 export function toDisplayUzs(amount: number, marketplace: string): number {
-  return isRubMarketplace(marketplace) ? amount * _rubToUzs : amount;
+  const result = isRubMarketplace(marketplace) ? amount * _rubToUzs : amount;
+  return Math.round(result);
 }
 
 /** Convert UZS amount to marketplace-native currency (RUB for WB, UZS for others) */
@@ -48,19 +49,19 @@ export function uzsToRub(uzs: number): number {
   return uzs / _rubToUzs;
 }
 
-/** Format price in UZS (so'm) for display — rounds to integer */
+/** Format price in UZS (so'm) for display — always rounds to whole so'm (no tiyinlar) */
 export function formatUzs(amount: number): string {
   const rounded = Math.round(amount);
-  if (Math.abs(rounded) >= 1_000_000) return (rounded / 1_000_000).toFixed(1) + ' mln';
+  if (Math.abs(rounded) >= 1_000_000) return (Math.round(rounded / 100_000) / 10).toFixed(1) + ' mln';
   if (Math.abs(rounded) >= 1_000) return Math.round(rounded / 1_000) + ' ming';
-  return new Intl.NumberFormat('uz-UZ').format(rounded);
+  return new Intl.NumberFormat('uz-UZ', { maximumFractionDigits: 0 }).format(rounded);
 }
 
-/** Format price with "so'm" suffix */
+/** Format price with "so'm" suffix — always whole so'm */
 export function formatUzsFull(amount: number): string {
   const rounded = Math.round(amount);
-  if (Math.abs(rounded) >= 1_000_000) return (rounded / 1_000_000).toFixed(2) + " mln so'm";
-  return new Intl.NumberFormat('uz-UZ').format(rounded) + " so'm";
+  if (Math.abs(rounded) >= 1_000_000) return (Math.round(rounded / 100_000) / 10).toFixed(1) + " mln so'm";
+  return new Intl.NumberFormat('uz-UZ', { maximumFractionDigits: 0 }).format(rounded) + " so'm";
 }
 
 /** Get currency symbol for a marketplace (for raw display only) */

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, forwardRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -18,7 +18,7 @@ interface Message {
   is_read: boolean;
 }
 
-export function SupportChat() {
+export const SupportChat = forwardRef<HTMLDivElement, {}>(function SupportChat(_props, ref) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [newMessage, setNewMessage] = useState('');
@@ -175,4 +175,4 @@ export function SupportChat() {
       </CardContent>
     </Card>
   );
-}
+});
