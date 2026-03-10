@@ -4127,7 +4127,9 @@ serve(async (req) => {
           result = { success: false, error: "WB narxlarni yangilashda xato" };
         }
       } else if (dataType === "stats" || dataType === "financials") {
-        // Financial report from Statistics API
+        // Financial report from Statistics API v5
+        // 2026 update: properly extract ppvz_for_pay, delivery_rub, penalty, 
+        // additional_payment, payment_schedule, currency fields
         try {
           const endDate = new Date();
           const startDate = new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -4143,25 +4145,59 @@ serve(async (req) => {
              const reportData = await safeJson(reportResp, []);
             const entries = Array.isArray(reportData) ? reportData : [];
             console.log(`WB financial report: ${entries.length} entries`);
+            if (entries.length > 0) {
+              const sample = entries[0];
+              console.log(`WB report sample keys: ${Object.keys(sample).join(', ')}`);
+              console.log(`WB report sample: ppvz_for_pay=${sample.ppvz_for_pay}, delivery_rub=${sample.delivery_rub}, penalty=${sample.penalty}, commission_percent=${sample.commission_percent}, payment_schedule=${sample.payment_schedule}, currency=${sample.currency}`);
+            }
 
-            // Aggregate by subject
+            // Detailed aggregation with new fields
             const summary = {
-              totalSales: 0,
-              totalCommission: 0,
-              totalLogistics: 0,
-              totalPenalties: 0,
-              totalReturns: 0,
+              totalSales: 0,           // retail_price_withdisc_rub — full sale price
+              totalSellerPayout: 0,    // ppvz_for_pay — actual seller payout
+              totalCommission: 0,      // ppvz_kvw_prc_base + ppvz_kvw_prc
+              totalLogistics: 0,       // delivery_rub
+              totalStorage: 0,         // storage_fee
+              totalPenalties: 0,       // penalty
+              totalAdditional: 0,      // additional_payment (subsidies)
+              totalReturns: 0,         // return_amount
+              totalAcceptance: 0,      // acceptance (приемка)
+              totalPaymentSchedule: 0, // payment_schedule (instant withdrawal fee)
+              totalSpp: 0,             // ppvz_spp_prc — WB discount amount
               netIncome: 0,
+              currency: '',
             };
 
             entries.forEach((e: any) => {
-              summary.totalSales += e.retail_price_withdisc_rub || e.ppvz_for_pay || 0;
-              summary.totalCommission += e.commission_percent ? (e.retail_price_withdisc_rub * e.commission_percent / 100) : 0;
+              // ppvz_for_pay = actual amount seller gets per item (most accurate)
+              summary.totalSellerPayout += e.ppvz_for_pay || 0;
+              // retail_price_withdisc_rub = sale price before marketplace deductions
+              summary.totalSales += e.retail_price_withdisc_rub || 0;
+              // Commission: use ppvz_kvw_prc (marketplace retention) if available
+              const commAmount = e.ppvz_kvw_prc || (e.commission_percent ? (e.retail_price_withdisc_rub || 0) * e.commission_percent / 100 : 0);
+              summary.totalCommission += commAmount;
+              // Logistics
               summary.totalLogistics += e.delivery_rub || 0;
-              summary.totalPenalties += e.penalty || 0;
+              // Storage fee
+              summary.totalStorage += e.storage_fee || 0;
+              // Penalties
+              summary.totalPenalties += Math.abs(e.penalty || 0);
+              // Additional payment (subsidies from WB, positive = seller benefit)
+              summary.totalAdditional += e.additional_payment || 0;
+              // Returns
               summary.totalReturns += e.return_amount || 0;
+              // Acceptance fee
+              summary.totalAcceptance += e.acceptance || 0;
+              // Payment schedule (instant withdrawal fee)
+              summary.totalPaymentSchedule += e.payment_schedule || 0;
+              // SPP amount (WB discount)
+              summary.totalSpp += e.ppvz_spp_prc || 0;
+              // Track currency
+              if (e.currency && !summary.currency) summary.currency = e.currency;
             });
-            summary.netIncome = summary.totalSales - summary.totalCommission - summary.totalLogistics - summary.totalPenalties;
+            
+            // Net income = payout - penalties - returns + additional
+            summary.netIncome = summary.totalSellerPayout - summary.totalPenalties + summary.totalAdditional;
 
             result = { 
               success: true, 

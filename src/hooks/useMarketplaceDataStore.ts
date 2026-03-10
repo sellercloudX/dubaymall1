@@ -36,6 +36,9 @@ export interface MarketplaceOrder {
   itemsTotalUZS: number;
   deliveryTotal: number;
   deliveryTotalUZS: number;
+  // WB-specific financial fields
+  spp?: number; // WB seller price penalty (скидка WB), %
+  forPay?: number; // WB actual payout to seller (после всех вычетов)
   buyer?: {
     firstName?: string;
     lastName?: string;
@@ -48,6 +51,10 @@ export interface MarketplaceOrder {
     priceUZS: number;
     photo?: string;
     nmID?: number;
+    // WB-specific: actual price after WB discount
+    spp?: number;
+    finishedPrice?: number;
+    forPay?: number;
   }>;
 }
 
