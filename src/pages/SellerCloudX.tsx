@@ -55,6 +55,7 @@ const CompetitorPriceMonitor = lazy(() => import('@/components/sellercloud/Compe
 const UnitEconomyDashboard = lazy(() => import('@/components/sellercloud/UnitEconomyDashboard').then(m => ({ default: m.UnitEconomyDashboard })));
 const StockForecast = lazy(() => import('@/components/sellercloud/StockForecast').then(m => ({ default: m.StockForecast })));
 const SEOMonitor = lazy(() => import('@/components/sellercloud/SEOMonitor').then(m => ({ default: m.SEOMonitor })));
+const AutoReorderAlerts = lazy(() => import('@/components/sellercloud/AutoReorderAlerts').then(m => ({ default: m.AutoReorderAlerts })));
 const MarketplaceProductAnalytics = lazy(() => import('@/components/sellercloud/MarketplaceProductAnalytics').then(m => ({ default: m.MarketplaceProductAnalytics })));
 const TeamManager = lazy(() => import('@/components/sellercloud/TeamManager').then(m => ({ default: m.TeamManager })));
 
