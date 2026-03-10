@@ -56,11 +56,11 @@ export function formatUzs(amount: number): string {
   return new Intl.NumberFormat('uz-UZ', { maximumFractionDigits: 0 }).format(rounded);
 }
 
-/** Format price with "so'm" suffix */
+/** Format price with "so'm" suffix — always whole so'm */
 export function formatUzsFull(amount: number): string {
   const rounded = Math.round(amount);
-  if (Math.abs(rounded) >= 1_000_000) return (rounded / 1_000_000).toFixed(2) + " mln so'm";
-  return new Intl.NumberFormat('uz-UZ').format(rounded) + " so'm";
+  if (Math.abs(rounded) >= 1_000_000) return (Math.round(rounded / 100_000) / 10).toFixed(1) + " mln so'm";
+  return new Intl.NumberFormat('uz-UZ', { maximumFractionDigits: 0 }).format(rounded) + " so'm";
 }
 
 /** Get currency symbol for a marketplace (for raw display only) */
