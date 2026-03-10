@@ -236,6 +236,14 @@ export default function SellerCloudMobile() {
         return <MobileTrendHunter />;
       case 'ads':
         return <div className="p-4"><WBAdsCampaigns connectedMarketplaces={connectedMarketplaces} /></div>;
+      case 'competitor':
+        return <div className="p-4"><CompetitorPriceMonitor connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
+      case 'sales':
+        return <div className="p-4"><SalesDashboard connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
+      case 'support':
+        return <div className="p-4"><SupportChat /></div>;
+      case 'stores':
+        return <div className="p-4"><MultiStoreManager connectedMarketplaces={connectedMarketplaces} onStoreChange={() => refetch()} /></div>;
       default:
         return null;
     }
