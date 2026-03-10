@@ -3428,9 +3428,9 @@ serve(async (req) => {
             const commResp = await fetch("https://common-api.wildberries.ru/api/v1/tariffs/commission", {
               headers: wbHeaders,
             });
-            if (commResp.ok) {
-              const commData = await commResp.json();
-              const commissions = Array.isArray(commData?.report) ? commData.report 
+             if (commResp.ok || commResp.status === 204) {
+               const commData = await safeJson(commResp, { report: [] });
+               const commissions = Array.isArray(commData?.report) ? commData.report 
                 : Array.isArray(commData) ? commData : [];
               
               // Build map: subjectName (lowercase) → commission %
