@@ -43,6 +43,7 @@ const MxikImport = lazy(() => import('@/components/sellercloud/MxikImport').then
 const MarketplaceReviews = lazy(() => import('@/components/sellercloud/MarketplaceReviews').then(m => ({ default: m.MarketplaceReviews })));
 const WBSellerAnalytics = lazy(() => import('@/components/sellercloud/WBSellerAnalytics').then(m => ({ default: m.WBSellerAnalytics })));
 const WBAdsCampaigns = lazy(() => import('@/components/sellercloud/WBAdsCampaigns').then(m => ({ default: m.WBAdsCampaigns })));
+const WBSearchKeywords = lazy(() => import('@/components/sellercloud/WBSearchKeywords').then(m => ({ default: m.WBSearchKeywords })));
 
 // Lightweight tab loading skeleton
 function TabLoader() {
