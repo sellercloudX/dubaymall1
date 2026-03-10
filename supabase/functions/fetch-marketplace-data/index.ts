@@ -13,6 +13,24 @@ const corsHeaders = {
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+/**
+ * Safely parse JSON from a Response.
+ * WB Partner API (2026-03-11+) returns 204 No Content for empty results.
+ * Calling .json() on 204 would throw — this helper returns a fallback instead.
+ */
+async function safeJson(response: Response, fallback: any = {}): Promise<any> {
+  if (response.status === 204 || response.headers.get('content-length') === '0') {
+    return fallback;
+  }
+  try {
+    const text = await response.text();
+    if (!text || text.trim() === '') return fallback;
+    return JSON.parse(text);
+  } catch {
+    return fallback;
+  }
+}
+
 // Retry wrapper for Yandex API calls with rate limit handling
 async function fetchWithRetry(
   url: string, 

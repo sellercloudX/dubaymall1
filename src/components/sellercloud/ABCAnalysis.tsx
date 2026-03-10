@@ -339,7 +339,7 @@ export function ABCAnalysis({ connectedMarketplaces, store }: ABCAnalysisProps) 
                         </div>
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-2 text-xs">
+                     <div className="grid grid-cols-3 gap-2 text-xs">
                       <div><span className="text-muted-foreground">Sotildi:</span><div className="font-medium">{product.totalSold} ta</div></div>
                       <div><span className="text-muted-foreground">Daromad:</span><div className="font-medium whitespace-nowrap">{formatPrice(product.totalRevenue)}</div></div>
                       <div>
@@ -349,6 +349,24 @@ export function ABCAnalysis({ connectedMarketplaces, store }: ABCAnalysisProps) 
                         </div>
                       </div>
                     </div>
+                    {/* Unit Economy — per-item cost breakdown */}
+                    {product.totalSold > 0 && (
+                      <div className="bg-muted/50 rounded-md p-2 text-[11px] space-y-0.5">
+                        <div className="font-medium text-muted-foreground mb-1">📊 1 dona uchun:</div>
+                        <div className="flex justify-between"><span>Narx:</span><span className="font-medium">{formatPrice(product.price)}</span></div>
+                        <div className="flex justify-between"><span>Komissiya:</span><span className="text-destructive">-{formatPrice(product.commissionAmount / product.totalSold)}</span></div>
+                        <div className="flex justify-between"><span>Logistika:</span><span className="text-destructive">-{formatPrice(product.logisticsCost / product.totalSold)}</span></div>
+                        {product.estimatedCost > 0 && (
+                          <div className="flex justify-between"><span>Tannarx+soliq:</span><span className="text-destructive">-{formatPrice((product.estimatedCost - product.commissionAmount - product.logisticsCost) / product.totalSold)}</span></div>
+                        )}
+                        <div className="flex justify-between border-t border-border/50 pt-0.5 mt-0.5">
+                          <span className="font-medium">Sof foyda:</span>
+                          <span className={`font-bold ${product.netProfit >= 0 ? 'text-primary' : 'text-destructive'}`}>
+                            {product.netProfit >= 0 ? '+' : ''}{formatPrice(product.netProfit / product.totalSold)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-muted-foreground">Marja:</span>
                       <span className={`font-medium ${product.profitMargin >= 0 ? 'text-primary' : 'text-destructive'}`}>{product.profitMargin.toFixed(0)}%</span>
