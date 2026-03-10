@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils';
 import {
   Globe, Package, ShoppingCart, BarChart3, Scan,
-  ArrowDownUp, DollarSign, Bell, FileSpreadsheet, CreditCard,
+  ArrowDownUp, DollarSign, Bell, FileSpreadsheet, CreditCard, Receipt,
   Calculator, Shield, Copy, AlertOctagon,
   MessageCircle, Activity, Megaphone, ChevronLeft, ChevronRight,
   LogOut, LayoutDashboard, Sun, Moon, Wallet, Search,
