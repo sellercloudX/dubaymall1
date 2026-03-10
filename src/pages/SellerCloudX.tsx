@@ -278,6 +278,8 @@ export default function SellerCloudX() {
         return <StockForecast connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'seo-monitor':
         return <SEOMonitor connectedMarketplaces={connectedMarketplaces} store={store} />;
+      case 'auto-reorder':
+        return <AutoReorderAlerts connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'inventory':
         return <InventorySync connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'pricing':
