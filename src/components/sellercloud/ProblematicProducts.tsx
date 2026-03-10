@@ -20,9 +20,10 @@ interface ProblematicProductsProps {
 interface ProblemProduct {
   id: string; name: string; sku: string; marketplace: string;
   price: number; stock: number;
-  problemType: 'low_sales' | 'high_returns' | 'low_stock' | 'no_sales' | 'overstock' | 'inactive';
+  problemType: 'low_sales' | 'high_returns' | 'low_stock' | 'no_sales' | 'overstock' | 'inactive' | 'stockout_soon';
   severity: 'critical' | 'warning' | 'info';
   description: string; metric: string; suggestion: string;
+  daysUntilStockout?: number;
 }
 
 const MARKETPLACE_NAMES: Record<string, string> = {
