@@ -3660,6 +3660,11 @@ serve(async (req) => {
               const spp = o.spp || 0; // WB buyer discount %
               const forPay = o.forPay || 0; // actual seller payout
 
+              // Determine FBO/FBS from warehouseName
+              const statsWh = (o.warehouseName || '').toLowerCase();
+              const statsFboKw = ['коледино', 'подольск', 'электросталь', 'казань', 'краснодар', 'екатеринбург', 'новосибирск', 'хабаровск', 'тула', 'wb'];
+              const statsIsFBO = statsFboKw.some(kw => statsWh.includes(kw));
+
               allOrders.push({
                 id: cleanId || o.nmId || Math.random(),
                 status,
@@ -3670,6 +3675,7 @@ serve(async (req) => {
                 itemsTotalUZS: price,
                 deliveryTotal: 0,
                 deliveryTotalUZS: 0,
+                fulfillmentType: statsIsFBO ? 'FBO' : 'FBS',
                 spp: spp > 0 ? spp : undefined,
                 forPay: forPay > 0 ? forPay : undefined,
                 items: [{
