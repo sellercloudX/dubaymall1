@@ -102,14 +102,18 @@ interface YandexOrder {
 // Helper to map WB order object to unified format
 // New Orders API returns prices in "сотые доли копеек" (hundredths of kopecks = value × 10000)
 // Statistics/Sales APIs return prices directly in RUB
+// 2026 update: FBS assembly tasks include convertedFinalPrice, currencyCode fields
 function mapWBOrder(o: any, defaultStatus: string, fromNewApi = false) {
   const rawPrice = o.convertedPrice || o.price || o.salePrice || 0;
   // New orders: divide by 10000 (hundredths of kopecks → RUB)
   const price = fromNewApi ? rawPrice / 10000 : rawPrice;
   
+  // FBS assembly: convertedFinalPrice (seller's currency × 100) or finalPrice (sale currency × 100)
+  const convertedFinal = fromNewApi && o.convertedFinalPrice 
+    ? o.convertedFinalPrice / 100 
+    : undefined;
+  
   // Build buyer info from available data
-  // New orders: address object with province/city
-  // Stats/Sales: regionName, oblast, countryName
   const region = fromNewApi 
     ? (o.address?.province || o.address?.city || o.regionName || '')
     : (o.regionName || o.oblast || '');
@@ -123,28 +127,48 @@ function mapWBOrder(o: any, defaultStatus: string, fromNewApi = false) {
     ? (o.id || o.rid)
     : (o.odid || o.orderID || o.id || o.rid);
 
+  // SPP (WB discount to buyer): available in stats/sales APIs
+  const spp = o.spp || 0;
+  // forPay: actual amount seller receives after ALL deductions
+  const forPay = o.forPay || 0;
+  // finishedPrice: price buyer actually paid (after WB discount)
+  const finishedPrice = o.finishedPrice || 0;
+
+  // Use best available price: convertedFinalPrice > finishedPrice > priceWithDisc > raw
+  const bestPrice = convertedFinal || (finishedPrice > 0 ? finishedPrice : price);
+
   return {
     id: orderId,
     status: defaultStatus,
     createdAt: o.createdAt || o.dateCreated || o.date || new Date().toISOString(),
-    total: price,
-    totalUZS: price,
-    itemsTotal: price,
-    itemsTotalUZS: price,
+    total: bestPrice,
+    totalUZS: bestPrice,
+    itemsTotal: bestPrice,
+    itemsTotalUZS: bestPrice,
     deliveryTotal: 0,
     deliveryTotalUZS: 0,
+    // WB-level financial fields
+    spp: spp > 0 ? spp : undefined,
+    forPay: forPay > 0 ? forPay : undefined,
     items: [{
       offerId: o.article || o.supplierArticle || "",
       offerName: o.subject || o.category || "",
       count: 1,
-      price: price,
-      priceUZS: price,
+      price: bestPrice,
+      priceUZS: bestPrice,
       nmID: o.nmId || undefined,
+      // Item-level WB financial details
+      spp: spp > 0 ? spp : undefined,
+      finishedPrice: finishedPrice > 0 ? finishedPrice : undefined,
+      forPay: forPay > 0 ? forPay : undefined,
     }],
     buyer: { firstName: buyerLocation, lastName: "" },
     nmID: o.nmId,
     warehouseName: o.warehouseName || "",
     deliveryType: o.deliveryType || "",
+    // WB sticker ID (DBS orders, Feb 2026+)
+    wbStickerId: o.wbStickerId || undefined,
+    scanPrice: fromNewApi && o.scanPrice ? o.scanPrice / 100 : undefined,
   };
 }
 
@@ -3609,6 +3633,10 @@ serve(async (req) => {
               const rawSrid = String(o.srid || '');
               const cleanId = rawSrid.endsWith('.0.0') ? rawSrid.slice(0, -4) : rawSrid;
 
+              // WB-specific financial fields
+              const spp = o.spp || 0; // WB buyer discount %
+              const forPay = o.forPay || 0; // actual seller payout
+
               allOrders.push({
                 id: cleanId || o.nmId || Math.random(),
                 status,
@@ -3619,6 +3647,8 @@ serve(async (req) => {
                 itemsTotalUZS: price,
                 deliveryTotal: 0,
                 deliveryTotalUZS: 0,
+                spp: spp > 0 ? spp : undefined,
+                forPay: forPay > 0 ? forPay : undefined,
                 items: [{
                   offerId: o.supplierArticle || o.techSize || "",
                   offerName: o.subject || o.category || "",
@@ -3626,6 +3656,9 @@ serve(async (req) => {
                   price: price,
                   priceUZS: price,
                   nmID: o.nmId || undefined,
+                  spp: spp > 0 ? spp : undefined,
+                  finishedPrice: o.finishedPrice || undefined,
+                  forPay: forPay > 0 ? forPay : undefined,
                 }],
                 buyer: { firstName: buyerRegion, lastName: "" },
                 nmID: o.nmId,
@@ -3665,6 +3698,8 @@ serve(async (req) => {
               
               // Sales API returns prices in RUBLES (not kopecks)
               const price = sale.finishedPrice || sale.priceWithDisc || sale.totalPrice || 0;
+              const spp = sale.spp || 0;
+              const forPay = sale.forPay || 0;
               
               salesAdded++;
               allOrders.push({
@@ -3677,6 +3712,8 @@ serve(async (req) => {
                 itemsTotalUZS: price,
                 deliveryTotal: 0,
                 deliveryTotalUZS: 0,
+                spp: spp > 0 ? spp : undefined,
+                forPay: forPay > 0 ? forPay : undefined,
                 items: [{
                   offerId: sale.supplierArticle || "",
                   offerName: sale.subject || sale.category || "",
@@ -3684,6 +3721,9 @@ serve(async (req) => {
                   price: price,
                   priceUZS: price,
                   nmID: sale.nmId || undefined,
+                  spp: spp > 0 ? spp : undefined,
+                  finishedPrice: sale.finishedPrice || undefined,
+                  forPay: forPay > 0 ? forPay : undefined,
                 }],
                 buyer: { firstName: sale.regionName || sale.oblast || "", lastName: "" },
               });
@@ -4103,7 +4143,9 @@ serve(async (req) => {
           result = { success: false, error: "WB narxlarni yangilashda xato" };
         }
       } else if (dataType === "stats" || dataType === "financials") {
-        // Financial report from Statistics API
+        // Financial report from Statistics API v5
+        // 2026 update: properly extract ppvz_for_pay, delivery_rub, penalty, 
+        // additional_payment, payment_schedule, currency fields
         try {
           const endDate = new Date();
           const startDate = new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -4119,25 +4161,59 @@ serve(async (req) => {
              const reportData = await safeJson(reportResp, []);
             const entries = Array.isArray(reportData) ? reportData : [];
             console.log(`WB financial report: ${entries.length} entries`);
+            if (entries.length > 0) {
+              const sample = entries[0];
+              console.log(`WB report sample keys: ${Object.keys(sample).join(', ')}`);
+              console.log(`WB report sample: ppvz_for_pay=${sample.ppvz_for_pay}, delivery_rub=${sample.delivery_rub}, penalty=${sample.penalty}, commission_percent=${sample.commission_percent}, payment_schedule=${sample.payment_schedule}, currency=${sample.currency}`);
+            }
 
-            // Aggregate by subject
+            // Detailed aggregation with new fields
             const summary = {
-              totalSales: 0,
-              totalCommission: 0,
-              totalLogistics: 0,
-              totalPenalties: 0,
-              totalReturns: 0,
+              totalSales: 0,           // retail_price_withdisc_rub — full sale price
+              totalSellerPayout: 0,    // ppvz_for_pay — actual seller payout
+              totalCommission: 0,      // ppvz_kvw_prc_base + ppvz_kvw_prc
+              totalLogistics: 0,       // delivery_rub
+              totalStorage: 0,         // storage_fee
+              totalPenalties: 0,       // penalty
+              totalAdditional: 0,      // additional_payment (subsidies)
+              totalReturns: 0,         // return_amount
+              totalAcceptance: 0,      // acceptance (приемка)
+              totalPaymentSchedule: 0, // payment_schedule (instant withdrawal fee)
+              totalSpp: 0,             // ppvz_spp_prc — WB discount amount
               netIncome: 0,
+              currency: '',
             };
 
             entries.forEach((e: any) => {
-              summary.totalSales += e.retail_price_withdisc_rub || e.ppvz_for_pay || 0;
-              summary.totalCommission += e.commission_percent ? (e.retail_price_withdisc_rub * e.commission_percent / 100) : 0;
+              // ppvz_for_pay = actual amount seller gets per item (most accurate)
+              summary.totalSellerPayout += e.ppvz_for_pay || 0;
+              // retail_price_withdisc_rub = sale price before marketplace deductions
+              summary.totalSales += e.retail_price_withdisc_rub || 0;
+              // Commission: use ppvz_kvw_prc (marketplace retention) if available
+              const commAmount = e.ppvz_kvw_prc || (e.commission_percent ? (e.retail_price_withdisc_rub || 0) * e.commission_percent / 100 : 0);
+              summary.totalCommission += commAmount;
+              // Logistics
               summary.totalLogistics += e.delivery_rub || 0;
-              summary.totalPenalties += e.penalty || 0;
+              // Storage fee
+              summary.totalStorage += e.storage_fee || 0;
+              // Penalties
+              summary.totalPenalties += Math.abs(e.penalty || 0);
+              // Additional payment (subsidies from WB, positive = seller benefit)
+              summary.totalAdditional += e.additional_payment || 0;
+              // Returns
               summary.totalReturns += e.return_amount || 0;
+              // Acceptance fee
+              summary.totalAcceptance += e.acceptance || 0;
+              // Payment schedule (instant withdrawal fee)
+              summary.totalPaymentSchedule += e.payment_schedule || 0;
+              // SPP amount (WB discount)
+              summary.totalSpp += e.ppvz_spp_prc || 0;
+              // Track currency
+              if (e.currency && !summary.currency) summary.currency = e.currency;
             });
-            summary.netIncome = summary.totalSales - summary.totalCommission - summary.totalLogistics - summary.totalPenalties;
+            
+            // Net income = payout - penalties - returns + additional
+            summary.netIncome = summary.totalSellerPayout - summary.totalPenalties + summary.totalAdditional;
 
             result = { 
               success: true, 

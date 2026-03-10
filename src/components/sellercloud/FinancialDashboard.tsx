@@ -68,8 +68,10 @@ export function FinancialDashboard({
     let totalMarketplaceFees = 0;
     let realTariffCount = 0;
     let totalItemRevenue = 0;
+    let totalWbSppAmount = 0;
+    let totalWbForPay = 0;
 
-    const feesByMarketplace: Record<string, { fees: number; feePercent: string; revenue: number; orders: number }> = {};
+    const feesByMarketplace: Record<string, { fees: number; feePercent: string; revenue: number; orders: number; sppAmount: number; forPayTotal: number }> = {};
 
     const marketplaceBreakdown = activeMarketplaces.map(marketplace => {
       const orders = store.getOrders(marketplace);
@@ -85,39 +87,50 @@ export function FinancialDashboard({
       
       let mpRevenue = 0;
       let mpFees = 0;
+      let mpSpp = 0;
+      let mpForPay = 0;
 
       activeOrders.forEach(order => {
         (order.items || []).forEach(item => {
           const cost = getCostPrice(marketplace, item.offerId);
           const qty = item.count || 1;
-          // Always convert from native currency — never trust priceUZS (may be RUB for WB)
           const itemPrice = toDisplayUzs(item.price || 0, marketplace);
           const itemRevenue = itemPrice * qty;
           totalProductCount += qty;
           mpRevenue += itemRevenue;
           
           if (cost !== null) {
-            // Cost price for WB is in RUB, convert to UZS
             totalProductCost += toDisplayUzs(cost, marketplace) * qty;
             costPricesCovered += qty;
           }
 
-          // Tariffs are already in UZS (WB tariffs converted in useMarketplaceTariffs)
           const tariff = getTariffForProduct(tariffMap, item.offerId, itemPrice, marketplace);
           const itemFees = tariff.totalFee * qty;
           mpFees += itemFees;
           totalMarketplaceFees += itemFees;
           if (tariff.isReal) realTariffCount += qty;
+
+          // WB SPP: WB discount to buyer (seller bears cost)
+          if (marketplace === 'wildberries' && item.spp && item.spp > 0) {
+            mpSpp += toDisplayUzs((item.price || 0) * item.spp / 100, 'wildberries') * qty;
+          }
+          if (marketplace === 'wildberries' && item.forPay && item.forPay > 0) {
+            mpForPay += toDisplayUzs(item.forPay, 'wildberries') * qty;
+          }
         });
       });
 
       totalItemRevenue += mpRevenue;
+      totalWbSppAmount += mpSpp;
+      totalWbForPay += mpForPay;
 
       feesByMarketplace[marketplace] = {
         fees: mpFees,
         feePercent: mpRevenue > 0 ? ((mpFees / mpRevenue) * 100).toFixed(1) : '0',
         revenue: mpRevenue,
         orders: activeOrders.length,
+        sppAmount: mpSpp,
+        forPayTotal: mpForPay,
       };
 
       return {
@@ -129,7 +142,6 @@ export function FinancialDashboard({
     const totalRevenue = totalItemRevenue;
     const totalOrders = marketplaceBreakdown.reduce((s, m) => s + m.orders, 0);
     
-    // Tax per marketplace
     let totalTax = 0;
     activeMarketplaces.forEach(mp => {
       const taxRate = MARKETPLACE_TAX[mp] ?? 0.04;
@@ -142,8 +154,9 @@ export function FinancialDashboard({
     const costCoverage = totalProductCount > 0 ? Math.round((costPricesCovered / totalProductCount) * 100) : 0;
     const tariffCoverage = totalProductCount > 0 ? Math.round((realTariffCount / totalProductCount) * 100) : 0;
     const feePercent = totalRevenue > 0 ? ((totalMarketplaceFees / totalRevenue) * 100).toFixed(1) : '0';
+    const hasWbSpp = totalWbSppAmount > 0;
 
-    return { totalRevenue, totalOrders, totalMarketplaceFees, feePercent, totalTax, totalExpenses, netProfit, profitMargin, marketplaceBreakdown, totalProductCost, costCoverage, tariffCoverage, feesByMarketplace };
+    return { totalRevenue, totalOrders, totalMarketplaceFees, feePercent, totalTax, totalExpenses, netProfit, profitMargin, marketplaceBreakdown, totalProductCost, costCoverage, tariffCoverage, feesByMarketplace, hasWbSpp, totalWbSppAmount, totalWbForPay };
   }, [activeMarketplaces, store.dataVersion, isLoading, getCostPrice, tariffUpdatedAt, dateFrom, dateTo, selectedMp]);
 
   const formatPrice = (price: number) => {
@@ -299,7 +312,20 @@ export function FinancialDashboard({
               </div>
             )}
 
-            {/* Tax */}
+            {/* WB SPP (WB chegirma) — only show when data available */}
+            {summary.hasWbSpp && (
+              <div className="flex items-center justify-between p-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20 gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center shrink-0"><Percent className="h-4 w-4 text-amber-600" /></div>
+                  <div className="min-w-0">
+                    <div className="font-medium text-sm truncate">WB chegirma (SPP)</div>
+                    <div className="text-xs text-muted-foreground">WB xaridor uchun chegirma — sotuvchi hisobidan</div>
+                  </div>
+                </div>
+                <div className="text-right shrink-0"><div className="font-bold text-sm whitespace-nowrap text-amber-600">{formatFullPrice(summary.totalWbSppAmount)}</div></div>
+              </div>
+            )}
+
             <div className="flex items-center justify-between p-3 rounded-lg border gap-2">
               <div className="flex items-center gap-2 min-w-0">
                 <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0"><DollarSign className="h-4 w-4 text-muted-foreground" /></div>
