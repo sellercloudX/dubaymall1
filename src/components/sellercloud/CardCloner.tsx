@@ -351,11 +351,6 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
   };
 
   const handleClone = async () => {
-    console.log('[CardCloner] handleClone called', { 
-      selectedCount: selectedProducts.length, 
-      targets: targetMarketplaces,
-      cloneHistorySize: cloneHistoryKeys.size 
-    });
     if (selectedProducts.length === 0 || targetMarketplaces.length === 0) {
       console.log('[CardCloner] No products or targets selected, returning');
       return;
