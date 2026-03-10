@@ -13,6 +13,7 @@ import { useSellerCloudSubscription } from '@/hooks/useSellerCloudSubscription';
 import { useMarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 import { calculateTotalRevenue } from '@/lib/revenueCalculations';
 import { useAutoNotifications } from '@/hooks/useAutoNotifications';
+import { useAutoSync } from '@/hooks/useAutoSync';
 import { toast } from 'sonner';
 import { useExchangeRate } from '@/hooks/useExchangeRate';
 import { 
@@ -45,9 +46,9 @@ const ProfitCalculator = lazy(() => import('@/components/sellercloud/ProfitCalcu
 const CostPriceManager = lazy(() => import('@/components/sellercloud/CostPriceManager').then(m => ({ default: m.CostPriceManager })));
 const AIScannerPro = lazy(() => import('@/components/seller/AIScannerPro').then(m => ({ default: m.AIScannerPro })));
 const MarketplaceReviews = lazy(() => import('@/components/sellercloud/MarketplaceReviews').then(m => ({ default: m.MarketplaceReviews })));
-const WBSellerAnalytics = lazy(() => import('@/components/sellercloud/WBSellerAnalytics').then(m => ({ default: m.WBSellerAnalytics })));
-const WBAdsCampaigns = lazy(() => import('@/components/sellercloud/WBAdsCampaigns').then(m => ({ default: m.WBAdsCampaigns })));
-const WBSearchKeywords = lazy(() => import('@/components/sellercloud/WBSearchKeywords').then(m => ({ default: m.WBSearchKeywords })));
+const MarketplaceSellerAnalytics = lazy(() => import('@/components/sellercloud/MarketplaceSellerAnalytics').then(m => ({ default: m.MarketplaceSellerAnalytics })));
+const MarketplaceAdsCampaigns = lazy(() => import('@/components/sellercloud/MarketplaceAdsCampaigns').then(m => ({ default: m.MarketplaceAdsCampaigns })));
+const MarketplaceSearchKeywords = lazy(() => import('@/components/sellercloud/MarketplaceSearchKeywords').then(m => ({ default: m.MarketplaceSearchKeywords })));
 const SupportChat = lazy(() => import('@/components/sellercloud/SupportChat').then(m => ({ default: m.SupportChat })));
 const SalesDashboard = lazy(() => import('@/components/sellercloud/SalesDashboard').then(m => ({ default: m.SalesDashboard })));
 const MultiStoreManager = lazy(() => import('@/components/sellercloud/MultiStoreManager').then(m => ({ default: m.MultiStoreManager })));
@@ -72,8 +73,8 @@ const pageTitles: Record<string, string> = {
   sales: 'Sotuvlar hisoboti',
   'product-analytics': 'Mahsulot analitika',
   analytics: 'Umumiy analitika',
-  'wb-analytics': 'WB Analitika',
-  'wb-keywords': 'WB Qidiruv so\'zlari',
+  'wb-analytics': 'Sotuvchi analitikasi',
+  'wb-keywords': 'Qidiruv so\'zlari',
   financials: 'Moliyaviy dashboard',
   abc: 'ABC-analiz',
   'cost-prices': 'Tannarx boshqaruvi',
@@ -174,6 +175,7 @@ export default function SellerCloudX() {
   const isBlocked = accessStatus?.blocked === true;
   const daysLeft = accessStatus?.days_left as number | undefined;
   const expiryWarning = accessStatus?.warning === true;
+  useAutoSync({ connectedMarketplaces, enabled: !!subscription && !isBlocked, onSyncComplete: refetch });
 
   if (authLoading || subscriptionLoading) {
     return (
@@ -259,9 +261,9 @@ export default function SellerCloudX() {
       case 'product-analytics':
         return <MarketplaceProductAnalytics connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'wb-analytics':
-        return <WBSellerAnalytics connectedMarketplaces={connectedMarketplaces} />;
+        return <MarketplaceSellerAnalytics connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'wb-keywords':
-        return <WBSearchKeywords connectedMarketplaces={connectedMarketplaces} />;
+        return <MarketplaceSearchKeywords connectedMarketplaces={connectedMarketplaces} />;
       case 'financials':
         return <FinancialDashboard connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'abc':
@@ -287,7 +289,7 @@ export default function SellerCloudX() {
       case 'reviews':
         return <MarketplaceReviews connectedMarketplaces={connectedMarketplaces} />;
       case 'ads':
-        return <WBAdsCampaigns connectedMarketplaces={connectedMarketplaces} />;
+        return <MarketplaceAdsCampaigns connectedMarketplaces={connectedMarketplaces} />;
       case 'min-price':
         return <MinPriceProtection connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'clone':
