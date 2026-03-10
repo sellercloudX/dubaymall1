@@ -3633,6 +3633,10 @@ serve(async (req) => {
               const rawSrid = String(o.srid || '');
               const cleanId = rawSrid.endsWith('.0.0') ? rawSrid.slice(0, -4) : rawSrid;
 
+              // WB-specific financial fields
+              const spp = o.spp || 0; // WB buyer discount %
+              const forPay = o.forPay || 0; // actual seller payout
+
               allOrders.push({
                 id: cleanId || o.nmId || Math.random(),
                 status,
@@ -3643,6 +3647,8 @@ serve(async (req) => {
                 itemsTotalUZS: price,
                 deliveryTotal: 0,
                 deliveryTotalUZS: 0,
+                spp: spp > 0 ? spp : undefined,
+                forPay: forPay > 0 ? forPay : undefined,
                 items: [{
                   offerId: o.supplierArticle || o.techSize || "",
                   offerName: o.subject || o.category || "",
@@ -3650,6 +3656,9 @@ serve(async (req) => {
                   price: price,
                   priceUZS: price,
                   nmID: o.nmId || undefined,
+                  spp: spp > 0 ? spp : undefined,
+                  finishedPrice: o.finishedPrice || undefined,
+                  forPay: forPay > 0 ? forPay : undefined,
                 }],
                 buyer: { firstName: buyerRegion, lastName: "" },
                 nmID: o.nmId,
