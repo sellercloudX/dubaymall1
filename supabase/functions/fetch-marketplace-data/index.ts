@@ -3523,12 +3523,12 @@ serve(async (req) => {
               const allOrdersUrl = `https://marketplace-api.wildberries.ru/api/v3/orders?limit=200&next=${nextCursor}&dateFrom=${sevenDaysAgo}`;
               const allOrdersResp = await fetch(allOrdersUrl, { headers: wbHeaders });
               
-              if (!allOrdersResp.ok) {
-                console.warn(`WB all orders fetch failed: ${allOrdersResp.status}`);
-                break;
-              }
-              
-              const allOrdersData = await allOrdersResp.json();
+               if (!allOrdersResp.ok && allOrdersResp.status !== 204) {
+                 console.warn(`WB all orders fetch failed: ${allOrdersResp.status}`);
+                 break;
+               }
+               
+               const allOrdersData = await safeJson(allOrdersResp, { orders: [] });
               const pageOrders = allOrdersData.orders || [];
               console.log(`WB all orders page ${allOrdersPage}: ${pageOrders.length} orders`);
               
