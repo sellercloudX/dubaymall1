@@ -512,9 +512,8 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
           ]);
           if (raceResult.length > 0) {
             generatedInfos = raceResult;
-            console.log(`✅ Images ready before card creation: ${generatedInfos.length} ta`);
+            // Images ready
           } else {
-            console.log('⏳ Images still generating, creating card with reference image...');
             toast.info('Rasmlar yaratilmoqda... Kartochka reference rasm bilan yaratiladi');
           }
         } catch {
