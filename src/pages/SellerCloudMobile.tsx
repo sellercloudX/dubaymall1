@@ -5,6 +5,7 @@ import { useMarketplaceConnections } from '@/hooks/useMarketplaceConnections';
 import { useSellerCloudSubscription } from '@/hooks/useSellerCloudSubscription';
 import { useMarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 import { calculateTotalRevenue } from '@/lib/revenueCalculations';
+import { useAutoNotifications } from '@/hooks/useAutoNotifications';
 import { MobileSellerCloudNav, type MobileTabType } from '@/components/mobile/MobileSellerCloudNav';
 import { MobileSellerCloudHeader } from '@/components/mobile/MobileSellerCloudHeader';
 import { BackgroundTasksPanel } from '@/components/mobile/BackgroundTasksPanel';
