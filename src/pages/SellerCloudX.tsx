@@ -260,9 +260,9 @@ export default function SellerCloudX() {
       case 'product-analytics':
         return <MarketplaceProductAnalytics connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'wb-analytics':
-        return <WBSellerAnalytics connectedMarketplaces={connectedMarketplaces} />;
+        return <MarketplaceSellerAnalytics connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'wb-keywords':
-        return <WBSearchKeywords connectedMarketplaces={connectedMarketplaces} />;
+        return <MarketplaceSearchKeywords connectedMarketplaces={connectedMarketplaces} />;
       case 'financials':
         return <FinancialDashboard connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'abc':
