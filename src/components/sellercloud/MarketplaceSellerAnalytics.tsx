@@ -85,7 +85,7 @@ export function MarketplaceSellerAnalytics({ connectedMarketplaces, store }: Pro
           return {
             name: p.name,
             offerId: p.offerId,
-            photo: p.photo,
+            photo: p.pictures?.[0],
             orders: orderData.count,
             revenue: orderData.revenue,
             stock: (p.stockFBO || 0) + (p.stockFBS || 0),
