@@ -3384,8 +3384,8 @@ serve(async (req) => {
               const pricesResp = await fetch(`https://discounts-prices-api.wildberries.ru/api/v2/list/goods/filter?limit=${priceLimit}&offset=${offset}`, {
                 headers: wbHeaders,
               });
-              if (!pricesResp.ok) break;
-              const pricesData = await pricesResp.json();
+               if (!pricesResp.ok && pricesResp.status !== 204) break;
+               const pricesData = await safeJson(pricesResp, { data: { listGoods: [] } });
               const goods = pricesData.data?.listGoods || [];
               if (goods.length === 0) break;
               allGoods.push(...goods);
