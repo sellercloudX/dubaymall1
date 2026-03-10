@@ -3137,53 +3137,65 @@ serve(async (req) => {
       } else if (dataType === "feedbacks" || dataType === "reviews") {
         // Uzum Market: Fetch product reviews
         try {
-          // Try Uzum seller reviews API
-          const reviewParams = new URLSearchParams();
-          if (uzumShopId) reviewParams.append("shopId", String(uzumShopId));
-          reviewParams.append("size", "50");
-          reviewParams.append("page", String(requestBody.page || 0));
-          
-          const reviewEndpoints = [
-            `${uzumBaseUrl}/v1/review/list?${reviewParams.toString()}`,
-            `${uzumBaseUrl}/v2/review?${reviewParams.toString()}`,
-            `${uzumBaseUrl}/v1/feedback?${reviewParams.toString()}`,
-          ];
-
           let reviews: any[] = [];
-          for (const endpoint of reviewEndpoints) {
-            try {
-              const revResp = await fetch(endpoint, { headers: uzumHeaders });
-              if (revResp.ok) {
-                const revData = await revResp.json();
-                const items = revData.payload || revData.data || revData.content || [];
-                if (Array.isArray(items) && items.length > 0) {
-                  reviews = items;
-                  console.log(`Uzum reviews: got ${reviews.length} from ${endpoint}`);
-                  break;
+          
+          // Try all known Uzum review endpoints for each shop
+          for (const shopId of allShopIds) {
+            const reviewParams = new URLSearchParams();
+            reviewParams.append("shopId", String(shopId));
+            reviewParams.append("size", "50");
+            reviewParams.append("page", String(requestBody.page || 0));
+            
+            const reviewEndpoints = [
+              `${uzumBaseUrl}/v1/review/list?${reviewParams.toString()}`,
+              `${uzumBaseUrl}/v2/review?${reviewParams.toString()}`,
+              `${uzumBaseUrl}/v1/feedback?${reviewParams.toString()}`,
+              `${uzumBaseUrl}/v1/reviews?${reviewParams.toString()}`,
+              `${uzumBaseUrl}/v2/reviews?${reviewParams.toString()}`,
+              `${uzumBaseUrl}/v1/feedback/list?${reviewParams.toString()}`,
+            ];
+
+            for (const endpoint of reviewEndpoints) {
+              try {
+                console.log(`Uzum reviews: trying ${endpoint}`);
+                const revResp = await fetch(endpoint, { headers: uzumHeaders });
+                console.log(`Uzum reviews: ${endpoint} => status ${revResp.status}`);
+                if (revResp.ok) {
+                  const revData = await revResp.json();
+                  const items = revData.payload?.content || revData.payload || revData.data || revData.content || [];
+                  if (Array.isArray(items) && items.length > 0) {
+                    reviews = [...reviews, ...items];
+                    console.log(`Uzum reviews: got ${items.length} from ${endpoint}`);
+                    break;
+                  }
                 }
+              } catch {
+                // Try next endpoint
               }
-            } catch {
-              // Try next endpoint
             }
+            if (reviews.length > 0) break; // Got reviews from one shop
+            await sleep(300);
           }
+
+          console.log(`Uzum total reviews: ${reviews.length}`);
 
           const mapped = reviews.map((r: any) => ({
             id: String(r.id || r.reviewId || r.feedbackId || Math.random()),
             offerId: String(r.productId || r.skuId || ''),
             productName: r.productTitle || r.productName || r.skuTitle || '',
-            userName: r.authorName || r.customerName || 'Xaridor',
-            text: r.body || r.text || r.comment || '',
-            answer: r.answer?.body || r.sellerComment || r.reply || null,
-            rating: r.rating || r.grade || 0,
-            createdAt: r.createdAt || r.date || '',
-            photos: (r.photos || r.media || []).map((p: any) => typeof p === 'string' ? p : p.url || ''),
-            isAnswered: !!(r.answer?.body || r.sellerComment || r.reply),
+            userName: r.authorName || r.customerName || r.author || 'Xaridor',
+            text: r.body || r.text || r.comment || r.content || '',
+            answer: r.answer?.body || r.sellerComment || r.reply || r.shopComment || null,
+            rating: r.rating || r.grade || r.stars || 0,
+            createdAt: r.createdAt || r.date || r.createdDate || '',
+            photos: (r.photos || r.media || r.images || []).map((p: any) => typeof p === 'string' ? p : p.url || ''),
+            isAnswered: !!(r.answer?.body || r.sellerComment || r.reply || r.shopComment),
           }));
 
           result = { success: true, data: mapped, total: mapped.length };
         } catch (e) {
           console.error("Uzum reviews error:", e);
-          result = { success: false, error: "Uzum reviews fetch error" };
+          result = { success: false, error: "Uzum reviews fetch error: " + (e as Error).message };
         }
       } else if (dataType === "answer-feedback") {
         // Uzum Market: Answer a review
