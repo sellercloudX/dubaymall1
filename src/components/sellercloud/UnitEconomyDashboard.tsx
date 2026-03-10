@@ -282,7 +282,7 @@ export function UnitEconomyDashboard({ connectedMarketplaces, store }: Props) {
                         <div className="flex items-center gap-1.5">
                           <MarketplaceLogo marketplace={s.marketplace} size={12} />
                           <span className="text-[10px] text-muted-foreground">{s.offerId}</span>
-                          {!s.hasCostPrice && <AlertTriangle className="h-3 w-3 text-amber-500" title="Tannarx kiritilmagan" />}
+                          {!s.hasCostPrice && <span title="Tannarx kiritilmagan"><AlertTriangle className="h-3 w-3 text-amber-500" /></span>}
                         </div>
                       </div>
                     </div>

@@ -39,6 +39,7 @@ export const sellerMenuItems: SellerMenuItem[] = [
   { id: 'calculator', label: 'Kalkulyator', icon: Calculator, group: 'analytics' },
   { id: 'seo-monitor', label: 'SEO Monitor', icon: Search, group: 'analytics' },
   { id: 'competitor', label: 'Raqobat narx', icon: ArrowDownUp, group: 'tools' },
+  { id: 'stock-forecast', label: 'Zaxira prognoz', icon: Activity, group: 'tools' },
   { id: 'inventory', label: 'Zaxira sinxron', icon: ArrowDownUp, group: 'tools' },
   { id: 'pricing', label: 'Narxlar', icon: DollarSign, group: 'tools' },
   { id: 'reviews', label: 'Sharhlar', icon: MessageCircle, group: 'tools' },
