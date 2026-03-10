@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils';
 import {
   Globe, Package, ShoppingCart, BarChart3, Scan,
-  ArrowDownUp, DollarSign, Bell, FileSpreadsheet, CreditCard,
+  ArrowDownUp, DollarSign, Bell, FileSpreadsheet, CreditCard, Receipt,
   Calculator, Shield, Copy, AlertOctagon,
   MessageCircle, Activity, Megaphone, ChevronLeft, ChevronRight,
   LogOut, LayoutDashboard, Sun, Moon, Wallet, Search,
@@ -33,10 +33,13 @@ export const sellerMenuItems: SellerMenuItem[] = [
   { id: 'wb-analytics', label: 'WB Analitika', icon: Activity, group: 'analytics' },
   { id: 'wb-keywords', label: 'WB Qidiruv', icon: Search, group: 'analytics' },
   { id: 'financials', label: 'Moliya', icon: Calculator, group: 'analytics' },
+  { id: 'unit-economy', label: 'Unit-economy', icon: Receipt, group: 'analytics' },
   { id: 'abc', label: 'ABC-analiz', icon: BarChart3, group: 'analytics' },
   { id: 'cost-prices', label: 'Tannarx', icon: DollarSign, group: 'analytics' },
   { id: 'calculator', label: 'Kalkulyator', icon: Calculator, group: 'analytics' },
+  { id: 'seo-monitor', label: 'SEO Monitor', icon: Search, group: 'analytics' },
   { id: 'competitor', label: 'Raqobat narx', icon: ArrowDownUp, group: 'tools' },
+  { id: 'stock-forecast', label: 'Zaxira prognoz', icon: Activity, group: 'tools' },
   { id: 'inventory', label: 'Zaxira sinxron', icon: ArrowDownUp, group: 'tools' },
   { id: 'pricing', label: 'Narxlar', icon: DollarSign, group: 'tools' },
   { id: 'reviews', label: 'Sharhlar', icon: MessageCircle, group: 'tools' },

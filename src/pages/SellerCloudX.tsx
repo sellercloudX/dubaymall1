@@ -52,6 +52,9 @@ const SupportChat = lazy(() => import('@/components/sellercloud/SupportChat').th
 const SalesDashboard = lazy(() => import('@/components/sellercloud/SalesDashboard').then(m => ({ default: m.SalesDashboard })));
 const MultiStoreManager = lazy(() => import('@/components/sellercloud/MultiStoreManager').then(m => ({ default: m.MultiStoreManager })));
 const CompetitorPriceMonitor = lazy(() => import('@/components/sellercloud/CompetitorPriceMonitor').then(m => ({ default: m.CompetitorPriceMonitor })));
+const UnitEconomyDashboard = lazy(() => import('@/components/sellercloud/UnitEconomyDashboard').then(m => ({ default: m.UnitEconomyDashboard })));
+const StockForecast = lazy(() => import('@/components/sellercloud/StockForecast').then(m => ({ default: m.StockForecast })));
+const SEOMonitor = lazy(() => import('@/components/sellercloud/SEOMonitor').then(m => ({ default: m.SEOMonitor })));
 
 const TabLoader = React.forwardRef<HTMLDivElement>((_, ref) => <div ref={ref} className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>);
 TabLoader.displayName = 'TabLoader';
@@ -84,6 +87,9 @@ const pageTitles: Record<string, string> = {
   notifications: 'Bildirishnomalar',
   competitor: 'Raqobat narx monitoring',
   support: 'Yordam markazi',
+  'unit-economy': 'Unit-economy (SKU)',
+  'stock-forecast': 'Zaxira prognozi',
+  'seo-monitor': 'SEO Monitor',
 };
 
 export default function SellerCloudX() {
@@ -258,6 +264,12 @@ export default function SellerCloudX() {
         return <ProfitCalculator />;
       case 'competitor':
         return <CompetitorPriceMonitor connectedMarketplaces={connectedMarketplaces} store={store} />;
+      case 'unit-economy':
+        return <UnitEconomyDashboard connectedMarketplaces={connectedMarketplaces} store={store} />;
+      case 'stock-forecast':
+        return <StockForecast connectedMarketplaces={connectedMarketplaces} store={store} />;
+      case 'seo-monitor':
+        return <SEOMonitor connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'inventory':
         return <InventorySync connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'pricing':
