@@ -31,6 +31,7 @@ const MARKETPLACE_NAMES: Record<string, string> = {
 };
 
 const PROBLEM_TYPES = {
+  stockout_soon: { label: 'Tugaydi', icon: AlertTriangle, color: 'text-red-600' },
   no_sales: { label: 'Sotilmagan', icon: XCircle, color: 'text-red-600' },
   low_sales: { label: 'Kam sotilgan', icon: TrendingDown, color: 'text-orange-600' },
   low_stock: { label: 'Kam qoldiq', icon: AlertTriangle, color: 'text-amber-600' },
