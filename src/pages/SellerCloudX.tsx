@@ -13,6 +13,7 @@ import { useSellerCloudSubscription } from '@/hooks/useSellerCloudSubscription';
 import { useMarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 import { calculateTotalRevenue } from '@/lib/revenueCalculations';
 import { useAutoNotifications } from '@/hooks/useAutoNotifications';
+import { useAutoSync } from '@/hooks/useAutoSync';
 import { toast } from 'sonner';
 import { useExchangeRate } from '@/hooks/useExchangeRate';
 import { 
