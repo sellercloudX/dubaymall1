@@ -4715,7 +4715,7 @@ serve(async (req) => {
           } else {
             const action = dataType === "ads-pause" ? "pause" : "start";
             const resp = await fetch(
-              `https://advert-api.wildberries.ru/adv/v0//${action}?id=${advertId}`,
+              `https://advert-api.wildberries.ru/adv/v0/${action}?id=${advertId}`,
               { method: "GET", headers: wbHeaders }
             );
             if (resp.ok || resp.status === 204) {
@@ -4728,6 +4728,80 @@ serve(async (req) => {
         } catch (e) {
           console.error("WB ads action error:", e);
           result = { success: false, error: "Error performing ads action" };
+        }
+      } else if (dataType === "ads-budget") {
+        // WB Ads: update daily budget for a campaign
+        try {
+          const { advertId, dailyBudget } = requestBody;
+          if (!advertId || dailyBudget === undefined) {
+            result = { success: false, error: "advertId and dailyBudget required" };
+          } else {
+            const resp = await fetch(
+              `https://advert-api.wildberries.ru/adv/v0/budget/deposit`,
+              {
+                method: "POST",
+                headers: wbHeaders,
+                body: JSON.stringify({ id: advertId, sum: dailyBudget, type: 1 }),
+              }
+            );
+            if (resp.ok || resp.status === 204) {
+              result = { success: true, message: `Byudjet yangilandi: ${dailyBudget} ₽` };
+            } else {
+              const errText = await resp.text();
+              result = { success: false, error: `Budget update failed: ${resp.status}`, details: errText };
+            }
+          }
+        } catch (e) {
+          console.error("WB ads budget error:", e);
+          result = { success: false, error: "Error updating ads budget" };
+        }
+      } else if (dataType === "ads-cpm") {
+        // WB Ads: update CPM bid for a campaign
+        try {
+          const { advertId, cpm, type, param } = requestBody;
+          if (!advertId || !cpm) {
+            result = { success: false, error: "advertId and cpm required" };
+          } else {
+            const resp = await fetch(
+              `https://advert-api.wildberries.ru/adv/v0/cpm`,
+              {
+                method: "POST",
+                headers: wbHeaders,
+                body: JSON.stringify({
+                  advertId,
+                  type: type || 6,
+                  cpm,
+                  param: param || 0,
+                }),
+              }
+            );
+            if (resp.ok || resp.status === 204) {
+              result = { success: true, message: `CPM yangilandi: ${cpm} ₽` };
+            } else {
+              const errText = await resp.text();
+              result = { success: false, error: `CPM update failed: ${resp.status}`, details: errText };
+            }
+          }
+        } catch (e) {
+          console.error("WB ads CPM error:", e);
+          result = { success: false, error: "Error updating ads CPM" };
+        }
+      } else if (dataType === "ads-balance") {
+        // WB Ads: get advertising balance
+        try {
+          const resp = await fetch(
+            "https://advert-api.wildberries.ru/adv/v1/balance",
+            { headers: wbHeaders }
+          );
+          if (resp.ok) {
+            const balData = await safeJson(resp, {});
+            result = { success: true, balance: balData.balance || 0, bonus: balData.bonus || 0 };
+          } else {
+            result = { success: false, error: `Balance fetch failed: ${resp.status}` };
+          }
+        } catch (e) {
+          console.error("WB ads balance error:", e);
+          result = { success: false, error: "Error fetching ads balance" };
         }
       } else if (dataType === "search-queries") {
         // WB Search Report — search texts and positions for seller's products
