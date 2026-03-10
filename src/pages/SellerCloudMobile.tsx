@@ -5,6 +5,7 @@ import { useMarketplaceConnections } from '@/hooks/useMarketplaceConnections';
 import { useSellerCloudSubscription } from '@/hooks/useSellerCloudSubscription';
 import { useMarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 import { calculateTotalRevenue } from '@/lib/revenueCalculations';
+import { useAutoNotifications } from '@/hooks/useAutoNotifications';
 import { MobileSellerCloudNav, type MobileTabType } from '@/components/mobile/MobileSellerCloudNav';
 import { MobileSellerCloudHeader } from '@/components/mobile/MobileSellerCloudHeader';
 import { BackgroundTasksPanel } from '@/components/mobile/BackgroundTasksPanel';
@@ -44,6 +45,10 @@ const MarketplaceReviews = lazy(() => import('@/components/sellercloud/Marketpla
 const WBSellerAnalytics = lazy(() => import('@/components/sellercloud/WBSellerAnalytics').then(m => ({ default: m.WBSellerAnalytics })));
 const WBAdsCampaigns = lazy(() => import('@/components/sellercloud/WBAdsCampaigns').then(m => ({ default: m.WBAdsCampaigns })));
 const MobileTrendHunter = lazy(() => import('@/components/mobile/MobileTrendHunter').then(m => ({ default: m.MobileTrendHunter })));
+const CompetitorPriceMonitor = lazy(() => import('@/components/sellercloud/CompetitorPriceMonitor').then(m => ({ default: m.CompetitorPriceMonitor })));
+const SalesDashboard = lazy(() => import('@/components/sellercloud/SalesDashboard').then(m => ({ default: m.SalesDashboard })));
+const SupportChat = lazy(() => import('@/components/sellercloud/SupportChat').then(m => ({ default: m.SupportChat })));
+const MultiStoreManager = lazy(() => import('@/components/sellercloud/MultiStoreManager').then(m => ({ default: m.MultiStoreManager })));
 
 // Lightweight tab loading skeleton
 function TabLoader() {
@@ -95,7 +100,10 @@ export default function SellerCloudMobile() {
    const connectedMarketplaces = useMemo(() => connections.map(c => c.marketplace), [connections]);
    
    // Centralized data store — fetches once, cached for all tabs
-   const store = useMarketplaceDataStore(connectedMarketplaces);
+    const store = useMarketplaceDataStore(connectedMarketplaces);
+    
+    // Auto-dispatch Telegram notifications for new orders / low stock
+    useAutoNotifications(connectedMarketplaces, store);
    
    // Calculate revenue from actual order data with proper currency conversion
    const totalRevenue = useMemo(() => {
@@ -232,6 +240,14 @@ export default function SellerCloudMobile() {
         return <MobileTrendHunter />;
       case 'ads':
         return <div className="p-4"><WBAdsCampaigns connectedMarketplaces={connectedMarketplaces} /></div>;
+      case 'competitor':
+        return <div className="p-4"><CompetitorPriceMonitor connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
+      case 'sales':
+        return <div className="p-4"><SalesDashboard connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
+      case 'support':
+        return <div className="p-4"><SupportChat /></div>;
+      case 'stores':
+        return <div className="p-4"><MultiStoreManager connectedMarketplaces={connectedMarketplaces} onStoreChange={() => refetch()} /></div>;
       default:
         return null;
     }
@@ -254,6 +270,7 @@ export default function SellerCloudMobile() {
                 'inventory': '📦 Qoldiq', 'min-price': '🛡 Min narx', 'card-clone': '📋 Klonlash',
                 'uzum-card': '✨ Uzum Card', 'problems': '⚠️ Muammolar', 'mxik': '📄 MXIK baza',
                 'reports': '📑 Hisobotlar', 'notifications': '🔔 Bildirishnoma', 'subscription': '💳 Obuna',
+                'competitor': '🎯 Raqobat', 'sales': '📊 Sotuvlar', 'support': '💬 Yordam', 'stores': '🏪 Do\'konlar',
               };
               return labels[activeTab] || activeTab;
             })()}

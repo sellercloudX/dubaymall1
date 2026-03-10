@@ -12,6 +12,7 @@ import { useMarketplaceConnections } from '@/hooks/useMarketplaceConnections';
 import { useSellerCloudSubscription } from '@/hooks/useSellerCloudSubscription';
 import { useMarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 import { calculateTotalRevenue } from '@/lib/revenueCalculations';
+import { useAutoNotifications } from '@/hooks/useAutoNotifications';
 import { toast } from 'sonner';
 import { useExchangeRate } from '@/hooks/useExchangeRate';
 import { 
@@ -133,6 +134,7 @@ export default function SellerCloudX() {
   
   const connectedMarketplaces = useMemo(() => connections.map(c => c.marketplace), [connections]);
   const store = useMarketplaceDataStore(connectedMarketplaces);
+  useAutoNotifications(connectedMarketplaces, store);
   
   const totalRevenue = useMemo(() => {
     if (store.allOrders.length === 0) return connections.reduce((sum, c) => sum + (c.total_revenue || 0), 0);
