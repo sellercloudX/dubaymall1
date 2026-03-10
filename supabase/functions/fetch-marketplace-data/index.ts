@@ -4719,6 +4719,7 @@ serve(async (req) => {
               { method: "GET", headers: wbHeaders }
             );
             if (resp.ok || resp.status === 204) {
+              await resp.text(); // consume body
               result = { success: true, message: `Kampaniya ${action === 'pause' ? 'to\'xtatildi' : 'ishga tushirildi'}` };
             } else {
               const errText = await resp.text();
