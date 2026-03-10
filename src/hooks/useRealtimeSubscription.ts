@@ -67,7 +67,7 @@
            // Check if this order item belongs to our products
            const productId = newRecord?.product_id || oldRecord?.product_id;
            if (productId && productIds.includes(productId)) {
-             console.log('Order change for our product:', payload.eventType);
+             
              
              // Invalidate all order-related queries
              queryClient.invalidateQueries({ queryKey: ['seller-stats'] });

@@ -19,7 +19,7 @@ export function getRubToUzs(): number { return _rubToUzs; }
 export function setRubToUzs(rate: number) {
   if (rate > 0) {
     _rubToUzs = Math.round(rate * 100) / 100;
-    console.log(`Currency rate updated: 1 RUB = ${_rubToUzs} UZS`);
+    
   }
 }
 

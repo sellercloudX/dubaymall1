@@ -170,7 +170,7 @@ export function useMarketplaceTariffs(
                 wbLogisticsLiterRub = Number(payload.logistics.deliveryLiter || 0);
               }
 
-              console.log(`WB real tariffs: ${commissionBySubject.size} categories loaded; logistics base=${wbLogisticsBaseRub}, liter=${wbLogisticsLiterRub}`);
+              // WB tariffs loaded
             }
           } catch (e) {
             console.warn('WB tariff fetch failed, using estimates:', e);
