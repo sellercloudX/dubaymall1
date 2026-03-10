@@ -312,7 +312,20 @@ export function FinancialDashboard({
               </div>
             )}
 
-            {/* Tax */}
+            {/* WB SPP (WB chegirma) — only show when data available */}
+            {summary.hasWbSpp && (
+              <div className="flex items-center justify-between p-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20 gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center shrink-0"><Percent className="h-4 w-4 text-amber-600" /></div>
+                  <div className="min-w-0">
+                    <div className="font-medium text-sm truncate">WB chegirma (SPP)</div>
+                    <div className="text-xs text-muted-foreground">WB xaridor uchun chegirma — sotuvchi hisobidan</div>
+                  </div>
+                </div>
+                <div className="text-right shrink-0"><div className="font-bold text-sm whitespace-nowrap text-amber-600">{formatFullPrice(summary.totalWbSppAmount)}</div></div>
+              </div>
+            )}
+
             <div className="flex items-center justify-between p-3 rounded-lg border gap-2">
               <div className="flex items-center gap-2 min-w-0">
                 <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0"><DollarSign className="h-4 w-4 text-muted-foreground" /></div>
