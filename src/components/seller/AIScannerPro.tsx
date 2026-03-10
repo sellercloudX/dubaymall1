@@ -544,7 +544,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
           },
         });
 
-        console.log('WB Card creation result:', JSON.stringify(cardResult)?.substring(0, 500));
+        
         if (error) {
           const errDetail = cardResult?.error || error.message || 'WB xatosi';
           throw new Error(`WB: ${errDetail}`);
