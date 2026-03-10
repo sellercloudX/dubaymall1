@@ -284,7 +284,7 @@ export function CompetitorPriceMonitor({ connectedMarketplaces, store }: Competi
         user_id: string; rule_id: string; marketplace: string; offer_id: string;
         product_name: string; old_price: number; new_price: number; strategy: string;
         reason: string; status: string;
-      }>[] = [];
+      }> = [];
 
       for (const prod of mpProducts) {
         const key = prod.offerId.toLowerCase().replace(/[-_\s]/g, '');
