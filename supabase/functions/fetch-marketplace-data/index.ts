@@ -3310,7 +3310,7 @@ serve(async (req) => {
                 headers: wbHeaders,
               });
               if (whResp.ok) {
-                const warehouses = await whResp.json();
+                const warehouses = await safeJson(whResp, []);
                 const warehouseIds = (Array.isArray(warehouses) ? warehouses : []).map((w: any) => w.id);
                 
                 // Collect ALL barcodes from cards
