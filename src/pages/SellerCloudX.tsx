@@ -175,6 +175,7 @@ export default function SellerCloudX() {
   const isBlocked = accessStatus?.blocked === true;
   const daysLeft = accessStatus?.days_left as number | undefined;
   const expiryWarning = accessStatus?.warning === true;
+  useAutoSync({ connectedMarketplaces, enabled: !!subscription && !isBlocked, onSyncComplete: refetch });
 
   if (authLoading || subscriptionLoading) {
     return (
