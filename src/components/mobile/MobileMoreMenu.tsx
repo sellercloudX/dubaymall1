@@ -5,7 +5,7 @@ import type { MobileTabType } from './MobileSellerCloudNav';
 import {
   ArrowDownUp, DollarSign, Calculator, BarChart3, Shield, Copy,
   AlertOctagon, Tag, FileSpreadsheet, Bell, CreditCard, Coins,
-  Sparkles, MessageCircle, Activity, Megaphone,
+  Sparkles, MessageCircle, Activity, Megaphone, Search,
 } from 'lucide-react';
 
 interface MobileMoreMenuProps {
