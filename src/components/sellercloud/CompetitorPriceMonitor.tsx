@@ -280,7 +280,11 @@ export function CompetitorPriceMonitor({ connectedMarketplaces, store }: Competi
       });
 
       const pricesToUpdate: { offerId: string; price: number; nmID?: number }[] = [];
-      const logEntries: Omit<RepriceLogEntry, 'id' | 'created_at'>[] = [];
+      const logEntries: Array<{
+        user_id: string; rule_id: string; marketplace: string; offer_id: string;
+        product_name: string; old_price: number; new_price: number; strategy: string;
+        reason: string; status: string;
+      }>[] = [];
 
       for (const prod of mpProducts) {
         const key = prod.offerId.toLowerCase().replace(/[-_\s]/g, '');
