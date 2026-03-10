@@ -46,6 +46,7 @@ export const sellerMenuItems: SellerMenuItem[] = [
   { id: 'clone', label: 'Klonlash', icon: Copy, group: 'tools' },
   { id: 'problems', label: 'Muammolar', icon: AlertOctagon, group: 'tools' },
   { id: 'mxik', label: 'MXIK baza', icon: FileSpreadsheet, group: 'tools' },
+  { id: 'team', label: 'Jamoa', icon: Globe, group: 'settings' },
   { id: 'subscription', label: 'Obuna', icon: CreditCard, group: 'settings' },
   { id: 'reports', label: 'Hisobotlar', icon: FileSpreadsheet, group: 'settings' },
   { id: 'notifications', label: 'Bildirishnoma', icon: Bell, group: 'settings' },
