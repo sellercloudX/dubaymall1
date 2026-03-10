@@ -292,6 +292,8 @@ export default function SellerCloudX() {
         return <ProblematicProducts connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'mxik':
         return <MxikImport />;
+      case 'team':
+        return <TeamManager />;
       case 'subscription':
         return <SubscriptionBilling totalSalesVolume={totalRevenue} />;
       case 'reports':
