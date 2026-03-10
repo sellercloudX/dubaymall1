@@ -3698,6 +3698,8 @@ serve(async (req) => {
               
               // Sales API returns prices in RUBLES (not kopecks)
               const price = sale.finishedPrice || sale.priceWithDisc || sale.totalPrice || 0;
+              const spp = sale.spp || 0;
+              const forPay = sale.forPay || 0;
               
               salesAdded++;
               allOrders.push({
@@ -3710,6 +3712,8 @@ serve(async (req) => {
                 itemsTotalUZS: price,
                 deliveryTotal: 0,
                 deliveryTotalUZS: 0,
+                spp: spp > 0 ? spp : undefined,
+                forPay: forPay > 0 ? forPay : undefined,
                 items: [{
                   offerId: sale.supplierArticle || "",
                   offerName: sale.subject || sale.category || "",
@@ -3717,6 +3721,9 @@ serve(async (req) => {
                   price: price,
                   priceUZS: price,
                   nmID: sale.nmId || undefined,
+                  spp: spp > 0 ? spp : undefined,
+                  finishedPrice: sale.finishedPrice || undefined,
+                  forPay: forPay > 0 ? forPay : undefined,
                 }],
                 buyer: { firstName: sale.regionName || sale.oblast || "", lastName: "" },
               });
