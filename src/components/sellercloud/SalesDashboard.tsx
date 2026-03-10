@@ -230,6 +230,12 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
     const totalNetProfit = nonCancelled.reduce((s, e) => s + e.netProfit, 0);
     const avgMargin = totalRevenue > 0 ? (totalNetProfit / totalRevenue) * 100 : 0;
 
+    // FBO/FBS breakdown
+    const fboOrders = nonCancelled.filter(e => (e.order as any).fulfillmentType === 'FBO');
+    const fbsOrders = nonCancelled.filter(e => (e.order as any).fulfillmentType !== 'FBO');
+    const fboRevenue = fboOrders.reduce((s, e) => s + e.totalUzs, 0);
+    const fbsRevenue = fbsOrders.reduce((s, e) => s + e.totalUzs, 0);
+
     return {
       totalOrders: dateFiltered.length,
       deliveredCount: delivered.length,
@@ -237,6 +243,8 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
       activeCount: active.length,
       totalRevenue, totalCost, totalCommission, totalLogistics, totalNetProfit, avgMargin,
       cancelRate: dateFiltered.length > 0 ? (cancelled.length / dateFiltered.length * 100) : 0,
+      fboCount: fboOrders.length, fbsCount: fbsOrders.length,
+      fboRevenue, fbsRevenue,
     };
   }, [dateFiltered]);
 
