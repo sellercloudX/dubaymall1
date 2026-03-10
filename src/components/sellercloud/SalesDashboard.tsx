@@ -71,6 +71,7 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
   const [dateFrom, setDateFrom] = useState<Date | undefined>(getPresetDates('30d').from);
   const [dateTo, setDateTo] = useState<Date | undefined>(getPresetDates('30d').to);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [fulfillmentFilter, setFulfillmentFilter] = useState<'all' | 'FBO' | 'FBS'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
