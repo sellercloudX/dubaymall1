@@ -2008,6 +2008,7 @@ serve(async (req) => {
                 createdAt: uzumCreatedAt,
                 total: orderTotal,
                 totalUZS: orderTotal,
+                fulfillmentType: 'FBS' as const, // Uzum FBS endpoint
                 itemsTotal,
                 itemsTotalUZS: itemsTotal,
                 deliveryTotal: order.deliveryPrice || 0,
