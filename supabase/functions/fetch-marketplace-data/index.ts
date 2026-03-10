@@ -3730,6 +3730,11 @@ serve(async (req) => {
               const spp = sale.spp || 0;
               const forPay = sale.forPay || 0;
               
+              // Determine FBO/FBS from warehouseName
+              const saleWh = (sale.warehouseName || '').toLowerCase();
+              const saleFboKw = ['коледино', 'подольск', 'электросталь', 'казань', 'краснодар', 'екатеринбург', 'новосибирск', 'хабаровск', 'тула', 'wb'];
+              const saleIsFBO = saleFboKw.some(kw => saleWh.includes(kw));
+
               salesAdded++;
               allOrders.push({
                 id: sale.odid || sale.saleID || sale.srid,
@@ -3741,6 +3746,7 @@ serve(async (req) => {
                 itemsTotalUZS: price,
                 deliveryTotal: 0,
                 deliveryTotalUZS: 0,
+                fulfillmentType: saleIsFBO ? 'FBO' : 'FBS',
                 spp: spp > 0 ? spp : undefined,
                 forPay: forPay > 0 ? forPay : undefined,
                 items: [{
