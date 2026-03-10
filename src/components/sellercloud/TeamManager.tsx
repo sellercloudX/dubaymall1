@@ -285,7 +285,7 @@ export function TeamManager() {
       ) : (
         <div className="space-y-3">
           {members.map(member => {
-            const perms = (member.permissions || {}) as TeamPermissions;
+            const perms = (member.permissions || {}) as unknown as TeamPermissions;
             const statusCfg = statusConfig[member.status] || statusConfig.pending;
             const StatusIcon = statusCfg.icon;
             const permCount = Object.values(perms).filter(Boolean).length;
