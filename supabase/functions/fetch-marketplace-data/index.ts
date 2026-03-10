@@ -3338,9 +3338,9 @@ serve(async (req) => {
                         headers: wbHeaders,
                         body: JSON.stringify({ skus: batch }),
                       });
-                      if (stockResp.ok) {
-                        const stockData = await stockResp.json();
-                        const stocks = stockData.stocks || [];
+                       if (stockResp.ok || stockResp.status === 204) {
+                         const stockData = await safeJson(stockResp, { stocks: [] });
+                         const stocks = stockData.stocks || [];
                         for (const s of stocks) {
                           const vc = barcodeToVendorCode.get(s.sku);
                           if (!vc) continue;
