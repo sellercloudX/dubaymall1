@@ -670,13 +670,14 @@ serve(async (req) => {
               }
 
               // Determine fulfillment type from delivery info
-              // FBY (FBO) = Yandex fulfillment, FBS = seller fulfillment
+              // FBY (FBO) = Yandex fulfillment warehouse, FBS = seller fulfillment
               const deliveryPartnerType = order.delivery?.deliveryPartnerType || '';
-              const deliveryServiceId = order.delivery?.deliveryServiceId;
-              // YANDEX_MARKET = FBO (FBY), SHOP = FBS
-              const fulfillmentType = (deliveryPartnerType === 'YANDEX_MARKET' || order.delivery?.type === 'DELIVERY') && !order.delivery?.shipments?.some((s: any) => s.shipmentType === 'IMPORT')
-                ? (deliveryPartnerType === 'YANDEX_MARKET' ? 'FBO' : 'FBS')
-                : 'FBS';
+              // YANDEX_MARKET = marketplace handles fulfillment (FBO/FBY)
+              // SHOP = seller handles fulfillment (FBS)
+              let fulfillmentType: 'FBO' | 'FBS' = 'FBS'; // Default to FBS
+              if (deliveryPartnerType === 'YANDEX_MARKET') {
+                fulfillmentType = 'FBO';
+              }
 
               return {
                 id: order.id,
