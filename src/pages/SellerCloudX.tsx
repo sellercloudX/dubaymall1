@@ -87,6 +87,9 @@ const pageTitles: Record<string, string> = {
   notifications: 'Bildirishnomalar',
   competitor: 'Raqobat narx monitoring',
   support: 'Yordam markazi',
+  'unit-economy': 'Unit-economy (SKU)',
+  'stock-forecast': 'Zaxira prognozi',
+  'seo-monitor': 'SEO Monitor',
 };
 
 export default function SellerCloudX() {
