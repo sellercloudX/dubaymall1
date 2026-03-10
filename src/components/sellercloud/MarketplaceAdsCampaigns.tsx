@@ -132,7 +132,7 @@ export function MarketplaceAdsCampaigns({ connectedMarketplaces }: Props) {
       {/* Marketplace filter */}
       <MarketplaceFilterBar
         connectedMarketplaces={connectedMarketplaces}
-        selectedMarketplace={selectedMp}
+        selectedMp={selectedMp}
         onSelect={setSelectedMp}
         showAll={false}
       />
