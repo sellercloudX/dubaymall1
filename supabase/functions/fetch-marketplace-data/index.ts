@@ -4778,6 +4778,7 @@ serve(async (req) => {
               }
             );
             if (resp.ok || resp.status === 204) {
+              await resp.text(); // consume body
               result = { success: true, message: `CPM yangilandi: ${cpm} ₽` };
             } else {
               const errText = await resp.text();
