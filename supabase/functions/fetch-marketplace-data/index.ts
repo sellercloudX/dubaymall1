@@ -3577,8 +3577,8 @@ serve(async (req) => {
             `https://statistics-api.wildberries.ru/api/v1/supplier/orders?dateFrom=${dateFrom}`,
             { headers: wbHeaders }
           );
-          if (statsOrdersResp.ok) {
-            const statsOrders = await statsOrdersResp.json();
+           if (statsOrdersResp.ok || statsOrdersResp.status === 204) {
+             const statsOrders = await safeJson(statsOrdersResp, []);
             const ordersList = Array.isArray(statsOrders) ? statsOrders : [];
             console.log(`WB stats orders: ${ordersList.length}`);
             if (ordersList.length > 0) {
