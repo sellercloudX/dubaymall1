@@ -94,6 +94,7 @@ const pageTitles: Record<string, string> = {
   'unit-economy': 'Unit-economy (SKU)',
   'stock-forecast': 'Zaxira prognozi',
   'seo-monitor': 'SEO Monitor',
+  'auto-reorder': 'Avto buyurtma rejasi',
   team: 'Jamoa boshqaruvi',
 };
 
