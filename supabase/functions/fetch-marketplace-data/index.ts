@@ -3642,8 +3642,8 @@ serve(async (req) => {
             `https://statistics-api.wildberries.ru/api/v1/supplier/sales?dateFrom=${dateFrom}`,
             { headers: wbHeaders }
           );
-          if (salesResp.ok) {
-            const salesData = await salesResp.json();
+           if (salesResp.ok || salesResp.status === 204) {
+             const salesData = await safeJson(salesResp, []);
             const salesList = Array.isArray(salesData) ? salesData : [];
             console.log(`WB sales entries: ${salesList.length}`);
             let salesAdded = 0;
