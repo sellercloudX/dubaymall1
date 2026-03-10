@@ -430,7 +430,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
         });
         if (mxikData?.mxik_code) {
           mxikResult = mxikData;
-          console.log(`✅ MXIK: ${mxikData.mxik_code} (${mxikData.mxik_name}) confidence: ${mxikData.confidence}%`);
+          
         }
       } catch (e) {
         console.warn('MXIK lookup failed:', e);
@@ -450,7 +450,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
         
         imagePromise = (async (): Promise<string[]> => {
           try {
-            console.log('🖼️ Calling ai-agent-images (SellZen primary):', bestImageForInfographic.substring(0, 80));
+            
             const { data: imgData, error: imgError } = await supabase.functions.invoke('ai-agent-images', {
               body: {
                 action: 'scanner-generate',
@@ -466,7 +466,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
               setBackgroundTasks(prev => prev.map(task => 
                 task.id === taskId ? { ...task, generatedImages: [...imgData.images] } : task
               ));
-              console.log(`✅ AI Agent pipeline: ${imgData.totalImages} ta rasm yaratildi`);
+              
               updateTaskProgress(4, 'completed');
               return imgData.images;
             } else if (!imgError && imgData?.success && imgData.images?.length === 0) {
@@ -512,9 +512,8 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
           ]);
           if (raceResult.length > 0) {
             generatedInfos = raceResult;
-            console.log(`✅ Images ready before card creation: ${generatedInfos.length} ta`);
+            // Images ready
           } else {
-            console.log('⏳ Images still generating, creating card with reference image...');
             toast.info('Rasmlar yaratilmoqda... Kartochka reference rasm bilan yaratiladi');
           }
         } catch {
@@ -545,7 +544,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
           },
         });
 
-        console.log('WB Card creation result:', JSON.stringify(cardResult)?.substring(0, 500));
+        
         if (error) {
           const errDetail = cardResult?.error || error.message || 'WB xatosi';
           throw new Error(`WB: ${errDetail}`);
@@ -589,7 +588,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
           },
         });
 
-        console.log('Yandex Card creation result:', JSON.stringify(cardResult)?.substring(0, 500));
+        
         if (error) {
           const errDetail = cardResult?.error || error.message || 'Yandex xatosi';
           throw new Error(`Yandex: ${errDetail}`);

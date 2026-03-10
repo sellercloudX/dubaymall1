@@ -27,7 +27,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const handleAuthChange = async (event: AuthChangeEvent, currentSession: Session | null) => {
       if (!mounted) return;
 
-      console.log('[Auth] Event:', event);
+      
 
       switch (event) {
         case 'SIGNED_IN':

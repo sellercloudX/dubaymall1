@@ -18,7 +18,7 @@ export function useExchangeRate() {
       }
 
       const rate = data?.rubToUzs || 140;
-      console.log(`Exchange rate loaded: 1 RUB = ${rate} UZS (${data?.source}, ${data?.date})`);
+      
       
       // Update global currency module
       setRubToUzs(rate);

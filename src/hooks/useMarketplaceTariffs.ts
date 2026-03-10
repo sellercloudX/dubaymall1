@@ -87,7 +87,7 @@ export function useMarketplaceTariffs(
                 }
                 realExpenses!.set(offerId, existing);
               });
-              console.log(`Uzum finance: got real expenses for ${realExpenses.size} products`);
+              // Uzum finance loaded
             }
           } catch (e) {
             console.warn('Uzum finance fetch failed, using estimated tariffs:', e);
@@ -170,7 +170,7 @@ export function useMarketplaceTariffs(
                 wbLogisticsLiterRub = Number(payload.logistics.deliveryLiter || 0);
               }
 
-              console.log(`WB real tariffs: ${commissionBySubject.size} categories loaded; logistics base=${wbLogisticsBaseRub}, liter=${wbLogisticsLiterRub}`);
+              // WB tariffs loaded
             }
           } catch (e) {
             console.warn('WB tariff fetch failed, using estimates:', e);
