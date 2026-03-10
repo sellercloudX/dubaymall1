@@ -4604,7 +4604,7 @@ serve(async (req) => {
                   body: JSON.stringify(activeIds),
                 });
                 if (detailResp.ok) {
-                  const details = await detailResp.json();
+                  const details = await safeJson(detailResp, []);
                   const detailMap = new Map<number, any>();
                   (Array.isArray(details) ? details : []).forEach((d: any) => {
                     detailMap.set(d.advertId, d);
