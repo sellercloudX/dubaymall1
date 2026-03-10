@@ -20,9 +20,10 @@ interface ProblematicProductsProps {
 interface ProblemProduct {
   id: string; name: string; sku: string; marketplace: string;
   price: number; stock: number;
-  problemType: 'low_sales' | 'high_returns' | 'low_stock' | 'no_sales' | 'overstock' | 'inactive';
+  problemType: 'low_sales' | 'high_returns' | 'low_stock' | 'no_sales' | 'overstock' | 'inactive' | 'stockout_soon';
   severity: 'critical' | 'warning' | 'info';
   description: string; metric: string; suggestion: string;
+  daysUntilStockout?: number;
 }
 
 const MARKETPLACE_NAMES: Record<string, string> = {
@@ -30,6 +31,7 @@ const MARKETPLACE_NAMES: Record<string, string> = {
 };
 
 const PROBLEM_TYPES = {
+  stockout_soon: { label: 'Tugaydi', icon: AlertTriangle, color: 'text-red-600' },
   no_sales: { label: 'Sotilmagan', icon: XCircle, color: 'text-red-600' },
   low_sales: { label: 'Kam sotilgan', icon: TrendingDown, color: 'text-orange-600' },
   low_stock: { label: 'Kam qoldiq', icon: AlertTriangle, color: 'text-amber-600' },
@@ -66,12 +68,36 @@ export function ProblematicProducts({ connectedMarketplaces, store }: Problemati
       const avgSalesPerProduct = orders.length > 0 && productsList.length > 0
         ? orders.length / productsList.length : 0;
 
+      // Calculate sales velocity: daily sales rate per product (based on 90 days of orders)
+      const LOOKBACK_DAYS = 90;
+      const dailySalesRate = new Map<string, number>();
+      salesCount.forEach((totalSold, offerId) => {
+        dailySalesRate.set(offerId, totalSold / LOOKBACK_DAYS);
+      });
+
       productsList.forEach(product => {
         const stock = product.stockCount || ((product.stockFBO || 0) + (product.stockFBS || 0));
         const sold = salesCount.get(product.offerId) || 0;
         const price = product.price || 0;
         const availability = product.availability?.toUpperCase();
         const isInactive = ['INACTIVE', 'UNPUBLISHED', 'DISABLED_BY_PARTNER', 'DISABLED_AUTOMATICALLY', 'ARCHIVED'].includes(availability || '');
+
+        // Stock-out forecast: days until stock reaches 0
+        const dailyRate = dailySalesRate.get(product.offerId) || 0;
+        const daysUntilStockout = dailyRate > 0 && stock > 0
+          ? Math.round(stock / dailyRate)
+          : null;
+
+        // CRITICAL: Stock will run out in ≤7 days (high velocity products)
+        if (daysUntilStockout !== null && daysUntilStockout <= 7 && stock > 0 && !isInactive) {
+          allProblems.push({ id: product.offerId, name: product.name || 'Nomsiz', sku: product.shopSku || product.offerId,
+            marketplace, price, stock, problemType: 'stockout_soon',
+            severity: daysUntilStockout <= 3 ? 'critical' : 'warning',
+            description: `${daysUntilStockout} kunda tugaydi (kuniga ~${dailyRate.toFixed(1)} ta sotiladi)`,
+            metric: `${stock} dona / ${daysUntilStockout} kun`,
+            suggestion: daysUntilStockout <= 3 ? 'TEZKOR: Zaxirani bugun to\'ldiring!' : 'Yaqin kunlarda to\'ldiring',
+            daysUntilStockout });
+        }
 
         if (sold === 0 && !isInactive && price > 0) {
           allProblems.push({ id: product.offerId, name: product.name || 'Nomsiz', sku: product.shopSku || product.offerId,
@@ -86,10 +112,13 @@ export function ProblematicProducts({ connectedMarketplaces, store }: Problemati
         }
 
         if (stock > 0 && stock <= 3 && !isInactive) {
-          allProblems.push({ id: product.offerId, name: product.name || 'Nomsiz', sku: product.shopSku || product.offerId,
-            marketplace, price, stock, problemType: 'low_stock', severity: stock <= 1 ? 'critical' : 'warning',
-            description: 'Zaxira tugamoqda', metric: `${stock} dona qoldi`,
-            suggestion: 'Tezda to\'ldiring' });
+          // Only add low_stock if not already flagged as stockout_soon
+          if (!daysUntilStockout || daysUntilStockout > 7) {
+            allProblems.push({ id: product.offerId, name: product.name || 'Nomsiz', sku: product.shopSku || product.offerId,
+              marketplace, price, stock, problemType: 'low_stock', severity: stock <= 1 ? 'critical' : 'warning',
+              description: 'Zaxira tugamoqda', metric: `${stock} dona qoldi`,
+              suggestion: 'Tezda to\'ldiring' });
+          }
         }
 
         if (stock > 50 && sold === 0) {

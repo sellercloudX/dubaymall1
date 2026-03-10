@@ -13,6 +13,24 @@ const corsHeaders = {
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+/**
+ * Safely parse JSON from a Response.
+ * WB Partner API (2026-03-11+) returns 204 No Content for empty results.
+ * Calling .json() on 204 would throw — this helper returns a fallback instead.
+ */
+async function safeJson(response: Response, fallback: any = {}): Promise<any> {
+  if (response.status === 204 || response.headers.get('content-length') === '0') {
+    return fallback;
+  }
+  try {
+    const text = await response.text();
+    if (!text || text.trim() === '') return fallback;
+    return JSON.parse(text);
+  } catch {
+    return fallback;
+  }
+}
+
 // Retry wrapper for Yandex API calls with rate limit handling
 async function fetchWithRetry(
   url: string, 
@@ -3218,7 +3236,7 @@ serve(async (req) => {
               break;
             }
 
-            const data = await resp.json();
+            const data = await safeJson(resp, { cards: [] });
             const cards = data.cards || [];
             console.log(`WB cards page ${pageNum}: ${cards.length} cards (total cursor: ${data.cursor?.total})`);
 
@@ -3292,7 +3310,7 @@ serve(async (req) => {
                 headers: wbHeaders,
               });
               if (whResp.ok) {
-                const warehouses = await whResp.json();
+                const warehouses = await safeJson(whResp, []);
                 const warehouseIds = (Array.isArray(warehouses) ? warehouses : []).map((w: any) => w.id);
                 
                 // Collect ALL barcodes from cards
@@ -3320,9 +3338,9 @@ serve(async (req) => {
                         headers: wbHeaders,
                         body: JSON.stringify({ skus: batch }),
                       });
-                      if (stockResp.ok) {
-                        const stockData = await stockResp.json();
-                        const stocks = stockData.stocks || [];
+                       if (stockResp.ok || stockResp.status === 204) {
+                         const stockData = await safeJson(stockResp, { stocks: [] });
+                         const stocks = stockData.stocks || [];
                         for (const s of stocks) {
                           const vc = barcodeToVendorCode.get(s.sku);
                           if (!vc) continue;
@@ -3366,8 +3384,8 @@ serve(async (req) => {
               const pricesResp = await fetch(`https://discounts-prices-api.wildberries.ru/api/v2/list/goods/filter?limit=${priceLimit}&offset=${offset}`, {
                 headers: wbHeaders,
               });
-              if (!pricesResp.ok) break;
-              const pricesData = await pricesResp.json();
+               if (!pricesResp.ok && pricesResp.status !== 204) break;
+               const pricesData = await safeJson(pricesResp, { data: { listGoods: [] } });
               const goods = pricesData.data?.listGoods || [];
               if (goods.length === 0) break;
               allGoods.push(...goods);
@@ -3410,9 +3428,9 @@ serve(async (req) => {
             const commResp = await fetch("https://common-api.wildberries.ru/api/v1/tariffs/commission", {
               headers: wbHeaders,
             });
-            if (commResp.ok) {
-              const commData = await commResp.json();
-              const commissions = Array.isArray(commData?.report) ? commData.report 
+             if (commResp.ok || commResp.status === 204) {
+               const commData = await safeJson(commResp, { report: [] });
+               const commissions = Array.isArray(commData?.report) ? commData.report 
                 : Array.isArray(commData) ? commData : [];
               
               // Build map: subjectName (lowercase) → commission %
@@ -3480,8 +3498,8 @@ serve(async (req) => {
           const newOrdersResp = await fetch("https://marketplace-api.wildberries.ru/api/v3/orders/new", {
             headers: wbHeaders,
           });
-          if (newOrdersResp.ok) {
-            const newData = await newOrdersResp.json();
+           if (newOrdersResp.ok || newOrdersResp.status === 204) {
+             const newData = await safeJson(newOrdersResp, { orders: [] });
             const newOrders = newData.orders || [];
             console.log(`WB new orders: ${newOrders.length}`);
             for (const o of newOrders) {
@@ -3505,12 +3523,12 @@ serve(async (req) => {
               const allOrdersUrl = `https://marketplace-api.wildberries.ru/api/v3/orders?limit=200&next=${nextCursor}&dateFrom=${sevenDaysAgo}`;
               const allOrdersResp = await fetch(allOrdersUrl, { headers: wbHeaders });
               
-              if (!allOrdersResp.ok) {
-                console.warn(`WB all orders fetch failed: ${allOrdersResp.status}`);
-                break;
-              }
-              
-              const allOrdersData = await allOrdersResp.json();
+               if (!allOrdersResp.ok && allOrdersResp.status !== 204) {
+                 console.warn(`WB all orders fetch failed: ${allOrdersResp.status}`);
+                 break;
+               }
+               
+               const allOrdersData = await safeJson(allOrdersResp, { orders: [] });
               const pageOrders = allOrdersData.orders || [];
               console.log(`WB all orders page ${allOrdersPage}: ${pageOrders.length} orders`);
               
@@ -3559,8 +3577,8 @@ serve(async (req) => {
             `https://statistics-api.wildberries.ru/api/v1/supplier/orders?dateFrom=${dateFrom}`,
             { headers: wbHeaders }
           );
-          if (statsOrdersResp.ok) {
-            const statsOrders = await statsOrdersResp.json();
+           if (statsOrdersResp.ok || statsOrdersResp.status === 204) {
+             const statsOrders = await safeJson(statsOrdersResp, []);
             const ordersList = Array.isArray(statsOrders) ? statsOrders : [];
             console.log(`WB stats orders: ${ordersList.length}`);
             if (ordersList.length > 0) {
@@ -3624,8 +3642,8 @@ serve(async (req) => {
             `https://statistics-api.wildberries.ru/api/v1/supplier/sales?dateFrom=${dateFrom}`,
             { headers: wbHeaders }
           );
-          if (salesResp.ok) {
-            const salesData = await salesResp.json();
+           if (salesResp.ok || salesResp.status === 204) {
+             const salesData = await safeJson(salesResp, []);
             const salesList = Array.isArray(salesData) ? salesData : [];
             console.log(`WB sales entries: ${salesList.length}`);
             let salesAdded = 0;
@@ -3694,7 +3712,7 @@ serve(async (req) => {
           if (!whResp.ok) {
             result = { success: false, error: "Failed to fetch warehouses" };
           } else {
-            const warehouses = await whResp.json();
+             const warehouses = await safeJson(whResp, []);
             const stockData: any[] = [];
             
             for (const wh of (Array.isArray(warehouses) ? warehouses : []).slice(0, 10)) {
@@ -3823,7 +3841,7 @@ serve(async (req) => {
             if (!whResp.ok) {
               result = { success: false, error: `Failed to fetch warehouses: ${whResp.status}` };
             } else {
-              const warehouses = await whResp.json();
+              const warehouses = await safeJson(whResp, []);
               const whList = Array.isArray(warehouses) ? warehouses : [];
               
               if (whList.length === 0) {
@@ -3858,7 +3876,7 @@ serve(async (req) => {
                     }),
                   });
                   if (!cardsResp.ok) { await cardsResp.text(); break; }
-                  const cardsData = await cardsResp.json();
+                   const cardsData = await safeJson(cardsResp, { cards: [] });
                   const cards = cardsData.cards || [];
                   for (const card of cards) {
                     const vc = card.vendorCode?.toLowerCase() || "";
@@ -3960,7 +3978,7 @@ serve(async (req) => {
                 }),
               });
               if (!cardsResp.ok) { await cardsResp.text(); break; }
-              const cardsData = await cardsResp.json();
+              const cardsData = await safeJson(cardsResp, { cards: [] });
               const cards = cardsData.cards || [];
               for (const card of cards) {
                 if (card.vendorCode && card.nmID) {
@@ -4097,8 +4115,8 @@ serve(async (req) => {
             { headers: wbHeaders }
           );
 
-          if (reportResp.ok) {
-            const reportData = await reportResp.json();
+           if (reportResp.ok || reportResp.status === 204) {
+             const reportData = await safeJson(reportResp, []);
             const entries = Array.isArray(reportData) ? reportData : [];
             console.log(`WB financial report: ${entries.length} entries`);
 
@@ -4153,8 +4171,8 @@ serve(async (req) => {
             headers: wbHeaders,
             body: JSON.stringify({ settings: { cursor: { limit: 100 }, filter: { withPhoto: -1 } } }),
           });
-          if (cardsResp.ok) {
-            const cd = await cardsResp.json();
+           if (cardsResp.ok || cardsResp.status === 204) {
+             const cd = await safeJson(cardsResp, { cards: [] });
             (cd.cards || []).forEach((c: any) => {
               productMap.set(c.vendorCode || String(c.nmID), {
                 name: c.title || c.subjectName || "",
@@ -4191,8 +4209,8 @@ serve(async (req) => {
             `https://statistics-api.wildberries.ru/api/v1/supplier/sales?dateFrom=${dateFrom90}`,
             { headers: wbHeaders }
           );
-          if (salesResp.ok) {
-            const sales = await salesResp.json();
+           if (salesResp.ok || salesResp.status === 204) {
+             const sales = await safeJson(salesResp, []);
             (Array.isArray(sales) ? sales : []).forEach((s: any) => {
               const sku = s.supplierArticle || "";
               if (!sku) return;
