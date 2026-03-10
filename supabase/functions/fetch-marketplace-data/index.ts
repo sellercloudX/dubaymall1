@@ -4209,8 +4209,8 @@ serve(async (req) => {
             `https://statistics-api.wildberries.ru/api/v1/supplier/sales?dateFrom=${dateFrom90}`,
             { headers: wbHeaders }
           );
-          if (salesResp.ok) {
-            const sales = await salesResp.json();
+           if (salesResp.ok || salesResp.status === 204) {
+             const sales = await safeJson(salesResp, []);
             (Array.isArray(sales) ? sales : []).forEach((s: any) => {
               const sku = s.supplierArticle || "";
               if (!sku) return;
