@@ -87,7 +87,7 @@ export function useMarketplaceTariffs(
                 }
                 realExpenses!.set(offerId, existing);
               });
-              console.log(`Uzum finance: got real expenses for ${realExpenses.size} products`);
+              // Uzum finance loaded
             }
           } catch (e) {
             console.warn('Uzum finance fetch failed, using estimated tariffs:', e);
