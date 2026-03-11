@@ -2124,7 +2124,183 @@ serve(async (req) => {
             }
             } // end while
             } // end for shops
-          } // end for statuses
+          } // end for FBS statuses
+
+          // ===== FETCH FBO ORDERS (Fulfillment by Operator / Uzum warehouse) =====
+          // FBO uses /v2/fbo/orders endpoint with different statuses
+          const fboOrderStatuses = status ? [status] : [
+            'PROCESSING', 'ACCEPTED', 'DELIVERING', 'COMPLETED', 'CANCELLED', 'CANCELED', 'RETURNED'
+          ];
+
+          for (let fi = 0; fi < fboOrderStatuses.length; fi++) {
+            const fboStatus = fboOrderStatuses[fi];
+            if (fi > 0 || allOrders.length > 0) await sleep(500);
+
+            for (let shopIdx = 0; shopIdx < orderShopIds.length; shopIdx++) {
+              const currentOrderShopId = orderShopIds[shopIdx];
+              if (shopIdx > 0) await sleep(300);
+
+              page = 0;
+              hasMore = true;
+
+              while (hasMore) {
+                const params = new URLSearchParams({
+                  size: String(pageSize),
+                  page: String(page),
+                  status: fboStatus,
+                  shopIds: String(currentOrderShopId),
+                });
+
+                console.log(`Uzum FBO orders (${fboStatus}) shop=${currentOrderShopId} page ${page}: ${uzumBaseUrl}/v2/fbo/orders?${params.toString()}`);
+
+                let fboResponse: Response;
+                try {
+                  fboResponse = await fetch(
+                    `${uzumBaseUrl}/v2/fbo/orders?${params.toString()}`,
+                    { headers: uzumHeaders }
+                  );
+                } catch (fetchErr) {
+                  console.error(`Uzum FBO orders fetch error (${fboStatus}):`, fetchErr);
+                  hasMore = false;
+                  continue;
+                }
+
+                if (!fboResponse.ok) {
+                  const errText = await fboResponse.text();
+                  console.error(`Uzum FBO orders error (${fboStatus}):`, fboResponse.status, errText);
+                  hasMore = false;
+                  continue;
+                }
+
+                const fboData = await fboResponse.json();
+                const fboPayload = fboData.payload?.sellerOrders || fboData.payload?.fboOrders || fboData.payload?.orders || fboData.payload || [];
+                const fboOrderList = Array.isArray(fboPayload) ? fboPayload : [];
+
+                console.log(`Uzum FBO orders (${fboStatus}) page ${page}: ${fboOrderList.length} orders`);
+
+                if (fboOrderList.length === 0) {
+                  hasMore = false;
+                  continue;
+                }
+
+                // Log first FBO order structure
+                if (page === 0 && fboOrderList.length > 0) {
+                  const sampleOrder = fboOrderList[0];
+                  console.log(`[UZUM FBO ORDER KEYS] shop=${currentOrderShopId} status=${fboStatus} keys=${JSON.stringify(Object.keys(sampleOrder))}`);
+                }
+
+                const fboMapped = fboOrderList.map((order: any) => {
+                  const items = order.items || order.orderItems || [];
+                  const itemsTotal = items.reduce((sum: number, item: any) => {
+                    return sum + ((item.price || item.amount || 0) * (item.quantity || item.count || 1));
+                  }, 0);
+
+                  const displayOrderId = order.orderCode || order.orderNumber || order.code || order.orderId || order.id;
+
+                  // Parse date (same logic as FBS)
+                  const rawCreatedAt = order.createdAt || order.createDate || order.dateCreated || order.created_at || '';
+                  let uzumCreatedAt = '';
+                  if (typeof rawCreatedAt === 'number') {
+                    uzumCreatedAt = new Date(rawCreatedAt > 1e12 ? rawCreatedAt : rawCreatedAt * 1000).toISOString();
+                  } else if (rawCreatedAt && !isNaN(Number(rawCreatedAt))) {
+                    const ts = Number(rawCreatedAt);
+                    uzumCreatedAt = new Date(ts > 1e12 ? ts : ts * 1000).toISOString();
+                  } else if (rawCreatedAt) {
+                    const parsed = new Date(String(rawCreatedAt));
+                    uzumCreatedAt = isNaN(parsed.getTime()) ? '' : parsed.toISOString();
+                  }
+
+                  const orderTotal = order.price || order.totalPrice || order.totalAmount || itemsTotal;
+
+                  return {
+                    id: displayOrderId,
+                    status: order.status || fboStatus,
+                    substatus: order.substatus || '',
+                    createdAt: uzumCreatedAt,
+                    total: orderTotal,
+                    totalUZS: orderTotal,
+                    fulfillmentType: 'FBO' as const,
+                    itemsTotal,
+                    itemsTotalUZS: itemsTotal,
+                    deliveryTotal: order.deliveryPrice || 0,
+                    deliveryTotalUZS: order.deliveryPrice || 0,
+                    buyer: {
+                      firstName: order.customerName || order.buyer?.firstName || '',
+                      lastName: order.buyer?.lastName || '',
+                    },
+                    items: items.map((item: any) => {
+                      const identInfo = (item.identifierInfo && typeof item.identifierInfo === 'object') ? item.identifierInfo : {};
+                      const itemBarcode = item.barcode || identInfo.barcode || '';
+                      const offerId = item.skuTitle || itemBarcode || String(item.id || '');
+
+                      let itemPhoto = '';
+                      try {
+                        if (item.photo) {
+                          if (typeof item.photo === 'string') {
+                            itemPhoto = item.photo.startsWith('http') ? item.photo : `https://images.uzum.uz/${item.photo.replace(/^\//, '')}`;
+                          } else if (typeof item.photo === 'object') {
+                            const photoObj = item.photo.photo || item.photo;
+                            const sizes = [240, 120, 80, 60];
+                            for (const size of sizes) {
+                              const sizeData = photoObj[size] || photoObj[String(size)];
+                              if (sizeData && typeof sizeData === 'object') {
+                                if (typeof sizeData.high === 'string' && sizeData.high) { itemPhoto = sizeData.high; break; }
+                                else if (typeof sizeData.low === 'string' && sizeData.low) { itemPhoto = sizeData.low; break; }
+                              }
+                            }
+                            if (!itemPhoto && typeof item.photo.photoKey === 'string' && item.photo.photoKey) {
+                              const pk = item.photo.photoKey;
+                              itemPhoto = pk.startsWith('http') ? pk : `https://images.uzum.uz/${pk.replace(/^\//, '')}`;
+                            }
+                            if (!itemPhoto) {
+                              const photoStr = JSON.stringify(item.photo);
+                              const urlMatch = photoStr.match(/https?:\/\/[^\s"',}]+\.(jpg|jpeg|png|webp)/i);
+                              if (urlMatch) itemPhoto = urlMatch[0];
+                            }
+                          }
+                        }
+                        if (!itemPhoto) {
+                          const fallbackPhoto = item.productPhoto || item.image || item.imageUrl || item.img;
+                          if (typeof fallbackPhoto === 'string' && fallbackPhoto) {
+                            itemPhoto = fallbackPhoto.startsWith('http') ? fallbackPhoto : `https://images.uzum.uz/${fallbackPhoto.replace(/^\//, '')}`;
+                          }
+                        }
+                      } catch { /* ignore photo errors */ }
+
+                      return {
+                        offerId,
+                        skuId: String(item.id || ''),
+                        barcode: itemBarcode,
+                        offerName: item.title || item.skuTitle || item.productTitle || item.name || '',
+                        count: item.quantity || item.count || item.amount || 1,
+                        price: item.price || 0,
+                        priceUZS: item.price || 0,
+                        photo: itemPhoto,
+                      };
+                    }),
+                  };
+                });
+
+                // Deduplicate
+                for (const order of fboMapped) {
+                  const ordKey = String(order.id);
+                  if (!orderIdsSeen.has(ordKey)) {
+                    orderIdsSeen.add(ordKey);
+                    allOrders.push(order);
+                  }
+                }
+
+                if (fboOrderList.length < pageSize || !fetchAll) {
+                  hasMore = false;
+                } else {
+                  page++;
+                  await sleep(300);
+                }
+              } // end while FBO
+            } // end for FBO shops
+          } // end for FBO statuses
+
+          console.log(`Uzum total orders (FBS + FBO): ${allOrders.length}`);
 
           // Server-side date filtering — Uzum API may ignore dateFrom/dateTo params
           // so we filter manually to ensure only requested date range is returned
