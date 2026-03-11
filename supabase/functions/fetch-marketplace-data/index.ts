@@ -2148,7 +2148,7 @@ serve(async (req) => {
 
             for (let si = 0; si < finShopIds.length; si++) {
               const sid = finShopIds[si];
-              if (si > 0) await sleep(300);
+              if (si > 0) await sleep(500); // 500ms to avoid 429
 
               let finPage = 0;
               let finHasMore = true;
@@ -2172,6 +2172,10 @@ serve(async (req) => {
                     if (finResp.status === 403) {
                       await finResp.text();
                       console.warn(`Uzum FBO finance shop=${sid}: 403 — skipping`);
+                    } else if (finResp.status === 429) {
+                      await finResp.text();
+                      console.warn(`Uzum FBO finance shop=${sid}: 429 rate limit — waiting 2s`);
+                      await sleep(2000);
                     } else {
                       const errBody = await finResp.text();
                       console.warn(`Uzum FBO finance shop=${sid} failed: ${finResp.status}, body: ${errBody.substring(0, 300)}`);
