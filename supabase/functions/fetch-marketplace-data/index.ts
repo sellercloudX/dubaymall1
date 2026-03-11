@@ -2390,10 +2390,12 @@ serve(async (req) => {
                   console.log(`[UZUM FINANCE RAW] ${JSON.stringify(ordData).substring(0, 1000)}`);
                 }
 
-                const orders = ordData.payload?.orders || ordData.payload?.content || ordData.content || ordData.payload || ordData.data || [];
+                // Uzum finance API returns {"orderItems":[], "totalElements":0} at top level
+                const orders = ordData.orderItems || ordData.payload?.orders || ordData.payload?.content || ordData.content || ordData.payload || ordData.data || [];
                 const orderList = Array.isArray(orders) ? orders : [];
+                const totalElements = ordData.totalElements || 0;
 
-                console.log(`Uzum finance shop=${sid} page ${finPage}: ${orderList.length} orders`);
+                console.log(`Uzum finance shop=${sid} page ${finPage}: ${orderList.length} orders (totalElements=${totalElements})`);
                 if (orderList.length === 0) break;
 
                 if (financeOrders.length === 0 && orderList.length > 0) {
