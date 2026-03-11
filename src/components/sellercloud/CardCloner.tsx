@@ -238,6 +238,10 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
         const wbColor = fullProduct?.color || '';
         const wbModel = fullProduct?.vendorCode || fullProduct?.model || '';
         
+        // Use MXIK code from source product if available (avoids re-searching)
+        const sourceMxikCode = product.mxikCode || fullProduct?.mxikCode;
+        const sourceMxikName = product.mxikName || fullProduct?.mxikName;
+        
         const { data, error } = await supabase.functions.invoke('yandex-market-create-card', {
           body: {
             shopId: 'sellercloud',
@@ -261,6 +265,9 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
               weight: wbWeight,
               dimensions: wbDimensions,
               shopSku: product.shopSku,
+              // Pass source MXIK code to avoid re-searching
+              mxikCode: sourceMxikCode,
+              mxikName: sourceMxikName,
             },
             pricing: {
               costPrice,
