@@ -2189,7 +2189,7 @@ serve(async (req) => {
                 // Log first FBO order structure
                 if (page === 0 && fboOrderList.length > 0) {
                   const sampleOrder = fboOrderList[0];
-                  console.log(`[UZUM FBO ORDER KEYS] shop=${currentOrderShopId} status=${fboStatus} keys=${JSON.stringify(Object.keys(sampleOrder))}`);
+                  console.log(`[UZUM FBO ORDER KEYS] status=${fboStatus} keys=${JSON.stringify(Object.keys(sampleOrder))}`);
                 }
 
                 const fboMapped = fboOrderList.map((order: any) => {
