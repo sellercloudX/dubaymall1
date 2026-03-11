@@ -2166,7 +2166,8 @@ serve(async (req) => {
               );
 
               if (!finResp.ok) {
-                console.warn(`Uzum finance/orders failed: ${finResp.status}`);
+                const errBody = await finResp.text();
+                console.warn(`Uzum finance/orders failed: ${finResp.status}, body: ${errBody.substring(0, 500)}`);
                 break;
               }
 
