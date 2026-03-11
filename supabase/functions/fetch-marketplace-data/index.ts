@@ -2326,108 +2326,120 @@ serve(async (req) => {
 
       } else if (dataType === "finance") {
         // GET /v1/finance/orders + /v1/finance/expenses
-        // Both require shopIds as mandatory param per Swagger spec
+        // IMPORTANT: Uzum API returns 403 when multiple shopIds are passed
+        // We must query each shop individually
         try {
-          const financeParams = new URLSearchParams();
-          // shopIds is REQUIRED per Uzum Swagger spec — pass ALL shops
-          const finShopIds = allShopIds.length > 0 ? allShopIds : (uzumShopId ? [String(uzumShopId)] : []);
-          for (const sid of finShopIds) {
-            financeParams.append("shopIds", sid);
-          }
-          console.log(`Uzum finance: querying ${finShopIds.length} shops: ${finShopIds.join(',')}`);
-          // CRITICAL: dateFrom/dateTo must be epoch milliseconds (int64), NOT date strings!
-          const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
-          financeParams.append("dateFrom", String(ninetyDaysAgo));
-          financeParams.append("dateTo", String(Date.now()));
-          // Also add pagination for comprehensive data
-          financeParams.append("size", "100");
-          financeParams.append("page", "0");
-          
-          // Try multiple API paths for expenses (Uzum API can vary)
-          const expenseEndpoints = [
-            `${uzumBaseUrl}/v1/finance/expenses?${financeParams.toString()}`,
-            `${uzumBaseUrl}/v2/finance/expenses?${financeParams.toString()}`,
-            `${uzumBaseUrl}/v1/finance/accruals?${financeParams.toString()}`,
-          ];
-
-          const ordersUrl = `${uzumBaseUrl}/v1/finance/orders?${financeParams.toString()}`;
-          console.log(`Uzum finance orders URL: ${ordersUrl}`);
-          const ordersRes = await fetch(ordersUrl, { headers: uzumHeaders });
-
           let financeOrders: any[] = [];
           let financeExpenses: any[] = [];
+          const finShopIds = allShopIds.length > 0 ? allShopIds : (uzumShopId ? [String(uzumShopId)] : []);
+          console.log(`Uzum finance: querying ${finShopIds.length} shops individually: ${finShopIds.join(',')}`);
 
-          if (ordersRes.ok) {
-            const ordData = await ordersRes.json();
-            // Log raw structure for debugging
-            const topKeys = Object.keys(ordData);
-            const payloadKeys = ordData.payload ? Object.keys(ordData.payload) : [];
-            console.log(`[UZUM FINANCE RESP] status=${ordersRes.status}, topKeys=${JSON.stringify(topKeys)}, payloadKeys=${JSON.stringify(payloadKeys)}`);
-            console.log(`[UZUM FINANCE RAW] ${JSON.stringify(ordData).substring(0, 1000)}`);
-            
-            // Try multiple data paths
-            financeOrders = ordData.payload?.orders || ordData.payload?.content || ordData.content || ordData.payload || ordData.data || [];
-            if (!Array.isArray(financeOrders)) financeOrders = [];
-            
-            console.log(`Uzum finance orders parsed: ${financeOrders.length}`);
-            
-            // Log first order structure if available
-            if (financeOrders.length > 0) {
-              console.log(`[UZUM FINANCE ORDER KEYS] ${JSON.stringify(Object.keys(financeOrders[0]))}`);
-              console.log(`[UZUM FINANCE ORDER SAMPLE] ${JSON.stringify(financeOrders[0]).substring(0, 800)}`);
-            }
-            
-            // Extract per-item expenses from order-level finance data
-            financeOrders.forEach((fo: any) => {
-                const items = fo.items || fo.orderItems || [];
-                items.forEach((item: any) => {
-                  const productId = String(item.skuId || item.skuTitle || item.productId || '');
-                  if (!productId) return;
-                  // Extract commission and logistics from order finance
-                  if (item.commission || item.commissionAmount) {
-                    financeExpenses.push({
-                      productId,
-                      type: 'commission',
-                      amount: Math.abs(item.commission || item.commissionAmount || 0),
-                    });
-                  }
-                  if (item.deliveryAmount || item.logisticsAmount || item.deliveryCost) {
-                    financeExpenses.push({
-                      productId,
-                      type: 'logistics',
-                      amount: Math.abs(item.deliveryAmount || item.logisticsAmount || item.deliveryCost || 0),
-                    });
-                  }
-                });
-                // Also check order-level fees
-                if (fo.commissionAmount && !fo.items?.length) {
-                  financeExpenses.push({
-                    productId: String(fo.orderId || fo.id || ''),
-                    type: 'commission',
-                    amount: Math.abs(fo.commissionAmount || 0),
-                  });
-                }
-              });
-          } else {
-            const errBody = await ordersRes.text();
-            console.warn(`Uzum finance/orders failed: ${ordersRes.status}, body: ${errBody.substring(0, 500)}`);
-          }
+          const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
 
-          // Try expense endpoints with fallback
-          for (const endpoint of expenseEndpoints) {
-            try {
-              const expensesRes = await fetch(endpoint, { headers: uzumHeaders });
-              if (expensesRes.ok) {
-                const expData = await expensesRes.json();
-                const expenses = expData.payload || expData.data || expData.content || [];
-                if (Array.isArray(expenses) && expenses.length > 0) {
-                  financeExpenses.push(...expenses);
-                  console.log(`Uzum finance: got ${expenses.length} expenses from ${endpoint}`);
+          for (let si = 0; si < finShopIds.length; si++) {
+            const sid = finShopIds[si];
+            if (si > 0) await sleep(300);
+
+            const financeParams = new URLSearchParams();
+            financeParams.append("shopIds", sid);
+            financeParams.append("dateFrom", String(ninetyDaysAgo));
+            financeParams.append("dateTo", String(Date.now()));
+            financeParams.append("size", "100");
+            financeParams.append("page", "0");
+
+            let finPage = 0;
+            let finHasMore = true;
+            while (finHasMore && finPage < 10) {
+              financeParams.set("page", String(finPage));
+              try {
+                const ordersRes = await fetch(
+                  `${uzumBaseUrl}/v1/finance/orders?${financeParams.toString()}`,
+                  { headers: uzumHeaders }
+                );
+
+                if (!ordersRes.ok) {
+                  if (ordersRes.status === 403) {
+                    await ordersRes.text();
+                    console.warn(`Uzum finance shop=${sid}: 403 — skipping`);
+                  } else {
+                    const errBody = await ordersRes.text();
+                    console.warn(`Uzum finance/orders shop=${sid} failed: ${ordersRes.status}, body: ${errBody.substring(0, 300)}`);
+                  }
                   break;
                 }
+
+                const ordData = await ordersRes.json();
+
+                if (financeOrders.length === 0 && finPage === 0) {
+                  const topKeys = Object.keys(ordData);
+                  const payloadKeys = ordData.payload ? Object.keys(ordData.payload) : [];
+                  console.log(`[UZUM FINANCE RESP] shop=${sid}, topKeys=${JSON.stringify(topKeys)}, payloadKeys=${JSON.stringify(payloadKeys)}`);
+                  console.log(`[UZUM FINANCE RAW] ${JSON.stringify(ordData).substring(0, 1000)}`);
+                }
+
+                const orders = ordData.payload?.orders || ordData.payload?.content || ordData.content || ordData.payload || ordData.data || [];
+                const orderList = Array.isArray(orders) ? orders : [];
+
+                console.log(`Uzum finance shop=${sid} page ${finPage}: ${orderList.length} orders`);
+                if (orderList.length === 0) break;
+
+                if (financeOrders.length === 0 && orderList.length > 0) {
+                  console.log(`[UZUM FINANCE ORDER KEYS] ${JSON.stringify(Object.keys(orderList[0]))}`);
+                  console.log(`[UZUM FINANCE ORDER SAMPLE] ${JSON.stringify(orderList[0]).substring(0, 800)}`);
+                }
+
+                financeOrders.push(...orderList);
+
+                orderList.forEach((fo: any) => {
+                  const items = fo.items || fo.orderItems || [];
+                  items.forEach((item: any) => {
+                    const productId = String(item.skuId || item.skuTitle || item.productId || '');
+                    if (!productId) return;
+                    if (item.commission || item.commissionAmount) {
+                      financeExpenses.push({ productId, type: 'commission', amount: Math.abs(item.commission || item.commissionAmount || 0) });
+                    }
+                    if (item.deliveryAmount || item.logisticsAmount || item.deliveryCost) {
+                      financeExpenses.push({ productId, type: 'logistics', amount: Math.abs(item.deliveryAmount || item.logisticsAmount || item.deliveryCost || 0) });
+                    }
+                  });
+                  if (fo.commissionAmount && !fo.items?.length) {
+                    financeExpenses.push({ productId: String(fo.orderId || fo.id || ''), type: 'commission', amount: Math.abs(fo.commissionAmount || 0) });
+                  }
+                });
+
+                if (orderList.length < 100) finHasMore = false;
+                else { finPage++; await sleep(200); }
+              } catch (pageErr) {
+                console.error(`Uzum finance page error shop=${sid}:`, pageErr);
+                break;
               }
-            } catch (expErr) {
-              // Try next endpoint
+            }
+
+            // Try expense endpoints for this shop
+            const shopExpParams = new URLSearchParams();
+            shopExpParams.append("shopIds", sid);
+            shopExpParams.append("dateFrom", String(ninetyDaysAgo));
+            shopExpParams.append("dateTo", String(Date.now()));
+            shopExpParams.append("size", "100");
+            shopExpParams.append("page", "0");
+            const expenseEndpoints = [
+              `${uzumBaseUrl}/v1/finance/expenses?${shopExpParams.toString()}`,
+              `${uzumBaseUrl}/v2/finance/expenses?${shopExpParams.toString()}`,
+              `${uzumBaseUrl}/v1/finance/accruals?${shopExpParams.toString()}`,
+            ];
+            for (const endpoint of expenseEndpoints) {
+              try {
+                const expensesRes = await fetch(endpoint, { headers: uzumHeaders });
+                if (expensesRes.ok) {
+                  const expData = await expensesRes.json();
+                  const expenses = expData.payload || expData.data || expData.content || [];
+                  if (Array.isArray(expenses) && expenses.length > 0) {
+                    financeExpenses.push(...expenses);
+                    console.log(`Uzum finance shop=${sid}: got ${expenses.length} expenses`);
+                    break;
+                  }
+                } else { await expensesRes.text(); }
+              } catch (expErr) { /* Try next */ }
             }
           }
 
@@ -2436,8 +2448,8 @@ serve(async (req) => {
           result = {
             success: true,
             data: {
-              orders: Array.isArray(financeOrders) ? financeOrders : [],
-              expenses: Array.isArray(financeExpenses) ? financeExpenses : [],
+              orders: financeOrders,
+              expenses: financeExpenses,
             },
           };
         } catch (e) {
