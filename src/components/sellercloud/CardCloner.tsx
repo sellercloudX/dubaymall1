@@ -105,12 +105,12 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
   // Get products for selected source
   const products = useMemo((): CloneableProduct[] => {
     if (!sourceMarketplace) return [];
-    // Filter out deleted/archived/inactive products from Yandex and other marketplaces
-    const INACTIVE_STATUSES = ['INACTIVE', 'ARCHIVED', 'DELISTED', 'DELETED', 'DISABLED', 'REMOVED', 'NO_STOCKS', 'UNPUBLISHED'];
+    // Filter out only truly deleted/archived products — keep NO_STOCKS and INACTIVE for cloning
+    const HIDDEN_STATUSES = ['ARCHIVED', 'DELISTED', 'DELETED', 'REMOVED'];
     return store.getProducts(sourceMarketplace)
       .filter(p => {
         const status = (p.availability || '').toUpperCase();
-        return !INACTIVE_STATUSES.includes(status);
+        return !HIDDEN_STATUSES.includes(status);
       })
       .map(p => ({
         offerId: p.offerId,
