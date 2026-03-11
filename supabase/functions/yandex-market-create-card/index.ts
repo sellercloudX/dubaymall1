@@ -35,6 +35,9 @@ interface ProductInput {
   sourceMarketplace?: string;
   sourceCategory?: string;
   sourceCategoryId?: number;
+  sourceSubject?: string;
+  sourceParent?: string;
+  sourceCharacteristics?: any[];
   shopSku?: string;
 }
 
@@ -288,7 +291,8 @@ async function getYandexCredentials(supabase: any, userId: string) {
 
 async function findLeafCategory(
   apiKey: string, productName: string, productDesc: string, lovableApiKey: string,
-  sourceCategory?: string, sourceMarketplace?: string
+  sourceCategory?: string, sourceMarketplace?: string,
+  sourceSubject?: string, sourceParent?: string
 ): Promise<{ id: number; name: string }> {
   // 1. Fetch category tree from Yandex
   console.log("📂 Fetching Yandex category tree...");
@@ -328,7 +332,25 @@ async function findLeafCategory(
   console.log(`📂 Found ${leaves.length} leaf categories`);
 
   // 3. Use AI to extract RUSSIAN search keywords from product name
+  // CRITICAL for clones: use source subject/parent as PRIMARY keywords — they are already categorized!
   let searchKeywords: string[] = [];
+  
+  // Priority 1: Source WB subject/parent (already accurate category names in Russian)
+  if (sourceSubject) {
+    searchKeywords.push(sourceSubject);
+    console.log(`📂 Using source subject: "${sourceSubject}"`);
+  }
+  if (sourceParent && sourceParent !== sourceSubject) {
+    searchKeywords.push(sourceParent);
+    console.log(`📂 Using source parent: "${sourceParent}"`);
+  }
+  
+  // Priority 2: Source category  
+  if (sourceCategory && !searchKeywords.includes(sourceCategory)) {
+    searchKeywords.push(sourceCategory);
+  }
+  
+  // Priority 3: AI keyword extraction (supplement, not replace)
   if (lovableApiKey) {
     try {
       const kwResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -338,16 +360,18 @@ async function findLeafCategory(
           model: "google/gemini-2.5-flash-lite",
           messages: [{ role: "user", content: `Mahsulot: "${productName}"
 Tavsif: "${productDesc || ''}"
-${sourceCategory ? `Manba marketplace kategoriyasi: "${sourceCategory}"` : ''}
+${sourceSubject ? `Manba marketplace kategoriyasi (WB subject): "${sourceSubject}"` : ''}
+${sourceParent ? `Manba ota-kategoriya (WB parent): "${sourceParent}"` : ''}
+${sourceCategory ? `Manba kategoriya: "${sourceCategory}"` : ''}
 
 Bu mahsulotni Yandex Market kategoriyalarida topish uchun RUSCHA kalit so'zlar ber.
-${sourceCategory ? `MUHIM: Manba kategoriya "${sourceCategory}" — shu kategoriyaga mos ruscha so'zlarni ALBATTA qo'sh!` : ''}
+${sourceSubject ? `MUHIM: WB dagi kategoriya "${sourceSubject}" — shu kategoriyaga mos Yandex Market kategoriyasini topish uchun eng aniq ruscha so'zlarni ber!` : ''}
 Faqat mahsulot TURINI bildiruvchi so'zlar (brend, model, rang emas).
 
 Masalan:
-- "Estée Lauder Double Wear foundation" → ["тональный крем", "тональное средство", "макияж", "косметика"]
-- "iPhone 15 Pro" → ["смартфон", "мобильный телефон"]
-- "Nike Air Max krossovka" → ["кроссовки", "спортивная обувь", "обувь"]
+- WB subject "Кроссовки" → ["кроссовки", "спортивная обувь", "обувь"]
+- WB subject "Тональные средства" → ["тональный крем", "тональное средство", "косметика"]
+- WB subject "Шампуни" → ["шампунь", "средство для волос", "косметика"]
 
 Javob FAQAT JSON array: ["so'z1", "so'z2", ...]` }],
           temperature: 0, max_tokens: 150,
@@ -358,7 +382,11 @@ Javob FAQAT JSON array: ["so'z1", "so'z2", ...]` }],
         const kwContent = kwData.choices?.[0]?.message?.content?.trim() || "";
         const kwMatch = kwContent.match(/\[.*\]/s);
         if (kwMatch) {
-          searchKeywords = JSON.parse(kwMatch[0]).filter((k: string) => typeof k === 'string' && k.length > 1);
+          const aiKeywords = JSON.parse(kwMatch[0]).filter((k: string) => typeof k === 'string' && k.length > 1);
+          // Add AI keywords that aren't already present
+          for (const kw of aiKeywords) {
+            if (!searchKeywords.includes(kw)) searchKeywords.push(kw);
+          }
         }
       }
     } catch (e) {
@@ -400,15 +428,19 @@ Javob FAQAT JSON array: ["so'z1", "so'z2", ...]` }],
 
 MAHSULOT NOMI: "${productName}"
 TAVSIF: "${productDesc || 'Yo\'q'}"
-${sourceCategory ? `MANBA MARKETPLACE KATEGORIYASI: "${sourceCategory}" (${sourceMarketplace || 'unknown'})` : ''}
+${sourceSubject ? `MANBA MARKETPLACE KATEGORIYASI (WB Subject): "${sourceSubject}"` : ''}
+${sourceParent ? `MANBA OTA-KATEGORIYA (WB Parent): "${sourceParent}"` : ''}
+${sourceCategory ? `MANBA KATEGORIYA: "${sourceCategory}" (${sourceMarketplace || 'unknown'})` : ''}
 
 MUHIM QOIDALAR:
 - Kategoriya mahsulot TURIGA aniq mos bo'lishi SHART
-${sourceCategory ? `- Manba kategoriya "${sourceCategory}" — shunga ENG YAQIN Yandex kategoriyani tanla!` : ''}
+${sourceSubject ? `- WB dagi kategoriya "${sourceSubject}" — shunga ENG YAQIN Yandex kategoriyani tanla! Bu eng ishonchli ma'lumot!` : ''}
+${sourceParent ? `- WB ota-kategoriya: "${sourceParent}" — bu ham yo'nalishni aniqlashda muhim!` : ''}
 - "Par dazmol" va "Vakuum paketlash mashinasi" — BU BOSHQA NARSALAR!
 - Mahsulot nomidagi kalit so'zlarni sinchiklab tahlil qil
 - Masalan: "vakuumlovchi" → "Вакуумные упаковщики", "par dazmol" → "Парогенераторы"
 - "foundation/tonal krem" → "Тональные средства", "lipstick" → "Губная помада"
+- WB "Кроссовки" → Yandex "Кроссовки" yoki eng yaqin sport poyabzal kategoriyasi
 - Agar mahsulot nomi ANIQ bir kategoriyaga to'g'ri kelsa, uni tanla
 
 KATEGORIYALAR RO'YXATI:
@@ -997,8 +1029,12 @@ serve(async (req) => {
         console.log(`🖼️ Total ${images.length} images ready`);
 
         // ═══ STEP 2: Find LEAF category from Yandex tree ═══
-        // COST OPTIMIZATION: For clones, use cheaper Flash Lite for category detection
-        const leafCat = await findLeafCategory(creds.apiKey, product.name, product.description || "", LOVABLE_KEY, product.sourceCategory || product.category, product.sourceMarketplace);
+        // Pass source subject/parent for much better category matching in clone mode
+        const leafCat = await findLeafCategory(
+          creds.apiKey, product.name, product.description || "", LOVABLE_KEY,
+          product.sourceCategory || product.category, product.sourceMarketplace,
+          product.sourceSubject, product.sourceParent
+        );
         console.log(`📂 Category: ${leafCat.name} (${leafCat.id})`);
 
         // ═══ STEP 3: Fetch category parameters ═══
@@ -1006,19 +1042,23 @@ serve(async (req) => {
         console.log(`📋 ${params.length} params for category ${leafCat.id}`);
 
         // ═══ STEP 4: AI optimization ═══
+        // Pass source characteristics for better parameter filling
         let ai: any = null;
         if (LOVABLE_KEY) {
           const isClone = !!body.cloneMode || !!body.skipImageGeneration;
           if (isClone) {
-            console.log(`💰 Clone mode: using Flash instead of Pro for AI optimization`);
+            console.log(`💰 Clone mode: using Flash for AI optimization`);
           }
           ai = await aiOptimize(product, leafCat.name, params, LOVABLE_KEY, isClone);
         }
 
         // ═══ STEP 5: MXIK lookup (AI-powered) ═══
+        // For clones, use source subject (Russian category) for better MXIK matching
+        const mxikSearchName = product.sourceSubject || product.sourceCategory || product.name;
+        const mxikSearchCategory = product.sourceParent || product.category;
         const mxik = (product.mxikCode && product.mxikName)
           ? { code: product.mxikCode, name_uz: product.mxikName }
-          : await lookupMXIK(supabase, product.name, product.category, LOVABLE_KEY);
+          : await lookupMXIK(supabase, mxikSearchName, mxikSearchCategory, LOVABLE_KEY);
 
         // ═══ STEP 6: Build & send offer ═══
         const offer = buildOffer(product, ai, sku, barcode, leafCat, mxik, pricing.recommendedPrice, images);
@@ -1049,9 +1089,9 @@ serve(async (req) => {
           uzSent = await sendUzbekContent(creds.apiKey, creds.businessId, sku, ai.name_uz, ai.description_uz);
         }
 
-        // ═══ STEP 7.5: Auto quality check (SKIP in clone mode for speed) ═══
+        // ═══ STEP 7.5: Auto quality check + auto-fix (ALWAYS run, including clone mode) ═══
         let qualityCheck: any = null;
-        if (yResp.ok && LOVABLE_KEY && !body.cloneMode) {
+        if (yResp.ok && LOVABLE_KEY) {
           try {
             console.log("🔍 Running auto quality check...");
             await new Promise(r => setTimeout(r, 1000));
@@ -1119,8 +1159,6 @@ serve(async (req) => {
           } catch (e) {
             console.warn("Quality check failed:", e);
           }
-        } else if (body.cloneMode) {
-          console.log("⚡ Clone mode: quality check skipped for speed");
         }
 
         // ═══ STEP 8: Save locally ═══

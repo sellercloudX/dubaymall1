@@ -221,7 +221,18 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
       if (targetMp === 'yandex') {
         // Get full product data from store for richer context
         const storeProducts = store.getProducts(product.marketplace);
-        const fullProduct = storeProducts.find(p => p.offerId === product.offerId);
+        const fullProduct: any = storeProducts.find(p => p.offerId === product.offerId);
+        
+        // Extract source marketplace data for better Yandex mapping (use `any` — raw cache may have extra fields)
+        const wbSubject = fullProduct?.subjectName || fullProduct?.subject || '';
+        const wbParent = fullProduct?.parentName || fullProduct?.parent || '';
+        const wbBrand = fullProduct?.brand || fullProduct?.vendor || '';
+        const wbBarcode = fullProduct?.barcode || fullProduct?.barcodes?.[0] || '';
+        const wbCharacteristics = fullProduct?.characteristics || fullProduct?.charcs || [];
+        const wbWeight = fullProduct?.weightKg || fullProduct?.weightDimensions?.weight;
+        const wbDimensions = fullProduct?.weightDimensions || (fullProduct?.lengthCm ? { length: fullProduct.lengthCm, width: fullProduct.widthCm, height: fullProduct.heightCm } : undefined);
+        const wbColor = fullProduct?.color || '';
+        const wbModel = fullProduct?.vendorCode || fullProduct?.model || '';
         
         const { data, error } = await supabase.functions.invoke('yandex-market-create-card', {
           body: {
@@ -236,6 +247,15 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
               sourceMarketplace: product.marketplace,
               sourceCategory: productCategory,
               sourceCategoryId: fullProduct?.marketCategoryId,
+              sourceSubject: wbSubject,
+              sourceParent: wbParent,
+              sourceCharacteristics: wbCharacteristics,
+              brand: wbBrand,
+              barcode: wbBarcode,
+              color: wbColor,
+              model: wbModel,
+              weight: wbWeight,
+              dimensions: wbDimensions,
               shopSku: product.shopSku,
             },
             pricing: {
