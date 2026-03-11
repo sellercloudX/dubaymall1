@@ -2149,10 +2149,13 @@ serve(async (req) => {
                   size: String(pageSize),
                   page: String(page),
                   status: fboStatus,
-                  shopIds: String(currentOrderShopId),
                 });
+                // Add ALL shopIds to single FBO request
+                for (const sid of orderShopIds) {
+                  params.append("shopIds", sid);
+                }
 
-                console.log(`Uzum FBO orders (${fboStatus}) shop=${currentOrderShopId} page ${page}: ${uzumBaseUrl}/v2/fbo/orders?${params.toString()}`);
+                console.log(`Uzum FBO (${fboStatus}) page ${page}`);
 
                 let fboResponse: Response;
                 try {
