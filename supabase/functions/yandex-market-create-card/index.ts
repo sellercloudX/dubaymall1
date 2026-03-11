@@ -1159,8 +1159,6 @@ serve(async (req) => {
           } catch (e) {
             console.warn("Quality check failed:", e);
           }
-        } else if (body.cloneMode) {
-          console.log("⚡ Clone mode: quality check skipped for speed");
         }
 
         // ═══ STEP 8: Save locally ═══
