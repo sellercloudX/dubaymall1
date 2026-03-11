@@ -1907,39 +1907,33 @@ serve(async (req) => {
             'COMPLETED', 'CANCELED', 'PENDING_CANCELLATION', 'RETURNED', 'REJECTED'
           ];
 
-          // Pass ALL shop IDs in a single request (comma-separated or multiple params)
+          // Fetch FBS orders per-shop to avoid 403 "Shops ids is not available" errors
+          // Some shops may not support FBS — we skip them gracefully
           const orderShopIds = allShopIds.length > 0 ? allShopIds : (uzumShopId ? [String(uzumShopId)] : []);
-          // Build shopIds query string once — Uzum API accepts multiple shopIds params
-          const shopIdsQueryParts = orderShopIds.map(id => `shopIds=${id}`).join('&');
           
-          console.log(`Uzum FBS orders: ${orderStatuses.length} statuses, ${orderShopIds.length} shops (batch mode)`);
+          console.log(`Uzum FBS orders: ${orderStatuses.length} statuses, ${orderShopIds.length} shops (per-shop mode)`);
           
           for (let si = 0; si < orderStatuses.length; si++) {
             const orderStatus = orderStatuses[si];
-            // Reduced delay: 200ms between statuses (was 500ms)
-            if (si > 0) await sleep(200);
+            if (si > 0) await sleep(300); // Rate limit protection
             
-            // Single request per status with ALL shopIds
-            page = 0;
-            hasMore = true;
+            // Try each shop individually to handle 403 gracefully
+            for (const shopId of orderShopIds) {
+              page = 0;
+              hasMore = true;
 
-            while (hasMore) {
-              const params = new URLSearchParams({
-                size: String(pageSize),
-                page: String(page),
-                status: orderStatus,
-              });
-              // Add ALL shopIds to single request
-              for (const sid of orderShopIds) {
-                params.append("shopIds", sid);
-              }
+              while (hasMore) {
+                const params = new URLSearchParams({
+                  size: String(pageSize),
+                  page: String(page),
+                  status: orderStatus,
+                  shopIds: shopId,
+                });
 
-              console.log(`Uzum FBS (${orderStatus}) page ${page}`);
-
-              const response = await fetch(
-                `${uzumBaseUrl}/v2/fbs/orders?${params.toString()}`,
-                { headers: uzumHeaders }
-              );
+                const response = await fetch(
+                  `${uzumBaseUrl}/v2/fbs/orders?${params.toString()}`,
+                  { headers: uzumHeaders }
+                );
 
             if (!response.ok) {
               const errText = await response.text();
