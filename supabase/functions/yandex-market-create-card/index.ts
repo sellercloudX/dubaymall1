@@ -332,7 +332,25 @@ async function findLeafCategory(
   console.log(`📂 Found ${leaves.length} leaf categories`);
 
   // 3. Use AI to extract RUSSIAN search keywords from product name
+  // CRITICAL for clones: use source subject/parent as PRIMARY keywords — they are already categorized!
   let searchKeywords: string[] = [];
+  
+  // Priority 1: Source WB subject/parent (already accurate category names in Russian)
+  if (sourceSubject) {
+    searchKeywords.push(sourceSubject);
+    console.log(`📂 Using source subject: "${sourceSubject}"`);
+  }
+  if (sourceParent && sourceParent !== sourceSubject) {
+    searchKeywords.push(sourceParent);
+    console.log(`📂 Using source parent: "${sourceParent}"`);
+  }
+  
+  // Priority 2: Source category  
+  if (sourceCategory && !searchKeywords.includes(sourceCategory)) {
+    searchKeywords.push(sourceCategory);
+  }
+  
+  // Priority 3: AI keyword extraction (supplement, not replace)
   if (lovableApiKey) {
     try {
       const kwResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -342,16 +360,18 @@ async function findLeafCategory(
           model: "google/gemini-2.5-flash-lite",
           messages: [{ role: "user", content: `Mahsulot: "${productName}"
 Tavsif: "${productDesc || ''}"
-${sourceCategory ? `Manba marketplace kategoriyasi: "${sourceCategory}"` : ''}
+${sourceSubject ? `Manba marketplace kategoriyasi (WB subject): "${sourceSubject}"` : ''}
+${sourceParent ? `Manba ota-kategoriya (WB parent): "${sourceParent}"` : ''}
+${sourceCategory ? `Manba kategoriya: "${sourceCategory}"` : ''}
 
 Bu mahsulotni Yandex Market kategoriyalarida topish uchun RUSCHA kalit so'zlar ber.
-${sourceCategory ? `MUHIM: Manba kategoriya "${sourceCategory}" — shu kategoriyaga mos ruscha so'zlarni ALBATTA qo'sh!` : ''}
+${sourceSubject ? `MUHIM: WB dagi kategoriya "${sourceSubject}" — shu kategoriyaga mos Yandex Market kategoriyasini topish uchun eng aniq ruscha so'zlarni ber!` : ''}
 Faqat mahsulot TURINI bildiruvchi so'zlar (brend, model, rang emas).
 
 Masalan:
-- "Estée Lauder Double Wear foundation" → ["тональный крем", "тональное средство", "макияж", "косметика"]
-- "iPhone 15 Pro" → ["смартфон", "мобильный телефон"]
-- "Nike Air Max krossovka" → ["кроссовки", "спортивная обувь", "обувь"]
+- WB subject "Кроссовки" → ["кроссовки", "спортивная обувь", "обувь"]
+- WB subject "Тональные средства" → ["тональный крем", "тональное средство", "косметика"]
+- WB subject "Шампуни" → ["шампунь", "средство для волос", "косметика"]
 
 Javob FAQAT JSON array: ["so'z1", "so'z2", ...]` }],
           temperature: 0, max_tokens: 150,
@@ -362,7 +382,11 @@ Javob FAQAT JSON array: ["so'z1", "so'z2", ...]` }],
         const kwContent = kwData.choices?.[0]?.message?.content?.trim() || "";
         const kwMatch = kwContent.match(/\[.*\]/s);
         if (kwMatch) {
-          searchKeywords = JSON.parse(kwMatch[0]).filter((k: string) => typeof k === 'string' && k.length > 1);
+          const aiKeywords = JSON.parse(kwMatch[0]).filter((k: string) => typeof k === 'string' && k.length > 1);
+          // Add AI keywords that aren't already present
+          for (const kw of aiKeywords) {
+            if (!searchKeywords.includes(kw)) searchKeywords.push(kw);
+          }
         }
       }
     } catch (e) {
