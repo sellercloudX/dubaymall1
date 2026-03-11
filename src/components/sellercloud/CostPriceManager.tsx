@@ -9,6 +9,9 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from '@/components/ui/table';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
 import { DollarSign, Save, Search, Package, CheckCircle2, AlertCircle, ChevronLeft, ChevronRight, Download, Loader2 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useCostPrices } from '@/hooks/useCostPrices';
@@ -33,7 +36,7 @@ const getCurrencyLabelFull = () => "so'm";
 
 export function CostPriceManager({ connectedMarketplaces, store }: CostPriceManagerProps) {
   const isMobile = useIsMobile();
-  const { getCostPrice, setCostPrice, bulkSetCostPrices, loading: costLoading, refetch } = useCostPrices();
+  const { getCostPrice, setCostPrice, bulkSetCostPrices, loading: costLoading, costPrices, refetch } = useCostPrices();
   const [selectedMp, setSelectedMp] = useState(connectedMarketplaces[0] || '');
   const [search, setSearch] = useState('');
   const [editingPrices, setEditingPrices] = useState<Record<string, string>>({});
@@ -42,29 +45,36 @@ export function CostPriceManager({ connectedMarketplaces, store }: CostPriceMana
 
   const isLoading = store.isLoadingProducts || costLoading;
 
-  // Import cost prices from Yandex to WB using AI matching
-  const handleImportFromYandex = useCallback(async () => {
-    if (!connectedMarketplaces.includes('yandex')) {
-      toast.error('Yandex Market ulanmagan');
-      return;
-    }
+  // Find which other marketplaces have cost prices entered (potential import sources)
+  const availableSources = useMemo(() => {
+    if (!selectedMp) return [];
+    const sourceMps = new Set<string>();
+    costPrices.forEach(cp => {
+      if (cp.marketplace !== selectedMp && cp.cost_price > 0) {
+        sourceMps.add(cp.marketplace);
+      }
+    });
+    return connectedMarketplaces.filter(mp => mp !== selectedMp && sourceMps.has(mp));
+  }, [selectedMp, connectedMarketplaces, costPrices]);
+
+  // Universal import: from any source marketplace to current selected marketplace
+  const handleImportCostPrices = useCallback(async (sourceMarketplace: string) => {
     setImporting(true);
     try {
-      const yandexProducts = store.getProducts('yandex');
-      const wbProducts = store.getProducts('wildberries');
+      const targetProducts = store.getProducts(selectedMp);
+      const sourceProducts = store.getProducts(sourceMarketplace);
       
-      if (yandexProducts.length === 0) {
-        toast.error('Yandex da mahsulotlar topilmadi');
+      if (targetProducts.length === 0) {
+        toast.error(`${MARKETPLACE_NAMES[selectedMp]} da mahsulotlar topilmadi`);
         return;
       }
-      if (wbProducts.length === 0) {
-        toast.error('WB da mahsulotlar topilmadi');
+      if (sourceProducts.length === 0) {
+        toast.error(`${MARKETPLACE_NAMES[sourceMarketplace]} da mahsulotlar topilmadi`);
         return;
       }
 
-      toast.info(`AI yordamida ${wbProducts.length} ta WB mahsulotni ${yandexProducts.length} ta Yandex mahsulot bilan solishtirilmoqda...`);
+      toast.info(`AI yordamida ${targetProducts.length} ta ${MARKETPLACE_NAMES[selectedMp]} mahsulotni ${sourceProducts.length} ta ${MARKETPLACE_NAMES[sourceMarketplace]} bilan solishtirilmoqda...`);
 
-      // Pre-flight billing check
       if (!(await checkBillingAccess('ai-product-matching'))) {
         setImporting(false);
         return;
@@ -72,8 +82,10 @@ export function CostPriceManager({ connectedMarketplaces, store }: CostPriceMana
 
       const { data, error } = await supabase.functions.invoke('match-products-ai', {
         body: {
-          wbProducts: wbProducts.map(p => ({ name: p.name, offerId: p.offerId })),
-          yandexProducts: yandexProducts.map(p => ({ name: p.name, offerId: p.offerId })),
+          targetProducts: targetProducts.map(p => ({ name: p.name, offerId: p.offerId })),
+          sourceProducts: sourceProducts.map(p => ({ name: p.name, offerId: p.offerId })),
+          targetMarketplace: selectedMp,
+          sourceMarketplace,
         }
       });
 
@@ -84,7 +96,7 @@ export function CostPriceManager({ connectedMarketplaces, store }: CostPriceMana
 
       if (data?.matches > 0) {
         await refetch();
-        toast.success(`${data.matches} ta mahsulotga tannarx import qilindi (${data.text_matches || 0} matn + ${data.ai_matches || 0} AI)`);
+        toast.success(`${data.matches} ta mahsulotga tannarx import qilindi (${data.sku_matches || 0} SKU + ${data.text_matches || 0} matn + ${data.ai_matches || 0} AI)`);
       } else {
         toast.warning('Mos mahsulotlar topilmadi');
       }
@@ -94,7 +106,7 @@ export function CostPriceManager({ connectedMarketplaces, store }: CostPriceMana
     } finally {
       setImporting(false);
     }
-  }, [connectedMarketplaces, store, refetch]);
+  }, [connectedMarketplaces, store, refetch, selectedMp]);
 
   const products = useMemo(() => {
     if (!selectedMp) return [];
