@@ -33,6 +33,8 @@ interface CloneableProduct {
   description: string;
   marketplace: string;
   selected: boolean;
+  mxikCode?: string;
+  mxikName?: string;
 }
 
 const MARKETPLACE_INFO = MARKETPLACE_CONFIG;

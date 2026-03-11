@@ -2144,19 +2144,22 @@ serve(async (req) => {
 
           console.log(`Uzum FBS orders collected: ${allOrders.length}`);
 
-          // ===== FETCH FBO DATA via /v1/finance/orders =====
-          // Uzum has NO /v2/fbo/orders endpoint. FBO orders are visible through
-          // the finance API. We must query EACH shop individually (403 on multi-shop).
+          // ===== FETCH FBO DATA via /v1/invoice (supply invoices) + /v1/finance/orders =====
+          // Uzum has NO /v2/fbo/orders endpoint. FBO sold orders appear through:
+          // 1. /v1/finance/orders — settled financial orders (commission deducted)
+          // 2. /v1/shop/{shopId}/invoice — supply invoices track what was sent to FBO warehouse
+          // We query EACH shop individually (403 on multi-shop batch).
           try {
             const finShopIds = allShopIds.length > 0 ? allShopIds : (uzumShopId ? [String(uzumShopId)] : []);
-            console.log(`Uzum FBO finance: querying ${finShopIds.length} shops individually`);
+            console.log(`Uzum FBO: querying ${finShopIds.length} shops via finance + invoice APIs`);
             const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
             let fboCount = 0;
 
             for (let si = 0; si < finShopIds.length; si++) {
               const sid = finShopIds[si];
-              if (si > 0) await sleep(500); // 500ms to avoid 429
+              if (si > 0) await sleep(500);
 
+              // --- Method 1: /v1/finance/orders (settled FBO orders) ---
               let finPage = 0;
               let finHasMore = true;
 
@@ -2192,7 +2195,6 @@ serve(async (req) => {
 
                   const finData = await finResp.json();
 
-                  // Log structure on first successful response
                   if (fboCount === 0 && finPage === 0) {
                     const topKeys = Object.keys(finData);
                     const payloadKeys = finData.payload ? Object.keys(finData.payload) : [];
@@ -2202,7 +2204,6 @@ serve(async (req) => {
                     }
                   }
 
-                  // Uzum finance API returns {"orderItems":[], "totalElements":0} at top level
                   const finOrders = finData.orderItems || finData.payload?.orders || finData.payload?.content || finData.content || finData.payload || [];
                   const finList = Array.isArray(finOrders) ? finOrders : [];
 
@@ -2233,7 +2234,7 @@ serve(async (req) => {
                       parsedDate = isNaN(p.getTime()) ? '' : p.toISOString();
                     }
 
-                    const orderTotal = fo.totalAmount || fo.price || fo.totalPrice || itemsTotal;
+                    const orderTotal = fo.totalAmount || fo.price || fo.totalPrice || fo.sellerAmount || itemsTotal;
 
                     allOrders.push({
                       id: foId,
@@ -2270,9 +2271,40 @@ serve(async (req) => {
                   break;
                 }
               }
+
+              // --- Method 2: /v1/shop/{shopId}/invoice (FBO supply invoices) ---
+              // If finance API returned 0 results, try invoice API for FBO order data
+              if (fboCount === 0) {
+                try {
+                  await sleep(300);
+                  const invResp = await fetch(
+                    `${uzumBaseUrl}/v1/shop/${sid}/invoice?page=0&size=50`,
+                    { headers: uzumHeaders }
+                  );
+                  if (invResp.ok) {
+                    const invData = await invResp.json();
+                    const invoices = invData.payload || invData.data || invData.invoiceList || invData || [];
+                    const invList = Array.isArray(invoices) ? invoices : [];
+                    console.log(`Uzum FBO invoices shop=${sid}: ${invList.length} invoices`);
+                    
+                    // Invoices represent FBO supply deliveries — they contain product items
+                    // that were sent to Uzum warehouse. These are NOT orders directly,
+                    // but they prove FBO activity is present for this shop.
+                    if (invList.length > 0 && invList[0]) {
+                      console.log(`[UZUM INVOICE SAMPLE] keys=${JSON.stringify(Object.keys(invList[0]))}`);
+                      console.log(`[UZUM INVOICE SAMPLE] ${JSON.stringify(invList[0]).substring(0, 600)}`);
+                    }
+                  } else {
+                    console.log(`Uzum invoices shop=${sid}: ${invResp.status}`);
+                    await invResp.text();
+                  }
+                } catch (invErr) {
+                  console.error(`Uzum invoice error shop=${sid}:`, invErr);
+                }
+              }
             }
 
-            console.log(`Uzum FBO orders from finance API: ${fboCount}`);
+            console.log(`Uzum FBO orders from finance + invoice API: ${fboCount}`);
           } catch (fboErr) {
             console.error("Uzum FBO finance fetch error:", fboErr);
           }
