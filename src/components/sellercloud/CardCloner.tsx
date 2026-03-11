@@ -227,16 +227,52 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
         const storeProducts = store.getProducts(product.marketplace);
         const fullProduct: any = storeProducts.find(p => p.offerId === product.offerId);
         
-        // Extract source marketplace data for better Yandex mapping (use `any` — raw cache may have extra fields)
-        const wbSubject = fullProduct?.subjectName || fullProduct?.subject || '';
-        const wbParent = fullProduct?.parentName || fullProduct?.parent || '';
-        const wbBrand = fullProduct?.brand || fullProduct?.vendor || '';
-        const wbBarcode = fullProduct?.barcode || fullProduct?.barcodes?.[0] || '';
-        const wbCharacteristics = fullProduct?.characteristics || fullProduct?.charcs || [];
-        const wbWeight = fullProduct?.weightKg || fullProduct?.weightDimensions?.weight;
-        const wbDimensions = fullProduct?.weightDimensions || (fullProduct?.lengthCm ? { length: fullProduct.lengthCm, width: fullProduct.widthCm, height: fullProduct.heightCm } : undefined);
-        const wbColor = fullProduct?.color || '';
-        const wbModel = fullProduct?.vendorCode || fullProduct?.model || '';
+        // Extract source marketplace data — universal for ALL source marketplaces
+        let sourceBrand = '';
+        let sourceSubject = '';
+        let sourceParent = '';
+        let sourceBarcode = '';
+        let sourceCharacteristics: any[] = [];
+        let sourceWeight: number | undefined;
+        let sourceDimensions: any;
+        let sourceColor = '';
+        let sourceModel = '';
+        
+        if (product.marketplace === 'uzum') {
+          // Uzum-specific field extraction
+          sourceBrand = fullProduct?.brandName || fullProduct?.brand || '';
+          // Uzum category is the best subject equivalent
+          sourceSubject = fullProduct?.category || product.category || '';
+          sourceParent = fullProduct?.categoryTitle || fullProduct?.parentCategory || '';
+          sourceBarcode = fullProduct?.barcode || fullProduct?.ean || '';
+          sourceCharacteristics = fullProduct?.characteristicValues || fullProduct?.characteristics || fullProduct?.attributes || [];
+          sourceColor = fullProduct?.color || '';
+          sourceModel = fullProduct?.vendorCode || fullProduct?.model || fullProduct?.article || '';
+          // Try to extract brand from product name if not available
+          if (!sourceBrand && product.name) {
+            // Common pattern: "BrandName ProductType..." - first capitalized word often is brand
+            const nameWords = product.name.split(/\s+/);
+            if (nameWords.length >= 2) {
+              // Don't use generic words as brand
+              const genericWords = ['telefon', 'chexol', 'quvvatlagich', 'naushnik', 'kabel', 'adapter', 'zaryadka', 'чехол', 'телефон', 'зарядка', 'кабель', 'наушники', 'для', 'uchun', 'case', 'cover'];
+              const firstWord = nameWords[0];
+              if (!genericWords.includes(firstWord.toLowerCase()) && firstWord.length > 1) {
+                sourceBrand = firstWord;
+              }
+            }
+          }
+        } else {
+          // WB / Ozon field extraction
+          sourceSubject = fullProduct?.subjectName || fullProduct?.subject || '';
+          sourceParent = fullProduct?.parentName || fullProduct?.parent || '';
+          sourceBrand = fullProduct?.brand || fullProduct?.vendor || fullProduct?.brandName || '';
+          sourceBarcode = fullProduct?.barcode || fullProduct?.barcodes?.[0] || '';
+          sourceCharacteristics = fullProduct?.characteristics || fullProduct?.charcs || [];
+          sourceWeight = fullProduct?.weightKg || fullProduct?.weightDimensions?.weight;
+          sourceDimensions = fullProduct?.weightDimensions || (fullProduct?.lengthCm ? { length: fullProduct.lengthCm, width: fullProduct.widthCm, height: fullProduct.heightCm } : undefined);
+          sourceColor = fullProduct?.color || '';
+          sourceModel = fullProduct?.vendorCode || fullProduct?.model || '';
+        }
         
         // Use MXIK code from source product if available (avoids re-searching)
         const sourceMxikCode = product.mxikCode || fullProduct?.mxikCode;
@@ -255,15 +291,15 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
               sourceMarketplace: product.marketplace,
               sourceCategory: productCategory,
               sourceCategoryId: fullProduct?.marketCategoryId,
-              sourceSubject: wbSubject,
-              sourceParent: wbParent,
-              sourceCharacteristics: wbCharacteristics,
-              brand: wbBrand,
-              barcode: wbBarcode,
-              color: wbColor,
-              model: wbModel,
-              weight: wbWeight,
-              dimensions: wbDimensions,
+              sourceSubject: sourceSubject,
+              sourceParent: sourceParent,
+              sourceCharacteristics: sourceCharacteristics,
+              brand: sourceBrand,
+              barcode: sourceBarcode,
+              color: sourceColor,
+              model: sourceModel,
+              weight: sourceWeight,
+              dimensions: sourceDimensions,
               shopSku: product.shopSku,
               // Pass source MXIK code to avoid re-searching
               mxikCode: sourceMxikCode,
