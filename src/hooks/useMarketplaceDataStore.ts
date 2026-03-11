@@ -23,6 +23,9 @@ export interface MarketplaceProduct {
   // Real commission from marketplace product catalog (Uzum)
   commissionPercent?: number;
   dimensionalGroup?: string;
+  // MXIK (IKPU) code from source marketplace
+  mxikCode?: string;
+  mxikName?: string;
 }
 
 export interface MarketplaceOrder {
