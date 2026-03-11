@@ -434,6 +434,11 @@ serve(async (req) => {
               const dims = offer.weightDimensions || mapping.weightDimensions || {};
               
               newProductsOnPage++;
+              
+              // Extract MXIK/IKPU code from Yandex commodity codes
+              const commodityCodes = offer.commodityCodes || mapping.commodityCodes || [];
+              const ikpuEntry = commodityCodes.find((c: any) => c.type === 'IKPU_CODE' || c.type === 'MXIK_CODE') || commodityCodes[0];
+              
               productMap.set(offerId, {
                 offerId,
                 name: offer.name || mapping.marketSkuName || mapping.marketModelName || '',
@@ -451,6 +456,8 @@ serve(async (req) => {
                 lengthCm: dims.length || undefined,
                 widthCm: dims.width || undefined,
                 heightCm: dims.height || undefined,
+                mxikCode: ikpuEntry?.code || undefined,
+                mxikName: ikpuEntry?.name || undefined,
               });
             });
           }
