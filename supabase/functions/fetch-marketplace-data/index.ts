@@ -1854,6 +1854,11 @@ serve(async (req) => {
                   const dimGroup = card.dimensionalGroup || firstSku.dimensionalGroup || {};
                   const dimGroupName = typeof dimGroup === 'string' ? dimGroup : (dimGroup.name || dimGroup.title || '');
                   
+                  // Extract MXIK/IKPU code from Uzum product data
+                  const mxikCode = card.ikpuCode || card.mxikCode || card.commodityCode || 
+                                   firstSku.ikpuCode || firstSku.mxikCode || firstSku.commodityCode || '';
+                  const mxikName = card.ikpuName || card.mxikName || '';
+                  
                   return {
                     offerId: String(card.productId || card.id || firstSku.skuId || ''),
                     name: card.title || card.name || '',
@@ -1871,6 +1876,9 @@ serve(async (req) => {
                     // Real commission and dimensional data from Uzum product catalog
                     commissionPercent: realCommissionPercent,
                     dimensionalGroup: dimGroupName,
+                    // MXIK code from Uzum product
+                    mxikCode: mxikCode || undefined,
+                    mxikName: mxikName || undefined,
                   };
                 });
 
