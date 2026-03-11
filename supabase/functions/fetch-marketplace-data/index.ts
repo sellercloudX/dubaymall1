@@ -2139,95 +2139,130 @@ serve(async (req) => {
 
           // ===== FETCH FBO DATA via /v1/finance/orders =====
           // Uzum has NO /v2/fbo/orders endpoint. FBO orders are visible through
-          // the finance API. We fetch finance orders and mark non-FBS ones as FBO.
+          // the finance API. We must query EACH shop individually (403 on multi-shop).
           try {
-            const finParams = new URLSearchParams();
-            if (uzumShopId) finParams.append("shopIds", String(uzumShopId));
+            const finShopIds = allShopIds.length > 0 ? allShopIds : (uzumShopId ? [String(uzumShopId)] : []);
+            console.log(`Uzum FBO finance: querying ${finShopIds.length} shops individually`);
             const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
-            finParams.append("dateFrom", String(ninetyDaysAgo));
-            finParams.append("dateTo", String(Date.now()));
-            finParams.append("size", "100");
-            finParams.append("page", "0");
-
-            let finPage = 0;
-            let finHasMore = true;
             let fboCount = 0;
 
-            while (finHasMore && finPage < 20) {
-              finParams.set("page", String(finPage));
-              const finResp = await fetch(
-                `${uzumBaseUrl}/v1/finance/orders?${finParams.toString()}`,
-                { headers: uzumHeaders }
-              );
+            for (let si = 0; si < finShopIds.length; si++) {
+              const sid = finShopIds[si];
+              if (si > 0) await sleep(500); // 500ms to avoid 429
 
-              if (!finResp.ok) {
-                console.warn(`Uzum finance/orders failed: ${finResp.status}`);
-                break;
-              }
+              let finPage = 0;
+              let finHasMore = true;
 
-              const finData = await finResp.json();
-              const finOrders = finData.payload?.orders || finData.payload || finData.content || [];
-              const finList = Array.isArray(finOrders) ? finOrders : [];
-
-              if (finList.length === 0) break;
-
-              for (const fo of finList) {
-                const foId = String(fo.orderCode || fo.orderNumber || fo.orderId || fo.id || '');
-                if (!foId || orderIdsSeen.has(foId)) continue; // Already in FBS data
-
-                // This is an FBO order (not in FBS)
-                orderIdsSeen.add(foId);
-                fboCount++;
-
-                const items = fo.items || fo.orderItems || [];
-                const itemsTotal = items.reduce((sum: number, item: any) => {
-                  return sum + ((item.price || item.amount || 0) * (item.quantity || item.count || 1));
-                }, 0);
-
-                const rawDate = fo.createdAt || fo.orderDate || fo.date || fo.createDate || '';
-                let parsedDate = '';
-                if (typeof rawDate === 'number') {
-                  parsedDate = new Date(rawDate > 1e12 ? rawDate : rawDate * 1000).toISOString();
-                } else if (rawDate && !isNaN(Number(rawDate))) {
-                  const ts = Number(rawDate);
-                  parsedDate = new Date(ts > 1e12 ? ts : ts * 1000).toISOString();
-                } else if (rawDate) {
-                  const p = new Date(String(rawDate));
-                  parsedDate = isNaN(p.getTime()) ? '' : p.toISOString();
-                }
-
-                const orderTotal = fo.totalAmount || fo.price || fo.totalPrice || itemsTotal;
-
-                allOrders.push({
-                  id: foId,
-                  status: fo.status || fo.paymentStatus || 'COMPLETED',
-                  substatus: '',
-                  createdAt: parsedDate,
-                  total: orderTotal,
-                  totalUZS: orderTotal,
-                  fulfillmentType: 'FBO' as const,
-                  itemsTotal,
-                  itemsTotalUZS: itemsTotal,
-                  deliveryTotal: fo.deliveryPrice || 0,
-                  deliveryTotalUZS: fo.deliveryPrice || 0,
-                  buyer: {
-                    firstName: fo.customerName || '',
-                    lastName: '',
-                  },
-                  items: items.map((item: any) => ({
-                    offerId: item.skuTitle || item.barcode || String(item.skuId || item.id || ''),
-                    skuId: String(item.skuId || item.id || ''),
-                    barcode: item.barcode || '',
-                    offerName: item.title || item.skuTitle || item.productTitle || '',
-                    count: item.quantity || item.count || item.amount || 1,
-                    price: item.price || item.sellerAmount || 0,
-                    priceUZS: item.price || item.sellerAmount || 0,
-                  })),
+              while (finHasMore && finPage < 10) {
+                const finParams = new URLSearchParams({
+                  shopIds: sid,
+                  dateFrom: String(ninetyDaysAgo),
+                  dateTo: String(Date.now()),
+                  size: "100",
+                  page: String(finPage),
                 });
-              }
 
-              if (finList.length < 100) finHasMore = false;
-              else { finPage++; await sleep(300); }
+                try {
+                  const finResp = await fetch(
+                    `${uzumBaseUrl}/v1/finance/orders?${finParams.toString()}`,
+                    { headers: uzumHeaders }
+                  );
+
+                  if (!finResp.ok) {
+                    if (finResp.status === 403) {
+                      await finResp.text();
+                      console.warn(`Uzum FBO finance shop=${sid}: 403 — skipping`);
+                    } else if (finResp.status === 429) {
+                      await finResp.text();
+                      console.warn(`Uzum FBO finance shop=${sid}: 429 rate limit — waiting 2s`);
+                      await sleep(2000);
+                    } else {
+                      const errBody = await finResp.text();
+                      console.warn(`Uzum FBO finance shop=${sid} failed: ${finResp.status}, body: ${errBody.substring(0, 300)}`);
+                    }
+                    break;
+                  }
+
+                  const finData = await finResp.json();
+
+                  // Log structure on first successful response
+                  if (fboCount === 0 && finPage === 0) {
+                    const topKeys = Object.keys(finData);
+                    const payloadKeys = finData.payload ? Object.keys(finData.payload) : [];
+                    console.log(`[UZUM FBO RESP] shop=${sid}, topKeys=${JSON.stringify(topKeys)}, payloadKeys=${JSON.stringify(payloadKeys)}`);
+                    if (finData.payload) {
+                      console.log(`[UZUM FBO PAYLOAD] ${JSON.stringify(finData.payload).substring(0, 800)}`);
+                    }
+                  }
+
+                  // Uzum finance API returns {"orderItems":[], "totalElements":0} at top level
+                  const finOrders = finData.orderItems || finData.payload?.orders || finData.payload?.content || finData.content || finData.payload || [];
+                  const finList = Array.isArray(finOrders) ? finOrders : [];
+
+                  console.log(`Uzum FBO finance shop=${sid} page ${finPage}: ${finList.length} items`);
+                  if (finList.length === 0) break;
+
+                  for (const fo of finList) {
+                    const foId = String(fo.orderCode || fo.orderNumber || fo.orderId || fo.id || '');
+                    if (!foId || orderIdsSeen.has(foId)) continue;
+
+                    orderIdsSeen.add(foId);
+                    fboCount++;
+
+                    const items = fo.items || fo.orderItems || [];
+                    const itemsTotal = items.reduce((sum: number, item: any) => {
+                      return sum + ((item.price || item.amount || 0) * (item.quantity || item.count || 1));
+                    }, 0);
+
+                    const rawDate = fo.createdAt || fo.orderDate || fo.date || fo.createDate || '';
+                    let parsedDate = '';
+                    if (typeof rawDate === 'number') {
+                      parsedDate = new Date(rawDate > 1e12 ? rawDate : rawDate * 1000).toISOString();
+                    } else if (rawDate && !isNaN(Number(rawDate))) {
+                      const ts = Number(rawDate);
+                      parsedDate = new Date(ts > 1e12 ? ts : ts * 1000).toISOString();
+                    } else if (rawDate) {
+                      const p = new Date(String(rawDate));
+                      parsedDate = isNaN(p.getTime()) ? '' : p.toISOString();
+                    }
+
+                    const orderTotal = fo.totalAmount || fo.price || fo.totalPrice || itemsTotal;
+
+                    allOrders.push({
+                      id: foId,
+                      status: fo.status || fo.paymentStatus || 'COMPLETED',
+                      substatus: '',
+                      createdAt: parsedDate,
+                      total: orderTotal,
+                      totalUZS: orderTotal,
+                      fulfillmentType: 'FBO' as const,
+                      itemsTotal,
+                      itemsTotalUZS: itemsTotal,
+                      deliveryTotal: fo.deliveryPrice || 0,
+                      deliveryTotalUZS: fo.deliveryPrice || 0,
+                      buyer: {
+                        firstName: fo.customerName || '',
+                        lastName: '',
+                      },
+                      items: items.map((item: any) => ({
+                        offerId: item.skuTitle || item.barcode || String(item.skuId || item.id || ''),
+                        skuId: String(item.skuId || item.id || ''),
+                        barcode: item.barcode || '',
+                        offerName: item.title || item.skuTitle || item.productTitle || '',
+                        count: item.quantity || item.count || item.amount || 1,
+                        price: item.price || item.sellerAmount || 0,
+                        priceUZS: item.price || item.sellerAmount || 0,
+                      })),
+                    });
+                  }
+
+                  if (finList.length < 100) finHasMore = false;
+                  else { finPage++; await sleep(200); }
+                } catch (pageErr) {
+                  console.error(`Uzum FBO page error shop=${sid}:`, pageErr);
+                  break;
+                }
+              }
             }
 
             console.log(`Uzum FBO orders from finance API: ${fboCount}`);
@@ -2309,86 +2344,126 @@ serve(async (req) => {
 
       } else if (dataType === "finance") {
         // GET /v1/finance/orders + /v1/finance/expenses
-        // Both require shopIds as mandatory param per Swagger spec
+        // IMPORTANT: Uzum API returns 403 when multiple shopIds are passed
+        // We must query each shop individually
         try {
-          const financeParams = new URLSearchParams();
-          // shopIds is REQUIRED per Uzum Swagger spec
-          if (uzumShopId) financeParams.append("shopIds", String(uzumShopId));
-          // CRITICAL: dateFrom/dateTo must be epoch milliseconds (int64), NOT date strings!
-          const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
-          financeParams.append("dateFrom", String(ninetyDaysAgo));
-          financeParams.append("dateTo", String(Date.now()));
-          // Also add pagination for comprehensive data
-          financeParams.append("size", "100");
-          financeParams.append("page", "0");
-          
-          // Try multiple API paths for expenses (Uzum API can vary)
-          const expenseEndpoints = [
-            `${uzumBaseUrl}/v1/finance/expenses?${financeParams.toString()}`,
-            `${uzumBaseUrl}/v2/finance/expenses?${financeParams.toString()}`,
-            `${uzumBaseUrl}/v1/finance/accruals?${financeParams.toString()}`,
-          ];
-
-          const ordersRes = await fetch(`${uzumBaseUrl}/v1/finance/orders?${financeParams.toString()}`, { headers: uzumHeaders });
-
           let financeOrders: any[] = [];
           let financeExpenses: any[] = [];
+          const finShopIds = allShopIds.length > 0 ? allShopIds : (uzumShopId ? [String(uzumShopId)] : []);
+          console.log(`Uzum finance: querying ${finShopIds.length} shops individually: ${finShopIds.join(',')}`);
 
-          if (ordersRes.ok) {
-            const ordData = await ordersRes.json();
-            financeOrders = ordData.payload || ordData.data || ordData.content || [];
-            // Extract per-item expenses from order-level finance data
-            if (Array.isArray(financeOrders)) {
-              financeOrders.forEach((fo: any) => {
-                const items = fo.items || fo.orderItems || [];
-                items.forEach((item: any) => {
-                  const productId = String(item.skuId || item.skuTitle || item.productId || '');
-                  if (!productId) return;
-                  // Extract commission and logistics from order finance
-                  if (item.commission || item.commissionAmount) {
-                    financeExpenses.push({
-                      productId,
-                      type: 'commission',
-                      amount: Math.abs(item.commission || item.commissionAmount || 0),
-                    });
-                  }
-                  if (item.deliveryAmount || item.logisticsAmount || item.deliveryCost) {
-                    financeExpenses.push({
-                      productId,
-                      type: 'logistics',
-                      amount: Math.abs(item.deliveryAmount || item.logisticsAmount || item.deliveryCost || 0),
-                    });
-                  }
-                });
-                // Also check order-level fees
-                if (fo.commissionAmount && !fo.items?.length) {
-                  financeExpenses.push({
-                    productId: String(fo.orderId || fo.id || ''),
-                    type: 'commission',
-                    amount: Math.abs(fo.commissionAmount || 0),
-                  });
-                }
-              });
-            }
-          } else {
-            console.warn(`Uzum finance/orders failed: ${ordersRes.status}`);
-          }
+          const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
 
-          // Try expense endpoints with fallback
-          for (const endpoint of expenseEndpoints) {
-            try {
-              const expensesRes = await fetch(endpoint, { headers: uzumHeaders });
-              if (expensesRes.ok) {
-                const expData = await expensesRes.json();
-                const expenses = expData.payload || expData.data || expData.content || [];
-                if (Array.isArray(expenses) && expenses.length > 0) {
-                  financeExpenses.push(...expenses);
-                  console.log(`Uzum finance: got ${expenses.length} expenses from ${endpoint}`);
+          for (let si = 0; si < finShopIds.length; si++) {
+            const sid = finShopIds[si];
+            if (si > 0) await sleep(500); // 500ms between shops to avoid 429
+
+            const financeParams = new URLSearchParams();
+            financeParams.append("shopIds", sid);
+            financeParams.append("dateFrom", String(ninetyDaysAgo));
+            financeParams.append("dateTo", String(Date.now()));
+            financeParams.append("size", "100");
+            financeParams.append("page", "0");
+
+            let finPage = 0;
+            let finHasMore = true;
+            while (finHasMore && finPage < 10) {
+              financeParams.set("page", String(finPage));
+              try {
+                const ordersRes = await fetch(
+                  `${uzumBaseUrl}/v1/finance/orders?${financeParams.toString()}`,
+                  { headers: uzumHeaders }
+                );
+
+                if (!ordersRes.ok) {
+                  if (ordersRes.status === 403) {
+                    await ordersRes.text();
+                    console.warn(`Uzum finance shop=${sid}: 403 — skipping`);
+                  } else if (ordersRes.status === 429) {
+                    await ordersRes.text();
+                    console.warn(`Uzum finance shop=${sid}: 429 rate limit — waiting 2s`);
+                    await sleep(2000);
+                  } else {
+                    const errBody = await ordersRes.text();
+                    console.warn(`Uzum finance/orders shop=${sid} failed: ${ordersRes.status}, body: ${errBody.substring(0, 300)}`);
+                  }
                   break;
                 }
+
+                const ordData = await ordersRes.json();
+
+                if (financeOrders.length === 0 && finPage === 0) {
+                  const topKeys = Object.keys(ordData);
+                  const payloadKeys = ordData.payload ? Object.keys(ordData.payload) : [];
+                  console.log(`[UZUM FINANCE RESP] shop=${sid}, topKeys=${JSON.stringify(topKeys)}, payloadKeys=${JSON.stringify(payloadKeys)}`);
+                  console.log(`[UZUM FINANCE RAW] ${JSON.stringify(ordData).substring(0, 1000)}`);
+                }
+
+                // Uzum finance API returns {"orderItems":[], "totalElements":0} at top level
+                const orders = ordData.orderItems || ordData.payload?.orders || ordData.payload?.content || ordData.content || ordData.payload || ordData.data || [];
+                const orderList = Array.isArray(orders) ? orders : [];
+                const totalElements = ordData.totalElements || 0;
+
+                console.log(`Uzum finance shop=${sid} page ${finPage}: ${orderList.length} orders (totalElements=${totalElements})`);
+                if (orderList.length === 0) break;
+
+                if (financeOrders.length === 0 && orderList.length > 0) {
+                  console.log(`[UZUM FINANCE ORDER KEYS] ${JSON.stringify(Object.keys(orderList[0]))}`);
+                  console.log(`[UZUM FINANCE ORDER SAMPLE] ${JSON.stringify(orderList[0]).substring(0, 800)}`);
+                }
+
+                financeOrders.push(...orderList);
+
+                orderList.forEach((fo: any) => {
+                  const items = fo.items || fo.orderItems || [];
+                  items.forEach((item: any) => {
+                    const productId = String(item.skuId || item.skuTitle || item.productId || '');
+                    if (!productId) return;
+                    if (item.commission || item.commissionAmount) {
+                      financeExpenses.push({ productId, type: 'commission', amount: Math.abs(item.commission || item.commissionAmount || 0) });
+                    }
+                    if (item.deliveryAmount || item.logisticsAmount || item.deliveryCost) {
+                      financeExpenses.push({ productId, type: 'logistics', amount: Math.abs(item.deliveryAmount || item.logisticsAmount || item.deliveryCost || 0) });
+                    }
+                  });
+                  if (fo.commissionAmount && !fo.items?.length) {
+                    financeExpenses.push({ productId: String(fo.orderId || fo.id || ''), type: 'commission', amount: Math.abs(fo.commissionAmount || 0) });
+                  }
+                });
+
+                if (orderList.length < 100) finHasMore = false;
+                else { finPage++; await sleep(200); }
+              } catch (pageErr) {
+                console.error(`Uzum finance page error shop=${sid}:`, pageErr);
+                break;
               }
-            } catch (expErr) {
-              // Try next endpoint
+            }
+
+            // Try expense endpoints for this shop
+            const shopExpParams = new URLSearchParams();
+            shopExpParams.append("shopIds", sid);
+            shopExpParams.append("dateFrom", String(ninetyDaysAgo));
+            shopExpParams.append("dateTo", String(Date.now()));
+            shopExpParams.append("size", "100");
+            shopExpParams.append("page", "0");
+            const expenseEndpoints = [
+              `${uzumBaseUrl}/v1/finance/expenses?${shopExpParams.toString()}`,
+              `${uzumBaseUrl}/v2/finance/expenses?${shopExpParams.toString()}`,
+              `${uzumBaseUrl}/v1/finance/accruals?${shopExpParams.toString()}`,
+            ];
+            for (const endpoint of expenseEndpoints) {
+              try {
+                const expensesRes = await fetch(endpoint, { headers: uzumHeaders });
+                if (expensesRes.ok) {
+                  const expData = await expensesRes.json();
+                  const expenses = expData.payload || expData.data || expData.content || [];
+                  if (Array.isArray(expenses) && expenses.length > 0) {
+                    financeExpenses.push(...expenses);
+                    console.log(`Uzum finance shop=${sid}: got ${expenses.length} expenses`);
+                    break;
+                  }
+                } else { await expensesRes.text(); }
+              } catch (expErr) { /* Try next */ }
             }
           }
 
@@ -2397,8 +2472,8 @@ serve(async (req) => {
           result = {
             success: true,
             data: {
-              orders: Array.isArray(financeOrders) ? financeOrders : [],
-              expenses: Array.isArray(financeExpenses) ? financeExpenses : [],
+              orders: financeOrders,
+              expenses: financeExpenses,
             },
           };
         } catch (e) {
