@@ -493,25 +493,50 @@ serve(async (req) => {
             await sleep(800);
             const stockMap = new Map<string, { fbo: number; fbs: number }>();
             
-            // First, get seller's own warehouses (FBS) to distinguish from Yandex warehouses (FBO)
-            const sellerWarehouseIds = new Set<number>();
+            // ===== STEP 1: Detect campaign placement model (FBS / FBY / DBS) =====
+            let campaignPlacementType = '';
             try {
-              const whResp = await fetchWithRetry(
-                `https://api.partner.market.yandex.ru/campaigns/${campaignId}/warehouses`,
+              const campResp = await fetchWithRetry(
+                `https://api.partner.market.yandex.ru/campaigns/${campaignId}`,
                 { headers }
               );
-              if (whResp.ok) {
-                const whData = await whResp.json();
-                const warehouses = whData.result?.warehouses || whData.warehouses || [];
-                warehouses.forEach((wh: any) => {
-                  if (wh.id) sellerWarehouseIds.add(wh.id);
-                });
-                console.log(`Seller warehouses (FBS): ${Array.from(sellerWarehouseIds).join(', ')}`);
+              if (campResp.ok) {
+                const campData = await campResp.json();
+                campaignPlacementType = campData.campaign?.placementType || '';
+                console.log(`Campaign ${campaignId} placementType: "${campaignPlacementType}"`);
               }
             } catch (e) {
-              console.error("Error fetching seller warehouses:", e);
+              console.warn("Error detecting campaign placement type:", e);
             }
             
+            // FBS-only campaign: ALL stocks belong to seller (FBS)
+            const isFbsOnlyCampaign = campaignPlacementType === 'FBS' || campaignPlacementType === 'DBS';
+            
+            // ===== STEP 2: Get seller's own warehouses (FBS) =====
+            const sellerWarehouseIds = new Set<number>();
+            if (!isFbsOnlyCampaign) {
+              // Only need warehouse detection for FBY/mixed campaigns
+              try {
+                const whResp = await fetchWithRetry(
+                  `https://api.partner.market.yandex.ru/campaigns/${campaignId}/warehouses`,
+                  { headers }
+                );
+                if (whResp.ok) {
+                  const whData = await whResp.json();
+                  const warehouses = whData.result?.warehouses || whData.warehouses || [];
+                  warehouses.forEach((wh: any) => {
+                    if (wh.id) sellerWarehouseIds.add(wh.id);
+                  });
+                  console.log(`Seller warehouses (FBS): ${Array.from(sellerWarehouseIds).join(', ') || 'none'}`);
+                }
+              } catch (e) {
+                console.error("Error fetching seller warehouses:", e);
+              }
+            } else {
+              console.log(`FBS/DBS campaign — all stocks classified as FBS`);
+            }
+            
+            // ===== STEP 3: Fetch stocks with pagination =====
             let stockPageToken: string | undefined;
             let stockPage = 0;
 
@@ -538,12 +563,11 @@ serve(async (req) => {
               
               warehouseOffers.forEach((wh: any) => {
                 const whId = wh.warehouseId;
-                // Seller warehouses = FBS (seller fulfillment)
-                // Yandex warehouses (NOT in seller list) = FBO (marketplace fulfillment)
-                // IMPORTANT: If sellerWarehouseIds is empty (API failed), default to FBS
-                // because most sellers use FBS model and don't have FBO stock
-                const isFBS = sellerWarehouseIds.size === 0 || sellerWarehouseIds.has(whId);
-                console.log(`  Warehouse ${whId} => ${isFBS ? 'FBS' : 'FBO'} (seller warehouses: ${Array.from(sellerWarehouseIds).join(',') || 'none'})`);
+                // For FBS/DBS campaigns: ALL stocks are FBS
+                // For FBY/mixed campaigns: check seller warehouses list
+                // If seller warehouse list is empty (API failed), default to FBS
+                const isFBS = isFbsOnlyCampaign || sellerWarehouseIds.size === 0 || sellerWarehouseIds.has(whId);
+                console.log(`  Warehouse ${whId} => ${isFBS ? 'FBS' : 'FBO'} (campaign: ${campaignPlacementType || 'unknown'})`);
                 
                 const offers = wh.offers || [];
                 offers.forEach((offer: any) => {
@@ -586,7 +610,7 @@ serve(async (req) => {
             sampleProducts.forEach(p => {
               console.log(`Stock debug: ${p.offerId} => FBO=${p.stockFBO}, FBS=${p.stockFBS}, total=${p.stockCount}`);
             });
-            console.log(`Updated stocks for ${stockMap.size} products`);
+            console.log(`Updated stocks for ${stockMap.size} products (campaign type: ${campaignPlacementType || 'unknown'})`);
           } catch (e) {
             console.error("Error fetching stocks:", e);
           }
@@ -772,20 +796,37 @@ serve(async (req) => {
           result = { success: false, error: "Campaign ID required for stocks" };
         } else {
           try {
-            // Get seller warehouses to distinguish FBS from FBO
-            const sellerWhIds = new Set<number>();
+            // Detect campaign placement model
+            let stockCampaignType = '';
             try {
-              const whResp = await fetchWithRetry(
-                `https://api.partner.market.yandex.ru/campaigns/${campaignId}/warehouses`,
+              const campResp = await fetchWithRetry(
+                `https://api.partner.market.yandex.ru/campaigns/${campaignId}`,
                 { headers }
               );
-              if (whResp.ok) {
-                const whData = await whResp.json();
-                (whData.result?.warehouses || whData.warehouses || []).forEach((wh: any) => {
-                  if (wh.id) sellerWhIds.add(wh.id);
-                });
+              if (campResp.ok) {
+                const campData = await campResp.json();
+                stockCampaignType = campData.campaign?.placementType || '';
               }
             } catch (_) {}
+            
+            const isFbsOnly = stockCampaignType === 'FBS' || stockCampaignType === 'DBS';
+            
+            // Get seller warehouses to distinguish FBS from FBO (only for FBY/mixed)
+            const sellerWhIds = new Set<number>();
+            if (!isFbsOnly) {
+              try {
+                const whResp = await fetchWithRetry(
+                  `https://api.partner.market.yandex.ru/campaigns/${campaignId}/warehouses`,
+                  { headers }
+                );
+                if (whResp.ok) {
+                  const whData = await whResp.json();
+                  (whData.result?.warehouses || whData.warehouses || []).forEach((wh: any) => {
+                    if (wh.id) sellerWhIds.add(wh.id);
+                  });
+                }
+              } catch (_) {}
+            }
             
             const stocksResponse = await fetchWithRetry(
               `https://api.partner.market.yandex.ru/campaigns/${campaignId}/offers/stocks`,
@@ -804,7 +845,7 @@ serve(async (req) => {
               
               warehouseOffers.forEach((wh: any) => {
                 const whId = wh.warehouseId;
-                const isFBS = sellerWhIds.has(whId) || sellerWhIds.size === 0;
+                const isFBS = isFbsOnly || sellerWhIds.size === 0 || sellerWhIds.has(whId);
                 
                 const offers = wh.offers || [];
                 offers.forEach((offer: any) => {
@@ -1272,27 +1313,49 @@ serve(async (req) => {
           if (!stocks || stocks.length === 0 || !campaignId) {
             result = { success: false, error: "No stocks provided or campaignId missing" };
           } else {
-            // First get warehouseId from stocks endpoint to find seller's FBS warehouse
+            // Get warehouseId from seller's registered warehouses (most reliable)
             let warehouseId: number | undefined;
+            
+            // Method 1: Use /campaigns/{campaignId}/warehouses — returns seller's own FBS warehouses
             try {
-              const stocksCheckResp = await fetchWithRetry(
-                `https://api.partner.market.yandex.ru/campaigns/${campaignId}/offers/stocks`,
-                {
-                  method: 'POST',
-                  headers,
-                  body: JSON.stringify({ limit: 1 })
-                }
+              const whResp = await fetchWithRetry(
+                `https://api.partner.market.yandex.ru/campaigns/${campaignId}/warehouses`,
+                { headers }
               );
-              if (stocksCheckResp.ok) {
-                const stocksCheckData = await stocksCheckResp.json();
-                const warehouses = stocksCheckData.result?.warehouses || [];
-                // Find FBS warehouse (warehouseId >= 100000) or use first available
-                const fbsWh = warehouses.find((wh: any) => wh.warehouseId >= 100000);
-                warehouseId = fbsWh?.warehouseId || warehouses[0]?.warehouseId;
-                console.log(`Found warehouseId: ${warehouseId}`);
+              if (whResp.ok) {
+                const whData = await whResp.json();
+                const warehouses = whData.result?.warehouses || whData.warehouses || [];
+                if (warehouses.length > 0) {
+                  warehouseId = warehouses[0].id;
+                  console.log(`Found seller warehouse from /warehouses: ${warehouseId}`);
+                }
               }
             } catch (e) {
-              console.error("Error fetching warehouse info:", e);
+              console.warn("Error fetching seller warehouses for stock update:", e);
+            }
+            
+            // Method 2: Fallback — get first warehouse from stocks endpoint
+            if (!warehouseId) {
+              try {
+                const stocksCheckResp = await fetchWithRetry(
+                  `https://api.partner.market.yandex.ru/campaigns/${campaignId}/offers/stocks`,
+                  {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ limit: 1 })
+                  }
+                );
+                if (stocksCheckResp.ok) {
+                  const stocksCheckData = await stocksCheckResp.json();
+                  const warehouses = stocksCheckData.result?.warehouses || [];
+                  if (warehouses.length > 0) {
+                    warehouseId = warehouses[0].warehouseId;
+                    console.log(`Found warehouse from stocks endpoint: ${warehouseId}`);
+                  }
+                }
+              } catch (e) {
+                console.error("Error fetching warehouse from stocks:", e);
+              }
             }
 
             if (!warehouseId) {
