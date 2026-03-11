@@ -1891,7 +1891,8 @@ serve(async (req) => {
         }
 
       } else if (dataType === "orders") {
-        // GET /v2/fbs/orders
+        // GET /v2/fbs/orders + /v2/fbo/orders
+        // OPTIMIZED: Pass ALL shopIds in a single param to avoid N×M iteration
         try {
           let allOrders: any[] = [];
           const orderIdsSeen = new Set<string>();
@@ -1899,27 +1900,28 @@ serve(async (req) => {
           let hasMore = true;
           const pageSize = 50; // Uzum max 50 per page
 
-          // Fetch all order statuses to get complete picture
+          // Consolidated status list — avoid redundant/rarely-used statuses
           const orderStatuses = status ? [status] : [
             'NEW', 'CREATED', 'PROCESSING', 'PACKING', 'PENDING_DELIVERY', 'DELIVERING', 
             'DELIVERED', 'ACCEPTED_AT_DP', 'DELIVERED_TO_CUSTOMER_DELIVERY_POINT',
             'COMPLETED', 'CANCELED', 'PENDING_CANCELLATION', 'RETURNED', 'REJECTED'
           ];
 
-          // Fetch orders from ALL shops, not just primary
+          // Pass ALL shop IDs in a single request (comma-separated or multiple params)
           const orderShopIds = allShopIds.length > 0 ? allShopIds : (uzumShopId ? [String(uzumShopId)] : []);
+          // Build shopIds query string once — Uzum API accepts multiple shopIds params
+          const shopIdsQueryParts = orderShopIds.map(id => `shopIds=${id}`).join('&');
+          
+          console.log(`Uzum FBS orders: ${orderStatuses.length} statuses, ${orderShopIds.length} shops (batch mode)`);
           
           for (let si = 0; si < orderStatuses.length; si++) {
             const orderStatus = orderStatuses[si];
-            // Add delay between status queries to avoid 429 rate limits
-            if (si > 0) await sleep(500);
+            // Reduced delay: 200ms between statuses (was 500ms)
+            if (si > 0) await sleep(200);
             
-            for (let shopIdx = 0; shopIdx < orderShopIds.length; shopIdx++) {
-              const currentOrderShopId = orderShopIds[shopIdx];
-              if (shopIdx > 0) await sleep(300); // Delay between shops
-              
-              page = 0;
-              hasMore = true;
+            // Single request per status with ALL shopIds
+            page = 0;
+            hasMore = true;
 
             while (hasMore) {
               const params = new URLSearchParams({
@@ -1927,12 +1929,12 @@ serve(async (req) => {
                 page: String(page),
                 status: orderStatus,
               });
-              // shopIds is required - pass each shop
-              params.append("shopIds", String(currentOrderShopId));
-              // NOTE: Uzum v2 FBS orders API does NOT support dateFrom/dateTo params
-              // (sending them causes 0 results). We fetch all and filter server-side.
+              // Add ALL shopIds to single request
+              for (const sid of orderShopIds) {
+                params.append("shopIds", sid);
+              }
 
-              console.log(`Uzum orders (${orderStatus}) page ${page}: ${uzumBaseUrl}/v2/fbs/orders?${params.toString()}`);
+              console.log(`Uzum FBS (${orderStatus}) page ${page}`);
 
               const response = await fetch(
                 `${uzumBaseUrl}/v2/fbs/orders?${params.toString()}`,
@@ -1955,14 +1957,13 @@ serve(async (req) => {
             // Log first order structure for debugging — for EVERY shop's first batch
             if (page === 0 && orderList.length > 0) {
               const sampleOrder = orderList[0];
-              console.log(`[UZUM ORDER KEYS] shop=${currentOrderShopId} status=${orderStatus} keys=${JSON.stringify(Object.keys(sampleOrder))}`);
-              // Log ALL date-related fields
+              console.log(`[UZUM FBS ORDER KEYS] status=${orderStatus} keys=${JSON.stringify(Object.keys(sampleOrder))}`);
               const dateFields = ['createdAt', 'createDate', 'dateCreated', 'created_at', 'orderDate', 'date', 'updatedAt', 'updateDate', 'completedAt', 'deliveredAt', 'acceptDate', 'statusDate'];
               const dateValues: Record<string, any> = {};
               for (const f of dateFields) {
                 if (sampleOrder[f] !== undefined) dateValues[f] = sampleOrder[f];
               }
-              console.log(`[UZUM DATE FIELDS] shop=${currentOrderShopId} status=${orderStatus}: ${JSON.stringify(dateValues)}`);
+              console.log(`[UZUM DATE FIELDS] status=${orderStatus}: ${JSON.stringify(dateValues)}`);
               if (Object.keys(dateValues).length === 0) {
                 // No known date field found — dump first 500 chars of order
                 console.log(`[UZUM ORDER RAW] ${JSON.stringify(sampleOrder).substring(0, 800)}`);
@@ -2120,27 +2121,26 @@ serve(async (req) => {
               hasMore = false;
             } else {
               page++;
-              await sleep(300);
+              await sleep(200);
             }
             } // end while
-            } // end for shops
           } // end for FBS statuses
+
+          console.log(`Uzum FBS orders collected: ${allOrders.length}`);
 
           // ===== FETCH FBO ORDERS (Fulfillment by Operator / Uzum warehouse) =====
           // FBO uses /v2/fbo/orders endpoint with different statuses
+          // OPTIMIZED: batch all shopIds, reduce delays
           const fboOrderStatuses = status ? [status] : [
             'PROCESSING', 'ACCEPTED', 'DELIVERING', 'COMPLETED', 'CANCELLED', 'CANCELED', 'RETURNED'
           ];
 
           for (let fi = 0; fi < fboOrderStatuses.length; fi++) {
             const fboStatus = fboOrderStatuses[fi];
-            if (fi > 0 || allOrders.length > 0) await sleep(500);
-
-            for (let shopIdx = 0; shopIdx < orderShopIds.length; shopIdx++) {
-              const currentOrderShopId = orderShopIds[shopIdx];
-              if (shopIdx > 0) await sleep(300);
+            if (fi > 0) await sleep(200);
 
               page = 0;
+              hasMore = true;
               hasMore = true;
 
               while (hasMore) {
@@ -2148,10 +2148,13 @@ serve(async (req) => {
                   size: String(pageSize),
                   page: String(page),
                   status: fboStatus,
-                  shopIds: String(currentOrderShopId),
                 });
+                // Add ALL shopIds to single FBO request
+                for (const sid of orderShopIds) {
+                  params.append("shopIds", sid);
+                }
 
-                console.log(`Uzum FBO orders (${fboStatus}) shop=${currentOrderShopId} page ${page}: ${uzumBaseUrl}/v2/fbo/orders?${params.toString()}`);
+                console.log(`Uzum FBO (${fboStatus}) page ${page}`);
 
                 let fboResponse: Response;
                 try {
@@ -2186,7 +2189,7 @@ serve(async (req) => {
                 // Log first FBO order structure
                 if (page === 0 && fboOrderList.length > 0) {
                   const sampleOrder = fboOrderList[0];
-                  console.log(`[UZUM FBO ORDER KEYS] shop=${currentOrderShopId} status=${fboStatus} keys=${JSON.stringify(Object.keys(sampleOrder))}`);
+                  console.log(`[UZUM FBO ORDER KEYS] status=${fboStatus} keys=${JSON.stringify(Object.keys(sampleOrder))}`);
                 }
 
                 const fboMapped = fboOrderList.map((order: any) => {
@@ -2294,10 +2297,9 @@ serve(async (req) => {
                   hasMore = false;
                 } else {
                   page++;
-                  await sleep(300);
+                  await sleep(200);
                 }
               } // end while FBO
-            } // end for FBO shops
           } // end for FBO statuses
 
           console.log(`Uzum total orders (FBS + FBO): ${allOrders.length}`);
