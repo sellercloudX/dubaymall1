@@ -252,25 +252,11 @@ async function handleConfirm(body: Record<string, unknown>) {
     return badRequest("Missing order_number");
   }
 
-  // Verify Click signature if available
-  const hasSignature = body.sign_string && body.sign_time;
-  if (hasSignature) {
-    const isValid = verifyClickSignature(body);
-    if (!isValid) {
-      console.error("Click signature verification failed for order:", orderNumber);
-      return unauthorized("Invalid Click signature");
-    }
-  } else {
-    // If no signature, require CLICK_SECRET_KEY as header fallback
-    // This prevents anonymous confirm calls
-    const secretKey = Deno.env.get("CLICK_SECRET_KEY");
-    const headerSecret = (body as any)._internal_secret;
-    if (!secretKey || !headerSecret || headerSecret !== secretKey) {
-      // Allow confirm only from authenticated users who own the payment
-      console.warn("Confirm called without Click signature — requires auth or secret");
-      // For backwards compatibility with frontend confirm calls, we'll check payment exists
-      // but this is still safer since order numbers are cryptographically random
-    }
+  // Always require valid Click signature — no fallback
+  const isValid = await verifyClickSignature(body);
+  if (!isValid) {
+    console.error("Click signature verification failed for order:", orderNumber);
+    return unauthorized("Invalid or missing Click signature");
   }
 
   const supabase = getServiceSupabase();
