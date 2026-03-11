@@ -796,20 +796,37 @@ serve(async (req) => {
           result = { success: false, error: "Campaign ID required for stocks" };
         } else {
           try {
-            // Get seller warehouses to distinguish FBS from FBO
-            const sellerWhIds = new Set<number>();
+            // Detect campaign placement model
+            let stockCampaignType = '';
             try {
-              const whResp = await fetchWithRetry(
-                `https://api.partner.market.yandex.ru/campaigns/${campaignId}/warehouses`,
+              const campResp = await fetchWithRetry(
+                `https://api.partner.market.yandex.ru/campaigns/${campaignId}`,
                 { headers }
               );
-              if (whResp.ok) {
-                const whData = await whResp.json();
-                (whData.result?.warehouses || whData.warehouses || []).forEach((wh: any) => {
-                  if (wh.id) sellerWhIds.add(wh.id);
-                });
+              if (campResp.ok) {
+                const campData = await campResp.json();
+                stockCampaignType = campData.campaign?.placementType || '';
               }
             } catch (_) {}
+            
+            const isFbsOnly = stockCampaignType === 'FBS' || stockCampaignType === 'DBS';
+            
+            // Get seller warehouses to distinguish FBS from FBO (only for FBY/mixed)
+            const sellerWhIds = new Set<number>();
+            if (!isFbsOnly) {
+              try {
+                const whResp = await fetchWithRetry(
+                  `https://api.partner.market.yandex.ru/campaigns/${campaignId}/warehouses`,
+                  { headers }
+                );
+                if (whResp.ok) {
+                  const whData = await whResp.json();
+                  (whData.result?.warehouses || whData.warehouses || []).forEach((wh: any) => {
+                    if (wh.id) sellerWhIds.add(wh.id);
+                  });
+                }
+              } catch (_) {}
+            }
             
             const stocksResponse = await fetchWithRetry(
               `https://api.partner.market.yandex.ru/campaigns/${campaignId}/offers/stocks`,
@@ -828,7 +845,7 @@ serve(async (req) => {
               
               warehouseOffers.forEach((wh: any) => {
                 const whId = wh.warehouseId;
-                const isFBS = sellerWhIds.has(whId) || sellerWhIds.size === 0;
+                const isFBS = isFbsOnly || sellerWhIds.size === 0 || sellerWhIds.has(whId);
                 
                 const offers = wh.offers || [];
                 offers.forEach((offer: any) => {
