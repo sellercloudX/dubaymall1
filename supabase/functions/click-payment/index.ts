@@ -98,9 +98,9 @@ async function authenticateUser(req: Request): Promise<{ userId: string } | Resp
   return { userId: data.claims.sub as string };
 }
 
-// ==================== Click HMAC signature verification ====================
+// ==================== Click MD5 signature verification ====================
 
-function verifyClickSignature(body: Record<string, unknown>): boolean {
+async function verifyClickSignature(body: Record<string, unknown>): Promise<boolean> {
   const secretKey = Deno.env.get("CLICK_SECRET_KEY");
   if (!secretKey) {
     console.error("CLICK_SECRET_KEY not configured");
@@ -113,24 +113,32 @@ function verifyClickSignature(body: Record<string, unknown>): boolean {
   const amount = String(body.amount || "");
   const action = String(body.action || "");
   const signTime = String(body.sign_time || "");
+  const providedSign = String(body.sign_string || "");
 
+  if (!providedSign || !signTime) {
+    console.error("Missing sign_string or sign_time in Click callback");
+    return false;
+  }
+
+  // Click signature: MD5(click_trans_id + service_id + secret_key + merchant_trans_id + amount + action + sign_time)
   const signString = `${clickTransId}${serviceId}${secretKey}${merchantTransId}${amount}${action}${signTime}`;
 
   try {
     const encoder = new TextEncoder();
     const data = encoder.encode(signString);
-    // Use simple string comparison with the provided sign
-    // Click uses MD5-based signing
-    const hashBuffer = new Uint8Array(
-      // @ts-ignore: Deno crypto
-      Array.from(data).reduce((h, b) => ((h << 5) - h + b) | 0, 0)
-    );
-    // Fallback: just verify order exists in our DB (order numbers are cryptographically random)
-    console.warn("Using order-existence verification as signature fallback");
+    const hashBuffer = await crypto.subtle.digest("MD5", data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const computedSign = hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+
+    if (computedSign !== providedSign) {
+      console.error("Click signature mismatch", { computedSign, providedSign, merchantTransId });
+      return false;
+    }
+
     return true;
-  } catch {
-    console.warn("HMAC verification fallback — checking order ownership instead");
-    return true; // Allow if order exists in DB (checked in handleConfirm)
+  } catch (err) {
+    console.error("Click signature verification error:", err);
+    return false;
   }
 }
 
@@ -244,25 +252,11 @@ async function handleConfirm(body: Record<string, unknown>) {
     return badRequest("Missing order_number");
   }
 
-  // Verify Click signature if available
-  const hasSignature = body.sign_string && body.sign_time;
-  if (hasSignature) {
-    const isValid = verifyClickSignature(body);
-    if (!isValid) {
-      console.error("Click signature verification failed for order:", orderNumber);
-      return unauthorized("Invalid Click signature");
-    }
-  } else {
-    // If no signature, require CLICK_SECRET_KEY as header fallback
-    // This prevents anonymous confirm calls
-    const secretKey = Deno.env.get("CLICK_SECRET_KEY");
-    const headerSecret = (body as any)._internal_secret;
-    if (!secretKey || !headerSecret || headerSecret !== secretKey) {
-      // Allow confirm only from authenticated users who own the payment
-      console.warn("Confirm called without Click signature — requires auth or secret");
-      // For backwards compatibility with frontend confirm calls, we'll check payment exists
-      // but this is still safer since order numbers are cryptographically random
-    }
+  // Always require valid Click signature — no fallback
+  const isValid = await verifyClickSignature(body);
+  if (!isValid) {
+    console.error("Click signature verification failed for order:", orderNumber);
+    return unauthorized("Invalid or missing Click signature");
   }
 
   const supabase = getServiceSupabase();
