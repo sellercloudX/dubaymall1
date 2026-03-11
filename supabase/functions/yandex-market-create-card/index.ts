@@ -1029,8 +1029,12 @@ serve(async (req) => {
         console.log(`🖼️ Total ${images.length} images ready`);
 
         // ═══ STEP 2: Find LEAF category from Yandex tree ═══
-        // COST OPTIMIZATION: For clones, use cheaper Flash Lite for category detection
-        const leafCat = await findLeafCategory(creds.apiKey, product.name, product.description || "", LOVABLE_KEY, product.sourceCategory || product.category, product.sourceMarketplace);
+        // Pass source subject/parent for much better category matching in clone mode
+        const leafCat = await findLeafCategory(
+          creds.apiKey, product.name, product.description || "", LOVABLE_KEY,
+          product.sourceCategory || product.category, product.sourceMarketplace,
+          product.sourceSubject, product.sourceParent
+        );
         console.log(`📂 Category: ${leafCat.name} (${leafCat.id})`);
 
         // ═══ STEP 3: Fetch category parameters ═══
@@ -1038,19 +1042,23 @@ serve(async (req) => {
         console.log(`📋 ${params.length} params for category ${leafCat.id}`);
 
         // ═══ STEP 4: AI optimization ═══
+        // Pass source characteristics for better parameter filling
         let ai: any = null;
         if (LOVABLE_KEY) {
           const isClone = !!body.cloneMode || !!body.skipImageGeneration;
           if (isClone) {
-            console.log(`💰 Clone mode: using Flash instead of Pro for AI optimization`);
+            console.log(`💰 Clone mode: using Flash for AI optimization`);
           }
           ai = await aiOptimize(product, leafCat.name, params, LOVABLE_KEY, isClone);
         }
 
         // ═══ STEP 5: MXIK lookup (AI-powered) ═══
+        // For clones, use source subject (Russian category) for better MXIK matching
+        const mxikSearchName = product.sourceSubject || product.sourceCategory || product.name;
+        const mxikSearchCategory = product.sourceParent || product.category;
         const mxik = (product.mxikCode && product.mxikName)
           ? { code: product.mxikCode, name_uz: product.mxikName }
-          : await lookupMXIK(supabase, product.name, product.category, LOVABLE_KEY);
+          : await lookupMXIK(supabase, mxikSearchName, mxikSearchCategory, LOVABLE_KEY);
 
         // ═══ STEP 6: Build & send offer ═══
         const offer = buildOffer(product, ai, sku, barcode, leafCat, mxik, pricing.recommendedPrice, images);
