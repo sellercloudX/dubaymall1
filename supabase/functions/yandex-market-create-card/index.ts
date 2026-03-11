@@ -1089,9 +1089,9 @@ serve(async (req) => {
           uzSent = await sendUzbekContent(creds.apiKey, creds.businessId, sku, ai.name_uz, ai.description_uz);
         }
 
-        // ═══ STEP 7.5: Auto quality check (SKIP in clone mode for speed) ═══
+        // ═══ STEP 7.5: Auto quality check + auto-fix (ALWAYS run, including clone mode) ═══
         let qualityCheck: any = null;
-        if (yResp.ok && LOVABLE_KEY && !body.cloneMode) {
+        if (yResp.ok && LOVABLE_KEY) {
           try {
             console.log("🔍 Running auto quality check...");
             await new Promise(r => setTimeout(r, 1000));
