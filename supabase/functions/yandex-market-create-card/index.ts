@@ -428,15 +428,19 @@ Javob FAQAT JSON array: ["so'z1", "so'z2", ...]` }],
 
 MAHSULOT NOMI: "${productName}"
 TAVSIF: "${productDesc || 'Yo\'q'}"
-${sourceCategory ? `MANBA MARKETPLACE KATEGORIYASI: "${sourceCategory}" (${sourceMarketplace || 'unknown'})` : ''}
+${sourceSubject ? `MANBA MARKETPLACE KATEGORIYASI (WB Subject): "${sourceSubject}"` : ''}
+${sourceParent ? `MANBA OTA-KATEGORIYA (WB Parent): "${sourceParent}"` : ''}
+${sourceCategory ? `MANBA KATEGORIYA: "${sourceCategory}" (${sourceMarketplace || 'unknown'})` : ''}
 
 MUHIM QOIDALAR:
 - Kategoriya mahsulot TURIGA aniq mos bo'lishi SHART
-${sourceCategory ? `- Manba kategoriya "${sourceCategory}" — shunga ENG YAQIN Yandex kategoriyani tanla!` : ''}
+${sourceSubject ? `- WB dagi kategoriya "${sourceSubject}" — shunga ENG YAQIN Yandex kategoriyani tanla! Bu eng ishonchli ma'lumot!` : ''}
+${sourceParent ? `- WB ota-kategoriya: "${sourceParent}" — bu ham yo'nalishni aniqlashda muhim!` : ''}
 - "Par dazmol" va "Vakuum paketlash mashinasi" — BU BOSHQA NARSALAR!
 - Mahsulot nomidagi kalit so'zlarni sinchiklab tahlil qil
 - Masalan: "vakuumlovchi" → "Вакуумные упаковщики", "par dazmol" → "Парогенераторы"
 - "foundation/tonal krem" → "Тональные средства", "lipstick" → "Губная помада"
+- WB "Кроссовки" → Yandex "Кроссовки" yoki eng yaqin sport poyabzal kategoriyasi
 - Agar mahsulot nomi ANIQ bir kategoriyaga to'g'ri kelsa, uni tanla
 
 KATEGORIYALAR RO'YXATI:
