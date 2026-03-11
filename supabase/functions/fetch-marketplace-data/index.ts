@@ -1313,27 +1313,49 @@ serve(async (req) => {
           if (!stocks || stocks.length === 0 || !campaignId) {
             result = { success: false, error: "No stocks provided or campaignId missing" };
           } else {
-            // First get warehouseId from stocks endpoint to find seller's FBS warehouse
+            // Get warehouseId from seller's registered warehouses (most reliable)
             let warehouseId: number | undefined;
+            
+            // Method 1: Use /campaigns/{campaignId}/warehouses — returns seller's own FBS warehouses
             try {
-              const stocksCheckResp = await fetchWithRetry(
-                `https://api.partner.market.yandex.ru/campaigns/${campaignId}/offers/stocks`,
-                {
-                  method: 'POST',
-                  headers,
-                  body: JSON.stringify({ limit: 1 })
-                }
+              const whResp = await fetchWithRetry(
+                `https://api.partner.market.yandex.ru/campaigns/${campaignId}/warehouses`,
+                { headers }
               );
-              if (stocksCheckResp.ok) {
-                const stocksCheckData = await stocksCheckResp.json();
-                const warehouses = stocksCheckData.result?.warehouses || [];
-                // Find FBS warehouse (warehouseId >= 100000) or use first available
-                const fbsWh = warehouses.find((wh: any) => wh.warehouseId >= 100000);
-                warehouseId = fbsWh?.warehouseId || warehouses[0]?.warehouseId;
-                console.log(`Found warehouseId: ${warehouseId}`);
+              if (whResp.ok) {
+                const whData = await whResp.json();
+                const warehouses = whData.result?.warehouses || whData.warehouses || [];
+                if (warehouses.length > 0) {
+                  warehouseId = warehouses[0].id;
+                  console.log(`Found seller warehouse from /warehouses: ${warehouseId}`);
+                }
               }
             } catch (e) {
-              console.error("Error fetching warehouse info:", e);
+              console.warn("Error fetching seller warehouses for stock update:", e);
+            }
+            
+            // Method 2: Fallback — get first warehouse from stocks endpoint
+            if (!warehouseId) {
+              try {
+                const stocksCheckResp = await fetchWithRetry(
+                  `https://api.partner.market.yandex.ru/campaigns/${campaignId}/offers/stocks`,
+                  {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ limit: 1 })
+                  }
+                );
+                if (stocksCheckResp.ok) {
+                  const stocksCheckData = await stocksCheckResp.json();
+                  const warehouses = stocksCheckData.result?.warehouses || [];
+                  if (warehouses.length > 0) {
+                    warehouseId = warehouses[0].warehouseId;
+                    console.log(`Found warehouse from stocks endpoint: ${warehouseId}`);
+                  }
+                }
+              } catch (e) {
+                console.error("Error fetching warehouse from stocks:", e);
+              }
             }
 
             if (!warehouseId) {
