@@ -21,13 +21,11 @@ function wordOverlapScore(a: string, b: string): number {
   const wordsB = new Set(normalize(b).split(' ').filter(w => w.length >= 3));
   if (wordsA.size === 0 || wordsB.size === 0) return 0;
 
-  // Also check partial matches (one word contains another)
   let overlap = 0;
   for (const w of wordsA) {
     if (wordsB.has(w)) {
       overlap++;
     } else {
-      // Partial match: check if any word in B contains w or vice versa
       for (const wb of wordsB) {
         if (wb.includes(w) || w.includes(wb)) {
           overlap += 0.5;
@@ -38,6 +36,14 @@ function wordOverlapScore(a: string, b: string): number {
   }
   
   return overlap / Math.min(wordsA.size, wordsB.size);
+}
+
+// Exact SKU match (highest priority)
+function skuMatch(targetSku: string, sourceSku: string): boolean {
+  if (!targetSku || !sourceSku) return false;
+  const a = normalize(targetSku);
+  const b = normalize(sourceSku);
+  return a === b || a.includes(b) || b.includes(a);
 }
 
 serve(async (req) => {
@@ -61,103 +67,168 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
     }
 
-    const { wbProducts, yandexProducts } = await req.json();
-    console.log(`Received ${wbProducts?.length} WB, ${yandexProducts?.length} Yandex products`);
+    const body = await req.json();
+    
+    // New universal API: targetProducts, sourceProducts, targetMarketplace, sourceMarketplace
+    // Also supports legacy API: wbProducts, yandexProducts
+    const targetMarketplace: string = body.targetMarketplace || 'wildberries';
+    const sourceMarketplace: string = body.sourceMarketplace || 'yandex';
+    const targetProducts = body.targetProducts || body.wbProducts || [];
+    const sourceProducts = body.sourceProducts || body.yandexProducts || [];
 
-    if (!wbProducts?.length || !yandexProducts?.length) {
+    console.log(`Matching ${targetProducts.length} ${targetMarketplace} ← ${sourceProducts.length} ${sourceMarketplace}`);
+
+    if (!targetProducts.length || !sourceProducts.length) {
       return new Response(JSON.stringify({ error: 'No products provided' }), { status: 400, headers: corsHeaders });
     }
 
-    // Get all Yandex cost prices for this user
+    // Get ALL cost prices for this user from ALL marketplaces (source will be filtered)
     const { data: costPrices } = await supabase
       .from('marketplace_cost_prices')
-      .select('offer_id, cost_price')
-      .eq('user_id', user.id)
-      .eq('marketplace', 'yandex');
+      .select('offer_id, cost_price, marketplace, currency')
+      .eq('user_id', user.id);
 
-    const costMap = new Map<string, number>();
-    (costPrices || []).forEach((cp: any) => costMap.set(cp.offer_id, cp.cost_price));
-    console.log(`Found ${costMap.size} Yandex cost prices`);
+    // Build cost map from all marketplaces EXCEPT target (any marketplace can be source)
+    const costMap = new Map<string, { cost: number; marketplace: string; currency: string }>();
+    (costPrices || []).forEach((cp: any) => {
+      // If specific sourceMarketplace given, only use that; otherwise use all except target
+      if (sourceMarketplace === 'all') {
+        if (cp.marketplace !== targetMarketplace) {
+          costMap.set(`${cp.marketplace}:${cp.offer_id}`, { cost: cp.cost_price, marketplace: cp.marketplace, currency: cp.currency || 'UZS' });
+        }
+      } else {
+        if (cp.marketplace === sourceMarketplace) {
+          costMap.set(`${cp.marketplace}:${cp.offer_id}`, { cost: cp.cost_price, marketplace: cp.marketplace, currency: cp.currency || 'UZS' });
+        }
+      }
+    });
+    console.log(`Found ${costMap.size} source cost prices`);
 
-    // Filter Yandex products that have cost prices
-    const yandexWithCost = yandexProducts.filter((yp: any) => costMap.has(yp.offerId));
-    console.log(`Yandex with cost prices: ${yandexWithCost.length}`);
+    // Filter source products that have cost prices
+    const sourceWithCost = sourceProducts.filter((sp: any) => {
+      for (const [key] of costMap) {
+        const offerId = key.split(':')[1];
+        if (offerId === sp.offerId) return true;
+      }
+      return false;
+    });
+    console.log(`Source with cost prices: ${sourceWithCost.length}`);
 
-    if (yandexWithCost.length === 0) {
-      return new Response(JSON.stringify({ matches: 0, message: 'Yandex da tannarx kiritilgan mahsulotlar topilmadi' }), {
+    if (sourceWithCost.length === 0) {
+      return new Response(JSON.stringify({ 
+        matches: 0, 
+        message: `Manba marketplace'da tannarx kiritilgan mahsulotlar topilmadi` 
+      }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    // STEP 1: Fast text-based matching first (word overlap)
-    const textMatches: { wbOfferId: string; yandexOfferId: string; costPriceUzs: number }[] = [];
-    const unmatchedWb: any[] = [];
+    // Helper to get cost for a source offerId
+    function getCostForSource(offerId: string): { cost: number; currency: string } | null {
+      // Check specific source first, then any
+      const specificKey = `${sourceMarketplace}:${offerId}`;
+      if (costMap.has(specificKey)) {
+        const entry = costMap.get(specificKey)!;
+        return { cost: entry.cost, currency: entry.currency };
+      }
+      // Check all sources
+      for (const [key, val] of costMap) {
+        if (key.endsWith(`:${offerId}`)) return { cost: val.cost, currency: val.currency };
+      }
+      return null;
+    }
 
-    for (const wp of wbProducts) {
+    // STEP 0: Exact SKU match (highest priority)
+    const skuMatches: { targetOfferId: string; sourceOfferId: string; costPrice: number; currency: string }[] = [];
+    const afterSkuTarget: any[] = [];
+
+    for (const tp of targetProducts) {
+      let matched = false;
+      for (const sp of sourceWithCost) {
+        if (skuMatch(tp.offerId, sp.offerId)) {
+          const costEntry = getCostForSource(sp.offerId);
+          if (costEntry && costEntry.cost > 0) {
+            skuMatches.push({
+              targetOfferId: tp.offerId,
+              sourceOfferId: sp.offerId,
+              costPrice: costEntry.cost,
+              currency: costEntry.currency,
+            });
+            matched = true;
+            break;
+          }
+        }
+      }
+      if (!matched) afterSkuTarget.push(tp);
+    }
+    console.log(`SKU matches: ${skuMatches.length}`);
+
+    // STEP 1: Fast text-based matching (word overlap)
+    const textMatches: typeof skuMatches = [];
+    const unmatchedTarget: any[] = [];
+
+    for (const tp of afterSkuTarget) {
       let bestScore = 0;
-      let bestYandex: any = null;
+      let bestSource: any = null;
 
-      for (const yp of yandexWithCost) {
-        const score = wordOverlapScore(wp.name, yp.name);
+      for (const sp of sourceWithCost) {
+        const score = wordOverlapScore(tp.name, sp.name);
         if (score > bestScore) {
           bestScore = score;
-          bestYandex = yp;
+          bestSource = sp;
         }
       }
 
-      // Threshold: at least 30% word overlap
-      if (bestScore >= 0.3 && bestYandex) {
-        const costUzs = costMap.get(bestYandex.offerId);
-        if (costUzs && costUzs > 0) {
+      if (bestScore >= 0.3 && bestSource) {
+        const costEntry = getCostForSource(bestSource.offerId);
+        if (costEntry && costEntry.cost > 0) {
           textMatches.push({
-            wbOfferId: wp.offerId,
-            yandexOfferId: bestYandex.offerId,
-            costPriceUzs: costUzs,
+            targetOfferId: tp.offerId,
+            sourceOfferId: bestSource.offerId,
+            costPrice: costEntry.cost,
+            currency: costEntry.currency,
           });
         }
       } else {
-        unmatchedWb.push(wp);
+        unmatchedTarget.push(tp);
       }
     }
+    console.log(`Text matching: ${textMatches.length} matches, ${unmatchedTarget.length} unmatched`);
 
-    console.log(`Text matching: ${textMatches.length} matches, ${unmatchedWb.length} unmatched`);
-
-    // STEP 2: Use AI for unmatched products (smaller batches with fewer yandex candidates)
+    // STEP 2: AI matching for remaining
     const aiMatches: typeof textMatches = [];
 
-    if (unmatchedWb.length > 0 && yandexWithCost.length > 0) {
+    if (unmatchedTarget.length > 0 && sourceWithCost.length > 0) {
       const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
       
       if (LOVABLE_API_KEY) {
         const AI_BATCH = 20;
         
-        for (let i = 0; i < unmatchedWb.length; i += AI_BATCH) {
-          const wbBatch = unmatchedWb.slice(i, i + AI_BATCH);
+        for (let i = 0; i < unmatchedTarget.length; i += AI_BATCH) {
+          const targetBatch = unmatchedTarget.slice(i, i + AI_BATCH);
           
-          // For each WB batch, find top candidates from Yandex by partial word overlap
           const candidateSet = new Set<string>();
-          for (const wp of wbBatch) {
-            const scored = yandexWithCost
-              .map((yp: any) => ({ yp, score: wordOverlapScore(wp.name, yp.name) }))
+          for (const tp of targetBatch) {
+            const scored = sourceWithCost
+              .map((sp: any) => ({ sp, score: wordOverlapScore(tp.name, sp.name) }))
               .filter((x: any) => x.score > 0.1)
               .sort((a: any, b: any) => b.score - a.score)
               .slice(0, 5);
-            for (const s of scored) candidateSet.add(s.yp.offerId);
+            for (const s of scored) candidateSet.add(s.sp.offerId);
           }
 
-          const yxCandidates = yandexWithCost.filter((yp: any) => candidateSet.has(yp.offerId));
-          
-          if (yxCandidates.length === 0) continue;
+          const candidates = sourceWithCost.filter((sp: any) => candidateSet.has(sp.offerId));
+          if (candidates.length === 0) continue;
 
-          const prompt = `Match WB products to Yandex products. Same physical product, different names/languages.
+          const prompt = `Match target marketplace products to source marketplace products. Same physical product, different names/languages.
 
-WB:
-${wbBatch.map((w: any) => `- "${w.name}" [${w.offerId}]`).join('\n')}
+Target (${targetMarketplace}):
+${targetBatch.map((t: any) => `- "${t.name}" [${t.offerId}]`).join('\n')}
 
-Yandex:
-${yxCandidates.map((y: any) => `- "${y.name}" [${y.offerId}]`).join('\n')}
+Source (${sourceMarketplace}):
+${candidates.map((s: any) => `- "${s.name}" [${s.offerId}]`).join('\n')}
 
-Return JSON array only: [{"wb":"offerId","yx":"offerId"}]
+Return JSON array only: [{"target":"offerId","source":"offerId"}]
 Only confident matches. Empty array if none.`;
 
           try {
@@ -181,18 +252,20 @@ Only confident matches. Empty array if none.`;
 
             const aiData = await resp.json();
             const text = aiData?.choices?.[0]?.message?.content || '[]';
-            console.log(`AI batch ${i}: response length=${text.length}`);
 
             const jsonMatch = text.match(/\[[\s\S]*?\]/);
             if (jsonMatch) {
               const matches = JSON.parse(jsonMatch[0]);
               for (const m of matches) {
-                const costUzs = costMap.get(m.yx);
-                if (costUzs && costUzs > 0) {
+                const sourceId = m.source || m.yx;
+                const targetId = m.target || m.wb;
+                const costEntry = getCostForSource(sourceId);
+                if (costEntry && costEntry.cost > 0) {
                   aiMatches.push({
-                    wbOfferId: m.wb,
-                    yandexOfferId: m.yx,
-                    costPriceUzs: costUzs,
+                    targetOfferId: targetId,
+                    sourceOfferId: sourceId,
+                    costPrice: costEntry.cost,
+                    currency: costEntry.currency,
                   });
                 }
               }
@@ -201,7 +274,7 @@ Only confident matches. Empty array if none.`;
             console.error('AI batch error:', aiErr);
           }
 
-          if (i + AI_BATCH < unmatchedWb.length) {
+          if (i + AI_BATCH < unmatchedTarget.length) {
             await new Promise(r => setTimeout(r, 300));
           }
         }
@@ -210,18 +283,38 @@ Only confident matches. Empty array if none.`;
 
     console.log(`AI matching: ${aiMatches.length} additional matches`);
 
-    const allMatches = [...textMatches, ...aiMatches];
+    const allMatches = [...skuMatches, ...textMatches, ...aiMatches];
     console.log(`Total matches: ${allMatches.length}`);
 
-    // Bulk insert WB cost prices (UZS → RUB)
-    const UZS_TO_RUB = 140;
-    const insertEntries = allMatches.map(m => ({
-      user_id: user.id,
-      marketplace: 'wildberries',
-      offer_id: m.wbOfferId,
-      cost_price: Math.round(m.costPriceUzs / UZS_TO_RUB),
-      currency: 'RUB',
-    }));
+    // Determine target currency and conversion
+    // RUB marketplaces: wildberries, ozon
+    // UZS marketplaces: uzum, yandex
+    const rubMarketplaces = ['wildberries', 'ozon'];
+    const targetIsRub = rubMarketplaces.includes(targetMarketplace);
+    const UZS_TO_RUB = 140; // Approximate cross-rate
+
+    const insertEntries = allMatches.map(m => {
+      let finalCost = m.costPrice;
+      const sourceIsRub = m.currency === 'RUB';
+
+      // Convert to target currency
+      if (targetIsRub && !sourceIsRub) {
+        // UZS → RUB
+        finalCost = Math.round(m.costPrice / UZS_TO_RUB);
+      } else if (!targetIsRub && sourceIsRub) {
+        // RUB → UZS
+        finalCost = Math.round(m.costPrice * UZS_TO_RUB);
+      }
+      // Same currency → no conversion
+
+      return {
+        user_id: user.id,
+        marketplace: targetMarketplace,
+        offer_id: m.targetOfferId,
+        cost_price: finalCost,
+        currency: targetIsRub ? 'RUB' : 'UZS',
+      };
+    });
 
     if (insertEntries.length > 0) {
       for (let i = 0; i < insertEntries.length; i += 50) {
@@ -231,16 +324,18 @@ Only confident matches. Empty array if none.`;
           .upsert(batch, { onConflict: 'user_id,marketplace,offer_id' });
         if (upsertErr) console.error('Upsert error:', upsertErr);
       }
-      console.log(`Inserted ${insertEntries.length} cost prices`);
+      console.log(`Inserted ${insertEntries.length} cost prices for ${targetMarketplace}`);
     }
 
     return new Response(JSON.stringify({
       matches: allMatches.length,
-      total_wb: wbProducts.length,
-      total_yandex: yandexWithCost.length,
+      total_target: targetProducts.length,
+      total_source: sourceWithCost.length,
+      sku_matches: skuMatches.length,
       text_matches: textMatches.length,
       ai_matches: aiMatches.length,
-      entries: insertEntries.map(e => ({ offerId: e.offer_id, costRub: e.cost_price })),
+      target_marketplace: targetMarketplace,
+      source_marketplace: sourceMarketplace,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
