@@ -2329,8 +2329,12 @@ serve(async (req) => {
         // Both require shopIds as mandatory param per Swagger spec
         try {
           const financeParams = new URLSearchParams();
-          // shopIds is REQUIRED per Uzum Swagger spec
-          if (uzumShopId) financeParams.append("shopIds", String(uzumShopId));
+          // shopIds is REQUIRED per Uzum Swagger spec — pass ALL shops
+          const finShopIds = allShopIds.length > 0 ? allShopIds : (uzumShopId ? [String(uzumShopId)] : []);
+          for (const sid of finShopIds) {
+            financeParams.append("shopIds", sid);
+          }
+          console.log(`Uzum finance: querying ${finShopIds.length} shops: ${finShopIds.join(',')}`);
           // CRITICAL: dateFrom/dateTo must be epoch milliseconds (int64), NOT date strings!
           const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
           financeParams.append("dateFrom", String(ninetyDaysAgo));
@@ -2346,17 +2350,35 @@ serve(async (req) => {
             `${uzumBaseUrl}/v1/finance/accruals?${financeParams.toString()}`,
           ];
 
-          const ordersRes = await fetch(`${uzumBaseUrl}/v1/finance/orders?${financeParams.toString()}`, { headers: uzumHeaders });
+          const ordersUrl = `${uzumBaseUrl}/v1/finance/orders?${financeParams.toString()}`;
+          console.log(`Uzum finance orders URL: ${ordersUrl}`);
+          const ordersRes = await fetch(ordersUrl, { headers: uzumHeaders });
 
           let financeOrders: any[] = [];
           let financeExpenses: any[] = [];
 
           if (ordersRes.ok) {
             const ordData = await ordersRes.json();
-            financeOrders = ordData.payload || ordData.data || ordData.content || [];
+            // Log raw structure for debugging
+            const topKeys = Object.keys(ordData);
+            const payloadKeys = ordData.payload ? Object.keys(ordData.payload) : [];
+            console.log(`[UZUM FINANCE RESP] status=${ordersRes.status}, topKeys=${JSON.stringify(topKeys)}, payloadKeys=${JSON.stringify(payloadKeys)}`);
+            console.log(`[UZUM FINANCE RAW] ${JSON.stringify(ordData).substring(0, 1000)}`);
+            
+            // Try multiple data paths
+            financeOrders = ordData.payload?.orders || ordData.payload?.content || ordData.content || ordData.payload || ordData.data || [];
+            if (!Array.isArray(financeOrders)) financeOrders = [];
+            
+            console.log(`Uzum finance orders parsed: ${financeOrders.length}`);
+            
+            // Log first order structure if available
+            if (financeOrders.length > 0) {
+              console.log(`[UZUM FINANCE ORDER KEYS] ${JSON.stringify(Object.keys(financeOrders[0]))}`);
+              console.log(`[UZUM FINANCE ORDER SAMPLE] ${JSON.stringify(financeOrders[0]).substring(0, 800)}`);
+            }
+            
             // Extract per-item expenses from order-level finance data
-            if (Array.isArray(financeOrders)) {
-              financeOrders.forEach((fo: any) => {
+            financeOrders.forEach((fo: any) => {
                 const items = fo.items || fo.orderItems || [];
                 items.forEach((item: any) => {
                   const productId = String(item.skuId || item.skuTitle || item.productId || '');
@@ -2386,9 +2408,9 @@ serve(async (req) => {
                   });
                 }
               });
-            }
           } else {
-            console.warn(`Uzum finance/orders failed: ${ordersRes.status}`);
+            const errBody = await ordersRes.text();
+            console.warn(`Uzum finance/orders failed: ${ordersRes.status}, body: ${errBody.substring(0, 500)}`);
           }
 
           // Try expense endpoints with fallback
