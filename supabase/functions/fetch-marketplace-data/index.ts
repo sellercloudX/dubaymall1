@@ -493,25 +493,50 @@ serve(async (req) => {
             await sleep(800);
             const stockMap = new Map<string, { fbo: number; fbs: number }>();
             
-            // First, get seller's own warehouses (FBS) to distinguish from Yandex warehouses (FBO)
-            const sellerWarehouseIds = new Set<number>();
+            // ===== STEP 1: Detect campaign placement model (FBS / FBY / DBS) =====
+            let campaignPlacementType = '';
             try {
-              const whResp = await fetchWithRetry(
-                `https://api.partner.market.yandex.ru/campaigns/${campaignId}/warehouses`,
+              const campResp = await fetchWithRetry(
+                `https://api.partner.market.yandex.ru/campaigns/${campaignId}`,
                 { headers }
               );
-              if (whResp.ok) {
-                const whData = await whResp.json();
-                const warehouses = whData.result?.warehouses || whData.warehouses || [];
-                warehouses.forEach((wh: any) => {
-                  if (wh.id) sellerWarehouseIds.add(wh.id);
-                });
-                console.log(`Seller warehouses (FBS): ${Array.from(sellerWarehouseIds).join(', ')}`);
+              if (campResp.ok) {
+                const campData = await campResp.json();
+                campaignPlacementType = campData.campaign?.placementType || '';
+                console.log(`Campaign ${campaignId} placementType: "${campaignPlacementType}"`);
               }
             } catch (e) {
-              console.error("Error fetching seller warehouses:", e);
+              console.warn("Error detecting campaign placement type:", e);
             }
             
+            // FBS-only campaign: ALL stocks belong to seller (FBS)
+            const isFbsOnlyCampaign = campaignPlacementType === 'FBS' || campaignPlacementType === 'DBS';
+            
+            // ===== STEP 2: Get seller's own warehouses (FBS) =====
+            const sellerWarehouseIds = new Set<number>();
+            if (!isFbsOnlyCampaign) {
+              // Only need warehouse detection for FBY/mixed campaigns
+              try {
+                const whResp = await fetchWithRetry(
+                  `https://api.partner.market.yandex.ru/campaigns/${campaignId}/warehouses`,
+                  { headers }
+                );
+                if (whResp.ok) {
+                  const whData = await whResp.json();
+                  const warehouses = whData.result?.warehouses || whData.warehouses || [];
+                  warehouses.forEach((wh: any) => {
+                    if (wh.id) sellerWarehouseIds.add(wh.id);
+                  });
+                  console.log(`Seller warehouses (FBS): ${Array.from(sellerWarehouseIds).join(', ') || 'none'}`);
+                }
+              } catch (e) {
+                console.error("Error fetching seller warehouses:", e);
+              }
+            } else {
+              console.log(`FBS/DBS campaign — all stocks classified as FBS`);
+            }
+            
+            // ===== STEP 3: Fetch stocks with pagination =====
             let stockPageToken: string | undefined;
             let stockPage = 0;
 
@@ -538,12 +563,11 @@ serve(async (req) => {
               
               warehouseOffers.forEach((wh: any) => {
                 const whId = wh.warehouseId;
-                // Seller warehouses = FBS (seller fulfillment)
-                // Yandex warehouses (NOT in seller list) = FBO (marketplace fulfillment)
-                // IMPORTANT: If sellerWarehouseIds is empty (API failed), default to FBS
-                // because most sellers use FBS model and don't have FBO stock
-                const isFBS = sellerWarehouseIds.size === 0 || sellerWarehouseIds.has(whId);
-                console.log(`  Warehouse ${whId} => ${isFBS ? 'FBS' : 'FBO'} (seller warehouses: ${Array.from(sellerWarehouseIds).join(',') || 'none'})`);
+                // For FBS/DBS campaigns: ALL stocks are FBS
+                // For FBY/mixed campaigns: check seller warehouses list
+                // If seller warehouse list is empty (API failed), default to FBS
+                const isFBS = isFbsOnlyCampaign || sellerWarehouseIds.size === 0 || sellerWarehouseIds.has(whId);
+                console.log(`  Warehouse ${whId} => ${isFBS ? 'FBS' : 'FBO'} (campaign: ${campaignPlacementType || 'unknown'})`);
                 
                 const offers = wh.offers || [];
                 offers.forEach((offer: any) => {
@@ -586,7 +610,7 @@ serve(async (req) => {
             sampleProducts.forEach(p => {
               console.log(`Stock debug: ${p.offerId} => FBO=${p.stockFBO}, FBS=${p.stockFBS}, total=${p.stockCount}`);
             });
-            console.log(`Updated stocks for ${stockMap.size} products`);
+            console.log(`Updated stocks for ${stockMap.size} products (campaign type: ${campaignPlacementType || 'unknown'})`);
           } catch (e) {
             console.error("Error fetching stocks:", e);
           }
