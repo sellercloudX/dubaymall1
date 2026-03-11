@@ -1891,7 +1891,7 @@ serve(async (req) => {
         }
 
       } else if (dataType === "orders") {
-        // GET /v2/fbs/orders + /v2/fbo/orders
+        // GET /v2/fbs/orders (per-shop) + /v1/finance/orders (for FBO data)
         // OPTIMIZED: Pass ALL shopIds in a single param to avoid N×M iteration
         try {
           let allOrders: any[] = [];
