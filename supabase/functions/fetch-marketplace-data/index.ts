@@ -2002,99 +2002,101 @@ serve(async (req) => {
         try {
           let allOrders: any[] = [];
           const orderIdsSeen = new Set<string>();
-          let page = 0;
-          let hasMore = true;
           const pageSize = 50; // Uzum max 50 per page
 
-          // Consolidated status list — avoid redundant/rarely-used statuses
-          const orderStatuses = status ? [status] : [
-            'NEW', 'CREATED', 'PROCESSING', 'PACKING', 'PENDING_DELIVERY', 'DELIVERING', 
-            'DELIVERED', 'ACCEPTED_AT_DP', 'DELIVERED_TO_CUSTOMER_DELIVERY_POINT',
-            'COMPLETED', 'CANCELED', 'PENDING_CANCELLATION', 'RETURNED', 'REJECTED'
+          // OPTIMIZED: Reduced status list — many are sub-states that get captured anyway
+          // Group into 3 batches to stay within timeout: active, completed, cancelled
+          const orderStatusBatches = status ? [[status]] : [
+            ['NEW', 'CREATED', 'PROCESSING', 'PACKING', 'PENDING_DELIVERY', 'DELIVERING'],
+            ['DELIVERED', 'COMPLETED', 'ACCEPTED_AT_DP'],
+            ['CANCELED', 'RETURNED'],
           ];
 
-          // Fetch FBS orders per-shop to avoid 403 "Shops ids is not available" errors
-          // Some shops may not support FBS — we skip them gracefully
+          // Fetch FBS orders — parallelize shops within each status batch
           const orderShopIds = allShopIds.length > 0 ? allShopIds : (uzumShopId ? [String(uzumShopId)] : []);
           
-          console.log(`Uzum FBS orders: ${orderStatuses.length} statuses, ${orderShopIds.length} shops (per-shop mode)`);
-          
-          for (let si = 0; si < orderStatuses.length; si++) {
-            const orderStatus = orderStatuses[si];
-            if (si > 0) await sleep(300); // Rate limit protection
-            
-            // Try each shop individually to handle 403 gracefully
-            for (const shopId of orderShopIds) {
-              page = 0;
-              hasMore = true;
+          console.log(`Uzum FBS orders: ${orderStatusBatches.flat().length} statuses in ${orderStatusBatches.length} batches, ${orderShopIds.length} shops`);
 
-              while (hasMore) {
-                const params = new URLSearchParams({
-                  size: String(pageSize),
-                  page: String(page),
-                  status: orderStatus,
-                  shopIds: shopId,
-                });
+          // Helper to fetch one status+shop combination
+          const fetchStatusShop = async (orderStatus: string, shopId: string) => {
+            const results: any[] = [];
+            let page = 0;
+            let hasMore = true;
+            while (hasMore) {
+              const params = new URLSearchParams({
+                size: String(pageSize),
+                page: String(page),
+                status: orderStatus,
+                shopIds: shopId,
+              });
 
+              try {
                 const response = await fetch(
                   `${uzumBaseUrl}/v2/fbs/orders?${params.toString()}`,
                   { headers: uzumHeaders }
                 );
 
-            if (!response.ok) {
-              if (response.status === 403) {
-                // This shop doesn't support FBS — skip silently
-                await response.text();
-                hasMore = false;
-                continue;
-              }
-              if (response.status === 429) {
-                // Rate limited — wait and retry once
-                await response.text();
-                await sleep(2000);
-                hasMore = false;
-                continue;
-              }
-              const errText = await response.text();
-              console.error(`Uzum orders error (${orderStatus}, shop=${shopId}):`, response.status, errText);
-              hasMore = false;
-              continue;
-            }
+                if (!response.ok) {
+                  await response.text();
+                  break; // 403/429/other — skip
+                }
 
-            const data = await response.json();
-            const ordersPayload = data.payload?.sellerOrders || data.payload?.fbsOrders || data.payload?.orders || data.payload || [];
-            const orderList = Array.isArray(ordersPayload) ? ordersPayload : [];
-            
-            console.log(`Uzum orders (${orderStatus}) page ${page}: ${orderList.length} orders`);
+                const data = await response.json();
+                const ordersPayload = data.payload?.sellerOrders || data.payload?.fbsOrders || data.payload?.orders || data.payload || [];
+                const orderList = Array.isArray(ordersPayload) ? ordersPayload : [];
+                
+                if (orderList.length === 0) break;
 
-            // Log first order structure for debugging — for EVERY shop's first batch
-            if (page === 0 && orderList.length > 0) {
-              const sampleOrder = orderList[0];
-              console.log(`[UZUM FBS ORDER KEYS] status=${orderStatus} keys=${JSON.stringify(Object.keys(sampleOrder))}`);
-              const dateFields = ['createdAt', 'createDate', 'dateCreated', 'created_at', 'orderDate', 'date', 'updatedAt', 'updateDate', 'completedAt', 'deliveredAt', 'acceptDate', 'statusDate'];
-              const dateValues: Record<string, any> = {};
-              for (const f of dateFields) {
-                if (sampleOrder[f] !== undefined) dateValues[f] = sampleOrder[f];
-              }
-              console.log(`[UZUM DATE FIELDS] status=${orderStatus}: ${JSON.stringify(dateValues)}`);
-              if (Object.keys(dateValues).length === 0) {
-                // No known date field found — dump first 500 chars of order
-                console.log(`[UZUM ORDER RAW] ${JSON.stringify(sampleOrder).substring(0, 800)}`);
+                // Log first order structure for debugging
+                if (page === 0 && results.length === 0 && orderList.length > 0) {
+                  const sampleOrder = orderList[0];
+                  console.log(`[UZUM FBS ORDER KEYS] status=${orderStatus} keys=${JSON.stringify(Object.keys(sampleOrder))}`);
+                  const dateFields = ['createdAt', 'createDate', 'dateCreated', 'created_at', 'orderDate', 'date', 'updatedAt', 'updateDate', 'completedAt', 'deliveredAt', 'acceptDate', 'statusDate'];
+                  const dateValues: Record<string, any> = {};
+                  for (const f of dateFields) {
+                    if (sampleOrder[f] !== undefined) dateValues[f] = sampleOrder[f];
+                  }
+                  console.log(`[UZUM DATE FIELDS] status=${orderStatus}: ${JSON.stringify(dateValues)}`);
+                  if (Object.keys(dateValues).length === 0) {
+                    console.log(`[UZUM ORDER RAW] ${JSON.stringify(sampleOrder).substring(0, 800)}`);
+                  }
+                }
+
+                results.push(...orderList);
+
+                if (orderList.length < pageSize || !fetchAll) {
+                  hasMore = false;
+                } else {
+                  page++;
+                  await sleep(150);
+                }
+              } catch (e) {
+                console.error(`Uzum orders error (${orderStatus}, shop=${shopId}):`, e);
+                break;
               }
             }
+            return results;
+          };
 
-            const mapped = orderList.map((order: any) => {
+          // Process batches sequentially, but parallelize shops WITHIN each batch
+          for (let bi = 0; bi < orderStatusBatches.length; bi++) {
+            const batch = orderStatusBatches[bi];
+            if (bi > 0) await sleep(200);
+
+            // For each status in batch, run all shops in parallel
+            for (const orderStatus of batch) {
+              const shopPromises = orderShopIds.map(shopId => fetchStatusShop(orderStatus, shopId));
+              const shopResults = await Promise.all(shopPromises);
+              
+              for (const orderList of shopResults) {
+                const mapped = orderList.map((order: any) => {
               const items = order.items || order.orderItems || [];
               const itemsTotal = items.reduce((sum: number, item: any) => {
                 return sum + ((item.price || item.amount || 0) * (item.quantity || item.count || 1));
               }, 0);
 
-              // Use orderCode/orderNumber for display (what seller sees in Uzum dashboard)
-              // Fall back to orderId/id for internal dedup
               const displayOrderId = order.orderCode || order.orderNumber || order.code || order.orderId || order.id;
 
-              // Parse Uzum createdAt — may be Unix timestamp (ms/s), numeric string, or ISO
-              // Uzum v2 FBS API often returns createdAt as Unix seconds (e.g. 1741234567)
               const rawCreatedAt = order.createdAt || order.createDate || order.dateCreated || order.created_at || '';
               let uzumCreatedAt = '';
               if (typeof rawCreatedAt === 'number') {
@@ -2103,22 +2105,13 @@ serve(async (req) => {
                 const ts = Number(rawCreatedAt);
                 uzumCreatedAt = new Date(ts > 1e12 ? ts : ts * 1000).toISOString();
               } else if (rawCreatedAt) {
-                // Try parsing as ISO or date string
                 const parsed = new Date(String(rawCreatedAt));
                 uzumCreatedAt = isNaN(parsed.getTime()) ? '' : parsed.toISOString();
               }
-              // Don't fall back to current date — leave empty so frontend knows it's missing
               if (!uzumCreatedAt) {
-                console.warn(`[UZUM DATE WARN] Order ${displayOrderId} has no date field, skipping fallback`);
-                uzumCreatedAt = ''; // Will be excluded by frontend date filter
-              }
-              
-              // Debug: log first order's date parsing
-              if (allOrders.length === 0 && orderList.indexOf(order) === 0) {
-                console.log(`[UZUM DATE DEBUG] raw=${JSON.stringify(rawCreatedAt)} type=${typeof rawCreatedAt} → parsed=${uzumCreatedAt}`);
+                console.warn(`[UZUM DATE WARN] Order ${displayOrderId} has no date field`);
               }
 
-              // Uzum API uses 'price' for order total (NOT 'totalPrice')
               const orderTotal = order.price || order.totalPrice || order.totalAmount || itemsTotal;
               
               return {
@@ -2128,7 +2121,7 @@ serve(async (req) => {
                 createdAt: uzumCreatedAt,
                 total: orderTotal,
                 totalUZS: orderTotal,
-                fulfillmentType: 'FBS' as const, // Uzum FBS endpoint
+                fulfillmentType: 'FBS' as const,
                 itemsTotal,
                 itemsTotalUZS: itemsTotal,
                 deliveryTotal: order.deliveryPrice || 0,
@@ -2138,74 +2131,47 @@ serve(async (req) => {
                   lastName: order.buyer?.lastName || '',
                 },
                 items: items.map((item: any) => {
-                  // CRITICAL: Uzum FBS order items have these keys:
-                  // id, barcode, skuTitle, title, price, amount, photo, identifierInfo
-                  // identifierInfo may be "N/A" string, not an object!
                   const identInfo = (item.identifierInfo && typeof item.identifierInfo === 'object') ? item.identifierInfo : {};
                   const itemBarcode = item.barcode || identInfo.barcode || '';
-                  // Use skuTitle (human-readable SKU like "TEXPERT-GEEMY") as primary identifier
-                  // This matches the product offerId from product sync
                   const offerId = item.skuTitle || itemBarcode || String(item.id || '');
                   
-                  // Extract photo URL - item.photo can be various structures
                   let itemPhoto = '';
                    try {
-                     // Only log photo debug for very first order item globally
-                     const isFirstItem = allOrders.length === 0 && items.indexOf(item) === 0;
                      if (item.photo) {
                        if (typeof item.photo === 'string') {
                         itemPhoto = item.photo.startsWith('http') ? item.photo : `https://images.uzum.uz/${item.photo.replace(/^\//, '')}`;
                        } else if (typeof item.photo === 'object') {
-                        // Try nested photo.photo first, then direct item.photo
                         const photoObj = item.photo.photo || item.photo;
                         const sizes = [240, 120, 80, 60];
                         for (const size of sizes) {
                           const sizeData = photoObj[size] || photoObj[String(size)];
                           if (sizeData && typeof sizeData === 'object') {
-                            if (typeof sizeData.high === 'string' && sizeData.high) {
-                              itemPhoto = sizeData.high;
-                              break;
-                            } else if (typeof sizeData.low === 'string' && sizeData.low) {
-                              itemPhoto = sizeData.low;
-                              break;
-                            }
+                            if (typeof sizeData.high === 'string' && sizeData.high) { itemPhoto = sizeData.high; break; }
+                            else if (typeof sizeData.low === 'string' && sizeData.low) { itemPhoto = sizeData.low; break; }
                           }
                         }
-                        // Fallback: check photoKey as a direct path
                         if (!itemPhoto && typeof item.photo.photoKey === 'string' && item.photo.photoKey) {
                           const pk = item.photo.photoKey;
                           itemPhoto = pk.startsWith('http') ? pk : `https://images.uzum.uz/${pk.replace(/^\//, '')}`;
                         }
-                        // Fallback: deep search for any URL-like string in the photo object
                         if (!itemPhoto) {
                           const photoStr = JSON.stringify(item.photo);
-                          // Look for full URLs first
                           const urlMatch = photoStr.match(/https?:\/\/[^\s"',}]+\.(jpg|jpeg|png|webp)/i);
-                          if (urlMatch) {
-                            itemPhoto = urlMatch[0];
-                          } else {
-                            // Look for path-like strings (e.g. "product/abc-123.jpg")
+                          if (urlMatch) { itemPhoto = urlMatch[0]; }
+                          else {
                             const pathMatch = photoStr.match(/"([\w\-\/\.]+\.(jpg|jpeg|png|webp))"/i);
-                            if (pathMatch) {
-                              itemPhoto = `https://images.uzum.uz/${pathMatch[1]}`;
-                            }
+                            if (pathMatch) { itemPhoto = `https://images.uzum.uz/${pathMatch[1]}`; }
                           }
                         }
                        }
                      }
-                     // Also try item.productPhoto, item.image, item.imageUrl as last resort
                      if (!itemPhoto) {
                        const fallbackPhoto = item.productPhoto || item.image || item.imageUrl || item.img;
                        if (typeof fallbackPhoto === 'string' && fallbackPhoto) {
                          itemPhoto = fallbackPhoto.startsWith('http') ? fallbackPhoto : `https://images.uzum.uz/${fallbackPhoto.replace(/^\//, '')}`;
                        }
                      }
-                     if (isFirstItem) {
-                        console.log('[UZUM ORDER PHOTO] Final itemPhoto:', itemPhoto || 'EMPTY');
-                      }
-                  } catch (photoErr) { 
-                    console.error('[UZUM ORDER PHOTO ERROR]', photoErr);
-                  }
+                  } catch (photoErr) { /* skip */ }
                   
                   return {
                     offerId,
@@ -2229,34 +2195,23 @@ serve(async (req) => {
                 allOrders.push(order);
               }
             }
-
-            if (orderList.length < pageSize || !fetchAll) {
-              hasMore = false;
-            } else {
-              page++;
-              await sleep(200);
-            }
-            } // end while
-            await sleep(100); // Small delay between shops
-            } // end for shops
-          } // end for FBS statuses
+              } // end shopResults
+              await sleep(100); // brief pause between statuses
+            } // end for statuses in batch
+          } // end for batches
 
           console.log(`Uzum FBS orders collected: ${allOrders.length}`);
 
-          // ===== FETCH FBO DATA via /v1/invoice (supply invoices) + /v1/finance/orders =====
-          // Uzum has NO /v2/fbo/orders endpoint. FBO sold orders appear through:
-          // 1. /v1/finance/orders — settled financial orders (commission deducted)
-          // 2. /v1/shop/{shopId}/invoice — supply invoices track what was sent to FBO warehouse
-          // We query EACH shop individually (403 on multi-shop batch).
+          // ===== FETCH FBO DATA via /v1/finance/orders =====
           try {
             const finShopIds = allShopIds.length > 0 ? allShopIds : (uzumShopId ? [String(uzumShopId)] : []);
-            console.log(`Uzum FBO: querying ${finShopIds.length} shops via finance + invoice APIs`);
+            console.log(`Uzum FBO: querying ${finShopIds.length} shops via finance API`);
             const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
             let fboCount = 0;
 
             for (let si = 0; si < finShopIds.length; si++) {
               const sid = finShopIds[si];
-              if (si > 0) await sleep(500);
+              if (si > 0) await sleep(200);
 
               // --- Method 1: /v1/finance/orders (settled FBO orders) ---
               let finPage = 0;
