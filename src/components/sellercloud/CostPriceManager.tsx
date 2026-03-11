@@ -230,11 +230,23 @@ export function CostPriceManager({ connectedMarketplaces, store }: CostPriceMana
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Mahsulot qidirish..." value={search} onChange={e => setSearch(e.target.value)} className="pl-8 h-9 text-sm" />
           </div>
-          {selectedMp === 'wildberries' && connectedMarketplaces.includes('yandex') && (
-            <Button size="sm" variant="outline" onClick={handleImportFromYandex} disabled={importing} className="shrink-0 text-xs">
-              {importing ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Download className="h-3.5 w-3.5 mr-1" />}
-              Yandex dan import (₽)
-            </Button>
+          {availableSources.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="outline" disabled={importing} className="shrink-0 text-xs">
+                  {importing ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Download className="h-3.5 w-3.5 mr-1" />}
+                  Tannarx import
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {availableSources.map(src => (
+                  <DropdownMenuItem key={src} onClick={() => handleImportCostPrices(src)}>
+                    <MarketplaceLogo marketplace={src} size={14} className="mr-2" />
+                    {MARKETPLACE_NAMES[src]} dan import
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
           {changedCount > 0 && (
             <Button size="sm" onClick={handleSaveAll} disabled={saving} className="shrink-0">
