@@ -159,31 +159,45 @@ async function proxyImagesToStorage(
   return proxied;
 }
 
-// ============ MXIK LOOKUP (AI-powered) ============
+// ============ MXIK LOOKUP (AI-powered, category-aware) ============
 
 async function lookupMXIK(
   supabase: any, name: string, category?: string, lovableApiKey?: string
 ): Promise<{ code: string; name_uz: string }> {
   try {
-    // Step 1: AI keyword extraction for better search
+    // Step 1: AI keyword extraction — use STRONGER model + category context for accuracy
     let keywords: string[] = [];
     if (lovableApiKey) {
       try {
         const prompt = `Mahsulot: "${name}"${category ? ` (Kategoriya: ${category})` : ''}
-Ushbu mahsulot uchun MXIK kodini topish uchun eng muhim kalit so'zlarni ajrating.
-Faqat mahsulot TURINI aniqlaydigan umumiy so'zlarni bering (brend, model raqami, rang olib tashlang).
+
+VAZIFA: Bu mahsulot uchun MXIK (IKPU) kodini topish uchun eng aniq kalit so'zlarni ajrating.
+
+MUHIM QOIDALAR:
+1. Faqat mahsulot TURINI aniqlaydigan so'zlarni bering
+2. Brend nomi, model raqami, rang — OLIB TASHLANG
+3. O'zbekcha va ruscha sinonimlarni bering
+4. Kategoriyaga e'tibor bering — "чехол для телефона" va "водка" BUTUNLAY boshqa narsalar!
+
 Masalan:
-- "Estée Lauder Double Wear foundation" → ["tonal krem", "kosmetika", "pardoz vositasi", "yuz uchun krem"]
-- "iPhone 15 Pro Max 256GB" → ["telefon", "smartfon", "mobil telefon"]
+- "Чехол для iPhone 15 Pro Max" → ["чехол", "чехол для телефона", "telefon chexoli", "aksessuar", "аксессуар для телефона"]
+- "Samsung Galaxy S24 Ultra 256GB" → ["telefon", "smartfon", "мобильный телефон", "смартфон"]
+- "Шампунь Elseve 400ml" → ["шампунь", "shampun", "soch uchun vosita", "средство для волос"]
+
+TAQIQLANGAN: 
+- Mahsulot turiga aloqasi bo'lmagan so'zlar
+- Brend nomlari (Samsung, Apple, Xiaomi)
+- Model raqamlari
+
 Javobni faqat JSON array: ["so'z1", "so'z2", ...]`;
 
         const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
           method: "POST",
           headers: { Authorization: `Bearer ${lovableApiKey}`, "Content-Type": "application/json" },
           body: JSON.stringify({
-            model: "google/gemini-2.5-flash-lite",
+            model: "google/gemini-2.5-flash",
             messages: [{ role: "user", content: prompt }],
-            temperature: 0, max_tokens: 150,
+            temperature: 0, max_tokens: 200,
           }),
         });
         if (resp.ok) {
@@ -203,10 +217,10 @@ Javobni faqat JSON array: ["so'z1", "so'z2", ...]`;
 
     // Step 2: Search with multiple keywords
     let matches: any[] = [];
-    for (const kw of keywords.slice(0, 4)) {
+    for (const kw of keywords.slice(0, 5)) {
       const { data } = await supabase.from('mxik_codes').select('code, name_uz, name_ru, group_name')
         .or(`name_uz.ilike.%${kw}%,name_ru.ilike.%${kw}%,group_name.ilike.%${kw}%`)
-        .eq('is_active', true).limit(10);
+        .eq('is_active', true).limit(15);
       if (data) matches.push(...data);
     }
 
@@ -218,34 +232,76 @@ Javobni faqat JSON array: ["so'z1", "so'z2", ...]`;
       return { code: "46901100001000000", name_uz: "Boshqa tovarlar" };
     }
 
-    // Step 3: AI selects best match
+    // Step 3: AI selects best match — use STRONGER model with detailed context
     if (lovableApiKey && unique.length > 1) {
       try {
-        const options = unique.slice(0, 10).map((m, i) =>
-          `${i + 1}. ${m.code} — ${m.name_uz}${m.name_ru ? ` (${m.name_ru})` : ''}`
+        const options = unique.slice(0, 15).map((m, i) =>
+          `${i + 1}. ${m.code} — ${m.name_uz}${m.name_ru ? ` (${m.name_ru})` : ''}${m.group_name ? ` [${m.group_name}]` : ''}`
         ).join('\n');
         const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
           method: "POST",
           headers: { Authorization: `Bearer ${lovableApiKey}`, "Content-Type": "application/json" },
           body: JSON.stringify({
-            model: "google/gemini-2.5-flash-lite",
-            messages: [{ role: "user", content: `Mahsulot: "${name}"
-Quyidagilardan eng mos MXIK kodni tanla:
+            model: "google/gemini-2.5-flash",
+            messages: [{ role: "user", content: `VAZIFA: Mahsulotga ENG TO'G'RI MXIK (IKPU) kodni tanla.
+
+Mahsulot: "${name}"
+${category ? `Kategoriya: "${category}"` : ''}
+
+MUHIM QOIDALAR:
+1. Mahsulot TURINI aniq solishtir — "чехол" = telefon aksessuari, "водка" = spirtli ichimlik — BULAR BOSHQA!
+2. Kategoriya bo'yicha mos kelmaydigan kodlarni TANLAMA
+3. Eng ANIQ mos keladigan kodni tanla
+4. Agar hech biri mos kelmasa, 0 yoz
+
+Variantlar:
 ${options}
-Javob faqat raqam (1-${Math.min(unique.length, 10)}):` }],
+
+Javob faqat raqam (1-${Math.min(unique.length, 15)}) yoki 0 (mos kelmasa):` }],
             temperature: 0, max_tokens: 10,
           }),
         });
         if (resp.ok) {
           const data = await resp.json();
           const content = data.choices?.[0]?.message?.content?.trim() || "";
-          const idx = parseInt(content.match(/\d+/)?.[0] || "1") - 1;
+          const num = parseInt(content.match(/\d+/)?.[0] || "0");
+          if (num === 0) {
+            console.warn("[MXIK] AI rejected all options — using generic fallback");
+            return { code: "46901100001000000", name_uz: "Boshqa tovarlar" };
+          }
+          const idx = num - 1;
           if (idx >= 0 && idx < unique.length) {
             console.log(`[MXIK] AI selected: ${unique[idx].name_uz} (${unique[idx].code})`);
             return { code: unique[idx].code, name_uz: unique[idx].name_uz };
           }
         }
       } catch (e) { console.error("AI MXIK select error:", e); }
+    }
+
+    // Single result — still validate with AI
+    if (lovableApiKey && unique.length === 1) {
+      try {
+        const m = unique[0];
+        const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${lovableApiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash-lite",
+            messages: [{ role: "user", content: `Mahsulot: "${name}"
+MXIK: "${m.name_uz}${m.name_ru ? ` (${m.name_ru})` : ''}"
+Bu MXIK kodi shu mahsulotga mos keladimi? Javob faqat "ha" yoki "yo'q":` }],
+            temperature: 0, max_tokens: 5,
+          }),
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          const answer = (data.choices?.[0]?.message?.content?.trim() || "").toLowerCase();
+          if (answer.includes("yo'q") || answer.includes("нет") || answer === "no") {
+            console.warn(`[MXIK] AI rejected single match: ${m.name_uz} — using fallback`);
+            return { code: "46901100001000000", name_uz: "Boshqa tovarlar" };
+          }
+        }
+      } catch (e) { /* use the match */ }
     }
 
     return { code: unique[0].code, name_uz: unique[0].name_uz };
