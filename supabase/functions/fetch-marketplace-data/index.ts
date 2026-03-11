@@ -2202,20 +2202,16 @@ serve(async (req) => {
 
           console.log(`Uzum FBS orders collected: ${allOrders.length}`);
 
-          // ===== FETCH FBO DATA via /v1/invoice (supply invoices) + /v1/finance/orders =====
-          // Uzum has NO /v2/fbo/orders endpoint. FBO sold orders appear through:
-          // 1. /v1/finance/orders — settled financial orders (commission deducted)
-          // 2. /v1/shop/{shopId}/invoice — supply invoices track what was sent to FBO warehouse
-          // We query EACH shop individually (403 on multi-shop batch).
+          // ===== FETCH FBO DATA via /v1/finance/orders =====
           try {
             const finShopIds = allShopIds.length > 0 ? allShopIds : (uzumShopId ? [String(uzumShopId)] : []);
-            console.log(`Uzum FBO: querying ${finShopIds.length} shops via finance + invoice APIs`);
+            console.log(`Uzum FBO: querying ${finShopIds.length} shops via finance API`);
             const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
             let fboCount = 0;
 
             for (let si = 0; si < finShopIds.length; si++) {
               const sid = finShopIds[si];
-              if (si > 0) await sleep(500);
+              if (si > 0) await sleep(200);
 
               // --- Method 1: /v1/finance/orders (settled FBO orders) ---
               let finPage = 0;
