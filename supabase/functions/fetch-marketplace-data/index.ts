@@ -1918,9 +1918,33 @@ serve(async (req) => {
                   const dimGroupName = typeof dimGroup === 'string' ? dimGroup : (dimGroup.name || dimGroup.title || '');
                   
                   // Extract MXIK/IKPU code from Uzum product data
-                  const mxikCode = card.ikpuCode || card.mxikCode || card.commodityCode || 
+                  // CRITICAL: Uzum API field is just 'ikpu' (not 'ikpuCode')
+                  const mxikCode = firstSku.ikpu || card.ikpu ||
+                                   card.ikpuCode || card.mxikCode || card.commodityCode || 
                                    firstSku.ikpuCode || firstSku.mxikCode || firstSku.commodityCode || '';
                   const mxikName = card.ikpuName || card.mxikName || '';
+                  
+                  // Extract brand from characteristics
+                  const allChars = firstSku.characteristicsList || firstSku.characteristics || card.characteristics || [];
+                  let brandName = '';
+                  let charValues: any[] = [];
+                  if (Array.isArray(allChars)) {
+                    charValues = allChars;
+                    for (const ch of allChars) {
+                      const title = (ch.title || ch.name || ch.key || '').toLowerCase();
+                      if (title.includes('бренд') || title.includes('brand') || title === 'brend') {
+                        brandName = ch.value || ch.values?.[0] || '';
+                        break;
+                      }
+                    }
+                  }
+                  // Fallback brand from card-level fields
+                  if (!brandName) {
+                    brandName = card.brandName || card.brand || '';
+                  }
+                  
+                  // Extract barcode
+                  const barcode = firstSku.barcode || firstSku.barCode || card.barcode || '';
                   
                   return {
                     offerId: String(card.productId || card.id || firstSku.skuId || ''),
@@ -1939,9 +1963,13 @@ serve(async (req) => {
                     // Real commission and dimensional data from Uzum product catalog
                     commissionPercent: realCommissionPercent,
                     dimensionalGroup: dimGroupName,
-                    // MXIK code from Uzum product
+                    // MXIK code from Uzum product (field name is 'ikpu')
                     mxikCode: mxikCode || undefined,
                     mxikName: mxikName || undefined,
+                    // Brand and characteristics for cloning
+                    brandName: brandName || undefined,
+                    barcode: barcode || undefined,
+                    characteristics: charValues.length > 0 ? charValues : undefined,
                   };
                 });
 
