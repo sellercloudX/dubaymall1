@@ -2298,10 +2298,9 @@ serve(async (req) => {
                   hasMore = false;
                 } else {
                   page++;
-                  await sleep(300);
+                  await sleep(200);
                 }
               } // end while FBO
-            } // end for FBO shops
           } // end for FBO statuses
 
           console.log(`Uzum total orders (FBS + FBO): ${allOrders.length}`);
