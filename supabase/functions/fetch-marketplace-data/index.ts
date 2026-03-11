@@ -2379,6 +2379,10 @@ serve(async (req) => {
                   if (ordersRes.status === 403) {
                     await ordersRes.text();
                     console.warn(`Uzum finance shop=${sid}: 403 — skipping`);
+                  } else if (ordersRes.status === 429) {
+                    await ordersRes.text();
+                    console.warn(`Uzum finance shop=${sid}: 429 rate limit — waiting 2s`);
+                    await sleep(2000);
                   } else {
                     const errBody = await ordersRes.text();
                     console.warn(`Uzum finance/orders shop=${sid} failed: ${ordersRes.status}, body: ${errBody.substring(0, 300)}`);
