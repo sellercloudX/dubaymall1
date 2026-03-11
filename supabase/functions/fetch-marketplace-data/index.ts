@@ -2122,27 +2122,26 @@ serve(async (req) => {
               hasMore = false;
             } else {
               page++;
-              await sleep(300);
+              await sleep(200);
             }
             } // end while
-            } // end for shops
           } // end for FBS statuses
+
+          console.log(`Uzum FBS orders collected: ${allOrders.length}`);
 
           // ===== FETCH FBO ORDERS (Fulfillment by Operator / Uzum warehouse) =====
           // FBO uses /v2/fbo/orders endpoint with different statuses
+          // OPTIMIZED: batch all shopIds, reduce delays
           const fboOrderStatuses = status ? [status] : [
             'PROCESSING', 'ACCEPTED', 'DELIVERING', 'COMPLETED', 'CANCELLED', 'CANCELED', 'RETURNED'
           ];
 
           for (let fi = 0; fi < fboOrderStatuses.length; fi++) {
             const fboStatus = fboOrderStatuses[fi];
-            if (fi > 0 || allOrders.length > 0) await sleep(500);
-
-            for (let shopIdx = 0; shopIdx < orderShopIds.length; shopIdx++) {
-              const currentOrderShopId = orderShopIds[shopIdx];
-              if (shopIdx > 0) await sleep(300);
+            if (fi > 0) await sleep(200);
 
               page = 0;
+              hasMore = true;
               hasMore = true;
 
               while (hasMore) {
