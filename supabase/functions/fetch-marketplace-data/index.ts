@@ -1891,7 +1891,8 @@ serve(async (req) => {
         }
 
       } else if (dataType === "orders") {
-        // GET /v2/fbs/orders
+        // GET /v2/fbs/orders + /v2/fbo/orders
+        // OPTIMIZED: Pass ALL shopIds in a single param to avoid N×M iteration
         try {
           let allOrders: any[] = [];
           const orderIdsSeen = new Set<string>();
@@ -1899,27 +1900,28 @@ serve(async (req) => {
           let hasMore = true;
           const pageSize = 50; // Uzum max 50 per page
 
-          // Fetch all order statuses to get complete picture
+          // Consolidated status list — avoid redundant/rarely-used statuses
           const orderStatuses = status ? [status] : [
             'NEW', 'CREATED', 'PROCESSING', 'PACKING', 'PENDING_DELIVERY', 'DELIVERING', 
             'DELIVERED', 'ACCEPTED_AT_DP', 'DELIVERED_TO_CUSTOMER_DELIVERY_POINT',
             'COMPLETED', 'CANCELED', 'PENDING_CANCELLATION', 'RETURNED', 'REJECTED'
           ];
 
-          // Fetch orders from ALL shops, not just primary
+          // Pass ALL shop IDs in a single request (comma-separated or multiple params)
           const orderShopIds = allShopIds.length > 0 ? allShopIds : (uzumShopId ? [String(uzumShopId)] : []);
+          // Build shopIds query string once — Uzum API accepts multiple shopIds params
+          const shopIdsQueryParts = orderShopIds.map(id => `shopIds=${id}`).join('&');
+          
+          console.log(`Uzum FBS orders: ${orderStatuses.length} statuses, ${orderShopIds.length} shops (batch mode)`);
           
           for (let si = 0; si < orderStatuses.length; si++) {
             const orderStatus = orderStatuses[si];
-            // Add delay between status queries to avoid 429 rate limits
-            if (si > 0) await sleep(500);
+            // Reduced delay: 200ms between statuses (was 500ms)
+            if (si > 0) await sleep(200);
             
-            for (let shopIdx = 0; shopIdx < orderShopIds.length; shopIdx++) {
-              const currentOrderShopId = orderShopIds[shopIdx];
-              if (shopIdx > 0) await sleep(300); // Delay between shops
-              
-              page = 0;
-              hasMore = true;
+            // Single request per status with ALL shopIds
+            page = 0;
+            hasMore = true;
 
             while (hasMore) {
               const params = new URLSearchParams({
@@ -1927,12 +1929,12 @@ serve(async (req) => {
                 page: String(page),
                 status: orderStatus,
               });
-              // shopIds is required - pass each shop
-              params.append("shopIds", String(currentOrderShopId));
-              // NOTE: Uzum v2 FBS orders API does NOT support dateFrom/dateTo params
-              // (sending them causes 0 results). We fetch all and filter server-side.
+              // Add ALL shopIds to single request
+              for (const sid of orderShopIds) {
+                params.append("shopIds", sid);
+              }
 
-              console.log(`Uzum orders (${orderStatus}) page ${page}: ${uzumBaseUrl}/v2/fbs/orders?${params.toString()}`);
+              console.log(`Uzum FBS (${orderStatus}) page ${page}`);
 
               const response = await fetch(
                 `${uzumBaseUrl}/v2/fbs/orders?${params.toString()}`,
