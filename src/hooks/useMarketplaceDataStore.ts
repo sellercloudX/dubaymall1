@@ -26,6 +26,13 @@ export interface MarketplaceProduct {
   // MXIK (IKPU) code from source marketplace
   mxikCode?: string;
   mxikName?: string;
+  // Brand, barcode, characteristics for cloning
+  brandName?: string;
+  barcode?: string;
+  characteristics?: any[];
+  // WB-specific fields
+  subjectName?: string;
+  parentName?: string;
 }
 
 export interface MarketplaceOrder {

@@ -337,7 +337,30 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
       }
 
       if (targetMp === 'wildberries') {
-        // WB card creation involves nmID polling (~2-3 min), need extended timeout
+        // Get full product data from store for richer context
+        const storeProducts = store.getProducts(product.marketplace);
+        const fullProduct: any = storeProducts.find(p => p.offerId === product.offerId);
+        
+        // Extract source metadata for WB — universal for all source marketplaces
+        let wbSourceBrand = '';
+        let wbSourceCategory = productCategory;
+        
+        if (product.marketplace === 'uzum') {
+          wbSourceBrand = fullProduct?.brandName || '';
+          // Uzum category is in Uzbek — pass it so AI can translate
+          wbSourceCategory = fullProduct?.category || product.category || '';
+          if (!wbSourceBrand && product.name) {
+            const genericWords = ['telefon', 'chexol', 'quvvatlagich', 'naushnik', 'kabel', 'чехол', 'телефон', 'для', 'uchun'];
+            const firstWord = product.name.split(/\s+/)[0];
+            if (!genericWords.includes(firstWord.toLowerCase()) && firstWord.length > 1) {
+              wbSourceBrand = firstWord;
+            }
+          }
+        } else {
+          wbSourceBrand = fullProduct?.brandName || fullProduct?.brand || '';
+          wbSourceCategory = fullProduct?.subjectName || fullProduct?.category || productCategory;
+        }
+        
         const { data, error } = await supabase.functions.invoke('wildberries-create-card', {
           body: {
             shopId: 'sellercloud',
@@ -347,8 +370,11 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
               price: convertedPrice,
               costPrice,
               images: validImages,
-              category: productCategory,
-              shopSku: product.shopSku, // Preserve original SKU
+              category: wbSourceCategory,
+              shopSku: product.shopSku,
+              brand: wbSourceBrand,
+              sourceMarketplace: product.marketplace,
+              barcode: fullProduct?.barcode,
             },
             skipImageGeneration: validImages.length >= 4,
             cloneMode: true,
