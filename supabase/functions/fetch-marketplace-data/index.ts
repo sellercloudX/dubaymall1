@@ -2351,7 +2351,7 @@ serve(async (req) => {
 
           for (let si = 0; si < finShopIds.length; si++) {
             const sid = finShopIds[si];
-            if (si > 0) await sleep(300);
+            if (si > 0) await sleep(500); // 500ms between shops to avoid 429
 
             const financeParams = new URLSearchParams();
             financeParams.append("shopIds", sid);
