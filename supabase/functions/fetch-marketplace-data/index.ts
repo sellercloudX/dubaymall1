@@ -2172,9 +2172,20 @@ serve(async (req) => {
               }
 
               const finData = await finResp.json();
-              const finOrders = finData.payload?.orders || finData.payload || finData.content || [];
+              // Log the raw structure for debugging
+              if (finPage === 0) {
+                const topKeys = Object.keys(finData);
+                const payloadKeys = finData.payload ? Object.keys(finData.payload) : [];
+                console.log(`[UZUM FIN RESP] topKeys=${JSON.stringify(topKeys)}, payloadKeys=${JSON.stringify(payloadKeys)}`);
+                if (finData.payload) {
+                  // Log first 500 chars of payload for structure discovery
+                  console.log(`[UZUM FIN PAYLOAD] ${JSON.stringify(finData.payload).substring(0, 800)}`);
+                }
+              }
+              const finOrders = finData.payload?.orders || finData.payload?.content || finData.content || finData.payload || [];
               const finList = Array.isArray(finOrders) ? finOrders : [];
 
+              console.log(`Uzum FBO finance page ${finPage}: ${finList.length} items`);
               if (finList.length === 0) break;
 
               for (const fo of finList) {
