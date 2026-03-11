@@ -35,6 +35,9 @@ interface ProductInput {
   sourceMarketplace?: string;
   sourceCategory?: string;
   sourceCategoryId?: number;
+  sourceSubject?: string;
+  sourceParent?: string;
+  sourceCharacteristics?: any[];
   shopSku?: string;
 }
 
