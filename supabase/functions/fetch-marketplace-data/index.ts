@@ -2191,7 +2191,8 @@ serve(async (req) => {
                     }
                   }
 
-                  const finOrders = finData.payload?.orders || finData.payload?.content || finData.content || finData.payload || [];
+                  // Uzum finance API returns {"orderItems":[], "totalElements":0} at top level
+                  const finOrders = finData.orderItems || finData.payload?.orders || finData.payload?.content || finData.content || finData.payload || [];
                   const finList = Array.isArray(finOrders) ? finOrders : [];
 
                   console.log(`Uzum FBO finance shop=${sid} page ${finPage}: ${finList.length} items`);
