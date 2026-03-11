@@ -124,6 +124,8 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
         description: p.description || '',
         marketplace: sourceMarketplace,
         selected: selectedIds.has(p.offerId),
+        mxikCode: p.mxikCode,
+        mxikName: p.mxikName,
       }));
   }, [sourceMarketplace, store.dataVersion, selectedIds]);
 
