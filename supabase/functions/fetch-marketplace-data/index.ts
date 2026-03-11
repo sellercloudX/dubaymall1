@@ -1936,8 +1936,21 @@ serve(async (req) => {
                 );
 
             if (!response.ok) {
+              if (response.status === 403) {
+                // This shop doesn't support FBS — skip silently
+                await response.text();
+                hasMore = false;
+                continue;
+              }
+              if (response.status === 429) {
+                // Rate limited — wait and retry once
+                await response.text();
+                await sleep(2000);
+                hasMore = false;
+                continue;
+              }
               const errText = await response.text();
-              console.error(`Uzum orders error (${orderStatus}):`, response.status, errText);
+              console.error(`Uzum orders error (${orderStatus}, shop=${shopId}):`, response.status, errText);
               hasMore = false;
               continue;
             }
