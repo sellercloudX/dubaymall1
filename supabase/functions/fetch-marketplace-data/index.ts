@@ -2142,7 +2142,12 @@ serve(async (req) => {
           // the finance API. We fetch finance orders and mark non-FBS ones as FBO.
           try {
             const finParams = new URLSearchParams();
-            if (uzumShopId) finParams.append("shopIds", String(uzumShopId));
+            // Pass ALL shopIds to get finance data from all shops
+            const finShopIds = allShopIds.length > 0 ? allShopIds : (uzumShopId ? [String(uzumShopId)] : []);
+            for (const sid of finShopIds) {
+              finParams.append("shopIds", sid);
+            }
+            console.log(`Uzum FBO finance: querying ${finShopIds.length} shops: ${finShopIds.join(',')}`);
             const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
             finParams.append("dateFrom", String(ninetyDaysAgo));
             finParams.append("dateTo", String(Date.now()));
