@@ -223,6 +223,17 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
         const storeProducts = store.getProducts(product.marketplace);
         const fullProduct = storeProducts.find(p => p.offerId === product.offerId);
         
+        // Extract WB-specific data for better Yandex mapping
+        const wbSubject = fullProduct?.subjectName || fullProduct?.subject || '';
+        const wbParent = fullProduct?.parentName || fullProduct?.parent || '';
+        const wbBrand = fullProduct?.brand || fullProduct?.vendor || '';
+        const wbBarcode = fullProduct?.barcode || fullProduct?.barcodes?.[0] || '';
+        const wbCharacteristics = fullProduct?.characteristics || fullProduct?.charcs || [];
+        const wbWeight = fullProduct?.weight || fullProduct?.weightDimensions?.weight;
+        const wbDimensions = fullProduct?.dimensions || fullProduct?.weightDimensions;
+        const wbColor = fullProduct?.color || '';
+        const wbModel = fullProduct?.vendorCode || fullProduct?.model || '';
+        
         const { data, error } = await supabase.functions.invoke('yandex-market-create-card', {
           body: {
             shopId: 'sellercloud',
@@ -236,6 +247,15 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
               sourceMarketplace: product.marketplace,
               sourceCategory: productCategory,
               sourceCategoryId: fullProduct?.marketCategoryId,
+              sourceSubject: wbSubject,
+              sourceParent: wbParent,
+              sourceCharacteristics: wbCharacteristics,
+              brand: wbBrand,
+              barcode: wbBarcode,
+              color: wbColor,
+              model: wbModel,
+              weight: wbWeight,
+              dimensions: wbDimensions,
               shopSku: product.shopSku,
             },
             pricing: {
