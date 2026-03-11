@@ -1957,14 +1957,13 @@ serve(async (req) => {
             // Log first order structure for debugging — for EVERY shop's first batch
             if (page === 0 && orderList.length > 0) {
               const sampleOrder = orderList[0];
-              console.log(`[UZUM ORDER KEYS] shop=${currentOrderShopId} status=${orderStatus} keys=${JSON.stringify(Object.keys(sampleOrder))}`);
-              // Log ALL date-related fields
+              console.log(`[UZUM FBS ORDER KEYS] status=${orderStatus} keys=${JSON.stringify(Object.keys(sampleOrder))}`);
               const dateFields = ['createdAt', 'createDate', 'dateCreated', 'created_at', 'orderDate', 'date', 'updatedAt', 'updateDate', 'completedAt', 'deliveredAt', 'acceptDate', 'statusDate'];
               const dateValues: Record<string, any> = {};
               for (const f of dateFields) {
                 if (sampleOrder[f] !== undefined) dateValues[f] = sampleOrder[f];
               }
-              console.log(`[UZUM DATE FIELDS] shop=${currentOrderShopId} status=${orderStatus}: ${JSON.stringify(dateValues)}`);
+              console.log(`[UZUM DATE FIELDS] status=${orderStatus}: ${JSON.stringify(dateValues)}`);
               if (Object.keys(dateValues).length === 0) {
                 // No known date field found — dump first 500 chars of order
                 console.log(`[UZUM ORDER RAW] ${JSON.stringify(sampleOrder).substring(0, 800)}`);
