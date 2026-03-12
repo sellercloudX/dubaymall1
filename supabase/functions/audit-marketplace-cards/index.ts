@@ -795,12 +795,125 @@ JSON:
 // ===== APPLY FIXES VIA YANDEX API =====
 async function applyFixes(
   apiKey: string, businessId: string, offerId: string,
-  fixes: Record<string, any>, currentData?: Record<string, any>
+  fixes: Record<string, any>, currentData?: Record<string, any>,
+  options?: { hasCategoryMismatch?: boolean; productName?: string }
 ): Promise<{ success: boolean; message: string; details?: string }> {
   const headers = { "Api-Key": apiKey, "Content-Type": "application/json" };
   const fixData = fixes.fixes || fixes;
   const results: string[] = [];
   let hasError = false;
+
+  // === Step 0: Re-map category if mismatch detected ===
+  if (options?.hasCategoryMismatch && options?.productName) {
+    console.log(`[CategoryFix] Attempting to re-map ${offerId} from wrong category...`);
+    const suggestion = await suggestCorrectCategory(apiKey, businessId, offerId, options.productName);
+    
+    if (suggestion) {
+      try {
+        // Use offer-mappings/update with explicit mapping to force re-categorization
+        const remapPayload = {
+          offerMappings: [{
+            offer: { offerId },
+            mapping: { marketCategoryId: suggestion.categoryId },
+          }],
+        };
+        
+        console.log(`[CategoryFix] Re-mapping ${offerId} → ${suggestion.categoryName} (${suggestion.categoryId})`);
+        
+        const remapResp = await fetchWithRetry(
+          `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-mappings/update`,
+          { method: 'POST', headers, body: JSON.stringify(remapPayload) }
+        );
+        
+        if (remapResp.ok) {
+          const remapData = await remapResp.json();
+          const remapErrs = remapData.results?.[0]?.errors || remapData.result?.errors || [];
+          if (remapErrs.length > 0) {
+            const errMsgs = remapErrs.map((e: any) => e.message || e.code).join(', ');
+            results.push(`⚠️ Kategoriya: ${errMsgs}`);
+            console.error(`[CategoryFix] Re-map errors: ${errMsgs}`);
+          } else {
+            results.push(`✅ Kategoriya o'zgartirildi → ${suggestion.categoryName}`);
+            console.log(`[CategoryFix] SUCCESS: ${offerId} → ${suggestion.categoryName}`);
+            // Wait for Yandex to process the re-mapping
+            await sleep(2000);
+          }
+        } else {
+          const errText = await remapResp.text();
+          console.error(`[CategoryFix] API error: ${remapResp.status} ${errText.substring(0, 300)}`);
+          
+          // Fallback: try delete + recreate approach
+          console.log(`[CategoryFix] Trying delete+recreate for ${offerId}...`);
+          try {
+            // Delete the offer
+            const deleteResp = await fetchWithRetry(
+              `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-mappings/delete`,
+              { method: 'POST', headers, body: JSON.stringify({ offerIds: [offerId] }) }
+            );
+            
+            if (deleteResp.ok) {
+              await sleep(3000); // Wait for deletion to process
+              
+              // Re-create with correct data
+              const recreateOffer: any = {
+                offerId,
+                name: fixData.name || currentData?.name || options.productName,
+                description: fixData.description || currentData?.description || '',
+                vendor: fixData.vendor || currentData?.vendor || '',
+                pictures: currentData?.pictures || [],
+              };
+              
+              if (fixData.commodityCode) {
+                const code = String(fixData.commodityCode).replace(/\D/g, '');
+                if (code.length === 17) recreateOffer.commodityCodes = [code];
+              }
+              if (currentData?.barcodes?.length) recreateOffer.barcodes = currentData.barcodes;
+              if (fixData.weightDimensions || currentData?.weightDimensions) {
+                recreateOffer.weightDimensions = fixData.weightDimensions || currentData.weightDimensions;
+              }
+              
+              const recreateResp = await fetchWithRetry(
+                `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-mappings/update`,
+                {
+                  method: 'POST', headers,
+                  body: JSON.stringify({
+                    offerMappings: [{
+                      offer: recreateOffer,
+                      mapping: { marketCategoryId: suggestion.categoryId },
+                    }],
+                  }),
+                }
+              );
+              
+              if (recreateResp.ok) {
+                const recreateData = await recreateResp.json();
+                const recreateErrs = recreateData.results?.[0]?.errors || recreateData.result?.errors || [];
+                if (recreateErrs.length === 0) {
+                  results.push(`✅ Kartochka qayta yaratildi → ${suggestion.categoryName}`);
+                  // Return early — params will need to be set in next round
+                  return { 
+                    success: true, 
+                    message: results.join('\n') + '\n📌 Parametrlar keyingi bosqichda to\'ldiriladi',
+                    details: `Kategoriya: ${suggestion.categoryName}`,
+                  };
+                } else {
+                  results.push(`⚠️ Qayta yaratish: ${recreateErrs.map((e: any) => e.message).join(', ')}`);
+                }
+              }
+            }
+          } catch (deleteErr) {
+            console.error(`[CategoryFix] Delete+recreate error:`, deleteErr);
+            results.push(`❌ Kategoriya o'zgartirish imkonsiz — qo'lda o'zgartiring`);
+          }
+        }
+      } catch (e) {
+        console.error(`[CategoryFix] Error:`, e);
+        results.push(`❌ Kategoriya tuzatish xatosi`);
+      }
+    } else {
+      results.push(`⚠️ To'g'ri kategoriya topilmadi — AI bilan boshqa ma'lumotlarni tuzatilmoqda`);
+    }
+  }
 
   // === Step 1: Update offer base data ===
   const offerUpdate: any = { offerId };
