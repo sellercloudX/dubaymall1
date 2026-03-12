@@ -226,6 +226,74 @@ async function fetchCategoryParameters(
   return [];
 }
 
+// ===== SUGGEST CORRECT CATEGORY =====
+async function suggestCorrectCategory(
+  apiKey: string, businessId: string, offerId: string, productName: string
+): Promise<{ categoryId: number; categoryName: string } | null> {
+  const headers = { "Api-Key": apiKey, "Content-Type": "application/json" };
+
+  // Method 1: Use Yandex category suggest endpoint
+  try {
+    const resp = await fetchWithRetry(
+      `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-mappings/suggestions`,
+      {
+        method: 'POST', headers,
+        body: JSON.stringify({
+          offers: [{ offerId, name: productName }],
+        }),
+      }
+    );
+    if (resp.ok) {
+      const data = await resp.json();
+      const suggestions = data.result?.offers?.[0]?.suggestions || data.result?.offerMappingEntries?.[0]?.mapping || null;
+      if (suggestions) {
+        const catId = suggestions[0]?.marketCategoryId || suggestions.marketCategoryId;
+        const catName = suggestions[0]?.marketCategoryName || suggestions.marketCategoryName || '';
+        if (catId) {
+          console.log(`[Suggest] ${offerId} → category ${catId} (${catName})`);
+          return { categoryId: catId, categoryName: catName };
+        }
+      }
+    } else {
+      const errText = await resp.text();
+      console.log(`[Suggest] API error: ${resp.status} ${errText.substring(0, 200)}`);
+    }
+  } catch (e) {
+    console.log(`[Suggest] Error:`, (e as Error).message);
+  }
+
+  // Method 2: Search category tree by keywords
+  try {
+    const keywords = productName.toLowerCase();
+    let searchCategoryId: number | null = null;
+
+    // Common product type → category mapping
+    const CATEGORY_MAP: Array<{ pattern: RegExp; categoryId: number; name: string }> = [
+      { pattern: /чехол|кейс|бампер|накладка|case|cover/i, categoryId: 91498, name: 'Чехлы для мобильных телефонов' },
+      { pattern: /стекло|пленк|защитн.*экран|screen.*protector/i, categoryId: 91497, name: 'Защитные пленки и стекла' },
+      { pattern: /наушник|гарнитур|earbuds|headphone|earphone/i, categoryId: 90555, name: 'Наушники и гарнитуры' },
+      { pattern: /кабель|провод|шнур|cable|usb/i, categoryId: 91502, name: 'Кабели и переходники' },
+      { pattern: /зарядн|charger|powerbank|power.*bank|аккумулятор.*внешн/i, categoryId: 91503, name: 'Зарядные устройства' },
+      { pattern: /держатель|подставк|mount|stand|штатив/i, categoryId: 91504, name: 'Держатели для телефонов' },
+      { pattern: /адаптер|переходник|adapter/i, categoryId: 91502, name: 'Кабели и переходники' },
+      { pattern: /колонк|динамик|speaker/i, categoryId: 90556, name: 'Портативные колонки' },
+      { pattern: /часы.*смарт|smart.*watch|умные.*часы/i, categoryId: 91013, name: 'Умные часы и браслеты' },
+    ];
+
+    for (const mapping of CATEGORY_MAP) {
+      if (mapping.pattern.test(keywords)) {
+        searchCategoryId = mapping.categoryId;
+        console.log(`[Suggest] Keyword match: "${keywords}" → ${mapping.name} (${mapping.categoryId})`);
+        return { categoryId: mapping.categoryId, categoryName: mapping.name };
+      }
+    }
+  } catch (e) {
+    console.log(`[Suggest] Keyword search error:`, (e as Error).message);
+  }
+
+  return null;
+}
+
 // ===== LOOKUP MXIK CODE =====
 async function lookupMxikCode(
   _supabase: any, productName: string, category: string, authToken?: string
@@ -727,12 +795,125 @@ JSON:
 // ===== APPLY FIXES VIA YANDEX API =====
 async function applyFixes(
   apiKey: string, businessId: string, offerId: string,
-  fixes: Record<string, any>, currentData?: Record<string, any>
+  fixes: Record<string, any>, currentData?: Record<string, any>,
+  options?: { hasCategoryMismatch?: boolean; productName?: string }
 ): Promise<{ success: boolean; message: string; details?: string }> {
   const headers = { "Api-Key": apiKey, "Content-Type": "application/json" };
   const fixData = fixes.fixes || fixes;
   const results: string[] = [];
   let hasError = false;
+
+  // === Step 0: Re-map category if mismatch detected ===
+  if (options?.hasCategoryMismatch && options?.productName) {
+    console.log(`[CategoryFix] Attempting to re-map ${offerId} from wrong category...`);
+    const suggestion = await suggestCorrectCategory(apiKey, businessId, offerId, options.productName);
+    
+    if (suggestion) {
+      try {
+        // Use offer-mappings/update with explicit mapping to force re-categorization
+        const remapPayload = {
+          offerMappings: [{
+            offer: { offerId },
+            mapping: { marketCategoryId: suggestion.categoryId },
+          }],
+        };
+        
+        console.log(`[CategoryFix] Re-mapping ${offerId} → ${suggestion.categoryName} (${suggestion.categoryId})`);
+        
+        const remapResp = await fetchWithRetry(
+          `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-mappings/update`,
+          { method: 'POST', headers, body: JSON.stringify(remapPayload) }
+        );
+        
+        if (remapResp.ok) {
+          const remapData = await remapResp.json();
+          const remapErrs = remapData.results?.[0]?.errors || remapData.result?.errors || [];
+          if (remapErrs.length > 0) {
+            const errMsgs = remapErrs.map((e: any) => e.message || e.code).join(', ');
+            results.push(`⚠️ Kategoriya: ${errMsgs}`);
+            console.error(`[CategoryFix] Re-map errors: ${errMsgs}`);
+          } else {
+            results.push(`✅ Kategoriya o'zgartirildi → ${suggestion.categoryName}`);
+            console.log(`[CategoryFix] SUCCESS: ${offerId} → ${suggestion.categoryName}`);
+            // Wait for Yandex to process the re-mapping
+            await sleep(2000);
+          }
+        } else {
+          const errText = await remapResp.text();
+          console.error(`[CategoryFix] API error: ${remapResp.status} ${errText.substring(0, 300)}`);
+          
+          // Fallback: try delete + recreate approach
+          console.log(`[CategoryFix] Trying delete+recreate for ${offerId}...`);
+          try {
+            // Delete the offer
+            const deleteResp = await fetchWithRetry(
+              `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-mappings/delete`,
+              { method: 'POST', headers, body: JSON.stringify({ offerIds: [offerId] }) }
+            );
+            
+            if (deleteResp.ok) {
+              await sleep(3000); // Wait for deletion to process
+              
+              // Re-create with correct data
+              const recreateOffer: any = {
+                offerId,
+                name: fixData.name || currentData?.name || options.productName,
+                description: fixData.description || currentData?.description || '',
+                vendor: fixData.vendor || currentData?.vendor || '',
+                pictures: currentData?.pictures || [],
+              };
+              
+              if (fixData.commodityCode) {
+                const code = String(fixData.commodityCode).replace(/\D/g, '');
+                if (code.length === 17) recreateOffer.commodityCodes = [code];
+              }
+              if (currentData?.barcodes?.length) recreateOffer.barcodes = currentData.barcodes;
+              if (fixData.weightDimensions || currentData?.weightDimensions) {
+                recreateOffer.weightDimensions = fixData.weightDimensions || currentData.weightDimensions;
+              }
+              
+              const recreateResp = await fetchWithRetry(
+                `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-mappings/update`,
+                {
+                  method: 'POST', headers,
+                  body: JSON.stringify({
+                    offerMappings: [{
+                      offer: recreateOffer,
+                      mapping: { marketCategoryId: suggestion.categoryId },
+                    }],
+                  }),
+                }
+              );
+              
+              if (recreateResp.ok) {
+                const recreateData = await recreateResp.json();
+                const recreateErrs = recreateData.results?.[0]?.errors || recreateData.result?.errors || [];
+                if (recreateErrs.length === 0) {
+                  results.push(`✅ Kartochka qayta yaratildi → ${suggestion.categoryName}`);
+                  // Return early — params will need to be set in next round
+                  return { 
+                    success: true, 
+                    message: results.join('\n') + '\n📌 Parametrlar keyingi bosqichda to\'ldiriladi',
+                    details: `Kategoriya: ${suggestion.categoryName}`,
+                  };
+                } else {
+                  results.push(`⚠️ Qayta yaratish: ${recreateErrs.map((e: any) => e.message).join(', ')}`);
+                }
+              }
+            }
+          } catch (deleteErr) {
+            console.error(`[CategoryFix] Delete+recreate error:`, deleteErr);
+            results.push(`❌ Kategoriya o'zgartirish imkonsiz — qo'lda o'zgartiring`);
+          }
+        }
+      } catch (e) {
+        console.error(`[CategoryFix] Error:`, e);
+        results.push(`❌ Kategoriya tuzatish xatosi`);
+      }
+    } else {
+      results.push(`⚠️ To'g'ri kategoriya topilmadi — AI bilan boshqa ma'lumotlarni tuzatilmoqda`);
+    }
+  }
 
   // === Step 1: Update offer base data ===
   const offerUpdate: any = { offerId };
@@ -1324,7 +1505,20 @@ serve(async (req) => {
           const issue = issues[0];
           if (issue.qualityScore >= 90 && round > 0) { console.log(`Score >= 90, stopping.`); break; }
 
-          const categoryParams = await fetchCategoryParameters(apiKey, issue.categoryId || 0, businessId);
+          // Detect category mismatch for this specific issue
+          const hasCategoryMismatch = issue.issues.some(i => i.type === 'category_mismatch');
+          
+          // If category mismatch on first round, try to fix category FIRST before AI params
+          let correctCategoryId = issue.categoryId;
+          if (hasCategoryMismatch && round === 0) {
+            const suggestion = await suggestCorrectCategory(apiKey, businessId, targetId, issue.productName);
+            if (suggestion) {
+              correctCategoryId = suggestion.categoryId;
+              console.log(`Will use corrected category ${suggestion.categoryName} for params`);
+            }
+          }
+
+          const categoryParams = await fetchCategoryParameters(apiKey, correctCategoryId || 0, businessId);
           const mxikCode = await lookupMxikCode(supabase, issue.productName, issue.category || '', authHeader);
 
           let aiResult: any;
@@ -1337,7 +1531,10 @@ serve(async (req) => {
             break;
           }
 
-          const result = await applyFixes(apiKey, businessId, targetId, aiResult, issue.currentData);
+          const result = await applyFixes(apiKey, businessId, targetId, aiResult, issue.currentData, {
+            hasCategoryMismatch,
+            productName: issue.productName,
+          });
           lastResult = { ...result, issue: { ...issue, currentData: undefined }, fixes: aiResult };
           totalFixes.push(`Bosqich ${round + 1}: ${result.message}`);
 
