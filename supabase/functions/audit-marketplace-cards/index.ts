@@ -588,7 +588,7 @@ JSON:
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash-lite",
+      model: "google/gemini-2.5-flash",
       messages: [
         { role: "system", content: "Sen Yandex Market kartochka sifat ekspertisan. Faqat JSON formatda javob ber. Hech qachon parameterId to\'qib chiqarma." },
         { role: "user", content: prompt },
