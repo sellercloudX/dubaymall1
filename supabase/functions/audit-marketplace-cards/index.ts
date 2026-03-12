@@ -696,6 +696,25 @@ JSON:
         }
       }
 
+      // === Force inject MXIK code from lookup if AI didn't provide one ===
+      if (mxikCode && mxikCode.code.length === 17) {
+        if (!parsed.fixes.commodityCode || String(parsed.fixes.commodityCode).replace(/\D/g, '').length !== 17) {
+          parsed.fixes.commodityCode = mxikCode.code;
+          console.log(`✅ Injected MXIK from lookup: ${mxikCode.code}`);
+        }
+      }
+
+      // Validate AI-generated commodityCode
+      if (parsed.fixes?.commodityCode) {
+        const digits = String(parsed.fixes.commodityCode).replace(/\D/g, '');
+        if (digits.length !== 17) {
+          console.log(`❌ Invalid MXIK from AI: "${parsed.fixes.commodityCode}", discarding`);
+          parsed.fixes.commodityCode = null;
+        } else {
+          parsed.fixes.commodityCode = digits;
+        }
+      }
+
       return parsed;
     } catch (e) {
       console.error("JSON parse error:", e, "Content:", content.substring(0, 300));
