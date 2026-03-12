@@ -696,6 +696,7 @@ MAHSULOT:
 - Tavsif: ${product.description || "YO'Q — O'ZING YOZ!"}
 - Kategoriya: ${categoryName}
 ${product.sourceCategory ? `- Manba marketplace kategoriyasi: ${product.sourceCategory}` : ''}
+${sourceCharacteristicsText ? `- Manba xususiyatlari (Uzum/WB): ${sourceCharacteristicsText}` : ''}
 - Brend: ${product.brand || "Nomdan aniqla"}
 - Rang: ${product.color || "Nomdan aniqla"}
 - Model: ${product.model || "Nomdan aniqla"}
