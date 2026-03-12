@@ -388,46 +388,63 @@ async function findLeafCategory(
   console.log(`📂 Found ${leaves.length} leaf categories`);
 
   // 3. Use AI to extract RUSSIAN search keywords from product name
-  // CRITICAL for clones: use source subject/parent as PRIMARY keywords — they are already categorized!
+  // CRITICAL: Source subject from Uzum is in UZBEK (e.g. "Qoplamalar") — DON'T use it as keyword directly!
+  // Only use sourceSubject as keyword if it contains Cyrillic (Russian) characters
   let searchKeywords: string[] = [];
   
-  // Priority 1: Source WB subject/parent (already accurate category names in Russian)
-  if (sourceSubject) {
+  const hasCyrillic = (s: string) => /[\u0400-\u04FF]/.test(s);
+  
+  // Priority 1: Source subject/parent — ONLY if Russian (Cyrillic)
+  if (sourceSubject && hasCyrillic(sourceSubject)) {
     searchKeywords.push(sourceSubject);
-    console.log(`📂 Using source subject: "${sourceSubject}"`);
+    console.log(`📂 Using source subject (RU): "${sourceSubject}"`);
+  } else if (sourceSubject) {
+    console.log(`📂 Skipping non-Russian source subject: "${sourceSubject}" — will use AI translation`);
   }
-  if (sourceParent && sourceParent !== sourceSubject) {
+  if (sourceParent && sourceParent !== sourceSubject && hasCyrillic(sourceParent)) {
     searchKeywords.push(sourceParent);
-    console.log(`📂 Using source parent: "${sourceParent}"`);
+    console.log(`📂 Using source parent (RU): "${sourceParent}"`);
   }
   
-  // Priority 2: Source category  
-  if (sourceCategory && !searchKeywords.includes(sourceCategory)) {
+  // Priority 2: Source category (only if Russian)
+  if (sourceCategory && !searchKeywords.includes(sourceCategory) && hasCyrillic(sourceCategory)) {
     searchKeywords.push(sourceCategory);
   }
   
-  // Priority 3: AI keyword extraction (supplement, not replace)
+  // Priority 3: AI keyword extraction — ALWAYS run, especially important when source is Uzbek
   if (lovableApiKey) {
     try {
+      // Build context about source marketplace category
+      const sourceInfo = sourceSubject 
+        ? (hasCyrillic(sourceSubject) 
+            ? `Manba marketplace kategoriyasi: "${sourceSubject}"` 
+            : `Manba marketplace kategoriyasi (O'ZBEKCHA!): "${sourceSubject}" — buni RUSCHA tarjima qilib kalit so'z sifatida ber!`)
+        : '';
+      
       const kwResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${lovableApiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash-lite",
+          model: "google/gemini-2.5-flash",
           messages: [{ role: "user", content: `Mahsulot: "${productName}"
 Tavsif: "${productDesc || ''}"
-${sourceSubject ? `Manba marketplace kategoriyasi (WB subject): "${sourceSubject}"` : ''}
-${sourceParent ? `Manba ota-kategoriya (WB parent): "${sourceParent}"` : ''}
-${sourceCategory ? `Manba kategoriya: "${sourceCategory}"` : ''}
+${sourceInfo}
+${sourceParent ? `Ota-kategoriya: "${sourceParent}"` : ''}
+${sourceCategory ? `Kategoriya: "${sourceCategory}"` : ''}
 
 Bu mahsulotni Yandex Market kategoriyalarida topish uchun RUSCHA kalit so'zlar ber.
-${sourceSubject ? `MUHIM: WB dagi kategoriya "${sourceSubject}" — shu kategoriyaga mos Yandex Market kategoriyasini topish uchun eng aniq ruscha so'zlarni ber!` : ''}
+MUHIM:
+- Mahsulot NOMIGA qarab eng aniq RUSCHA kategoriya so'zlarini ber
+- "Чехол для iPhone" → ["чехол", "чехол для телефона", "аксессуары для телефонов"]
+- Agar manba kategoriyasi O'ZBEKCHA bo'lsa (masalan "Qoplamalar" = чехлы), uni RUSCHA tarjima qil!
+- "Qoplamalar" = "Чехлы", "Quloqchinlar" = "Наушники", "Zaryadka" = "Зарядные устройства"
 Faqat mahsulot TURINI bildiruvchi so'zlar (brend, model, rang emas).
 
 Masalan:
-- WB subject "Кроссовки" → ["кроссовки", "спортивная обувь", "обувь"]
-- WB subject "Тональные средства" → ["тональный крем", "тональное средство", "косметика"]
-- WB subject "Шампуни" → ["шампунь", "средство для волос", "косметика"]
+- "Чехол для Samsung Galaxy S24" → ["чехол", "чехол для телефона", "аксессуары для смартфонов"]
+- "Кроссовки Nike Air Max" → ["кроссовки", "спортивная обувь", "обувь"]
+- "Шампунь Elseve 400ml" → ["шампунь", "средство для волос", "уход за волосами"]
+- O'zbekcha "Qoplamalar" kategoriya → ["чехлы", "чехол", "аксессуары"]
 
 Javob FAQAT JSON array: ["so'z1", "so'z2", ...]` }],
           temperature: 0, max_tokens: 150,
@@ -484,19 +501,19 @@ Javob FAQAT JSON array: ["so'z1", "so'z2", ...]` }],
 
 MAHSULOT NOMI: "${productName}"
 TAVSIF: "${productDesc || 'Yo\'q'}"
-${sourceSubject ? `MANBA MARKETPLACE KATEGORIYASI (WB Subject): "${sourceSubject}"` : ''}
-${sourceParent ? `MANBA OTA-KATEGORIYA (WB Parent): "${sourceParent}"` : ''}
+${sourceSubject ? `MANBA MARKETPLACE KATEGORIYASI: "${sourceSubject}" (${sourceMarketplace || 'unknown'})` : ''}
+${sourceParent ? `MANBA OTA-KATEGORIYA: "${sourceParent}"` : ''}
 ${sourceCategory ? `MANBA KATEGORIYA: "${sourceCategory}" (${sourceMarketplace || 'unknown'})` : ''}
 
 MUHIM QOIDALAR:
 - Kategoriya mahsulot TURIGA aniq mos bo'lishi SHART
-${sourceSubject ? `- WB dagi kategoriya "${sourceSubject}" — shunga ENG YAQIN Yandex kategoriyani tanla! Bu eng ishonchli ma'lumot!` : ''}
-${sourceParent ? `- WB ota-kategoriya: "${sourceParent}" — bu ham yo'nalishni aniqlashda muhim!` : ''}
+- MAHSULOT NOMIGA qarab kategoriyani tanla — bu eng ishonchli ma'lumot!
+- "Чехол для Honor X9C" → Чехлы kategoriyasi
+- "Беспроводные Bluetooth наушники" → Наушники kategoriyasi
+${sourceSubject ? `- Manba kategoriya "${sourceSubject}" — agar o'zbekcha bo'lsa, RUSCHA tarjima qilib mos Yandex kategoriyani tanla` : ''}
 - "Par dazmol" va "Vakuum paketlash mashinasi" — BU BOSHQA NARSALAR!
 - Mahsulot nomidagi kalit so'zlarni sinchiklab tahlil qil
 - Masalan: "vakuumlovchi" → "Вакуумные упаковщики", "par dazmol" → "Парогенераторы"
-- "foundation/tonal krem" → "Тональные средства", "lipstick" → "Губная помада"
-- WB "Кроссовки" → Yandex "Кроссовки" yoki eng yaqin sport poyabzal kategoriyasi
 - Agar mahsulot nomi ANIQ bir kategoriyaga to'g'ri kelsa, uni tanla
 
 KATEGORIYALAR RO'YXATI:
