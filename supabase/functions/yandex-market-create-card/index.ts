@@ -525,9 +525,21 @@ Javob FAQAT JSON array: ["so'z1", "so'z2", ...]` }],
     }
   }
 
-  // Fallback keywords from product name
+  // Normalize keywords: remove noise, add compact tokens from product name
+  const noiseKeywords = new Set(['material', 'материал', 'материалы', 'покрытие', 'покрытия', 'товар', 'вещь', 'аксессуар']);
+  const nameTokens = (productName.toLowerCase().match(/[а-яё]{3,}/g) || []).slice(0, 6);
+  searchKeywords.push(...nameTokens);
+
+  searchKeywords = Array.from(new Set(searchKeywords.map(k => k.trim().toLowerCase())))
+    .filter(k => k.length > 1 && !noiseKeywords.has(k));
+
+  // Fallback keywords from product name/context
   if (searchKeywords.length === 0) {
-    searchKeywords = productName.toLowerCase().replace(/[^\w\s\u0400-\u04FF]/g, ' ').split(/\s+/).filter(w => w.length > 2);
+    searchKeywords = `${productName} ${sourceSubject || ''} ${sourceCategory || ''}`
+      .toLowerCase()
+      .replace(/[^\w\s\u0400-\u04FF]/g, ' ')
+      .split(/\s+/)
+      .filter(w => w.length > 2);
   }
   console.log(`📂 Search keywords: ${searchKeywords.join(', ')}`);
 
