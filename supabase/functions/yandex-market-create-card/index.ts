@@ -1196,12 +1196,14 @@ serve(async (req) => {
         }
 
         // ═══ STEP 5: MXIK lookup (AI-powered) ═══
-        // For clones, use source subject (Russian category) for better MXIK matching
-        const mxikSearchName = product.sourceSubject || product.sourceCategory || product.name;
-        const mxikSearchCategory = product.sourceParent || product.category;
-        const mxik = (product.mxikCode && product.mxikName)
-          ? { code: product.mxikCode, name_uz: product.mxikName }
-          : await lookupMXIK(supabase, mxikSearchName, mxikSearchCategory, LOVABLE_KEY);
+        // Priority: exact source MXIK code from source marketplace (if valid)
+        const sourceMxikCode = normalizeMxikCode(product.mxikCode);
+        const mxikSearchName = [product.name, product.model, product.brand].filter(Boolean).join(' ');
+        const mxikSearchCategory = product.sourceSubject || product.sourceCategory || product.sourceParent || product.category;
+
+        const mxik = sourceMxikCode
+          ? { code: sourceMxikCode, name_uz: product.mxikName || 'Manba MXIK kodi' }
+          : await lookupMXIK(supabase, mxikSearchName || product.name, mxikSearchCategory, LOVABLE_KEY);
 
         // ═══ STEP 6: Build & send offer ═══
         const offer = buildOffer(product, ai, sku, barcode, leafCat, mxik, pricing.recommendedPrice, images);
