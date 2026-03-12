@@ -1505,7 +1505,20 @@ serve(async (req) => {
           const issue = issues[0];
           if (issue.qualityScore >= 90 && round > 0) { console.log(`Score >= 90, stopping.`); break; }
 
-          const categoryParams = await fetchCategoryParameters(apiKey, issue.categoryId || 0, businessId);
+          // Detect category mismatch for this specific issue
+          const hasCategoryMismatch = issue.issues.some(i => i.type === 'category_mismatch');
+          
+          // If category mismatch on first round, try to fix category FIRST before AI params
+          let correctCategoryId = issue.categoryId;
+          if (hasCategoryMismatch && round === 0) {
+            const suggestion = await suggestCorrectCategory(apiKey, businessId, targetId, issue.productName);
+            if (suggestion) {
+              correctCategoryId = suggestion.categoryId;
+              console.log(`Will use corrected category ${suggestion.categoryName} for params`);
+            }
+          }
+
+          const categoryParams = await fetchCategoryParameters(apiKey, correctCategoryId || 0, businessId);
           const mxikCode = await lookupMxikCode(supabase, issue.productName, issue.category || '', authHeader);
 
           let aiResult: any;
@@ -1518,7 +1531,10 @@ serve(async (req) => {
             break;
           }
 
-          const result = await applyFixes(apiKey, businessId, targetId, aiResult, issue.currentData);
+          const result = await applyFixes(apiKey, businessId, targetId, aiResult, issue.currentData, {
+            hasCategoryMismatch,
+            productName: issue.productName,
+          });
           lastResult = { ...result, issue: { ...issue, currentData: undefined }, fixes: aiResult };
           totalFixes.push(`Bosqich ${round + 1}: ${result.message}`);
 
