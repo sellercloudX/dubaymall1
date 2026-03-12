@@ -501,19 +501,19 @@ Javob FAQAT JSON array: ["so'z1", "so'z2", ...]` }],
 
 MAHSULOT NOMI: "${productName}"
 TAVSIF: "${productDesc || 'Yo\'q'}"
-${sourceSubject ? `MANBA MARKETPLACE KATEGORIYASI (WB Subject): "${sourceSubject}"` : ''}
-${sourceParent ? `MANBA OTA-KATEGORIYA (WB Parent): "${sourceParent}"` : ''}
+${sourceSubject ? `MANBA MARKETPLACE KATEGORIYASI: "${sourceSubject}" (${sourceMarketplace || 'unknown'})` : ''}
+${sourceParent ? `MANBA OTA-KATEGORIYA: "${sourceParent}"` : ''}
 ${sourceCategory ? `MANBA KATEGORIYA: "${sourceCategory}" (${sourceMarketplace || 'unknown'})` : ''}
 
 MUHIM QOIDALAR:
 - Kategoriya mahsulot TURIGA aniq mos bo'lishi SHART
-${sourceSubject ? `- WB dagi kategoriya "${sourceSubject}" — shunga ENG YAQIN Yandex kategoriyani tanla! Bu eng ishonchli ma'lumot!` : ''}
-${sourceParent ? `- WB ota-kategoriya: "${sourceParent}" — bu ham yo'nalishni aniqlashda muhim!` : ''}
+- MAHSULOT NOMIGA qarab kategoriyani tanla — bu eng ishonchli ma'lumot!
+- "Чехол для Honor X9C" → Чехлы kategoriyasi
+- "Беспроводные Bluetooth наушники" → Наушники kategoriyasi
+${sourceSubject ? `- Manba kategoriya "${sourceSubject}" — agar o'zbekcha bo'lsa, RUSCHA tarjima qilib mos Yandex kategoriyani tanla` : ''}
 - "Par dazmol" va "Vakuum paketlash mashinasi" — BU BOSHQA NARSALAR!
 - Mahsulot nomidagi kalit so'zlarni sinchiklab tahlil qil
 - Masalan: "vakuumlovchi" → "Вакуумные упаковщики", "par dazmol" → "Парогенераторы"
-- "foundation/tonal krem" → "Тональные средства", "lipstick" → "Губная помада"
-- WB "Кроссовки" → Yandex "Кроссовки" yoki eng yaqin sport poyabzal kategoriyasi
 - Agar mahsulot nomi ANIQ bir kategoriyaga to'g'ri kelsa, uni tanla
 
 KATEGORIYALAR RO'YXATI:
