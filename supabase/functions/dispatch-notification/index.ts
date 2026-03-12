@@ -79,7 +79,36 @@ serve(async (req) => {
 
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    
+    // Auth check: require valid JWT (authenticated user or service role)
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return jsonResponse({ error: 'Unauthorized' }, 401);
+    }
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims?.sub) {
+      return jsonResponse({ error: 'Unauthorized' }, 401);
+    }
+    const callerId = claimsData.claims.sub as string;
+
     const body: DispatchRequest = await req.json();
+    
+    // For single dispatch: caller can only notify themselves unless admin
+    if (body.user_id && body.user_id !== callerId) {
+      const { data: isAdmin } = await supabase.rpc('has_role', { _user_id: callerId, _role: 'admin' });
+      if (!isAdmin) {
+        return jsonResponse({ error: 'Forbidden: cannot notify other users' }, 403);
+      }
+    }
+    
+    // batch_user_id and process_queue require admin
+    if (body.batch_user_id || body.process_queue) {
+      const { data: isAdmin } = await supabase.rpc('has_role', { _user_id: callerId, _role: 'admin' });
+      if (!isAdmin) {
+        return jsonResponse({ error: 'Forbidden: admin only' }, 403);
+      }
+    }
 
     // ============ MODE 1: Single notification dispatch ============
     if (body.user_id && body.type && body.message) {
