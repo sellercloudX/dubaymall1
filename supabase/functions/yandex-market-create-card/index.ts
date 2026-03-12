@@ -192,8 +192,10 @@ async function lookupMXIK(
   supabase: any, name: string, category?: string, lovableApiKey?: string
 ): Promise<{ code: string; name_uz: string }> {
   try {
-    // Step 1: AI keyword extraction — use STRONGER model + category context for accuracy
-    let keywords: string[] = [];
+    // Step 1: AI keyword extraction + rule-based hints
+    const contextText = `${name || ''} ${category || ''}`.trim();
+    let keywords: string[] = getMarketplaceHintKeywords(contextText);
+
     if (lovableApiKey) {
       try {
         const prompt = `Mahsulot: "${name}"${category ? ` (Kategoriya: ${category})` : ''}
@@ -211,7 +213,7 @@ Masalan:
 - "Samsung Galaxy S24 Ultra 256GB" → ["telefon", "smartfon", "мобильный телефон", "смартфон"]
 - "Шампунь Elseve 400ml" → ["шампунь", "shampun", "soch uchun vosita", "средство для волос"]
 
-TAQIQLANGAN: 
+TAQIQLANGAN:
 - Mahsulot turiga aloqasi bo'lmagan so'zlar
 - Brend nomlari (Samsung, Apple, Xiaomi)
 - Model raqamlari
@@ -231,14 +233,20 @@ Javobni faqat JSON array: ["so'z1", "so'z2", ...]`;
           const data = await resp.json();
           const content = data.choices?.[0]?.message?.content?.trim() || "";
           const match = content.match(/\[.*\]/s);
-          if (match) keywords = JSON.parse(match[0]).filter((k: string) => typeof k === 'string' && k.length > 1);
+          if (match) {
+            const aiKeywords = JSON.parse(match[0]).filter((k: string) => typeof k === 'string' && k.length > 1);
+            keywords.push(...aiKeywords);
+          }
         }
       } catch (e) { console.error("AI MXIK keywords error:", e); }
     }
 
+    const noiseKeywords = new Set(['material', 'материал', 'материалы', 'покрытие', 'покрытия', 'товар', 'вещь']);
+    keywords = Array.from(new Set(keywords.map(k => k.trim().toLowerCase()))).filter(k => k.length > 1 && !noiseKeywords.has(k));
+
     // Fallback keywords
     if (keywords.length === 0) {
-      keywords = name.toLowerCase().replace(/[^\w\s\u0400-\u04FFa-zA-Z'ʼ]/g, ' ').split(/\s+/).filter(w => w.length > 2);
+      keywords = contextText.toLowerCase().replace(/[^\w\s\u0400-\u04FFa-zA-Z'ʼ]/g, ' ').split(/\s+/).filter(w => w.length > 2);
     }
     console.log(`[MXIK] Keywords: ${keywords.join(', ')}`);
 
