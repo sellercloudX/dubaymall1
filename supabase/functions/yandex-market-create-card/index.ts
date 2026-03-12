@@ -680,6 +680,14 @@ async function aiOptimize(
 
   console.log(`🤖 AI optimizing (2-pass): ${allParams.length} TOTAL params`);
 
+  const sourceCharacteristicsText = Array.isArray(product.sourceCharacteristics) && product.sourceCharacteristics.length > 0
+    ? product.sourceCharacteristics
+        .slice(0, 20)
+        .map((ch: any) => `${ch.title || ch.name || ch.key || 'attr'}: ${ch.value || ch.values?.[0] || ''}`)
+        .filter((s: string) => s && !s.endsWith(': '))
+        .join('; ')
+    : '';
+
   const prompt = `VAZIFA: Yandex Market kartochkasi uchun BARCHA ${allParams.length} ta parametrni to'ldir!
 MAQSAD: MAKSIMAL ball olish. "Maydonlarni ko'rsatish" (Показать поля) ortidagi YASHIRIN parametrlar ham ALBATTA to'ldirilishi SHART!
 
