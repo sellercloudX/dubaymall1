@@ -723,6 +723,19 @@ async function applyFixes(
   if (fixData.vendorCode) { offerUpdate.vendorCode = fixData.vendorCode; needsBaseUpdate = true; }
   if (fixData.barcode && !currentData?.barcodes?.length) { offerUpdate.barcodes = [fixData.barcode]; needsBaseUpdate = true; }
   if (fixData.weightDimensions && !currentData?.weightDimensions) { offerUpdate.weightDimensions = fixData.weightDimensions; needsBaseUpdate = true; }
+  
+  // === MXIK/commodityCodes fix ===
+  if (fixData.commodityCode) {
+    const code = String(fixData.commodityCode).replace(/\D/g, '');
+    if (code.length === 17) {
+      const existingCodes = currentData?.commodityCodes || [];
+      if (existingCodes.length === 0 || !existingCodes.includes(code)) {
+        offerUpdate.commodityCodes = [code];
+        needsBaseUpdate = true;
+        console.log(`Adding MXIK code ${code} to ${offerId}`);
+      }
+    }
+  }
 
   if (needsBaseUpdate) {
     console.log(`Updating base data for ${offerId}`);
