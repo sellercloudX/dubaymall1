@@ -83,6 +83,33 @@ function stripHtml(text: string): string {
   return text.replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
 }
 
+function normalizeMxikCode(value?: string): string | null {
+  const digits = (value || '').replace(/\D/g, '');
+  return digits.length === 17 ? digits : null;
+}
+
+function getMarketplaceHintKeywords(text: string): string[] {
+  const t = text.toLowerCase();
+  const hints: string[] = [];
+
+  const mappings: Array<{ test: RegExp; values: string[] }> = [
+    { test: /(qoplama|qoplamalar|chexol|чехол|case|cover)/i, values: ['чехол', 'чехлы', 'чехол для телефона', 'аксессуары для телефонов'] },
+    { test: /(himoya shisha|himoya plyonka|защитн.*стекл|пленк)/i, values: ['защитное стекло', 'защитные стекла', 'защитная пленка'] },
+    { test: /(quloqchin|naushnik|наушник|earbuds|гарнитур)/i, values: ['наушники', 'гарнитуры'] },
+    { test: /(zaryad|заряд|adapter|адаптер|kabel|кабель|cable)/i, values: ['зарядные устройства', 'кабели', 'аксессуары для телефонов'] },
+    { test: /(xotira karta|карта памяти|microsd|micro sd|sd card)/i, values: ['карты памяти', 'micro sd', 'флеш-карты'] },
+    { test: /(telefon|smartfon|смартфон|iphone|samsung|honor|xiaomi)/i, values: ['смартфон', 'аксессуары для смартфонов'] },
+  ];
+
+  for (const rule of mappings) {
+    if (rule.test.test(t)) {
+      hints.push(...rule.values);
+    }
+  }
+
+  return Array.from(new Set(hints));
+}
+
 // ============ IMAGE PROXY ============
 
 async function proxyImagesToStorage(
@@ -165,8 +192,10 @@ async function lookupMXIK(
   supabase: any, name: string, category?: string, lovableApiKey?: string
 ): Promise<{ code: string; name_uz: string }> {
   try {
-    // Step 1: AI keyword extraction — use STRONGER model + category context for accuracy
-    let keywords: string[] = [];
+    // Step 1: AI keyword extraction + rule-based hints
+    const contextText = `${name || ''} ${category || ''}`.trim();
+    let keywords: string[] = getMarketplaceHintKeywords(contextText);
+
     if (lovableApiKey) {
       try {
         const prompt = `Mahsulot: "${name}"${category ? ` (Kategoriya: ${category})` : ''}
@@ -184,7 +213,7 @@ Masalan:
 - "Samsung Galaxy S24 Ultra 256GB" → ["telefon", "smartfon", "мобильный телефон", "смартфон"]
 - "Шампунь Elseve 400ml" → ["шампунь", "shampun", "soch uchun vosita", "средство для волос"]
 
-TAQIQLANGAN: 
+TAQIQLANGAN:
 - Mahsulot turiga aloqasi bo'lmagan so'zlar
 - Brend nomlari (Samsung, Apple, Xiaomi)
 - Model raqamlari
@@ -204,24 +233,52 @@ Javobni faqat JSON array: ["so'z1", "so'z2", ...]`;
           const data = await resp.json();
           const content = data.choices?.[0]?.message?.content?.trim() || "";
           const match = content.match(/\[.*\]/s);
-          if (match) keywords = JSON.parse(match[0]).filter((k: string) => typeof k === 'string' && k.length > 1);
+          if (match) {
+            const aiKeywords = JSON.parse(match[0]).filter((k: string) => typeof k === 'string' && k.length > 1);
+            keywords.push(...aiKeywords);
+          }
         }
       } catch (e) { console.error("AI MXIK keywords error:", e); }
     }
 
+    const noiseKeywords = new Set(['material', 'материал', 'материалы', 'покрытие', 'покрытия', 'товар', 'вещь']);
+    keywords = Array.from(new Set(keywords.map(k => k.trim().toLowerCase()))).filter(k => k.length > 1 && !noiseKeywords.has(k));
+
     // Fallback keywords
     if (keywords.length === 0) {
-      keywords = name.toLowerCase().replace(/[^\w\s\u0400-\u04FFa-zA-Z'ʼ]/g, ' ').split(/\s+/).filter(w => w.length > 2);
+      keywords = contextText.toLowerCase().replace(/[^\w\s\u0400-\u04FFa-zA-Z'ʼ]/g, ' ').split(/\s+/).filter(w => w.length > 2);
     }
     console.log(`[MXIK] Keywords: ${keywords.join(', ')}`);
 
-    // Step 2: Search with multiple keywords
+    // Step 2: Search with multiple keywords + fuzzy RPC fallback
     let matches: any[] = [];
-    for (const kw of keywords.slice(0, 5)) {
-      const { data } = await supabase.from('mxik_codes').select('code, name_uz, name_ru, group_name')
+    for (const kw of keywords.slice(0, 6)) {
+      const { data } = await supabase
+        .from('mxik_codes')
+        .select('code, name_uz, name_ru, group_name')
         .or(`name_uz.ilike.%${kw}%,name_ru.ilike.%${kw}%,group_name.ilike.%${kw}%`)
-        .eq('is_active', true).limit(15);
+        .eq('is_active', true)
+        .limit(15);
       if (data) matches.push(...data);
+    }
+
+    if (matches.length < 8 && contextText) {
+      try {
+        const { data: fuzzyMatches } = await supabase.rpc('search_mxik_fuzzy', {
+          p_search_term: contextText.slice(0, 200),
+          p_limit: 25,
+        });
+        if (Array.isArray(fuzzyMatches)) {
+          matches.push(...fuzzyMatches.map((m: any) => ({
+            code: m.code,
+            name_uz: m.name_uz,
+            name_ru: m.name_ru,
+            group_name: m.group_name,
+          })));
+        }
+      } catch (rpcError) {
+        console.error('[MXIK] fuzzy search error:', rpcError);
+      }
     }
 
     // Deduplicate
@@ -390,7 +447,8 @@ async function findLeafCategory(
   // 3. Use AI to extract RUSSIAN search keywords from product name
   // CRITICAL: Source subject from Uzum is in UZBEK (e.g. "Qoplamalar") — DON'T use it as keyword directly!
   // Only use sourceSubject as keyword if it contains Cyrillic (Russian) characters
-  let searchKeywords: string[] = [];
+  const initialHintKeywords = getMarketplaceHintKeywords(`${productName} ${sourceSubject || ''} ${sourceCategory || ''} ${sourceParent || ''}`);
+  let searchKeywords: string[] = [...initialHintKeywords];
   
   const hasCyrillic = (s: string) => /[\u0400-\u04FF]/.test(s);
   
@@ -467,9 +525,21 @@ Javob FAQAT JSON array: ["so'z1", "so'z2", ...]` }],
     }
   }
 
-  // Fallback keywords from product name
+  // Normalize keywords: remove noise, add compact tokens from product name
+  const noiseKeywords = new Set(['material', 'материал', 'материалы', 'покрытие', 'покрытия', 'товар', 'вещь', 'аксессуар']);
+  const nameTokens = (productName.toLowerCase().match(/[а-яё]{3,}/g) || []).slice(0, 6);
+  searchKeywords.push(...nameTokens);
+
+  searchKeywords = Array.from(new Set(searchKeywords.map(k => k.trim().toLowerCase())))
+    .filter(k => k.length > 1 && !noiseKeywords.has(k));
+
+  // Fallback keywords from product name/context
   if (searchKeywords.length === 0) {
-    searchKeywords = productName.toLowerCase().replace(/[^\w\s\u0400-\u04FF]/g, ' ').split(/\s+/).filter(w => w.length > 2);
+    searchKeywords = `${productName} ${sourceSubject || ''} ${sourceCategory || ''}`
+      .toLowerCase()
+      .replace(/[^\w\s\u0400-\u04FF]/g, ' ')
+      .split(/\s+/)
+      .filter(w => w.length > 2);
   }
   console.log(`📂 Search keywords: ${searchKeywords.join(', ')}`);
 
@@ -479,10 +549,16 @@ Javob FAQAT JSON array: ["so'z1", "so'z2", ...]` }],
     let score = 0;
     for (const kw of searchKeywords) {
       const kwLower = kw.toLowerCase();
-      if (leafText.includes(kwLower)) score += 3;
+      const isPhrase = kwLower.includes(' ');
+      if (leafText.includes(kwLower)) score += isPhrase ? 5 : 3;
       // Partial match
-      if (kwLower.length > 4 && leafText.includes(kwLower.substring(0, kwLower.length - 2))) score += 1;
+      if (kwLower.length > 4 && leafText.includes(kwLower.substring(0, kwLower.length - 2))) score += isPhrase ? 2 : 1;
     }
+
+    // Penalize obvious domain mismatches for phone accessories
+    const phoneAccessoryIntent = searchKeywords.some(k => /чехол|смартфон|телефон|защитн|micro sd|карта памяти/.test(k));
+    if (phoneAccessoryIntent && /авто|мебел|рычаг|сидень/.test(leafText)) score -= 8;
+
     return { ...leaf, score };
   }).filter(l => l.score > 0).sort((a, b) => b.score - a.score).slice(0, 50);
 
@@ -610,6 +686,14 @@ async function aiOptimize(
 
   console.log(`🤖 AI optimizing (2-pass): ${allParams.length} TOTAL params`);
 
+  const sourceCharacteristicsText = Array.isArray(product.sourceCharacteristics) && product.sourceCharacteristics.length > 0
+    ? product.sourceCharacteristics
+        .slice(0, 20)
+        .map((ch: any) => `${ch.title || ch.name || ch.key || 'attr'}: ${ch.value || ch.values?.[0] || ''}`)
+        .filter((s: string) => s && !s.endsWith(': '))
+        .join('; ')
+    : '';
+
   const prompt = `VAZIFA: Yandex Market kartochkasi uchun BARCHA ${allParams.length} ta parametrni to'ldir!
 MAQSAD: MAKSIMAL ball olish. "Maydonlarni ko'rsatish" (Показать поля) ortidagi YASHIRIN parametrlar ham ALBATTA to'ldirilishi SHART!
 
@@ -618,6 +702,7 @@ MAHSULOT:
 - Tavsif: ${product.description || "YO'Q — O'ZING YOZ!"}
 - Kategoriya: ${categoryName}
 ${product.sourceCategory ? `- Manba marketplace kategoriyasi: ${product.sourceCategory}` : ''}
+${sourceCharacteristicsText ? `- Manba xususiyatlari (Uzum/WB): ${sourceCharacteristicsText}` : ''}
 - Brend: ${product.brand || "Nomdan aniqla"}
 - Rang: ${product.color || "Nomdan aniqla"}
 - Model: ${product.model || "Nomdan aniqla"}
@@ -1126,12 +1211,14 @@ serve(async (req) => {
         }
 
         // ═══ STEP 5: MXIK lookup (AI-powered) ═══
-        // For clones, use source subject (Russian category) for better MXIK matching
-        const mxikSearchName = product.sourceSubject || product.sourceCategory || product.name;
-        const mxikSearchCategory = product.sourceParent || product.category;
-        const mxik = (product.mxikCode && product.mxikName)
-          ? { code: product.mxikCode, name_uz: product.mxikName }
-          : await lookupMXIK(supabase, mxikSearchName, mxikSearchCategory, LOVABLE_KEY);
+        // Priority: exact source MXIK code from source marketplace (if valid)
+        const sourceMxikCode = normalizeMxikCode(product.mxikCode);
+        const mxikSearchName = [product.name, product.model, product.brand].filter(Boolean).join(' ');
+        const mxikSearchCategory = product.sourceSubject || product.sourceCategory || product.sourceParent || product.category;
+
+        const mxik = sourceMxikCode
+          ? { code: sourceMxikCode, name_uz: product.mxikName || 'Manba MXIK kodi' }
+          : await lookupMXIK(supabase, mxikSearchName || product.name, mxikSearchCategory, LOVABLE_KEY);
 
         // ═══ STEP 6: Build & send offer ═══
         const offer = buildOffer(product, ai, sku, barcode, leafCat, mxik, pricing.recommendedPrice, images);
