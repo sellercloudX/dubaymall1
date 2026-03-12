@@ -447,7 +447,8 @@ async function findLeafCategory(
   // 3. Use AI to extract RUSSIAN search keywords from product name
   // CRITICAL: Source subject from Uzum is in UZBEK (e.g. "Qoplamalar") — DON'T use it as keyword directly!
   // Only use sourceSubject as keyword if it contains Cyrillic (Russian) characters
-  let searchKeywords: string[] = [];
+  const initialHintKeywords = getMarketplaceHintKeywords(`${productName} ${sourceSubject || ''} ${sourceCategory || ''} ${sourceParent || ''}`);
+  let searchKeywords: string[] = [...initialHintKeywords];
   
   const hasCyrillic = (s: string) => /[\u0400-\u04FF]/.test(s);
   
