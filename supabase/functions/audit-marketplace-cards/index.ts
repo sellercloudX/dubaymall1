@@ -528,9 +528,17 @@ async function generateAIFixes(
     .map((p: any) => `  ${p.name || p.parameterName || p.parameterId}: ${p.value || JSON.stringify(p.values)}`)
     .join('\n');
 
+  const existingCommodityCodes = currentData.commodityCodes || [];
   const mxikInfo = mxikCode
-    ? `\nMXIK/IKPU kod topildi: ${mxikCode.code} (${mxikCode.name})`
-    : '\nMXIK/IKPU kod topilmadi';
+    ? `\nMXIK/IKPU kod topildi: ${mxikCode.code} (${mxikCode.name}). Buni commodityCode ga qo'y!`
+    : existingCommodityCodes.length > 0
+    ? `\nMavjud MXIK/IKPU: ${existingCommodityCodes.join(', ')}`
+    : '\nMXIK/IKPU kod topilmadi — agar mahsulot nomidan aniqlay olsang, 17 raqamli kodni ber';
+
+  const hasCategoryMismatch = issue.issues.some(i => i.type === 'category_mismatch');
+  const categoryWarning = hasCategoryMismatch 
+    ? `\n⚠️ KATEGORIYA XATO! Hozirgi "${issue.category}" kategoriyasi mahsulotga mos emas! Mahsulot nomiga qarab TO'G'RI kategoriyani tavsiya qil.`
+    : '';
 
   const prompt = `Sen Yandex Market kartochka sifat ekspertisan. Mavjud kartochkani tahlil qil va SIFATINI OSHIR.
 
@@ -541,9 +549,11 @@ MAHSULOT:
 - Brend: ${currentData.vendor || '(bo\'sh)'}
 - Shtrixkod: ${currentData.barcodes?.join(', ') || '(bo\'sh)'}
 - Rasmlar: ${currentData.pictures?.length || 0}
+- Mavjud MXIK kodlar: ${existingCommodityCodes.join(', ') || '(yo\'q)'}
 - Mavjud parametrlar:
 ${existingParams || '  (yo\'q)'}
 ${mxikInfo}
+${categoryWarning}
 
 XATOLIKLAR:
 ${issuesList}
@@ -564,6 +574,7 @@ QOIDALAR:
    NOTO'G'RI: {"parameterId": 123, "value": "12 мм"}
 7. [REQUIRED] parametrlarni ALBATTA to'ldir.
 8. O'zing to'qib chiqargan parameterId ishlatma!
+9. commodityCode: MXIK/IKPU 17 raqamli kodni ber. Agar MXIK topilgan bo'lsa — aynan o'shani ber.
 
 JSON:
 {
@@ -572,6 +583,7 @@ JSON:
     "description": "yangi tavsif yoki null",
     "vendor": "brend yoki null",
     "barcode": "EAN-13 yoki null",
+    "commodityCode": "17 raqamli MXIK kod yoki null",
     "weightDimensions": {"weight": 0.5, "length": 20, "width": 15, "height": 10},
     "parameterValues": [
       {"parameterId": HAQIQIY_ID, "value": "FAQAT_QIYMAT", "unitId": ID_AGAR_BOR}
