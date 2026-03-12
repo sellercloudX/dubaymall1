@@ -549,10 +549,16 @@ Javob FAQAT JSON array: ["so'z1", "so'z2", ...]` }],
     let score = 0;
     for (const kw of searchKeywords) {
       const kwLower = kw.toLowerCase();
-      if (leafText.includes(kwLower)) score += 3;
+      const isPhrase = kwLower.includes(' ');
+      if (leafText.includes(kwLower)) score += isPhrase ? 5 : 3;
       // Partial match
-      if (kwLower.length > 4 && leafText.includes(kwLower.substring(0, kwLower.length - 2))) score += 1;
+      if (kwLower.length > 4 && leafText.includes(kwLower.substring(0, kwLower.length - 2))) score += isPhrase ? 2 : 1;
     }
+
+    // Penalize obvious domain mismatches for phone accessories
+    const phoneAccessoryIntent = searchKeywords.some(k => /чехол|смартфон|телефон|защитн|micro sd|карта памяти/.test(k));
+    if (phoneAccessoryIntent && /авто|мебел|рычаг|сидень/.test(leafText)) score -= 8;
+
     return { ...leaf, score };
   }).filter(l => l.score > 0).sort((a, b) => b.score - a.score).slice(0, 50);
 
