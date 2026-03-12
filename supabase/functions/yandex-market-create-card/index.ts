@@ -250,13 +250,35 @@ Javobni faqat JSON array: ["so'z1", "so'z2", ...]`;
     }
     console.log(`[MXIK] Keywords: ${keywords.join(', ')}`);
 
-    // Step 2: Search with multiple keywords
+    // Step 2: Search with multiple keywords + fuzzy RPC fallback
     let matches: any[] = [];
-    for (const kw of keywords.slice(0, 5)) {
-      const { data } = await supabase.from('mxik_codes').select('code, name_uz, name_ru, group_name')
+    for (const kw of keywords.slice(0, 6)) {
+      const { data } = await supabase
+        .from('mxik_codes')
+        .select('code, name_uz, name_ru, group_name')
         .or(`name_uz.ilike.%${kw}%,name_ru.ilike.%${kw}%,group_name.ilike.%${kw}%`)
-        .eq('is_active', true).limit(15);
+        .eq('is_active', true)
+        .limit(15);
       if (data) matches.push(...data);
+    }
+
+    if (matches.length < 8 && contextText) {
+      try {
+        const { data: fuzzyMatches } = await supabase.rpc('search_mxik_fuzzy', {
+          p_search_term: contextText.slice(0, 200),
+          p_limit: 25,
+        });
+        if (Array.isArray(fuzzyMatches)) {
+          matches.push(...fuzzyMatches.map((m: any) => ({
+            code: m.code,
+            name_uz: m.name_uz,
+            name_ru: m.name_ru,
+            group_name: m.group_name,
+          })));
+        }
+      } catch (rpcError) {
+        console.error('[MXIK] fuzzy search error:', rpcError);
+      }
     }
 
     // Deduplicate
