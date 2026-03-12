@@ -83,6 +83,33 @@ function stripHtml(text: string): string {
   return text.replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
 }
 
+function normalizeMxikCode(value?: string): string | null {
+  const digits = (value || '').replace(/\D/g, '');
+  return digits.length === 17 ? digits : null;
+}
+
+function getMarketplaceHintKeywords(text: string): string[] {
+  const t = text.toLowerCase();
+  const hints: string[] = [];
+
+  const mappings: Array<{ test: RegExp; values: string[] }> = [
+    { test: /(qoplama|qoplamalar|chexol|чехол|case|cover)/i, values: ['чехол', 'чехлы', 'чехол для телефона', 'аксессуары для телефонов'] },
+    { test: /(himoya shisha|himoya plyonka|защитн.*стекл|пленк)/i, values: ['защитное стекло', 'защитные стекла', 'защитная пленка'] },
+    { test: /(quloqchin|naushnik|наушник|earbuds|гарнитур)/i, values: ['наушники', 'гарнитуры'] },
+    { test: /(zaryad|заряд|adapter|адаптер|kabel|кабель|cable)/i, values: ['зарядные устройства', 'кабели', 'аксессуары для телефонов'] },
+    { test: /(xotira karta|карта памяти|microsd|micro sd|sd card)/i, values: ['карты памяти', 'micro sd', 'флеш-карты'] },
+    { test: /(telefon|smartfon|смартфон|iphone|samsung|honor|xiaomi)/i, values: ['смартфон', 'аксессуары для смартфонов'] },
+  ];
+
+  for (const rule of mappings) {
+    if (rule.test.test(t)) {
+      hints.push(...rule.values);
+    }
+  }
+
+  return Array.from(new Set(hints));
+}
+
 // ============ IMAGE PROXY ============
 
 async function proxyImagesToStorage(
