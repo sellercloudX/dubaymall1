@@ -263,6 +263,25 @@ async function lookupMxikCode(
   }
 }
 
+// ===== CATEGORY MISMATCH DETECTION =====
+const PHONE_ACCESSORY_KEYWORDS = /чехол|стекло|защитн|наушник|кабель|зарядн|пленк|case|cover|glass|earbuds|headphone|powerbank|аккумулятор|кейс|бампер|накладка|гарнитур|адаптер|переходник|подставк|держатель.*телефон|mount.*phone/i;
+const WRONG_CATEGORIES_FOR_PHONE = /автомагнитол|магнитол|автомобильн.*аудио|car.*stereo|car.*audio|автоакустик|автоэлектроник|сабвуфер|усилител.*авто/i;
+
+function detectCategoryMismatch(offer: any): { isMismatch: boolean; reason: string } | null {
+  const name = (offer.name || '').toLowerCase();
+  const category = (offer.category || '').toLowerCase();
+  
+  // Check if product name looks like phone accessories but category is car stereos etc.
+  if (PHONE_ACCESSORY_KEYWORDS.test(name) && WRONG_CATEGORIES_FOR_PHONE.test(category)) {
+    return { 
+      isMismatch: true, 
+      reason: `Mahsulot "${offer.name}" telefon aksessuari, lekin "${offer.category}" kategoriyasiga qo'yilgan`
+    };
+  }
+  
+  return null;
+}
+
 // ===== ANALYZE OFFERS =====
 function analyzeOffers(
   offers: any[], cardQualityMap: Map<string, any>, filterOfferIds?: string[]
@@ -284,6 +303,17 @@ function analyzeOffers(
     } else if (quality?.averageContentRating != null) {
       qualityScore = Math.round(quality.averageContentRating);
       hasApiScore = true;
+    }
+
+    // === Category mismatch check ===
+    const mismatch = detectCategoryMismatch(offer);
+    if (mismatch) {
+      issues.push({
+        type: 'category_mismatch', severity: 'error', field: 'category',
+        message: mismatch.reason,
+        currentValue: offer.category,
+        suggestedFix: 'Kategoriyani to\'g\'ri marketplace kategoriyasiga o\'zgartirish kerak',
+      });
     }
 
     // === Name check ===
@@ -363,6 +393,17 @@ function analyzeOffers(
       });
     }
 
+    // === MXIK/commodityCodes check ===
+    const rawCommodityCodes = offer.rawOffer?.commodityCodes || [];
+    if (rawCommodityCodes.length === 0) {
+      issues.push({
+        type: 'missing_mxik', severity: 'error', field: 'commodityCodes',
+        message: 'MXIK/IKPU kodi yo\'q — Yandex uchun zarur',
+        currentValue: '(bo\'sh)',
+        suggestedFix: 'AI mahsulot nomiga mos MXIK kodni topadi va qo\'shadi',
+      });
+    }
+
     // === Yandex API recommendations ===
     if (quality?.recommendations) {
       for (const rec of quality.recommendations) {
@@ -436,6 +477,7 @@ function analyzeOffers(
           vendor: offer.vendor, vendorCode: offer.vendorCode,
           barcodes: offer.barcodes, pictures: offer.pictures,
           params: offer.params, weightDimensions: offer.weightDimensions,
+          commodityCodes: offer.rawOffer?.commodityCodes || [],
         },
       });
     }
