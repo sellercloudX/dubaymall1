@@ -79,7 +79,8 @@ export default function UzumProductCardCreator() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [extensionPushed, setExtensionPushed] = useState(false);
   const [imageUrl, setImageUrl] = useState('');
-
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeMode, setResizeMode] = useState<'cover' | 'contain'>('cover');
   const update = useCallback(<K extends keyof CardFormData>(key: K, val: CardFormData[K]) => {
     setForm(prev => ({ ...prev, [key]: val }));
   }, []);
