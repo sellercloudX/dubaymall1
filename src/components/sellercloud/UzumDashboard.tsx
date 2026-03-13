@@ -258,7 +258,7 @@ export default function UzumDashboard({ marketplace = 'uzum' }: UzumDashboardPro
                   <Truck className="w-3.5 h-3.5 mr-1.5 text-accent" />
                   FBS buyurtmalar
                 </Button>
-                <Button variant="outline" size="sm" className="h-9 text-xs justify-start">
+                <Button variant="outline" size="sm" className="h-9 text-xs justify-start" onClick={() => setActiveTab('boost')}>
                   <Eye className="w-3.5 h-3.5 mr-1.5 text-success" />
                   Boost boshqaruv
                 </Button>
