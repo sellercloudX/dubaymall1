@@ -300,7 +300,12 @@ export default function SellerCloudX() {
       case 'problems':
         return <ProblematicProducts connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'mxik':
-        return <MxikImport />;
+        return (
+          <div className="space-y-6">
+            <MxikLookup />
+            <MxikImport />
+          </div>
+        );
       case 'team':
         return <TeamManager />;
       case 'uzum-dashboard':
