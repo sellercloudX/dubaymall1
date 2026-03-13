@@ -96,7 +96,7 @@ interface BackgroundTask {
 }
 
 type Step = 'capture' | 'analyzing' | 'pricing';
-type TargetMarketplace = 'yandex' | 'wildberries';
+type TargetMarketplace = 'yandex' | 'wildberries' | 'uzum';
 
 interface AIScannerProProps {
   shopId: string;
