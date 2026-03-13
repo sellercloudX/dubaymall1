@@ -2081,17 +2081,15 @@ serve(async (req) => {
             return results;
           };
 
-          // Process batches sequentially, but parallelize shops WITHIN each batch
+          // Process batches sequentially, run all shops at once per status
           for (let bi = 0; bi < orderStatusBatches.length; bi++) {
             const batch = orderStatusBatches[bi];
             if (bi > 0) await sleep(200);
 
-            // For each status in batch, run all shops in parallel
+            // For each status in batch, fetch with ALL shopIds in one request
             for (const orderStatus of batch) {
-              const shopPromises = orderShopIds.map(shopId => fetchStatusShop(orderStatus, shopId));
-              const shopResults = await Promise.all(shopPromises);
-              
-              for (const orderList of shopResults) {
+              const orderList = await fetchStatusAllShops(orderStatus);
+              {
                 const mapped = orderList.map((order: any) => {
               const items = order.items || order.orderItems || [];
               const itemsTotal = items.reduce((sum: number, item: any) => {
