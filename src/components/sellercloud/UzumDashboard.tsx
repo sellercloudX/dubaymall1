@@ -11,12 +11,16 @@ import {
   Package, ShoppingCart, TrendingUp, TrendingDown, AlertTriangle,
   DollarSign, Calculator, Truck, BarChart3, RefreshCw, Search,
   ArrowUpRight, ArrowDownRight, Warehouse, PackageX, Zap, Eye,
+  FileText, UserPlus, Send,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import UzumUnitEconomics from './UzumUnitEconomics';
 import UzumLostItems from './UzumLostItems';
+import UzumProductCardCreator from './UzumProductCardCreator';
+import UzumBoostManager from './UzumBoostManager';
+import UzumManagerInvite from './UzumManagerInvite';
 
 interface UzumDashboardProps {
   marketplace?: string;
