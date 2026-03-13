@@ -986,7 +986,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
                 onClick={() => setTargetMarketplace('yandex')}
                 className="flex-1"
               >
-                🟡 Yandex Market
+                🟡 Yandex
               </Button>
               <Button
                 variant={targetMarketplace === 'wildberries' ? 'default' : 'outline'}
@@ -994,7 +994,15 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
                 onClick={() => setTargetMarketplace('wildberries')}
                 className="flex-1"
               >
-                🟣 Wildberries
+                🟣 WB
+              </Button>
+              <Button
+                variant={targetMarketplace === 'uzum' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setTargetMarketplace('uzum')}
+                className="flex-1"
+              >
+                🟢 Uzum
               </Button>
             </div>
             {/* Selected Product Preview */}
