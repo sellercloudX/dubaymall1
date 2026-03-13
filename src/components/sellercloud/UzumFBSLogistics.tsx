@@ -270,7 +270,7 @@ export default function UzumFBSLogistics() {
           ) : (
             <div className="space-y-2 max-h-[500px] overflow-y-auto">
               {filteredOrders.map(order => {
-                const statusInfo = FBS_STATUSES[order.status] || FBS_STATUSES.CREATED;
+                const statusInfo = FBS_STATUSES[order.status || 'CREATED'] || FBS_STATUSES.CREATED;
                 const StatusIcon = statusInfo.icon;
                 const items = Array.isArray(order.items) ? order.items : [];
                 const itemCount = items.reduce((s: number, i: any) => s + ((i as any)?.count || (i as any)?.quantity || 1), 0);
