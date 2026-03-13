@@ -552,7 +552,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
           throw new Error(`WB: ${cardResult.error}`);
         }
       } else if (targetMarketplace === 'uzum') {
-        // Uzum card creation
+        // Uzum API does NOT support product creation — only prepare data + offer extension auto-fill
         const { data: cardResult, error } = await supabase.functions.invoke('create-uzum-card', {
           body: {
             product: {
@@ -574,9 +574,8 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
         if (cardResult && !cardResult.success && cardResult.error) {
           throw new Error(`Uzum: ${cardResult.error}`);
         }
-        if (cardResult?.method === 'prepared') {
-          toast.info("Ma'lumotlar tayyor. Uzum Seller kabinetida qo'lda yuklang.");
-        }
+        // Uzum API doesn't support card creation — always "prepared" mode
+        uzumPreparedCard = cardResult?.card || null;
       } else {
         // Yandex card creation — ALWAYS skip image gen since AIScannerPro already generated them
         const hasAiImages = generatedInfos.length >= 1;
