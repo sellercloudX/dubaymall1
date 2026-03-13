@@ -10,11 +10,12 @@ import { Progress } from '@/components/ui/progress';
 import {
   FileText, Image as ImageIcon, Tag, List, Send, Plus, X,
   ChevronRight, ChevronLeft, CheckCircle2, Upload, Sparkles,
-  Package, AlertTriangle, Loader2, Copy, ExternalLink,
+  Package, AlertTriangle, Loader2, Copy, ExternalLink, ImagePlus,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
+import { resizeImageForUzum, resizeImageForUzumContain, checkImageDimensions, resizeAndUploadForUzum } from '@/lib/uzumImageResize';
 
 interface ProductAttribute {
   name: string;
@@ -78,7 +79,8 @@ export default function UzumProductCardCreator() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [extensionPushed, setExtensionPushed] = useState(false);
   const [imageUrl, setImageUrl] = useState('');
-
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeMode, setResizeMode] = useState<'cover' | 'contain'>('cover');
   const update = useCallback(<K extends keyof CardFormData>(key: K, val: CardFormData[K]) => {
     setForm(prev => ({ ...prev, [key]: val }));
   }, []);
@@ -97,15 +99,53 @@ export default function UzumProductCardCreator() {
     update('attributes', attrs);
   };
 
-  const addImage = () => {
-    if (imageUrl && imageUrl.startsWith('http')) {
+  const addImage = async () => {
+    if (!imageUrl || !imageUrl.startsWith('http')) return;
+    if (!user) return;
+    
+    setIsResizing(true);
+    try {
+      // Avtomatik 1080x1440 ga resize qilish
+      const publicUrl = await resizeAndUploadForUzum(supabase, user.id, imageUrl, resizeMode);
+      if (publicUrl) {
+        update('images', [...form.images, publicUrl]);
+        setImageUrl('');
+        toast({ title: '✅ Rasm tayyor', description: 'Rasm 1080×1440 ga o\'zgartirildi va yuklandi' });
+      } else {
+        // Fallback: original URL
+        update('images', [...form.images, imageUrl]);
+        setImageUrl('');
+        toast({ title: '⚠️ Resize xatosi', description: 'Original rasm qo\'shildi. Uzum rad etishi mumkin.', variant: 'destructive' });
+      }
+    } catch (err) {
+      console.error('Image resize error:', err);
       update('images', [...form.images, imageUrl]);
       setImageUrl('');
+    } finally {
+      setIsResizing(false);
     }
   };
 
-  const removeImage = (idx: number) => {
-    update('images', form.images.filter((_, i) => i !== idx));
+  const addImageFromFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    
+    setIsResizing(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        const base64 = ev.target?.result as string;
+        const publicUrl = await resizeAndUploadForUzum(supabase, user.id, base64, resizeMode);
+        if (publicUrl) {
+          update('images', [...form.images, publicUrl]);
+          toast({ title: '✅ Rasm tayyor', description: '1080×1440 resize + upload muvaffaqiyatli' });
+        }
+        setIsResizing(false);
+      };
+      reader.readAsDataURL(file);
+    } catch {
+      setIsResizing(false);
+    }
   };
 
   // AI-generate title & description using dedicated prepare-uzum-card function
@@ -463,36 +503,78 @@ export default function UzumProductCardCreator() {
         <Card className="border-border/50">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
-              <ImageIcon className="w-4 h-4 text-success" />
+              <ImageIcon className="w-4 h-4 text-green-500" />
               Mahsulot rasmlari
               <Badge variant="secondary" className="text-[10px]">{form.images.length}/10</Badge>
+              <Badge variant="outline" className="text-[10px] ml-auto">1080×1440 px</Badge>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            {/* Resize mode selector */}
+            <div className="flex gap-2 items-center">
+              <Label className="text-[10px] text-muted-foreground whitespace-nowrap">Resize usuli:</Label>
+              <div className="flex gap-1">
+                <Button
+                  variant={resizeMode === 'cover' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setResizeMode('cover')}
+                  className="h-6 text-[10px] px-2"
+                >
+                  Cover (crop)
+                </Button>
+                <Button
+                  variant={resizeMode === 'contain' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setResizeMode('contain')}
+                  className="h-6 text-[10px] px-2"
+                >
+                  Contain (oq fon)
+                </Button>
+              </div>
+            </div>
+
+            {/* URL input */}
             <div className="flex gap-2">
               <Input
                 value={imageUrl}
                 onChange={e => setImageUrl(e.target.value)}
                 placeholder="Rasm URL manzili (https://...)"
                 className="h-8 text-xs flex-1"
+                disabled={isResizing}
               />
-              <Button variant="outline" size="sm" onClick={addImage} disabled={!imageUrl || form.images.length >= 10} className="h-8">
-                <Plus className="w-3 h-3" />
+              <Button variant="outline" size="sm" onClick={addImage} disabled={!imageUrl || form.images.length >= 10 || isResizing} className="h-8">
+                {isResizing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
               </Button>
             </div>
+
+            {/* File upload */}
+            <div className="relative">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={addImageFromFile}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                disabled={isResizing || form.images.length >= 10}
+              />
+              <Button variant="outline" className="w-full h-8 text-xs" disabled={isResizing}>
+                <ImagePlus className="w-3 h-3 mr-1" />
+                {isResizing ? 'Resize qilinmoqda...' : 'Kompyuterdan yuklash (avtomatik 1080×1440)'}
+              </Button>
+            </div>
+
             {form.images.length === 0 ? (
               <div className="text-center py-8 border-2 border-dashed border-border rounded-lg">
                 <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground opacity-40" />
-                <p className="text-xs text-muted-foreground">Rasm URL manzilini kiriting</p>
-                <p className="text-[10px] text-muted-foreground mt-1">Kamida 1, ko'pi bilan 10 ta rasm</p>
+                <p className="text-xs text-muted-foreground">Rasm qo'shing — avtomatik 1080×1440 ga o'zgartiriladi</p>
+                <p className="text-[10px] text-muted-foreground mt-1">Uzum Market talabi: aniq 1080×1440 piksel</p>
               </div>
             ) : (
               <div className="grid grid-cols-3 gap-2">
                 {form.images.map((img, i) => (
                   <div key={i} className="relative group">
-                    <img src={img} alt={`Product ${i + 1}`} className="w-full h-20 object-cover rounded-lg border border-border" />
+                    <img src={img} alt={`Product ${i + 1}`} className="w-full h-24 object-cover rounded-lg border border-border" />
                     <button
-                      onClick={() => removeImage(i)}
+                      onClick={() => update('images', form.images.filter((_, idx) => idx !== i))}
                       className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                     >
                       <X className="w-3 h-3" />
@@ -500,6 +582,7 @@ export default function UzumProductCardCreator() {
                     {i === 0 && (
                       <Badge className="absolute bottom-1 left-1 text-[8px] h-3.5 px-1">Asosiy</Badge>
                     )}
+                    <Badge variant="outline" className="absolute top-1 right-1 text-[7px] h-3 px-1 bg-background/80">1080×1440</Badge>
                   </div>
                 ))}
               </div>
