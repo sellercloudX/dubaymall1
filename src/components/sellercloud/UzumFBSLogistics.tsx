@@ -297,7 +297,7 @@ export default function UzumFBSLogistics() {
                           </Badge>
                         </div>
                       </div>
-                      <span className="text-[10px] text-muted-foreground">{getTimeAgo(order.created_at)}</span>
+                      <span className="text-[10px] text-muted-foreground">{getTimeAgo(order.created_at || '')}</span>
                     </div>
 
                     {/* Items */}
