@@ -21,6 +21,7 @@ import UzumLostItems from './UzumLostItems';
 import UzumProductCardCreator from './UzumProductCardCreator';
 import UzumBoostManager from './UzumBoostManager';
 import UzumManagerInvite from './UzumManagerInvite';
+import UzumFBSLogistics from './UzumFBSLogistics';
 
 interface UzumDashboardProps {
   marketplace?: string;
