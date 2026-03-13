@@ -120,11 +120,11 @@ export default function UzumFBSLogistics() {
         uzum_account_id: account.id,
         command_type: 'generate_label',
         payload: {
-          orderId: order.order_id,
+          orderId: order.order_code,
           orderStatus: order.status,
           items: order.items,
-          customerName: order.customer_name,
-          deliveryAddress: order.delivery_address,
+          buyerInfo: order.buyer_info,
+          deliveryInfo: order.delivery_info,
         },
         status: 'pending',
       } as any);
