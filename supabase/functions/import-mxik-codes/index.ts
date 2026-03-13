@@ -113,7 +113,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('[MXIK Import] Error:', error);
     return new Response(JSON.stringify({
-      error: error instanceof Error ? error.message : 'Internal error',
+      error: 'Internal server error',
     }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

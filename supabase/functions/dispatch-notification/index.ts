@@ -131,7 +131,7 @@ serve(async (req) => {
     return jsonResponse({ error: 'Invalid request. Provide user_id+type+message, batch_user_id, or process_queue.' }, 400);
   } catch (err: any) {
     console.error('Dispatch error:', err);
-    return jsonResponse({ error: err.message }, 500);
+    return jsonResponse({ error: 'Internal server error' }, 500);
   }
 });
 
