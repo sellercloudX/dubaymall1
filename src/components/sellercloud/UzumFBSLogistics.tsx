@@ -319,7 +319,7 @@ export default function UzumFBSLogistics() {
                         <span className="font-medium text-foreground">{fmt(order.total_amount || 0)} so'm</span>
                       </div>
                       <div className="flex gap-1.5">
-                        {['CREATED', 'PACKING'].includes(order.status) && (
+                        {['CREATED', 'PACKING'].includes(order.status || '') && (
                           <>
                             <Button
                               variant="outline"
