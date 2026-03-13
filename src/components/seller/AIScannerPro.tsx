@@ -575,7 +575,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
           throw new Error(`Uzum: ${cardResult.error}`);
         }
         // Uzum API doesn't support card creation — always "prepared" mode
-        uzumPreparedCard = cardResult?.card || null;
+        // Card data saved for potential extension auto-fill use
       } else {
         // Yandex card creation — ALWAYS skip image gen since AIScannerPro already generated them
         const hasAiImages = generatedInfos.length >= 1;
