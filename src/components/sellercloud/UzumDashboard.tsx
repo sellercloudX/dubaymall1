@@ -11,12 +11,16 @@ import {
   Package, ShoppingCart, TrendingUp, TrendingDown, AlertTriangle,
   DollarSign, Calculator, Truck, BarChart3, RefreshCw, Search,
   ArrowUpRight, ArrowDownRight, Warehouse, PackageX, Zap, Eye,
+  FileText, UserPlus, Send,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import UzumUnitEconomics from './UzumUnitEconomics';
 import UzumLostItems from './UzumLostItems';
+import UzumProductCardCreator from './UzumProductCardCreator';
+import UzumBoostManager from './UzumBoostManager';
+import UzumManagerInvite from './UzumManagerInvite';
 
 interface UzumDashboardProps {
   marketplace?: string;
@@ -145,24 +149,38 @@ export default function UzumDashboard({ marketplace = 'uzum' }: UzumDashboardPro
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-3">
-        <TabsList className="grid grid-cols-4 h-9">
-          <TabsTrigger value="overview" className="text-xs">
-            <BarChart3 className="w-3 h-3 mr-1" />
-            Umumiy
-          </TabsTrigger>
-          <TabsTrigger value="unit-economics" className="text-xs">
-            <Calculator className="w-3 h-3 mr-1" />
-            Unit Econ
-          </TabsTrigger>
-          <TabsTrigger value="lost-items" className="text-xs">
-            <PackageX className="w-3 h-3 mr-1" />
-            Yo'qolgan
-          </TabsTrigger>
-          <TabsTrigger value="fbs" className="text-xs">
-            <Truck className="w-3 h-3 mr-1" />
-            FBS
-          </TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto -mx-1 px-1">
+          <TabsList className="inline-flex h-9 w-auto min-w-full">
+            <TabsTrigger value="overview" className="text-[10px] px-2">
+              <BarChart3 className="w-3 h-3 mr-1" />
+              Umumiy
+            </TabsTrigger>
+            <TabsTrigger value="unit-economics" className="text-[10px] px-2">
+              <Calculator className="w-3 h-3 mr-1" />
+              Unit Econ
+            </TabsTrigger>
+            <TabsTrigger value="lost-items" className="text-[10px] px-2">
+              <PackageX className="w-3 h-3 mr-1" />
+              Yo'qolgan
+            </TabsTrigger>
+            <TabsTrigger value="card-creator" className="text-[10px] px-2">
+              <FileText className="w-3 h-3 mr-1" />
+              Kartochka
+            </TabsTrigger>
+            <TabsTrigger value="boost" className="text-[10px] px-2">
+              <Zap className="w-3 h-3 mr-1" />
+              Boost
+            </TabsTrigger>
+            <TabsTrigger value="manager" className="text-[10px] px-2">
+              <UserPlus className="w-3 h-3 mr-1" />
+              Manager
+            </TabsTrigger>
+            <TabsTrigger value="fbs" className="text-[10px] px-2">
+              <Truck className="w-3 h-3 mr-1" />
+              FBS
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-4">
@@ -289,6 +307,21 @@ export default function UzumDashboard({ marketplace = 'uzum' }: UzumDashboardPro
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Card Creator Tab */}
+        <TabsContent value="card-creator">
+          <UzumProductCardCreator />
+        </TabsContent>
+
+        {/* Boost Tab */}
+        <TabsContent value="boost">
+          <UzumBoostManager />
+        </TabsContent>
+
+        {/* Manager Tab */}
+        <TabsContent value="manager">
+          <UzumManagerInvite />
         </TabsContent>
       </Tabs>
     </div>
