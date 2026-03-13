@@ -653,7 +653,12 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
       }
 
       updateTaskStatus('completed', generatedInfos);
-      toast.success(`"${normalizedProductName}" kartochkasi tayyor!`);
+      if (targetMarketplace === 'uzum') {
+        toast.success(`"${normalizedProductName}" ma'lumotlari tayyor! Uzum Seller kabinetiga o'ting va qo'lda yuklang.`, { duration: 6000 });
+        toast.info("💡 SellerCloudX Chrome kengaytmasini o'rnating — avtomatik to'ldirish imkoniyati!", { duration: 8000 });
+      } else {
+        toast.success(`"${normalizedProductName}" kartochkasi tayyor!`);
+      }
       
       if (onSuccess) onSuccess();
     } catch (error: any) {
