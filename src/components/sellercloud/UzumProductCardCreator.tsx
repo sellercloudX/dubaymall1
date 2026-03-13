@@ -10,11 +10,12 @@ import { Progress } from '@/components/ui/progress';
 import {
   FileText, Image as ImageIcon, Tag, List, Send, Plus, X,
   ChevronRight, ChevronLeft, CheckCircle2, Upload, Sparkles,
-  Package, AlertTriangle, Loader2, Copy, ExternalLink,
+  Package, AlertTriangle, Loader2, Copy, ExternalLink, ImagePlus,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
+import { resizeImageForUzum, resizeImageForUzumContain, checkImageDimensions, resizeAndUploadForUzum } from '@/lib/uzumImageResize';
 
 interface ProductAttribute {
   name: string;
