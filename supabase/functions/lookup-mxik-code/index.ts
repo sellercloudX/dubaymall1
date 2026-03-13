@@ -336,7 +336,8 @@ async function aiSelectBestCode(
       const fbContent = fbData.choices?.[0]?.message?.content?.trim() || '';
       const fbMatch = fbContent.match(/\{[\s\S]*\}/);
       if (fbMatch) {
-        const fbResult = JSON.parse(fbMatch[0]);
+        const fbClean = fbMatch[0].replace(/,\s*([}\]])/g, '$1').replace(/'/g, '"').replace(/[\x00-\x1F\x7F]/g, ' ');
+        const fbResult = JSON.parse(fbClean);
         const code = String(fbResult.mxik_code || '').replace(/\D/g, '').padEnd(17, '0').slice(0, 17);
         return {
           mxik_code: code,
