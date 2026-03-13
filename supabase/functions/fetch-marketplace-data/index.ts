@@ -2004,31 +2004,34 @@ serve(async (req) => {
           const orderIdsSeen = new Set<string>();
           const pageSize = 50; // Uzum max 50 per page
 
-          // OPTIMIZED: Reduced status list — many are sub-states that get captured anyway
-          // Group into 3 batches to stay within timeout: active, completed, cancelled
+          // FBS status list — MUST match Uzum OpenAPI enum exactly
+          // Invalid statuses (like 'NEW', 'PROCESSING') return 0 results silently
           const orderStatusBatches = status ? [[status]] : [
-            ['NEW', 'CREATED', 'PROCESSING', 'PACKING', 'PENDING_DELIVERY', 'DELIVERING'],
-            ['DELIVERED', 'COMPLETED', 'ACCEPTED_AT_DP'],
-            ['CANCELED', 'RETURNED'],
+            ['CREATED', 'PACKING', 'PENDING_DELIVERY', 'DELIVERING'],
+            ['DELIVERED', 'COMPLETED', 'ACCEPTED_AT_DP', 'DELIVERED_TO_CUSTOMER_DELIVERY_POINT'],
+            ['CANCELED', 'PENDING_CANCELLATION', 'RETURNED'],
           ];
 
-          // Fetch FBS orders — parallelize shops within each status batch
+          // Fetch FBS orders — use ALL shopIds as array parameter (API requires it)
           const orderShopIds = allShopIds.length > 0 ? allShopIds : (uzumShopId ? [String(uzumShopId)] : []);
           
           console.log(`Uzum FBS orders: ${orderStatusBatches.flat().length} statuses in ${orderStatusBatches.length} batches, ${orderShopIds.length} shops`);
 
-          // Helper to fetch one status+shop combination
-          const fetchStatusShop = async (orderStatus: string, shopId: string) => {
+          // Helper to fetch one status with ALL shops at once (API accepts array of shopIds)
+          const fetchStatusAllShops = async (orderStatus: string) => {
             const results: any[] = [];
             let page = 0;
             let hasMore = true;
             while (hasMore) {
-              const params = new URLSearchParams({
-                size: String(pageSize),
-                page: String(page),
-                status: orderStatus,
-                shopIds: shopId,
-              });
+              // Build params with shopIds as repeated params: shopIds=40852&shopIds=71592
+              const params = new URLSearchParams();
+              params.append('size', String(pageSize));
+              params.append('page', String(page));
+              params.append('status', orderStatus);
+              // Add each shopId separately so URL becomes shopIds=X&shopIds=Y (array format)
+              for (const sid of orderShopIds) {
+                params.append('shopIds', sid);
+              }
 
               try {
                 const response = await fetch(
