@@ -59,6 +59,7 @@ const SEOMonitor = lazy(() => import('@/components/sellercloud/SEOMonitor').then
 const AutoReorderAlerts = lazy(() => import('@/components/sellercloud/AutoReorderAlerts').then(m => ({ default: m.AutoReorderAlerts })));
 const MarketplaceProductAnalytics = lazy(() => import('@/components/sellercloud/MarketplaceProductAnalytics').then(m => ({ default: m.MarketplaceProductAnalytics })));
 const TeamManager = lazy(() => import('@/components/sellercloud/TeamManager').then(m => ({ default: m.TeamManager })));
+const UzumDashboard = lazy(() => import('@/components/sellercloud/UzumDashboard'));
 
 const TabLoader = React.forwardRef<HTMLDivElement>((_, ref) => <div ref={ref} className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>);
 TabLoader.displayName = 'TabLoader';
@@ -97,6 +98,7 @@ const pageTitles: Record<string, string> = {
   'seo-monitor': 'SEO Monitor',
   'auto-reorder': 'Avto buyurtma rejasi',
   team: 'Jamoa boshqaruvi',
+  'uzum-dashboard': 'Uzum Market Pro',
 };
 
 export default function SellerCloudX() {
@@ -300,6 +302,8 @@ export default function SellerCloudX() {
         return <MxikImport />;
       case 'team':
         return <TeamManager />;
+      case 'uzum-dashboard':
+        return <UzumDashboard />;
       case 'subscription':
         return <SubscriptionBilling totalSalesVolume={totalRevenue} />;
       case 'reports':

@@ -2997,6 +2997,330 @@ export type Database = {
         }
         Relationships: []
       }
+      uzum_accounts: {
+        Row: {
+          account_info: Json | null
+          api_key: string | null
+          created_at: string | null
+          encrypted_api_key: string | null
+          id: string
+          is_active: boolean | null
+          last_sync_at: string | null
+          manager_connected_at: string | null
+          manager_invited_at: string | null
+          manager_phone: string | null
+          manager_status: string | null
+          session_expires_at: string | null
+          session_token: string | null
+          shop_id: string | null
+          shop_name: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          account_info?: Json | null
+          api_key?: string | null
+          created_at?: string | null
+          encrypted_api_key?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_sync_at?: string | null
+          manager_connected_at?: string | null
+          manager_invited_at?: string | null
+          manager_phone?: string | null
+          manager_status?: string | null
+          session_expires_at?: string | null
+          session_token?: string | null
+          shop_id?: string | null
+          shop_name?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          account_info?: Json | null
+          api_key?: string | null
+          created_at?: string | null
+          encrypted_api_key?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_sync_at?: string | null
+          manager_connected_at?: string | null
+          manager_invited_at?: string | null
+          manager_phone?: string | null
+          manager_status?: string | null
+          session_expires_at?: string | null
+          session_token?: string | null
+          shop_id?: string | null
+          shop_name?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      uzum_extension_commands: {
+        Row: {
+          command_type: string
+          completed_at: string | null
+          created_at: string | null
+          error_message: string | null
+          id: string
+          payload: Json | null
+          processed_at: string | null
+          result: Json | null
+          status: string | null
+          user_id: string
+          uzum_account_id: string | null
+        }
+        Insert: {
+          command_type: string
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          payload?: Json | null
+          processed_at?: string | null
+          result?: Json | null
+          status?: string | null
+          user_id: string
+          uzum_account_id?: string | null
+        }
+        Update: {
+          command_type?: string
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          payload?: Json | null
+          processed_at?: string | null
+          result?: Json | null
+          status?: string | null
+          user_id?: string
+          uzum_account_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "uzum_extension_commands_uzum_account_id_fkey"
+            columns: ["uzum_account_id"]
+            isOneToOne: false
+            referencedRelation: "uzum_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      uzum_orders: {
+        Row: {
+          buyer_info: Json | null
+          commission_amount: number | null
+          created_at: string | null
+          created_at_uzum: string | null
+          delivered_at: string | null
+          delivery_info: Json | null
+          fulfillment_type: string | null
+          id: string
+          is_lost: boolean | null
+          items: Json | null
+          items_count: number | null
+          label_generated_at: string | null
+          label_url: string | null
+          logistics_cost: number | null
+          lost_detected_at: string | null
+          lost_reason: string | null
+          net_profit: number | null
+          order_code: string
+          order_number: string | null
+          packaging_cost: number | null
+          status: string | null
+          substatus: string | null
+          synced_at: string | null
+          total_amount: number | null
+          updated_at: string | null
+          user_id: string
+          uzum_account_id: string
+        }
+        Insert: {
+          buyer_info?: Json | null
+          commission_amount?: number | null
+          created_at?: string | null
+          created_at_uzum?: string | null
+          delivered_at?: string | null
+          delivery_info?: Json | null
+          fulfillment_type?: string | null
+          id?: string
+          is_lost?: boolean | null
+          items?: Json | null
+          items_count?: number | null
+          label_generated_at?: string | null
+          label_url?: string | null
+          logistics_cost?: number | null
+          lost_detected_at?: string | null
+          lost_reason?: string | null
+          net_profit?: number | null
+          order_code: string
+          order_number?: string | null
+          packaging_cost?: number | null
+          status?: string | null
+          substatus?: string | null
+          synced_at?: string | null
+          total_amount?: number | null
+          updated_at?: string | null
+          user_id: string
+          uzum_account_id: string
+        }
+        Update: {
+          buyer_info?: Json | null
+          commission_amount?: number | null
+          created_at?: string | null
+          created_at_uzum?: string | null
+          delivered_at?: string | null
+          delivery_info?: Json | null
+          fulfillment_type?: string | null
+          id?: string
+          is_lost?: boolean | null
+          items?: Json | null
+          items_count?: number | null
+          label_generated_at?: string | null
+          label_url?: string | null
+          logistics_cost?: number | null
+          lost_detected_at?: string | null
+          lost_reason?: string | null
+          net_profit?: number | null
+          order_code?: string
+          order_number?: string | null
+          packaging_cost?: number | null
+          status?: string | null
+          substatus?: string | null
+          synced_at?: string | null
+          total_amount?: number | null
+          updated_at?: string | null
+          user_id?: string
+          uzum_account_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "uzum_orders_uzum_account_id_fkey"
+            columns: ["uzum_account_id"]
+            isOneToOne: false
+            referencedRelation: "uzum_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      uzum_products: {
+        Row: {
+          barcode: string | null
+          boost_active: boolean | null
+          boost_budget: number | null
+          boost_ended_at: string | null
+          boost_started_at: string | null
+          brand_name: string | null
+          category_id: string | null
+          category_name: string | null
+          characteristics: Json | null
+          commission_percent: number | null
+          cost_price: number | null
+          created_at: string | null
+          description: string | null
+          description_ru: string | null
+          dimensions: Json | null
+          id: string
+          images: string[] | null
+          mxik_code: string | null
+          original_price: number | null
+          price: number | null
+          sku: string | null
+          status: string | null
+          stock_fbo: number | null
+          stock_fbs: number | null
+          stock_total: number | null
+          synced_at: string | null
+          title: string
+          title_ru: string | null
+          updated_at: string | null
+          user_id: string
+          uzum_account_id: string
+          uzum_product_id: string | null
+          weight_kg: number | null
+        }
+        Insert: {
+          barcode?: string | null
+          boost_active?: boolean | null
+          boost_budget?: number | null
+          boost_ended_at?: string | null
+          boost_started_at?: string | null
+          brand_name?: string | null
+          category_id?: string | null
+          category_name?: string | null
+          characteristics?: Json | null
+          commission_percent?: number | null
+          cost_price?: number | null
+          created_at?: string | null
+          description?: string | null
+          description_ru?: string | null
+          dimensions?: Json | null
+          id?: string
+          images?: string[] | null
+          mxik_code?: string | null
+          original_price?: number | null
+          price?: number | null
+          sku?: string | null
+          status?: string | null
+          stock_fbo?: number | null
+          stock_fbs?: number | null
+          stock_total?: number | null
+          synced_at?: string | null
+          title: string
+          title_ru?: string | null
+          updated_at?: string | null
+          user_id: string
+          uzum_account_id: string
+          uzum_product_id?: string | null
+          weight_kg?: number | null
+        }
+        Update: {
+          barcode?: string | null
+          boost_active?: boolean | null
+          boost_budget?: number | null
+          boost_ended_at?: string | null
+          boost_started_at?: string | null
+          brand_name?: string | null
+          category_id?: string | null
+          category_name?: string | null
+          characteristics?: Json | null
+          commission_percent?: number | null
+          cost_price?: number | null
+          created_at?: string | null
+          description?: string | null
+          description_ru?: string | null
+          dimensions?: Json | null
+          id?: string
+          images?: string[] | null
+          mxik_code?: string | null
+          original_price?: number | null
+          price?: number | null
+          sku?: string | null
+          status?: string | null
+          stock_fbo?: number | null
+          stock_fbs?: number | null
+          stock_total?: number | null
+          synced_at?: string | null
+          title?: string
+          title_ru?: string | null
+          updated_at?: string | null
+          user_id?: string
+          uzum_account_id?: string
+          uzum_product_id?: string | null
+          weight_kg?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "uzum_products_uzum_account_id_fkey"
+            columns: ["uzum_account_id"]
+            isOneToOne: false
+            referencedRelation: "uzum_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       uzum_transactions: {
         Row: {
           account_params: Json | null
@@ -3071,6 +3395,102 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      uzum_unit_economics: {
+        Row: {
+          calculated_at: string | null
+          commission_amount: number | null
+          commission_rate: number | null
+          cost_price: number | null
+          created_at: string | null
+          id: string
+          logistics_fee: number | null
+          margin_percent: number | null
+          net_profit: number | null
+          other_expenses: number | null
+          packaging_cost: number | null
+          product_name: string | null
+          return_cost: number | null
+          return_rate_percent: number | null
+          roi_percent: number | null
+          sale_price: number | null
+          sku: string | null
+          tax_amount: number | null
+          tax_rate: number | null
+          total_expenses: number | null
+          updated_at: string | null
+          user_id: string
+          uzum_account_id: string | null
+          uzum_product_id: string | null
+        }
+        Insert: {
+          calculated_at?: string | null
+          commission_amount?: number | null
+          commission_rate?: number | null
+          cost_price?: number | null
+          created_at?: string | null
+          id?: string
+          logistics_fee?: number | null
+          margin_percent?: number | null
+          net_profit?: number | null
+          other_expenses?: number | null
+          packaging_cost?: number | null
+          product_name?: string | null
+          return_cost?: number | null
+          return_rate_percent?: number | null
+          roi_percent?: number | null
+          sale_price?: number | null
+          sku?: string | null
+          tax_amount?: number | null
+          tax_rate?: number | null
+          total_expenses?: number | null
+          updated_at?: string | null
+          user_id: string
+          uzum_account_id?: string | null
+          uzum_product_id?: string | null
+        }
+        Update: {
+          calculated_at?: string | null
+          commission_amount?: number | null
+          commission_rate?: number | null
+          cost_price?: number | null
+          created_at?: string | null
+          id?: string
+          logistics_fee?: number | null
+          margin_percent?: number | null
+          net_profit?: number | null
+          other_expenses?: number | null
+          packaging_cost?: number | null
+          product_name?: string | null
+          return_cost?: number | null
+          return_rate_percent?: number | null
+          roi_percent?: number | null
+          sale_price?: number | null
+          sku?: string | null
+          tax_amount?: number | null
+          tax_rate?: number | null
+          total_expenses?: number | null
+          updated_at?: string | null
+          user_id?: string
+          uzum_account_id?: string | null
+          uzum_product_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "uzum_unit_economics_uzum_account_id_fkey"
+            columns: ["uzum_account_id"]
+            isOneToOne: false
+            referencedRelation: "uzum_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "uzum_unit_economics_uzum_product_id_fkey"
+            columns: ["uzum_product_id"]
+            isOneToOne: false
+            referencedRelation: "uzum_products"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       wildberries_connections: {
         Row: {
