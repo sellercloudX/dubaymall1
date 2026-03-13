@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 interface ProductInput {
@@ -14,12 +14,6 @@ interface ProductInput {
   images?: string[];
   category?: string;
   shopSku?: string;
-}
-
-interface CreateUzumCardRequest {
-  product: ProductInput;
-  cloneMode?: boolean;
-  skipImageGeneration?: boolean;
 }
 
 serve(async (req) => {
@@ -67,64 +61,29 @@ serve(async (req) => {
       );
     }
 
-    let apiKey = "";
     let shopId = "";
     if (conn.encrypted_credentials) {
-      const { data, error } = await supabase.rpc("decrypt_credentials", {
-        p_encrypted: conn.encrypted_credentials,
-      });
-      if (!error && data) {
-        apiKey = (data as any).apiKey || "";
-        shopId = (data as any).sellerId || "";
-      }
+      try {
+        const { data } = await supabase.rpc("decrypt_credentials", {
+          p_encrypted: conn.encrypted_credentials,
+        });
+        if (data) {
+          shopId = (data as any).sellerId || "";
+        }
+      } catch { /* ignore */ }
     } else {
-      apiKey = (conn.credentials as any)?.apiKey || "";
       shopId = (conn.credentials as any)?.sellerId || "";
     }
-
-    // Also try account_info for shopId
     if (!shopId) {
       shopId = (conn.account_info as any)?.shopId || (conn.account_info as any)?.sellerId || "";
     }
 
-    if (!apiKey) {
-      return new Response(
-        JSON.stringify({ success: false, error: "Uzum API kaliti yo'q" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    const request = await req.json();
+    const { product }: { product: ProductInput } = request;
 
-    const request: CreateUzumCardRequest = await req.json();
-    const { product } = request;
+    console.log(`Preparing Uzum card data for: "${product.name}", shopId: ${shopId}`);
 
-    console.log(`Creating Uzum card: "${product.name}", shopId: ${shopId}`);
-
-    const uzumBaseUrl = "https://api-seller.uzum.uz/api/seller-openapi";
-    const uzumHeaders: Record<string, string> = {
-      "Authorization": apiKey,
-      "Accept": "application/json",
-      "Content-Type": "application/json",
-    };
-
-    // Discover shopId if not available
-    if (!shopId) {
-      try {
-        const shopsResp = await fetch(`${uzumBaseUrl}/v1/shops`, { headers: uzumHeaders });
-        if (shopsResp.ok) {
-          const shopsData = await shopsResp.json();
-          const shops = Array.isArray(shopsData) ? shopsData : (shopsData.payload || []);
-          const shopList = Array.isArray(shops) ? shops : [shops];
-          if (shopList.length > 0) {
-            shopId = String(shopList[0].shopId || shopList[0].id || "");
-            console.log(`Discovered shopId: ${shopId}`);
-          }
-        }
-      } catch (e) {
-        console.error("Shop discovery failed:", e);
-      }
-    }
-
-    // Step 1: Generate AI content for Uzum card
+    // Generate AI content for the card
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     let cardContent: any = null;
 
@@ -217,14 +176,7 @@ JSON formatda quyidagilarni ber: name_uz, name_ru, description_uz, description_r
       };
     }
 
-    // Step 2: Try Uzum Seller API product creation endpoints
-    // Attempt 1: POST /v2/product (newer endpoint)
-    // Attempt 2: POST /v1/product/shop/{shopId} (older endpoint)
-    let uzumSuccess = false;
-    let uzumResponse: any = null;
-    let uzumError = "";
-
-    // Proxy images to Supabase storage
+    // Proxy images to storage for persistence
     const images = product.images || [];
     const proxiedImages: string[] = [];
     for (const imgUrl of images.slice(0, 10)) {
@@ -252,132 +204,22 @@ JSON formatda quyidagilarni ber: name_uz, name_ru, description_uz, description_r
       }
     }
 
-    // Try creating product via Uzum API
-    const productSku = product.shopSku || `SCX-${Date.now().toString(36).toUpperCase()}`;
-    const productPayload = {
-      title: cardContent.name_uz || product.name,
-      titleRu: cardContent.name_ru || product.name,
-      description: cardContent.description_uz || product.description || "",
-      descriptionRu: cardContent.description_ru || product.description || "",
-      price: Math.round(product.price * 100), // Uzum uses tiyin
-      images: proxiedImages.length > 0 ? proxiedImages : (images.length > 0 ? images : []),
-      shopId: shopId ? Number(shopId) : undefined,
-      sku: productSku,
-      characteristics: (cardContent.properties || []).map((p: any) => ({
-        title: p.name,
-        value: p.value,
-      })),
-    };
+    // NOTE: Uzum Seller OpenAPI does NOT have a product creation endpoint.
+    // The API only supports: GET products, POST price changes, FBS orders, stocks, invoices.
+    // We return prepared card data for manual upload or Chrome extension auto-fill.
+    console.log("✅ Uzum card data prepared (API does not support product creation)");
 
-    // Attempt 1: /v2/product
-    try {
-      console.log("Trying Uzum POST /v2/product...");
-      const resp = await fetch(`${uzumBaseUrl}/v2/product`, {
-        method: "POST",
-        headers: uzumHeaders,
-        body: JSON.stringify(productPayload),
-      });
-      const respText = await resp.text();
-      console.log(`Uzum /v2/product response: ${resp.status} ${respText.substring(0, 200)}`);
-      
-      if (resp.ok || resp.status === 201) {
-        try { uzumResponse = JSON.parse(respText); } catch { uzumResponse = respText; }
-        uzumSuccess = true;
-      } else if (resp.status === 404 || resp.status === 405) {
-        console.log("/v2/product not available, trying alternative...");
-      } else {
-        uzumError = respText.substring(0, 200);
-      }
-    } catch (e) {
-      console.error("Uzum /v2/product error:", e);
-    }
-
-    // Attempt 2: /v1/product/shop/{shopId}
-    if (!uzumSuccess && shopId) {
-      try {
-        console.log(`Trying Uzum POST /v1/product/shop/${shopId}...`);
-        const resp = await fetch(`${uzumBaseUrl}/v1/product/shop/${shopId}`, {
-          method: "POST",
-          headers: uzumHeaders,
-          body: JSON.stringify({
-            title: cardContent.name_uz || product.name,
-            description: cardContent.description_uz || "",
-            price: product.price,
-            photos: proxiedImages.length > 0 ? proxiedImages.map(url => ({ photoUrl: url })) : undefined,
-          }),
-        });
-        const respText = await resp.text();
-        console.log(`Uzum /v1/product response: ${resp.status} ${respText.substring(0, 200)}`);
-        
-        if (resp.ok || resp.status === 201) {
-          try { uzumResponse = JSON.parse(respText); } catch { uzumResponse = respText; }
-          uzumSuccess = true;
-        } else {
-          uzumError = respText.substring(0, 200);
-        }
-      } catch (e) {
-        console.error("Uzum /v1/product error:", e);
-      }
-    }
-
-    // Attempt 3: /v1/product-card (another possible endpoint)
-    if (!uzumSuccess) {
-      try {
-        console.log("Trying Uzum POST /v1/product-card...");
-        const resp = await fetch(`${uzumBaseUrl}/v1/product-card`, {
-          method: "POST",
-          headers: uzumHeaders,
-          body: JSON.stringify({
-            shopId: shopId ? Number(shopId) : undefined,
-            title: cardContent.name_uz || product.name,
-            titleRu: cardContent.name_ru || product.name,
-            description: cardContent.description_uz || "",
-            descriptionRu: cardContent.description_ru || "",
-            price: product.price,
-            photoUrls: proxiedImages.length > 0 ? proxiedImages : images,
-          }),
-        });
-        const respText = await resp.text();
-        console.log(`Uzum /v1/product-card response: ${resp.status} ${respText.substring(0, 200)}`);
-        
-        if (resp.ok || resp.status === 201) {
-          try { uzumResponse = JSON.parse(respText); } catch { uzumResponse = respText; }
-          uzumSuccess = true;
-        }
-      } catch (e) {
-        console.error("Uzum /v1/product-card error:", e);
-      }
-    }
-
-    if (uzumSuccess) {
-      console.log("✅ Uzum card created via API");
-      return new Response(
-        JSON.stringify({
-          success: true,
-          method: "api",
-          name: cardContent.name_uz || product.name,
-          price: product.price,
-          images: proxiedImages.length,
-          uzumResponse,
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // API creation not supported — return prepared card data for manual upload
-    console.log("Uzum API card creation not available, returning prepared data");
     return new Response(
       JSON.stringify({
         success: true,
         method: "prepared",
-        message: "Kartochka ma'lumotlari tayyor. Uzum Seller kabinetida qo'lda yuklab oling.",
+        message: "Uzum API kartochka yaratishni qo'llab-quvvatlamaydi. Ma'lumotlar tayyor — Seller kabinetida qo'lda yuklang yoki Chrome kengaytmasidan foydalaning.",
         card: {
           ...cardContent,
           price: product.price,
           images: proxiedImages.length > 0 ? proxiedImages : images,
           shopId,
         },
-        apiNote: uzumError || "Uzum Seller API hozircha kartochka yaratishni qo'llab-quvvatlamaydi",
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

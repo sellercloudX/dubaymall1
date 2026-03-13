@@ -552,7 +552,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
           throw new Error(`WB: ${cardResult.error}`);
         }
       } else if (targetMarketplace === 'uzum') {
-        // Uzum card creation
+        // Uzum API does NOT support product creation — only prepare data + offer extension auto-fill
         const { data: cardResult, error } = await supabase.functions.invoke('create-uzum-card', {
           body: {
             product: {
@@ -574,9 +574,8 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
         if (cardResult && !cardResult.success && cardResult.error) {
           throw new Error(`Uzum: ${cardResult.error}`);
         }
-        if (cardResult?.method === 'prepared') {
-          toast.info("Ma'lumotlar tayyor. Uzum Seller kabinetida qo'lda yuklang.");
-        }
+        // Uzum API doesn't support card creation — always "prepared" mode
+        // Card data saved for potential extension auto-fill use
       } else {
         // Yandex card creation — ALWAYS skip image gen since AIScannerPro already generated them
         const hasAiImages = generatedInfos.length >= 1;
@@ -654,7 +653,12 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
       }
 
       updateTaskStatus('completed', generatedInfos);
-      toast.success(`"${normalizedProductName}" kartochkasi tayyor!`);
+      if (targetMarketplace === 'uzum') {
+        toast.success(`"${normalizedProductName}" ma'lumotlari tayyor! Uzum Seller kabinetiga o'ting va qo'lda yuklang.`, { duration: 6000 });
+        toast.info("💡 SellerCloudX Chrome kengaytmasini o'rnating — avtomatik to'ldirish imkoniyati!", { duration: 8000 });
+      } else {
+        toast.success(`"${normalizedProductName}" kartochkasi tayyor!`);
+      }
       
       if (onSuccess) onSuccess();
     } catch (error: any) {
