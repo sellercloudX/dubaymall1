@@ -415,7 +415,23 @@ JSON:
       .replace(/,\s*([}\]])/g, '$1')
       .replace(/'/g, '"')
       .replace(/[\x00-\x1F\x7F]/g, ' ');
-    const result = JSON.parse(cleanJson);
+    let result: any;
+    try {
+      result = JSON.parse(cleanJson);
+    } catch (parseErr) {
+      console.warn('[MXIK] AI JSON parse failed, using first candidate fallback:', parseErr);
+      const fb = candidates[0];
+      return {
+        mxik_code: fb.code,
+        mxik_name: fb.name_uz,
+        name_ru: fb.name_ru,
+        vat_rate: 12,
+        confidence: 55,
+        alternatives: candidates.slice(1, 4).map(c => ({
+          code: c.code, name_uz: c.name_uz, name_ru: c.name_ru, confidence: 45,
+        })),
+      };
+    }
     const selectedCode = String(result.mxik_code || '');
 
     const isValid = candidates.some(c => c.code === selectedCode);
