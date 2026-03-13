@@ -98,6 +98,7 @@ const pageTitles: Record<string, string> = {
   'seo-monitor': 'SEO Monitor',
   'auto-reorder': 'Avto buyurtma rejasi',
   team: 'Jamoa boshqaruvi',
+  'uzum-dashboard': 'Uzum Market Pro',
 };
 
 export default function SellerCloudX() {
