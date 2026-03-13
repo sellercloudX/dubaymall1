@@ -279,7 +279,7 @@ export default function UzumFBSLogistics() {
                   <div
                     key={order.id}
                     className={`p-3 rounded-lg border text-xs transition-all ${
-                      ['CREATED', 'PACKING'].includes(order.status)
+                      ['CREATED', 'PACKING'].includes(order.status || '')
                         ? 'border-warning/30 bg-warning/5'
                         : order.status === 'READY_TO_SHIP'
                         ? 'border-accent/30 bg-accent/5'
