@@ -308,6 +308,21 @@ export default function UzumDashboard({ marketplace = 'uzum' }: UzumDashboardPro
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Card Creator Tab */}
+        <TabsContent value="card-creator">
+          <UzumProductCardCreator />
+        </TabsContent>
+
+        {/* Boost Tab */}
+        <TabsContent value="boost">
+          <UzumBoostManager />
+        </TabsContent>
+
+        {/* Manager Tab */}
+        <TabsContent value="manager">
+          <UzumManagerInvite />
+        </TabsContent>
       </Tabs>
     </div>
   );
