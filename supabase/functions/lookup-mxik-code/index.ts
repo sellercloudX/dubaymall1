@@ -336,7 +336,8 @@ async function aiSelectBestCode(
       const fbContent = fbData.choices?.[0]?.message?.content?.trim() || '';
       const fbMatch = fbContent.match(/\{[\s\S]*\}/);
       if (fbMatch) {
-        const fbResult = JSON.parse(fbMatch[0]);
+        const fbClean = fbMatch[0].replace(/,\s*([}\]])/g, '$1').replace(/'/g, '"').replace(/[\x00-\x1F\x7F]/g, ' ');
+        const fbResult = JSON.parse(fbClean);
         const code = String(fbResult.mxik_code || '').replace(/\D/g, '').padEnd(17, '0').slice(0, 17);
         return {
           mxik_code: code,
@@ -409,7 +410,12 @@ JSON:
 
   const match = content.match(/\{[\s\S]*\}/);
   if (match) {
-    const result = JSON.parse(match[0]);
+    // Clean AI-generated JSON: remove trailing commas before ] or }
+    const cleanJson = match[0]
+      .replace(/,\s*([}\]])/g, '$1')
+      .replace(/'/g, '"')
+      .replace(/[\x00-\x1F\x7F]/g, ' ');
+    const result = JSON.parse(cleanJson);
     const selectedCode = String(result.mxik_code || '');
 
     const isValid = candidates.some(c => c.code === selectedCode);
