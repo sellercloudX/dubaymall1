@@ -2196,7 +2196,7 @@ serve(async (req) => {
                 allOrders.push(order);
               }
             }
-              } // end shopResults
+              } // end orderList mapping
               await sleep(100); // brief pause between statuses
             } // end for statuses in batch
           } // end for batches
