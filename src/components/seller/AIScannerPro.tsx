@@ -96,7 +96,7 @@ interface BackgroundTask {
 }
 
 type Step = 'capture' | 'analyzing' | 'pricing';
-type TargetMarketplace = 'yandex' | 'wildberries';
+type TargetMarketplace = 'yandex' | 'wildberries' | 'uzum';
 
 interface AIScannerProProps {
   shopId: string;
@@ -540,17 +540,42 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
             },
             skipImageGeneration: generatedInfos.length >= 2,
             cloneMode: false,
-            skipBilling: true, // Scanner handles billing
+            skipBilling: true,
           },
         });
 
-        
         if (error) {
           const errDetail = cardResult?.error || error.message || 'WB xatosi';
           throw new Error(`WB: ${errDetail}`);
         }
         if (cardResult && !cardResult.success && cardResult.error) {
           throw new Error(`WB: ${cardResult.error}`);
+        }
+      } else if (targetMarketplace === 'uzum') {
+        // Uzum card creation
+        const { data: cardResult, error } = await supabase.functions.invoke('create-uzum-card', {
+          body: {
+            product: {
+              name: normalizedProductName,
+              description: product.description || analyzed?.description,
+              price: pricingData.sellingPrice,
+              costPrice: pricingData.costPrice,
+              images: cardImages,
+              category: analyzed?.category,
+            },
+            skipImageGeneration: generatedInfos.length >= 2,
+          },
+        });
+
+        if (error) {
+          const errDetail = cardResult?.error || error.message || 'Uzum xatosi';
+          throw new Error(`Uzum: ${errDetail}`);
+        }
+        if (cardResult && !cardResult.success && cardResult.error) {
+          throw new Error(`Uzum: ${cardResult.error}`);
+        }
+        if (cardResult?.method === 'prepared') {
+          toast.info("Ma'lumotlar tayyor. Uzum Seller kabinetida qo'lda yuklang.");
         }
       } else {
         // Yandex card creation — ALWAYS skip image gen since AIScannerPro already generated them
@@ -575,7 +600,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
               mxikName: mxikResult?.mxik_name,
             },
             skipImageGeneration: hasAiImages,
-            skipBilling: true, // Scanner handles billing
+            skipBilling: true,
             pricing: {
               costPrice: pricingData.costPrice,
               recommendedPrice: pricingData.sellingPrice,
@@ -588,17 +613,14 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
           },
         });
 
-        
         if (error) {
           const errDetail = cardResult?.error || error.message || 'Yandex xatosi';
           throw new Error(`Yandex: ${errDetail}`);
         }
-        // Check for Yandex API-level errors in the response
         if (cardResult?.results?.[0]?.error) {
           const yErr = cardResult.results[0].error;
           console.error('Yandex API error:', yErr);
           toast.error(`Yandex xatosi: ${yErr.substring(0, 150)}`);
-          // Don't throw — card may still be partially created
         }
       }
 
@@ -665,7 +687,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
         { name: 'Tavsif yaratish', status: 'pending', model: 'AI', icon: <FileText className="h-4 w-4" /> },
         { name: 'MXIK aniqlash', status: 'pending', model: 'Gemini + DB', icon: <Hash className="h-4 w-4" /> },
         { name: 'Rasm + Infografika', status: 'pending', model: 'OpenAI gpt-image-1', icon: <ImageLucide className="h-4 w-4" /> },
-        { name: 'Kartochka yaratish', status: 'pending', model: targetMarketplace === 'wildberries' ? 'WB API' : 'Yandex API', icon: <Store className="h-4 w-4" /> },
+        { name: 'Kartochka yaratish', status: 'pending', model: targetMarketplace === 'wildberries' ? 'WB API' : targetMarketplace === 'uzum' ? 'Uzum API' : 'Yandex API', icon: <Store className="h-4 w-4" /> },
       ],
       generatedImages: [],
       startedAt: new Date(),
@@ -986,7 +1008,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
                 onClick={() => setTargetMarketplace('yandex')}
                 className="flex-1"
               >
-                🟡 Yandex Market
+                🟡 Yandex
               </Button>
               <Button
                 variant={targetMarketplace === 'wildberries' ? 'default' : 'outline'}
@@ -994,7 +1016,15 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
                 onClick={() => setTargetMarketplace('wildberries')}
                 className="flex-1"
               >
-                🟣 Wildberries
+                🟣 WB
+              </Button>
+              <Button
+                variant={targetMarketplace === 'uzum' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setTargetMarketplace('uzum')}
+                className="flex-1"
+              >
+                🟢 Uzum
               </Button>
             </div>
             {/* Selected Product Preview */}
