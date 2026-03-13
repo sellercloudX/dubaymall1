@@ -426,7 +426,8 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
           return false;
         }
         if (data.method === 'prepared') {
-          toast.info(`${product.name.slice(0, 25)}: Ma'lumotlar tayyor (qo'lda yuklash kerak)`);
+          toast.info(`${product.name.slice(0, 25)}: Ma'lumotlar tayyor. Uzum kabinetida qo'lda yuklang.`, { duration: 5000 });
+          toast.info("💡 Chrome kengaytmasi orqali avtomatik to'ldirish mumkin!", { duration: 6000 });
         }
         return true;
       }
