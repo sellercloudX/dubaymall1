@@ -199,7 +199,9 @@ export default function SellerCloudMobile() {
       case 'analytics':
         return <MobileAnalytics connections={connections} connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'scanner':
-        return <div className="p-4"><AIScannerPro shopId="sellercloud" /></div>;
+        return connectedMarketplaces.length > 0
+          ? <div className="p-4"><AIScannerPro shopId="sellercloud" /></div>
+          : <div className="p-4 text-center text-muted-foreground py-12"><p className="text-lg font-medium">AI Scanner Pro</p><p className="text-sm mt-1">Avval kamida bitta marketplace ulang</p></div>;
       case 'products':
         return <MobileProducts connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'orders':
