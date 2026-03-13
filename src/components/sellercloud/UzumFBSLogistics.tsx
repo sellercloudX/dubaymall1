@@ -93,7 +93,7 @@ export default function UzumFBSLogistics() {
   const pendingCount = orders.filter(o => ['CREATED', 'PACKING', 'READY_TO_SHIP'].includes(o.status || '')).length;
   const shippedCount = orders.filter(o => ['SHIPPED', 'DELIVERING'].includes(o.status || '')).length;
   const todayOrders = orders.filter(o => {
-    const created = new Date(o.created_at);
+    const created = new Date(o.created_at || '');
     const today = new Date();
     return created.toDateString() === today.toDateString();
   }).length;
