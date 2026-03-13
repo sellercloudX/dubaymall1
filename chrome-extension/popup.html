@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SellerCloudX Pro</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 340px;
+      min-height: 420px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: #0f0f23;
+      color: #e2e8f0;
+    }
+    .header {
+      background: linear-gradient(135deg, #8b5cf6, #6366f1);
+      padding: 16px 20px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .header-icon {
+      width: 32px; height: 32px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+    .header h1 { font-size: 16px; font-weight: 700; color: white; }
+    .header p { font-size: 11px; color: rgba(255,255,255,0.7); }
+    
+    .content { padding: 16px; }
+    
+    .status-card {
+      background: #1a1a2e;
+      border: 1px solid #2d2d44;
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+    .status-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 6px 0;
+    }
+    .status-label { font-size: 12px; color: #94a3b8; }
+    .status-value { font-size: 12px; font-weight: 600; }
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 6px;
+    }
+    .dot-green { background: #22c55e; box-shadow: 0 0 6px #22c55e55; }
+    .dot-red { background: #ef4444; box-shadow: 0 0 6px #ef444455; }
+    .dot-yellow { background: #eab308; box-shadow: 0 0 6px #eab30855; }
+    
+    .section-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #64748b;
+      margin: 16px 0 8px;
+    }
+    
+    .btn {
+      width: 100%;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.15s;
+      margin-bottom: 8px;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn:active { transform: translateY(0); }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, #8b5cf6, #6366f1);
+      color: white;
+    }
+    .btn-primary:hover { box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4); }
+    
+    .btn-success {
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      color: white;
+    }
+    
+    .btn-outline {
+      background: transparent;
+      border: 1px solid #2d2d44;
+      color: #94a3b8;
+    }
+    .btn-outline:hover { border-color: #8b5cf6; color: #c4b5fd; }
+    
+    .btn-danger {
+      background: transparent;
+      border: 1px solid #7f1d1d;
+      color: #fca5a5;
+    }
+    .btn-danger:hover { background: #7f1d1d33; }
+    
+    .input-group {
+      margin-bottom: 12px;
+    }
+    .input-group label {
+      display: block;
+      font-size: 11px;
+      color: #94a3b8;
+      margin-bottom: 4px;
+    }
+    .input-group input {
+      width: 100%;
+      padding: 8px 12px;
+      background: #1a1a2e;
+      border: 1px solid #2d2d44;
+      border-radius: 8px;
+      color: #e2e8f0;
+      font-size: 13px;
+      outline: none;
+    }
+    .input-group input:focus { border-color: #8b5cf6; }
+    
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .stat-card {
+      background: #1a1a2e;
+      border: 1px solid #2d2d44;
+      border-radius: 8px;
+      padding: 10px;
+      text-align: center;
+    }
+    .stat-value { font-size: 18px; font-weight: 700; color: #c4b5fd; }
+    .stat-label { font-size: 10px; color: #64748b; margin-top: 2px; }
+    
+    .footer {
+      padding: 12px 16px;
+      border-top: 1px solid #2d2d44;
+      text-align: center;
+      font-size: 10px;
+      color: #475569;
+    }
+    
+    #login-section, #dashboard-section { display: none; }
+    
+    .command-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px;
+      background: #1a1a2e;
+      border: 1px solid #2d2d44;
+      border-radius: 8px;
+      margin-bottom: 6px;
+      font-size: 11px;
+    }
+    .command-icon { font-size: 16px; }
+    .command-status { margin-left: auto; font-size: 10px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-icon">⚡</div>
+    <div>
+      <h1>SellerCloudX Pro</h1>
+      <p>Uzum Market Avtomatlashtirish</p>
+    </div>
+  </div>
+
+  <!-- Login Section -->
+  <div id="login-section" class="content">
+    <div class="status-card">
+      <div style="text-align: center; padding: 8px 0;">
+        <div style="font-size: 32px; margin-bottom: 8px;">🔐</div>
+        <div style="font-size: 13px; font-weight: 600; margin-bottom: 4px;">Tizimga kirish</div>
+        <div style="font-size: 11px; color: #94a3b8;">SellerCloudX akkauntingiz bilan ulaning</div>
+      </div>
+    </div>
+    
+    <div class="input-group">
+      <label>Email</label>
+      <input type="email" id="login-email" placeholder="email@example.com" />
+    </div>
+    <div class="input-group">
+      <label>Parol</label>
+      <input type="password" id="login-password" placeholder="••••••••" />
+    </div>
+    
+    <button class="btn btn-primary" id="login-btn">
+      🚀 Kirish
+    </button>
+    
+    <div id="login-error" style="color: #fca5a5; font-size: 11px; text-align: center; margin-top: 8px; display: none;"></div>
+  </div>
+
+  <!-- Dashboard Section -->
+  <div id="dashboard-section" class="content">
+    <div class="status-card">
+      <div class="status-row">
+        <span class="status-label">Ulanish holati</span>
+        <span class="status-value" id="connection-status">
+          <span class="status-dot dot-yellow"></span>Tekshirilmoqda...
+        </span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Uzum Seller</span>
+        <span class="status-value" id="seller-status">—</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Foydalanuvchi</span>
+        <span class="status-value" id="user-email" style="font-size: 11px;">—</span>
+      </div>
+    </div>
+    
+    <div class="section-title">Statistika</div>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value" id="stat-pending">0</div>
+        <div class="stat-label">Kutilmoqda</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-completed">0</div>
+        <div class="stat-label">Bajarildi</div>
+      </div>
+    </div>
+    
+    <div class="section-title">Oxirgi buyruqlar</div>
+    <div id="commands-list">
+      <div class="command-item" style="justify-content: center; color: #64748b;">
+        Hali buyruqlar yo'q
+      </div>
+    </div>
+    
+    <div class="section-title">Tez harakatlar</div>
+    <button class="btn btn-success" id="open-seller-btn">
+      🏪 Uzum Seller'ni ochish
+    </button>
+    <button class="btn btn-outline" id="refresh-btn">
+      🔄 Ma'lumotlarni yangilash
+    </button>
+    <button class="btn btn-danger" id="logout-btn">
+      Chiqish
+    </button>
+  </div>
+
+  <div class="footer">
+    SellerCloudX Pro v1.0 · sellercloudx.lovable.app
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
