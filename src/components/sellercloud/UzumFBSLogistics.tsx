@@ -15,15 +15,18 @@ import { toast } from '@/hooks/use-toast';
 
 interface FBSOrder {
   id: string;
-  order_id: string;
-  status: string;
-  fulfillment_type: string;
-  total_amount: number;
-  items: any[];
-  customer_name?: string;
-  delivery_address?: string;
-  created_at: string;
-  fbs_substatus?: string;
+  order_code: string;
+  order_number: string | null;
+  status: string | null;
+  fulfillment_type: string | null;
+  total_amount: number | null;
+  items: any;
+  buyer_info: any;
+  delivery_info: any;
+  created_at: string | null;
+  substatus: string | null;
+  label_url: string | null;
+  label_generated_at: string | null;
 }
 
 const FBS_STATUSES: Record<string, { label: string; color: string; icon: React.ElementType }> = {
