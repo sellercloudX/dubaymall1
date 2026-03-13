@@ -291,7 +291,7 @@ export default function UzumFBSLogistics() {
                       <div className="flex items-center gap-2">
                         <StatusIcon className={`w-4 h-4 ${statusInfo.color}`} />
                         <div>
-                          <span className="font-medium text-foreground">#{order.order_id}</span>
+                          <span className="font-medium text-foreground">#{order.order_code}</span>
                           <Badge variant="outline" className={`ml-1.5 text-[9px] h-4 ${statusInfo.color}`}>
                             {statusInfo.label}
                           </Badge>
