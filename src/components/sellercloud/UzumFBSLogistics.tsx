@@ -79,7 +79,7 @@ export default function UzumFBSLogistics() {
       (o.buyer_info as any)?.name?.toLowerCase().includes(search.toLowerCase());
 
     if (filter === 'pending') {
-      return matchesSearch && ['CREATED', 'PACKING', 'READY_TO_SHIP'].includes(o.status);
+      return matchesSearch && ['CREATED', 'PACKING', 'READY_TO_SHIP'].includes(o.status || '');
     }
     if (filter === 'shipped') {
       return matchesSearch && ['SHIPPED', 'DELIVERING'].includes(o.status);
