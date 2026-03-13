@@ -21,6 +21,7 @@ import UzumLostItems from './UzumLostItems';
 import UzumProductCardCreator from './UzumProductCardCreator';
 import UzumBoostManager from './UzumBoostManager';
 import UzumManagerInvite from './UzumManagerInvite';
+import UzumFBSLogistics from './UzumFBSLogistics';
 
 interface UzumDashboardProps {
   marketplace?: string;
@@ -257,7 +258,7 @@ export default function UzumDashboard({ marketplace = 'uzum' }: UzumDashboardPro
                   <Truck className="w-3.5 h-3.5 mr-1.5 text-accent" />
                   FBS buyurtmalar
                 </Button>
-                <Button variant="outline" size="sm" className="h-9 text-xs justify-start">
+                <Button variant="outline" size="sm" className="h-9 text-xs justify-start" onClick={() => setActiveTab('boost')}>
                   <Eye className="w-3.5 h-3.5 mr-1.5 text-success" />
                   Boost boshqaruv
                 </Button>
@@ -277,36 +278,8 @@ export default function UzumDashboard({ marketplace = 'uzum' }: UzumDashboardPro
         </TabsContent>
 
         {/* FBS Tab */}
-        <TabsContent value="fbs" className="space-y-3">
-          <Card className="border-border/50">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Truck className="w-4 h-4 text-accent" />
-                FBS kutilayotgan buyurtmalar
-                {stats.pendingFbs > 0 && (
-                  <Badge variant="destructive" className="text-[10px] h-4">{stats.pendingFbs}</Badge>
-                )}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {stats.pendingFbs === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Truck className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                  <p className="text-sm">Hozircha kutilayotgan FBS buyurtmalar yo'q</p>
-                </div>
-              ) : (
-                <div className="text-center py-4">
-                  <p className="text-sm text-muted-foreground">
-                    {stats.pendingFbs} ta buyurtma yig'ish va jo'natish kutilmoqda
-                  </p>
-                  <Button size="sm" className="mt-3 text-xs">
-                    <Package className="w-3.5 h-3.5 mr-1.5" />
-                    Etiketka generatsiya qilish
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        <TabsContent value="fbs">
+          <UzumFBSLogistics />
         </TabsContent>
 
         {/* Card Creator Tab */}

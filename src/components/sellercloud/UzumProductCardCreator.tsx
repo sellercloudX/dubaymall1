@@ -108,7 +108,7 @@ export default function UzumProductCardCreator() {
     update('images', form.images.filter((_, i) => i !== idx));
   };
 
-  // AI-generate title & description
+  // AI-generate title & description using dedicated prepare-uzum-card function
   const generateWithAI = async () => {
     if (!form.title) {
       toast({ title: 'Xato', description: 'Avval mahsulot nomini kiriting', variant: 'destructive' });
@@ -116,22 +116,43 @@ export default function UzumProductCardCreator() {
     }
     setIsGenerating(true);
     try {
-      const { data, error } = await supabase.functions.invoke('generate-product-content', {
+      const { data, error } = await supabase.functions.invoke('prepare-uzum-card', {
         body: {
           productName: form.title,
-          category: form.category,
-          marketplace: 'uzum',
+          description: form.description || undefined,
+          category: form.category || undefined,
+          brand: form.brandName || undefined,
+          price: form.price > 0 ? form.price : undefined,
+          specifications: form.attributes.filter(a => a.name && a.value).length > 0
+            ? Object.fromEntries(form.attributes.filter(a => a.name && a.value).map(a => [a.name, a.value]))
+            : undefined,
         },
       });
       if (error) throw error;
-      if (data?.title) update('title', data.title);
-      if (data?.titleRu) update('titleRu', data.titleRu);
-      if (data?.description) update('description', data.description);
-      if (data?.descriptionRu) update('descriptionRu', data.descriptionRu);
-      if (data?.attributes?.length) {
-        update('attributes', data.attributes.map((a: any) => ({ name: a.name || a.title, value: a.value })));
+
+      const card = data?.card;
+      if (card) {
+        if (card.name_uz) update('title', card.name_uz);
+        if (card.name_ru) update('titleRu', card.name_ru);
+        if (card.short_description_uz && card.full_description_uz) {
+          update('description', card.full_description_uz);
+        } else if (card.short_description_uz) {
+          update('description', card.short_description_uz);
+        }
+        if (card.short_description_ru && card.full_description_ru) {
+          update('descriptionRu', card.full_description_ru);
+        } else if (card.short_description_ru) {
+          update('descriptionRu', card.short_description_ru);
+        }
+        if (card.brand) update('brandName', card.brand);
+        if (card.properties?.length) {
+          update('attributes', card.properties.map((p: any) => ({
+            name: p.name_uz || p.name,
+            value: p.value_uz || p.value,
+          })));
+        }
       }
-      toast({ title: 'AI kontent yaratildi', description: 'Nom, tavsif va xususiyatlar generatsiya qilindi' });
+      toast({ title: 'AI kontent yaratildi ✨', description: 'Nom, tavsif va xususiyatlar Uzum standartiga mos generatsiya qilindi' });
     } catch (err: any) {
       toast({ title: 'AI xato', description: err.message, variant: 'destructive' });
     } finally {
