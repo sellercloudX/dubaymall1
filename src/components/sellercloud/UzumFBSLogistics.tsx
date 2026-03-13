@@ -85,7 +85,7 @@ export default function UzumFBSLogistics() {
       return matchesSearch && ['SHIPPED', 'DELIVERING'].includes(o.status || '');
     }
     if (filter === 'completed') {
-      return matchesSearch && ['DELIVERED'].includes(o.status);
+      return matchesSearch && ['DELIVERED'].includes(o.status || '');
     }
     return matchesSearch;
   });
