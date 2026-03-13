@@ -2204,37 +2204,28 @@ serve(async (req) => {
           console.log(`Uzum FBS orders collected: ${allOrders.length}`);
 
           // ===== FETCH FBO DATA via /v1/finance/orders =====
-          // This is the ONLY way to get FBO orders from Uzum — /v2/fbs/orders only returns FBS
+          // Finance API returns ALL orders (FBO+FBS) — we deduplicate with orderIdsSeen
+          // shopIds is REQUIRED per Uzum OpenAPI spec — no global fallback possible
           try {
             const finShopIds = allShopIds.length > 0 ? allShopIds : (uzumShopId ? [String(uzumShopId)] : []);
-            console.log(`Uzum FBO: querying ${finShopIds.length} shops via finance API`);
+            console.log(`Uzum Finance orders: querying with ${finShopIds.length} shopIds`);
             const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
             let fboCount = 0;
 
-            // Strategy: Try per-shop first, then try WITHOUT shopIds as global fallback
-            const shopQueries = [...finShopIds];
-            // Add a global query (no shopIds) as fallback if per-shop returns nothing
-            let triedGlobal = false;
+            let finPage = 0;
+            let finHasMore = true;
 
-            for (let si = 0; si < shopQueries.length; si++) {
-              const sid = shopQueries[si];
-              if (si > 0) await sleep(200);
-
-              let finPage = 0;
-              let finHasMore = true;
-              let shopFboCount = 0;
-
-              while (finHasMore && finPage < 20) {
-                const finParams = new URLSearchParams({
-                  dateFrom: String(ninetyDaysAgo),
-                  dateTo: String(Date.now()),
-                  size: "100",
-                  page: String(finPage),
-                });
-                // Only add shopIds if we have a specific shop (not global query)
-                if (sid !== '__global__') {
-                  finParams.append("shopIds", sid);
-                }
+            while (finHasMore && finPage < 20) {
+              // Build params with shopIds as repeated array params (REQUIRED by API)
+              const finParams = new URLSearchParams();
+              finParams.append('dateFrom', String(ninetyDaysAgo));
+              finParams.append('dateTo', String(Date.now()));
+              finParams.append('size', '100');
+              finParams.append('page', String(finPage));
+              // Add ALL shopIds as array params: shopIds=40852&shopIds=71592...
+              for (const sid of finShopIds) {
+                finParams.append('shopIds', sid);
+              }
 
                 try {
                   const finUrl = `${uzumBaseUrl}/v1/finance/orders?${finParams.toString()}`;
