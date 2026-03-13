@@ -75,8 +75,8 @@ export default function UzumFBSLogistics() {
 
   const filteredOrders = orders.filter(o => {
     const matchesSearch = !search ||
-      o.order_id?.toLowerCase().includes(search.toLowerCase()) ||
-      o.customer_name?.toLowerCase().includes(search.toLowerCase());
+      o.order_code?.toLowerCase().includes(search.toLowerCase()) ||
+      (o.buyer_info as any)?.name?.toLowerCase().includes(search.toLowerCase());
 
     if (filter === 'pending') {
       return matchesSearch && ['CREATED', 'PACKING', 'READY_TO_SHIP'].includes(o.status);
