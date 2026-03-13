@@ -63,7 +63,7 @@ export default function UzumFBSLogistics() {
 
       const { data, error } = await query;
       if (error) throw error;
-      setOrders((data || []) as FBSOrder[]);
+      setOrders((data || []) as unknown as FBSOrder[]);
     } catch (err) {
       console.error('Failed to load FBS orders:', err);
     } finally {
