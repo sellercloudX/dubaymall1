@@ -302,6 +302,8 @@ export default function SellerCloudX() {
         return <MxikImport />;
       case 'team':
         return <TeamManager />;
+      case 'uzum-dashboard':
+        return <UzumDashboard />;
       case 'subscription':
         return <SubscriptionBilling totalSalesVolume={totalRevenue} />;
       case 'reports':
