@@ -99,15 +99,53 @@ export default function UzumProductCardCreator() {
     update('attributes', attrs);
   };
 
-  const addImage = () => {
-    if (imageUrl && imageUrl.startsWith('http')) {
+  const addImage = async () => {
+    if (!imageUrl || !imageUrl.startsWith('http')) return;
+    if (!user) return;
+    
+    setIsResizing(true);
+    try {
+      // Avtomatik 1080x1440 ga resize qilish
+      const publicUrl = await resizeAndUploadForUzum(supabase, user.id, imageUrl, resizeMode);
+      if (publicUrl) {
+        update('images', [...form.images, publicUrl]);
+        setImageUrl('');
+        toast({ title: '✅ Rasm tayyor', description: 'Rasm 1080×1440 ga o\'zgartirildi va yuklandi' });
+      } else {
+        // Fallback: original URL
+        update('images', [...form.images, imageUrl]);
+        setImageUrl('');
+        toast({ title: '⚠️ Resize xatosi', description: 'Original rasm qo\'shildi. Uzum rad etishi mumkin.', variant: 'destructive' });
+      }
+    } catch (err) {
+      console.error('Image resize error:', err);
       update('images', [...form.images, imageUrl]);
       setImageUrl('');
+    } finally {
+      setIsResizing(false);
     }
   };
 
-  const removeImage = (idx: number) => {
-    update('images', form.images.filter((_, i) => i !== idx));
+  const addImageFromFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    
+    setIsResizing(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        const base64 = ev.target?.result as string;
+        const publicUrl = await resizeAndUploadForUzum(supabase, user.id, base64, resizeMode);
+        if (publicUrl) {
+          update('images', [...form.images, publicUrl]);
+          toast({ title: '✅ Rasm tayyor', description: '1080×1440 resize + upload muvaffaqiyatli' });
+        }
+        setIsResizing(false);
+      };
+      reader.readAsDataURL(file);
+    } catch {
+      setIsResizing(false);
+    }
   };
 
   // AI-generate title & description using dedicated prepare-uzum-card function
