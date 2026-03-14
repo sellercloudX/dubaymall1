@@ -35,6 +35,8 @@ export default function UzumManagerInvite() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [managerPhone, setManagerPhone] = useState('');
+  const [apiKey, setApiKey] = useState('');
+  const [apiKeySaved, setApiKeySaved] = useState(false);
   const [extensionStatus, setExtensionStatus] = useState<ExtensionStatus>({
     connected: false,
     lastPing: null,
@@ -56,6 +58,23 @@ export default function UzumManagerInvite() {
       if (data) {
         setAccount(data);
         setManagerPhone((data as any).manager_phone || '');
+      }
+
+      // Check if real API key already exists in marketplace_connections
+      const { data: conn } = await supabase
+        .from('marketplace_connections')
+        .select('credentials')
+        .eq('user_id', user.id)
+        .eq('marketplace', 'uzum')
+        .maybeSingle();
+
+      if (conn?.credentials) {
+        const creds = conn.credentials as any;
+        const existingKey = typeof creds.apiKey === 'string' ? creds.apiKey.trim() : '';
+        if (existingKey && existingKey !== 'manager_session') {
+          setApiKeySaved(true);
+          setApiKey(existingKey.substring(0, 8) + '...');
+        }
       }
 
       // Check pending extension commands
@@ -251,6 +270,60 @@ export default function UzumManagerInvite() {
     }
   };
 
+  const saveApiKey = async () => {
+    if (!user || !apiKey.trim() || apiKey.includes('...')) return;
+    setIsSaving(true);
+    try {
+      // Get existing connection
+      const { data: conn } = await supabase
+        .from('marketplace_connections')
+        .select('id, credentials, account_info')
+        .eq('user_id', user.id)
+        .eq('marketplace', 'uzum')
+        .maybeSingle();
+
+      if (!conn) {
+        // Create new connection with the API key
+        const { error } = await supabase
+          .from('marketplace_connections')
+          .insert({
+            user_id: user.id,
+            marketplace: 'uzum',
+            credentials: { apiKey: apiKey.trim(), sellerId: '' },
+            is_active: true,
+            account_info: { connectionType: 'manager', storeName: 'Uzum Do\'kon' },
+          });
+        if (error) throw error;
+      } else {
+        // Update existing connection with real API key
+        const existingCreds = (conn.credentials as any) || {};
+        const { error } = await supabase
+          .from('marketplace_connections')
+          .update({
+            credentials: { ...existingCreds, apiKey: apiKey.trim() },
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', conn.id);
+        if (error) throw error;
+      }
+
+      // Also save to uzum_accounts
+      if (account) {
+        await supabase
+          .from('uzum_accounts')
+          .update({ api_key: apiKey.trim() } as any)
+          .eq('id', account.id);
+      }
+
+      setApiKeySaved(true);
+      toast({ title: '✅ API kalit saqlandi!', description: 'Endi ma\'lumotlar sinxronlanadi.' });
+    } catch (err: any) {
+      toast({ title: 'Xato', description: err.message, variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const managerStatus = account?.manager_status || 'not_invited';
   const statusInfo = MANAGER_STATUSES[managerStatus as keyof typeof MANAGER_STATUSES] || MANAGER_STATUSES.not_invited;
   const StatusIcon = statusInfo.icon;
@@ -407,6 +480,52 @@ export default function UzumManagerInvite() {
                   </Button>
                 </CardContent>
               </Card>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* API Key Input */}
+      <Card className={`border-2 ${apiKeySaved ? 'border-success/30 bg-success/5' : 'border-warning/30 bg-warning/5'}`}>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Shield className="w-4 h-4 text-primary" />
+            Uzum Seller OpenAPI kalit
+            {apiKeySaved && (
+              <Badge variant="secondary" className="text-[10px] text-success">
+                <CheckCircle2 className="w-3 h-3 mr-0.5" />
+                Saqlangan
+              </Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="text-[11px] text-muted-foreground leading-relaxed">
+            <strong>Uzum Seller</strong> → Sozlamalar → API bo'limidan OpenAPI kalitni oling va pastga kiriting. 
+            Bu kalit mahsulotlar, buyurtmalar va moliya ma'lumotlarini olish uchun kerak.
+          </div>
+          <div className="flex gap-2">
+            <Input
+              value={apiKey}
+              onChange={e => { setApiKey(e.target.value); setApiKeySaved(false); }}
+              placeholder="API kalitni kiriting..."
+              className="h-8 text-xs flex-1 font-mono"
+              type="password"
+            />
+            <Button
+              size="sm"
+              onClick={saveApiKey}
+              disabled={isSaving || !apiKey.trim() || apiKey.includes('...')}
+              className="h-8 text-xs"
+            >
+              {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3 mr-1" />}
+              Saqlash
+            </Button>
+          </div>
+          {!apiKeySaved && (
+            <div className="flex items-start gap-2 text-[10px] text-warning">
+              <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+              API kalit kiritilmagan — ma'lumotlarni sinxronlash mumkin emas.
             </div>
           )}
         </CardContent>
