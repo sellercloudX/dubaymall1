@@ -151,7 +151,7 @@ export default function UzumManagerInvite() {
         .from('uzum_accounts')
         .update({
           manager_status: 'active',
-          manager_accepted_at: new Date().toISOString(),
+          manager_connected_at: new Date().toISOString(),
         } as any)
         .eq('id', account.id);
       if (accErr) throw accErr;
