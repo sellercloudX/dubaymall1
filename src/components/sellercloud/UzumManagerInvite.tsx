@@ -35,6 +35,8 @@ export default function UzumManagerInvite() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [managerPhone, setManagerPhone] = useState('');
+  const [apiKey, setApiKey] = useState('');
+  const [apiKeySaved, setApiKeySaved] = useState(false);
   const [extensionStatus, setExtensionStatus] = useState<ExtensionStatus>({
     connected: false,
     lastPing: null,
