@@ -142,6 +142,68 @@ export default function UzumManagerInvite() {
     }
   };
 
+  const confirmManagerActive = async () => {
+    if (!account || !user) return;
+    setIsSaving(true);
+    try {
+      // 1. Update uzum_accounts status to active
+      const { error: accErr } = await supabase
+        .from('uzum_accounts')
+        .update({
+          manager_status: 'active',
+          manager_accepted_at: new Date().toISOString(),
+        } as any)
+        .eq('id', account.id);
+      if (accErr) throw accErr;
+
+      // 2. Create marketplace_connections entry so the whole system recognizes Uzum
+      const sellerId = (account as any).seller_id || (account as any).shop_id || '';
+      const { error: connErr } = await supabase
+        .from('marketplace_connections')
+        .upsert({
+          user_id: user.id,
+          marketplace: 'uzum',
+          credentials: { apiKey: 'manager_session', sellerId },
+          is_active: true,
+          account_info: {
+            storeName: (account as any).shop_name || 'Uzum Do\'kon',
+            sellerId,
+            connectionType: 'manager',
+            managerPhone: managerPhone,
+          },
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id,marketplace' });
+      if (connErr) {
+        // If unique constraint doesn't exist on user_id,marketplace, try insert
+        const { error: insertErr } = await supabase
+          .from('marketplace_connections')
+          .insert({
+            user_id: user.id,
+            marketplace: 'uzum',
+            credentials: { apiKey: 'manager_session', sellerId },
+            is_active: true,
+            account_info: {
+              storeName: (account as any).shop_name || 'Uzum Do\'kon',
+              sellerId,
+              connectionType: 'manager',
+              managerPhone: managerPhone,
+            },
+          });
+        if (insertErr && !insertErr.message.includes('duplicate')) throw insertErr;
+      }
+
+      setAccount((prev: any) => ({ ...prev, manager_status: 'active' }));
+      toast({ 
+        title: '✅ Uzum Market ulandi!', 
+        description: 'Manager muvaffaqiyatli tasdiqlandi. Endi barcha funksiyalar ishlaydi.' 
+      });
+    } catch (err: any) {
+      toast({ title: 'Xato', description: err.message, variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const revokeManager = async () => {
     if (!account) return;
     setIsSaving(true);
@@ -271,7 +333,7 @@ export default function UzumManagerInvite() {
                   {[
                     { step: 1, text: 'Uzum Seller → Sozlamalar → Xodimlar bo\'limiga o\'ting', done: managerStatus !== 'not_invited' },
                     { step: 2, text: `"Менеджер қўшиш" tugmasini bosing va ${managerPhone || 'raqamni'} kiriting`, done: ['pending', 'active'].includes(managerStatus) },
-                    { step: 3, text: 'Tasdiqlang va bizning tizim avtomatik ulanadi', done: managerStatus === 'active' },
+                    { step: 3, text: 'Qo\'shib bo\'lgach, pastdagi "Ulanishni tasdiqlash" tugmasini bosing', done: managerStatus === 'active' },
                   ].map(item => (
                     <div key={item.step} className="flex items-center gap-2 text-[11px]">
                       <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-medium ${
@@ -284,6 +346,27 @@ export default function UzumManagerInvite() {
                   ))}
                 </div>
               </div>
+
+              {/* Confirmation button */}
+              {managerStatus === 'invited' && (
+                <div className="pt-2">
+                  <Card className="border-primary/30 bg-primary/5">
+                    <CardContent className="p-3 space-y-2">
+                      <div className="text-[11px] text-muted-foreground">
+                        Uzum Seller kabinetida manager sifatida qo'shib bo'ldingizmi?
+                      </div>
+                      <Button 
+                        onClick={confirmManagerActive} 
+                        disabled={isSaving}
+                        className="w-full h-9 text-xs"
+                      >
+                        {isSaving ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <CheckCircle2 className="w-3 h-3 mr-1" />}
+                        Ha, ulanishni tasdiqlash
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
             </>
           )}
         </CardContent>
