@@ -49,7 +49,6 @@ const menuCategories: MenuCategory[] = [
       { id: 'inventory', icon: ArrowDownUp, label: 'Qoldiq', color: 'bg-teal-500/15 text-teal-600 dark:text-teal-400' },
       { id: 'min-price', icon: Shield, label: 'Min narx', color: 'bg-red-500/15 text-red-600 dark:text-red-400' },
       { id: 'card-clone', icon: Copy, label: 'Klonlash', color: 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400' },
-      { id: 'uzum-card', icon: Sparkles, label: 'Uzum Card', color: 'bg-purple-500/15 text-purple-600 dark:text-purple-400' },
       { id: 'problems', icon: AlertOctagon, label: 'Muammolar', color: 'bg-rose-500/15 text-rose-600 dark:text-rose-400' },
       { id: 'mxik', icon: FileSpreadsheet, label: 'MXIK baza', color: 'bg-slate-500/15 text-slate-600 dark:text-slate-400' },
     ],

@@ -2871,9 +2871,10 @@ serve(async (req) => {
               let prodHasMore = true;
               while (prodHasMore) {
                 try {
-                  const prodResp = await fetch(
+                  const prodResp = await fetchWithRetry(
                     `${uzumBaseUrl}/v1/product/shop/${currentShopId}?size=100&page=${prodPage}&filter=ALL`,
-                    { headers: uzumHeaders }
+                    { headers: uzumHeaders },
+                    4
                   );
                   if (!prodResp.ok) {
                     if (prodResp.status === 403) {

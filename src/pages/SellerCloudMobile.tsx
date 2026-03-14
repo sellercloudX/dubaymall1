@@ -267,7 +267,7 @@ export default function SellerCloudMobile() {
                 'pricing': '🏷 Narxlar', 'abc-analysis': '📊 ABC-analiz', 'seller-analytics': '📈 WB Analitika',
                 'wb-keywords': '🔍 WB Qidiruv', 'reviews': '💬 Sharhlar', 'ads': '📢 Reklama',
                 'inventory': '📦 Qoldiq', 'min-price': '🛡 Min narx', 'card-clone': '📋 Klonlash',
-                'uzum-card': '✨ Uzum Card', 'problems': '⚠️ Muammolar', 'mxik': '📄 MXIK baza',
+                'problems': '⚠️ Muammolar', 'mxik': '📄 MXIK baza',
                 'reports': '📑 Hisobotlar', 'notifications': '🔔 Bildirishnoma', 'subscription': '💳 Obuna',
                 'competitor': '🎯 Raqobat', 'sales': '📊 Sotuvlar', 'support': '💬 Yordam', 'stores': '🏪 Do\'konlar',
               };
