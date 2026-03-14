@@ -147,7 +147,7 @@ export function MarketplaceAdsCampaigns({ connectedMarketplaces }: Props) {
             <p className="font-medium">Reklama API hozircha mavjud emas</p>
             <p className="text-sm text-muted-foreground mt-1">
               {MARKETPLACE_CONFIG[selectedMp]?.name || selectedMp} uchun reklama boshqaruvi tez orada qo'shiladi.
-              Hozircha faqat Wildberries reklama API qo'llab-quvvatlanadi.
+              Hozircha Wildberries va Uzum reklama boshqaruvini qo'llab-quvvatlaydi.
             </p>
           </CardContent>
         </Card>
