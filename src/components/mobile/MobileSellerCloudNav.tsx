@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 
 export type MobileTabType = 
   | 'marketplaces' | 'analytics' | 'scanner' | 'products' | 'orders' 
-  | 'abc-analysis' | 'min-price' | 'card-clone' | 'uzum-card' | 'problems' 
+  | 'abc-analysis' | 'min-price' | 'card-clone' | 'problems' 
   | 'financials' | 'calculator' | 'inventory' | 'pricing' | 'mxik'
   | 'reports' | 'notifications' | 'subscription' | 'cost-prices'
   | 'reviews' | 'seller-analytics' | 'ads' | 'wb-keywords'

@@ -1724,9 +1724,10 @@ serve(async (req) => {
 
                 console.log(`Uzum products shop=${currentShopId} page ${currentPage}`);
 
-                const response = await fetch(
+                const response = await fetchWithRetry(
                   `${uzumBaseUrl}/v1/product/shop/${currentShopId}?${params.toString()}`,
-                  { headers: uzumHeaders }
+                  { headers: uzumHeaders },
+                  4
                 );
 
                 if (!response.ok) {
