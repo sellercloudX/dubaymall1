@@ -348,7 +348,7 @@ export default function UzumManagerInvite() {
               </div>
 
               {/* Confirmation button */}
-              {managerStatus === 'invited' && (
+              {(managerStatus === 'invited' || managerStatus === 'pending') && (
                 <div className="pt-2">
                   <Card className="border-primary/30 bg-primary/5">
                     <CardContent className="p-3 space-y-2">
