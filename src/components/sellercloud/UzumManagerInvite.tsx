@@ -485,6 +485,52 @@ export default function UzumManagerInvite() {
         </CardContent>
       </Card>
 
+      {/* API Key Input */}
+      <Card className={`border-2 ${apiKeySaved ? 'border-success/30 bg-success/5' : 'border-warning/30 bg-warning/5'}`}>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Shield className="w-4 h-4 text-primary" />
+            Uzum Seller OpenAPI kalit
+            {apiKeySaved && (
+              <Badge variant="secondary" className="text-[10px] text-success">
+                <CheckCircle2 className="w-3 h-3 mr-0.5" />
+                Saqlangan
+              </Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="text-[11px] text-muted-foreground leading-relaxed">
+            <strong>Uzum Seller</strong> → Sozlamalar → API bo'limidan OpenAPI kalitni oling va pastga kiriting. 
+            Bu kalit mahsulotlar, buyurtmalar va moliya ma'lumotlarini olish uchun kerak.
+          </div>
+          <div className="flex gap-2">
+            <Input
+              value={apiKey}
+              onChange={e => { setApiKey(e.target.value); setApiKeySaved(false); }}
+              placeholder="API kalitni kiriting..."
+              className="h-8 text-xs flex-1 font-mono"
+              type="password"
+            />
+            <Button
+              size="sm"
+              onClick={saveApiKey}
+              disabled={isSaving || !apiKey.trim() || apiKey.includes('...')}
+              className="h-8 text-xs"
+            >
+              {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3 mr-1" />}
+              Saqlash
+            </Button>
+          </div>
+          {!apiKeySaved && (
+            <div className="flex items-start gap-2 text-[10px] text-warning">
+              <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+              API kalit kiritilmagan — ma'lumotlarni sinxronlash mumkin emas.
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Security Notice */}
       <Card className="border-border/50">
         <CardContent className="p-3 flex items-start gap-2">
