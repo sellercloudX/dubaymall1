@@ -52,30 +52,73 @@ export default function UzumDashboard({ marketplace = 'uzum' }: UzumDashboardPro
     if (!user) return;
     setIsLoading(true);
     try {
-      const [productsRes, ordersRes] = await Promise.all([
+      const [connectionRes, productsRes, ordersRes] = await Promise.all([
+        supabase
+          .from('marketplace_connections_safe')
+          .select('products_count, orders_count, total_revenue')
+          .eq('user_id', user.id)
+          .eq('marketplace', marketplace)
+          .eq('is_active', true)
+          .maybeSingle(),
         supabase.from('uzum_products').select('id, price, stock_fbo, stock_fbs, boost_active', { count: 'exact' }).eq('user_id', user.id),
         supabase.from('uzum_orders').select('id, total_amount, fulfillment_type, status, is_lost', { count: 'exact' }).eq('user_id', user.id),
       ]);
 
-      const products = productsRes.data || [];
-      const orders = ordersRes.data || [];
+      let products: any[] = productsRes.data || [];
+      let orders: any[] = ordersRes.data || [];
 
-      const fboOrders = orders.filter(o => o.fulfillment_type === 'FBO');
-      const fbsOrders = orders.filter(o => o.fulfillment_type === 'FBS');
-      const totalRevenue = orders.reduce((s, o) => s + (o.total_amount || 0), 0);
-      const returnedOrders = orders.filter(o => o.status === 'returned' || o.status === 'RETURNED');
-      const lostItems = orders.filter(o => o.is_lost);
-      const activeBoosts = products.filter(p => p.boost_active);
-      const pendingFbs = fbsOrders.filter(o => ['created', 'CREATED', 'PACKING'].includes(o.status));
+      let totalProducts = productsRes.count || products.length;
+      let totalOrders = ordersRes.count || orders.length;
+      let totalRevenue = orders.reduce((s, o) => s + Number(o.total_amount || 0), 0);
+
+      // If Uzum local tables are empty, fetch live data; fallback to connection counters
+      if (totalProducts === 0 && totalOrders === 0 && connectionRes.data) {
+        const [liveProductsRes, liveOrdersRes] = await Promise.all([
+          supabase.functions.invoke('fetch-marketplace-data', {
+            body: { marketplace: 'uzum', dataType: 'products', limit: 200, fetchAll: true },
+          }),
+          supabase.functions.invoke('fetch-marketplace-data', {
+            body: { marketplace: 'uzum', dataType: 'orders', fetchAll: true },
+          }),
+        ]);
+
+        const liveProducts = Array.isArray(liveProductsRes.data?.data) ? liveProductsRes.data.data : [];
+        const liveOrders = Array.isArray(liveOrdersRes.data?.data) ? liveOrdersRes.data.data : [];
+
+        if (!liveProductsRes.error && !liveOrdersRes.error && (liveProducts.length > 0 || liveOrders.length > 0)) {
+          products = liveProducts;
+          orders = liveOrders;
+          totalProducts = liveProducts.length;
+          totalOrders = liveOrders.length;
+          totalRevenue = liveOrders.reduce((s: number, o: any) => s + Number(o.totalUZS ?? o.total ?? 0), 0);
+        } else {
+          totalProducts = Number(connectionRes.data.products_count || 0);
+          totalOrders = Number(connectionRes.data.orders_count || 0);
+          totalRevenue = Number(connectionRes.data.total_revenue || 0);
+        }
+      }
+
+      const fboOrders = orders.filter(o => (o.fulfillment_type || o.fulfillmentType) === 'FBO');
+      const fbsOrders = orders.filter(o => (o.fulfillment_type || o.fulfillmentType) === 'FBS');
+      const returnedOrders = orders.filter(o => {
+        const status = String(o.status || '').toUpperCase();
+        return status === 'RETURNED';
+      });
+      const lostItems = orders.filter(o => Boolean(o.is_lost));
+      const activeBoosts = products.filter(p => Boolean(p.boost_active || p.boostActive));
+      const pendingFbs = fbsOrders.filter(o => {
+        const status = String(o.status || '').toUpperCase();
+        return ['CREATED', 'PACKING', 'PROCESSING'].includes(status);
+      });
 
       setStats({
-        totalProducts: productsRes.count || products.length,
-        totalOrders: ordersRes.count || orders.length,
+        totalProducts,
+        totalOrders,
         totalRevenue,
         fboOrders: fboOrders.length,
         fbsOrders: fbsOrders.length,
-        avgOrderValue: orders.length > 0 ? totalRevenue / orders.length : 0,
-        returnRate: orders.length > 0 ? (returnedOrders.length / orders.length) * 100 : 0,
+        avgOrderValue: totalOrders > 0 ? totalRevenue / totalOrders : 0,
+        returnRate: totalOrders > 0 ? (returnedOrders.length / totalOrders) * 100 : 0,
         lostItems: lostItems.length,
         activeBoosts: activeBoosts.length,
         pendingFbs: pendingFbs.length,

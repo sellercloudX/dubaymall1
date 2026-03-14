@@ -156,21 +156,55 @@ export default function UzumManagerInvite() {
         .eq('id', account.id);
       if (accErr) throw accErr;
 
-      // 2. Create marketplace_connections entry so the whole system recognizes Uzum
-      const sellerId = (account as any).seller_id || (account as any).shop_id || '';
+      // 2. Create/update marketplace_connections entry so the whole system recognizes Uzum
+      // IMPORTANT: preserve existing real API credentials (don't overwrite with manager_session)
+      const { data: existingConn } = await supabase
+        .from('marketplace_connections')
+        .select('credentials, account_info')
+        .eq('user_id', user.id)
+        .eq('marketplace', 'uzum')
+        .maybeSingle();
+
+      const existingCredentials = ((existingConn?.credentials as any) || {}) as Record<string, any>;
+      const existingAccountInfo = ((existingConn?.account_info as any) || {}) as Record<string, any>;
+
+      const sellerId = String(
+        (account as any).shop_id ||
+        existingAccountInfo.shopId ||
+        existingAccountInfo.sellerId ||
+        existingCredentials.sellerId ||
+        ''
+      );
+
+      const existingApiKey =
+        typeof existingCredentials.apiKey === 'string' ? existingCredentials.apiKey.trim() : '';
+
+      const nextCredentials = {
+        ...existingCredentials,
+        sellerId,
+        apiKey:
+          existingApiKey && existingApiKey !== 'manager_session'
+            ? existingApiKey
+            : ((account as any).api_key || 'manager_session'),
+      };
+
+      const nextAccountInfo = {
+        ...existingAccountInfo,
+        storeName: (account as any).shop_name || existingAccountInfo.storeName || 'Uzum Do\'kon',
+        sellerId,
+        shopId: sellerId || existingAccountInfo.shopId,
+        connectionType: 'manager',
+        managerPhone: managerPhone || (account as any).manager_phone || '',
+      };
+
       const { error: connErr } = await supabase
         .from('marketplace_connections')
         .upsert({
           user_id: user.id,
           marketplace: 'uzum',
-          credentials: { apiKey: 'manager_session', sellerId },
+          credentials: nextCredentials,
           is_active: true,
-          account_info: {
-            storeName: (account as any).shop_name || 'Uzum Do\'kon',
-            sellerId,
-            connectionType: 'manager',
-            managerPhone: managerPhone,
-          },
+          account_info: nextAccountInfo,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'user_id,marketplace' });
       if (connErr) {
@@ -180,14 +214,9 @@ export default function UzumManagerInvite() {
           .insert({
             user_id: user.id,
             marketplace: 'uzum',
-            credentials: { apiKey: 'manager_session', sellerId },
+            credentials: nextCredentials,
             is_active: true,
-            account_info: {
-              storeName: (account as any).shop_name || 'Uzum Do\'kon',
-              sellerId,
-              connectionType: 'manager',
-              managerPhone: managerPhone,
-            },
+            account_info: nextAccountInfo,
           });
         if (insertErr && !insertErr.message.includes('duplicate')) throw insertErr;
       }
