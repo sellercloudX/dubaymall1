@@ -552,6 +552,13 @@ export function MarketplaceOAuth({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Uzum Manager Invite — shown when Uzum is connected */}
+      {isConnected('uzum') && (
+        <Suspense fallback={<Skeleton className="h-32 rounded-xl" />}>
+          <UzumManagerInviteLazy />
+        </Suspense>
+      )}
     </div>
   );
 }
