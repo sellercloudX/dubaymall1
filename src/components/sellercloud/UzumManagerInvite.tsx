@@ -311,10 +311,24 @@ export default function UzumManagerInvite() {
                 disabled={managerStatus === 'active'}
               />
               {managerStatus !== 'active' ? (
-                <Button size="sm" onClick={inviteManager} disabled={isSaving || !managerPhone} className="h-8 text-xs">
-                  {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <UserPlus className="w-3 h-3 mr-1" />}
-                  Taklif
-                </Button>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={inviteManager} disabled={isSaving || !managerPhone} className="h-8 text-xs">
+                    {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <UserPlus className="w-3 h-3 mr-1" />}
+                    Taklif
+                  </Button>
+                  {canShowConfirmInline && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={confirmManagerActive}
+                      disabled={isSaving || !managerPhone}
+                      className="h-8 text-xs"
+                    >
+                      <CheckCircle2 className="w-3 h-3 mr-1" />
+                      Tasdiqlash
+                    </Button>
+                  )}
+                </div>
               ) : (
                 <Button variant="destructive" size="sm" onClick={revokeManager} disabled={isSaving} className="h-8 text-xs">
                   <XCircle className="w-3 h-3 mr-1" />
