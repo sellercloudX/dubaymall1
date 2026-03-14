@@ -142,6 +142,68 @@ export default function UzumManagerInvite() {
     }
   };
 
+  const confirmManagerActive = async () => {
+    if (!account || !user) return;
+    setIsSaving(true);
+    try {
+      // 1. Update uzum_accounts status to active
+      const { error: accErr } = await supabase
+        .from('uzum_accounts')
+        .update({
+          manager_status: 'active',
+          manager_accepted_at: new Date().toISOString(),
+        } as any)
+        .eq('id', account.id);
+      if (accErr) throw accErr;
+
+      // 2. Create marketplace_connections entry so the whole system recognizes Uzum
+      const sellerId = (account as any).seller_id || (account as any).shop_id || '';
+      const { error: connErr } = await supabase
+        .from('marketplace_connections')
+        .upsert({
+          user_id: user.id,
+          marketplace: 'uzum',
+          credentials: { apiKey: 'manager_session', sellerId },
+          is_active: true,
+          account_info: {
+            storeName: (account as any).shop_name || 'Uzum Do\'kon',
+            sellerId,
+            connectionType: 'manager',
+            managerPhone: managerPhone,
+          },
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id,marketplace' });
+      if (connErr) {
+        // If unique constraint doesn't exist on user_id,marketplace, try insert
+        const { error: insertErr } = await supabase
+          .from('marketplace_connections')
+          .insert({
+            user_id: user.id,
+            marketplace: 'uzum',
+            credentials: { apiKey: 'manager_session', sellerId },
+            is_active: true,
+            account_info: {
+              storeName: (account as any).shop_name || 'Uzum Do\'kon',
+              sellerId,
+              connectionType: 'manager',
+              managerPhone: managerPhone,
+            },
+          });
+        if (insertErr && !insertErr.message.includes('duplicate')) throw insertErr;
+      }
+
+      setAccount((prev: any) => ({ ...prev, manager_status: 'active' }));
+      toast({ 
+        title: '✅ Uzum Market ulandi!', 
+        description: 'Manager muvaffaqiyatli tasdiqlandi. Endi barcha funksiyalar ishlaydi.' 
+      });
+    } catch (err: any) {
+      toast({ title: 'Xato', description: err.message, variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const revokeManager = async () => {
     if (!account) return;
     setIsSaving(true);
