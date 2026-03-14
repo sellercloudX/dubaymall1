@@ -15,7 +15,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toDisplayUzs, formatUzs, isRubMarketplace, rubToUzs, getCurrencySymbol } from '@/lib/currency';
 import { MarketplaceFilterBar } from './MarketplaceFilterBar';
 import { MarketplaceLogo, MARKETPLACE_CONFIG } from '@/lib/marketplaceConfig';
-import { Skeleton } from '@/components/ui/skeleton';
 
 const UzumBoostManagerLazy = lazy(() => import('@/components/sellercloud/UzumBoostManager'));
 
