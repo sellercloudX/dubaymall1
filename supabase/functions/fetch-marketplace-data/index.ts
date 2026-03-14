@@ -2123,7 +2123,8 @@ serve(async (req) => {
                 createdAt: uzumCreatedAt,
                 total: orderTotal,
                 totalUZS: orderTotal,
-                fulfillmentType: 'FBS' as const,
+                // Uzum /v2/fbs/orders returns ALL orders — use 'scheme' field to detect FBO vs FBS
+                fulfillmentType: (order.scheme === 'FBO' ? 'FBO' : 'FBS') as 'FBO' | 'FBS',
                 itemsTotal,
                 itemsTotalUZS: itemsTotal,
                 deliveryTotal: order.deliveryPrice || 0,
