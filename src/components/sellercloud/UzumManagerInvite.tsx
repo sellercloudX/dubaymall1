@@ -60,6 +60,23 @@ export default function UzumManagerInvite() {
         setManagerPhone((data as any).manager_phone || '');
       }
 
+      // Check if real API key already exists in marketplace_connections
+      const { data: conn } = await supabase
+        .from('marketplace_connections')
+        .select('credentials')
+        .eq('user_id', user.id)
+        .eq('marketplace', 'uzum')
+        .maybeSingle();
+
+      if (conn?.credentials) {
+        const creds = conn.credentials as any;
+        const existingKey = typeof creds.apiKey === 'string' ? creds.apiKey.trim() : '';
+        if (existingKey && existingKey !== 'manager_session') {
+          setApiKeySaved(true);
+          setApiKey(existingKey.substring(0, 8) + '...');
+        }
+      }
+
       // Check pending extension commands
       const { count } = await supabase
         .from('uzum_extension_commands')
