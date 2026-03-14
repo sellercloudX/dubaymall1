@@ -225,6 +225,7 @@ export default function UzumManagerInvite() {
   const managerStatus = account?.manager_status || 'not_invited';
   const statusInfo = MANAGER_STATUSES[managerStatus as keyof typeof MANAGER_STATUSES] || MANAGER_STATUSES.not_invited;
   const StatusIcon = statusInfo.icon;
+  const canShowConfirmInline = !!account && managerStatus !== 'active';
 
   if (isLoading) {
     return (
