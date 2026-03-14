@@ -270,6 +270,60 @@ export default function UzumManagerInvite() {
     }
   };
 
+  const saveApiKey = async () => {
+    if (!user || !apiKey.trim() || apiKey.includes('...')) return;
+    setIsSaving(true);
+    try {
+      // Get existing connection
+      const { data: conn } = await supabase
+        .from('marketplace_connections')
+        .select('id, credentials, account_info')
+        .eq('user_id', user.id)
+        .eq('marketplace', 'uzum')
+        .maybeSingle();
+
+      if (!conn) {
+        // Create new connection with the API key
+        const { error } = await supabase
+          .from('marketplace_connections')
+          .insert({
+            user_id: user.id,
+            marketplace: 'uzum',
+            credentials: { apiKey: apiKey.trim(), sellerId: '' },
+            is_active: true,
+            account_info: { connectionType: 'manager', storeName: 'Uzum Do\'kon' },
+          });
+        if (error) throw error;
+      } else {
+        // Update existing connection with real API key
+        const existingCreds = (conn.credentials as any) || {};
+        const { error } = await supabase
+          .from('marketplace_connections')
+          .update({
+            credentials: { ...existingCreds, apiKey: apiKey.trim() },
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', conn.id);
+        if (error) throw error;
+      }
+
+      // Also save to uzum_accounts
+      if (account) {
+        await supabase
+          .from('uzum_accounts')
+          .update({ api_key: apiKey.trim() } as any)
+          .eq('id', account.id);
+      }
+
+      setApiKeySaved(true);
+      toast({ title: '✅ API kalit saqlandi!', description: 'Endi ma\'lumotlar sinxronlanadi.' });
+    } catch (err: any) {
+      toast({ title: 'Xato', description: err.message, variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const managerStatus = account?.manager_status || 'not_invited';
   const statusInfo = MANAGER_STATUSES[managerStatus as keyof typeof MANAGER_STATUSES] || MANAGER_STATUSES.not_invited;
   const StatusIcon = statusInfo.icon;
