@@ -151,7 +151,7 @@ export default function UzumManagerInvite() {
         .from('uzum_accounts')
         .update({
           manager_status: 'active',
-          manager_accepted_at: new Date().toISOString(),
+          manager_connected_at: new Date().toISOString(),
         } as any)
         .eq('id', account.id);
       if (accErr) throw accErr;
@@ -348,7 +348,7 @@ export default function UzumManagerInvite() {
               </div>
 
               {/* Confirmation button */}
-              {managerStatus === 'invited' && (
+              {(managerStatus === 'invited' || managerStatus === 'pending') && (
                 <div className="pt-2">
                   <Card className="border-primary/30 bg-primary/5">
                     <CardContent className="p-3 space-y-2">
