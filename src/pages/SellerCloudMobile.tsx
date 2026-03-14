@@ -213,8 +213,6 @@ export default function SellerCloudMobile() {
         return <div className="p-4"><MinPriceProtection connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'card-clone':
         return <div className="p-4"><CardCloner connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
-      case 'uzum-card':
-        return <div className="p-4"><UzumCardHelper connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'problems':
         return <div className="p-4"><ProblematicProducts connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'financials':
