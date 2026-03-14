@@ -153,7 +153,14 @@ export function MarketplaceAdsCampaigns({ connectedMarketplaces }: Props) {
         </Card>
       )}
 
-      {adsSupported && (
+      {/* Uzum Boost Manager */}
+      {selectedMp === 'uzum' && hasSelectedMp && (
+        <Suspense fallback={<Skeleton className="h-40 rounded-xl" />}>
+          <UzumBoostManagerLazy />
+        </Suspense>
+      )}
+
+      {adsSupported && selectedMp !== 'uzum' && (
         <>
           {/* Ads Balance */}
           {balanceData?.success && (
