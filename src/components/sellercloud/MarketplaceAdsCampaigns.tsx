@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toDisplayUzs, formatUzs, isRubMarketplace, rubToUzs, getCurrencySymbol } from '@/lib/currency';
 import { MarketplaceFilterBar } from './MarketplaceFilterBar';
 import { MarketplaceLogo, MARKETPLACE_CONFIG } from '@/lib/marketplaceConfig';
+
+const UzumBoostManagerLazy = lazy(() => import('@/components/sellercloud/UzumBoostManager'));
 
 interface Props {
   connectedMarketplaces: string[];
@@ -38,7 +40,7 @@ export function MarketplaceAdsCampaigns({ connectedMarketplaces }: Props) {
   const [editLoading, setEditLoading] = useState(false);
 
   const hasSelectedMp = connectedMarketplaces.includes(selectedMp);
-  const adsSupported = selectedMp === 'wildberries'; // Currently only WB has ads API
+  const adsSupported = selectedMp === 'wildberries' || selectedMp === 'uzum'; // WB has ads API, Uzum has Boost
 
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['marketplace-ads', selectedMp],
@@ -145,13 +147,20 @@ export function MarketplaceAdsCampaigns({ connectedMarketplaces }: Props) {
             <p className="font-medium">Reklama API hozircha mavjud emas</p>
             <p className="text-sm text-muted-foreground mt-1">
               {MARKETPLACE_CONFIG[selectedMp]?.name || selectedMp} uchun reklama boshqaruvi tez orada qo'shiladi.
-              Hozircha faqat Wildberries reklama API qo'llab-quvvatlanadi.
+              Hozircha Wildberries va Uzum reklama boshqaruvini qo'llab-quvvatlaydi.
             </p>
           </CardContent>
         </Card>
       )}
 
-      {adsSupported && (
+      {/* Uzum Boost Manager */}
+      {selectedMp === 'uzum' && hasSelectedMp && (
+        <Suspense fallback={<Skeleton className="h-40 rounded-xl" />}>
+          <UzumBoostManagerLazy />
+        </Suspense>
+      )}
+
+      {adsSupported && selectedMp !== 'uzum' && (
         <>
           {/* Ads Balance */}
           {balanceData?.success && (

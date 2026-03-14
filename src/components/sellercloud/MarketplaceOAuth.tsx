@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { MARKETPLACE_CONFIG, MarketplaceLogo } from '@/lib/marketplaceConfig';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,8 @@ import {
   Unplug, KeyRound
 } from 'lucide-react';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
+
+const UzumManagerInviteLazy = lazy(() => import('@/components/sellercloud/UzumManagerInvite'));
 
 interface MarketplaceConnection {
   id: string;
@@ -552,6 +554,13 @@ export function MarketplaceOAuth({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Uzum Manager Invite — shown when Uzum is connected */}
+      {isConnected('uzum') && (
+        <Suspense fallback={<Skeleton className="h-32 rounded-xl" />}>
+          <UzumManagerInviteLazy />
+        </Suspense>
+      )}
     </div>
   );
 }

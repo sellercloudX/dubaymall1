@@ -49,7 +49,6 @@ export const sellerMenuItems: SellerMenuItem[] = [
   { id: 'clone', label: 'Klonlash', icon: Copy, group: 'tools' },
   { id: 'problems', label: 'Muammolar', icon: AlertOctagon, group: 'tools' },
   { id: 'mxik', label: 'MXIK baza', icon: FileSpreadsheet, group: 'tools' },
-  { id: 'uzum-dashboard', label: 'Uzum Pro', icon: LayoutDashboard, group: 'tools' },
   { id: 'team', label: 'Jamoa', icon: Globe, group: 'settings' },
   { id: 'subscription', label: 'Obuna', icon: CreditCard, group: 'settings' },
   { id: 'reports', label: 'Hisobotlar', icon: FileSpreadsheet, group: 'settings' },
