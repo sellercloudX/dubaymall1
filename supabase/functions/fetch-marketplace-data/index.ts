@@ -2054,7 +2054,8 @@ serve(async (req) => {
                 // Log first order structure for debugging
                 if (page === 0 && results.length === 0 && orderList.length > 0) {
                   const sampleOrder = orderList[0];
-                  console.log(`[UZUM FBS ORDER KEYS] status=${orderStatus} keys=${JSON.stringify(Object.keys(sampleOrder))}`);
+                  console.log(`[UZUM ORDER KEYS] status=${orderStatus} keys=${JSON.stringify(Object.keys(sampleOrder))}`);
+                  console.log(`[UZUM ORDER SCHEME] status=${orderStatus} scheme=${sampleOrder.scheme}, stock=${sampleOrder.stock}`);
                   const dateFields = ['createdAt', 'createDate', 'dateCreated', 'created_at', 'orderDate', 'date', 'updatedAt', 'updateDate', 'completedAt', 'deliveredAt', 'acceptDate', 'statusDate'];
                   const dateValues: Record<string, any> = {};
                   for (const f of dateFields) {
@@ -2064,6 +2065,13 @@ serve(async (req) => {
                   if (Object.keys(dateValues).length === 0) {
                     console.log(`[UZUM ORDER RAW] ${JSON.stringify(sampleOrder).substring(0, 800)}`);
                   }
+                  // Log scheme distribution for all orders on first page
+                  const schemes = orderList.reduce((acc: Record<string, number>, o: any) => {
+                    const s = o.scheme || 'unknown';
+                    acc[s] = (acc[s] || 0) + 1;
+                    return acc;
+                  }, {});
+                  console.log(`[UZUM ORDER SCHEMES] status=${orderStatus} distribution=${JSON.stringify(schemes)}`);
                 }
 
                 results.push(...orderList);
