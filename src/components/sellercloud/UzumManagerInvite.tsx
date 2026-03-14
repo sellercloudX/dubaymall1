@@ -333,7 +333,7 @@ export default function UzumManagerInvite() {
                   {[
                     { step: 1, text: 'Uzum Seller → Sozlamalar → Xodimlar bo\'limiga o\'ting', done: managerStatus !== 'not_invited' },
                     { step: 2, text: `"Менеджер қўшиш" tugmasini bosing va ${managerPhone || 'raqamni'} kiriting`, done: ['pending', 'active'].includes(managerStatus) },
-                    { step: 3, text: 'Tasdiqlang va bizning tizim avtomatik ulanadi', done: managerStatus === 'active' },
+                    { step: 3, text: 'Qo\'shib bo\'lgach, pastdagi "Ulanishni tasdiqlash" tugmasini bosing', done: managerStatus === 'active' },
                   ].map(item => (
                     <div key={item.step} className="flex items-center gap-2 text-[11px]">
                       <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-medium ${
@@ -346,6 +346,27 @@ export default function UzumManagerInvite() {
                   ))}
                 </div>
               </div>
+
+              {/* Confirmation button */}
+              {managerStatus === 'invited' && (
+                <div className="pt-2">
+                  <Card className="border-primary/30 bg-primary/5">
+                    <CardContent className="p-3 space-y-2">
+                      <div className="text-[11px] text-muted-foreground">
+                        Uzum Seller kabinetida manager sifatida qo'shib bo'ldingizmi?
+                      </div>
+                      <Button 
+                        onClick={confirmManagerActive} 
+                        disabled={isSaving}
+                        className="w-full h-9 text-xs"
+                      >
+                        {isSaving ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <CheckCircle2 className="w-3 h-3 mr-1" />}
+                        Ha, ulanishni tasdiqlash
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
             </>
           )}
         </CardContent>
