@@ -308,8 +308,6 @@ export default function SellerCloudX() {
         );
       case 'team':
         return <TeamManager />;
-      case 'uzum-dashboard':
-        return <UzumDashboard />;
       case 'subscription':
         return <SubscriptionBilling totalSalesVolume={totalRevenue} />;
       case 'reports':
