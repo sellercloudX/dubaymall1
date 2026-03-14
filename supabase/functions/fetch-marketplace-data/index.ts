@@ -2054,7 +2054,8 @@ serve(async (req) => {
                 // Log first order structure for debugging
                 if (page === 0 && results.length === 0 && orderList.length > 0) {
                   const sampleOrder = orderList[0];
-                  console.log(`[UZUM FBS ORDER KEYS] status=${orderStatus} keys=${JSON.stringify(Object.keys(sampleOrder))}`);
+                  console.log(`[UZUM ORDER KEYS] status=${orderStatus} keys=${JSON.stringify(Object.keys(sampleOrder))}`);
+                  console.log(`[UZUM ORDER SCHEME] status=${orderStatus} scheme=${sampleOrder.scheme}, stock=${sampleOrder.stock}`);
                   const dateFields = ['createdAt', 'createDate', 'dateCreated', 'created_at', 'orderDate', 'date', 'updatedAt', 'updateDate', 'completedAt', 'deliveredAt', 'acceptDate', 'statusDate'];
                   const dateValues: Record<string, any> = {};
                   for (const f of dateFields) {
@@ -2064,6 +2065,13 @@ serve(async (req) => {
                   if (Object.keys(dateValues).length === 0) {
                     console.log(`[UZUM ORDER RAW] ${JSON.stringify(sampleOrder).substring(0, 800)}`);
                   }
+                  // Log scheme distribution for all orders on first page
+                  const schemes = orderList.reduce((acc: Record<string, number>, o: any) => {
+                    const s = o.scheme || 'unknown';
+                    acc[s] = (acc[s] || 0) + 1;
+                    return acc;
+                  }, {});
+                  console.log(`[UZUM ORDER SCHEMES] status=${orderStatus} distribution=${JSON.stringify(schemes)}`);
                 }
 
                 results.push(...orderList);
@@ -2123,7 +2131,8 @@ serve(async (req) => {
                 createdAt: uzumCreatedAt,
                 total: orderTotal,
                 totalUZS: orderTotal,
-                fulfillmentType: 'FBS' as const,
+                // Uzum /v2/fbs/orders returns ALL orders — use 'scheme' field to detect FBO vs FBS
+                fulfillmentType: (order.scheme === 'FBO' ? 'FBO' : 'FBS') as 'FBO' | 'FBS',
                 itemsTotal,
                 itemsTotalUZS: itemsTotal,
                 deliveryTotal: order.deliveryPrice || 0,
@@ -2202,173 +2211,14 @@ serve(async (req) => {
             } // end for statuses in batch
           } // end for batches
 
-          console.log(`Uzum FBS orders collected: ${allOrders.length}`);
+          // Log FBO vs FBS distribution from scheme field
+          const fboCount = allOrders.filter((o: any) => o.fulfillmentType === 'FBO').length;
+          const fbsCount = allOrders.filter((o: any) => o.fulfillmentType === 'FBS').length;
+          console.log(`Uzum orders collected: ${allOrders.length} (FBO: ${fboCount}, FBS: ${fbsCount})`);
 
-          // ===== FETCH FBO DATA via /v2/fbo/orders (DIRECT FBO ENDPOINT) =====
-          // This fetches actual FBO orders (fulfilled by Uzum warehouse)
-          // Finance API only returns settled transactions, so we need this for pending/active FBO orders
-          try {
-            const fboShopIds = allShopIds.length > 0 ? allShopIds : (uzumShopId ? [String(uzumShopId)] : []);
-            console.log(`Uzum FBO orders: fetching from /v2/fbo/orders for ${fboShopIds.length} shops`);
-            
-            // FBO statuses — similar to FBS but for warehouse fulfillment
-            const fboStatusBatches = [
-              ['CREATED', 'PACKING', 'PENDING_DELIVERY', 'DELIVERING'],
-              ['DELIVERED', 'COMPLETED', 'ACCEPTED_AT_DP', 'DELIVERED_TO_CUSTOMER_DELIVERY_POINT'],
-              ['CANCELED', 'PENDING_CANCELLATION', 'RETURNED'],
-            ];
-
-            let fboDirectCount = 0;
-            
-            for (let bi = 0; bi < fboStatusBatches.length; bi++) {
-              const batch = fboStatusBatches[bi];
-              if (bi > 0) await sleep(200);
-              
-              for (const fboStatus of batch) {
-                let fboPage = 0;
-                let fboHasMore = true;
-                
-                while (fboHasMore && fboPage < 20) {
-                  try {
-                    const fboParams = new URLSearchParams();
-                    fboParams.append('size', String(pageSize));
-                    fboParams.append('page', String(fboPage));
-                    fboParams.append('status', fboStatus);
-                    for (const sid of fboShopIds) {
-                      fboParams.append('shopIds', sid);
-                    }
-                    
-                    const fboResp = await fetch(
-                      `${uzumBaseUrl}/v2/fbo/orders?${fboParams.toString()}`,
-                      { headers: uzumHeaders }
-                    );
-                    
-                    if (!fboResp.ok) {
-                      if (fboResp.status === 429) {
-                        console.warn(`Uzum FBO orders: 429 rate limit — waiting 3s`);
-                        await sleep(3000);
-                        continue;
-                      }
-                      break;
-                    }
-                    
-                    const fboData = await fboResp.json();
-                    const fboOrders = fboData.payload?.sellerOrders || fboData.payload?.fboOrders || fboData.payload?.orders || fboData.payload || [];
-                    const fboList = Array.isArray(fboOrders) ? fboOrders : [];
-                    
-                    if (fboList.length === 0) break;
-                    
-                    // Log first FBO order structure
-                    if (fboDirectCount === 0 && fboList.length > 0) {
-                      console.log(`[UZUM FBO ORDER KEYS] status=${fboStatus} keys=${JSON.stringify(Object.keys(fboList[0]))}`);
-                      console.log(`[UZUM FBO ORDER SAMPLE] ${JSON.stringify(fboList[0]).substring(0, 600)}`);
-                    }
-                    
-                    for (const order of fboList) {
-                      const items = order.items || order.orderItems || [];
-                      const itemsTotal = items.reduce((sum: number, item: any) => {
-                        return sum + ((item.price || item.amount || 0) * (item.quantity || item.count || 1));
-                      }, 0);
-                      
-                      const displayOrderId = order.orderCode || order.orderNumber || order.code || order.orderId || order.id;
-                      const ordKey = String(displayOrderId);
-                      
-                      if (orderIdsSeen.has(ordKey)) continue;
-                      orderIdsSeen.add(ordKey);
-                      fboDirectCount++;
-                      
-                      const rawCreatedAt = order.createdAt || order.createDate || order.dateCreated || order.created_at || '';
-                      let fboCreatedAt = '';
-                      if (typeof rawCreatedAt === 'number') {
-                        fboCreatedAt = new Date(rawCreatedAt > 1e12 ? rawCreatedAt : rawCreatedAt * 1000).toISOString();
-                      } else if (rawCreatedAt && !isNaN(Number(rawCreatedAt))) {
-                        const ts = Number(rawCreatedAt);
-                        fboCreatedAt = new Date(ts > 1e12 ? ts : ts * 1000).toISOString();
-                      } else if (rawCreatedAt) {
-                        const parsed = new Date(String(rawCreatedAt));
-                        fboCreatedAt = isNaN(parsed.getTime()) ? '' : parsed.toISOString();
-                      }
-                      if (!fboCreatedAt) fboCreatedAt = new Date().toISOString();
-                      
-                      const orderTotal = order.price || order.totalPrice || order.totalAmount || itemsTotal;
-                      
-                      allOrders.push({
-                        id: displayOrderId,
-                        status: order.status || fboStatus,
-                        substatus: order.substatus || '',
-                        createdAt: fboCreatedAt,
-                        total: orderTotal,
-                        totalUZS: orderTotal,
-                        fulfillmentType: 'FBO' as const,
-                        itemsTotal,
-                        itemsTotalUZS: itemsTotal,
-                        deliveryTotal: order.deliveryPrice || 0,
-                        deliveryTotalUZS: order.deliveryPrice || 0,
-                        buyer: {
-                          firstName: order.customerName || order.buyer?.firstName || '',
-                          lastName: order.buyer?.lastName || '',
-                        },
-                        items: items.map((item: any) => {
-                          const identInfo = (item.identifierInfo && typeof item.identifierInfo === 'object') ? item.identifierInfo : {};
-                          const itemBarcode = item.barcode || identInfo.barcode || '';
-                          const offerId = item.skuTitle || itemBarcode || String(item.id || '');
-                          
-                          let itemPhoto = '';
-                          try {
-                            if (item.photo) {
-                              if (typeof item.photo === 'string') {
-                                itemPhoto = item.photo.startsWith('http') ? item.photo : `https://images.uzum.uz/${item.photo.replace(/^\//, '')}`;
-                              } else if (typeof item.photo === 'object') {
-                                const photoObj = item.photo.photo || item.photo;
-                                const sizes = [240, 120, 80, 60];
-                                for (const size of sizes) {
-                                  const sizeData = photoObj[size] || photoObj[String(size)];
-                                  if (sizeData && typeof sizeData === 'object') {
-                                    if (typeof sizeData.high === 'string' && sizeData.high) { itemPhoto = sizeData.high; break; }
-                                    else if (typeof sizeData.low === 'string' && sizeData.low) { itemPhoto = sizeData.low; break; }
-                                  }
-                                }
-                                if (!itemPhoto && typeof item.photo.photoKey === 'string') {
-                                  const pk = item.photo.photoKey;
-                                  itemPhoto = pk.startsWith('http') ? pk : `https://images.uzum.uz/${pk.replace(/^\//, '')}`;
-                                }
-                              }
-                            }
-                          } catch { /* skip */ }
-                          
-                          return {
-                            offerId,
-                            skuId: String(item.id || ''),
-                            barcode: itemBarcode,
-                            offerName: item.title || item.skuTitle || item.productTitle || item.name || '',
-                            count: item.quantity || item.count || item.amount || 1,
-                            price: item.price || 0,
-                            priceUZS: item.price || 0,
-                            photo: itemPhoto,
-                          };
-                        }),
-                      });
-                    }
-                    
-                    if (fboList.length < pageSize || !fetchAll) {
-                      fboHasMore = false;
-                    } else {
-                      fboPage++;
-                      await sleep(150);
-                    }
-                  } catch (e) {
-                    console.error(`Uzum FBO order error (${fboStatus}):`, e);
-                    break;
-                  }
-                }
-                await sleep(100);
-              }
-            }
-            
-            console.log(`Uzum FBO orders (direct /v2/fbo/orders): ${fboDirectCount} new orders added`);
-          } catch (fboDirectErr) {
-            console.error("Uzum FBO direct fetch error:", fboDirectErr);
-          }
+          // NOTE: Uzum API has NO separate /v2/fbo/orders endpoint (confirmed via swagger).
+          // ALL orders (FBO+FBS) come through /v2/fbs/orders with 'scheme' field distinguishing them.
+          // FBO orders are detected via order.scheme === 'FBO'.
 
           // ===== FETCH ADDITIONAL FBO DATA via /v1/finance/orders (settled transactions) =====
           // Finance API captures settled FBO transactions that may not appear in /v2/fbo/orders
