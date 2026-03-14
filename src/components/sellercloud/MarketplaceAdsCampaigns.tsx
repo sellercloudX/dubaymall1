@@ -41,7 +41,7 @@ export function MarketplaceAdsCampaigns({ connectedMarketplaces }: Props) {
   const [editLoading, setEditLoading] = useState(false);
 
   const hasSelectedMp = connectedMarketplaces.includes(selectedMp);
-  const adsSupported = selectedMp === 'wildberries'; // Currently only WB has ads API
+  const adsSupported = selectedMp === 'wildberries' || selectedMp === 'uzum'; // WB has ads API, Uzum has Boost
 
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['marketplace-ads', selectedMp],

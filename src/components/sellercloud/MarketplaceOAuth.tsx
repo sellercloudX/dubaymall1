@@ -31,6 +31,8 @@ import {
 } from 'lucide-react';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 
+const UzumManagerInviteLazy = lazy(() => import('@/components/sellercloud/UzumManagerInvite'));
+
 interface MarketplaceConnection {
   id: string;
   marketplace: string;
