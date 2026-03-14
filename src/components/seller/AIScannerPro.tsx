@@ -654,8 +654,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
 
       updateTaskStatus('completed', generatedInfos);
       if (targetMarketplace === 'uzum') {
-        toast.success(`"${normalizedProductName}" ma'lumotlari tayyor! Uzum Seller kabinetiga o'ting va qo'lda yuklang.`, { duration: 6000 });
-        toast.info("💡 SellerCloudX Chrome kengaytmasini o'rnating — avtomatik to'ldirish imkoniyati!", { duration: 8000 });
+        toast.success(`"${normalizedProductName}" — AI kontent tayyor! Extension orqali avtomatik to'ldiriladi ✨`, { duration: 6000 });
       } else {
         toast.success(`"${normalizedProductName}" kartochkasi tayyor!`);
       }

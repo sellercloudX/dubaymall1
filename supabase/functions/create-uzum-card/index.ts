@@ -204,16 +204,15 @@ JSON formatda quyidagilarni ber: name_uz, name_ru, description_uz, description_r
       }
     }
 
-    // NOTE: Uzum Seller OpenAPI does NOT have a product creation endpoint.
-    // The API only supports: GET products, POST price changes, FBS orders, stocks, invoices.
-    // We return prepared card data for manual upload or Chrome extension auto-fill.
-    console.log("✅ Uzum card data prepared (API does not support product creation)");
+    // Uzum API does not support direct product creation.
+    // Data is sent to Chrome Extension for automated form filling on seller.uzum.uz
+    console.log("✅ Uzum card data prepared for Chrome Extension auto-fill");
 
     return new Response(
       JSON.stringify({
         success: true,
-        method: "prepared",
-        message: "Uzum API kartochka yaratishni qo'llab-quvvatlamaydi. Ma'lumotlar tayyor — Seller kabinetida qo'lda yuklang yoki Chrome kengaytmasidan foydalaning.",
+        method: "extension_autofill",
+        message: "AI kontent tayyor! Chrome Extension orqali Uzum Seller kabinetida avtomatik to'ldiriladi.",
         card: {
           ...cardContent,
           price: product.price,

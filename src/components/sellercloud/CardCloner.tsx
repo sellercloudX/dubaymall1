@@ -425,9 +425,8 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
           toast.error(`${product.name.slice(0, 30)}: ${data?.error || 'API xatosi'}`);
           return false;
         }
-        if (data.method === 'prepared') {
-          toast.info(`${product.name.slice(0, 25)}: Ma'lumotlar tayyor. Uzum kabinetida qo'lda yuklang.`, { duration: 5000 });
-          toast.info("💡 Chrome kengaytmasi orqali avtomatik to'ldirish mumkin!", { duration: 6000 });
+        if (data.method === 'prepared' || data.method === 'extension_autofill') {
+          toast.success(`${product.name.slice(0, 25)}: AI kontent tayyor ✨ Extension avtomatik to'ldiradi`, { duration: 5000 });
         }
         return true;
       }
