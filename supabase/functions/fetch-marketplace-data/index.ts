@@ -2104,9 +2104,10 @@ serve(async (req) => {
               }
 
               try {
-                const response = await fetch(
+                const response = await fetchWithRetry(
                   `${uzumBaseUrl}/v2/fbs/orders?${params.toString()}`,
-                  { headers: uzumHeaders }
+                  { headers: uzumHeaders },
+                  4
                 );
 
                 if (!response.ok) {
