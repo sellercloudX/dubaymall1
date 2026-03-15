@@ -2176,26 +2176,20 @@ serve(async (req) => {
 
               const displayOrderId = order.orderCode || order.orderNumber || order.code || order.orderId || order.id;
 
-              const rawCreatedAt = order.createdAt || order.createDate || order.dateCreated || order.created_at || '';
-              let uzumCreatedAt = '';
-              if (typeof rawCreatedAt === 'number') {
-                uzumCreatedAt = new Date(rawCreatedAt > 1e12 ? rawCreatedAt : rawCreatedAt * 1000).toISOString();
-              } else if (rawCreatedAt && !isNaN(Number(rawCreatedAt))) {
-                const ts = Number(rawCreatedAt);
-                uzumCreatedAt = new Date(ts > 1e12 ? ts : ts * 1000).toISOString();
-              } else if (rawCreatedAt) {
-                const parsed = new Date(String(rawCreatedAt));
-                uzumCreatedAt = isNaN(parsed.getTime()) ? '' : parsed.toISOString();
-              }
+              const uzumCreatedAt = parseUzumDate(
+                order.createdAt || order.createDate || order.dateCreated || order.created_at ||
+                order.updatedAt || order.updateDate || ''
+              );
               if (!uzumCreatedAt) {
                 console.warn(`[UZUM DATE WARN] Order ${displayOrderId} has no date field`);
               }
 
               const orderTotal = order.price || order.totalPrice || order.totalAmount || itemsTotal;
-              
+              const normalizedStatus = normalizeUzumStatus(order.status || orderStatus);
+
               return {
                 id: displayOrderId,
-                status: order.status || orderStatus,
+                status: normalizedStatus,
                 substatus: order.substatus || '',
                 createdAt: uzumCreatedAt,
                 total: orderTotal,
