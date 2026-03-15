@@ -2211,10 +2211,9 @@ serve(async (req) => {
             } // end for statuses in batch
           } // end for batches
 
-          // Log FBO vs FBS distribution from scheme field
-          const fboCount = allOrders.filter((o: any) => o.fulfillmentType === 'FBO').length;
-          const fbsCount = allOrders.filter((o: any) => o.fulfillmentType === 'FBS').length;
-          console.log(`Uzum orders collected: ${allOrders.length} (FBO: ${fboCount}, FBS: ${fbsCount})`);
+          // Log FBS orders collected before Finance/Invoice fetch
+          const fbsPreCount = allOrders.filter((o: any) => o.fulfillmentType === 'FBS').length;
+          console.log(`Uzum FBS orders collected: ${fbsPreCount}`);
 
           // NOTE: /v2/fbs/orders ONLY returns FBS orders. FBO orders are NOT included.
           // FBO data comes from /v1/finance/orders (settled transactions) — this is the ONLY source.
