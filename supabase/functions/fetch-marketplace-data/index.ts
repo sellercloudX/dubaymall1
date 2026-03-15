@@ -2211,34 +2211,40 @@ serve(async (req) => {
             } // end for statuses in batch
           } // end for batches
 
-          // Log FBO vs FBS distribution from scheme field
-          const fboCount = allOrders.filter((o: any) => o.fulfillmentType === 'FBO').length;
-          const fbsCount = allOrders.filter((o: any) => o.fulfillmentType === 'FBS').length;
-          console.log(`Uzum orders collected: ${allOrders.length} (FBO: ${fboCount}, FBS: ${fbsCount})`);
+          // Log FBS orders collected before Finance/Invoice fetch
+          const fbsPreCount = allOrders.filter((o: any) => o.fulfillmentType === 'FBS').length;
+          console.log(`Uzum FBS orders collected: ${fbsPreCount}`);
 
-          // NOTE: Uzum API has NO separate /v2/fbo/orders endpoint (confirmed via swagger).
-          // ALL orders (FBO+FBS) come through /v2/fbs/orders with 'scheme' field distinguishing them.
-          // FBO orders are detected via order.scheme === 'FBO'.
+          // NOTE: /v2/fbs/orders ONLY returns FBS orders. FBO orders are NOT included.
+          // FBO data comes from /v1/finance/orders (settled transactions) — this is the ONLY source.
+          // The 'scheme' field in FBS orders is always 'FBS' — never 'FBO'.
 
-          // ===== FETCH ADDITIONAL FBO DATA via /v1/finance/orders (settled transactions) =====
-          // Finance API captures settled FBO transactions that may not appear in /v2/fbo/orders
-          // shopIds is REQUIRED per Uzum OpenAPI spec — no global fallback possible
+          // ===== FETCH FBO DATA via /v1/finance/orders (ALL settled transactions incl. FBO) =====
+          // Finance API is the ONLY way to get FBO order data via OpenAPI
+          // shopIds is REQUIRED per Uzum OpenAPI spec
+          // statuses: TO_WITHDRAW, PROCESSING, CANCELED, PARTIALLY_CANCELLED
           try {
             const finShopIds = allShopIds.length > 0 ? allShopIds : (uzumShopId ? [String(uzumShopId)] : []);
             console.log(`Uzum Finance orders: querying with ${finShopIds.length} shopIds`);
             const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
             let fboCount = 0;
 
+            // Query ALL finance statuses to get complete FBO picture
+            const financeStatuses = ['TO_WITHDRAW', 'PROCESSING', 'CANCELED', 'PARTIALLY_CANCELLED'];
+
             let finPage = 0;
             let finHasMore = true;
 
             while (finHasMore && finPage < 20) {
-              // Build params with shopIds as repeated array params (REQUIRED by API)
               const finParams = new URLSearchParams();
               finParams.append('dateFrom', String(ninetyDaysAgo));
               finParams.append('dateTo', String(Date.now()));
               finParams.append('size', '100');
               finParams.append('page', String(finPage));
+              // Add ALL statuses to get complete data
+              for (const st of financeStatuses) {
+                finParams.append('statuses', st);
+              }
               // Add ALL shopIds as array params: shopIds=40852&shopIds=71592...
               for (const sid of finShopIds) {
                 finParams.append('shopIds', sid);
@@ -2378,6 +2384,103 @@ serve(async (req) => {
             console.log(`Uzum Finance orders total: ${fboCount} (deduplicated with FBS)`);
           } catch (fboErr) {
             console.error("Uzum Finance fetch error:", fboErr);
+          }
+
+          // ===== FETCH FBO SUPPLY INVOICES for additional revenue tracking =====
+          // /v1/shop/{shopId}/invoice shows what was shipped TO Uzum warehouse (FBO supply)
+          // This helps reconstruct FBO order volume when Finance API returns 0
+          try {
+            const invoiceShopIds = allShopIds.length > 0 ? allShopIds : (uzumShopId ? [String(uzumShopId)] : []);
+            let invoiceOrderCount = 0;
+
+            for (const sid of invoiceShopIds) {
+              try {
+                const invResp = await fetchWithRetry(
+                  `${uzumBaseUrl}/v1/shop/${sid}/invoice?size=50&page=0`,
+                  { headers: uzumHeaders },
+                  2
+                );
+                if (invResp.ok) {
+                  const invData = await invResp.json();
+                  const invoices = Array.isArray(invData) ? invData : (invData.payload || invData.data || []);
+                  const invList = Array.isArray(invoices) ? invoices : [];
+                  
+                  if (invList.length > 0) {
+                    console.log(`Uzum FBO invoices for shop ${sid}: ${invList.length}`);
+                    // Log first invoice for debugging
+                    if (invoiceOrderCount === 0) {
+                      console.log(`[UZUM INVOICE SAMPLE] ${JSON.stringify(invList[0]).substring(0, 500)}`);
+                    }
+                    
+                    // Each invoice represents an FBO supply shipment
+                    for (const inv of invList) {
+                      const invId = `INV-${inv.invoiceNumber || inv.id || inv.invoiceId}`;
+                      if (orderIdsSeen.has(invId)) continue;
+                      
+                      // Parse invoice date
+                      const invRawDate = inv.createdDate || inv.createDate || inv.date || inv.createdAt || '';
+                      let invDate = '';
+                      if (typeof invRawDate === 'number') {
+                        invDate = new Date(invRawDate > 1e12 ? invRawDate : invRawDate * 1000).toISOString();
+                      } else if (invRawDate) {
+                        const p = new Date(String(invRawDate));
+                        invDate = isNaN(p.getTime()) ? new Date().toISOString() : p.toISOString();
+                      }
+                      if (!invDate) invDate = new Date().toISOString();
+                      
+                      // Only include invoices within our date range
+                      const invTime = new Date(invDate).getTime();
+                      const ninetyDaysAgoMs = Date.now() - 90 * 24 * 60 * 60 * 1000;
+                      if (invTime < ninetyDaysAgoMs) continue;
+                      
+                      // Invoice total amount
+                      const invTotal = inv.totalAmount || inv.amount || inv.totalPrice || 0;
+                      const invStatus = inv.status || inv.invoiceStatus || 'DELIVERED';
+                      
+                      // Only add if has monetary value (real FBO shipment)
+                      if (invTotal > 0) {
+                        orderIdsSeen.add(invId);
+                        invoiceOrderCount++;
+                        allOrders.push({
+                          id: invId,
+                          status: invStatus === 'ACCEPTED' || invStatus === 'DELIVERED' || invStatus === 'COMPLETED' ? 'COMPLETED' : invStatus,
+                          substatus: 'FBO_INVOICE',
+                          createdAt: invDate,
+                          total: invTotal,
+                          totalUZS: invTotal,
+                          fulfillmentType: 'FBO' as const,
+                          itemsTotal: invTotal,
+                          itemsTotalUZS: invTotal,
+                          deliveryTotal: 0,
+                          deliveryTotalUZS: 0,
+                          buyer: { firstName: '', lastName: '' },
+                          items: [{
+                            offerId: `invoice-${inv.invoiceNumber || inv.id}`,
+                            skuId: '',
+                            barcode: '',
+                            offerName: `FBO поставка #${inv.invoiceNumber || inv.id}`,
+                            count: inv.itemCount || inv.productCount || inv.skuCount || 1,
+                            price: invTotal,
+                            priceUZS: invTotal,
+                          }],
+                        });
+                      }
+                    }
+                  }
+                } else {
+                  await invResp.text(); // consume body
+                }
+                await sleep(150);
+              } catch (invErr) {
+                console.warn(`Uzum invoice error for shop ${sid}:`, invErr);
+              }
+            }
+            
+            if (invoiceOrderCount > 0) {
+              console.log(`Uzum FBO invoices added: ${invoiceOrderCount} orders`);
+            }
+          } catch (invoiceErr) {
+            console.error("Uzum Invoice fetch error:", invoiceErr);
           }
 
           console.log(`Uzum total orders (FBS + FBO): ${allOrders.length}`);
