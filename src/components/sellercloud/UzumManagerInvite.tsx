@@ -376,7 +376,7 @@ export default function UzumManagerInvite() {
                 <div className="text-[10px] text-muted-foreground">
                   {extensionStatus.connected
                     ? `Oxirgi faoliyat: ${extensionStatus.lastPing ? new Date(extensionStatus.lastPing).toLocaleTimeString() : '—'}`
-                    : 'Extension o\'rnatilmagan yoki aktiv emas'
+                    : 'Extension hali tizimga ping yubormagan (popupdan Kirish bosing)'
                   }
                 </div>
               </div>

@@ -2561,8 +2561,11 @@ serve(async (req) => {
           console.log(`Uzum orders before date filter: ${allOrders.length}, after: ${dateFilteredOrders.length} (${new Date(effectiveFrom).toISOString()} to ${new Date(effectiveTo).toISOString()})`);
 
           // Calculate total revenue from non-cancelled orders
-          const activeUzumOrders = dateFilteredOrders.filter((o: any) => !['CANCELED', 'CANCELLED', 'RETURNED'].includes(o.status));
-          const uzumTotalRevenue = activeUzumOrders.reduce((sum: number, o: any) => sum + (o.totalUZS || o.total || 0), 0);
+          const activeUzumOrders = dateFilteredOrders.filter((o: any) => {
+            const status = normalizeUzumStatus(o.status);
+            return !['CANCELED', 'CANCELLED', 'RETURNED', 'REJECTED'].includes(status);
+          });
+          const uzumTotalRevenue = activeUzumOrders.reduce((sum: number, o: any) => sum + (toNumber(o.totalUZS || o.total || 0)), 0);
           
           console.log(`Uzum final orders: ${dateFilteredOrders.length}, active: ${activeUzumOrders.length}, revenue: ${uzumTotalRevenue}`);
           result = {
