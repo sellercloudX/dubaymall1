@@ -2216,29 +2216,36 @@ serve(async (req) => {
           const fbsCount = allOrders.filter((o: any) => o.fulfillmentType === 'FBS').length;
           console.log(`Uzum orders collected: ${allOrders.length} (FBO: ${fboCount}, FBS: ${fbsCount})`);
 
-          // NOTE: Uzum API has NO separate /v2/fbo/orders endpoint (confirmed via swagger).
-          // ALL orders (FBO+FBS) come through /v2/fbs/orders with 'scheme' field distinguishing them.
-          // FBO orders are detected via order.scheme === 'FBO'.
+          // NOTE: /v2/fbs/orders ONLY returns FBS orders. FBO orders are NOT included.
+          // FBO data comes from /v1/finance/orders (settled transactions) — this is the ONLY source.
+          // The 'scheme' field in FBS orders is always 'FBS' — never 'FBO'.
 
-          // ===== FETCH ADDITIONAL FBO DATA via /v1/finance/orders (settled transactions) =====
-          // Finance API captures settled FBO transactions that may not appear in /v2/fbo/orders
-          // shopIds is REQUIRED per Uzum OpenAPI spec — no global fallback possible
+          // ===== FETCH FBO DATA via /v1/finance/orders (ALL settled transactions incl. FBO) =====
+          // Finance API is the ONLY way to get FBO order data via OpenAPI
+          // shopIds is REQUIRED per Uzum OpenAPI spec
+          // statuses: TO_WITHDRAW, PROCESSING, CANCELED, PARTIALLY_CANCELLED
           try {
             const finShopIds = allShopIds.length > 0 ? allShopIds : (uzumShopId ? [String(uzumShopId)] : []);
             console.log(`Uzum Finance orders: querying with ${finShopIds.length} shopIds`);
             const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
             let fboCount = 0;
 
+            // Query ALL finance statuses to get complete FBO picture
+            const financeStatuses = ['TO_WITHDRAW', 'PROCESSING', 'CANCELED', 'PARTIALLY_CANCELLED'];
+
             let finPage = 0;
             let finHasMore = true;
 
             while (finHasMore && finPage < 20) {
-              // Build params with shopIds as repeated array params (REQUIRED by API)
               const finParams = new URLSearchParams();
               finParams.append('dateFrom', String(ninetyDaysAgo));
               finParams.append('dateTo', String(Date.now()));
               finParams.append('size', '100');
               finParams.append('page', String(finPage));
+              // Add ALL statuses to get complete data
+              for (const st of financeStatuses) {
+                finParams.append('statuses', st);
+              }
               // Add ALL shopIds as array params: shopIds=40852&shopIds=71592...
               for (const sid of finShopIds) {
                 finParams.append('shopIds', sid);
