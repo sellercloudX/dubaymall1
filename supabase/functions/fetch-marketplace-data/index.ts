@@ -2005,6 +2005,75 @@ serve(async (req) => {
           const orderIdsSeen = new Set<string>();
           const pageSize = 50; // Uzum max 50 per page
 
+          const toNumber = (value: any): number => {
+            if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+            if (value === null || value === undefined) return 0;
+            const normalized = String(value).replace(/\s+/g, '').replace(',', '.');
+            const parsed = Number(normalized);
+            return Number.isFinite(parsed) ? parsed : 0;
+          };
+
+          const parseUzumDate = (rawDate: any): string => {
+            if (rawDate === null || rawDate === undefined || rawDate === '') return '';
+
+            if (typeof rawDate === 'number') {
+              const d = new Date(rawDate > 1e12 ? rawDate : rawDate * 1000);
+              return isNaN(d.getTime()) ? '' : d.toISOString();
+            }
+
+            const raw = String(rawDate).trim();
+            if (!raw) return '';
+
+            // Uzum invoices may come as DD.MM.YYYY
+            const dmY = raw.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+            if (dmY) {
+              const [, dd, mm, yyyy] = dmY;
+              const d = new Date(`${yyyy}-${mm}-${dd}T00:00:00.000Z`);
+              return isNaN(d.getTime()) ? '' : d.toISOString();
+            }
+
+            if (!isNaN(Number(raw))) {
+              const ts = Number(raw);
+              const d = new Date(ts > 1e12 ? ts : ts * 1000);
+              return isNaN(d.getTime()) ? '' : d.toISOString();
+            }
+
+            const d = new Date(raw);
+            return isNaN(d.getTime()) ? '' : d.toISOString();
+          };
+
+          const normalizeUzumStatus = (rawStatus: any): string => {
+            const base = typeof rawStatus === 'object' && rawStatus !== null
+              ? (rawStatus.value ?? rawStatus.status ?? rawStatus.text ?? '')
+              : (rawStatus ?? '');
+            const statusText = String(base).trim().toUpperCase();
+            if (!statusText) return 'UNKNOWN';
+
+            if (['CANCELED', 'CANCELLED', 'RETURNED', 'REJECTED'].includes(statusText)) {
+              return statusText;
+            }
+            if (statusText.includes('BEKOR') || statusText.includes('ОТМЕН') || statusText.includes('CANCEL')) {
+              return 'CANCELED';
+            }
+            if (statusText.includes('RETURN') || statusText.includes('ВОЗВРАТ')) {
+              return 'RETURNED';
+            }
+            if (statusText.includes('QABUL') || statusText.includes('ПРИНЯТ') || statusText.includes('ACCEPT')) {
+              return 'ACCEPTED';
+            }
+            if (statusText.includes('DELIVER')) {
+              return 'DELIVERED';
+            }
+            if (statusText.includes('COMPLETE') || statusText.includes('FINAL')) {
+              return 'COMPLETED';
+            }
+            if (statusText.includes('YARAT') || statusText.includes('СОЗДАН') || statusText.includes('CREATE')) {
+              return 'CREATED';
+            }
+
+            return statusText;
+          };
+
           // FBS status list — MUST match Uzum OpenAPI enum exactly
           // Invalid statuses (like 'NEW', 'PROCESSING') return 0 results silently
           const orderStatusBatches = status ? [[status]] : [
