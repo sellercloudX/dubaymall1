@@ -116,7 +116,7 @@ export default function UzumManagerInvite() {
     const channel = supabase
       .channel('extension-status')
       .on('postgres_changes', {
-        event: 'UPDATE',
+        event: '*',
         schema: 'public',
         table: 'uzum_extension_commands',
         filter: `user_id=eq.${user.id}`,
