@@ -84,7 +84,23 @@ export default function UzumManagerInvite() {
         .eq('user_id', user.id)
         .eq('status', 'pending');
 
-      setExtensionStatus(prev => ({ ...prev, pendingCommands: count || 0 }));
+      // Check latest extension activity (completed/processing commands)
+      const { data: lastActivity } = await supabase
+        .from('uzum_extension_commands')
+        .select('status, processed_at, created_at')
+        .eq('user_id', user.id)
+        .in('status', ['processing', 'completed'])
+        .order('processed_at', { ascending: false, nullsFirst: false })
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      setExtensionStatus(prev => ({
+        ...prev,
+        pendingCommands: count || 0,
+        connected: !!lastActivity,
+        lastPing: (lastActivity?.processed_at as string | null) || (lastActivity?.created_at as string | null) || null,
+      }));
     } catch (err) {
       console.error('Failed to load account:', err);
     } finally {
@@ -100,7 +116,7 @@ export default function UzumManagerInvite() {
     const channel = supabase
       .channel('extension-status')
       .on('postgres_changes', {
-        event: 'UPDATE',
+        event: '*',
         schema: 'public',
         table: 'uzum_extension_commands',
         filter: `user_id=eq.${user.id}`,
@@ -360,7 +376,7 @@ export default function UzumManagerInvite() {
                 <div className="text-[10px] text-muted-foreground">
                   {extensionStatus.connected
                     ? `Oxirgi faoliyat: ${extensionStatus.lastPing ? new Date(extensionStatus.lastPing).toLocaleTimeString() : '—'}`
-                    : 'Extension o\'rnatilmagan yoki aktiv emas'
+                    : 'Extension hali tizimga ping yubormagan (popupdan Kirish bosing)'
                   }
                 </div>
               </div>

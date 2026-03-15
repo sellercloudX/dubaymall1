@@ -2005,6 +2005,75 @@ serve(async (req) => {
           const orderIdsSeen = new Set<string>();
           const pageSize = 50; // Uzum max 50 per page
 
+          const toNumber = (value: any): number => {
+            if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+            if (value === null || value === undefined) return 0;
+            const normalized = String(value).replace(/\s+/g, '').replace(',', '.');
+            const parsed = Number(normalized);
+            return Number.isFinite(parsed) ? parsed : 0;
+          };
+
+          const parseUzumDate = (rawDate: any): string => {
+            if (rawDate === null || rawDate === undefined || rawDate === '') return '';
+
+            if (typeof rawDate === 'number') {
+              const d = new Date(rawDate > 1e12 ? rawDate : rawDate * 1000);
+              return isNaN(d.getTime()) ? '' : d.toISOString();
+            }
+
+            const raw = String(rawDate).trim();
+            if (!raw) return '';
+
+            // Uzum invoices may come as DD.MM.YYYY
+            const dmY = raw.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+            if (dmY) {
+              const [, dd, mm, yyyy] = dmY;
+              const d = new Date(`${yyyy}-${mm}-${dd}T00:00:00.000Z`);
+              return isNaN(d.getTime()) ? '' : d.toISOString();
+            }
+
+            if (!isNaN(Number(raw))) {
+              const ts = Number(raw);
+              const d = new Date(ts > 1e12 ? ts : ts * 1000);
+              return isNaN(d.getTime()) ? '' : d.toISOString();
+            }
+
+            const d = new Date(raw);
+            return isNaN(d.getTime()) ? '' : d.toISOString();
+          };
+
+          const normalizeUzumStatus = (rawStatus: any): string => {
+            const base = typeof rawStatus === 'object' && rawStatus !== null
+              ? (rawStatus.value ?? rawStatus.status ?? rawStatus.text ?? '')
+              : (rawStatus ?? '');
+            const statusText = String(base).trim().toUpperCase();
+            if (!statusText) return 'UNKNOWN';
+
+            if (['CANCELED', 'CANCELLED', 'RETURNED', 'REJECTED'].includes(statusText)) {
+              return statusText;
+            }
+            if (statusText.includes('BEKOR') || statusText.includes('ОТМЕН') || statusText.includes('CANCEL')) {
+              return 'CANCELED';
+            }
+            if (statusText.includes('RETURN') || statusText.includes('ВОЗВРАТ')) {
+              return 'RETURNED';
+            }
+            if (statusText.includes('QABUL') || statusText.includes('ПРИНЯТ') || statusText.includes('ACCEPT')) {
+              return 'ACCEPTED';
+            }
+            if (statusText.includes('DELIVER')) {
+              return 'DELIVERED';
+            }
+            if (statusText.includes('COMPLETE') || statusText.includes('FINAL')) {
+              return 'COMPLETED';
+            }
+            if (statusText.includes('YARAT') || statusText.includes('СОЗДАН') || statusText.includes('CREATE')) {
+              return 'CREATED';
+            }
+
+            return statusText;
+          };
+
           // FBS status list — MUST match Uzum OpenAPI enum exactly
           // Invalid statuses (like 'NEW', 'PROCESSING') return 0 results silently
           const orderStatusBatches = status ? [[status]] : [
@@ -2035,9 +2104,10 @@ serve(async (req) => {
               }
 
               try {
-                const response = await fetch(
+                const response = await fetchWithRetry(
                   `${uzumBaseUrl}/v2/fbs/orders?${params.toString()}`,
-                  { headers: uzumHeaders }
+                  { headers: uzumHeaders },
+                  4
                 );
 
                 if (!response.ok) {
@@ -2107,26 +2177,20 @@ serve(async (req) => {
 
               const displayOrderId = order.orderCode || order.orderNumber || order.code || order.orderId || order.id;
 
-              const rawCreatedAt = order.createdAt || order.createDate || order.dateCreated || order.created_at || '';
-              let uzumCreatedAt = '';
-              if (typeof rawCreatedAt === 'number') {
-                uzumCreatedAt = new Date(rawCreatedAt > 1e12 ? rawCreatedAt : rawCreatedAt * 1000).toISOString();
-              } else if (rawCreatedAt && !isNaN(Number(rawCreatedAt))) {
-                const ts = Number(rawCreatedAt);
-                uzumCreatedAt = new Date(ts > 1e12 ? ts : ts * 1000).toISOString();
-              } else if (rawCreatedAt) {
-                const parsed = new Date(String(rawCreatedAt));
-                uzumCreatedAt = isNaN(parsed.getTime()) ? '' : parsed.toISOString();
-              }
+              const uzumCreatedAt = parseUzumDate(
+                order.createdAt || order.createDate || order.dateCreated || order.created_at ||
+                order.updatedAt || order.updateDate || ''
+              );
               if (!uzumCreatedAt) {
                 console.warn(`[UZUM DATE WARN] Order ${displayOrderId} has no date field`);
               }
 
               const orderTotal = order.price || order.totalPrice || order.totalAmount || itemsTotal;
-              
+              const normalizedStatus = normalizeUzumStatus(order.status || orderStatus);
+
               return {
                 id: displayOrderId,
-                status: order.status || orderStatus,
+                status: normalizedStatus,
                 substatus: order.substatus || '',
                 createdAt: uzumCreatedAt,
                 total: orderTotal,
@@ -2417,33 +2481,31 @@ serve(async (req) => {
                       const invId = `INV-${inv.invoiceNumber || inv.id || inv.invoiceId}`;
                       if (orderIdsSeen.has(invId)) continue;
                       
-                      // Parse invoice date
-                      const invRawDate = inv.createdDate || inv.createDate || inv.date || inv.createdAt || '';
-                      let invDate = '';
-                      if (typeof invRawDate === 'number') {
-                        invDate = new Date(invRawDate > 1e12 ? invRawDate : invRawDate * 1000).toISOString();
-                      } else if (invRawDate) {
-                        const p = new Date(String(invRawDate));
-                        invDate = isNaN(p.getTime()) ? new Date().toISOString() : p.toISOString();
-                      }
-                      if (!invDate) invDate = new Date().toISOString();
-                      
+                      // Parse invoice date (Uzum may return DD.MM.YYYY in dateCreated)
+                      const invDate = parseUzumDate(
+                        inv.dateCreated || inv.createdDate || inv.createDate || inv.date || inv.createdAt || inv.dateAccepted || ''
+                      ) || new Date().toISOString();
+
                       // Only include invoices within our date range
                       const invTime = new Date(invDate).getTime();
                       const ninetyDaysAgoMs = Date.now() - 90 * 24 * 60 * 60 * 1000;
                       if (invTime < ninetyDaysAgoMs) continue;
-                      
-                      // Invoice total amount
-                      const invTotal = inv.totalAmount || inv.amount || inv.totalPrice || 0;
-                      const invStatus = inv.status || inv.invoiceStatus || 'DELIVERED';
-                      
-                      // Only add if has monetary value (real FBO shipment)
-                      if (invTotal > 0) {
+
+                      // Invoice total amount (fullPrice is common in Uzum response)
+                      const invTotal = toNumber(inv.totalAmount ?? inv.amount ?? inv.totalPrice ?? inv.fullPrice ?? inv.full_amount ?? 0);
+                      const invStatusRaw = inv.invoiceStatus?.value || inv.invoiceStatus?.status || inv.invoiceStatus?.text || inv.status || 'UNKNOWN';
+                      const invStatus = normalizeUzumStatus(invStatusRaw);
+
+                      // Count only financially meaningful/accepted warehouse invoices
+                      const acceptedQty = toNumber(inv.totalAccepted ?? inv.acceptedCount ?? 0);
+                      const invoiceCanAffectSales = ['ACCEPTED', 'DELIVERED', 'COMPLETED'].includes(invStatus) || acceptedQty > 0;
+
+                      if (invTotal > 0 && invoiceCanAffectSales) {
                         orderIdsSeen.add(invId);
                         invoiceOrderCount++;
                         allOrders.push({
                           id: invId,
-                          status: invStatus === 'ACCEPTED' || invStatus === 'DELIVERED' || invStatus === 'COMPLETED' ? 'COMPLETED' : invStatus,
+                          status: ['ACCEPTED', 'DELIVERED', 'COMPLETED'].includes(invStatus) ? 'COMPLETED' : invStatus,
                           substatus: 'FBO_INVOICE',
                           createdAt: invDate,
                           total: invTotal,
@@ -2500,8 +2562,11 @@ serve(async (req) => {
           console.log(`Uzum orders before date filter: ${allOrders.length}, after: ${dateFilteredOrders.length} (${new Date(effectiveFrom).toISOString()} to ${new Date(effectiveTo).toISOString()})`);
 
           // Calculate total revenue from non-cancelled orders
-          const activeUzumOrders = dateFilteredOrders.filter((o: any) => !['CANCELED', 'CANCELLED', 'RETURNED'].includes(o.status));
-          const uzumTotalRevenue = activeUzumOrders.reduce((sum: number, o: any) => sum + (o.totalUZS || o.total || 0), 0);
+          const activeUzumOrders = dateFilteredOrders.filter((o: any) => {
+            const status = normalizeUzumStatus(o.status);
+            return !['CANCELED', 'CANCELLED', 'RETURNED', 'REJECTED'].includes(status);
+          });
+          const uzumTotalRevenue = activeUzumOrders.reduce((sum: number, o: any) => sum + (toNumber(o.totalUZS || o.total || 0)), 0);
           
           console.log(`Uzum final orders: ${dateFilteredOrders.length}, active: ${activeUzumOrders.length}, revenue: ${uzumTotalRevenue}`);
           result = {
