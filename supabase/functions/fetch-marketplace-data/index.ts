@@ -2480,33 +2480,31 @@ serve(async (req) => {
                       const invId = `INV-${inv.invoiceNumber || inv.id || inv.invoiceId}`;
                       if (orderIdsSeen.has(invId)) continue;
                       
-                      // Parse invoice date
-                      const invRawDate = inv.createdDate || inv.createDate || inv.date || inv.createdAt || '';
-                      let invDate = '';
-                      if (typeof invRawDate === 'number') {
-                        invDate = new Date(invRawDate > 1e12 ? invRawDate : invRawDate * 1000).toISOString();
-                      } else if (invRawDate) {
-                        const p = new Date(String(invRawDate));
-                        invDate = isNaN(p.getTime()) ? new Date().toISOString() : p.toISOString();
-                      }
-                      if (!invDate) invDate = new Date().toISOString();
-                      
+                      // Parse invoice date (Uzum may return DD.MM.YYYY in dateCreated)
+                      const invDate = parseUzumDate(
+                        inv.dateCreated || inv.createdDate || inv.createDate || inv.date || inv.createdAt || inv.dateAccepted || ''
+                      ) || new Date().toISOString();
+
                       // Only include invoices within our date range
                       const invTime = new Date(invDate).getTime();
                       const ninetyDaysAgoMs = Date.now() - 90 * 24 * 60 * 60 * 1000;
                       if (invTime < ninetyDaysAgoMs) continue;
-                      
-                      // Invoice total amount
-                      const invTotal = inv.totalAmount || inv.amount || inv.totalPrice || 0;
-                      const invStatus = inv.status || inv.invoiceStatus || 'DELIVERED';
-                      
-                      // Only add if has monetary value (real FBO shipment)
-                      if (invTotal > 0) {
+
+                      // Invoice total amount (fullPrice is common in Uzum response)
+                      const invTotal = toNumber(inv.totalAmount ?? inv.amount ?? inv.totalPrice ?? inv.fullPrice ?? inv.full_amount ?? 0);
+                      const invStatusRaw = inv.invoiceStatus?.value || inv.invoiceStatus?.status || inv.invoiceStatus?.text || inv.status || 'UNKNOWN';
+                      const invStatus = normalizeUzumStatus(invStatusRaw);
+
+                      // Count only financially meaningful/accepted warehouse invoices
+                      const acceptedQty = toNumber(inv.totalAccepted ?? inv.acceptedCount ?? 0);
+                      const invoiceCanAffectSales = ['ACCEPTED', 'DELIVERED', 'COMPLETED'].includes(invStatus) || acceptedQty > 0;
+
+                      if (invTotal > 0 && invoiceCanAffectSales) {
                         orderIdsSeen.add(invId);
                         invoiceOrderCount++;
                         allOrders.push({
                           id: invId,
-                          status: invStatus === 'ACCEPTED' || invStatus === 'DELIVERED' || invStatus === 'COMPLETED' ? 'COMPLETED' : invStatus,
+                          status: ['ACCEPTED', 'DELIVERED', 'COMPLETED'].includes(invStatus) ? 'COMPLETED' : invStatus,
                           substatus: 'FBO_INVOICE',
                           createdAt: invDate,
                           total: invTotal,
