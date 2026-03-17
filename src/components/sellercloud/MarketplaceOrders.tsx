@@ -14,6 +14,7 @@ import { format } from 'date-fns';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 import { MARKETPLACE_CONFIG, MarketplaceLogo } from '@/lib/marketplaceConfig';
 import { toDisplayUzs, formatUzs } from '@/lib/currency';
+import { getOrderRevenueUzs } from '@/lib/revenueCalculations';
 
 interface MarketplaceOrdersProps {
   connectedMarketplaces: string[];
