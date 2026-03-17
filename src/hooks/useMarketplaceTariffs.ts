@@ -406,7 +406,7 @@ export function getTariffForProduct(
     const avgLogistics = yandexTariffs.length > 0
       ? yandexTariffs.reduce((s, t) => s + t.fulfillment + t.delivery, 0) / yandexTariffs.length
       : 6000;
-    const commission = Math.round(price * avgCommPct);
+    const commission = Math.round(commBase * avgCommPct);
     const logistics = Math.round(avgLogistics);
     const withdrawal = Math.round(price * 0.01);
     return {
