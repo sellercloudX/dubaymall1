@@ -636,6 +636,24 @@ serve(async (req) => {
         let allOrders: YandexOrder[] = [];
         const orderIdsSeen = new Set<number>();
 
+        // ===== CRITICAL: Detect campaign placement model for correct FBO/FBS classification =====
+        // Without this, FBS-only campaigns show all orders as FBO (FBY) incorrectly
+        let orderCampaignPlacementType = '';
+        try {
+          const campResp = await fetchWithRetry(
+            `https://api.partner.market.yandex.ru/campaigns/${campaignId}`,
+            { headers }
+          );
+          if (campResp.ok) {
+            const campData = await campResp.json();
+            orderCampaignPlacementType = campData.campaign?.placementType || '';
+            console.log(`Orders: Campaign ${campaignId} placementType: "${orderCampaignPlacementType}"`);
+          }
+        } catch (e) {
+          console.error('Campaign type detection error:', e);
+        }
+        const isOrdersFbsOnlyCampaign = orderCampaignPlacementType === 'FBS' || orderCampaignPlacementType === 'DBS';
+
         // Split into 30-day chunks
         let chunkEnd = new Date(endDate);
         while (chunkEnd > startDate) {
