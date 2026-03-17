@@ -196,7 +196,7 @@ export function StockForecast({ connectedMarketplaces, store }: Props) {
                 <th className="text-right py-2.5 px-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort('currentStock')}>
                   <span className="inline-flex items-center gap-1">Zaxira <ArrowUpDown className="h-3 w-3" /></span>
                 </th>
-                <th className="text-right py-2.5 px-3 font-medium text-muted-foreground hidden md:table-cell">FBO / FBS</th>
+                <th className="text-right py-2.5 px-3 font-medium text-muted-foreground hidden md:table-cell">FBO(FBY) / FBS</th>
                 <th className="text-right py-2.5 px-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort('dailyVelocity')}>
                   <span className="inline-flex items-center gap-1">Kunlik sotilish <ArrowUpDown className="h-3 w-3" /></span>
                 </th>
