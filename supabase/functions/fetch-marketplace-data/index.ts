@@ -735,6 +735,10 @@ serve(async (req) => {
               const totalCount = Math.max(1, rawItems.reduce((s: number, i: any) => s + (i.count || 1), 0));
               const normalizedItemsTotal = itemsTotal || total;
               
+              // IMPORTANT: buyerItemsTotalBeforeDiscount = price BEFORE Yandex subsidies/promotions
+              // Yandex charges FEE commission on THIS price, not on buyerItemsTotal
+              const itemsTotalBeforeDiscount = order.buyerItemsTotalBeforeDiscount || order.itemsTotal || normalizedItemsTotal;
+              
               const mappedItems = rawItems.map((item: any, index: number) => {
                 const count = item.count || 1;
                 
@@ -757,12 +761,25 @@ serve(async (req) => {
 
                 const unitPrice = count > 0 ? Math.round(allocatedTotal / count) : allocatedTotal;
                 
+                // Extract the pre-discount price (commission base)
+                // Yandex charges FEE% on this price, not on the discounted buyer price
+                const rawBeforeDiscount = item.buyerPriceBeforeDiscount || item.priceBeforeDiscount || item.price || 0;
+                // Distribute order-level beforeDiscount proportionally if available
+                let commissionBase = unitPrice; // default: same as buyer price
+                if (itemsTotalBeforeDiscount > normalizedItemsTotal && normalizedItemsTotal > 0) {
+                  // There IS a subsidy — scale up the unit price proportionally
+                  commissionBase = Math.round(unitPrice * (itemsTotalBeforeDiscount / normalizedItemsTotal));
+                } else if (rawBeforeDiscount > 0 && rawBeforeDiscount > unitPrice) {
+                  commissionBase = rawBeforeDiscount;
+                }
+                
                 return {
                   offerId: item.offerId,
                   offerName: item.offerName,
                   count,
                   price: unitPrice,
                   priceUZS: unitPrice,
+                  commissionBase, // price before Yandex subsidy — used for fee calculation
                   categoryId: item.marketCategoryId,
                 };
               });
