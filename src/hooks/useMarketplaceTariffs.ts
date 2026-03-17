@@ -367,17 +367,29 @@ export function getTariffForProduct(
   tariffMap: Map<string, TariffInfo> | undefined,
   offerId: string,
   price: number,
-  marketplace?: string
+  marketplace?: string,
+  /** Yandex: price before subsidy — commission is charged on this, not buyer price */
+  commissionBase?: number,
 ): { commission: number; logistics: number; withdrawal: number; totalFee: number; isReal: boolean } {
   const tariff = safeMapGet(tariffMap, offerId);
+  // For Yandex: commission is on pre-subsidy price, not buyer price
+  const commBase = commissionBase && commissionBase > price ? commissionBase : price;
+  
   if (tariff && tariff.totalTariff > 0) {
-    // Yandex withdrawal fee: ~1% of sales price (for payment to seller account)
+    // If we have a commissionBase that differs from catalog price, recalculate commission
+    let commission = tariff.agencyCommission;
+    let totalTariff = tariff.totalTariff;
+    if (marketplace === 'yandex' && commissionBase && commissionBase > 0 && tariff.commissionPercent > 0) {
+      // Recalculate commission using the REAL base (pre-subsidy price)
+      commission = Math.round(commBase * (tariff.commissionPercent / 100));
+      totalTariff = commission + tariff.fulfillment + tariff.delivery;
+    }
     const withdrawalFee = marketplace === 'yandex' ? Math.round(price * 0.01) : 0;
     return {
-      commission: tariff.agencyCommission,
+      commission,
       logistics: tariff.fulfillment + tariff.delivery,
       withdrawal: withdrawalFee,
-      totalFee: tariff.totalTariff + withdrawalFee,
+      totalFee: totalTariff + withdrawalFee,
       isReal: true,
     };
   }
@@ -394,7 +406,7 @@ export function getTariffForProduct(
     const avgLogistics = yandexTariffs.length > 0
       ? yandexTariffs.reduce((s, t) => s + t.fulfillment + t.delivery, 0) / yandexTariffs.length
       : 6000;
-    const commission = Math.round(price * avgCommPct);
+    const commission = Math.round(commBase * avgCommPct);
     const logistics = Math.round(avgLogistics);
     const withdrawal = Math.round(price * 0.01);
     return {

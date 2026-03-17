@@ -104,7 +104,8 @@ export function FinancialDashboard({
             costPricesCovered += qty;
           }
 
-          const tariff = getTariffForProduct(tariffMap, item.offerId, itemPrice, marketplace);
+          const commBase = (item as any).commissionBase ? toDisplayUzs((item as any).commissionBase, marketplace) : undefined;
+          const tariff = getTariffForProduct(tariffMap, item.offerId, itemPrice, marketplace, commBase);
           const itemFees = tariff.totalFee * qty;
           mpFees += itemFees;
           totalMarketplaceFees += itemFees;

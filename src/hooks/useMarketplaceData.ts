@@ -122,7 +122,7 @@
    status?: string;
  }) {
    return useQuery({
-     queryKey: ['marketplace-orders', marketplace, options, 'v9-full-orders'],
+     queryKey: ['marketplace-orders', marketplace, options, 'v10-commission-base'],
      queryFn: async () => {
        if (!marketplace) return { data: [], total: 0 };
        const result = await fetchMarketplaceData(marketplace, 'orders', { 

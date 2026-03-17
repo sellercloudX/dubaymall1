@@ -62,6 +62,8 @@ export interface MarketplaceOrder {
     priceUZS: number;
     photo?: string;
     nmID?: number;
+    // Yandex: price before Yandex subsidy — commission is charged on THIS, not on buyer price
+    commissionBase?: number;
     // WB-specific: actual price after WB discount
     spp?: number;
     finishedPrice?: number;
@@ -162,7 +164,7 @@ export function useMarketplaceDataStore(connectedMarketplaces: string[]) {
     // Fetch orders for each marketplace
     const orderQueries = useQueries({
       queries: connectedMarketplaces.map(mp => ({
-         queryKey: ['marketplace-orders', mp, 'v9-full-orders'],
+         queryKey: ['marketplace-orders', mp, 'v10-commission-base'],
          queryFn: async () => {
            // Do NOT send date limits — let the edge function fetch all orders
            // The edge function defaults to 365 days which captures all active orders
