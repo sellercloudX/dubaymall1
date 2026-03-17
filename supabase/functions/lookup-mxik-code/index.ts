@@ -282,6 +282,53 @@ async function searchTasnif(keyword: string, lang = 'ru'): Promise<any[]> {
   }
 }
 
+// ===== Category relevance scoring =====
+// Penalize candidates that clearly don't match the product category
+function scoreCategoryRelevance(
+  candidateName: string,
+  productName: string,
+  category?: string,
+  description?: string
+): number {
+  const cLower = candidateName.toLowerCase();
+  const pLower = productName.toLowerCase();
+  const catLower = (category || '').toLowerCase();
+  const descLower = (description || '').toLowerCase();
+  const context = `${pLower} ${catLower} ${descLower}`;
+
+  // HARD PENALTIES: completely unrelated categories
+  const ALCOHOL_KEYWORDS = ['водка', 'вино', 'пиво', 'алкоголь', 'спиртной', 'коньяк', 'виски', 'ликёр', 'настойка'];
+  const FOOD_KEYWORDS = ['мясо', 'рыба', 'молоко', 'хлеб', 'мука', 'сахар', 'масло растительное', 'крупа'];
+  const PHARMA_KEYWORDS = ['лекарственный', 'фармацевтический', 'медицинский препарат', 'таблетка', 'инъекция'];
+  const TOBACCO_KEYWORDS = ['табак', 'сигарета', 'папироса', 'курительный'];
+  
+  const isAlcohol = ALCOHOL_KEYWORDS.some(k => cLower.includes(k));
+  const isFood = FOOD_KEYWORDS.some(k => cLower.includes(k));
+  const isPharma = PHARMA_KEYWORDS.some(k => cLower.includes(k));
+  const isTobacco = TOBACCO_KEYWORDS.some(k => cLower.includes(k));
+
+  // If product context clearly NOT alcohol/food/pharma/tobacco, heavily penalize
+  const contextIsAlcohol = ALCOHOL_KEYWORDS.some(k => context.includes(k));
+  const contextIsFood = FOOD_KEYWORDS.some(k => context.includes(k));
+  const contextIsPharma = PHARMA_KEYWORDS.some(k => context.includes(k));
+  const contextIsTobacco = TOBACCO_KEYWORDS.some(k => context.includes(k));
+
+  if (isAlcohol && !contextIsAlcohol) return -100;
+  if (isTobacco && !contextIsTobacco) return -100;
+  if (isPharma && !contextIsPharma) return -50;
+  if (isFood && !contextIsFood) return -30;
+
+  // POSITIVE: direct keyword match
+  const productWords = pLower.split(/\s+/).filter(w => w.length > 3);
+  let matchScore = 0;
+  for (const word of productWords) {
+    if (cLower.includes(word)) matchScore += 20;
+  }
+  if (catLower && cLower.includes(catLower)) matchScore += 30;
+
+  return matchScore;
+}
+
 // ===== STEP 3: AI selects best code =====
 async function aiSelectBestCode(
   productName: string,
@@ -300,28 +347,43 @@ async function aiSelectBestCode(
   const apiKey = Deno.env.get('LOVABLE_API_KEY');
   if (!apiKey) throw new Error('LOVABLE_API_KEY not configured');
 
-  const candidates: Array<{ code: string; name_uz: string; name_ru?: string; source: string; relevance?: number }> = [];
+  const candidates: Array<{ code: string; name_uz: string; name_ru?: string; source: string; relevance?: number; categoryScore: number }> = [];
 
   for (const r of dbResults) {
-    candidates.push({ code: r.code, name_uz: r.name_uz, name_ru: r.name_ru || undefined, source: 'database', relevance: r.relevance });
+    const catScore = scoreCategoryRelevance(
+      `${r.name_uz} ${r.name_ru || ''} ${r.group_name || ''}`,
+      productName, category, description
+    );
+    candidates.push({ code: r.code, name_uz: r.name_uz, name_ru: r.name_ru || undefined, source: 'database', relevance: r.relevance, categoryScore: catScore });
   }
 
   for (const t of tasnifResults) {
     const fullName = [t.groupName, t.className, t.positionName, t.subPositionName, t.attributeName]
       .filter(Boolean).join(' > ');
     if (!candidates.some(c => c.code === t.mxikCode)) {
-      candidates.push({ code: t.mxikCode, name_uz: fullName, source: 'tasnif' });
+      const catScore = scoreCategoryRelevance(fullName, productName, category, description);
+      candidates.push({ code: t.mxikCode, name_uz: fullName, source: 'tasnif', categoryScore: catScore });
     }
   }
 
-  if (candidates.length === 0) {
+  // CRITICAL: Filter out heavily penalized candidates BEFORE sending to AI
+  const filteredCandidates = candidates
+    .filter(c => c.categoryScore > -100)
+    .sort((a, b) => b.categoryScore - a.categoryScore);
+
+  if (filteredCandidates.length === 0 && candidates.length > 0) {
+    // If all were filtered, use originals but sorted by score
+    filteredCandidates.push(...candidates.sort((a, b) => b.categoryScore - a.categoryScore).slice(0, 10));
+  }
+
+  if (filteredCandidates.length === 0) {
     console.log('[MXIK] No candidates, using AI fallback');
     
     const fallbackResp = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash-lite',
+        model: 'google/gemini-2.5-flash',
         messages: [
           { role: 'system', content: 'Sen O\'zbekiston MXIK (IKPU) kod mutaxassisizan. Mahsulot nomi va kategoriyasi asosida eng mos MXIK kodni taklif qil. MXIK kodlar 17 xonali raqam. Faqat JSON javob ber.' },
           { role: 'user', content: `Mahsulot: "${productName}"\n${category ? `Kategoriya: "${category}"` : ''}\n${description ? `Tavsif: "${description}"` : ''}\n\nEng mos MXIK kodni 17 xonali formatda taklif qil.\nJSON: {"mxik_code":"17_digit_code","mxik_name":"nomi","vat_rate":12,"confidence":50}` },
@@ -358,10 +420,12 @@ async function aiSelectBestCode(
     };
   }
 
-  // Build candidate list for AI with relevance scores
-  const candidateList = candidates.slice(0, 30).map((c, i) => {
+  // Build candidate list for AI — sorted by category relevance
+  const topCandidates = filteredCandidates.slice(0, 25);
+  const candidateList = topCandidates.map((c, i) => {
     const relStr = c.relevance ? ` (relevance: ${(c.relevance * 100).toFixed(0)}%)` : '';
-    return `${i + 1}. ${c.code} — ${c.name_uz}${c.name_ru ? ` | ${c.name_ru}` : ''}${relStr} [${c.source}]`;
+    const catStr = c.categoryScore > 0 ? ` ★RELEVANT` : c.categoryScore < 0 ? ` ⚠UNLIKELY` : '';
+    return `${i + 1}. ${c.code} — ${c.name_uz}${c.name_ru ? ` | ${c.name_ru}` : ''}${relStr}${catStr} [${c.source}]`;
   }).join('\n');
 
   const prompt = `Mahsulot: "${productName}"
@@ -369,12 +433,17 @@ ${category ? `Kategoriya: "${category}"` : ''}
 ${description ? `Tavsif: "${description}"` : ''}
 
 Quyidagi RO'YXATDAN eng mos MXIK kodini tanlang.
+
 MUHIM QOIDALAR:
 1. Faqat shu ro'yxatdagi kodlardan birini tanlang! O'zingizdan kod to'qib chiqarmang!
-2. Mahsulot TURINI to'g'ri aniqlang! Masalan: "воскоплав" = depilatsiya jihozi, "apteka dori vositasi" EMAS!
-3. Kosmetika va go'zallik mahsulotlarini DORI-DARMON yoki FARMATSEVTIKA bilan adashtirmang!
-4. Mahsulot nomi va tavsifiga qarab aniq kategoriyani tanlang.
-5. "Лекарственный", "фармацевтический", "медицинский" so'zlari bor kodlarni FAQAT haqiqiy dori mahsulotlari uchun tanlang!
+2. Mahsulot TURINI to'g'ri aniqlang — KATEGORIYAGA e'tibor bering!
+   - "сковорода" = oshxona idishi (посуда), "водка" EMAS!
+   - "воскоплав" = depilatsiya jihozi, "дори-дармон" EMAS!
+   - "наушник" = audio qurilma, "telefon" EMAS!
+3. ★RELEVANT deb belgilangan kodlarni afzal ko'ring — ular kategoriyaga mos!
+4. ⚠UNLIKELY deb belgilangan kodlarni FAQAT boshqa variant bo'lmaganda tanlang!
+5. Kosmetika va go'zallik mahsulotlarini DORI-DARMON yoki FARMATSEVTIKA bilan adashtirmang!
+6. Alkogol, tamaki, oziq-ovqat kodlarini faqat haqiqatan o'sha mahsulot uchun tanlang!
 
 ${candidateList}
 
@@ -393,13 +462,13 @@ JSON:
     method: 'POST',
     headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'google/gemini-2.5-flash-lite',
+      model: 'google/gemini-2.5-flash',
       messages: [
-        { role: 'system', content: 'Sen MXIK kod mutaxassisizan. FAQAT berilgan ro\'yxatdagi kodlardan tanlaysan. Yangi kod to\'qib chiqarma. MUHIM: Kosmetika/go\'zallik mahsulotlarini (krem, shampun, vosk, depilyatsiya, parfyum) HECH QACHON dori-darmon yoki farmatsevtika kategoriyasiga qo\'yma! Mahsulot turini ANIQ farqla! JSON formatda javob ber.' },
+        { role: 'system', content: 'Sen MXIK kod mutaxassisizan. FAQAT berilgan ro\'yxatdagi kodlardan tanlaysan. Yangi kod to\'qib chiqarma. MUHIM: Mahsulot kategoriyasiga e\'tibor ber! Oshxona jihozlarini alkogol bilan, kosmetikani dori-darmon bilan adashtirma! ★RELEVANT belgilangan kodlarni afzal ko\'r. JSON formatda javob ber.' },
         { role: 'user', content: prompt },
       ],
       temperature: 0.1,
-      max_tokens: 400,
+      max_tokens: 500,
     }),
   });
 
@@ -410,7 +479,6 @@ JSON:
 
   const match = content.match(/\{[\s\S]*\}/);
   if (match) {
-    // Clean AI-generated JSON: remove trailing commas before ] or }
     const cleanJson = match[0]
       .replace(/,\s*([}\]])/g, '$1')
       .replace(/'/g, '"')
@@ -419,34 +487,54 @@ JSON:
     try {
       result = JSON.parse(cleanJson);
     } catch (parseErr) {
-      console.warn('[MXIK] AI JSON parse failed, using first candidate fallback:', parseErr);
-      const fb = candidates[0];
+      console.warn('[MXIK] AI JSON parse failed, using best category-scored candidate:', parseErr);
+      const fb = topCandidates[0];
       return {
         mxik_code: fb.code,
         mxik_name: fb.name_uz,
         name_ru: fb.name_ru,
         vat_rate: 12,
         confidence: 55,
-        alternatives: candidates.slice(1, 4).map(c => ({
+        alternatives: topCandidates.slice(1, 4).map(c => ({
           code: c.code, name_uz: c.name_uz, name_ru: c.name_ru, confidence: 45,
         })),
       };
     }
     const selectedCode = String(result.mxik_code || '');
 
-    const isValid = candidates.some(c => c.code === selectedCode);
-    if (!isValid && candidates.length > 0) {
-      console.warn(`[MXIK] AI returned invalid code ${selectedCode}, using first candidate`);
-      const fallback = candidates[0];
+    const isValid = topCandidates.some(c => c.code === selectedCode);
+    if (!isValid && topCandidates.length > 0) {
+      console.warn(`[MXIK] AI returned invalid code ${selectedCode}, using best category-scored candidate`);
+      const fallback = topCandidates[0];
       return {
         mxik_code: fallback.code,
         mxik_name: fallback.name_uz,
         name_ru: fallback.name_ru,
         vat_rate: 12,
         confidence: 60,
-        alternatives: candidates.slice(1, 4).map(c => ({
+        alternatives: topCandidates.slice(1, 4).map(c => ({
           code: c.code, name_uz: c.name_uz, name_ru: c.name_ru, confidence: 50,
         })),
+      };
+    }
+
+    // Verify the selected code isn't heavily penalized
+    const selectedCandidate = topCandidates.find(c => c.code === selectedCode);
+    if (selectedCandidate && selectedCandidate.categoryScore < -30 && topCandidates[0].categoryScore > 0) {
+      console.warn(`[MXIK] AI picked penalized code (score: ${selectedCandidate.categoryScore}), overriding with best match`);
+      const better = topCandidates[0];
+      return {
+        mxik_code: better.code,
+        mxik_name: better.name_uz,
+        name_ru: better.name_ru,
+        vat_rate: 12,
+        confidence: 70,
+        alternatives: [
+          { code: selectedCode, name_uz: result.mxik_name || '', name_ru: result.name_ru, confidence: 30 },
+          ...topCandidates.slice(1, 3).map(c => ({
+            code: c.code, name_uz: c.name_uz, name_ru: c.name_ru, confidence: 50,
+          })),
+        ],
       };
     }
 
@@ -459,21 +547,21 @@ JSON:
       alternatives: (result.alternatives || []).slice(0, 5)
         .map((a: any) => {
           const altCode = String(a.code || '');
-          if (!candidates.some(c => c.code === altCode)) return null;
+          if (!topCandidates.some(c => c.code === altCode)) return null;
           return { code: altCode, name_uz: a.name_uz || '', name_ru: a.name_ru, confidence: Math.min(a.confidence || 50, 95) };
         })
         .filter(Boolean),
     };
   }
 
-  const fallback = candidates[0];
+  const fallback = topCandidates[0];
   return {
     mxik_code: fallback.code,
     mxik_name: fallback.name_uz,
     name_ru: fallback.name_ru,
     vat_rate: 12,
     confidence: 50,
-    alternatives: candidates.slice(1, 4).map(c => ({
+    alternatives: topCandidates.slice(1, 4).map(c => ({
       code: c.code, name_uz: c.name_uz, name_ru: c.name_ru, confidence: 40,
     })),
   };
