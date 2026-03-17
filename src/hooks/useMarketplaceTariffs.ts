@@ -425,41 +425,23 @@ export function getTariffForProduct(
     };
   }
 
-  // WB fallback — price is ALREADY in UZS (converted by caller via toDisplayUzs)
+  // WB fallback — no real data, return zero
   if (marketplace === 'wildberries') {
-    const rubToUzs = getRubToUzs();
-    const commission = price * 0.15; // 15% of UZS price
-    const logisticsRub = price > (5000 * rubToUzs) ? 100 : price > (1000 * rubToUzs) ? 50 : 30;
-    const logisticsUzs = Math.round(logisticsRub * rubToUzs);
     return {
-      commission: Math.round(commission),
-      logistics: logisticsUzs,
+      commission: 0,
+      logistics: 0,
       withdrawal: 0,
-      totalFee: Math.round(commission) + logisticsUzs,
+      totalFee: 0,
       isReal: false,
     };
   }
 
-  if (safeMapSize(tariffMap) > 0) {
-    const values = safeMapValues(tariffMap);
-    const avgCommissionPercent = values.reduce((s, t) => s + t.commissionPercent, 0) / values.length;
-    const avgLogistics = values.reduce((s, t) => s + t.fulfillment + t.delivery + (t.otherFees || 0), 0) / values.length;
-    const estCommission = price * (avgCommissionPercent / 100);
-    return {
-      commission: estCommission,
-      logistics: avgLogistics,
-      withdrawal: 0,
-      totalFee: estCommission + avgLogistics,
-      isReal: false,
-    };
-  }
-
-  // Last resort fallback (should rarely hit now)
+  // No real data available — return zero, not estimates
   return {
-    commission: price * 0.17,
-    logistics: 6000,
+    commission: 0,
+    logistics: 0,
     withdrawal: 0,
-    totalFee: price * 0.17 + 6000,
+    totalFee: 0,
     isReal: false,
   };
 }
