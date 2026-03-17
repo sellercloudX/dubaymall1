@@ -258,36 +258,26 @@ export default function SellerCloudX() {
         return <MarketplaceProductAnalytics connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'wb-analytics':
         return <MarketplaceSellerAnalytics connectedMarketplaces={connectedMarketplaces} store={store} />;
-      case 'wb-keywords':
-        return <MarketplaceSearchKeywords connectedMarketplaces={connectedMarketplaces} />;
+      case 'seo-monitor':
+        return <SEOMonitor connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'financials':
         return <FinancialDashboard connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'abc':
         return <ABCAnalysis connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'cost-prices':
         return <CostPriceManager connectedMarketplaces={connectedMarketplaces} store={store} />;
-      case 'calculator':
-        return <ProfitCalculator />;
       case 'competitor':
         return <CompetitorPriceMonitor connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'unit-economy':
         return <UnitEconomyDashboard connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'stock-forecast':
-        return <StockForecast connectedMarketplaces={connectedMarketplaces} store={store} />;
-      case 'seo-monitor':
-        return <SEOMonitor connectedMarketplaces={connectedMarketplaces} store={store} />;
-      case 'auto-reorder':
-        return <AutoReorderAlerts connectedMarketplaces={connectedMarketplaces} store={store} />;
-      case 'inventory':
-        return <InventorySync connectedMarketplaces={connectedMarketplaces} store={store} />;
+        return <InventoryControlHub connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'pricing':
-        return <PriceManager connectedMarketplaces={connectedMarketplaces} store={store} />;
+        return <PriceControlHub connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'reviews':
         return <MarketplaceReviews connectedMarketplaces={connectedMarketplaces} />;
       case 'ads':
         return <MarketplaceAdsCampaigns connectedMarketplaces={connectedMarketplaces} />;
-      case 'min-price':
-        return <MinPriceProtection connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'clone':
         return <CardCloner connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'problems':
@@ -309,6 +299,8 @@ export default function SellerCloudX() {
         return <ReportsExport connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'notifications':
         return <NotificationCenter />;
+      case 'tutorials':
+        return <TutorialVideos />;
       case 'support':
         return <SupportChat />;
       default:
