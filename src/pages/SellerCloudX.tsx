@@ -99,7 +99,8 @@ const pageTitles: Record<string, string> = {
   'seo-monitor': 'SEO Monitor',
   'auto-reorder': 'Avto buyurtma rejasi',
   team: 'Jamoa boshqaruvi',
-  
+  profile: 'Profil sozlamalari',
+
 };
 
 export default function SellerCloudX() {
