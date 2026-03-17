@@ -732,7 +732,7 @@ serve(async (req) => {
             let imageResult: any = null;
             if (fix.needsImage && (product.imageCount || 0) < 3) {
               console.log(`Generating image for ${product.offerId}...`);
-              imageResult = await generateAndUploadImage(supabase, partnerId, product, marketplace, creds);
+              imageResult = await generateAndUploadImage(adminSupabase, partnerId, product, marketplace, creds);
               console.log(`Image result: ${imageResult.message}`);
             }
 
