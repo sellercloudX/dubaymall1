@@ -73,16 +73,14 @@ const pageTitles: Record<string, string> = {
   'product-analytics': 'Mahsulot analitika',
   analytics: 'Umumiy analitika',
   'wb-analytics': 'Sotuvchi analitikasi',
-  'wb-keywords': 'Qidiruv so\'zlari',
+  'seo-monitor': 'SEO & Kalit so\'zlar',
   financials: 'Moliyaviy dashboard',
   abc: 'ABC-analiz',
   'cost-prices': 'Tannarx boshqaruvi',
-  calculator: 'Foyda kalkulyatori',
-  inventory: 'Zaxira sinxronlash',
+  'stock-forecast': 'Zaxira nazorat',
   pricing: 'Narx boshqaruvi',
   reviews: 'Sharhlar va savollar',
   ads: 'Reklama kampaniyalari',
-  'min-price': 'Min narx himoyasi',
   clone: 'Karta klonlash',
   problems: 'Muammoli mahsulotlar',
   mxik: 'MXIK kodlar bazasi',
@@ -92,12 +90,9 @@ const pageTitles: Record<string, string> = {
   competitor: 'Raqobat narx monitoring',
   support: 'Yordam markazi',
   'unit-economy': 'Unit-economy (SKU)',
-  'stock-forecast': 'Zaxira prognozi',
-  'seo-monitor': 'SEO Monitor',
-  'auto-reorder': 'Avto buyurtma rejasi',
   team: 'Jamoa boshqaruvi',
   profile: 'Profil sozlamalari',
-
+  tutorials: 'Qo\'llanma',
 };
 
 export default function SellerCloudX() {
