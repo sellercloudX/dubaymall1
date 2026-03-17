@@ -304,10 +304,15 @@ export function UnitEconomyDashboard({ connectedMarketplaces, store }: Props) {
                   </td>
                   <td className="text-right py-2.5 px-3 font-medium">{fmt(s.unitsSold)}</td>
                   <td className="text-right py-2.5 px-3 font-medium">{fmt(s.revenue)}</td>
-                  <td className="text-right py-2.5 px-3 hidden md:table-cell">
-                    {s.hasCostPrice ? <span>{fmt(s.costPrice)}</span> : <span className="text-muted-foreground">—</span>}
+                  <td className="text-right py-2.5 px-3 hidden lg:table-cell">
+                    <span title={s.hasRealTariff ? 'API dan' : 'Taxminiy'}>{fmt(s.commission)}</span>
+                    {!s.hasRealTariff && <span className="text-[9px] text-muted-foreground ml-0.5">~</span>}
                   </td>
-                  <td className="text-right py-2.5 px-3 hidden lg:table-cell">{fmt(s.totalFees)}</td>
+                  <td className="text-right py-2.5 px-3 hidden lg:table-cell">{fmt(s.logistics)}</td>
+                  <td className="text-right py-2.5 px-3 hidden xl:table-cell">
+                    <span className="font-medium">{fmt(s.totalFees)}</span>
+                    {s.withdrawal > 0 && <div className="text-[9px] text-muted-foreground">+{fmt(s.withdrawal)} chiqarish</div>}
+                  </td>
                   <td className={`text-right py-2.5 px-3 font-semibold ${s.netProfit >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
                     {s.netProfit >= 0 ? '+' : ''}{fmt(s.netProfit)}
                   </td>
