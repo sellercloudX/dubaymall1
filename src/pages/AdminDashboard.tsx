@@ -13,6 +13,7 @@ import { PartnerAnalytics } from '@/components/admin/PartnerAnalytics';
 import { AIAgentDashboard } from '@/components/admin/AIAgentDashboard';
 import { AdminSupportChat } from '@/components/admin/AdminSupportChat';
 import { FeaturePricingManagement } from '@/components/admin/FeaturePricingManagement';
+import { TutorialVideosAdmin } from '@/components/admin/TutorialVideosAdmin';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
@@ -25,7 +26,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Layout } from '@/components/Layout';
 import {
   TrendingUp, BarChart3, UsersRound, Users, UserCheck,
-  Wallet, Zap, Settings, Bot, MessageCircle, Crown,
+  Wallet, Zap, Settings, Bot, MessageCircle, Crown, DollarSign, BookOpen,
 } from 'lucide-react';
 
 const pageTitles: Record<string, string> = {
@@ -41,6 +42,7 @@ const pageTitles: Record<string, string> = {
   expenses: 'Xarajatlar',
   admins: 'Adminlar boshqaruvi',
   'ai-agent': 'AI Agent Dashboard',
+  tutorials: 'Qo\'llanmalar boshqaruvi',
 };
 
 function AdminContent({ activeTab }: { activeTab: string }) {
@@ -57,6 +59,7 @@ function AdminContent({ activeTab }: { activeTab: string }) {
     case 'expenses': return <PlatformExpenses />;
     case 'admins': return <AdminsManagement />;
     case 'ai-agent': return <AIAgentDashboard />;
+    case 'tutorials': return <TutorialVideosAdmin />;
     default: return <StartupMetrics />;
   }
 }
