@@ -11,6 +11,7 @@ export interface TariffInfo {
   totalTariff: number;
   tariffPercent: number; // TOTAL tariff as % of price (commission + logistics + all fees)
   commissionPercent: number; // ONLY marketplace commission as % of price (without logistics)
+  otherFees?: number; // Extra fixed marketplace fees not covered by logistics buckets
 }
 
 // Uzum tariff rates — based on official Uzum Market docs
@@ -36,6 +37,24 @@ function getUzumLogistics(price: number): number {
   if (price > 500000) return 20000;
   if (price > 100000) return 8000;
   return 4000;
+}
+
+function getYandexTariffBatchKey(input: {
+  categoryId: number;
+  price: number;
+  length?: number;
+  width?: number;
+  height?: number;
+  weight?: number;
+}): string {
+  return [
+    input.categoryId || 0,
+    input.price || 0,
+    input.length || 0,
+    input.width || 0,
+    input.height || 0,
+    input.weight || 0,
+  ].join(':');
 }
 
 /**
