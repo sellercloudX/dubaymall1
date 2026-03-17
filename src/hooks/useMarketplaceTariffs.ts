@@ -11,6 +11,7 @@ export interface TariffInfo {
   totalTariff: number;
   tariffPercent: number; // TOTAL tariff as % of price (commission + logistics + all fees)
   commissionPercent: number; // ONLY marketplace commission as % of price (without logistics)
+  otherFees?: number; // Extra fixed marketplace fees not covered by logistics buckets
 }
 
 // Uzum tariff rates — based on official Uzum Market docs
@@ -38,6 +39,24 @@ function getUzumLogistics(price: number): number {
   return 4000;
 }
 
+function getYandexTariffBatchKey(input: {
+  categoryId: number;
+  price: number;
+  length?: number;
+  width?: number;
+  height?: number;
+  weight?: number;
+}): string {
+  return [
+    input.categoryId || 0,
+    input.price || 0,
+    input.length || 0,
+    input.width || 0,
+    input.height || 0,
+    input.weight || 0,
+  ].join(':');
+}
+
 /**
  * Fetches real Yandex Market tariffs for connected products.
  * For Uzum — uses known fee structure (commission varies by price tier + logistics + service fee).
@@ -54,7 +73,7 @@ export function useMarketplaceTariffs(
   const stableKey = productIds.length > 0 ? productIds.substring(0, 200) : 'empty';
 
   return useQuery({
-    queryKey: ['marketplace-tariffs', connectedMarketplaces.join(','), stableKey],
+    queryKey: ['marketplace-tariffs', 'v11-yandex-fee-fix', connectedMarketplaces.join(','), stableKey],
     queryFn: async () => {
       const tariffMap = new Map<string, TariffInfo>();
 
@@ -234,16 +253,23 @@ export function useMarketplaceTariffs(
         const seen = new Set<string>();
 
         for (const p of products) {
-          const catId = p.marketCategoryId || 0;
+          const categoryId = p.marketCategoryId || 0;
           const price = p.price || 0;
-          const catKey = `${catId}-${price}-${p.weightKg || 0}`;
-          
-          if (seen.has(catKey)) continue;
-          seen.add(catKey);
-          
-          if (catId > 0 && price > 0) {
+          const batchKey = getYandexTariffBatchKey({
+            categoryId,
+            price,
+            length: p.lengthCm,
+            width: p.widthCm,
+            height: p.heightCm,
+            weight: p.weightKg,
+          });
+
+          if (seen.has(batchKey)) continue;
+          seen.add(batchKey);
+
+          if (categoryId > 0 && price > 0) {
             batch.push({
-              categoryId: catId,
+              categoryId,
               price,
               offerId: p.offerId,
               length: p.lengthCm,
@@ -256,59 +282,80 @@ export function useMarketplaceTariffs(
 
         if (batch.length === 0) continue;
 
-        const sendBatch = batch.slice(0, 200);
-
         try {
-          const { data, error } = await supabase.functions.invoke('fetch-marketplace-data', {
-            body: {
-              marketplace: mp,
-              dataType: 'tariffs',
-              offers: sendBatch.map(o => ({
-                categoryId: o.categoryId,
-                price: o.price,
-                length: o.length,
-                width: o.width,
-                height: o.height,
-                weight: o.weight,
-              })),
-            },
-          });
+          for (let start = 0; start < batch.length; start += 200) {
+            const sendBatch = batch.slice(start, start + 200);
 
-          if (error || !data?.success) {
-            console.warn('Tariff fetch failed:', error || data?.error);
-            continue;
+            const { data, error } = await supabase.functions.invoke('fetch-marketplace-data', {
+              body: {
+                marketplace: mp,
+                dataType: 'tariffs',
+                offers: sendBatch.map(o => ({
+                  categoryId: o.categoryId,
+                  price: o.price,
+                  length: o.length,
+                  width: o.width,
+                  height: o.height,
+                  weight: o.weight,
+                })),
+              },
+            });
+
+            if (error || !data?.success) {
+              console.warn('Tariff fetch failed:', error || data?.error);
+              continue;
+            }
+
+            const tariffResults = data.data || [];
+
+            tariffResults.forEach((t: any, idx: number) => {
+              if (idx >= sendBatch.length) return;
+              const offerId = sendBatch[idx].offerId;
+              const commission = t.agencyCommission || 0;
+              const offerPrice = sendBatch[idx]?.price || 0;
+              const apiCommissionPercent = t.commissionPercent || (offerPrice > 0 ? (commission / offerPrice) * 100 : 0);
+
+              tariffMap.set(offerId, {
+                offerId,
+                agencyCommission: commission,
+                fulfillment: t.fulfillment || 0,
+                delivery: (t.delivery || 0) + (t.sorting || 0),
+                otherFees: t.other || 0,
+                totalTariff: t.totalTariff || 0,
+                tariffPercent: t.tariffPercent || 0,
+                commissionPercent: apiCommissionPercent,
+              });
+            });
           }
 
-          const tariffResults = data.data || [];
-
-          tariffResults.forEach((t: any, idx: number) => {
-            if (idx >= sendBatch.length) return;
-            const offerId = sendBatch[idx].offerId;
-            const commission = t.agencyCommission || 0;
-            const offerPrice = sendBatch[idx]?.price || 0;
-            // Use API-extracted commissionPercent directly (most accurate)
-            const apiCommissionPercent = t.commissionPercent || (offerPrice > 0 ? (commission / offerPrice) * 100 : 0);
-            tariffMap.set(offerId, {
-              offerId,
-              agencyCommission: commission,
-              fulfillment: t.fulfillment || 0,
-              delivery: (t.delivery || 0) + (t.sorting || 0),
-              totalTariff: t.totalTariff || 0,
-              tariffPercent: t.tariffPercent || 0,
-              commissionPercent: apiCommissionPercent,
-            });
-          });
-
-          // Map same tariff to products with SAME category+price
+          // Map same tariff only to products with the SAME category, price and dimensions
           for (const p of products) {
             if (tariffMap.has(p.offerId)) continue;
-            const catId = p.marketCategoryId || 0;
+            const categoryId = p.marketCategoryId || 0;
             const price = p.price || 0;
-            
-            if (catId > 0 && price > 0) {
-              const similar = products.find(
-                sp => (sp.marketCategoryId || 0) === catId && sp.price === price && tariffMap.has(sp.offerId)
-              );
+
+            if (categoryId > 0 && price > 0) {
+              const productKey = getYandexTariffBatchKey({
+                categoryId,
+                price,
+                length: p.lengthCm,
+                width: p.widthCm,
+                height: p.heightCm,
+                weight: p.weightKg,
+              });
+
+              const similar = products.find(sp => {
+                if (!tariffMap.has(sp.offerId)) return false;
+                return getYandexTariffBatchKey({
+                  categoryId: sp.marketCategoryId || 0,
+                  price: sp.price || 0,
+                  length: sp.lengthCm,
+                  width: sp.widthCm,
+                  height: sp.heightCm,
+                  weight: sp.weightKg,
+                }) === productKey;
+              });
+
               if (similar) {
                 const t = tariffMap.get(similar.offerId)!;
                 tariffMap.set(p.offerId, { ...t, offerId: p.offerId });
@@ -376,18 +423,20 @@ export function getTariffForProduct(
   const commBase = commissionBase && commissionBase > price ? commissionBase : price;
   
   if (tariff && tariff.totalTariff > 0) {
-    // If we have a commissionBase that differs from catalog price, recalculate commission
+    const extraFees = tariff.otherFees || 0;
     let commission = tariff.agencyCommission;
     let totalTariff = tariff.totalTariff;
+
     if (marketplace === 'yandex' && commissionBase && commissionBase > 0 && tariff.commissionPercent > 0) {
       // Recalculate commission using the REAL base (pre-subsidy price)
       commission = Math.round(commBase * (tariff.commissionPercent / 100));
-      totalTariff = commission + tariff.fulfillment + tariff.delivery;
+      totalTariff = commission + tariff.fulfillment + tariff.delivery + extraFees;
     }
+
     const withdrawalFee = marketplace === 'yandex' ? Math.round(price * 0.01) : 0;
     return {
       commission,
-      logistics: tariff.fulfillment + tariff.delivery,
+      logistics: tariff.fulfillment + tariff.delivery + extraFees,
       withdrawal: withdrawalFee,
       totalFee: totalTariff + withdrawalFee,
       isReal: true,
@@ -404,7 +453,7 @@ export function getTariffForProduct(
       ? yandexTariffs.reduce((s, t) => s + t.commissionPercent, 0) / yandexTariffs.length / 100
       : 0.17; // 17% = FEE 15.5% + PAYMENT_TRANSFER 1.5%
     const avgLogistics = yandexTariffs.length > 0
-      ? yandexTariffs.reduce((s, t) => s + t.fulfillment + t.delivery, 0) / yandexTariffs.length
+      ? yandexTariffs.reduce((s, t) => s + t.fulfillment + t.delivery + (t.otherFees || 0), 0) / yandexTariffs.length
       : 6000;
     const commission = Math.round(commBase * avgCommPct);
     const logistics = Math.round(avgLogistics);
@@ -451,7 +500,7 @@ export function getTariffForProduct(
   if (safeMapSize(tariffMap) > 0) {
     const values = safeMapValues(tariffMap);
     const avgCommissionPercent = values.reduce((s, t) => s + t.commissionPercent, 0) / values.length;
-    const avgLogistics = values.reduce((s, t) => s + t.fulfillment + t.delivery, 0) / values.length;
+    const avgLogistics = values.reduce((s, t) => s + t.fulfillment + t.delivery + (t.otherFees || 0), 0) / values.length;
     const estCommission = price * (avgCommissionPercent / 100);
     return {
       commission: estCommission,

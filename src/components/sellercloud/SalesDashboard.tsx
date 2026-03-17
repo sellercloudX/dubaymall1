@@ -16,7 +16,8 @@ import { DateRangeFilter, getPresetDates, type DatePreset } from './DateRangeFil
 import { MarketplaceFilterBar } from './MarketplaceFilterBar';
 import { MarketplaceLogo, MARKETPLACE_SHORT_NAMES } from '@/lib/marketplaceConfig';
 import { toDisplayUzs, formatUzsFull } from '@/lib/currency';
-import { getOrderRevenueUzs, isExcludedOrder } from '@/lib/revenueCalculations';
+import { getOrderRevenueUzs } from '@/lib/revenueCalculations';
+import { getMarketplaceOrderStatusCategory } from '@/lib/marketplaceOrderStatus';
 import { useCostPrices } from '@/hooks/useCostPrices';
 import { useMarketplaceTariffs, getTariffForProduct } from '@/hooks/useMarketplaceTariffs';
 import type { MarketplaceDataStore, MarketplaceOrder } from '@/hooks/useMarketplaceDataStore';
@@ -124,32 +125,7 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
         const netProfit = grossProfit - commission + subsidyAmount;
         const margin = totalUzs > 0 ? (netProfit / totalUzs) * 100 : 0;
 
-        // Determine status category (with Yandex substatus awareness)
-        const s = (order.status || '').toUpperCase();
-        const sub = ((order as any).substatus || '').toUpperCase();
-        let statusCategory = 'active';
-        
-        // Yandex PROCESSING substatus mapping — CRITICAL for correct tab placement
-        if (mp === 'yandex' && s === 'PROCESSING') {
-          // STARTED = just received, seller hasn't touched it yet → Yangi
-          // READY_TO_SHIP, SHIPPED = seller preparing → Yig'ish
-          // No substatus or unrecognized → Yangi (conservative: better to show than to hide)
-          if (sub === 'READY_TO_SHIP' || sub === 'SHIPPED') {
-            statusCategory = 'assembly';
-          } else {
-            statusCategory = 'new'; // STARTED, empty substatus, or anything else
-          }
-        } else if (mp === 'yandex' && s === 'PENDING') {
-          // PENDING = awaiting payment/verification → Yangi
-          statusCategory = 'new';
-        } else {
-          for (const cat of STATUS_CATEGORIES.slice(1)) {
-            if (cat.statuses?.some(st => st.toUpperCase() === s)) {
-              statusCategory = cat.key;
-              break;
-            }
-          }
-        }
+        const statusCategory = getMarketplaceOrderStatusCategory(order, mp);
 
         result.push({
           order, marketplace: mp, totalUzs, costTotal, grossProfit,
@@ -197,6 +173,10 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
   const fulfillmentFiltered = fulfillmentFilter === 'all'
     ? statusFiltered
     : statusFiltered.filter(e => (e.order as any).fulfillmentType === fulfillmentFilter);
+
+  const statusCountBase = fulfillmentFilter === 'all'
+    ? dateFiltered
+    : dateFiltered.filter(e => (e.order as any).fulfillmentType === fulfillmentFilter);
 
   // Filter by search
   const searchFiltered = searchQuery
@@ -342,7 +322,9 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
       {/* Status tabs */}
       <div className="flex items-center gap-2 flex-wrap">
         {STATUS_CATEGORIES.map(cat => {
-          const count = cat.key === 'all' ? dateFiltered.length : dateFiltered.filter(e => e.statusCategory === cat.key).length;
+          const count = cat.key === 'all'
+            ? statusCountBase.length
+            : statusCountBase.filter(e => e.statusCategory === cat.key).length;
           return (
             <Button key={cat.key} variant={statusFilter === cat.key ? 'default' : 'outline'}
               size="sm" className="h-7 text-[11px] px-2.5 gap-1 rounded-full"
