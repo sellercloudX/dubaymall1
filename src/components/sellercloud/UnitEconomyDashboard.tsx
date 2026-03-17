@@ -96,7 +96,8 @@ export function UnitEconomyDashboard({ connectedMarketplaces, store }: Props) {
           const cp = getCostPrice(mp, item.offerId);
           const costUzs = cp !== null ? toDisplayUzs(cp, mp) : 0;
           const totalCostForItem = costUzs * qty;
-          const tariff = getTariffForProduct(tariffMap, item.offerId, itemPrice, mp);
+          const commBase = (item as any).commissionBase ? toDisplayUzs((item as any).commissionBase, mp) : undefined;
+          const tariff = getTariffForProduct(tariffMap, item.offerId, itemPrice, mp, commBase);
           const commissionForItem = tariff.commission * qty;
           const logisticsForItem = tariff.logistics * qty;
           const withdrawalForItem = (tariff.withdrawal || 0) * qty;
