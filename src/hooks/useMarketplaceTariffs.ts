@@ -14,30 +14,7 @@ export interface TariffInfo {
   otherFees?: number; // Extra fixed marketplace fees not covered by logistics buckets
 }
 
-// Uzum tariff rates — based on official Uzum Market docs
-// Commission varies by category (up to 35%), using category-aware defaults
-// Logistics: 20,000 (large), 8,000 (medium), 2,000-6,000 (small) UZS
-const UZUM_COMMISSION_BY_PRICE: Array<{ maxPrice: number; percent: number }> = [
-  { maxPrice: 50000, percent: 0.20 },    // cheap items → higher %
-  { maxPrice: 200000, percent: 0.15 },   // medium
-  { maxPrice: 1000000, percent: 0.12 },  // standard
-  { maxPrice: Infinity, percent: 0.10 }, // expensive items → lower %
-];
-const UZUM_SERVICE_FEE_PERCENT = 0.02; // 2% xizmat haqi
-
-function getUzumCommissionPercent(price: number): number {
-  for (const tier of UZUM_COMMISSION_BY_PRICE) {
-    if (price <= tier.maxPrice) return tier.percent;
-  }
-  return 0.12;
-}
-
-function getUzumLogistics(price: number): number {
-  // Approximate by price: expensive = likely larger
-  if (price > 500000) return 20000;
-  if (price > 100000) return 8000;
-  return 4000;
-}
+// No hardcoded Uzum tariff tiers — only real API data is used
 
 function getYandexTariffBatchKey(input: {
   categoryId: number;
