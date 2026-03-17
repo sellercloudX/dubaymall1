@@ -80,7 +80,7 @@ async function analyzeWithGemini(img: string): Promise<any | null> {
     try {
       console.log("🔍 PRIMARY: Google AI Studio...");
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${googleKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${googleKey}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
