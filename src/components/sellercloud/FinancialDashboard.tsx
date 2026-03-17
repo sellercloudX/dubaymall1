@@ -71,7 +71,7 @@ export function FinancialDashboard({
     let totalWbSppAmount = 0;
     let totalWbForPay = 0;
 
-    const feesByMarketplace: Record<string, { fees: number; feePercent: string; revenue: number; orders: number; sppAmount: number; forPayTotal: number }> = {};
+    const feesByMarketplace: Record<string, { fees: number; feePercent: string; revenue: number; orders: number; sppAmount: number; forPayTotal: number; hasRealTariffs: boolean }> = {};
 
     const marketplaceBreakdown = activeMarketplaces.map(marketplace => {
       const orders = store.getOrders(marketplace);
@@ -89,6 +89,8 @@ export function FinancialDashboard({
       let mpFees = 0;
       let mpSpp = 0;
       let mpForPay = 0;
+      let mpRealTariffCount = 0;
+      let mpItemCount = 0;
 
       activeOrders.forEach(order => {
         (order.items || []).forEach(item => {
@@ -97,6 +99,7 @@ export function FinancialDashboard({
           const itemPrice = toDisplayUzs(item.price || 0, marketplace);
           const itemRevenue = itemPrice * qty;
           totalProductCount += qty;
+          mpItemCount += qty;
           mpRevenue += itemRevenue;
           
           if (cost !== null) {
@@ -109,7 +112,10 @@ export function FinancialDashboard({
           const itemFees = tariff.totalFee * qty;
           mpFees += itemFees;
           totalMarketplaceFees += itemFees;
-          if (tariff.isReal) realTariffCount += qty;
+          if (tariff.isReal) {
+            realTariffCount += qty;
+            mpRealTariffCount += qty;
+          }
 
           // WB SPP: WB discount to buyer (seller bears cost)
           if (marketplace === 'wildberries' && item.spp && item.spp > 0) {
@@ -132,6 +138,7 @@ export function FinancialDashboard({
         orders: activeOrders.length,
         sppAmount: mpSpp,
         forPayTotal: mpForPay,
+        hasRealTariffs: mpItemCount > 0 && mpRealTariffCount > 0,
       };
 
       return {
@@ -156,8 +163,9 @@ export function FinancialDashboard({
     const tariffCoverage = totalProductCount > 0 ? Math.round((realTariffCount / totalProductCount) * 100) : 0;
     const feePercent = totalRevenue > 0 ? ((totalMarketplaceFees / totalRevenue) * 100).toFixed(1) : '0';
     const hasWbSpp = totalWbSppAmount > 0;
+    const hasAnyRealTariffs = realTariffCount > 0;
 
-    return { totalRevenue, totalOrders, totalMarketplaceFees, feePercent, totalTax, totalExpenses, netProfit, profitMargin, marketplaceBreakdown, totalProductCost, costCoverage, tariffCoverage, feesByMarketplace, hasWbSpp, totalWbSppAmount, totalWbForPay };
+    return { totalRevenue, totalOrders, totalMarketplaceFees, feePercent, totalTax, totalExpenses, netProfit, profitMargin, marketplaceBreakdown, totalProductCost, costCoverage, tariffCoverage, feesByMarketplace, hasWbSpp, totalWbSppAmount, totalWbForPay, hasAnyRealTariffs };
   }, [activeMarketplaces, store.dataVersion, isLoading, getCostPrice, tariffUpdatedAt, dateFrom, dateTo, selectedMp]);
 
   const formatPrice = (price: number) => {
