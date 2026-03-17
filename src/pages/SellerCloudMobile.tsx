@@ -248,6 +248,8 @@ export default function SellerCloudMobile() {
         return <div className="p-4"><SupportChat /></div>;
       case 'stores':
         return <div className="p-4"><MultiStoreManager connectedMarketplaces={connectedMarketplaces} onStoreChange={() => refetch()} /></div>;
+      case 'profile':
+        return <div className="p-4"><ProfilePasswordSetup /></div>;
       default:
         return null;
     }
