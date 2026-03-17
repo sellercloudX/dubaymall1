@@ -190,7 +190,7 @@ FAQAT JSON javob ber (boshqa hech narsa yozma):
 }
 
 // ===== Generate and upload image using REFERENCE =====
-async function generateAndUploadImage(supabase: any, partnerId: string, product: any, marketplace: string, credentials: any): Promise<{ success: boolean; message: string }> {
+async function generateAndUploadImage(adminClient: any, partnerId: string, product: any, marketplace: string, credentials: any): Promise<{ success: boolean; message: string }> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!LOVABLE_API_KEY) return { success: false, message: 'AI key yo\'q' };
 
@@ -256,12 +256,12 @@ Clean white background, product centered, large, studio lighting, sharp focus, 3
     }
 
     const fileName = `ai-agent/${partnerId}/${product.offerId}-${Date.now()}.png`;
-    const { error: uploadErr } = await supabase.storage
+    const { error: uploadErr } = await adminClient.storage
       .from('product-images')
       .upload(fileName, bytes, { contentType: 'image/png', upsert: true });
     if (uploadErr) return { success: false, message: `Storage: ${uploadErr.message}` };
 
-    const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(fileName);
+    const { data: urlData } = adminClient.storage.from('product-images').getPublicUrl(fileName);
     const publicUrl = urlData?.publicUrl;
     if (!publicUrl) return { success: false, message: 'Public URL olinmadi' };
 
@@ -732,7 +732,7 @@ serve(async (req) => {
             let imageResult: any = null;
             if (fix.needsImage && (product.imageCount || 0) < 3) {
               console.log(`Generating image for ${product.offerId}...`);
-              imageResult = await generateAndUploadImage(supabase, partnerId, product, marketplace, creds);
+              imageResult = await generateAndUploadImage(adminSupabase, partnerId, product, marketplace, creds);
               console.log(`Image result: ${imageResult.message}`);
             }
 
