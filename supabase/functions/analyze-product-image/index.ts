@@ -150,7 +150,7 @@ async function analyzeWithGemini(img: string): Promise<any | null> {
 
       const result = JSON.parse(match[0]);
       console.log("✅ Lovable AI:", result.productName);
-      return { ...result, aiModel: "lovable-gemini-2.5-flash" };
+      return { ...result, aiModel: "lovable-gemini-3-flash-preview" };
     } catch (err) { console.error("Lovable AI error:", err); return null; }
   }
 

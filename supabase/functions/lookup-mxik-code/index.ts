@@ -462,7 +462,7 @@ JSON:
     method: 'POST',
     headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'google/gemini-2.5-flash',
+      model: 'google/gemini-3-flash-preview',
       messages: [
         { role: 'system', content: 'Sen MXIK kod mutaxassisizan. FAQAT berilgan ro\'yxatdagi kodlardan tanlaysan. Yangi kod to\'qib chiqarma. MUHIM: Mahsulot kategoriyasiga e\'tibor ber! Oshxona jihozlarini alkogol bilan, kosmetikani dori-darmon bilan adashtirma! ★RELEVANT belgilangan kodlarni afzal ko\'r. JSON formatda javob ber.' },
         { role: 'user', content: prompt },
