@@ -526,10 +526,8 @@ async function scanUzumProducts(credentials: any, supabase: any, userId: string)
     if (imgCount === 0) {
       issues.push('Rasmlar yo\'q');
       issueDetails.push({ type: 'critical', field: 'images', msg: 'Hech qanday rasm yo\'q' });
-    } else if (imgCount < 2) {
-      issues.push(`Kam rasm (${imgCount}/2)`);
-      issueDetails.push({ type: 'warning', field: 'images', msg: `${imgCount} ta rasm (min 2)` });
     }
+    // No penalty for < 2 images — quality matters, not quantity
 
     // Characteristics
     const charcCount = Array.isArray(item.characteristics) ? item.characteristics.length : 0;
