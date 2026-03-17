@@ -97,6 +97,9 @@ export function UnitEconomyDashboard({ connectedMarketplaces, store }: Props) {
           const costUzs = cp !== null ? toDisplayUzs(cp, mp) : 0;
           const totalCostForItem = costUzs * qty;
           const tariff = getTariffForProduct(tariffMap, item.offerId, itemPrice, mp);
+          const commissionForItem = tariff.commission * qty;
+          const logisticsForItem = tariff.logistics * qty;
+          const withdrawalForItem = (tariff.withdrawal || 0) * qty;
           const feesForItem = tariff.totalFee * qty;
           const ft = (order as any).fulfillmentType;
 
@@ -107,11 +110,12 @@ export function UnitEconomyDashboard({ connectedMarketplaces, store }: Props) {
               marketplace: mp,
               photo: item.photo,
               unitsSold: 0, revenue: 0, costPrice: costUzs, totalCost: 0,
-              commission: 0, logistics: 0, totalFees: 0,
+              commission: 0, logistics: 0, withdrawal: 0, totalFees: 0,
               grossProfit: 0, netProfit: 0, margin: 0,
               avgSellingPrice: 0,
               fulfillmentBreakdown: { fbo: 0, fbs: 0 },
               hasCostPrice: cp !== null,
+              hasRealTariff: tariff.isReal,
             });
           }
 
