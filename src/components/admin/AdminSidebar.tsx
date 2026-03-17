@@ -32,6 +32,7 @@ export const adminMenuItems: AdminMenuItem[] = [
   { id: 'sellercloud', label: 'SellerCloudX', icon: Crown, permission: 'can_manage_finances', group: 'finance' },
   { id: 'pricing', label: 'Narxlar & Balans', icon: DollarSign, permission: 'can_manage_finances', group: 'finance' },
   { id: 'expenses', label: 'Xarajatlar', icon: Zap, permission: 'can_manage_finances', group: 'finance' },
+  { id: 'tutorials', label: 'Qo\'llanmalar', icon: BookOpen, permission: 'can_manage_content', group: 'management' },
   { id: 'admins', label: 'Adminlar', icon: Settings, superAdminOnly: true, group: 'system' },
   { id: 'ai-agent', label: 'AI Agent', icon: Bot, superAdminOnly: true, group: 'system' },
 ];
