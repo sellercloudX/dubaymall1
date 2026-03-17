@@ -163,9 +163,11 @@ export function UnitEconomyDashboard({ connectedMarketplaces, store }: Props) {
 
   // Summary stats
   const totals = useMemo(() => {
-    const t = { revenue: 0, cost: 0, fees: 0, profit: 0, units: 0, withCost: 0, total: 0 };
+    const t = { revenue: 0, cost: 0, commission: 0, logistics: 0, withdrawal: 0, fees: 0, profit: 0, units: 0, withCost: 0, total: 0 };
     skuMetrics.forEach(s => {
-      t.revenue += s.revenue; t.cost += s.totalCost; t.fees += s.totalFees;
+      t.revenue += s.revenue; t.cost += s.totalCost;
+      t.commission += s.commission; t.logistics += s.logistics; t.withdrawal += s.withdrawal;
+      t.fees += s.totalFees;
       t.profit += s.netProfit; t.units += s.unitsSold; t.total++;
       if (s.hasCostPrice) t.withCost++;
     });
