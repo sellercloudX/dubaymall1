@@ -347,12 +347,13 @@ Only confident matches. Empty array if none.`;
     }
 
     return new Response(JSON.stringify({
-      matches: allMatches.length,
+      matches: newMatches.length,
       total_target: targetProducts.length,
       total_source: sourceWithCost.length,
       sku_matches: skuMatches.length,
       text_matches: textMatches.length,
       ai_matches: aiMatches.length,
+      skipped_existing: skippedExisting,
       target_marketplace: targetMarketplace,
       source_marketplace: sourceMarketplace,
     }), {
