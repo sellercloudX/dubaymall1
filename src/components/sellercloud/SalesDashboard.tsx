@@ -432,7 +432,7 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
                               <span className="font-mono text-primary/70">#{String(e.order.id)}</span>
                               {' · '}{format(new Date(e.order.createdAt), 'dd.MM.yy HH:mm')}
                               {e.order.items && e.order.items.length > 1 && ` · ${e.order.items.length} ta`}
-                              {(e.order as any).fulfillmentType && <Badge variant="outline" className="ml-1 text-[8px] px-1 h-3.5">{(e.order as any).fulfillmentType}</Badge>}
+                              {(e.order as any).fulfillmentType && <Badge variant="outline" className="ml-1 text-[8px] px-1 h-3.5">{(e.order as any).fulfillmentType === 'FBO' && e.marketplace === 'yandex' ? 'FBY' : (e.order as any).fulfillmentType}</Badge>}
                             </div>
                           </div>
                         </div>
