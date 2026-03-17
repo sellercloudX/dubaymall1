@@ -190,7 +190,7 @@ FAQAT JSON javob ber (boshqa hech narsa yozma):
 }
 
 // ===== Generate and upload image using REFERENCE =====
-async function generateAndUploadImage(supabase: any, partnerId: string, product: any, marketplace: string, credentials: any): Promise<{ success: boolean; message: string }> {
+async function generateAndUploadImage(adminClient: any, partnerId: string, product: any, marketplace: string, credentials: any): Promise<{ success: boolean; message: string }> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!LOVABLE_API_KEY) return { success: false, message: 'AI key yo\'q' };
 
