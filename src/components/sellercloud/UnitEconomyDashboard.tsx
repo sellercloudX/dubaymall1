@@ -123,7 +123,11 @@ export function UnitEconomyDashboard({ connectedMarketplaces, store }: Props) {
           m.unitsSold += qty;
           m.revenue += itemRevenue;
           m.totalCost += totalCostForItem;
+          m.commission += commissionForItem;
+          m.logistics += logisticsForItem;
+          m.withdrawal += withdrawalForItem;
           m.totalFees += feesForItem;
+          if (tariff.isReal) m.hasRealTariff = true;
           if (ft === 'FBO') m.fulfillmentBreakdown.fbo += qty;
           else m.fulfillmentBreakdown.fbs += qty;
         }
