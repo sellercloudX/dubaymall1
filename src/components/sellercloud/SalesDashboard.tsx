@@ -343,14 +343,14 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
         })}
       </div>
 
-      {/* FBO/FBS Filter + Stats */}
+      {/* FBO/FBY/FBS Filter + Stats */}
       <div className="flex items-center gap-2 flex-wrap">
         <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-0.5">
           {(['all', 'FBO', 'FBS'] as const).map(ft => (
             <Button key={ft} variant={fulfillmentFilter === ft ? 'default' : 'ghost'}
               size="sm" className="h-6 text-[11px] px-2.5 rounded-md"
               onClick={() => { setFulfillmentFilter(ft); setCurrentPage(1); }}>
-              {ft === 'all' ? 'Hammasi' : ft}
+              {ft === 'all' ? 'Hammasi' : ft === 'FBO' ? 'FBO/FBY' : ft}
               {ft === 'FBO' && stats.fboCount > 0 && <Badge variant="secondary" className="ml-1 h-4 text-[9px] px-1">{stats.fboCount}</Badge>}
               {ft === 'FBS' && stats.fbsCount > 0 && <Badge variant="secondary" className="ml-1 h-4 text-[9px] px-1">{stats.fbsCount}</Badge>}
             </Button>
@@ -358,7 +358,7 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
         </div>
         {stats.fboCount > 0 && (
           <div className="flex items-center gap-3 text-[11px] text-muted-foreground ml-2">
-            <span>FBO: <strong className="text-foreground">{fmtPrice(stats.fboRevenue)}</strong></span>
+            <span>FBO/FBY: <strong className="text-foreground">{fmtPrice(stats.fboRevenue)}</strong></span>
             <span>FBS: <strong className="text-foreground">{fmtPrice(stats.fbsRevenue)}</strong></span>
           </div>
         )}
