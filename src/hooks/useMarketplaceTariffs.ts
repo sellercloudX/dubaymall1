@@ -73,7 +73,7 @@ export function useMarketplaceTariffs(
   const stableKey = productIds.length > 0 ? productIds.substring(0, 200) : 'empty';
 
   return useQuery({
-    queryKey: ['marketplace-tariffs', connectedMarketplaces.join(','), stableKey],
+    queryKey: ['marketplace-tariffs', 'v11-yandex-fee-fix', connectedMarketplaces.join(','), stableKey],
     queryFn: async () => {
       const tariffMap = new Map<string, TariffInfo>();
 
