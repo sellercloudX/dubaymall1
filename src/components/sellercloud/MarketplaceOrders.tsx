@@ -253,7 +253,7 @@ export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceO
                             )}
                             {getStatusBadge(order.status, order.substatus)}
                             <div className="text-right">
-                              <div className="font-bold">{formatPrice(order.total)}</div>
+                              <div className="font-bold">{formatOrderTotal(order)}</div>
                               <div className="text-xs text-muted-foreground">{order.items?.length || 0} mahsulot</div>
                             </div>
                             <ChevronDown className={`h-5 w-5 transition-transform ${expandedOrder === order.id ? 'rotate-180' : ''}`} />
