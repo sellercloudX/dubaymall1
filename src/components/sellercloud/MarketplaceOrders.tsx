@@ -176,7 +176,7 @@ export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceO
             {total > 0 && <Badge variant="secondary" className="ml-2">{total} ta</Badge>}
           </CardTitle>
           <CardDescription>
-            {selectedMarketplace === 'yandex' ? 'Yandex Market' : selectedMarketplace} dagi buyurtmalar (so'nggi 30 kun)
+            {selectedMarketplace === 'yandex' ? 'Yandex Market' : selectedMarketplace} dagi barcha buyurtmalar
           </CardDescription>
         </CardHeader>
         <CardContent>
