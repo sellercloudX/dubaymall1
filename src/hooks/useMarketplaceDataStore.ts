@@ -62,6 +62,8 @@ export interface MarketplaceOrder {
     priceUZS: number;
     photo?: string;
     nmID?: number;
+    // Yandex: price before Yandex subsidy — commission is charged on THIS, not on buyer price
+    commissionBase?: number;
     // WB-specific: actual price after WB discount
     spp?: number;
     finishedPrice?: number;
