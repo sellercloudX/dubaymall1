@@ -3,7 +3,7 @@ import {
   TrendingUp, BarChart3, UsersRound, Users, UserCheck,
   Wallet, Zap, Settings, Bot, MessageCircle, Shield,
   LayoutDashboard, ChevronLeft, ChevronRight, Crown,
-  LogOut, Sun, Moon, DollarSign,
+  LogOut, Sun, Moon, DollarSign, BookOpen,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
