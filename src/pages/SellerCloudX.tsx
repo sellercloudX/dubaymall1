@@ -309,6 +309,8 @@ export default function SellerCloudX() {
         );
       case 'team':
         return <TeamManager />;
+      case 'profile':
+        return <ProfilePasswordSetup />;
       case 'subscription':
         return <SubscriptionBilling totalSalesVolume={totalRevenue} />;
       case 'reports':
