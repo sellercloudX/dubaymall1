@@ -81,16 +81,16 @@ export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceO
     : allOrders.filter(o => o.status === statusFilter);
   const total = orders.length;
 
+  /** Format order total using unified revenue calculation (same as SalesDashboard) */
+  const formatOrderTotal = (order: any) => {
+    const uzs = getOrderRevenueUzs(order, selectedMarketplace);
+    return formatUzs(uzs) + " so'm";
+  };
+
   /** Format a native-currency price to display in UZS */
   const formatPrice = (price?: number) => {
     if (!price && price !== 0) return '—';
     const priceUzs = toDisplayUzs(price, selectedMarketplace);
-    return formatUzs(priceUzs) + " so'm";
-  };
-
-  /** Format a price that is ALREADY in UZS */
-  const formatPriceUzs = (priceUzs?: number) => {
-    if (!priceUzs && priceUzs !== 0) return '—';
     return formatUzs(priceUzs) + " so'm";
   };
 
