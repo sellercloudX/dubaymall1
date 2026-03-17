@@ -132,20 +132,20 @@ function AdminBalanceTopup({ allBalances }: { allBalances: any[] }) {
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [search, setSearch] = useState('');
+  const [userSearch, setUserSearch] = useState('');
+  const [showUserPicker, setShowUserPicker] = useState(false);
 
-  // Fetch profiles to show names
-  const { data: profiles } = useQuery({
-    queryKey: ['admin-balance-profiles'],
+  // Fetch ALL profiles for user picker
+  const { data: allProfiles } = useQuery({
+    queryKey: ['admin-all-profiles'],
     queryFn: async () => {
-      const userIds = allBalances.map(b => b.user_id);
-      if (userIds.length === 0) return [];
       const { data } = await supabase
         .from('profiles')
-        .select('user_id, full_name, phone')
-        .in('user_id', userIds);
+        .select('user_id, full_name, phone, email')
+        .order('full_name', { ascending: true })
+        .limit(1000);
       return data || [];
     },
-    enabled: allBalances.length > 0,
   });
 
   // Fetch subscriptions to show plan type
@@ -163,7 +163,7 @@ function AdminBalanceTopup({ allBalances }: { allBalances: any[] }) {
     enabled: allBalances.length > 0,
   });
 
-  const getProfile = (uid: string) => profiles?.find(p => p.user_id === uid);
+  const getProfile = (uid: string) => allProfiles?.find(p => p.user_id === uid);
   const getSub = (uid: string) => subscriptions?.find(s => s.user_id === uid);
 
   const handleTopup = () => {
@@ -172,6 +172,15 @@ function AdminBalanceTopup({ allBalances }: { allBalances: any[] }) {
     setAmount('');
     setDescription('');
   };
+
+  // Filter profiles for user picker dropdown
+  const filteredProfiles = userSearch
+    ? (allProfiles || []).filter(p =>
+        (p.full_name || '').toLowerCase().includes(userSearch.toLowerCase()) ||
+        (p.phone || '').includes(userSearch) ||
+        (p.email || '').toLowerCase().includes(userSearch.toLowerCase())
+      )
+    : (allProfiles || []).slice(0, 50);
 
   const filteredBalances = search
     ? allBalances.filter(b => {
@@ -193,16 +202,39 @@ function AdminBalanceTopup({ allBalances }: { allBalances: any[] }) {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div>
+          <div className="relative">
             <Label className="text-xs">Foydalanuvchi</Label>
-            <Input
-              value={userId}
-              onChange={(e) => setUserId(e.target.value)}
-              placeholder="user UUID yoki ro'yxatdan tanlang"
-              className="h-9 text-sm"
-            />
-            {selectedProfile && (
-              <p className="text-xs text-primary mt-1">✓ {selectedProfile.full_name || selectedProfile.phone || 'Noma\'lum'}</p>
+            {selectedProfile ? (
+              <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-input bg-background text-sm">
+                <span className="truncate flex-1 font-medium">{selectedProfile.full_name || selectedProfile.phone || 'Noma\'lum'}</span>
+                <Button size="sm" variant="ghost" className="h-5 px-1 text-[10px]" onClick={() => { setUserId(''); setShowUserPicker(true); }}>✕</Button>
+              </div>
+            ) : (
+              <div>
+                <Input
+                  value={userSearch}
+                  onChange={(e) => { setUserSearch(e.target.value); setShowUserPicker(true); }}
+                  onFocus={() => setShowUserPicker(true)}
+                  onBlur={() => setTimeout(() => setShowUserPicker(false), 200)}
+                  placeholder="Ism, telefon yoki email..."
+                  className="h-9 text-sm"
+                />
+                {showUserPicker && filteredProfiles.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 max-h-60 overflow-y-auto rounded-md border border-border bg-popover shadow-md">
+                    {filteredProfiles.map(p => (
+                      <button
+                        key={p.user_id}
+                        className="w-full text-left px-3 py-2 hover:bg-muted/50 text-sm border-b border-border/30 last:border-0"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => { setUserId(p.user_id); setUserSearch(''); setShowUserPicker(false); }}
+                      >
+                        <p className="font-medium truncate">{p.full_name || 'Noma\'lum'}</p>
+                        <p className="text-xs text-muted-foreground">{p.phone || p.email || p.user_id.slice(0, 12) + '...'}</p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
           </div>
           <div>

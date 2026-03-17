@@ -159,10 +159,9 @@ async function scanYandexProducts(credentials: any): Promise<any> {
     if (imgCount === 0) {
       issues.push('Rasmlar yo\'q');
       issueDetails.push({ type: 'critical', field: 'images', msg: 'Hech qanday rasm yo\'q' });
-    } else if (imgCount < 2) {
-      issues.push(`Kam rasm (${imgCount}/2)`);
-      issueDetails.push({ type: 'warning', field: 'images', msg: `${imgCount} ta rasm (min 2)` });
     }
+    // Note: image quality is checked via Yandex moderation API errors (quality.errors/warnings)
+    // No penalty for having < 2 images if marketplace doesn't report quality issues
 
     if (!offer.vendor) {
       issues.push('Brend yo\'q');
@@ -306,10 +305,8 @@ async function scanWildberriesProducts(credentials: any): Promise<any> {
     if (photos.length === 0) {
       issues.push('Rasmlar yo\'q');
       issueDetails.push({ type: 'critical', field: 'images', msg: 'Hech qanday rasm yo\'q' });
-    } else if (photos.length < 2) {
-      issues.push(`Kam rasm (${photos.length}/2)`);
-      issueDetails.push({ type: 'warning', field: 'images', msg: `${photos.length} ta rasm (min 2)` });
     }
+    // WB async errors handle image quality issues from marketplace side
 
     if (!card.brand) {
       issues.push('Brend yo\'q');
@@ -529,10 +526,8 @@ async function scanUzumProducts(credentials: any, supabase: any, userId: string)
     if (imgCount === 0) {
       issues.push('Rasmlar yo\'q');
       issueDetails.push({ type: 'critical', field: 'images', msg: 'Hech qanday rasm yo\'q' });
-    } else if (imgCount < 2) {
-      issues.push(`Kam rasm (${imgCount}/2)`);
-      issueDetails.push({ type: 'warning', field: 'images', msg: `${imgCount} ta rasm (min 2)` });
     }
+    // No penalty for < 2 images — quality matters, not quantity
 
     // Characteristics
     const charcCount = Array.isArray(item.characteristics) ? item.characteristics.length : 0;
