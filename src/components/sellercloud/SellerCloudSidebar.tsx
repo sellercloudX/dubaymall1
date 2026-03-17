@@ -2,9 +2,9 @@ import { cn } from '@/lib/utils';
 import {
   Globe, Package, ShoppingCart, BarChart3, Scan,
   ArrowDownUp, DollarSign, Bell, FileSpreadsheet, CreditCard, Receipt,
-  Calculator, Shield, Copy, AlertOctagon,
+  Copy, AlertOctagon,
   MessageCircle, Activity, Megaphone, ChevronLeft, ChevronRight,
-  LogOut, LayoutDashboard, Sun, Moon, Wallet, Search, UserCog,
+  LogOut, LayoutDashboard, Sun, Moon, Wallet, Search, UserCog, BookOpen,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -31,21 +31,16 @@ export const sellerMenuItems: SellerMenuItem[] = [
   { id: 'sales', label: 'Sotuvlar', icon: DollarSign, group: 'main' },
   { id: 'product-analytics', label: 'Mahsulot analitika', icon: BarChart3, group: 'analytics' },
   { id: 'wb-analytics', label: 'Sotuvchi analitika', icon: Activity, group: 'analytics' },
-  { id: 'seo-monitor', label: 'SEO Monitor', icon: Search, group: 'analytics' },
-  { id: 'wb-keywords', label: 'Qidiruv so\'zlari', icon: Search, group: 'analytics' },
-  { id: 'financials', label: 'Moliya', icon: Calculator, group: 'analytics' },
+  { id: 'seo-monitor', label: 'SEO & Kalit so\'zlar', icon: Search, group: 'analytics' },
+  { id: 'financials', label: 'Moliya', icon: DollarSign, group: 'analytics' },
   { id: 'unit-economy', label: 'Unit-economy', icon: Receipt, group: 'analytics' },
   { id: 'abc', label: 'ABC-analiz', icon: BarChart3, group: 'analytics' },
   { id: 'cost-prices', label: 'Tannarx', icon: DollarSign, group: 'analytics' },
-  { id: 'calculator', label: 'Kalkulyator', icon: Calculator, group: 'analytics' },
   { id: 'competitor', label: 'Raqobat narx', icon: ArrowDownUp, group: 'tools' },
-  { id: 'stock-forecast', label: 'Zaxira prognoz', icon: Activity, group: 'tools' },
-  { id: 'auto-reorder', label: 'Avto buyurtma', icon: ShoppingCart, group: 'tools' },
-  { id: 'inventory', label: 'Zaxira sinxron', icon: ArrowDownUp, group: 'tools' },
-  { id: 'pricing', label: 'Narxlar', icon: DollarSign, group: 'tools' },
+  { id: 'stock-forecast', label: 'Zaxira nazorat', icon: Activity, group: 'tools' },
+  { id: 'pricing', label: 'Narx boshqaruvi', icon: DollarSign, group: 'tools' },
   { id: 'reviews', label: 'Sharhlar', icon: MessageCircle, group: 'tools' },
   { id: 'ads', label: 'Reklama', icon: Megaphone, group: 'tools' },
-  { id: 'min-price', label: 'Min narx himoya', icon: Shield, group: 'tools' },
   { id: 'clone', label: 'Klonlash', icon: Copy, group: 'tools' },
   { id: 'problems', label: 'Muammolar', icon: AlertOctagon, group: 'tools' },
   { id: 'mxik', label: 'MXIK baza', icon: FileSpreadsheet, group: 'tools' },
@@ -54,6 +49,7 @@ export const sellerMenuItems: SellerMenuItem[] = [
   { id: 'subscription', label: 'Obuna', icon: CreditCard, group: 'settings' },
   { id: 'reports', label: 'Hisobotlar', icon: FileSpreadsheet, group: 'settings' },
   { id: 'notifications', label: 'Bildirishnoma', icon: Bell, group: 'settings' },
+  { id: 'tutorials', label: 'Qo\'llanma', icon: BookOpen, group: 'settings' },
   { id: 'support', label: 'Yordam', icon: MessageCircle, group: 'settings' },
 ];
 
