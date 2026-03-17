@@ -358,25 +358,56 @@ function safeMapValues(map: any): TariffInfo[] {
 /**
  * Get tariff for a specific product.
  * Marketplace-aware: uses real data when available, sensible fallbacks otherwise.
+ * 
+ * Yandex: FEE (~15.5%) + PAYMENT_TRANSFER (~1.5%) + DELIVERY (~6000) + withdrawal (~1%)
+ * Uzum: Commission (10-20%) + Service fee (2%) + Logistics (4000-20000)
+ * WB: Commission (5-25%) + Logistics (base + per-liter)
  */
 export function getTariffForProduct(
   tariffMap: Map<string, TariffInfo> | undefined,
   offerId: string,
   price: number,
   marketplace?: string
-): { commission: number; logistics: number; totalFee: number; isReal: boolean } {
+): { commission: number; logistics: number; withdrawal: number; totalFee: number; isReal: boolean } {
   const tariff = safeMapGet(tariffMap, offerId);
   if (tariff && tariff.totalTariff > 0) {
+    // Yandex withdrawal fee: ~1% of sales price (for payment to seller account)
+    const withdrawalFee = marketplace === 'yandex' ? Math.round(price * 0.01) : 0;
     return {
       commission: tariff.agencyCommission,
       logistics: tariff.fulfillment + tariff.delivery,
-      totalFee: tariff.totalTariff,
+      withdrawal: withdrawalFee,
+      totalFee: tariff.totalTariff + withdrawalFee,
       isReal: true,
     };
   }
 
-  // Marketplace-specific fallbacks
+  // Marketplace-specific fallbacks with REAL rate structures
+  if (marketplace === 'yandex') {
+    // Real Yandex rates: FEE ~15.5% + PAYMENT_TRANSFER ~1.5% = 17% commission
+    // DELIVERY_TO_CUSTOMER ~6000 UZS, withdrawal ~1%
+    // Try to use average from real tariff data if available
+    const yandexTariffs = safeMapValues(tariffMap).filter(t => t.commissionPercent >= 10);
+    const avgCommPct = yandexTariffs.length > 0
+      ? yandexTariffs.reduce((s, t) => s + t.commissionPercent, 0) / yandexTariffs.length / 100
+      : 0.17; // 17% = FEE 15.5% + PAYMENT_TRANSFER 1.5%
+    const avgLogistics = yandexTariffs.length > 0
+      ? yandexTariffs.reduce((s, t) => s + t.fulfillment + t.delivery, 0) / yandexTariffs.length
+      : 6000;
+    const commission = Math.round(price * avgCommPct);
+    const logistics = Math.round(avgLogistics);
+    const withdrawal = Math.round(price * 0.01);
+    return {
+      commission,
+      logistics,
+      withdrawal,
+      totalFee: commission + logistics + withdrawal,
+      isReal: false,
+    };
+  }
+
   if (marketplace === 'uzum') {
+    // Use real commission from product catalog when available
     const commissionPercent = getUzumCommissionPercent(price);
     const commission = price * commissionPercent;
     const serviceFee = price * UZUM_SERVICE_FEE_PERCENT;
@@ -384,6 +415,7 @@ export function getTariffForProduct(
     return {
       commission: commission + serviceFee,
       logistics,
+      withdrawal: 0,
       totalFee: commission + serviceFee + logistics,
       isReal: false,
     };
@@ -392,13 +424,13 @@ export function getTariffForProduct(
   // WB fallback — price is ALREADY in UZS (converted by caller via toDisplayUzs)
   if (marketplace === 'wildberries') {
     const rubToUzs = getRubToUzs();
-    const commission = price * 0.15; // 15% of UZS price = UZS
-    // Thresholds in UZS
+    const commission = price * 0.15; // 15% of UZS price
     const logisticsRub = price > (5000 * rubToUzs) ? 100 : price > (1000 * rubToUzs) ? 50 : 30;
     const logisticsUzs = Math.round(logisticsRub * rubToUzs);
     return {
       commission: Math.round(commission),
       logistics: logisticsUzs,
+      withdrawal: 0,
       totalFee: Math.round(commission) + logisticsUzs,
       isReal: false,
     };
@@ -406,23 +438,24 @@ export function getTariffForProduct(
 
   if (safeMapSize(tariffMap) > 0) {
     const values = safeMapValues(tariffMap);
-    // Use average COMMISSION percent (not total tariff) for estimation
     const avgCommissionPercent = values.reduce((s, t) => s + t.commissionPercent, 0) / values.length;
     const avgLogistics = values.reduce((s, t) => s + t.fulfillment + t.delivery, 0) / values.length;
     const estCommission = price * (avgCommissionPercent / 100);
     return {
       commission: estCommission,
       logistics: avgLogistics,
+      withdrawal: 0,
       totalFee: estCommission + avgLogistics,
       isReal: false,
     };
   }
 
-  // Last resort fallback
+  // Last resort fallback (should rarely hit now)
   return {
-    commission: price * 0.15,
-    logistics: 3000,
-    totalFee: price * 0.15 + 3000,
+    commission: price * 0.17,
+    logistics: 6000,
+    withdrawal: 0,
+    totalFee: price * 0.17 + 6000,
     isReal: false,
   };
 }

@@ -34,6 +34,7 @@ interface SkuMetrics {
   totalCost: number;
   commission: number;
   logistics: number;
+  withdrawal: number;
   totalFees: number;
   grossProfit: number;
   netProfit: number;
@@ -41,6 +42,7 @@ interface SkuMetrics {
   avgSellingPrice: number;
   fulfillmentBreakdown: { fbo: number; fbs: number };
   hasCostPrice: boolean;
+  hasRealTariff: boolean;
 }
 
 type SortKey = 'revenue' | 'unitsSold' | 'netProfit' | 'margin' | 'name';
@@ -95,6 +97,9 @@ export function UnitEconomyDashboard({ connectedMarketplaces, store }: Props) {
           const costUzs = cp !== null ? toDisplayUzs(cp, mp) : 0;
           const totalCostForItem = costUzs * qty;
           const tariff = getTariffForProduct(tariffMap, item.offerId, itemPrice, mp);
+          const commissionForItem = tariff.commission * qty;
+          const logisticsForItem = tariff.logistics * qty;
+          const withdrawalForItem = (tariff.withdrawal || 0) * qty;
           const feesForItem = tariff.totalFee * qty;
           const ft = (order as any).fulfillmentType;
 
@@ -105,11 +110,12 @@ export function UnitEconomyDashboard({ connectedMarketplaces, store }: Props) {
               marketplace: mp,
               photo: item.photo,
               unitsSold: 0, revenue: 0, costPrice: costUzs, totalCost: 0,
-              commission: 0, logistics: 0, totalFees: 0,
+              commission: 0, logistics: 0, withdrawal: 0, totalFees: 0,
               grossProfit: 0, netProfit: 0, margin: 0,
               avgSellingPrice: 0,
               fulfillmentBreakdown: { fbo: 0, fbs: 0 },
               hasCostPrice: cp !== null,
+              hasRealTariff: tariff.isReal,
             });
           }
 
@@ -117,7 +123,11 @@ export function UnitEconomyDashboard({ connectedMarketplaces, store }: Props) {
           m.unitsSold += qty;
           m.revenue += itemRevenue;
           m.totalCost += totalCostForItem;
+          m.commission += commissionForItem;
+          m.logistics += logisticsForItem;
+          m.withdrawal += withdrawalForItem;
           m.totalFees += feesForItem;
+          if (tariff.isReal) m.hasRealTariff = true;
           if (ft === 'FBO') m.fulfillmentBreakdown.fbo += qty;
           else m.fulfillmentBreakdown.fbs += qty;
         }
@@ -153,9 +163,11 @@ export function UnitEconomyDashboard({ connectedMarketplaces, store }: Props) {
 
   // Summary stats
   const totals = useMemo(() => {
-    const t = { revenue: 0, cost: 0, fees: 0, profit: 0, units: 0, withCost: 0, total: 0 };
+    const t = { revenue: 0, cost: 0, commission: 0, logistics: 0, withdrawal: 0, fees: 0, profit: 0, units: 0, withCost: 0, total: 0 };
     skuMetrics.forEach(s => {
-      t.revenue += s.revenue; t.cost += s.totalCost; t.fees += s.totalFees;
+      t.revenue += s.revenue; t.cost += s.totalCost;
+      t.commission += s.commission; t.logistics += s.logistics; t.withdrawal += s.withdrawal;
+      t.fees += s.totalFees;
       t.profit += s.netProfit; t.units += s.unitsSold; t.total++;
       if (s.hasCostPrice) t.withCost++;
     });
@@ -168,11 +180,13 @@ export function UnitEconomyDashboard({ connectedMarketplaces, store }: Props) {
   };
 
   const exportCSV = () => {
-    const headers = ['Marketplace', 'Artikul', 'Nomi', 'Sotilgan', 'Daromad', 'Tannarx', 'Xarajat', 'Komissiya+Logistika', 'Sof foyda', 'Marja %', 'FBO', 'FBS'];
+    const headers = ['Marketplace', 'Artikul', 'Nomi', 'Sotilgan', 'Daromad', 'Tannarx', 'Xarajat', 'Komissiya', 'Logistika', 'Chiqarish', 'Jami hizmatlar', 'Sof foyda', 'Marja %', 'FBO', 'FBS'];
     const rows = filtered.map(s => [
       s.marketplace, s.offerId, `"${s.name}"`, String(s.unitsSold),
       String(Math.round(s.revenue)), String(Math.round(s.costPrice)),
-      String(Math.round(s.totalCost)), String(Math.round(s.totalFees)),
+      String(Math.round(s.totalCost)), String(Math.round(s.commission)),
+      String(Math.round(s.logistics)), String(Math.round(s.withdrawal)),
+      String(Math.round(s.totalFees)),
       String(Math.round(s.netProfit)), s.margin.toFixed(1),
       String(s.fulfillmentBreakdown.fbo), String(s.fulfillmentBreakdown.fbs),
     ]);
@@ -209,7 +223,12 @@ export function UnitEconomyDashboard({ connectedMarketplaces, store }: Props) {
           <CardContent className="pt-4 pb-3">
             <div className="flex items-center gap-2 mb-1"><Package className="h-4 w-4 text-orange-500" /><span className="text-xs text-muted-foreground">Jami xarajat</span></div>
             <p className="text-lg font-bold">{fmtPrice(totals.cost + totals.fees)}</p>
-            <p className="text-xs text-muted-foreground">Tannarx + komissiya</p>
+            <div className="text-[10px] text-muted-foreground space-y-0.5">
+              <div>Tannarx: {fmtPrice(totals.cost)}</div>
+              <div>Komissiya: {fmtPrice(totals.commission)}</div>
+              <div>Logistika: {fmtPrice(totals.logistics)}</div>
+              {totals.withdrawal > 0 && <div>Chiqarish: {fmtPrice(totals.withdrawal)}</div>}
+            </div>
           </CardContent>
         </Card>
         <Card>
@@ -256,8 +275,9 @@ export function UnitEconomyDashboard({ connectedMarketplaces, store }: Props) {
                 <th className="text-right py-2.5 px-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort('revenue')}>
                   <span className="inline-flex items-center gap-1">Daromad <ArrowUpDown className="h-3 w-3" /></span>
                 </th>
-                <th className="text-right py-2.5 px-3 font-medium text-muted-foreground hidden md:table-cell">Tannarx</th>
                 <th className="text-right py-2.5 px-3 font-medium text-muted-foreground hidden lg:table-cell">Komissiya</th>
+                <th className="text-right py-2.5 px-3 font-medium text-muted-foreground hidden lg:table-cell">Logistika</th>
+                <th className="text-right py-2.5 px-3 font-medium text-muted-foreground hidden xl:table-cell">Jami hizmat</th>
                 <th className="text-right py-2.5 px-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort('netProfit')}>
                   <span className="inline-flex items-center gap-1">Sof foyda <ArrowUpDown className="h-3 w-3" /></span>
                 </th>
@@ -289,10 +309,15 @@ export function UnitEconomyDashboard({ connectedMarketplaces, store }: Props) {
                   </td>
                   <td className="text-right py-2.5 px-3 font-medium">{fmt(s.unitsSold)}</td>
                   <td className="text-right py-2.5 px-3 font-medium">{fmt(s.revenue)}</td>
-                  <td className="text-right py-2.5 px-3 hidden md:table-cell">
-                    {s.hasCostPrice ? <span>{fmt(s.costPrice)}</span> : <span className="text-muted-foreground">—</span>}
+                  <td className="text-right py-2.5 px-3 hidden lg:table-cell">
+                    <span title={s.hasRealTariff ? 'API dan' : 'Taxminiy'}>{fmt(s.commission)}</span>
+                    {!s.hasRealTariff && <span className="text-[9px] text-muted-foreground ml-0.5">~</span>}
                   </td>
-                  <td className="text-right py-2.5 px-3 hidden lg:table-cell">{fmt(s.totalFees)}</td>
+                  <td className="text-right py-2.5 px-3 hidden lg:table-cell">{fmt(s.logistics)}</td>
+                  <td className="text-right py-2.5 px-3 hidden xl:table-cell">
+                    <span className="font-medium">{fmt(s.totalFees)}</span>
+                    {s.withdrawal > 0 && <div className="text-[9px] text-muted-foreground">+{fmt(s.withdrawal)} chiqarish</div>}
+                  </td>
                   <td className={`text-right py-2.5 px-3 font-semibold ${s.netProfit >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
                     {s.netProfit >= 0 ? '+' : ''}{fmt(s.netProfit)}
                   </td>
