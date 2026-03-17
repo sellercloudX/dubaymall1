@@ -423,18 +423,20 @@ export function getTariffForProduct(
   const commBase = commissionBase && commissionBase > price ? commissionBase : price;
   
   if (tariff && tariff.totalTariff > 0) {
-    // If we have a commissionBase that differs from catalog price, recalculate commission
+    const extraFees = tariff.otherFees || 0;
     let commission = tariff.agencyCommission;
     let totalTariff = tariff.totalTariff;
+
     if (marketplace === 'yandex' && commissionBase && commissionBase > 0 && tariff.commissionPercent > 0) {
       // Recalculate commission using the REAL base (pre-subsidy price)
       commission = Math.round(commBase * (tariff.commissionPercent / 100));
-      totalTariff = commission + tariff.fulfillment + tariff.delivery;
+      totalTariff = commission + tariff.fulfillment + tariff.delivery + extraFees;
     }
+
     const withdrawalFee = marketplace === 'yandex' ? Math.round(price * 0.01) : 0;
     return {
       commission,
-      logistics: tariff.fulfillment + tariff.delivery,
+      logistics: tariff.fulfillment + tariff.delivery + extraFees,
       withdrawal: withdrawalFee,
       totalFee: totalTariff + withdrawalFee,
       isReal: true,
@@ -451,7 +453,7 @@ export function getTariffForProduct(
       ? yandexTariffs.reduce((s, t) => s + t.commissionPercent, 0) / yandexTariffs.length / 100
       : 0.17; // 17% = FEE 15.5% + PAYMENT_TRANSFER 1.5%
     const avgLogistics = yandexTariffs.length > 0
-      ? yandexTariffs.reduce((s, t) => s + t.fulfillment + t.delivery, 0) / yandexTariffs.length
+      ? yandexTariffs.reduce((s, t) => s + t.fulfillment + t.delivery + (t.otherFees || 0), 0) / yandexTariffs.length
       : 6000;
     const commission = Math.round(commBase * avgCommPct);
     const logistics = Math.round(avgLogistics);
@@ -498,7 +500,7 @@ export function getTariffForProduct(
   if (safeMapSize(tariffMap) > 0) {
     const values = safeMapValues(tariffMap);
     const avgCommissionPercent = values.reduce((s, t) => s + t.commissionPercent, 0) / values.length;
-    const avgLogistics = values.reduce((s, t) => s + t.fulfillment + t.delivery, 0) / values.length;
+    const avgLogistics = values.reduce((s, t) => s + t.fulfillment + t.delivery + (t.otherFees || 0), 0) / values.length;
     const estCommission = price * (avgCommissionPercent / 100);
     return {
       commission: estCommission,

@@ -322,7 +322,9 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
       {/* Status tabs */}
       <div className="flex items-center gap-2 flex-wrap">
         {STATUS_CATEGORIES.map(cat => {
-          const count = cat.key === 'all' ? dateFiltered.length : dateFiltered.filter(e => e.statusCategory === cat.key).length;
+          const count = cat.key === 'all'
+            ? statusCountBase.length
+            : statusCountBase.filter(e => e.statusCategory === cat.key).length;
           return (
             <Button key={cat.key} variant={statusFilter === cat.key ? 'default' : 'outline'}
               size="sm" className="h-7 text-[11px] px-2.5 gap-1 rounded-full"
