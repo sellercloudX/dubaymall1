@@ -305,10 +305,8 @@ async function scanWildberriesProducts(credentials: any): Promise<any> {
     if (photos.length === 0) {
       issues.push('Rasmlar yo\'q');
       issueDetails.push({ type: 'critical', field: 'images', msg: 'Hech qanday rasm yo\'q' });
-    } else if (photos.length < 2) {
-      issues.push(`Kam rasm (${photos.length}/2)`);
-      issueDetails.push({ type: 'warning', field: 'images', msg: `${photos.length} ta rasm (min 2)` });
     }
+    // WB async errors handle image quality issues from marketplace side
 
     if (!card.brand) {
       issues.push('Brend yo\'q');
