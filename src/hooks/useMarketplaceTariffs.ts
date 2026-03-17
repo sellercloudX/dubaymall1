@@ -253,16 +253,23 @@ export function useMarketplaceTariffs(
         const seen = new Set<string>();
 
         for (const p of products) {
-          const catId = p.marketCategoryId || 0;
+          const categoryId = p.marketCategoryId || 0;
           const price = p.price || 0;
-          const catKey = `${catId}-${price}-${p.weightKg || 0}`;
-          
-          if (seen.has(catKey)) continue;
-          seen.add(catKey);
-          
-          if (catId > 0 && price > 0) {
+          const batchKey = getYandexTariffBatchKey({
+            categoryId,
+            price,
+            length: p.lengthCm,
+            width: p.widthCm,
+            height: p.heightCm,
+            weight: p.weightKg,
+          });
+
+          if (seen.has(batchKey)) continue;
+          seen.add(batchKey);
+
+          if (categoryId > 0 && price > 0) {
             batch.push({
-              categoryId: catId,
+              categoryId,
               price,
               offerId: p.offerId,
               length: p.lengthCm,
@@ -275,59 +282,80 @@ export function useMarketplaceTariffs(
 
         if (batch.length === 0) continue;
 
-        const sendBatch = batch.slice(0, 200);
-
         try {
-          const { data, error } = await supabase.functions.invoke('fetch-marketplace-data', {
-            body: {
-              marketplace: mp,
-              dataType: 'tariffs',
-              offers: sendBatch.map(o => ({
-                categoryId: o.categoryId,
-                price: o.price,
-                length: o.length,
-                width: o.width,
-                height: o.height,
-                weight: o.weight,
-              })),
-            },
-          });
+          for (let start = 0; start < batch.length; start += 200) {
+            const sendBatch = batch.slice(start, start + 200);
 
-          if (error || !data?.success) {
-            console.warn('Tariff fetch failed:', error || data?.error);
-            continue;
+            const { data, error } = await supabase.functions.invoke('fetch-marketplace-data', {
+              body: {
+                marketplace: mp,
+                dataType: 'tariffs',
+                offers: sendBatch.map(o => ({
+                  categoryId: o.categoryId,
+                  price: o.price,
+                  length: o.length,
+                  width: o.width,
+                  height: o.height,
+                  weight: o.weight,
+                })),
+              },
+            });
+
+            if (error || !data?.success) {
+              console.warn('Tariff fetch failed:', error || data?.error);
+              continue;
+            }
+
+            const tariffResults = data.data || [];
+
+            tariffResults.forEach((t: any, idx: number) => {
+              if (idx >= sendBatch.length) return;
+              const offerId = sendBatch[idx].offerId;
+              const commission = t.agencyCommission || 0;
+              const offerPrice = sendBatch[idx]?.price || 0;
+              const apiCommissionPercent = t.commissionPercent || (offerPrice > 0 ? (commission / offerPrice) * 100 : 0);
+
+              tariffMap.set(offerId, {
+                offerId,
+                agencyCommission: commission,
+                fulfillment: t.fulfillment || 0,
+                delivery: (t.delivery || 0) + (t.sorting || 0),
+                otherFees: t.other || 0,
+                totalTariff: t.totalTariff || 0,
+                tariffPercent: t.tariffPercent || 0,
+                commissionPercent: apiCommissionPercent,
+              });
+            });
           }
 
-          const tariffResults = data.data || [];
-
-          tariffResults.forEach((t: any, idx: number) => {
-            if (idx >= sendBatch.length) return;
-            const offerId = sendBatch[idx].offerId;
-            const commission = t.agencyCommission || 0;
-            const offerPrice = sendBatch[idx]?.price || 0;
-            // Use API-extracted commissionPercent directly (most accurate)
-            const apiCommissionPercent = t.commissionPercent || (offerPrice > 0 ? (commission / offerPrice) * 100 : 0);
-            tariffMap.set(offerId, {
-              offerId,
-              agencyCommission: commission,
-              fulfillment: t.fulfillment || 0,
-              delivery: (t.delivery || 0) + (t.sorting || 0),
-              totalTariff: t.totalTariff || 0,
-              tariffPercent: t.tariffPercent || 0,
-              commissionPercent: apiCommissionPercent,
-            });
-          });
-
-          // Map same tariff to products with SAME category+price
+          // Map same tariff only to products with the SAME category, price and dimensions
           for (const p of products) {
             if (tariffMap.has(p.offerId)) continue;
-            const catId = p.marketCategoryId || 0;
+            const categoryId = p.marketCategoryId || 0;
             const price = p.price || 0;
-            
-            if (catId > 0 && price > 0) {
-              const similar = products.find(
-                sp => (sp.marketCategoryId || 0) === catId && sp.price === price && tariffMap.has(sp.offerId)
-              );
+
+            if (categoryId > 0 && price > 0) {
+              const productKey = getYandexTariffBatchKey({
+                categoryId,
+                price,
+                length: p.lengthCm,
+                width: p.widthCm,
+                height: p.heightCm,
+                weight: p.weightKg,
+              });
+
+              const similar = products.find(sp => {
+                if (!tariffMap.has(sp.offerId)) return false;
+                return getYandexTariffBatchKey({
+                  categoryId: sp.marketCategoryId || 0,
+                  price: sp.price || 0,
+                  length: sp.lengthCm,
+                  width: sp.widthCm,
+                  height: sp.heightCm,
+                  weight: sp.weightKg,
+                }) === productKey;
+              });
+
               if (similar) {
                 const t = tariffMap.get(similar.offerId)!;
                 tariffMap.set(p.offerId, { ...t, offerId: p.offerId });
