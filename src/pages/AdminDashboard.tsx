@@ -46,22 +46,25 @@ const pageTitles: Record<string, string> = {
 };
 
 function AdminContent({ activeTab }: { activeTab: string }) {
-  switch (activeTab) {
-    case 'metrics': return <StartupMetrics />;
-    case 'analytics': return <AdminAnalytics />;
-    case 'partners': return <PartnerAnalytics />;
-    case 'users': return <UsersManagement />;
-    case 'activations': return <ActivationsManagement />;
-    case 'chat': return <AdminSupportChat />;
-    case 'finance': return <AdminFinancials />;
-    case 'sellercloud': return <SellerCloudManagement />;
-    case 'pricing': return <FeaturePricingManagement />;
-    case 'expenses': return <PlatformExpenses />;
-    case 'admins': return <AdminsManagement />;
-    case 'ai-agent': return <AIAgentDashboard />;
-    case 'tutorials': return <TutorialVideosAdmin />;
-    default: return <StartupMetrics />;
-  }
+  const content = (() => {
+    switch (activeTab) {
+      case 'metrics': return <StartupMetrics />;
+      case 'analytics': return <AdminAnalytics />;
+      case 'partners': return <PartnerAnalytics />;
+      case 'users': return <UsersManagement />;
+      case 'activations': return <ActivationsManagement />;
+      case 'chat': return <AdminSupportChat />;
+      case 'finance': return <AdminFinancials />;
+      case 'sellercloud': return <SellerCloudManagement />;
+      case 'pricing': return <FeaturePricingManagement />;
+      case 'expenses': return <PlatformExpenses />;
+      case 'admins': return <AdminsManagement />;
+      case 'ai-agent': return <AIAgentDashboard />;
+      case 'tutorials': return <TutorialVideosAdmin />;
+      default: return <StartupMetrics />;
+    }
+  })();
+  return <div>{content}</div>;
 }
 
 export default function AdminDashboard() {
