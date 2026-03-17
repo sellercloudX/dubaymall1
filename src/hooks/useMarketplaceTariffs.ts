@@ -86,7 +86,7 @@ export function useMarketplaceTariffs(
               // Uzum finance loaded
             }
           } catch (e) {
-            console.warn('Uzum finance fetch failed, using estimated tariffs:', e);
+            console.warn('Uzum finance fetch failed:', e);
           }
 
           // Apply tariffs per product — ONLY real data from API

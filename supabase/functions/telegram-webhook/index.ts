@@ -688,24 +688,7 @@ async function handleCallback(cq: any) {
     return;
   }
 
-  // Partner unlink
-  if (data === 'partner_unlink') {
-    const { data: partnerLink } = await supabase
-      .from('telegram_chat_links')
-      .select('id, user_id')
-      .eq('telegram_chat_id', chatId)
-      .eq('is_admin', false)
-      .maybeSingle();
-
-    if (partnerLink) {
-      await supabase.from('telegram_chat_links').delete().eq('id', partnerLink.id);
-      await supabase.from('profiles').update({ telegram_linked: false }).eq('user_id', partnerLink.user_id);
-      await editMessage(chatId, msgId, '✅ Telegram uzildi. Qayta ulash uchun /start buyrug\'ini bering.');
-    } else {
-      await editMessage(chatId, msgId, '❌ Ulanish topilmadi.');
-    }
-    return;
-  }
+  // partner_unlink is now handled at the top of handleCallback (before admin check)
 }
 
 // ==================== TEXT MESSAGE HANDLER ====================
