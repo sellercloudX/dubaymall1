@@ -156,21 +156,16 @@ export function useSellerCloudSubscription(): UseSellerCloudSubscriptionReturn {
     }
 
     try {
-      const trialEnd = new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString();
-      const { error } = await supabase
-        .from('sellercloud_subscriptions')
-        .insert({
-          user_id: user.id,
-          plan_type: planType,
-          monthly_fee: monthlyFee,
-          commission_percent: 0,
-          is_trial: true,
-          is_active: true,
-          activation_trial_ends: trialEnd,
-          activation_fee_uzs: ACTIVATION_FEE_UZS,
-        });
+      const { data, error } = await supabase.rpc('create_sellercloud_subscription', {
+        p_plan_type: planType,
+        p_monthly_fee: monthlyFee,
+      });
 
       if (error) throw error;
+      const result = data as any;
+      if (result && !result.success) {
+        throw new Error(result.error || 'Subscription creation failed');
+      }
 
       await fetchData();
       return { success: true };
