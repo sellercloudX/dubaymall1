@@ -122,7 +122,7 @@ async function analyzeWithGemini(img: string): Promise<any | null> {
         method: "POST",
         headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
+          model: "google/gemini-3-flash-preview",
           messages: [
             { role: "system", content: SYSTEM_PROMPT },
             { role: "user", content: [
@@ -150,7 +150,7 @@ async function analyzeWithGemini(img: string): Promise<any | null> {
 
       const result = JSON.parse(match[0]);
       console.log("✅ Lovable AI:", result.productName);
-      return { ...result, aiModel: "lovable-gemini-2.5-flash" };
+      return { ...result, aiModel: "lovable-gemini-3-flash-preview" };
     } catch (err) { console.error("Lovable AI error:", err); return null; }
   }
 
