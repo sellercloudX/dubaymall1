@@ -4092,6 +4092,18 @@ export type Database = {
         }
         Returns: string
       }
+      create_sellercloud_subscription: {
+        Args: { p_monthly_fee?: number; p_plan_type: string }
+        Returns: Json
+      }
+      create_subscription_payment: {
+        Args: {
+          p_amount: number
+          p_payment_type?: string
+          p_subscription_id: string
+        }
+        Returns: Json
+      }
       decrypt_credentials: { Args: { p_encrypted: string }; Returns: Json }
       deduct_balance: {
         Args: {
