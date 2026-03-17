@@ -22,28 +22,41 @@ const CATEGORIES = [
   "Soatlar", "Zargarlik buyumlari",
 ];
 
-const SYSTEM_PROMPT = `You are a PROFESSIONAL E-COMMERCE PRODUCT ANALYST for Uzbekistan/CIS/Yandex Market.
-Identify the product from its IMAGE with high precision (like Google Lens).
+const SYSTEM_PROMPT = `You are an EXPERT E-COMMERCE PRODUCT IDENTIFICATION SPECIALIST with Google Lens-level accuracy.
+Your job: identify the EXACT product from its image with maximum precision.
 
-CRITICAL RULES:
-1. Product name MUST be in Uzbek language (Latin script)
-2. Description MUST be detailed (3-5 sentences) in Uzbek
-3. Prices in UZS (O'zbekiston so'mi)
-4. Category MUST be one of: ${CATEGORIES.join(", ")}
-5. Include brand and model if visible on the product
-6. suggestedPrice should be realistic for Uzbekistan market
-7. specifications should include all visible technical details (material, size, weight, color, etc.)
-8. searchKeywords should include both Uzbek and Russian terms for better marketplace discovery
+CRITICAL IDENTIFICATION RULES:
+1. LOOK AT THE PRODUCT ITSELF — identify the brand, model, and type from what is PHYSICALLY VISIBLE in the image.
+2. DO NOT CONFUSE the product with what it is FOR. Example:
+   - A PHONE CASE showing an iPhone picture is a CASE/CHEXOL, NOT an iPhone.
+   - A laptop bag with a MacBook logo is a BAG, NOT a MacBook.
+   - A screen protector for Samsung is a PROTECTOR, NOT a Samsung phone.
+3. READ ALL TEXT on the product/packaging: brand names, model numbers, specifications.
+4. If the product is an ACCESSORY (case, cover, protector, cable, charger), clearly state:
+   - What the accessory IS (e.g., "silikon chexol", "himoya oynasi")
+   - What device it is COMPATIBLE WITH (e.g., "iPhone 15 Pro uchun")
+   - The accessory's OWN brand if visible
+5. Pay attention to device COMPATIBILITY markers — a case labeled "iPhone 14" is for iPhone 14, even if the case shape looks similar to other models.
+6. For electronics, identify the EXACT model from visible text, camera layout, size, design details.
+7. If you see a product with packaging, prioritize info FROM THE PACKAGING (brand, model, specs).
+
+OUTPUT RULES:
+- Product name MUST be in Uzbek (Latin script)
+- Description MUST be 3-5 sentences in Uzbek, detailed
+- Prices in UZS (Uzbekistan so'm), realistic for Uzbekistan market
+- Category from: ${CATEGORIES.join(", ")}
+- specifications: include ALL visible details (material, color, size, weight, compatibility)
+- confidence: 0-100 (be honest — if unclear, lower the score)
 
 Return ONLY valid JSON:
 {
-  "productName": "mahsulot nomi (o'zbek, lotin)",
+  "productName": "mahsulot nomi (o'zbek, lotin) — aniq brend va model bilan",
   "description": "batafsil tavsif o'zbek tilida",
   "category": "aniq kategoriya",
   "suggestedPrice": 150000,
-  "brand": "brend nomi",
-  "model": "model nomi",
-  "specifications": {"material": "plastik", "rang": "qora", "og'irlik": "200g"},
+  "brand": "brend nomi (agar ko'rinsa)",
+  "model": "model nomi (agar ko'rinsa)",
+  "specifications": {"material": "...", "rang": "...", "moslik": "..."},
   "searchKeywords": ["keyword1", "keyword2"],
   "confidence": 85
 }`;
@@ -60,14 +73,14 @@ async function analyzeWithGemini(img: string): Promise<any | null> {
     if (m) { mimeType = m[1]; base64Data = m[2]; }
   }
 
-  const userPrompt = "Identify this product precisely from its appearance. Include all visible details — brand, model, color, size. Return ONLY valid JSON.";
+  const userPrompt = "Identify this product PRECISELY from its appearance. IMPORTANT: If this is an accessory (case, cover, protector, cable), identify it as an ACCESSORY and note what device it is for — do NOT identify it as the device itself. Read ALL text on the product and packaging. Include brand, model, color, material, compatibility. Return ONLY valid JSON.";
 
   // TRY 1: Google AI Studio
   if (googleKey) {
     try {
       console.log("🔍 PRIMARY: Google AI Studio...");
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${googleKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${googleKey}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -91,7 +104,7 @@ async function analyzeWithGemini(img: string): Promise<any | null> {
           if (match) {
             const result = JSON.parse(match[0]);
             console.log("✅ Google AI Studio:", result.productName);
-            return { ...result, aiModel: "google-ai-studio-gemini-2.5-flash" };
+            return { ...result, aiModel: "google-ai-studio-gemini-2.5-pro" };
           }
         }
       } else {
@@ -109,7 +122,7 @@ async function analyzeWithGemini(img: string): Promise<any | null> {
         method: "POST",
         headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash-lite",
+          model: "google/gemini-2.5-flash",
           messages: [
             { role: "system", content: SYSTEM_PROMPT },
             { role: "user", content: [

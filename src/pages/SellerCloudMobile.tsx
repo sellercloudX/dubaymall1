@@ -48,6 +48,7 @@ const CompetitorPriceMonitor = lazy(() => import('@/components/sellercloud/Compe
 const SalesDashboard = lazy(() => import('@/components/sellercloud/SalesDashboard').then(m => ({ default: m.SalesDashboard })));
 const SupportChat = lazy(() => import('@/components/sellercloud/SupportChat').then(m => ({ default: m.SupportChat })));
 const MultiStoreManager = lazy(() => import('@/components/sellercloud/MultiStoreManager').then(m => ({ default: m.MultiStoreManager })));
+const ProfilePasswordSetup = lazy(() => import('@/components/sellercloud/ProfilePasswordSetup').then(m => ({ default: m.ProfilePasswordSetup })));
 
 // Lightweight tab loading skeleton
 function TabLoader() {
@@ -247,6 +248,8 @@ export default function SellerCloudMobile() {
         return <div className="p-4"><SupportChat /></div>;
       case 'stores':
         return <div className="p-4"><MultiStoreManager connectedMarketplaces={connectedMarketplaces} onStoreChange={() => refetch()} /></div>;
+      case 'profile':
+        return <div className="p-4"><ProfilePasswordSetup /></div>;
       default:
         return null;
     }

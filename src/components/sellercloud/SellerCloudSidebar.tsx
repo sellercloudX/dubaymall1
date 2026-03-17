@@ -4,7 +4,7 @@ import {
   ArrowDownUp, DollarSign, Bell, FileSpreadsheet, CreditCard, Receipt,
   Calculator, Shield, Copy, AlertOctagon,
   MessageCircle, Activity, Megaphone, ChevronLeft, ChevronRight,
-  LogOut, LayoutDashboard, Sun, Moon, Wallet, Search,
+  LogOut, LayoutDashboard, Sun, Moon, Wallet, Search, UserCog,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -50,6 +50,7 @@ export const sellerMenuItems: SellerMenuItem[] = [
   { id: 'problems', label: 'Muammolar', icon: AlertOctagon, group: 'tools' },
   { id: 'mxik', label: 'MXIK baza', icon: FileSpreadsheet, group: 'tools' },
   { id: 'team', label: 'Jamoa', icon: Globe, group: 'settings' },
+  { id: 'profile', label: 'Profil', icon: UserCog, group: 'settings' },
   { id: 'subscription', label: 'Obuna', icon: CreditCard, group: 'settings' },
   { id: 'reports', label: 'Hisobotlar', icon: FileSpreadsheet, group: 'settings' },
   { id: 'notifications', label: 'Bildirishnoma', icon: Bell, group: 'settings' },

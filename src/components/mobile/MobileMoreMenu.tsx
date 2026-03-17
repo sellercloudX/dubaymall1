@@ -5,7 +5,7 @@ import type { MobileTabType } from './MobileSellerCloudNav';
 import {
   ArrowDownUp, DollarSign, Calculator, BarChart3, Shield, Copy,
   AlertOctagon, Tag, FileSpreadsheet, Bell, CreditCard, Coins,
-  MessageCircle, Activity, Megaphone, Search, LayoutDashboard,
+  MessageCircle, Activity, Megaphone, Search, LayoutDashboard, UserCog,
 } from 'lucide-react';
 
 interface MobileMoreMenuProps {
@@ -59,6 +59,7 @@ const menuCategories: MenuCategory[] = [
       { id: 'reports', icon: FileSpreadsheet, label: 'Hisobotlar', color: 'bg-gray-500/15 text-gray-600 dark:text-gray-400' },
       { id: 'notifications', icon: Bell, label: 'Bildirishnoma', color: 'bg-yellow-500/15 text-yellow-600 dark:text-yellow-400' },
       { id: 'subscription', icon: CreditCard, label: 'Obuna', color: 'bg-primary/15 text-primary' },
+      { id: 'profile', icon: UserCog, label: 'Profil', color: 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400' },
       { id: 'support', icon: MessageCircle, label: 'Yordam', color: 'bg-green-500/15 text-green-600 dark:text-green-400' },
     ],
   },

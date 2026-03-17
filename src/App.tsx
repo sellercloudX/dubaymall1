@@ -38,6 +38,7 @@ const SellerCloudX = lazy(() => import("./pages/SellerCloudX"));
 const SellerCloudMobile = lazy(() => import("./pages/SellerCloudMobile"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const TelegramAdminApp = lazy(() => import("./pages/TelegramAdminApp"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
  // Create persister for offline cache
@@ -106,6 +107,7 @@ function App() {
                     <Route path="/seller-cloud-mobile" element={<SellerCloudMobile />} />
                     <Route path="/admin" element={<AdminDashboard />} />
                     <Route path="/telegram-admin" element={<TelegramAdminApp />} />
+                    <Route path="/reset-password" element={<ResetPassword />} />
                     {/* Redirect old routes to landing */}
                     <Route path="/seller" element={<Navigate to="/seller-cloud" replace />} />
                     <Route path="/dashboard" element={<Navigate to="/seller-cloud" replace />} />
