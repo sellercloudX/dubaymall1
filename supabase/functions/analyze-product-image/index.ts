@@ -104,7 +104,7 @@ async function analyzeWithGemini(img: string): Promise<any | null> {
           if (match) {
             const result = JSON.parse(match[0]);
             console.log("✅ Google AI Studio:", result.productName);
-            return { ...result, aiModel: "google-ai-studio-gemini-2.5-flash" };
+            return { ...result, aiModel: "google-ai-studio-gemini-2.5-pro" };
           }
         }
       } else {
