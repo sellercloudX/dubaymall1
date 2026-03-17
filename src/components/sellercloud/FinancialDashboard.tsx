@@ -303,7 +303,7 @@ export function FinancialDashboard({
                     <div className="font-medium text-sm truncate flex items-center gap-1.5">
                       {feeLabel}
                       <Badge variant="outline" className="text-[10px] border-primary/30 text-primary px-1.5 py-0">
-                        <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />{selectedMp === 'uzum' ? 'Taxminiy' : 'Real'}
+                        <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />Real
                       </Badge>
                     </div>
                     <div className="text-xs text-muted-foreground truncate">

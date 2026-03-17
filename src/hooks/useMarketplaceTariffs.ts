@@ -414,41 +414,13 @@ export function getTariffForProduct(
     };
   }
 
-  // Marketplace-specific fallbacks with REAL rate structures
-  if (marketplace === 'yandex') {
-    // Real Yandex rates: FEE ~15.5% + PAYMENT_TRANSFER ~1.5% = 17% commission
-    // DELIVERY_TO_CUSTOMER ~6000 UZS, withdrawal ~1%
-    // Try to use average from real tariff data if available
-    const yandexTariffs = safeMapValues(tariffMap).filter(t => t.commissionPercent >= 10);
-    const avgCommPct = yandexTariffs.length > 0
-      ? yandexTariffs.reduce((s, t) => s + t.commissionPercent, 0) / yandexTariffs.length / 100
-      : 0.17; // 17% = FEE 15.5% + PAYMENT_TRANSFER 1.5%
-    const avgLogistics = yandexTariffs.length > 0
-      ? yandexTariffs.reduce((s, t) => s + t.fulfillment + t.delivery + (t.otherFees || 0), 0) / yandexTariffs.length
-      : 6000;
-    const commission = Math.round(commBase * avgCommPct);
-    const logistics = Math.round(avgLogistics);
-    const withdrawal = Math.round(price * 0.01);
-    return {
-      commission,
-      logistics,
-      withdrawal,
-      totalFee: commission + logistics + withdrawal,
-      isReal: false,
-    };
-  }
-
+  // Uzum fallback — no real data available, return zero (no estimates)
   if (marketplace === 'uzum') {
-    // Use real commission from product catalog when available
-    const commissionPercent = getUzumCommissionPercent(price);
-    const commission = price * commissionPercent;
-    const serviceFee = price * UZUM_SERVICE_FEE_PERCENT;
-    const logistics = getUzumLogistics(price);
     return {
-      commission: commission + serviceFee,
-      logistics,
+      commission: 0,
+      logistics: 0,
       withdrawal: 0,
-      totalFee: commission + serviceFee + logistics,
+      totalFee: 0,
       isReal: false,
     };
   }

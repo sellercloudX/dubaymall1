@@ -311,8 +311,7 @@ export function UnitEconomyDashboard({ connectedMarketplaces, store }: Props) {
                   <td className="text-right py-2.5 px-3 font-medium">{fmt(s.unitsSold)}</td>
                   <td className="text-right py-2.5 px-3 font-medium">{fmt(s.revenue)}</td>
                   <td className="text-right py-2.5 px-3 hidden lg:table-cell">
-                    <span title={s.hasRealTariff ? 'API dan' : 'Taxminiy'}>{fmt(s.commission)}</span>
-                    {!s.hasRealTariff && <span className="text-[9px] text-muted-foreground ml-0.5">~</span>}
+                    <span>{fmt(s.commission)}</span>
                   </td>
                   <td className="text-right py-2.5 px-3 hidden lg:table-cell">{fmt(s.logistics)}</td>
                   <td className="text-right py-2.5 px-3 hidden xl:table-cell">

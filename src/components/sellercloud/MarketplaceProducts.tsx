@@ -252,8 +252,6 @@ export function MarketplaceProducts({ connectedMarketplaces, store }: Marketplac
                               </span>
                               {tariff.isReal ? (
                                 <Badge variant="outline" className="text-[9px] px-1 py-0 border-primary/30 text-primary">Real</Badge>
-                              ) : commPct !== undefined ? (
-                                <Badge variant="outline" className="text-[9px] px-1 py-0 border-muted-foreground/30 text-muted-foreground">Taxminiy</Badge>
                               ) : null}
                             </div>
                           );
