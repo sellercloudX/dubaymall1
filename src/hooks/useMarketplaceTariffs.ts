@@ -89,14 +89,14 @@ export function useMarketplaceTariffs(
             console.warn('Uzum finance fetch failed, using estimated tariffs:', e);
           }
 
-          // Apply tariffs per product
+          // Apply tariffs per product — ONLY real data from API
           for (const p of products) {
             const price = p.price || 0;
             if (price <= 0) continue;
             
             const realExp = realExpenses?.get(p.offerId);
             if (realExp && (realExp.commission > 0 || realExp.logistics > 0)) {
-              // Use real finance data from API
+              // Use real finance data from Finance API
               const totalTariff = realExp.commission + realExp.logistics;
               tariffMap.set(p.offerId, {
                 offerId: p.offerId,
@@ -107,27 +107,21 @@ export function useMarketplaceTariffs(
                 tariffPercent: price > 0 ? (totalTariff / price) * 100 : 0,
                 commissionPercent: price > 0 ? (realExp.commission / price) * 100 : 0,
               });
-            } else {
-              // Use REAL commission from product catalog if available, else fallback to tier
-              // Uzum API returns commissionPercent as whole number (e.g. 17 = 17%)
-              const hasRealCommission = p.commissionPercent && p.commissionPercent > 0;
-              const commissionPercent = hasRealCommission 
-                ? p.commissionPercent! / 100  // Convert 17 → 0.17
-                : getUzumCommissionPercent(price);
+            } else if (p.commissionPercent && p.commissionPercent > 0) {
+              // Use REAL commission from product catalog (commissionDto)
+              const commissionPercent = p.commissionPercent / 100; // 17 → 0.17
               const commission = price * commissionPercent;
-              // Logistics based on dimensional group if available
-              const logistics = getUzumLogistics(price);
-              const totalTariff = commission + logistics;
               tariffMap.set(p.offerId, {
                 offerId: p.offerId,
                 agencyCommission: commission,
-                fulfillment: logistics,
+                fulfillment: 0, // No real logistics data available
                 delivery: 0,
-                totalTariff,
-                tariffPercent: price > 0 ? (totalTariff / price) * 100 : 0,
-                commissionPercent: commissionPercent * 100,
+                totalTariff: commission,
+                tariffPercent: price > 0 ? (commission / price) * 100 : 0,
+                commissionPercent: p.commissionPercent,
               });
             }
+            // If no real data — don't add to tariffMap (no estimates)
           }
           continue;
         }
