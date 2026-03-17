@@ -180,11 +180,13 @@ export function UnitEconomyDashboard({ connectedMarketplaces, store }: Props) {
   };
 
   const exportCSV = () => {
-    const headers = ['Marketplace', 'Artikul', 'Nomi', 'Sotilgan', 'Daromad', 'Tannarx', 'Xarajat', 'Komissiya+Logistika', 'Sof foyda', 'Marja %', 'FBO', 'FBS'];
+    const headers = ['Marketplace', 'Artikul', 'Nomi', 'Sotilgan', 'Daromad', 'Tannarx', 'Xarajat', 'Komissiya', 'Logistika', 'Chiqarish', 'Jami hizmatlar', 'Sof foyda', 'Marja %', 'FBO', 'FBS'];
     const rows = filtered.map(s => [
       s.marketplace, s.offerId, `"${s.name}"`, String(s.unitsSold),
       String(Math.round(s.revenue)), String(Math.round(s.costPrice)),
-      String(Math.round(s.totalCost)), String(Math.round(s.totalFees)),
+      String(Math.round(s.totalCost)), String(Math.round(s.commission)),
+      String(Math.round(s.logistics)), String(Math.round(s.withdrawal)),
+      String(Math.round(s.totalFees)),
       String(Math.round(s.netProfit)), s.margin.toFixed(1),
       String(s.fulfillmentBreakdown.fbo), String(s.fulfillmentBreakdown.fbs),
     ]);
