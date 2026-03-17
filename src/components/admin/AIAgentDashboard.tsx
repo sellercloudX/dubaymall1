@@ -409,7 +409,7 @@ function CardAuditTab({ selectedPartnerId, scanResults, setScanResults, selected
                               <TableCell className="max-w-[200px] truncate font-medium" title={product.name}>{product.name}</TableCell>
                               <TableCell className="text-center"><ScoreBadge score={product.score} /></TableCell>
                               <TableCell className="text-center">
-                                {product.imageCount >= 3 ? <CheckCircle2 className="h-4 w-4 text-green-500 inline" /> : <XCircle className="h-4 w-4 text-red-500 inline" />}
+                                {product.imageCount === 0 ? <XCircle className="h-4 w-4 text-red-500 inline" /> : <CheckCircle2 className="h-4 w-4 text-green-500 inline" />}
                                 <span className="text-[10px] ml-0.5">{product.imageCount}</span>
                               </TableCell>
                               <TableCell className="text-center">{product.hasDescription ? <CheckCircle2 className="h-4 w-4 text-green-500 inline" /> : <XCircle className="h-4 w-4 text-red-500 inline" />}</TableCell>
