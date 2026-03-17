@@ -73,7 +73,7 @@ async function analyzeWithGemini(img: string): Promise<any | null> {
     if (m) { mimeType = m[1]; base64Data = m[2]; }
   }
 
-  const userPrompt = "Identify this product precisely from its appearance. Include all visible details — brand, model, color, size. Return ONLY valid JSON.";
+  const userPrompt = "Identify this product PRECISELY from its appearance. IMPORTANT: If this is an accessory (case, cover, protector, cable), identify it as an ACCESSORY and note what device it is for — do NOT identify it as the device itself. Read ALL text on the product and packaging. Include brand, model, color, material, compatibility. Return ONLY valid JSON.";
 
   // TRY 1: Google AI Studio
   if (googleKey) {
