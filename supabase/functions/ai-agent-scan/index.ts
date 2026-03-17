@@ -159,10 +159,9 @@ async function scanYandexProducts(credentials: any): Promise<any> {
     if (imgCount === 0) {
       issues.push('Rasmlar yo\'q');
       issueDetails.push({ type: 'critical', field: 'images', msg: 'Hech qanday rasm yo\'q' });
-    } else if (imgCount < 2) {
-      issues.push(`Kam rasm (${imgCount}/2)`);
-      issueDetails.push({ type: 'warning', field: 'images', msg: `${imgCount} ta rasm (min 2)` });
     }
+    // Note: image quality is checked via Yandex moderation API errors (quality.errors/warnings)
+    // No penalty for having < 2 images if marketplace doesn't report quality issues
 
     if (!offer.vendor) {
       issues.push('Brend yo\'q');
