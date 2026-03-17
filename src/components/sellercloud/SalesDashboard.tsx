@@ -31,7 +31,7 @@ type SortDir = 'asc' | 'desc';
 
 const STATUS_CATEGORIES = [
   { key: 'all', label: 'Hammasi', icon: ShoppingCart, color: '' },
-  { key: 'new', label: 'Yangi', icon: Package, color: 'text-orange-500', statuses: ['NEW', 'PENDING', 'RESERVED', 'UNPAID', 'CREATED', 'STARTED'] },
+  { key: 'new', label: 'Yangi', icon: Package, color: 'text-orange-500', statuses: ['NEW', 'PENDING', 'RESERVED', 'UNPAID', 'CREATED', 'STARTED', 'AWAITING_PAYMENT'] },
   { key: 'assembly', label: "Yig'ish", icon: Clock, color: 'text-amber-500', statuses: ['PROCESSING', 'PACKING', 'CONFIRM', 'READY_TO_SHIP', 'ACCEPTED_AT_DP', 'ACCEPTED'] },
   { key: 'active', label: "Yo'lda", icon: Truck, color: 'text-blue-500', statuses: ['DELIVERY', 'DELIVERING', 'PENDING_DELIVERY', 'SHIPPED', 'PICKUP', 'DELIVERED_TO_CUSTOMER_DELIVERY_POINT'] },
   { key: 'delivered', label: 'Yetkazildi', icon: CheckCircle, color: 'text-emerald-600', statuses: ['DELIVERED', 'COMPLETED'] },
