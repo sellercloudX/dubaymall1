@@ -692,8 +692,11 @@ serve(async (req) => {
             }
 
             const pageOrders: YandexOrder[] = orders.map((order: any) => {
+              // CRITICAL: Use buyerItemsTotal (actual buyer price) as primary source
+              // order.itemsTotal is the DECLARED price which can differ from actual selling price
               const itemsTotal = order.buyerItemsTotal || order.itemsTotal || 0;
               const deliveryTotal = order.deliveryTotal || 0;
+              // buyerTotal is the ACTUAL amount buyer paid — this is the source of truth
               const total = order.buyerTotal || order.buyerItemsTotalBeforeDiscount || (itemsTotal + deliveryTotal) || 0;
               
               // Parse Yandex date format "DD-MM-YYYY HH:MM:SS" to ISO
@@ -702,13 +705,10 @@ serve(async (req) => {
               if (rawDate) {
                 const ddmmMatch = rawDate.match(/^(\d{2})-(\d{2})-(\d{4})\s+(\d{2}):(\d{2}):(\d{2})$/);
                 if (ddmmMatch) {
-                  // DD-MM-YYYY HH:MM:SS → ISO
                   parsedDate = `${ddmmMatch[3]}-${ddmmMatch[2]}-${ddmmMatch[1]}T${ddmmMatch[4]}:${ddmmMatch[5]}:${ddmmMatch[6]}Z`;
                 } else if (rawDate.includes('T') || rawDate.match(/^\d{4}-/)) {
-                  // Already ISO-like
                   parsedDate = rawDate;
                 } else {
-                  // Try DD-MM-YYYY without time
                   const dateOnlyMatch = rawDate.match(/^(\d{2})-(\d{2})-(\d{4})$/);
                   if (dateOnlyMatch) {
                     parsedDate = `${dateOnlyMatch[3]}-${dateOnlyMatch[2]}-${dateOnlyMatch[1]}T00:00:00Z`;
@@ -718,17 +718,51 @@ serve(async (req) => {
                 }
               }
 
-              // Determine fulfillment type from delivery info
-              // FBY = Yandex fulfillment warehouse, FBS = seller fulfillment
-              // CRITICAL: If campaign is FBS/DBS, ALL orders are FBS regardless of deliveryPartnerType
-              let fulfillmentType: 'FBO' | 'FBS' = 'FBS'; // Default to FBS
+              // Determine fulfillment type
+              let fulfillmentType: 'FBO' | 'FBS' = 'FBS';
               if (!isOrdersFbsOnlyCampaign) {
                 const deliveryPartnerType = order.delivery?.deliveryPartnerType || '';
-                // YANDEX_MARKET = marketplace handles fulfillment (FBY)
-                // SHOP = seller handles fulfillment (FBS)
                 if (deliveryPartnerType === 'YANDEX_MARKET') {
-                  fulfillmentType = 'FBO'; // Will display as FBY in UI
+                  fulfillmentType = 'FBO';
                 }
+              }
+
+              // CRITICAL: Map item prices using buyerPrice (actual selling price)
+              // item.price is the DECLARED/catalog price and is often wrong (e.g. 1000 instead of 30358)
+              // If buyerPrice is not available, compute proportionally from order buyerItemsTotal
+              const rawItems = order.items || [];
+              const mappedItems = rawItems.map((item: any) => {
+                // Priority: buyerPrice > buyerPriceBeforeDiscount > computed from order total
+                let itemPrice = item.buyerPrice || item.buyerPriceBeforeDiscount || 0;
+                
+                // If buyerPrice is missing, DON'T use item.price (it's catalog price, often wrong)
+                // Instead compute proportionally from order-level buyerItemsTotal
+                if (!itemPrice && itemsTotal > 0 && rawItems.length > 0) {
+                  // Proportional split: if single item, use full total; multi-item: equal split as approximation
+                  const totalCount = rawItems.reduce((s: number, i: any) => s + (i.count || 1), 0);
+                  const thisCount = item.count || 1;
+                  itemPrice = Math.round(itemsTotal * thisCount / totalCount);
+                }
+                
+                // Last resort: use item.price only if nothing else available
+                if (!itemPrice) {
+                  itemPrice = item.price || 0;
+                }
+                
+                return {
+                  offerId: item.offerId,
+                  offerName: item.offerName,
+                  count: item.count || 1,
+                  price: itemPrice,
+                  priceUZS: itemPrice,
+                  categoryId: item.marketCategoryId,
+                };
+              });
+
+              // Log price mismatch for debugging
+              const itemSum = mappedItems.reduce((s: number, i: any) => s + (i.price * i.count), 0);
+              if (itemSum > 0 && total > 0 && Math.abs(itemSum - total) > total * 0.1) {
+                console.log(`[PRICE MISMATCH] Order ${order.id}: itemSum=${itemSum}, buyerTotal=${total}, items=${rawItems.length}`);
               }
 
               return {
@@ -752,17 +786,7 @@ serve(async (req) => {
                 },
                 deliveryAddress: order.delivery?.address,
                 deliveryRegion: order.delivery?.region?.name,
-                items: order.items?.map((item: any) => {
-                  const itemPrice = item.buyerPrice || item.price || 0;
-                  return {
-                    offerId: item.offerId,
-                    offerName: item.offerName,
-                    count: item.count,
-                    price: itemPrice,
-                    priceUZS: itemPrice,
-                    categoryId: item.marketCategoryId,
-                  };
-                }),
+                items: mappedItems,
               };
             });
 

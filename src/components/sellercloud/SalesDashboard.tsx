@@ -127,9 +127,19 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
         const sub = ((order as any).substatus || '').toUpperCase();
         let statusCategory = 'active';
         
-        // Yandex PROCESSING substatus mapping
+        // Yandex PROCESSING substatus mapping — CRITICAL for correct tab placement
         if (mp === 'yandex' && s === 'PROCESSING') {
-          statusCategory = sub === 'STARTED' ? 'new' : 'assembly';
+          // STARTED = just received, seller hasn't touched it yet → Yangi
+          // READY_TO_SHIP, SHIPPED = seller preparing → Yig'ish
+          // No substatus or unrecognized → Yangi (conservative: better to show than to hide)
+          if (sub === 'READY_TO_SHIP' || sub === 'SHIPPED') {
+            statusCategory = 'assembly';
+          } else {
+            statusCategory = 'new'; // STARTED, empty substatus, or anything else
+          }
+        } else if (mp === 'yandex' && s === 'PENDING') {
+          // PENDING = awaiting payment/verification → Yangi
+          statusCategory = 'new';
         } else {
           for (const cat of STATUS_CATEGORIES.slice(1)) {
             if (cat.statuses?.some(st => st.toUpperCase() === s)) {
