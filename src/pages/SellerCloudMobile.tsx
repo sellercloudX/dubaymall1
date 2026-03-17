@@ -209,20 +209,16 @@ export default function SellerCloudMobile() {
         return <div className="p-4"><ABCAnalysis connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'cost-prices':
         return <div className="p-4"><CostPriceManager connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
-      case 'min-price':
-        return <div className="p-4"><MinPriceProtection connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'card-clone':
         return <div className="p-4"><CardCloner connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'problems':
         return <div className="p-4"><ProblematicProducts connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'financials':
         return <div className="p-4"><FinancialDashboard connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
-      case 'calculator':
-        return <div className="p-4"><ProfitCalculator /></div>;
-      case 'inventory':
-        return <div className="p-4"><InventorySync connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
+      case 'stock-forecast':
+        return <div className="p-4"><InventoryControlHub connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'pricing':
-        return <div className="p-4"><PriceManager connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
+        return <div className="p-4"><PriceControlHub connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'reports':
         return <div className="p-4"><ReportsExport connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'notifications':
@@ -234,11 +230,11 @@ export default function SellerCloudMobile() {
       case 'reviews':
         return <div className="p-4"><MarketplaceReviews connectedMarketplaces={connectedMarketplaces} /></div>;
       case 'seller-analytics':
-        return <div className="p-4"><WBSellerAnalytics connectedMarketplaces={connectedMarketplaces} /></div>;
-      case 'wb-keywords':
-        return <MobileTrendHunter />;
+        return <div className="p-4"><MarketplaceSellerAnalytics connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
+      case 'seo-keywords':
+        return <div className="p-4"><SEOMonitor connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'ads':
-        return <div className="p-4"><WBAdsCampaigns connectedMarketplaces={connectedMarketplaces} /></div>;
+        return <div className="p-4"><MarketplaceAdsCampaigns connectedMarketplaces={connectedMarketplaces} /></div>;
       case 'competitor':
         return <div className="p-4"><CompetitorPriceMonitor connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'sales':
@@ -249,6 +245,8 @@ export default function SellerCloudMobile() {
         return <div className="p-4"><MultiStoreManager connectedMarketplaces={connectedMarketplaces} onStoreChange={() => refetch()} /></div>;
       case 'profile':
         return <div className="p-4"><ProfilePasswordSetup /></div>;
+      case 'tutorials':
+        return <div className="p-4"><TutorialVideos /></div>;
       default:
         return null;
     }
