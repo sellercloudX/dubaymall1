@@ -34,6 +34,7 @@ interface SkuMetrics {
   totalCost: number;
   commission: number;
   logistics: number;
+  withdrawal: number;
   totalFees: number;
   grossProfit: number;
   netProfit: number;
@@ -41,6 +42,7 @@ interface SkuMetrics {
   avgSellingPrice: number;
   fulfillmentBreakdown: { fbo: number; fbs: number };
   hasCostPrice: boolean;
+  hasRealTariff: boolean;
 }
 
 type SortKey = 'revenue' | 'unitsSold' | 'netProfit' | 'margin' | 'name';
