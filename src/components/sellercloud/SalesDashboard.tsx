@@ -174,6 +174,10 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
     ? statusFiltered
     : statusFiltered.filter(e => (e.order as any).fulfillmentType === fulfillmentFilter);
 
+  const statusCountBase = fulfillmentFilter === 'all'
+    ? dateFiltered
+    : dateFiltered.filter(e => (e.order as any).fulfillmentType === fulfillmentFilter);
+
   // Filter by search
   const searchFiltered = searchQuery
     ? fulfillmentFiltered.filter(e => {
