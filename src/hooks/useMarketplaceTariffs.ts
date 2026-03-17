@@ -14,30 +14,7 @@ export interface TariffInfo {
   otherFees?: number; // Extra fixed marketplace fees not covered by logistics buckets
 }
 
-// Uzum tariff rates — based on official Uzum Market docs
-// Commission varies by category (up to 35%), using category-aware defaults
-// Logistics: 20,000 (large), 8,000 (medium), 2,000-6,000 (small) UZS
-const UZUM_COMMISSION_BY_PRICE: Array<{ maxPrice: number; percent: number }> = [
-  { maxPrice: 50000, percent: 0.20 },    // cheap items → higher %
-  { maxPrice: 200000, percent: 0.15 },   // medium
-  { maxPrice: 1000000, percent: 0.12 },  // standard
-  { maxPrice: Infinity, percent: 0.10 }, // expensive items → lower %
-];
-const UZUM_SERVICE_FEE_PERCENT = 0.02; // 2% xizmat haqi
-
-function getUzumCommissionPercent(price: number): number {
-  for (const tier of UZUM_COMMISSION_BY_PRICE) {
-    if (price <= tier.maxPrice) return tier.percent;
-  }
-  return 0.12;
-}
-
-function getUzumLogistics(price: number): number {
-  // Approximate by price: expensive = likely larger
-  if (price > 500000) return 20000;
-  if (price > 100000) return 8000;
-  return 4000;
-}
+// No hardcoded Uzum tariff tiers — only real API data is used
 
 function getYandexTariffBatchKey(input: {
   categoryId: number;
@@ -112,14 +89,14 @@ export function useMarketplaceTariffs(
             console.warn('Uzum finance fetch failed, using estimated tariffs:', e);
           }
 
-          // Apply tariffs per product
+          // Apply tariffs per product — ONLY real data from API
           for (const p of products) {
             const price = p.price || 0;
             if (price <= 0) continue;
             
             const realExp = realExpenses?.get(p.offerId);
             if (realExp && (realExp.commission > 0 || realExp.logistics > 0)) {
-              // Use real finance data from API
+              // Use real finance data from Finance API
               const totalTariff = realExp.commission + realExp.logistics;
               tariffMap.set(p.offerId, {
                 offerId: p.offerId,
@@ -130,27 +107,21 @@ export function useMarketplaceTariffs(
                 tariffPercent: price > 0 ? (totalTariff / price) * 100 : 0,
                 commissionPercent: price > 0 ? (realExp.commission / price) * 100 : 0,
               });
-            } else {
-              // Use REAL commission from product catalog if available, else fallback to tier
-              // Uzum API returns commissionPercent as whole number (e.g. 17 = 17%)
-              const hasRealCommission = p.commissionPercent && p.commissionPercent > 0;
-              const commissionPercent = hasRealCommission 
-                ? p.commissionPercent! / 100  // Convert 17 → 0.17
-                : getUzumCommissionPercent(price);
+            } else if (p.commissionPercent && p.commissionPercent > 0) {
+              // Use REAL commission from product catalog (commissionDto)
+              const commissionPercent = p.commissionPercent / 100; // 17 → 0.17
               const commission = price * commissionPercent;
-              // Logistics based on dimensional group if available
-              const logistics = getUzumLogistics(price);
-              const totalTariff = commission + logistics;
               tariffMap.set(p.offerId, {
                 offerId: p.offerId,
                 agencyCommission: commission,
-                fulfillment: logistics,
+                fulfillment: 0, // No real logistics data available
                 delivery: 0,
-                totalTariff,
-                tariffPercent: price > 0 ? (totalTariff / price) * 100 : 0,
-                commissionPercent: commissionPercent * 100,
+                totalTariff: commission,
+                tariffPercent: price > 0 ? (commission / price) * 100 : 0,
+                commissionPercent: p.commissionPercent,
               });
             }
+            // If no real data — don't add to tariffMap (no estimates)
           }
           continue;
         }
@@ -443,80 +414,34 @@ export function getTariffForProduct(
     };
   }
 
-  // Marketplace-specific fallbacks with REAL rate structures
-  if (marketplace === 'yandex') {
-    // Real Yandex rates: FEE ~15.5% + PAYMENT_TRANSFER ~1.5% = 17% commission
-    // DELIVERY_TO_CUSTOMER ~6000 UZS, withdrawal ~1%
-    // Try to use average from real tariff data if available
-    const yandexTariffs = safeMapValues(tariffMap).filter(t => t.commissionPercent >= 10);
-    const avgCommPct = yandexTariffs.length > 0
-      ? yandexTariffs.reduce((s, t) => s + t.commissionPercent, 0) / yandexTariffs.length / 100
-      : 0.17; // 17% = FEE 15.5% + PAYMENT_TRANSFER 1.5%
-    const avgLogistics = yandexTariffs.length > 0
-      ? yandexTariffs.reduce((s, t) => s + t.fulfillment + t.delivery + (t.otherFees || 0), 0) / yandexTariffs.length
-      : 6000;
-    const commission = Math.round(commBase * avgCommPct);
-    const logistics = Math.round(avgLogistics);
-    const withdrawal = Math.round(price * 0.01);
-    return {
-      commission,
-      logistics,
-      withdrawal,
-      totalFee: commission + logistics + withdrawal,
-      isReal: false,
-    };
-  }
-
+  // Uzum fallback — no real data available, return zero (no estimates)
   if (marketplace === 'uzum') {
-    // Use real commission from product catalog when available
-    const commissionPercent = getUzumCommissionPercent(price);
-    const commission = price * commissionPercent;
-    const serviceFee = price * UZUM_SERVICE_FEE_PERCENT;
-    const logistics = getUzumLogistics(price);
     return {
-      commission: commission + serviceFee,
-      logistics,
+      commission: 0,
+      logistics: 0,
       withdrawal: 0,
-      totalFee: commission + serviceFee + logistics,
+      totalFee: 0,
       isReal: false,
     };
   }
 
-  // WB fallback — price is ALREADY in UZS (converted by caller via toDisplayUzs)
+  // WB fallback — no real data, return zero
   if (marketplace === 'wildberries') {
-    const rubToUzs = getRubToUzs();
-    const commission = price * 0.15; // 15% of UZS price
-    const logisticsRub = price > (5000 * rubToUzs) ? 100 : price > (1000 * rubToUzs) ? 50 : 30;
-    const logisticsUzs = Math.round(logisticsRub * rubToUzs);
     return {
-      commission: Math.round(commission),
-      logistics: logisticsUzs,
+      commission: 0,
+      logistics: 0,
       withdrawal: 0,
-      totalFee: Math.round(commission) + logisticsUzs,
+      totalFee: 0,
       isReal: false,
     };
   }
 
-  if (safeMapSize(tariffMap) > 0) {
-    const values = safeMapValues(tariffMap);
-    const avgCommissionPercent = values.reduce((s, t) => s + t.commissionPercent, 0) / values.length;
-    const avgLogistics = values.reduce((s, t) => s + t.fulfillment + t.delivery + (t.otherFees || 0), 0) / values.length;
-    const estCommission = price * (avgCommissionPercent / 100);
-    return {
-      commission: estCommission,
-      logistics: avgLogistics,
-      withdrawal: 0,
-      totalFee: estCommission + avgLogistics,
-      isReal: false,
-    };
-  }
-
-  // Last resort fallback (should rarely hit now)
+  // No real data available — return zero, not estimates
   return {
-    commission: price * 0.17,
-    logistics: 6000,
+    commission: 0,
+    logistics: 0,
     withdrawal: 0,
-    totalFee: price * 0.17 + 6000,
+    totalFee: 0,
     isReal: false,
   };
 }
