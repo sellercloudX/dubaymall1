@@ -256,12 +256,12 @@ Clean white background, product centered, large, studio lighting, sharp focus, 3
     }
 
     const fileName = `ai-agent/${partnerId}/${product.offerId}-${Date.now()}.png`;
-    const { error: uploadErr } = await supabase.storage
+    const { error: uploadErr } = await adminClient.storage
       .from('product-images')
       .upload(fileName, bytes, { contentType: 'image/png', upsert: true });
     if (uploadErr) return { success: false, message: `Storage: ${uploadErr.message}` };
 
-    const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(fileName);
+    const { data: urlData } = adminClient.storage.from('product-images').getPublicUrl(fileName);
     const publicUrl = urlData?.publicUrl;
     if (!publicUrl) return { success: false, message: 'Public URL olinmadi' };
 
