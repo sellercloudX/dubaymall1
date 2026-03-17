@@ -307,7 +307,7 @@ export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceO
                           </div>
                           <div>
                             <div className="text-muted-foreground">Jami:</div>
-                            <div className="font-bold text-primary">{formatPrice(order.total)}</div>
+                            <div className="font-bold text-primary">{formatOrderTotal(order)}</div>
                           </div>
                         </div>
                       </div>
