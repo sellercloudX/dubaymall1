@@ -162,16 +162,14 @@ export function useMarketplaceDataStore(connectedMarketplaces: string[]) {
     // Fetch orders for each marketplace
     const orderQueries = useQueries({
       queries: connectedMarketplaces.map(mp => ({
-        queryKey: ['marketplace-orders', mp, 'v8-yandex-item-normalize'],
-        queryFn: async () => {
-          // Pass 90-day date range to avoid fetching ALL historical orders
-          const fromDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
-          const toDate = new Date().toISOString();
-          const result = await fetchMarketplaceDataFn(mp, 'orders', {
-            fetchAll: true,
-            fromDate,
-            toDate,
-          });
+         queryKey: ['marketplace-orders', mp, 'v9-full-orders'],
+         queryFn: async () => {
+           // Do NOT send date limits — let the edge function fetch all orders
+           // The edge function defaults to 365 days which captures all active orders
+           // Date filtering happens on the CLIENT side (SalesDashboard, etc.)
+           const result = await fetchMarketplaceDataFn(mp, 'orders', {
+             fetchAll: true,
+           });
           return {
             marketplace: mp,
             data: (result.data || []) as MarketplaceOrder[],

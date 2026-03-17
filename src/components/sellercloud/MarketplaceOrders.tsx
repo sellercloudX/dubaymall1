@@ -14,6 +14,7 @@ import { format } from 'date-fns';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 import { MARKETPLACE_CONFIG, MarketplaceLogo } from '@/lib/marketplaceConfig';
 import { toDisplayUzs, formatUzs } from '@/lib/currency';
+import { getOrderRevenueUzs } from '@/lib/revenueCalculations';
 
 interface MarketplaceOrdersProps {
   connectedMarketplaces: string[];
@@ -80,16 +81,16 @@ export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceO
     : allOrders.filter(o => o.status === statusFilter);
   const total = orders.length;
 
+  /** Format order total using unified revenue calculation (same as SalesDashboard) */
+  const formatOrderTotal = (order: any) => {
+    const uzs = getOrderRevenueUzs(order, selectedMarketplace);
+    return formatUzs(uzs) + " so'm";
+  };
+
   /** Format a native-currency price to display in UZS */
   const formatPrice = (price?: number) => {
     if (!price && price !== 0) return '—';
     const priceUzs = toDisplayUzs(price, selectedMarketplace);
-    return formatUzs(priceUzs) + " so'm";
-  };
-
-  /** Format a price that is ALREADY in UZS */
-  const formatPriceUzs = (priceUzs?: number) => {
-    if (!priceUzs && priceUzs !== 0) return '—';
     return formatUzs(priceUzs) + " so'm";
   };
 
@@ -175,7 +176,7 @@ export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceO
             {total > 0 && <Badge variant="secondary" className="ml-2">{total} ta</Badge>}
           </CardTitle>
           <CardDescription>
-            {selectedMarketplace === 'yandex' ? 'Yandex Market' : selectedMarketplace} dagi buyurtmalar (so'nggi 30 kun)
+            {selectedMarketplace === 'yandex' ? 'Yandex Market' : selectedMarketplace} dagi barcha buyurtmalar
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -252,7 +253,7 @@ export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceO
                             )}
                             {getStatusBadge(order.status, order.substatus)}
                             <div className="text-right">
-                              <div className="font-bold">{formatPrice(order.total)}</div>
+                              <div className="font-bold">{formatOrderTotal(order)}</div>
                               <div className="text-xs text-muted-foreground">{order.items?.length || 0} mahsulot</div>
                             </div>
                             <ChevronDown className={`h-5 w-5 transition-transform ${expandedOrder === order.id ? 'rotate-180' : ''}`} />
@@ -306,7 +307,7 @@ export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceO
                           </div>
                           <div>
                             <div className="text-muted-foreground">Jami:</div>
-                            <div className="font-bold text-primary">{formatPrice(order.total)}</div>
+                            <div className="font-bold text-primary">{formatOrderTotal(order)}</div>
                           </div>
                         </div>
                       </div>

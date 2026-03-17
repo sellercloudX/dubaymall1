@@ -626,9 +626,10 @@ serve(async (req) => {
       } else if (dataType === "orders") {
         // Fetch orders from Yandex Market
         // Yandex API allows max 30-day intervals, so we split into 30-day chunks
-        // Default to 90 days lookback (matches client-side date range)
+        // Default to 365 days lookback to ensure ALL active/pending orders are captured
+        // (90 days was too short — missed orders that are still being processed)
         const today = new Date();
-        const defaultDays = 90;
+        const defaultDays = 365;
         const chunkDays = 30;
         const startDate = fromDate ? new Date(fromDate) : new Date(today.getTime() - defaultDays * 24 * 60 * 60 * 1000);
         const endDate = toDate ? new Date(toDate) : today;
