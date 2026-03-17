@@ -344,11 +344,58 @@ async function handleCallback(cq: any) {
   const msgId = cq.message.message_id;
   const data = cq.data;
 
-  const admin = await isAdminChat(chatId);
   await answerCallback(cq.id);
 
+  // ===== Partner callbacks (no admin required) =====
+  if (data === 'partner_unlink') {
+    const { data: partnerLink } = await supabase
+      .from('telegram_chat_links')
+      .select('id, user_id')
+      .eq('telegram_chat_id', chatId)
+      .eq('is_admin', false)
+      .maybeSingle();
+
+    if (partnerLink) {
+      await supabase.from('telegram_chat_links').delete().eq('id', partnerLink.id);
+      await supabase.from('profiles').update({ telegram_linked: false }).eq('user_id', partnerLink.user_id);
+      await editMessage(chatId, msgId, '✅ Telegram uzildi. Qayta ulash uchun /start buyrug\'ini bering.');
+    } else {
+      await editMessage(chatId, msgId, '❌ Ulanish topilmadi.');
+    }
+    return;
+  }
+
+  // ===== Admin callbacks =====
+  const admin = await isAdminChat(chatId);
+
   if (!admin) {
-    await send(chatId, '❌ Bu bot faqat adminlar uchun. Avval /link va /admin buyruqlarini bering.');
+    // Check if partner — guide them properly
+    const { data: partnerLink } = await supabase
+      .from('telegram_chat_links')
+      .select('user_id')
+      .eq('telegram_chat_id', chatId)
+      .eq('is_admin', false)
+      .maybeSingle();
+
+    if (partnerLink) {
+      await send(chatId,
+        '📱 Bildirishnomalar sozlamalarini ilovadan boshqaring:\n' +
+        '<b>sellercloudx.com → Bildirishnomalar → Sozlamalar</b>',
+        { reply_markup: { inline_keyboard: [
+          [{ text: '🌐 Ilovaga o\'tish', url: 'https://sellercloudx.com/seller-cloud#notifications' }],
+          [{ text: '❌ Telegram uzish', callback_data: 'partner_unlink' }],
+        ]} }
+      );
+    } else {
+      await send(chatId,
+        '⚠️ Akkaunt bog\'lanmagan.\n\n' +
+        '🔗 Ulash uchun:\n1. <b>sellercloudx.com</b> → Bildirishnomalar → Telegram\n' +
+        '2. Kod oling va <code>/link KOD</code> yuboring',
+        { reply_markup: { inline_keyboard: [[
+          { text: '🌐 sellercloudx.com', url: 'https://sellercloudx.com/seller-cloud#notifications' },
+        ]]} }
+      );
+    }
     return;
   }
 
@@ -641,24 +688,7 @@ async function handleCallback(cq: any) {
     return;
   }
 
-  // Partner unlink
-  if (data === 'partner_unlink') {
-    const { data: partnerLink } = await supabase
-      .from('telegram_chat_links')
-      .select('id, user_id')
-      .eq('telegram_chat_id', chatId)
-      .eq('is_admin', false)
-      .maybeSingle();
-
-    if (partnerLink) {
-      await supabase.from('telegram_chat_links').delete().eq('id', partnerLink.id);
-      await supabase.from('profiles').update({ telegram_linked: false }).eq('user_id', partnerLink.user_id);
-      await editMessage(chatId, msgId, '✅ Telegram uzildi. Qayta ulash uchun /start buyrug\'ini bering.');
-    } else {
-      await editMessage(chatId, msgId, '❌ Ulanish topilmadi.');
-    }
-    return;
-  }
+  // partner_unlink is now handled at the top of handleCallback (before admin check)
 }
 
 // ==================== TEXT MESSAGE HANDLER ====================

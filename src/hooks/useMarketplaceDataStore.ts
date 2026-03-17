@@ -150,15 +150,15 @@ export function useMarketplaceDataStore(connectedMarketplaces: string[]) {
            total: deduped.length,
          };
        },
-        staleTime: 1000 * 60 * 10, // 10 min — balanced freshness
-        gcTime: 1000 * 60 * 60 * 2, // 2h cache (not 24h — prevents stale data across sessions)
-        refetchOnWindowFocus: false,
-        refetchOnMount: 'always' as const, // Always refetch products on mount for fresh data
-        refetchInterval: false, // No auto-refresh — only manual refresh
-        retry: 2,
-        retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10000),
-        networkMode: 'online' as const, // Force network fetch, don't use stale offline cache
-       })),
+         staleTime: 1000 * 60 * 10, // 10 min — balanced freshness
+         gcTime: 1000 * 60 * 60 * 2, // 2h cache
+         refetchOnWindowFocus: false,
+         refetchOnMount: false, // Use cached data if available, don't refetch on every tab switch
+         refetchInterval: false, // No auto-refresh — only manual refresh
+         retry: 2,
+         retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10000),
+         networkMode: 'online' as const,
+        })),
     });
 
     // Fetch orders for each marketplace
@@ -178,15 +178,15 @@ export function useMarketplaceDataStore(connectedMarketplaces: string[]) {
             total: result.data?.length || 0,
           };
         },
-         staleTime: 1000 * 60 * 2, // 2 min — orders must be very fresh
-         gcTime: 1000 * 60 * 60, // 1h cache
-         refetchOnWindowFocus: false,
-         refetchOnMount: 'always' as const, // Always refetch orders on mount for fresh data
-         refetchInterval: 1000 * 60 * 5, // Auto-refresh every 5 min
-         retry: 2,
-        retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10000),
-        networkMode: 'online' as const, // Force network fetch for real-time data
-       })),
+          staleTime: 1000 * 60 * 5, // 5 min — balanced freshness
+          gcTime: 1000 * 60 * 60, // 1h cache
+          refetchOnWindowFocus: false,
+          refetchOnMount: false, // Use cached data if available — prevents reload on tab switch
+          refetchInterval: 1000 * 60 * 10, // Auto-refresh every 10 min (not 5) to reduce load
+          retry: 2,
+         retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10000),
+         networkMode: 'online' as const,
+        })),
     });
    
    // Only return memoizedMarketplaces to stabilize query keys

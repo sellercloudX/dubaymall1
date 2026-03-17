@@ -71,7 +71,7 @@ export function FinancialDashboard({
     let totalWbSppAmount = 0;
     let totalWbForPay = 0;
 
-    const feesByMarketplace: Record<string, { fees: number; feePercent: string; revenue: number; orders: number; sppAmount: number; forPayTotal: number }> = {};
+    const feesByMarketplace: Record<string, { fees: number; feePercent: string; revenue: number; orders: number; sppAmount: number; forPayTotal: number; hasRealTariffs: boolean }> = {};
 
     const marketplaceBreakdown = activeMarketplaces.map(marketplace => {
       const orders = store.getOrders(marketplace);
@@ -89,6 +89,8 @@ export function FinancialDashboard({
       let mpFees = 0;
       let mpSpp = 0;
       let mpForPay = 0;
+      let mpRealTariffCount = 0;
+      let mpItemCount = 0;
 
       activeOrders.forEach(order => {
         (order.items || []).forEach(item => {
@@ -97,6 +99,7 @@ export function FinancialDashboard({
           const itemPrice = toDisplayUzs(item.price || 0, marketplace);
           const itemRevenue = itemPrice * qty;
           totalProductCount += qty;
+          mpItemCount += qty;
           mpRevenue += itemRevenue;
           
           if (cost !== null) {
@@ -109,7 +112,10 @@ export function FinancialDashboard({
           const itemFees = tariff.totalFee * qty;
           mpFees += itemFees;
           totalMarketplaceFees += itemFees;
-          if (tariff.isReal) realTariffCount += qty;
+          if (tariff.isReal) {
+            realTariffCount += qty;
+            mpRealTariffCount += qty;
+          }
 
           // WB SPP: WB discount to buyer (seller bears cost)
           if (marketplace === 'wildberries' && item.spp && item.spp > 0) {
@@ -132,6 +138,7 @@ export function FinancialDashboard({
         orders: activeOrders.length,
         sppAmount: mpSpp,
         forPayTotal: mpForPay,
+        hasRealTariffs: mpItemCount > 0 && mpRealTariffCount > 0,
       };
 
       return {
@@ -156,8 +163,9 @@ export function FinancialDashboard({
     const tariffCoverage = totalProductCount > 0 ? Math.round((realTariffCount / totalProductCount) * 100) : 0;
     const feePercent = totalRevenue > 0 ? ((totalMarketplaceFees / totalRevenue) * 100).toFixed(1) : '0';
     const hasWbSpp = totalWbSppAmount > 0;
+    const hasAnyRealTariffs = realTariffCount > 0;
 
-    return { totalRevenue, totalOrders, totalMarketplaceFees, feePercent, totalTax, totalExpenses, netProfit, profitMargin, marketplaceBreakdown, totalProductCost, costCoverage, tariffCoverage, feesByMarketplace, hasWbSpp, totalWbSppAmount, totalWbForPay };
+    return { totalRevenue, totalOrders, totalMarketplaceFees, feePercent, totalTax, totalExpenses, netProfit, profitMargin, marketplaceBreakdown, totalProductCost, costCoverage, tariffCoverage, feesByMarketplace, hasWbSpp, totalWbSppAmount, totalWbForPay, hasAnyRealTariffs };
   }, [activeMarketplaces, store.dataVersion, isLoading, getCostPrice, tariffUpdatedAt, dateFrom, dateTo, selectedMp]);
 
   const formatPrice = (price: number) => {
@@ -270,7 +278,7 @@ export function FinancialDashboard({
             {selectedMp === 'all' ? (
               activeMarketplaces.map(mp => {
                 const mpData = summary.feesByMarketplace[mp];
-                if (!mpData || mpData.fees === 0) return null;
+                if (!mpData || (mpData.fees === 0 && !mpData.hasRealTariffs)) return null;
                 return (
                   <div key={mp} className="flex items-center justify-between p-3 rounded-lg border gap-2">
                     <div className="flex items-center gap-2 min-w-0">
@@ -280,39 +288,57 @@ export function FinancialDashboard({
                       <div className="min-w-0">
                         <div className="font-medium text-sm truncate flex items-center gap-1.5">
                           {MARKETPLACE_FEE_LABELS[mp] || `${mp} xizmat haqi`}
-                          <Badge variant="outline" className="text-[10px] border-primary/30 text-primary px-1.5 py-0">
-                              <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />Real
+                          {mpData.hasRealTariffs ? (
+                            <Badge variant="outline" className="text-[10px] border-primary/30 text-primary px-1.5 py-0">
+                              <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />API
                             </Badge>
+                          ) : mpData.fees === 0 ? (
+                            <Badge variant="outline" className="text-[10px] border-muted-foreground/30 text-muted-foreground px-1.5 py-0">
+                              Ma'lumot yo'q
+                            </Badge>
+                          ) : null}
                         </div>
                         <div className="text-xs text-muted-foreground truncate">
-                          {MARKETPLACE_FEE_DETAILS[mp] || `~${mpData.feePercent}%`}
+                          {mpData.hasRealTariffs ? `${mpData.feePercent}%` : 'API ma\'lumoti kutilmoqda'}
                         </div>
                       </div>
                     </div>
-                    <div className="text-right shrink-0"><div className="font-bold text-sm whitespace-nowrap">{formatFullPrice(mpData.fees)}</div></div>
+                    <div className="text-right shrink-0"><div className="font-bold text-sm whitespace-nowrap">{mpData.fees > 0 ? formatFullPrice(mpData.fees) : '—'}</div></div>
                   </div>
                 );
               })
             ) : (
-              <div className="flex items-center justify-between p-3 rounded-lg border gap-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center shrink-0">
-                    <span className="text-sm">{selectedMp === 'yandex' ? '🟡' : selectedMp === 'uzum' ? '🟣' : '📦'}</span>
-                  </div>
-                  <div className="min-w-0">
-                    <div className="font-medium text-sm truncate flex items-center gap-1.5">
-                      {feeLabel}
-                      <Badge variant="outline" className="text-[10px] border-primary/30 text-primary px-1.5 py-0">
-                        <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />Real
-                      </Badge>
+              (() => {
+                const mpData = summary.feesByMarketplace[selectedMp];
+                const hasReal = mpData?.hasRealTariffs;
+                return (
+                  <div className="flex items-center justify-between p-3 rounded-lg border gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center shrink-0">
+                        <span className="text-sm">{selectedMp === 'yandex' ? '🟡' : selectedMp === 'uzum' ? '🟣' : '📦'}</span>
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-medium text-sm truncate flex items-center gap-1.5">
+                          {feeLabel}
+                          {hasReal ? (
+                            <Badge variant="outline" className="text-[10px] border-primary/30 text-primary px-1.5 py-0">
+                              <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />API
+                            </Badge>
+                          ) : summary.totalMarketplaceFees === 0 ? (
+                            <Badge variant="outline" className="text-[10px] border-muted-foreground/30 text-muted-foreground px-1.5 py-0">
+                              Ma'lumot yo'q
+                            </Badge>
+                          ) : null}
+                        </div>
+                        <div className="text-xs text-muted-foreground truncate">
+                          {hasReal ? `${summary.feePercent}%` : 'API ma\'lumoti kutilmoqda'}
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-xs text-muted-foreground truncate">
-                      {MARKETPLACE_FEE_DETAILS[selectedMp] || `~${summary.feePercent}%`}
-                    </div>
+                    <div className="text-right shrink-0"><div className="font-bold text-sm whitespace-nowrap">{summary.totalMarketplaceFees > 0 ? formatFullPrice(summary.totalMarketplaceFees) : '—'}</div></div>
                   </div>
-                </div>
-                <div className="text-right shrink-0"><div className="font-bold text-sm whitespace-nowrap">{formatFullPrice(summary.totalMarketplaceFees)}</div></div>
-              </div>
+                );
+              })()
             )}
 
             {/* WB SPP (WB chegirma) — only show when data available */}
