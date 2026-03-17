@@ -220,8 +220,18 @@ export default function AdminDashboard() {
                 </TabsTrigger>
               )}
               {hasPermission('can_manage_users') && (
-                <TabsTrigger value="chat" className="gap-1.5 text-xs">
+               <TabsTrigger value="chat" className="gap-1.5 text-xs">
                   <MessageCircle className="h-3.5 w-3.5" />Chat
+                </TabsTrigger>
+              )}
+              {hasPermission('can_manage_finances') && (
+                <TabsTrigger value="pricing" className="gap-1.5 text-xs">
+                  <DollarSign className="h-3.5 w-3.5" />Narxlar
+                </TabsTrigger>
+              )}
+              {hasPermission('can_manage_content') && (
+                <TabsTrigger value="tutorials" className="gap-1.5 text-xs">
+                  <BookOpen className="h-3.5 w-3.5" />Qo'llanma
                 </TabsTrigger>
               )}
             </TabsList>
@@ -245,6 +255,8 @@ export default function AdminDashboard() {
             <TabsContent value="admins"><AdminsManagement /></TabsContent>
             <TabsContent value="ai-agent"><AIAgentDashboard /></TabsContent>
             <TabsContent value="chat"><AdminSupportChat /></TabsContent>
+            <TabsContent value="pricing"><FeaturePricingManagement /></TabsContent>
+            <TabsContent value="tutorials"><TutorialVideosAdmin /></TabsContent>
           </Tabs>
         </div>
       </Layout>
