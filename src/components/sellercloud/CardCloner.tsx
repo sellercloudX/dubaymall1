@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { checkBillingAccess, handleEdgeFunctionBillingError } from '@/lib/billingCheck';
 import { backgroundTaskManager } from '@/lib/backgroundTaskManager';
+import { useCostPrices } from '@/hooks/useCostPrices';
 import { useBackgroundTasks } from '@/hooks/useBackgroundTasks';
 import { useAuth } from '@/contexts/AuthContext';
 import { toDisplayUzs, formatUzs, isRubMarketplace, getRubToUzs } from '@/lib/currency';
@@ -42,6 +43,7 @@ const MARKETPLACE_INFO = MARKETPLACE_CONFIG;
 export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
   const { user } = useAuth();
   const { tasks } = useBackgroundTasks();
+  const { getCostPrice, setCostPrice } = useCostPrices();
 
   const [sourceMarketplace, setSourceMarketplace] = useState(connectedMarketplaces[0] || '');
   const [targetMarketplaces, setTargetMarketplaces] = useState<string[]>([]);
@@ -514,7 +516,7 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
           if (r.status === 'fulfilled' && r.value.ok) {
             success++;
             backgroundTaskManager.incrementCompleted(taskId);
-            // Save to clone_history
+            // Save to clone_history + copy cost price from source to target
             if (user) {
               supabase.from('clone_history').upsert({
                 user_id: user.id,
@@ -522,6 +524,18 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
                 source_offer_id: r.value.product.offerId,
                 target_marketplace: r.value.target,
               }, { onConflict: 'user_id,source_marketplace,source_offer_id,target_marketplace' }).then(() => {});
+              
+              // Auto-copy cost price from source marketplace to target
+              const sourceCost = getCostPrice(r.value.product.marketplace, r.value.product.offerId);
+              if (sourceCost !== null && sourceCost > 0) {
+                // Convert currency if needed (RUB↔UZS)
+                const sourceIsRub = isRubMarketplace(r.value.product.marketplace);
+                const targetIsRub = isRubMarketplace(r.value.target);
+                let targetCost = sourceCost;
+                if (sourceIsRub && !targetIsRub) targetCost = Math.round(sourceCost * getRubToUzs());
+                else if (!sourceIsRub && targetIsRub) targetCost = Math.round(sourceCost / getRubToUzs());
+                setCostPrice(r.value.target, r.value.product.offerId, targetCost);
+              }
             }
           } else {
             failed++;

@@ -636,6 +636,24 @@ serve(async (req) => {
         let allOrders: YandexOrder[] = [];
         const orderIdsSeen = new Set<number>();
 
+        // ===== CRITICAL: Detect campaign placement model for correct FBO/FBS classification =====
+        // Without this, FBS-only campaigns show all orders as FBO (FBY) incorrectly
+        let orderCampaignPlacementType = '';
+        try {
+          const campResp = await fetchWithRetry(
+            `https://api.partner.market.yandex.ru/campaigns/${campaignId}`,
+            { headers }
+          );
+          if (campResp.ok) {
+            const campData = await campResp.json();
+            orderCampaignPlacementType = campData.campaign?.placementType || '';
+            console.log(`Orders: Campaign ${campaignId} placementType: "${orderCampaignPlacementType}"`);
+          }
+        } catch (e) {
+          console.error('Campaign type detection error:', e);
+        }
+        const isOrdersFbsOnlyCampaign = orderCampaignPlacementType === 'FBS' || orderCampaignPlacementType === 'DBS';
+
         // Split into 30-day chunks
         let chunkEnd = new Date(endDate);
         while (chunkEnd > startDate) {
@@ -701,13 +719,16 @@ serve(async (req) => {
               }
 
               // Determine fulfillment type from delivery info
-              // FBY (FBO) = Yandex fulfillment warehouse, FBS = seller fulfillment
-              const deliveryPartnerType = order.delivery?.deliveryPartnerType || '';
-              // YANDEX_MARKET = marketplace handles fulfillment (FBO/FBY)
-              // SHOP = seller handles fulfillment (FBS)
+              // FBY = Yandex fulfillment warehouse, FBS = seller fulfillment
+              // CRITICAL: If campaign is FBS/DBS, ALL orders are FBS regardless of deliveryPartnerType
               let fulfillmentType: 'FBO' | 'FBS' = 'FBS'; // Default to FBS
-              if (deliveryPartnerType === 'YANDEX_MARKET') {
-                fulfillmentType = 'FBO';
+              if (!isOrdersFbsOnlyCampaign) {
+                const deliveryPartnerType = order.delivery?.deliveryPartnerType || '';
+                // YANDEX_MARKET = marketplace handles fulfillment (FBY)
+                // SHOP = seller handles fulfillment (FBS)
+                if (deliveryPartnerType === 'YANDEX_MARKET') {
+                  fulfillmentType = 'FBO'; // Will display as FBY in UI
+                }
               }
 
               return {
