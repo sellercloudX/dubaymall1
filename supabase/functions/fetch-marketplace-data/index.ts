@@ -727,42 +727,48 @@ serve(async (req) => {
                 }
               }
 
-              // CRITICAL: Map item prices using buyerPrice (actual selling price)
-              // item.price is the DECLARED/catalog price and is often wrong (e.g. 1000 instead of 30358)
-              // If buyerPrice is not available, compute proportionally from order buyerItemsTotal
+              // CRITICAL: Normalize item prices to match order-level actual totals
+              // Yandex may return wrong item.price / buyerPrice for some orders (example: 1000 instead of 30358)
+              // For analytics and profit calculations, item sum MUST match actual order itemsTotal
               const rawItems = order.items || [];
-              const mappedItems = rawItems.map((item: any) => {
-                // Priority: buyerPrice > buyerPriceBeforeDiscount > computed from order total
-                let itemPrice = item.buyerPrice || item.buyerPriceBeforeDiscount || 0;
+              const totalCount = Math.max(1, rawItems.reduce((s: number, i: any) => s + (i.count || 1), 0));
+              const normalizedItemsTotal = itemsTotal || total;
+              
+              const mappedItems = rawItems.map((item: any, index: number) => {
+                const count = item.count || 1;
                 
-                // If buyerPrice is missing, DON'T use item.price (it's catalog price, often wrong)
-                // Instead compute proportionally from order-level buyerItemsTotal
-                if (!itemPrice && itemsTotal > 0 && rawItems.length > 0) {
-                  // Proportional split: if single item, use full total; multi-item: equal split as approximation
-                  const totalCount = rawItems.reduce((s: number, i: any) => s + (i.count || 1), 0);
-                  const thisCount = item.count || 1;
-                  itemPrice = Math.round(itemsTotal * thisCount / totalCount);
+                // Never trust item.price as primary source for Yandex revenue calculations
+                // Always distribute the real order-level amount across items
+                let allocatedTotal = 0;
+                if (normalizedItemsTotal > 0) {
+                  if (index === rawItems.length - 1) {
+                    const alreadyAllocated = rawItems.slice(0, index).reduce((sum: number, prev: any) => {
+                      const prevCount = prev.count || 1;
+                      return sum + Math.round((normalizedItemsTotal * prevCount) / totalCount);
+                    }, 0);
+                    allocatedTotal = Math.max(0, normalizedItemsTotal - alreadyAllocated);
+                  } else {
+                    allocatedTotal = Math.round((normalizedItemsTotal * count) / totalCount);
+                  }
+                } else {
+                  allocatedTotal = (item.buyerPrice || item.buyerPriceBeforeDiscount || item.price || 0) * count;
                 }
-                
-                // Last resort: use item.price only if nothing else available
-                if (!itemPrice) {
-                  itemPrice = item.price || 0;
-                }
+
+                const unitPrice = count > 0 ? Math.round(allocatedTotal / count) : allocatedTotal;
                 
                 return {
                   offerId: item.offerId,
                   offerName: item.offerName,
-                  count: item.count || 1,
-                  price: itemPrice,
-                  priceUZS: itemPrice,
+                  count,
+                  price: unitPrice,
+                  priceUZS: unitPrice,
                   categoryId: item.marketCategoryId,
                 };
               });
 
-              // Log price mismatch for debugging
               const itemSum = mappedItems.reduce((s: number, i: any) => s + (i.price * i.count), 0);
-              if (itemSum > 0 && total > 0 && Math.abs(itemSum - total) > total * 0.1) {
-                console.log(`[PRICE MISMATCH] Order ${order.id}: itemSum=${itemSum}, buyerTotal=${total}, items=${rawItems.length}`);
+              if (normalizedItemsTotal > 0 && Math.abs(itemSum - normalizedItemsTotal) > 1) {
+                console.log(`[YANDEX NORMALIZED] Order ${order.id}: itemSum=${itemSum}, normalizedItemsTotal=${normalizedItemsTotal}, rawItems=${rawItems.length}`);
               }
 
               return {
