@@ -43,6 +43,7 @@ const MARKETPLACE_INFO = MARKETPLACE_CONFIG;
 export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
   const { user } = useAuth();
   const { tasks } = useBackgroundTasks();
+  const { getCostPrice, setCostPrice } = useCostPrices();
 
   const [sourceMarketplace, setSourceMarketplace] = useState(connectedMarketplaces[0] || '');
   const [targetMarketplaces, setTargetMarketplaces] = useState<string[]>([]);
