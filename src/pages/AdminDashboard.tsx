@@ -13,6 +13,7 @@ import { PartnerAnalytics } from '@/components/admin/PartnerAnalytics';
 import { AIAgentDashboard } from '@/components/admin/AIAgentDashboard';
 import { AdminSupportChat } from '@/components/admin/AdminSupportChat';
 import { FeaturePricingManagement } from '@/components/admin/FeaturePricingManagement';
+import { TutorialVideosAdmin } from '@/components/admin/TutorialVideosAdmin';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
@@ -25,7 +26,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Layout } from '@/components/Layout';
 import {
   TrendingUp, BarChart3, UsersRound, Users, UserCheck,
-  Wallet, Zap, Settings, Bot, MessageCircle, Crown,
+  Wallet, Zap, Settings, Bot, MessageCircle, Crown, DollarSign, BookOpen,
 } from 'lucide-react';
 
 const pageTitles: Record<string, string> = {
@@ -41,6 +42,7 @@ const pageTitles: Record<string, string> = {
   expenses: 'Xarajatlar',
   admins: 'Adminlar boshqaruvi',
   'ai-agent': 'AI Agent Dashboard',
+  tutorials: 'Qo\'llanmalar boshqaruvi',
 };
 
 function AdminContent({ activeTab }: { activeTab: string }) {
@@ -57,6 +59,7 @@ function AdminContent({ activeTab }: { activeTab: string }) {
     case 'expenses': return <PlatformExpenses />;
     case 'admins': return <AdminsManagement />;
     case 'ai-agent': return <AIAgentDashboard />;
+    case 'tutorials': return <TutorialVideosAdmin />;
     default: return <StartupMetrics />;
   }
 }
@@ -217,8 +220,18 @@ export default function AdminDashboard() {
                 </TabsTrigger>
               )}
               {hasPermission('can_manage_users') && (
-                <TabsTrigger value="chat" className="gap-1.5 text-xs">
+               <TabsTrigger value="chat" className="gap-1.5 text-xs">
                   <MessageCircle className="h-3.5 w-3.5" />Chat
+                </TabsTrigger>
+              )}
+              {hasPermission('can_manage_finances') && (
+                <TabsTrigger value="pricing" className="gap-1.5 text-xs">
+                  <DollarSign className="h-3.5 w-3.5" />Narxlar
+                </TabsTrigger>
+              )}
+              {hasPermission('can_manage_content') && (
+                <TabsTrigger value="tutorials" className="gap-1.5 text-xs">
+                  <BookOpen className="h-3.5 w-3.5" />Qo'llanma
                 </TabsTrigger>
               )}
             </TabsList>
@@ -242,6 +255,8 @@ export default function AdminDashboard() {
             <TabsContent value="admins"><AdminsManagement /></TabsContent>
             <TabsContent value="ai-agent"><AIAgentDashboard /></TabsContent>
             <TabsContent value="chat"><AdminSupportChat /></TabsContent>
+            <TabsContent value="pricing"><FeaturePricingManagement /></TabsContent>
+            <TabsContent value="tutorials"><TutorialVideosAdmin /></TabsContent>
           </Tabs>
         </div>
       </Layout>

@@ -3,7 +3,7 @@ import {
   TrendingUp, BarChart3, UsersRound, Users, UserCheck,
   Wallet, Zap, Settings, Bot, MessageCircle, Shield,
   LayoutDashboard, ChevronLeft, ChevronRight, Crown,
-  LogOut, Sun, Moon, DollarSign,
+  LogOut, Sun, Moon, DollarSign, BookOpen,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -32,6 +32,7 @@ export const adminMenuItems: AdminMenuItem[] = [
   { id: 'sellercloud', label: 'SellerCloudX', icon: Crown, permission: 'can_manage_finances', group: 'finance' },
   { id: 'pricing', label: 'Narxlar & Balans', icon: DollarSign, permission: 'can_manage_finances', group: 'finance' },
   { id: 'expenses', label: 'Xarajatlar', icon: Zap, permission: 'can_manage_finances', group: 'finance' },
+  { id: 'tutorials', label: 'Qo\'llanmalar', icon: BookOpen, permission: 'can_manage_content', group: 'management' },
   { id: 'admins', label: 'Adminlar', icon: Settings, superAdminOnly: true, group: 'system' },
   { id: 'ai-agent', label: 'AI Agent', icon: Bot, superAdminOnly: true, group: 'system' },
 ];
