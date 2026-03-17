@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { checkBillingAccess, handleEdgeFunctionBillingError } from '@/lib/billingCheck';
 import { backgroundTaskManager } from '@/lib/backgroundTaskManager';
+import { useCostPrices } from '@/hooks/useCostPrices';
 import { useBackgroundTasks } from '@/hooks/useBackgroundTasks';
 import { useAuth } from '@/contexts/AuthContext';
 import { toDisplayUzs, formatUzs, isRubMarketplace, getRubToUzs } from '@/lib/currency';
