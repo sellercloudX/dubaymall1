@@ -286,6 +286,25 @@ Only confident matches. Empty array if none.`;
     const allMatches = [...skuMatches, ...textMatches, ...aiMatches];
     console.log(`Total matches: ${allMatches.length}`);
 
+    // ===== CRITICAL FIX: Don't overwrite existing manually-set cost prices =====
+    // Get existing cost prices for the target marketplace to avoid overwriting
+    const { data: existingTargetCosts } = await supabase
+      .from('marketplace_cost_prices')
+      .select('offer_id, cost_price')
+      .eq('user_id', user.id)
+      .eq('marketplace', targetMarketplace);
+    
+    const existingTargetMap = new Set<string>();
+    (existingTargetCosts || []).forEach((cp: any) => {
+      if (cp.cost_price > 0) existingTargetMap.add(cp.offer_id);
+    });
+    console.log(`Existing target cost prices: ${existingTargetMap.size} (will skip these)`);
+
+    // Filter out matches where target already has a cost price
+    const newMatches = allMatches.filter(m => !existingTargetMap.has(m.targetOfferId));
+    const skippedExisting = allMatches.length - newMatches.length;
+    console.log(`After filtering: ${newMatches.length} new, ${skippedExisting} skipped (already have cost price)`);
+
     // Determine target currency and conversion
     // RUB marketplaces: wildberries, ozon
     // UZS marketplaces: uzum, yandex
@@ -293,7 +312,7 @@ Only confident matches. Empty array if none.`;
     const targetIsRub = rubMarketplaces.includes(targetMarketplace);
     const UZS_TO_RUB = 140; // Approximate cross-rate
 
-    const insertEntries = allMatches.map(m => {
+    const insertEntries = newMatches.map(m => {
       let finalCost = m.costPrice;
       const sourceIsRub = m.currency === 'RUB';
 
