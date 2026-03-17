@@ -270,8 +270,9 @@ export function UnitEconomyDashboard({ connectedMarketplaces, store }: Props) {
                 <th className="text-right py-2.5 px-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort('revenue')}>
                   <span className="inline-flex items-center gap-1">Daromad <ArrowUpDown className="h-3 w-3" /></span>
                 </th>
-                <th className="text-right py-2.5 px-3 font-medium text-muted-foreground hidden md:table-cell">Tannarx</th>
                 <th className="text-right py-2.5 px-3 font-medium text-muted-foreground hidden lg:table-cell">Komissiya</th>
+                <th className="text-right py-2.5 px-3 font-medium text-muted-foreground hidden lg:table-cell">Logistika</th>
+                <th className="text-right py-2.5 px-3 font-medium text-muted-foreground hidden xl:table-cell">Jami hizmat</th>
                 <th className="text-right py-2.5 px-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort('netProfit')}>
                   <span className="inline-flex items-center gap-1">Sof foyda <ArrowUpDown className="h-3 w-3" /></span>
                 </th>
