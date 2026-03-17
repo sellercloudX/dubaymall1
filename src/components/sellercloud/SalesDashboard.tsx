@@ -109,8 +109,10 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
           itemCount += item.count || 1;
 
           // Use real tariffs (same as Finance & ABC Analysis)
+          // For Yandex: use commissionBase (pre-subsidy price) for accurate fee calculation
           const itemPrice = toDisplayUzs(item.price || 0, mp);
-          const tariff = getTariffForProduct(tariffMap, item.offerId, itemPrice, mp);
+          const commBase = (item as any).commissionBase ? toDisplayUzs((item as any).commissionBase, mp) : undefined;
+          const tariff = getTariffForProduct(tariffMap, item.offerId, itemPrice, mp, commBase);
           totalFees += tariff.totalFee * (item.count || 1);
         });
 
