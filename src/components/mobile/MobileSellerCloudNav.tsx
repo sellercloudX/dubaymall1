@@ -3,11 +3,12 @@ import { cn } from '@/lib/utils';
 
 export type MobileTabType = 
   | 'marketplaces' | 'analytics' | 'scanner' | 'products' | 'orders' 
-  | 'abc-analysis' | 'min-price' | 'card-clone' | 'problems' 
-  | 'financials' | 'calculator' | 'inventory' | 'pricing' | 'mxik'
+  | 'abc-analysis' | 'card-clone' | 'problems' 
+  | 'financials' | 'pricing' | 'mxik'
   | 'reports' | 'notifications' | 'subscription' | 'cost-prices'
-  | 'reviews' | 'seller-analytics' | 'ads' | 'wb-keywords'
-  | 'competitor' | 'sales' | 'support' | 'stores' | 'profile';
+  | 'reviews' | 'seller-analytics' | 'ads' | 'seo-keywords'
+  | 'competitor' | 'sales' | 'support' | 'stores' | 'profile'
+  | 'stock-forecast' | 'tutorials';
 
 interface MobileSellerCloudNavProps {
   activeTab: MobileTabType;

@@ -27,28 +27,27 @@ const MobileOrders = lazy(() => import('@/components/mobile/MobileOrders').then(
 const AIScannerPro = lazy(() => import('@/components/seller/AIScannerPro').then(m => ({ default: m.AIScannerPro })));
 const MarketplaceOAuth = lazy(() => import('@/components/sellercloud/MarketplaceOAuth').then(m => ({ default: m.MarketplaceOAuth })));
 const ABCAnalysis = lazy(() => import('@/components/sellercloud/ABCAnalysis').then(m => ({ default: m.ABCAnalysis })));
-const MinPriceProtection = lazy(() => import('@/components/sellercloud/MinPriceProtection').then(m => ({ default: m.MinPriceProtection })));
 const CardCloner = lazy(() => import('@/components/sellercloud/CardCloner').then(m => ({ default: m.CardCloner })));
 const ProblematicProducts = lazy(() => import('@/components/sellercloud/ProblematicProducts').then(m => ({ default: m.ProblematicProducts })));
 const FinancialDashboard = lazy(() => import('@/components/sellercloud/FinancialDashboard').then(m => ({ default: m.FinancialDashboard })));
-const ProfitCalculator = lazy(() => import('@/components/sellercloud/ProfitCalculator').then(m => ({ default: m.ProfitCalculator })));
-const InventorySync = lazy(() => import('@/components/sellercloud/InventorySync').then(m => ({ default: m.InventorySync })));
-const PriceManager = lazy(() => import('@/components/sellercloud/PriceManager').then(m => ({ default: m.PriceManager })));
-
 const ReportsExport = lazy(() => import('@/components/sellercloud/ReportsExport').then(m => ({ default: m.ReportsExport })));
 const NotificationCenter = lazy(() => import('@/components/sellercloud/NotificationCenter').then(m => ({ default: m.NotificationCenter })));
 const SubscriptionBilling = lazy(() => import('@/components/sellercloud/SubscriptionBilling').then(m => ({ default: m.SubscriptionBilling })));
 const CostPriceManager = lazy(() => import('@/components/sellercloud/CostPriceManager').then(m => ({ default: m.CostPriceManager })));
 const MxikImport = lazy(() => import('@/components/sellercloud/MxikImport').then(m => ({ default: m.MxikImport })));
 const MarketplaceReviews = lazy(() => import('@/components/sellercloud/MarketplaceReviews').then(m => ({ default: m.MarketplaceReviews })));
-const WBSellerAnalytics = lazy(() => import('@/components/sellercloud/WBSellerAnalytics').then(m => ({ default: m.WBSellerAnalytics })));
-const WBAdsCampaigns = lazy(() => import('@/components/sellercloud/WBAdsCampaigns').then(m => ({ default: m.WBAdsCampaigns })));
-const MobileTrendHunter = lazy(() => import('@/components/mobile/MobileTrendHunter').then(m => ({ default: m.MobileTrendHunter })));
+const MarketplaceSellerAnalytics = lazy(() => import('@/components/sellercloud/MarketplaceSellerAnalytics').then(m => ({ default: m.MarketplaceSellerAnalytics })));
+const MarketplaceAdsCampaigns = lazy(() => import('@/components/sellercloud/MarketplaceAdsCampaigns').then(m => ({ default: m.MarketplaceAdsCampaigns })));
 const CompetitorPriceMonitor = lazy(() => import('@/components/sellercloud/CompetitorPriceMonitor').then(m => ({ default: m.CompetitorPriceMonitor })));
 const SalesDashboard = lazy(() => import('@/components/sellercloud/SalesDashboard').then(m => ({ default: m.SalesDashboard })));
 const SupportChat = lazy(() => import('@/components/sellercloud/SupportChat').then(m => ({ default: m.SupportChat })));
 const MultiStoreManager = lazy(() => import('@/components/sellercloud/MultiStoreManager').then(m => ({ default: m.MultiStoreManager })));
 const ProfilePasswordSetup = lazy(() => import('@/components/sellercloud/ProfilePasswordSetup').then(m => ({ default: m.ProfilePasswordSetup })));
+const SEOMonitor = lazy(() => import('@/components/sellercloud/SEOMonitor').then(m => ({ default: m.SEOMonitor })));
+const TutorialVideos = lazy(() => import('@/components/sellercloud/TutorialVideos').then(m => ({ default: m.TutorialVideos })));
+// Consolidated hub components
+const InventoryControlHub = lazy(() => import('@/components/sellercloud/InventoryControlHub').then(m => ({ default: m.InventoryControlHub })));
+const PriceControlHub = lazy(() => import('@/components/sellercloud/PriceControlHub').then(m => ({ default: m.PriceControlHub })));
 
 // Lightweight tab loading skeleton
 function TabLoader() {
@@ -210,20 +209,16 @@ export default function SellerCloudMobile() {
         return <div className="p-4"><ABCAnalysis connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'cost-prices':
         return <div className="p-4"><CostPriceManager connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
-      case 'min-price':
-        return <div className="p-4"><MinPriceProtection connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'card-clone':
         return <div className="p-4"><CardCloner connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'problems':
         return <div className="p-4"><ProblematicProducts connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'financials':
         return <div className="p-4"><FinancialDashboard connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
-      case 'calculator':
-        return <div className="p-4"><ProfitCalculator /></div>;
-      case 'inventory':
-        return <div className="p-4"><InventorySync connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
+      case 'stock-forecast':
+        return <div className="p-4"><InventoryControlHub connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'pricing':
-        return <div className="p-4"><PriceManager connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
+        return <div className="p-4"><PriceControlHub connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'reports':
         return <div className="p-4"><ReportsExport connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'notifications':
@@ -235,11 +230,11 @@ export default function SellerCloudMobile() {
       case 'reviews':
         return <div className="p-4"><MarketplaceReviews connectedMarketplaces={connectedMarketplaces} /></div>;
       case 'seller-analytics':
-        return <div className="p-4"><WBSellerAnalytics connectedMarketplaces={connectedMarketplaces} /></div>;
-      case 'wb-keywords':
-        return <MobileTrendHunter />;
+        return <div className="p-4"><MarketplaceSellerAnalytics connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
+      case 'seo-keywords':
+        return <div className="p-4"><SEOMonitor connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'ads':
-        return <div className="p-4"><WBAdsCampaigns connectedMarketplaces={connectedMarketplaces} /></div>;
+        return <div className="p-4"><MarketplaceAdsCampaigns connectedMarketplaces={connectedMarketplaces} /></div>;
       case 'competitor':
         return <div className="p-4"><CompetitorPriceMonitor connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'sales':
@@ -250,6 +245,8 @@ export default function SellerCloudMobile() {
         return <div className="p-4"><MultiStoreManager connectedMarketplaces={connectedMarketplaces} onStoreChange={() => refetch()} /></div>;
       case 'profile':
         return <div className="p-4"><ProfilePasswordSetup /></div>;
+      case 'tutorials':
+        return <div className="p-4"><TutorialVideos /></div>;
       default:
         return null;
     }
@@ -266,13 +263,14 @@ export default function SellerCloudMobile() {
           >
             {(() => {
               const labels: Record<string, string> = {
-                'financials': '💰 Moliya', 'calculator': '🧮 Kalkulyator', 'cost-prices': '💲 Tannarx',
-                'pricing': '🏷 Narxlar', 'abc-analysis': '📊 ABC-analiz', 'seller-analytics': '📈 WB Analitika',
-                'wb-keywords': '🔍 WB Qidiruv', 'reviews': '💬 Sharhlar', 'ads': '📢 Reklama',
-                'inventory': '📦 Qoldiq', 'min-price': '🛡 Min narx', 'card-clone': '📋 Klonlash',
+                'financials': '💰 Moliya', 'cost-prices': '💲 Tannarx',
+                'pricing': '🏷 Narxlar', 'abc-analysis': '📊 ABC-analiz', 'seller-analytics': '📈 Sotuvchi',
+                'seo-keywords': '🔍 SEO', 'reviews': '💬 Sharhlar', 'ads': '📢 Reklama',
+                'stock-forecast': '📦 Zaxira', 'card-clone': '📋 Klonlash',
                 'problems': '⚠️ Muammolar', 'mxik': '📄 MXIK baza',
                 'reports': '📑 Hisobotlar', 'notifications': '🔔 Bildirishnoma', 'subscription': '💳 Obuna',
                 'competitor': '🎯 Raqobat', 'sales': '📊 Sotuvlar', 'support': '💬 Yordam', 'stores': '🏪 Do\'konlar',
+                'tutorials': '📖 Qo\'llanma', 'profile': '👤 Profil',
               };
               return labels[activeTab] || activeTab;
             })()}
