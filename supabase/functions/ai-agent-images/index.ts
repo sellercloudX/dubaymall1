@@ -1295,21 +1295,25 @@ serve(async (req) => {
       const cleanImageUrl = await uploadToStorage(adminSupabase, workingImageUrl, partnerId, offerId || 'product');
       pipelineResult.imageUrl = cleanImageUrl;
 
-      // ── STEP 4: Generate 2 Professional Images ──
-      // Image 1: Infographic Hero (modelli + infografika) via SellZen
-      // Image 2: Clean studio shot (modelsiz + studiya) via SellZen
-      // Fallback: OpenAI/Gemini if SellZen fails
+      // ── STEP 4: Generate 2 Professional Images via SellZen ONLY ──
+      // SellZen is the ONLY image provider — no fallback to OpenAI/Gemini
+      // SellZen generates the highest quality marketplace-ready images
       
-      console.log("🎨 STEP 4: Generating 2 images (SellZen primary, OpenAI/Gemini fallback)...");
+      console.log("🎨 STEP 4: Generating 2 images via SellZen AI (ONLY provider)...");
 
       let heroUrl: string | null = null;
       let studioUrl: string | null = null;
       const supplementaryUrls: string[] = [];
 
-      // ═══ Try SellZen first (2 parallel requests) ═══
       const SELLZEN_API_KEY = Deno.env.get("SELLZEN_API_KEY");
-      if (SELLZEN_API_KEY && workingImageUrl) {
-        // Convert URL to base64 for SellZen
+      if (!SELLZEN_API_KEY) {
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: 'SELLZEN_API_KEY sozlanmagan. Rasm yaratish uchun SellZen API kalitini kiriting.' 
+        }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      if (workingImageUrl) {
         const imgBase64 = await imageUrlToBase64(workingImageUrl);
         if (imgBase64) {
           const [sellzenHero, sellzenStudio] = await generateSellZenDualImages(
@@ -1319,44 +1323,27 @@ serve(async (req) => {
           if (sellzenHero) {
             heroUrl = await uploadToStorage(adminSupabase, sellzenHero, partnerId, `${offerId || 'card'}-hero`);
             pipelineResult.steps.push({ step: "4a", name: "Hero (SellZen modelli)", status: "✅" });
+          } else {
+            pipelineResult.steps.push({ step: "4a", name: "Hero (SellZen modelli)", status: "❌ Failed" });
           }
           if (sellzenStudio) {
             const stUrl = await uploadToStorage(adminSupabase, sellzenStudio, partnerId, `${offerId || 'card'}-studio`);
             if (stUrl) { studioUrl = stUrl; supplementaryUrls.push(stUrl); }
             pipelineResult.steps.push({ step: "4b", name: "Studio (SellZen modelsiz)", status: "✅" });
+          } else {
+            pipelineResult.steps.push({ step: "4b", name: "Studio (SellZen modelsiz)", status: "❌ Failed" });
           }
-        }
-      }
-
-      // ═══ Fallback to OpenAI/Gemini for missing images ═══
-      if (!heroUrl) {
-        console.log("🔄 Hero fallback: OpenAI/Gemini...");
-        const heroImage = await generateHeroImage(workingImageUrl, detection, categoryStyle, OPENAI_API_KEY);
-        if (heroImage) {
-          heroUrl = await uploadToStorage(adminSupabase, heroImage, partnerId, `${offerId || 'card'}-hero`);
-          pipelineResult.steps.push({ step: "4a", name: "Hero (Fallback)", status: "✅" });
         } else {
-          pipelineResult.steps.push({ step: "4a", name: "Hero", status: "❌ Failed" });
-        }
-      }
-
-      if (supplementaryUrls.length === 0) {
-        console.log("🔄 Lifestyle fallback: OpenAI/Gemini...");
-        const lifestyleAngle = LIFESTYLE_ANGLES[2];
-        const lifestyleImage = await generateLifestyleAngle(workingImageUrl, detection, lifestyleAngle, OPENAI_API_KEY);
-        if (lifestyleImage) {
-          const lifestyleUrl = await uploadToStorage(adminSupabase, lifestyleImage, partnerId, `${offerId || 'card'}-lifestyle`);
-          if (lifestyleUrl) { supplementaryUrls.push(lifestyleUrl); }
-          pipelineResult.steps.push({ step: "4b", name: "Lifestyle (Fallback)", status: "✅" });
-        } else {
-          pipelineResult.steps.push({ step: "4b", name: "Lifestyle", status: "❌ Failed" });
+          console.error("❌ Rasmni base64 formatga o'girib bo'lmadi");
+          pipelineResult.steps.push({ step: "4a", name: "Hero", status: "❌ Base64 xato" });
+          pipelineResult.steps.push({ step: "4b", name: "Studio", status: "❌ Base64 xato" });
         }
       }
 
       pipelineResult.cardUrl = heroUrl;
       pipelineResult.supplementaryImages = supplementaryUrls;
       const totalGenerated = (heroUrl ? 1 : 0) + supplementaryUrls.length;
-      console.log(`✅ Generated ${totalGenerated} total images (target: 2)`);
+      console.log(`✅ SellZen generated ${totalGenerated}/2 images`);
 
       // ── Skip Step 5 (Quality Control) to save timeout budget for 4 images ──
       pipelineResult.steps.push({ step: 5, name: "Quality Control", status: "⏭ Skipped (4-image mode)" });
