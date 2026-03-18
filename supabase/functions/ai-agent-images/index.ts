@@ -1242,10 +1242,8 @@ serve(async (req) => {
       console.log(`💰 Billing skipped (called from scanner pipeline)`);
     }
 
-    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-    if (!OPENAI_API_KEY) {
-      return new Response(JSON.stringify({ error: 'OPENAI_API_KEY sozlanmagan' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") || '';
+    // OPENAI_API_KEY is no longer required — SellZen is the primary and only image provider
 
     console.log(`\n${'='.repeat(60)}`);
     console.log(`🚀 SELLERCLOUDX AI IMAGE INTELLIGENCE SYSTEM`);
