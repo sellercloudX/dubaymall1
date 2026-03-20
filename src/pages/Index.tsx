@@ -432,8 +432,8 @@ export default function Index() {
 
       {/* ━━━ Navigation ━━━ */}
       <nav className="fixed top-0 left-0 right-0 z-50 border-b bg-background/80 backdrop-blur-xl">
-        <div className="container mx-auto px-3 sm:px-4 flex h-14 sm:h-16 items-center justify-between">
-          <Link to="/" className="flex items-center gap-1.5 shrink-0">
+        <div className="container mx-auto px-2 sm:px-4 flex h-12 sm:h-16 items-center justify-between gap-1">
+          <Link to="/" className="flex items-center gap-1 shrink-0">
             <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/20">
               <Crown className="h-3.5 w-3.5 sm:h-4.5 sm:w-4.5 text-white" />
             </div>
@@ -455,13 +455,13 @@ export default function Index() {
             </a>
           </div>
 
-          <div className="flex items-center gap-1 sm:gap-2">
+          <div className="flex items-center gap-0.5 sm:gap-2 shrink-0">
             <ThemeToggle />
             <LanguageSwitcher />
-            <Button variant="ghost" size="sm" className="font-medium text-xs sm:text-sm h-8 px-2 sm:px-3" asChild>
+            <Button variant="ghost" size="sm" className="font-medium text-[11px] sm:text-sm h-7 sm:h-8 px-1.5 sm:px-3" asChild>
               <Link to="/auth">{txt.loginCta}</Link>
             </Button>
-            <Button size="sm" asChild className="shadow-lg shadow-primary/20 text-xs sm:text-sm h-8 px-2 sm:px-4 whitespace-nowrap">
+            <Button size="sm" asChild className="shadow-lg shadow-primary/20 text-[11px] sm:text-sm h-7 sm:h-8 px-2 sm:px-4 whitespace-nowrap">
               <Link to="/auth?mode=register">
                 {language === 'uz' ? "Ro'yxatdan o'tish" : language === 'ru' ? 'Регистрация' : 'Sign Up'}
               </Link>
