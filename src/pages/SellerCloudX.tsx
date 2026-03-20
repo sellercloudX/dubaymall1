@@ -21,7 +21,7 @@ import {
   Scan, AlertTriangle, RefreshCw, MessageCircle, CreditCard
 } from 'lucide-react';
 import { MarketplaceLogo, MARKETPLACE_CONFIG } from '@/lib/marketplaceConfig';
-import { OnboardingWizard } from '@/components/sellercloud/OnboardingWizard';
+import { PlanSelector } from '@/components/sellercloud/PlanSelector';
 import { SellerCloudSidebar, sellerMenuItems } from '@/components/sellercloud/SellerCloudSidebar';
 
 
