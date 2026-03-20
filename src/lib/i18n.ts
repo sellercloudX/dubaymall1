@@ -527,7 +527,7 @@ export function getStoredLanguage(): Language {
       return stored as Language;
     }
   }
-  return 'uz';
+  return 'ru';
 }
 
 export function setStoredLanguage(language: Language) {
