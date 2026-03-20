@@ -43,7 +43,7 @@ export const sellerMenuItems: SellerMenuItem[] = [
   { id: 'reviews', label: 'Sharhlar', icon: MessageCircle, group: 'tools' },
   { id: 'ads', label: 'Reklama', icon: Megaphone, group: 'tools' },
   { id: 'clone', label: 'Klonlash', icon: Copy, group: 'tools' },
-  { id: 'ai-services', label: 'AI Xizmatlari', icon: Sparkles, group: 'tools' },
+  { id: 'sellzen-studio', label: 'SellZen Studio', icon: Sparkles, group: 'tools' },
   { id: 'problems', label: 'Muammolar', icon: AlertOctagon, group: 'tools' },
   { id: 'mxik', label: 'MXIK baza', icon: FileSpreadsheet, group: 'tools' },
   { id: 'team', label: 'Jamoa', icon: Globe, group: 'settings' },
