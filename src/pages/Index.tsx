@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { DynamicPricing } from '@/components/landing/DynamicPricing';
 import { SEOHead, StructuredData } from '@/components/SEOHead';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
