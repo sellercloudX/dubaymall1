@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { MarketplaceLogo } from '@/lib/marketplaceConfig';
 import { toDisplayUzs } from '@/lib/currency';
+import { isExcludedOrder } from '@/lib/revenueCalculations';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -80,8 +81,7 @@ export function ABCAnalysis({ connectedMarketplaces, store }: ABCAnalysisProps) 
 
       const salesMap = new Map<string, { qty: number; revenue: number; name?: string; photo?: string }>();
       const activeOrders = orders.filter(o => {
-        const st = (o.status || '').toUpperCase();
-        if (['CANCELLED', 'CANCELED', 'RETURNED', 'REJECTED'].includes(st)) return false;
+        if (isExcludedOrder(o)) return false;
         if (dateFrom || dateTo) {
           const orderDate = new Date(o.createdAt);
           if (dateFrom && orderDate < dateFrom) return false;
