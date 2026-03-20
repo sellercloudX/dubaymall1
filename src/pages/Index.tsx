@@ -456,8 +456,23 @@ export default function Index() {
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       <SEOHead 
         title="SellerCloudX — AI Marketplace Automation Platform"
-        description="Manage Uzum, Yandex Market, Wildberries, Ozon from one dashboard. AI card generation, PnL analytics, price optimization. Replace 4-5 employees."
+        description="Uzum, Yandex Market, Wildberries, Ozon — barchasini yagona AI dashboarddan boshqaring. 4-5 hodim o'rnini bosadi."
+        url="https://sellercloudx.lovable.app"
       />
+      <StructuredData type="Organization" data={{
+        name: 'SellerCloudX',
+        url: 'https://sellercloudx.lovable.app',
+        description: 'AI-Powered Marketplace Automation Platform for Uzbekistan sellers',
+        sameAs: ['https://t.me/sellercloudx'],
+      }} />
+      <StructuredData type="WebSite" data={{
+        name: 'SellerCloudX',
+        url: 'https://sellercloudx.lovable.app',
+        potentialAction: {
+          '@type': 'SearchAction',
+          target: 'https://sellercloudx.lovable.app/auth?mode=register',
+        },
+      }} />
 
       {/* ━━━ Navigation ━━━ */}
       <nav className="fixed top-0 left-0 right-0 z-50 border-b bg-background/80 backdrop-blur-xl">
