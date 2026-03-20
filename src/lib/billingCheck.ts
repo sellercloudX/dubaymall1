@@ -2,8 +2,19 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 /**
+ * Navigate to the subscription/balance tab.
+ * Works by changing URL hash which SellerCloudX listens to.
+ */
+function navigateToBalanceTab() {
+  // Use hash navigation that SellerCloudX/Mobile both listen to
+  if (window.location.pathname.includes('seller-cloud') || window.location.hash) {
+    window.location.hash = 'subscription';
+  }
+}
+
+/**
  * Pre-flight billing check — call BEFORE invoking any billable edge function.
- * Returns true if access is allowed, false if blocked (shows toast automatically).
+ * Returns true if access is allowed, false if blocked (shows toast + navigates automatically).
  */
 export async function checkBillingAccess(featureKey: string, userId?: string): Promise<boolean> {
   try {
@@ -20,22 +31,57 @@ export async function checkBillingAccess(featureKey: string, userId?: string): P
 
     if (error) {
       console.warn('Billing check error:', error);
-      // Allow through on RPC error (don't block user if billing system has issues)
       return true;
     }
 
     const ac = data as any;
     if (ac && !ac.allowed) {
       if (ac.error === 'insufficient_balance') {
-        toast.error(`Balans yetarli emas (${ac.balance?.toLocaleString() || 0} so'm). Balansni kamida 300,000 so'm to'ldiring.`);
+        toast.error(
+          `Balans yetarli emas (${ac.balance?.toLocaleString() || 0} so'm). Kerakli summa: ${ac.price?.toLocaleString() || 0} so'm`,
+          {
+            duration: 6000,
+            action: {
+              label: 'Balansni to\'ldirish',
+              onClick: navigateToBalanceTab,
+            },
+          }
+        );
       } else if (ac.error === 'activation_required') {
-        toast.error("Oylik aktivatsiya (99,000 so'm) talab etiladi. Obuna bo'limiga o'ting.");
+        toast.error(
+          'Obuna muddati tugagan. Davom etish uchun obunani yangilang.',
+          {
+            duration: 6000,
+            action: {
+              label: 'Obunaga o\'tish',
+              onClick: navigateToBalanceTab,
+            },
+          }
+        );
       } else if (ac.error === 'feature_disabled') {
         toast.error(ac.message || "Bu funksiya hozircha o'chirilgan");
       } else if (ac.error === 'premium_only') {
-        toast.error(ac.message || 'Bu funksiya faqat Premium/Elegant foydalanuvchilar uchun');
+        toast.error(
+          ac.message || 'Bu funksiya faqat Business va undan yuqori tariflar uchun',
+          {
+            duration: 6000,
+            action: {
+              label: 'Tarifni yangilash',
+              onClick: navigateToBalanceTab,
+            },
+          }
+        );
       } else if (ac.error === 'limit_reached') {
-        toast.error(ac.message || 'Oylik limit tugadi');
+        toast.error(
+          ac.message || 'Oylik limit tugadi. Keyingi oyni kuting yoki tarifni oshiring.',
+          {
+            duration: 6000,
+            action: {
+              label: 'Tarifni ko\'rish',
+              onClick: navigateToBalanceTab,
+            },
+          }
+        );
       } else {
         toast.error(ac.message || 'Ruxsat berilmadi');
       }
@@ -45,7 +91,6 @@ export async function checkBillingAccess(featureKey: string, userId?: string): P
     return true;
   } catch (err) {
     console.warn('Billing pre-check failed:', err);
-    // Allow through on unexpected error
     return true;
   }
 }
