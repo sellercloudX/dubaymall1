@@ -103,7 +103,16 @@ export function handleEdgeFunctionBillingError(error: any, data: any): boolean {
   const errorBody = data || error?.context || {};
   const billingErr = errorBody?.billingError;
   if (billingErr === 'insufficient_balance' || billingErr === 'activation_required' || billingErr === 'feature_disabled' || billingErr === 'premium_only') {
-    toast.error(errorBody.error || 'Balans yetarli emas. Balansni to\'ldiring.');
+    toast.error(
+      errorBody.error || 'Balans yetarli emas. Balansni to\'ldiring.',
+      {
+        duration: 6000,
+        action: {
+          label: 'Balansni to\'ldirish',
+          onClick: navigateToBalanceTab,
+        },
+      }
+    );
     return true;
   }
   return false;
