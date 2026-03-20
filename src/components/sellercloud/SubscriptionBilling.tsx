@@ -9,58 +9,34 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSellerCloudSubscription } from '@/hooks/useSellerCloudSubscription';
 import { useAuth } from '@/contexts/AuthContext';
-import { useFeaturePricing, useUserBalance, MIN_TOPUP_UZS, ACTIVATION_FEE_UZS, TRIAL_DAYS } from '@/hooks/useFeaturePricing';
+import { useFeaturePricing, useUserBalance, MIN_TOPUP_UZS, ACTIVATION_FEE_UZS } from '@/hooks/useFeaturePricing';
+import { useSubscriptionPlans, type SubscriptionPlan } from '@/hooks/useSubscriptionPlans';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { 
-  CreditCard, AlertTriangle, CheckCircle2, Clock, Crown, 
-  Calendar, DollarSign, TrendingUp, XCircle, FileText, 
-  ArrowRight, Landmark, Wallet, History, Zap, ArrowUpDown,
-  Sparkles, Settings2, Key, Rocket, Loader2,
+import {
+  CreditCard, AlertTriangle, CheckCircle2, Clock, Crown,
+  Calendar, DollarSign, TrendingUp, XCircle, FileText,
+  ArrowRight, Wallet, History, Zap, ArrowUpDown,
+  Sparkles, Settings2, Key, Rocket, Loader2, Store, Image, Copy, Percent,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { PromoCodeInput, type PromoValidation } from './PromoCodeInput';
 import { notifyAffiliatePayment } from '@/lib/affiliateWebhook';
+import { cn } from '@/lib/utils';
 
 interface SubscriptionBillingProps {
   totalSalesVolume?: number;
 }
 
 const categoryIcons: Record<string, React.ElementType> = {
-  card_creation: Sparkles,
-  cloning: ArrowUpDown,
-  ai_tools: Sparkles,
-  pricing: DollarSign,
-  sync: ArrowUpDown,
-  analytics: Zap,
-  management: Settings2,
-  activation: Key,
+  card_creation: Sparkles, cloning: ArrowUpDown, ai_tools: Sparkles, pricing: DollarSign,
+  sync: ArrowUpDown, analytics: Zap, management: Settings2, activation: Key,
 };
 
 const categoryNames: Record<string, string> = {
-  card_creation: 'Kartochka yaratish',
-  cloning: 'Klonlash',
-  ai_tools: 'AI Asboblar',
-  pricing: 'Narx boshqarish',
-  sync: 'Sinxronizatsiya',
-  analytics: 'Analitika',
-  management: 'Boshqaruv',
-  activation: 'Aktivatsiya',
-};
-
-const PLAN_PRICES = {
-  premium: {
-    amount_uzs: 1_270_000, // ~$99/month
-    label: 'Premium',
-    duration: '1 oy',
-    months: 1,
-  },
-  elegant: {
-    amount_uzs: 6_400_000,
-    label: 'Elegant',
-    duration: '1 oy',
-    months: 1,
-  },
+  card_creation: 'Kartochka yaratish', cloning: 'Klonlash', ai_tools: 'AI Asboblar',
+  pricing: 'Narx boshqarish', sync: 'Sinxronizatsiya', analytics: 'Analitika',
+  management: 'Boshqaruv', activation: 'Aktivatsiya',
 };
 
 const TOPUP_OPTIONS = [300_000, 500_000, 1_000_000, 2_000_000, 5_000_000];
@@ -71,28 +47,16 @@ function BalanceTopup({ userId }: { userId?: string }) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [useCustom, setUseCustom] = useState(false);
 
-  const formatP = (p: number) => {
-    if (p >= 1_000_000) return (p / 1_000_000).toFixed(1) + ' mln';
-    return (p / 1_000).toFixed(0) + ' ming';
-  };
-
+  const formatP = (p: number) => p >= 1_000_000 ? (p / 1_000_000).toFixed(1) + ' mln' : (p / 1_000).toFixed(0) + ' ming';
   const amount = useCustom ? Number(customAmount) : selectedAmount;
 
   const handleTopup = async () => {
     if (!userId) { toast.error('Avval tizimga kiring'); return; }
-    if (!amount || amount < MIN_TOPUP_UZS) {
-      toast.error(`Minimal summa: ${MIN_TOPUP_UZS.toLocaleString()} so'm`);
-      return;
-    }
+    if (!amount || amount < MIN_TOPUP_UZS) { toast.error(`Minimal summa: ${MIN_TOPUP_UZS.toLocaleString()} so'm`); return; }
     setIsProcessing(true);
     try {
       const { data, error } = await supabase.functions.invoke('click-payment', {
-        body: {
-          action: 'topup',
-          user_id: userId,
-          amount_uzs: amount,
-          return_url: window.location.origin + '/seller-cloud?tab=balance',
-        },
+        body: { action: 'topup', user_id: userId, amount_uzs: amount, return_url: window.location.origin + '/seller-cloud?tab=balance' },
       });
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error || 'Xatolik');
@@ -100,69 +64,84 @@ function BalanceTopup({ userId }: { userId?: string }) {
       window.open(data.payment_url, '_blank');
     } catch (err: any) {
       toast.error("To'lov xatoligi: " + (err.message || "Qaytadan urinib ko'ring"));
-    } finally {
-      setIsProcessing(false);
-    }
+    } finally { setIsProcessing(false); }
   };
 
   return (
     <div className="mt-6 p-4 rounded-xl border border-border bg-muted/30 space-y-4">
-      <h4 className="text-sm font-semibold flex items-center gap-2">
-        <DollarSign className="h-4 w-4" /> Balansni to'ldirish
-      </h4>
-      <p className="text-xs text-muted-foreground">
-        Minimal: <strong>{MIN_TOPUP_UZS.toLocaleString()} so'm</strong>
-      </p>
-
-      {/* Preset amounts */}
+      <h4 className="text-sm font-semibold flex items-center gap-2"><DollarSign className="h-4 w-4" /> Balansni to'ldirish</h4>
+      <p className="text-xs text-muted-foreground">Minimal: <strong>{MIN_TOPUP_UZS.toLocaleString()} so'm</strong></p>
       <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
         {TOPUP_OPTIONS.map((opt) => (
-          <button
-            key={opt}
-            onClick={() => { setSelectedAmount(opt); setUseCustom(false); }}
-            className={`px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
-              !useCustom && selectedAmount === opt
-                ? 'border-primary bg-primary/10 text-primary'
-                : 'border-border hover:border-primary/50'
-            }`}
-          >
+          <button key={opt} onClick={() => { setSelectedAmount(opt); setUseCustom(false); }}
+            className={`px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${!useCustom && selectedAmount === opt ? 'border-primary bg-primary/10 text-primary' : 'border-border hover:border-primary/50'}`}>
             {formatP(opt)}
           </button>
         ))}
       </div>
-
-      {/* Custom amount */}
       <div className="flex items-center gap-2">
-        <button
-          onClick={() => setUseCustom(!useCustom)}
-          className={`text-xs underline ${useCustom ? 'text-primary' : 'text-muted-foreground'}`}
-        >
-          Boshqa summa
-        </button>
-        {useCustom && (
-          <input
-            type="number"
-            value={customAmount}
-            onChange={(e) => setCustomAmount(e.target.value)}
-            placeholder="Summa kiriting"
-            min={MIN_TOPUP_UZS}
-            className="flex-1 h-9 rounded-lg border border-border bg-background px-3 text-sm"
-          />
-        )}
+        <button onClick={() => setUseCustom(!useCustom)} className={`text-xs underline ${useCustom ? 'text-primary' : 'text-muted-foreground'}`}>Boshqa summa</button>
+        {useCustom && <input type="number" value={customAmount} onChange={(e) => setCustomAmount(e.target.value)} placeholder="Summa kiriting" min={MIN_TOPUP_UZS} className="flex-1 h-9 rounded-lg border border-border bg-background px-3 text-sm" />}
+      </div>
+      <Button className="w-full" size="lg" onClick={handleTopup} disabled={isProcessing || !amount || amount < MIN_TOPUP_UZS}>
+        {isProcessing ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Yuklanmoqda...</> : <><CreditCard className="h-4 w-4 mr-2" /> Click orqali {amount >= MIN_TOPUP_UZS ? `${amount.toLocaleString()} so'm` : ''} to'ldirish</>}
+      </Button>
+    </div>
+  );
+}
+
+// ─── Dynamic Plan Card ───
+function DynamicPlanCard({ plan, isCurrentPlan, onSelect, isProcessing }: {
+  plan: SubscriptionPlan; isCurrentPlan: boolean; onSelect: (plan: SubscriptionPlan) => void; isProcessing: boolean;
+}) {
+  const formatPrice = (p: number) => p >= 1_000_000 ? (p / 1_000_000).toFixed(1) + ' mln so\'m' : p.toLocaleString() + ' so\'m';
+
+  return (
+    <div className={cn(
+      'p-5 rounded-xl border-2 space-y-3 transition-all',
+      isCurrentPlan ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/30'
+    )}>
+      <div className="flex items-center gap-2">
+        <Badge style={{ backgroundColor: (plan.color || '#3b82f6') + '15', color: plan.color || '#3b82f6', borderColor: (plan.color || '#3b82f6') + '30' }}>
+          {plan.name_uz || plan.name}
+        </Badge>
+        {isCurrentPlan && <Badge variant="secondary" className="text-[10px]">Hozirgi</Badge>}
       </div>
 
-      {/* Pay button */}
-      <Button
-        className="w-full"
-        size="lg"
-        onClick={handleTopup}
-        disabled={isProcessing || !amount || amount < MIN_TOPUP_UZS}
-      >
-        {isProcessing ? (
-          <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Yuklanmoqda...</>
-        ) : (
-          <><CreditCard className="h-4 w-4 mr-2" /> Click orqali {amount >= MIN_TOPUP_UZS ? `${amount.toLocaleString()} so'm` : ''} to'ldirish</>
+      <div>
+        <p className="text-2xl font-bold">{formatPrice(plan.onetime_price_uzs)}</p>
+        <p className="text-xs text-muted-foreground">
+          {plan.monthly_fee_uzs > 0
+            ? `Bir martalik + ${formatPrice(plan.monthly_fee_uzs)}/oy`
+            : 'Bir martalik to\'lov'}
+        </p>
+      </div>
+
+      <ul className="space-y-1.5 text-xs text-muted-foreground">
+        <li className="flex items-center gap-1.5">
+          <Store className="h-3.5 w-3.5 text-primary shrink-0" />
+          {plan.max_stores_per_marketplace >= 999 ? 'Cheksiz' : plan.max_stores_per_marketplace} do'kon / marketplace
+        </li>
+        {plan.free_card_creation_monthly > 0 && (
+          <li className="flex items-center gap-1.5"><Image className="h-3.5 w-3.5 text-primary shrink-0" /> {plan.free_card_creation_monthly} bepul kartochka / oy</li>
         )}
+        {plan.free_cloning_monthly > 0 && (
+          <li className="flex items-center gap-1.5"><Copy className="h-3.5 w-3.5 text-primary shrink-0" /> {plan.free_cloning_monthly} bepul klonlash / oy</li>
+        )}
+        {plan.balance_discount_percent > 0 && (
+          <li className="flex items-center gap-1.5"><Percent className="h-3.5 w-3.5 text-primary shrink-0" /> Pullik xizmatlar {plan.balance_discount_percent}% arzon</li>
+        )}
+        {(plan.included_feature_keys?.length || 0) > 0 && (
+          <li className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" /> {plan.included_feature_keys.length} ta bepul funksiya</li>
+        )}
+      </ul>
+
+      <Button className="w-full" variant={isCurrentPlan ? 'outline' : 'default'}
+        style={!isCurrentPlan ? { backgroundColor: plan.color || undefined } : undefined}
+        onClick={() => onSelect(plan)} disabled={isProcessing}>
+        {isProcessing
+          ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Yuklanmoqda...</>
+          : <><CreditCard className="h-4 w-4 mr-2" /> {isCurrentPlan ? 'Muddatni uzaytirish' : 'Click orqali to\'lash'}</>}
       </Button>
     </div>
   );
@@ -170,88 +149,140 @@ function BalanceTopup({ userId }: { userId?: string }) {
 
 export const SubscriptionBilling = forwardRef<HTMLDivElement, SubscriptionBillingProps>(function SubscriptionBilling({ totalSalesVolume }, ref) {
   const { user } = useAuth();
-  const { 
-    subscription, billing, totalDebt, accessStatus, isLoading,
-    createSubscription, refetch
-  } = useSellerCloudSubscription();
+  const { subscription, billing, totalDebt, accessStatus, isLoading, createSubscription, refetch } = useSellerCloudSubscription();
   const { features } = useFeaturePricing();
   const { balance, transactions, loadingTx, payActivation } = useUserBalance();
+  const { data: plans, isLoading: plansLoading } = useSubscriptionPlans();
   const [isCreating, setIsCreating] = useState(false);
   const [showTermsDialog, setShowTermsDialog] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [isPayingActivation, setIsPayingActivation] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState<string | null>(null);
+  const [selectedPlanForTerms, setSelectedPlanForTerms] = useState<SubscriptionPlan | null>(null);
 
-  const formatPrice = (price: number) => {
-    if (price >= 1000000) return (price / 1000000).toFixed(1) + ' mln so\'m';
-    return new Intl.NumberFormat('uz-UZ').format(price) + ' so\'m';
-  };
+  const formatPrice = (price: number) => price >= 1000000 ? (price / 1000000).toFixed(1) + ' mln so\'m' : new Intl.NumberFormat('uz-UZ').format(price) + ' so\'m';
 
   const activationPaidUntil = (subscription as any)?.activation_paid_until;
   const activationTrialEnds = (subscription as any)?.activation_trial_ends;
   const isActivationActive = activationPaidUntil && new Date(activationPaidUntil) > new Date();
   const isTrialActive = activationTrialEnds && new Date(activationTrialEnds) > new Date();
-  const needsActivation = subscription && !isActivationActive && !isTrialActive && subscription.plan_type !== 'enterprise';
 
   const handlePayActivation = async () => {
     setIsPayingActivation(true);
     try {
       const result = await payActivation();
       if (!result.success) {
-        toast.error(result.error === 'insufficient_balance' 
+        toast.error(result.error === 'insufficient_balance'
           ? `Balans yetarli emas. Kamida ${MIN_TOPUP_UZS.toLocaleString()} so'm to'ldiring.`
           : (result.error || 'Xatolik yuz berdi'));
       }
-    } catch (err: any) {
-      toast.error('Xatolik: ' + err.message);
-    } finally {
-      setIsPayingActivation(false);
-    }
+    } catch (err: any) { toast.error('Xatolik: ' + err.message); }
+    finally { setIsPayingActivation(false); }
   };
 
-  const handleStartFree = () => setShowTermsDialog(true);
+  const handleSelectPlan = (plan: SubscriptionPlan) => {
+    setSelectedPlanForTerms(plan);
+    setShowTermsDialog(true);
+  };
 
   const handleAcceptTerms = async () => {
-    if (!termsAccepted) { toast.error('Shartlarni qabul qilishingiz kerak'); return; }
+    if (!termsAccepted || !selectedPlanForTerms) { toast.error('Shartlarni qabul qilishingiz kerak'); return; }
     setIsCreating(true);
-    const result = await createSubscription('pro', 0);
-    if (result.success) {
-      setShowTermsDialog(false);
-      toast.success('Tabriklaymiz! Akkauntingiz faollashtirildi.');
+
+    if (!subscription) {
+      // New subscription
+      const result = await createSubscription(selectedPlanForTerms.slug, selectedPlanForTerms.monthly_fee_uzs);
+      if (result.success) {
+        setShowTermsDialog(false);
+        toast.success('Tabriklaymiz! Akkauntingiz faollashtirildi.');
+        // If plan has onetime price > 0, redirect to payment
+        if (selectedPlanForTerms.onetime_price_uzs > 0 && user?.id) {
+          try {
+            const { data, error } = await supabase.functions.invoke('click-payment', {
+              body: {
+                action: 'prepare', user_id: user.id, plan_type: selectedPlanForTerms.slug,
+                amount_uzs: selectedPlanForTerms.onetime_price_uzs,
+                return_url: window.location.origin + '/seller-cloud?tab=subscription',
+              },
+            });
+            if (!error && data?.success) window.open(data.payment_url, '_blank');
+          } catch {}
+        }
+      } else { toast.error(result.error || 'Xatolik yuz berdi'); }
     } else {
-      toast.error(result.error || 'Xatolik yuz berdi');
+      // Upgrade existing — go to payment
+      if (user?.id) {
+        setIsProcessingPayment(selectedPlanForTerms.slug);
+        try {
+          const { data, error } = await supabase.functions.invoke('click-payment', {
+            body: {
+              action: 'prepare', user_id: user.id, plan_type: selectedPlanForTerms.slug,
+              amount_uzs: selectedPlanForTerms.onetime_price_uzs || selectedPlanForTerms.monthly_fee_uzs,
+              return_url: window.location.origin + '/seller-cloud?tab=subscription',
+            },
+          });
+          if (error) throw error;
+          if (!data?.success) throw new Error(data?.error || 'Xatolik');
+          toast.success("To'lov sahifasiga yo'naltirilmoqda...");
+          window.open(data.payment_url, '_blank');
+          setShowTermsDialog(false);
+        } catch (err: any) {
+          toast.error('To\'lov xatoligi: ' + (err.message || 'Qaytadan urinib ko\'ring'));
+        } finally { setIsProcessingPayment(null); }
+      }
     }
     setIsCreating(false);
   };
 
-  const handleClickPayment = async (planKey: 'premium' | 'elegant') => {
-    if (!user?.id) { toast.error('Avval tizimga kiring'); return; }
-    const plan = PLAN_PRICES[planKey];
-    setIsProcessingPayment(planKey);
-    try {
-      const { data, error } = await supabase.functions.invoke('click-payment', {
-        body: {
-          action: 'prepare',
-          user_id: user.id,
-          plan_type: planKey === 'elegant' ? 'enterprise' : planKey,
-          amount_uzs: plan.amount_uzs,
-          return_url: window.location.origin + '/seller-cloud?tab=subscription',
-        },
-      });
-      if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || 'Xatolik');
-      toast.success(`To'lov sahifasiga yo'naltirilmoqda...`);
-      window.open(data.payment_url, '_blank');
-    } catch (err: any) {
-      toast.error('To\'lov xatoligi: ' + (err.message || 'Qaytadan urinib ko\'ring'));
-    } finally {
-      setIsProcessingPayment(null);
-    }
-  };
-
-  if (isLoading) {
-    return (<div className="space-y-4"><Skeleton className="h-48" /><Skeleton className="h-32" /></div>);
+  if (isLoading || plansLoading) {
+    return <div className="space-y-4"><Skeleton className="h-48" /><Skeleton className="h-32" /></div>;
   }
+
+  const activePlans = plans?.filter(p => p.is_active) || [];
+
+  // ========== Terms Dialog (shared) ==========
+  const termsDialog = (
+    <Dialog open={showTermsDialog} onOpenChange={setShowTermsDialog}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2"><FileText className="h-5 w-5" /> Xizmat shartlari</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          {selectedPlanForTerms && (
+            <div className="p-4 rounded-lg border" style={{ borderColor: (selectedPlanForTerms.color || '#3b82f6') + '40' }}>
+              <div className="flex items-center justify-between mb-2">
+                <Badge style={{ backgroundColor: (selectedPlanForTerms.color || '#3b82f6') + '15', color: selectedPlanForTerms.color || '#3b82f6' }}>
+                  {selectedPlanForTerms.name_uz || selectedPlanForTerms.name}
+                </Badge>
+                <span className="font-bold">{formatPrice(selectedPlanForTerms.onetime_price_uzs)}</span>
+              </div>
+              {selectedPlanForTerms.monthly_fee_uzs > 0 && (
+                <p className="text-xs text-muted-foreground">+ {formatPrice(selectedPlanForTerms.monthly_fee_uzs)} oylik to'lov</p>
+              )}
+            </div>
+          )}
+          <div className="bg-muted p-4 rounded-lg max-h-60 overflow-y-auto text-sm space-y-2">
+            <p className="font-medium">SellerCloudX xizmat shartlari:</p>
+            <ul className="list-disc pl-4 space-y-1">
+              <li>Tanlangan tarif: <strong>{selectedPlanForTerms?.name_uz || selectedPlanForTerms?.name}</strong></li>
+              <li>Bir martalik to'lov: {formatPrice(selectedPlanForTerms?.onetime_price_uzs || 0)}</li>
+              {(selectedPlanForTerms?.monthly_fee_uzs || 0) > 0 && <li>Oylik to'lov: {formatPrice(selectedPlanForTerms!.monthly_fee_uzs)}</li>}
+              <li>Do'kon limiti: {(selectedPlanForTerms?.max_stores_per_marketplace || 1) >= 999 ? 'Cheksiz' : selectedPlanForTerms?.max_stores_per_marketplace} / marketplace</li>
+              <li>AI xizmatlar — balans orqali ({selectedPlanForTerms?.balance_discount_percent || 0}% chegirma)</li>
+              <li>Balansni to'ldirish: kamida {MIN_TOPUP_UZS.toLocaleString()} so'm</li>
+            </ul>
+          </div>
+          <div className="flex items-start gap-3 p-3 border rounded-lg">
+            <Checkbox id="terms" checked={termsAccepted} onCheckedChange={(checked) => setTermsAccepted(checked === true)} />
+            <Label htmlFor="terms" className="text-sm cursor-pointer">Men shartlarni qabul qilaman</Label>
+          </div>
+          <Button onClick={handleAcceptTerms} className="w-full" disabled={!termsAccepted || isCreating}>
+            {isCreating ? 'Yuklanmoqda...' : <><CreditCard className="h-4 w-4 mr-2" /> Davom etish</>}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 
   // ========== NO SUBSCRIPTION — SHOW PLANS ==========
   if (!subscription) {
@@ -260,153 +291,32 @@ export const SubscriptionBilling = forwardRef<HTMLDivElement, SubscriptionBillin
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Crown className="h-5 w-5 text-primary" />
-                SellerCloudX — Boshlash
-              </CardTitle>
-              <CardDescription>
-                Marketplace boshqaruvini bepul boshlang, pullik AI xizmatlardan balans orqali foydalaning
-              </CardDescription>
+              <CardTitle className="flex items-center gap-2"><Crown className="h-5 w-5 text-primary" /> Tarifni tanlang</CardTitle>
+              <CardDescription>Biznesingizga mos rejani tanlang va marketplace boshqaruvini boshlang</CardDescription>
             </CardHeader>
           </Card>
 
-          <div className="grid md:grid-cols-3 gap-4">
-            {/* FREE */}
-            <Card className="border-2 border-primary/30 relative">
-              <div className="absolute -top-3 left-4">
-                <Badge className="bg-primary text-primary-foreground">Bepul boshlash</Badge>
-              </div>
-              <CardHeader>
-                <CardTitle className="text-lg">Free</CardTitle>
-                <CardDescription>Yangi sotuvchilar uchun</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <div className="text-3xl font-bold text-primary">Bepul</div>
-                  <div className="text-xs text-muted-foreground mt-1">{TRIAL_DAYS} kunlik sinov, keyin {ACTIVATION_FEE_UZS.toLocaleString()} so'm/oy</div>
-                </div>
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary shrink-0" /> 4 ta marketplace ulash</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary shrink-0" /> Analitika va hisobotlar</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary shrink-0" /> Buyurtmalarni boshqarish</li>
-                  <li className="flex items-center gap-2"><Wallet className="h-4 w-4 text-muted-foreground shrink-0" /> AI xizmatlar — balans orqali</li>
-                </ul>
-                <Button className="w-full" size="lg" onClick={handleStartFree} disabled={isCreating}>
-                  <Rocket className="h-4 w-4 mr-2" />
-                  {isCreating ? 'Yuklanmoqda...' : 'Bepul boshlash'}
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* PREMIUM */}
-            <Card className="border-2 border-amber-300/50">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  Premium
-                  <Badge className="bg-amber-500/10 text-amber-600 border-amber-200 text-[10px]">40% chegirma</Badge>
-                </CardTitle>
-                <CardDescription>Faol sotuvchilar uchun</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <div className="text-3xl font-bold">{formatPrice(PLAN_PRICES.premium.amount_uzs)}</div>
-                  <div className="text-xs text-muted-foreground mt-1">Oylik to'lov, aktivatsiya bepul</div>
-                </div>
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-amber-500 shrink-0" /> Free'dagi barcha imkoniyatlar</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-amber-500 shrink-0" /> Pullik xizmatlar 40% arzon, cheksiz</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-amber-500 shrink-0" /> Oylik aktivatsiya bepul</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-amber-500 shrink-0" /> Ustuvor qo'llab-quvvatlash</li>
-                </ul>
-                <Button className="w-full bg-amber-500 hover:bg-amber-600 text-white" size="lg" 
-                  onClick={() => handleClickPayment('premium')} disabled={isProcessingPayment === 'premium'}>
-                  {isProcessingPayment === 'premium' 
-                    ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Yuklanmoqda...</>
-                    : <><CreditCard className="h-4 w-4 mr-2" /> Click orqali to'lash</>}
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* ELEGANT */}
-            <Card className="border-2 border-violet-300/50">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  Elegant
-                  <Badge className="bg-violet-500/10 text-violet-600 border-violet-200 text-[10px]">0 so'm AI</Badge>
-                </CardTitle>
-                <CardDescription>Katta hajmdagi biznes</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <div className="text-3xl font-bold">{formatPrice(PLAN_PRICES.elegant.amount_uzs)}</div>
-                  <div className="text-xs text-muted-foreground mt-1">Oylik to'lov, barcha xizmatlar bepul</div>
-                </div>
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-violet-500 shrink-0" /> Premium'dagi barcha imkoniyatlar</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-violet-500 shrink-0" /> AI xizmatlar 0 so'm (limitli)</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-violet-500 shrink-0" /> Shaxsiy menejer</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-violet-500 shrink-0" /> API kirish + SLA</li>
-                </ul>
-                <Button className="w-full bg-violet-500 hover:bg-violet-600 text-white" size="lg" 
-                  onClick={() => handleClickPayment('elegant')} disabled={isProcessingPayment === 'elegant'}>
-                  {isProcessingPayment === 'elegant' 
-                    ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Yuklanmoqda...</>
-                    : <><CreditCard className="h-4 w-4 mr-2" /> Click orqali to'lash</>}
-                </Button>
-              </CardContent>
-            </Card>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {activePlans.map((plan, idx) => (
+              <DynamicPlanCard
+                key={plan.id}
+                plan={plan}
+                isCurrentPlan={false}
+                onSelect={handleSelectPlan}
+                isProcessing={isProcessingPayment === plan.slug}
+              />
+            ))}
           </div>
         </div>
-
-        <Dialog open={showTermsDialog} onOpenChange={setShowTermsDialog}>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2"><FileText className="h-5 w-5" /> Xizmat shartlari</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="bg-muted p-4 rounded-lg max-h-60 overflow-y-auto text-sm space-y-2">
-                <p className="font-medium">SellerCloudX xizmat shartlari:</p>
-                <ul className="list-disc pl-4 space-y-1">
-                  <li>Marketplace ulash va boshqarish — bepul</li>
-                  <li>Analitika, hisobotlar, buyurtmalar — bepul</li>
-                  <li>AI xizmatlar — balans orqali</li>
-                  <li>Balansni to'ldirish: kamida {MIN_TOPUP_UZS.toLocaleString()} so'm</li>
-                  <li>{TRIAL_DAYS} kunlik bepul sinov muddati</li>
-                  <li>Sinov muddatidan keyin: {ACTIVATION_FEE_UZS.toLocaleString()} so'm/oy</li>
-                </ul>
-              </div>
-              <div className="flex items-start gap-3 p-3 border rounded-lg">
-                <Checkbox id="terms" checked={termsAccepted} onCheckedChange={(checked) => setTermsAccepted(checked === true)} />
-                <Label htmlFor="terms" className="text-sm cursor-pointer">Men shartlarni qabul qilaman</Label>
-              </div>
-              <Button onClick={handleAcceptTerms} className="w-full" disabled={!termsAccepted || isCreating}>
-                {isCreating ? 'Yuklanmoqda...' : <><Rocket className="h-4 w-4 mr-2" /> Bepul boshlash</>}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        {termsDialog}
       </>
     );
   }
 
   // ========== HAS SUBSCRIPTION ==========
-  const getPlanLabel = (planType: string) => {
-    if (planType === 'pro' || planType === 'free') return 'Free';
-    if (planType === 'enterprise' || planType === 'elegant') return 'Elegant';
-    if (planType === 'premium') return 'Premium';
-    return planType;
-  };
-
-  const currentPlanLabel = getPlanLabel(subscription.plan_type as string);
-
-  const getPlanBadge = () => {
-    const colors: Record<string, string> = {
-      'Free': 'bg-muted text-muted-foreground',
-      'Premium': 'bg-amber-500/10 text-amber-600 border-amber-200',
-      'Elegant': 'bg-violet-500/10 text-violet-600 border-violet-200',
-    };
-    return <Badge className={colors[currentPlanLabel] || 'bg-muted'}>{currentPlanLabel}</Badge>;
-  };
+  const currentPlanSlug = (subscription as any).plan_slug || subscription.plan_type;
+  const currentPlan = activePlans.find(p => p.slug === currentPlanSlug);
+  const currentPlanLabel = currentPlan?.name_uz || currentPlan?.name || currentPlanSlug;
 
   const getStatusBadge = () => {
     if (!accessStatus) return null;
@@ -415,11 +325,17 @@ export const SubscriptionBilling = forwardRef<HTMLDivElement, SubscriptionBillin
         case 'active': return <Badge className="bg-primary text-primary-foreground"><CheckCircle2 className="h-3 w-3 mr-1" /> Faol</Badge>;
         case 'trial': return <Badge variant="secondary"><Clock className="h-3 w-3 mr-1" /> Sinov</Badge>;
         case 'admin_override': return <Badge className="bg-primary text-primary-foreground"><Crown className="h-3 w-3 mr-1" /> Faol</Badge>;
-        case 'debt': return <Badge variant="destructive"><AlertTriangle className="h-3 w-3 mr-1" /> Qarzdorlik</Badge>;
         default: return <Badge variant="secondary"><XCircle className="h-3 w-3 mr-1" /> Nofaol</Badge>;
       }
     })();
-    return <div className="flex items-center gap-1.5">{getPlanBadge()}{statusBadge}</div>;
+    return (
+      <div className="flex items-center gap-1.5">
+        <Badge style={currentPlan ? { backgroundColor: (currentPlan.color || '#3b82f6') + '15', color: currentPlan.color || '#3b82f6' } : undefined}>
+          {currentPlanLabel}
+        </Badge>
+        {statusBadge}
+      </div>
+    );
   };
 
   const featuresByCategory = features?.reduce((acc, f) => {
@@ -438,33 +354,7 @@ export const SubscriptionBilling = forwardRef<HTMLDivElement, SubscriptionBillin
               <div className="flex-1">
                 <h4 className="font-semibold text-destructive">Akkount bloklangan</h4>
                 <p className="text-sm text-muted-foreground mt-1">{accessStatus.message}</p>
-                {accessStatus.total_debt && accessStatus.total_debt > 0 && (
-                  <p className="font-medium mt-2">Qarzdorlik: {formatPrice(accessStatus.total_debt)}</p>
-                )}
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {needsActivation && (
-        <Card className="border-amber-400/50 bg-amber-500/5">
-          <CardContent className="pt-6">
-            <div className="flex items-start gap-4">
-              <Key className="h-6 w-6 text-amber-500 shrink-0" />
-              <div className="flex-1">
-                <h4 className="font-semibold text-amber-700 dark:text-amber-400">Oylik aktivatsiya talab qilinadi</h4>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {isTrialActive 
-                    ? `Sinov muddati: ${format(new Date(activationTrialEnds), 'dd.MM.yyyy')} gacha`
-                    : `Davom etish uchun ${ACTIVATION_FEE_UZS.toLocaleString()} so'm to'lang.`}
-                </p>
-              </div>
-              {!isTrialActive && (
-                <Button size="sm" onClick={handlePayActivation} disabled={isPayingActivation}>
-                  {isPayingActivation ? '...' : `${ACTIVATION_FEE_UZS.toLocaleString()} so'm`}
-                </Button>
-              )}
             </div>
           </CardContent>
         </Card>
@@ -491,81 +381,48 @@ export const SubscriptionBilling = forwardRef<HTMLDivElement, SubscriptionBillin
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-3 gap-2 sm:gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
                 <div className="p-2.5 sm:p-3 rounded-lg bg-muted/50">
-                  <div className="text-[10px] sm:text-xs text-muted-foreground flex items-center gap-1"><Calendar className="h-3 w-3 shrink-0" /> <span className="truncate">Boshlangan</span></div>
+                  <div className="text-[10px] sm:text-xs text-muted-foreground flex items-center gap-1"><Calendar className="h-3 w-3 shrink-0" /><span className="truncate">Boshlangan</span></div>
                   <div className="text-sm sm:text-base font-bold mt-1">{format(new Date(subscription.started_at), 'dd.MM.yy')}</div>
                 </div>
                 <div className="p-2.5 sm:p-3 rounded-lg bg-muted/50">
-                  <div className="text-[10px] sm:text-xs text-muted-foreground flex items-center gap-1"><Clock className="h-3 w-3 shrink-0" /> <span className="truncate">Tugash</span></div>
-                  <div className="text-sm sm:text-base font-bold mt-1">
-                    {subscription.activated_until ? format(new Date(subscription.activated_until), 'dd.MM.yy') : '—'}
-                  </div>
+                  <div className="text-[10px] sm:text-xs text-muted-foreground flex items-center gap-1"><Clock className="h-3 w-3 shrink-0" /><span className="truncate">Tugash</span></div>
+                  <div className="text-sm sm:text-base font-bold mt-1">{subscription.activated_until ? format(new Date(subscription.activated_until), 'dd.MM.yy') : '—'}</div>
                 </div>
-                <div className="p-2.5 sm:p-3 rounded-lg bg-muted/50">
-                  <div className="text-[10px] sm:text-xs text-muted-foreground flex items-center gap-1"><TrendingUp className="h-3 w-3 shrink-0" /> <span className="truncate">Tarif</span></div>
-                  <div className="text-sm sm:text-base font-bold mt-1">{currentPlanLabel}</div>
-                </div>
+                {currentPlan && (
+                  <>
+                    <div className="p-2.5 sm:p-3 rounded-lg bg-muted/50">
+                      <div className="text-[10px] sm:text-xs text-muted-foreground flex items-center gap-1"><Store className="h-3 w-3 shrink-0" /><span className="truncate">Do'konlar</span></div>
+                      <div className="text-sm sm:text-base font-bold mt-1">{currentPlan.max_stores_per_marketplace >= 999 ? '∞' : currentPlan.max_stores_per_marketplace}/MP</div>
+                    </div>
+                    <div className="p-2.5 sm:p-3 rounded-lg bg-muted/50">
+                      <div className="text-[10px] sm:text-xs text-muted-foreground flex items-center gap-1"><Percent className="h-3 w-3 shrink-0" /><span className="truncate">Chegirma</span></div>
+                      <div className="text-sm sm:text-base font-bold mt-1">{currentPlan.balance_discount_percent}%</div>
+                    </div>
+                  </>
+                )}
               </div>
             </CardContent>
           </Card>
 
-          {/* Plan Selection */}
+          {/* Plan Selection — dynamic from DB */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Crown className="h-5 w-5 text-amber-500" />
-                {subscription.plan_type === 'pro' ? 'Tarifni tanlash' : 'Tarifni almashtirish'}
-              </CardTitle>
+              <CardTitle className="flex items-center gap-2"><Crown className="h-5 w-5" /> Tarifni almashtirish</CardTitle>
               <CardDescription>Click orqali to'lab, tarifni faollashtiring yoki muddatni uzaytiring</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Premium */}
-                <div className={`p-5 rounded-xl border-2 space-y-3 ${(subscription.plan_type as string) === 'premium' ? 'border-amber-400 bg-amber-500/5' : 'border-border hover:border-amber-300 transition-colors'}`}>
-                  <div className="flex items-center gap-2">
-                    <Badge className="bg-amber-500/10 text-amber-600 border-amber-200">Premium</Badge>
-                    {(subscription.plan_type as string) === 'premium' && <Badge variant="secondary" className="text-[10px]">Hozirgi</Badge>}
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">{formatPrice(PLAN_PRICES.premium.amount_uzs)}</p>
-                    <p className="text-xs text-muted-foreground">{PLAN_PRICES.premium.duration}lik to'lov</p>
-                  </div>
-                  <ul className="space-y-1.5 text-xs text-muted-foreground">
-                    <li className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-amber-500" /> Pullik xizmatlar 40% arzon, cheksiz</li>
-                    <li className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-amber-500" /> Oylik aktivatsiya bepul</li>
-                    <li className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-amber-500" /> Ustuvor qo'llab-quvvatlash</li>
-                  </ul>
-                  <Button className="w-full bg-amber-500 hover:bg-amber-600 text-white"
-                    onClick={() => handleClickPayment('premium')} disabled={isProcessingPayment === 'premium'}>
-                    {isProcessingPayment === 'premium'
-                      ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Yuklanmoqda...</>
-                      : <><CreditCard className="h-4 w-4 mr-2" /> {(subscription.plan_type as string) === 'premium' ? 'Muddatni uzaytirish' : 'Click orqali to\'lash'}</>}
-                  </Button>
-                </div>
-
-                {/* Elegant */}
-                <div className={`p-5 rounded-xl border-2 space-y-3 ${subscription.plan_type === 'enterprise' ? 'border-violet-400 bg-violet-500/5' : 'border-border hover:border-violet-300 transition-colors'}`}>
-                  <div className="flex items-center gap-2">
-                    <Badge className="bg-violet-500/10 text-violet-600 border-violet-200">Elegant</Badge>
-                    {subscription.plan_type === 'enterprise' && <Badge variant="secondary" className="text-[10px]">Hozirgi</Badge>}
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">{formatPrice(PLAN_PRICES.elegant.amount_uzs)}</p>
-                    <p className="text-xs text-muted-foreground">{PLAN_PRICES.elegant.duration}lik to'lov</p>
-                  </div>
-                  <ul className="space-y-1.5 text-xs text-muted-foreground">
-                    <li className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-violet-500" /> AI xizmatlar 0 so'm (limitli)</li>
-                    <li className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-violet-500" /> Shaxsiy menejer</li>
-                    <li className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-violet-500" /> API kirish + SLA</li>
-                  </ul>
-                  <Button className="w-full bg-violet-500 hover:bg-violet-600 text-white"
-                    onClick={() => handleClickPayment('elegant')} disabled={isProcessingPayment === 'elegant'}>
-                    {isProcessingPayment === 'elegant'
-                      ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Yuklanmoqda...</>
-                      : <><CreditCard className="h-4 w-4 mr-2" /> {subscription.plan_type === 'enterprise' ? 'Muddatni uzaytirish' : 'Click orqali to\'lash'}</>}
-                  </Button>
-                </div>
+                {activePlans.map(plan => (
+                  <DynamicPlanCard
+                    key={plan.id}
+                    plan={plan}
+                    isCurrentPlan={plan.slug === currentPlanSlug}
+                    onSelect={handleSelectPlan}
+                    isProcessing={isProcessingPayment === plan.slug}
+                  />
+                ))}
               </div>
             </CardContent>
           </Card>
@@ -595,30 +452,7 @@ export const SubscriptionBilling = forwardRef<HTMLDivElement, SubscriptionBillin
                   </div>
                 </div>
               </div>
-
               <BalanceTopup userId={user?.id} />
-
-              <div className="mt-4 p-3 rounded-lg border border-border">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Key className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">Oylik aktivatsiya</span>
-                  </div>
-                  {isActivationActive ? (
-                    <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px]">
-                      <CheckCircle2 className="h-3 w-3 mr-1" /> {format(new Date(activationPaidUntil), 'dd.MM.yy')} gacha
-                    </Badge>
-                  ) : isTrialActive ? (
-                    <Badge variant="secondary" className="text-[10px]">
-                      <Clock className="h-3 w-3 mr-1" /> Sinov: {format(new Date(activationTrialEnds), 'dd.MM.yy')}
-                    </Badge>
-                  ) : (
-                    <Button size="sm" variant="outline" onClick={handlePayActivation} disabled={isPayingActivation}>
-                      {isPayingActivation ? '...' : `${ACTIVATION_FEE_UZS.toLocaleString()} so'm`}
-                    </Button>
-                  )}
-                </div>
-              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -626,9 +460,7 @@ export const SubscriptionBilling = forwardRef<HTMLDivElement, SubscriptionBillin
         {/* TAB 3: TRANSACTIONS */}
         <TabsContent value="transactions" className="space-y-4 mt-4">
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2"><History className="h-5 w-5" /> Tranzaksiyalar tarixi</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle className="flex items-center gap-2"><History className="h-5 w-5" /> Tranzaksiyalar tarixi</CardTitle></CardHeader>
             <CardContent>
               {loadingTx ? (
                 <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-14" />)}</div>
@@ -649,16 +481,11 @@ export const SubscriptionBilling = forwardRef<HTMLDivElement, SubscriptionBillin
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className="text-sm font-medium truncate">{tx.description || tx.feature_key || tx.transaction_type}</p>
-                            <p className="text-[10px] text-muted-foreground">
-                              {format(new Date(tx.created_at), 'dd.MM.yy HH:mm')}
-                              {tx.feature_key && <span className="ml-1 font-mono">• {tx.feature_key}</span>}
-                            </p>
+                            <p className="text-[10px] text-muted-foreground">{format(new Date(tx.created_at), 'dd.MM.yy HH:mm')}{tx.feature_key && <span className="ml-1 font-mono">• {tx.feature_key}</span>}</p>
                           </div>
                         </div>
                         <div className="text-right shrink-0 ml-2">
-                          <p className={`text-sm font-bold ${isDebit ? 'text-destructive' : 'text-primary'}`}>
-                            {isDebit ? '-' : '+'}{Math.abs(tx.amount).toLocaleString()}
-                          </p>
+                          <p className={`text-sm font-bold ${isDebit ? 'text-destructive' : 'text-primary'}`}>{isDebit ? '-' : '+'}{Math.abs(tx.amount).toLocaleString()}</p>
                           <p className="text-[10px] text-muted-foreground">Qoldiq: {Number(tx.balance_after).toLocaleString()}</p>
                         </div>
                       </div>
@@ -670,28 +497,76 @@ export const SubscriptionBilling = forwardRef<HTMLDivElement, SubscriptionBillin
           </Card>
         </TabsContent>
 
-        {/* TAB 4: PRICING */}
+        {/* TAB 4: PRICING — shows all plans comparison */}
         <TabsContent value="pricing" className="space-y-4 mt-4">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2"><DollarSign className="h-5 w-5" /> Xizmatlar narxi</CardTitle>
+              <CardTitle className="flex items-center gap-2"><DollarSign className="h-5 w-5" /> Tariflar taqqoslash</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {/* Plans comparison header */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-2 pr-4 text-muted-foreground font-medium">Xususiyat</th>
+                      {activePlans.map(p => (
+                        <th key={p.id} className="text-center py-2 px-2 font-medium" style={{ color: p.color || undefined }}>
+                          {p.name_uz || p.name}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    <tr>
+                      <td className="py-2 pr-4 text-muted-foreground">Narx</td>
+                      {activePlans.map(p => (
+                        <td key={p.id} className="py-2 px-2 text-center font-bold">{(p.onetime_price_uzs / 1000).toFixed(0)}K</td>
+                      ))}
+                    </tr>
+                    <tr>
+                      <td className="py-2 pr-4 text-muted-foreground">Oylik</td>
+                      {activePlans.map(p => (
+                        <td key={p.id} className="py-2 px-2 text-center">{p.monthly_fee_uzs > 0 ? (p.monthly_fee_uzs / 1000).toFixed(0) + 'K' : '—'}</td>
+                      ))}
+                    </tr>
+                    <tr>
+                      <td className="py-2 pr-4 text-muted-foreground">Do'kon/MP</td>
+                      {activePlans.map(p => (
+                        <td key={p.id} className="py-2 px-2 text-center">{p.max_stores_per_marketplace >= 999 ? '∞' : p.max_stores_per_marketplace}</td>
+                      ))}
+                    </tr>
+                    <tr>
+                      <td className="py-2 pr-4 text-muted-foreground">Kartochka/oy</td>
+                      {activePlans.map(p => (
+                        <td key={p.id} className="py-2 px-2 text-center">{p.free_card_creation_monthly || '—'}</td>
+                      ))}
+                    </tr>
+                    <tr>
+                      <td className="py-2 pr-4 text-muted-foreground">Klon/oy</td>
+                      {activePlans.map(p => (
+                        <td key={p.id} className="py-2 px-2 text-center">{p.free_cloning_monthly || '—'}</td>
+                      ))}
+                    </tr>
+                    <tr>
+                      <td className="py-2 pr-4 text-muted-foreground">Chegirma</td>
+                      {activePlans.map(p => (
+                        <td key={p.id} className="py-2 px-2 text-center">{p.balance_discount_percent > 0 ? p.balance_discount_percent + '%' : '—'}</td>
+                      ))}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Feature pricing list */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Zap className="h-5 w-5" /> Xizmatlar narxi (donalik)</CardTitle>
+              <CardDescription>Har bir amal uchun balansdan yechiladi</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-3 gap-2 p-3 rounded-lg bg-muted/50 border border-border">
-                <div className="text-center">
-                  <Badge variant="secondary" className="text-[10px] mb-1">Free</Badge>
-                  <p className="text-[10px] text-muted-foreground">To'liq narx</p>
-                </div>
-                <div className="text-center">
-                  <Badge className="bg-amber-500/10 text-amber-600 border-amber-200 text-[10px] mb-1">Premium</Badge>
-                  <p className="text-[10px] text-muted-foreground">40% chegirma</p>
-                </div>
-                <div className="text-center">
-                  <Badge className="bg-violet-500/10 text-violet-600 border-violet-200 text-[10px] mb-1">Elegant</Badge>
-                  <p className="text-[10px] text-muted-foreground">0 so'm + limit</p>
-                </div>
-              </div>
-
               {Object.entries(featuresByCategory).map(([cat, catFeatures]) => {
                 if (!catFeatures || catFeatures.length === 0) return null;
                 const CatIcon = categoryIcons[cat] || Zap;
@@ -708,7 +583,7 @@ export const SubscriptionBilling = forwardRef<HTMLDivElement, SubscriptionBillin
                             {f.is_free && <Badge variant="secondary" className="text-[8px] px-1 py-0">Bepul</Badge>}
                           </div>
                           <div className="text-right shrink-0">
-                            {f.is_free 
+                            {f.is_free
                               ? <span className="text-sm font-medium text-primary">Bepul</span>
                               : <span className="text-sm font-bold">{f.base_price_uzs.toLocaleString()} <span className="text-[10px] font-normal text-muted-foreground">UZS</span></span>}
                           </div>
@@ -722,6 +597,8 @@ export const SubscriptionBilling = forwardRef<HTMLDivElement, SubscriptionBillin
           </Card>
         </TabsContent>
       </Tabs>
+
+      {termsDialog}
     </div>
   );
 });
