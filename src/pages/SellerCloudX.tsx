@@ -84,6 +84,7 @@ const pageTitles: Record<string, string> = {
   reviews: 'Sharhlar va savollar',
   ads: 'Reklama kampaniyalari',
   clone: 'Karta klonlash',
+  'ai-services': 'AI Xizmatlari',
   problems: 'Muammoli mahsulotlar',
   mxik: 'MXIK kodlar bazasi',
   subscription: 'Obuna va to\'lov',
