@@ -382,6 +382,15 @@ export default function SellerCloudX() {
 
           {/* Main content */}
           <main className="flex-1 p-4 lg:p-6 overflow-auto">
+            {/* Onboarding wizard for new users */}
+            {hasAccess && connectedMarketplaces.length === 0 && (
+              <OnboardingWizard
+                connectedMarketplaces={connectedMarketplaces}
+                trialEndsAt={accessStatus?.expires_at as string | undefined}
+                onNavigate={handleTabChange}
+                onDismiss={() => {}}
+              />
+            )}
             <Suspense fallback={<TabLoader />}>
               {renderContent()}
             </Suspense>
