@@ -283,6 +283,8 @@ export default function SellerCloudX() {
         return <MarketplaceAdsCampaigns connectedMarketplaces={connectedMarketplaces} />;
       case 'clone':
         return <CardCloner connectedMarketplaces={connectedMarketplaces} store={store} />;
+      case 'ai-services':
+        return <AIServicesPanel />;
       case 'problems':
         return <ProblematicProducts connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'mxik':
