@@ -531,13 +531,13 @@ export default function Index() {
               </div>
 
               {/* Marketplace logos */}
-              <div className="mt-8 animate-fade-up text-center lg:text-left" style={{ animationDelay: '0.5s' }}>
-                <p className="text-xs text-muted-foreground mb-3 uppercase tracking-widest font-medium">{txt.trusted}</p>
-                <div className="flex items-center gap-6 md:gap-8 justify-center lg:justify-start">
+              <div className="mt-6 sm:mt-8 animate-fade-up text-center lg:text-left" style={{ animationDelay: '0.5s' }}>
+                <p className="text-[10px] sm:text-xs text-muted-foreground mb-2 sm:mb-3 uppercase tracking-widest font-medium">{txt.trusted}</p>
+                <div className="flex items-center gap-3 sm:gap-6 md:gap-8 justify-center lg:justify-start flex-wrap">
                   {Object.entries(MARKETPLACE_CONFIG).map(([key, mp]) => (
-                    <div key={key} className="flex items-center gap-1.5 opacity-70 hover:opacity-100 transition-opacity">
-                      <img src={mp.logo} alt={mp.name} className="w-5 h-5 rounded object-cover" />
-                      <span className="text-sm font-medium text-muted-foreground">{mp.name}</span>
+                    <div key={key} className="flex items-center gap-1 sm:gap-1.5 opacity-70 hover:opacity-100 transition-opacity">
+                      <img src={mp.logo} alt={mp.name} className="w-4 h-4 sm:w-5 sm:h-5 rounded object-cover" />
+                      <span className="text-[11px] sm:text-sm font-medium text-muted-foreground">{mp.name}</span>
                     </div>
                   ))}
                 </div>
