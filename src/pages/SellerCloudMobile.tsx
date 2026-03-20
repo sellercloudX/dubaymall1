@@ -132,11 +132,11 @@ export default function SellerCloudMobile() {
   if (!subscription) {
     return (
       <div className="min-h-screen bg-background p-4 pb-20 overflow-y-auto">
-        <OnboardingWizard 
-          onActivate={async () => {
-            const result = await createSubscription('pro');
+        <PlanSelector 
+          onSelectPlan={async (plan) => {
+            const result = await createSubscription(plan.slug);
             if (result.success) {
-              toast.success('Obuna yaratildi! To\'lov sahifasiga o\'tyapsiz...');
+              toast.success('Obuna yaratildi!');
             } else {
               toast.error(result.error || 'Xatolik yuz berdi');
             }
