@@ -81,8 +81,7 @@ export function ABCAnalysis({ connectedMarketplaces, store }: ABCAnalysisProps) 
 
       const salesMap = new Map<string, { qty: number; revenue: number; name?: string; photo?: string }>();
       const activeOrders = orders.filter(o => {
-        const st = (o.status || '').toUpperCase();
-        if (['CANCELLED', 'CANCELED', 'RETURNED', 'REJECTED'].includes(st)) return false;
+        if (isExcludedOrder(o)) return false;
         if (dateFrom || dateTo) {
           const orderDate = new Date(o.createdAt);
           if (dateFrom && orderDate < dateFrom) return false;

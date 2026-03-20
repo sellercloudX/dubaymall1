@@ -126,16 +126,18 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
         const commission = totalFees;
         const logistics = 0; // Already included in tariff.totalFee
         const subsidyAmount = 0;
+        const taxRate = MARKETPLACE_TAX[mp] ?? 0.04;
+        const taxAmount = totalUzs * taxRate;
         
         const grossProfit = totalUzs - costTotal;
-        const netProfit = grossProfit - commission + subsidyAmount;
+        const netProfit = grossProfit - commission - taxAmount + subsidyAmount;
         const margin = totalUzs > 0 ? (netProfit / totalUzs) * 100 : 0;
 
         const statusCategory = getMarketplaceOrderStatusCategory(order, mp);
 
         result.push({
           order, marketplace: mp, totalUzs, costTotal, grossProfit,
-          commission, logistics, netProfit, margin, subsidyAmount, statusCategory
+          commission, logistics, taxAmount, netProfit, margin, subsidyAmount, statusCategory
         });
       }
     }
