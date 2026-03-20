@@ -620,22 +620,22 @@ export default function Index() {
       </section>
 
       {/* ━━━ Features ━━━ */}
-      <section id="features" className="py-24 md:py-32 relative overflow-hidden">
+      <section id="features" className="py-16 sm:py-24 md:py-32 relative overflow-hidden">
         <div className="absolute inset-0 bg-dot-pattern opacity-[0.03]" />
         <div className="absolute inset-0 flex items-center justify-center opacity-10 dark:opacity-5 pointer-events-none">
           <img src={abstractShapes} alt="" className="w-full h-full object-cover" loading="lazy" />
         </div>
         
-        <div className="container mx-auto px-4 relative">
-          <FadeInSection className="text-center mb-16 md:mb-20">
-            <Badge variant="outline" className="mb-4 px-4 py-1.5">
+        <div className="container mx-auto px-3 sm:px-4 relative">
+          <FadeInSection className="text-center mb-10 sm:mb-16 md:mb-20">
+            <Badge variant="outline" className="mb-3 sm:mb-4 px-3 sm:px-4 py-1 sm:py-1.5">
               <Sparkles className="h-3 w-3 mr-1.5" />
               Features
             </Badge>
-            <h2 className="text-3xl md:text-5xl font-bold mb-3 font-display">
+            <h2 className="text-xl sm:text-3xl md:text-5xl font-bold mb-2 sm:mb-3 font-display">
               {txt.featuresTitle} <span className="text-gradient">{txt.featuresSubtitle}</span>
             </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto text-lg">{txt.featuresDesc}</p>
+            <p className="text-muted-foreground max-w-2xl mx-auto text-sm sm:text-base md:text-lg">{txt.featuresDesc}</p>
           </FadeInSection>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8 max-w-6xl mx-auto">
