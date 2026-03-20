@@ -59,6 +59,7 @@ const TutorialVideos = lazy(() => import('@/components/sellercloud/TutorialVideo
 // Consolidated hub components
 const InventoryControlHub = lazy(() => import('@/components/sellercloud/InventoryControlHub').then(m => ({ default: m.InventoryControlHub })));
 const PriceControlHub = lazy(() => import('@/components/sellercloud/PriceControlHub').then(m => ({ default: m.PriceControlHub })));
+const AIServicesPanel = lazy(() => import('@/components/sellercloud/AIServicesPanel').then(m => ({ default: m.AIServicesPanel })));
 
 const TabLoader = React.forwardRef<HTMLDivElement>((_, ref) => <div ref={ref} className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>);
 TabLoader.displayName = 'TabLoader';
@@ -83,6 +84,7 @@ const pageTitles: Record<string, string> = {
   reviews: 'Sharhlar va savollar',
   ads: 'Reklama kampaniyalari',
   clone: 'Karta klonlash',
+  'ai-services': 'AI Xizmatlari',
   problems: 'Muammoli mahsulotlar',
   mxik: 'MXIK kodlar bazasi',
   subscription: 'Obuna va to\'lov',
@@ -281,6 +283,8 @@ export default function SellerCloudX() {
         return <MarketplaceAdsCampaigns connectedMarketplaces={connectedMarketplaces} />;
       case 'clone':
         return <CardCloner connectedMarketplaces={connectedMarketplaces} store={store} />;
+      case 'ai-services':
+        return <AIServicesPanel />;
       case 'problems':
         return <ProblematicProducts connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'mxik':

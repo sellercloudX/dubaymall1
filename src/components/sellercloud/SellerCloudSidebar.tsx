@@ -5,6 +5,7 @@ import {
   Copy, AlertOctagon,
   MessageCircle, Activity, Megaphone, ChevronLeft, ChevronRight,
   LogOut, LayoutDashboard, Sun, Moon, Wallet, Search, UserCog, BookOpen,
+  Sparkles,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -42,6 +43,7 @@ export const sellerMenuItems: SellerMenuItem[] = [
   { id: 'reviews', label: 'Sharhlar', icon: MessageCircle, group: 'tools' },
   { id: 'ads', label: 'Reklama', icon: Megaphone, group: 'tools' },
   { id: 'clone', label: 'Klonlash', icon: Copy, group: 'tools' },
+  { id: 'ai-services', label: 'AI Xizmatlari', icon: Sparkles, group: 'tools' },
   { id: 'problems', label: 'Muammolar', icon: AlertOctagon, group: 'tools' },
   { id: 'mxik', label: 'MXIK baza', icon: FileSpreadsheet, group: 'tools' },
   { id: 'team', label: 'Jamoa', icon: Globe, group: 'settings' },
