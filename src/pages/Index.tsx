@@ -515,17 +515,17 @@ export default function Index() {
               </div>
 
               {/* Trust badges */}
-              <div className="mt-10 flex flex-wrap items-center gap-4 animate-fade-up justify-center lg:justify-start" style={{ animationDelay: '0.45s' }}>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Shield className="h-4 w-4 text-primary" />
+              <div className="mt-6 sm:mt-10 flex flex-wrap items-center gap-3 sm:gap-4 animate-fade-up justify-center lg:justify-start" style={{ animationDelay: '0.45s' }}>
+                <div className="flex items-center gap-1.5 text-[11px] sm:text-sm text-muted-foreground">
+                  <Shield className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary shrink-0" />
                   <span>{txt.guarantee}</span>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Lock className="h-4 w-4 text-primary" />
-                  <span>SSL Secured</span>
+                <div className="flex items-center gap-1.5 text-[11px] sm:text-sm text-muted-foreground">
+                  <Lock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary shrink-0" />
+                  <span>SSL</span>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <FileCheck className="h-4 w-4 text-primary" />
+                <div className="flex items-center gap-1.5 text-[11px] sm:text-sm text-muted-foreground">
+                  <FileCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary shrink-0" />
                   <span>GDPR</span>
                 </div>
               </div>
