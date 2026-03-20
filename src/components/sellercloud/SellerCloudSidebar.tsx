@@ -5,6 +5,7 @@ import {
   Copy, AlertOctagon,
   MessageCircle, Activity, Megaphone, ChevronLeft, ChevronRight,
   LogOut, LayoutDashboard, Sun, Moon, Wallet, Search, UserCog, BookOpen,
+  Sparkles,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
