@@ -432,8 +432,8 @@ export default function Index() {
 
       {/* ━━━ Navigation ━━━ */}
       <nav className="fixed top-0 left-0 right-0 z-50 border-b bg-background/80 backdrop-blur-xl">
-        <div className="container mx-auto px-3 sm:px-4 flex h-14 sm:h-16 items-center justify-between">
-          <Link to="/" className="flex items-center gap-1.5 shrink-0">
+        <div className="container mx-auto px-2 sm:px-4 flex h-12 sm:h-16 items-center justify-between gap-1">
+          <Link to="/" className="flex items-center gap-1 shrink-0">
             <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/20">
               <Crown className="h-3.5 w-3.5 sm:h-4.5 sm:w-4.5 text-white" />
             </div>
@@ -455,13 +455,13 @@ export default function Index() {
             </a>
           </div>
 
-          <div className="flex items-center gap-1 sm:gap-2">
+          <div className="flex items-center gap-0.5 sm:gap-2 shrink-0">
             <ThemeToggle />
             <LanguageSwitcher />
-            <Button variant="ghost" size="sm" className="font-medium text-xs sm:text-sm h-8 px-2 sm:px-3" asChild>
+            <Button variant="ghost" size="sm" className="font-medium text-[11px] sm:text-sm h-7 sm:h-8 px-1.5 sm:px-3" asChild>
               <Link to="/auth">{txt.loginCta}</Link>
             </Button>
-            <Button size="sm" asChild className="shadow-lg shadow-primary/20 text-xs sm:text-sm h-8 px-2 sm:px-4 whitespace-nowrap">
+            <Button size="sm" asChild className="shadow-lg shadow-primary/20 text-[11px] sm:text-sm h-7 sm:h-8 px-2 sm:px-4 whitespace-nowrap">
               <Link to="/auth?mode=register">
                 {language === 'uz' ? "Ro'yxatdan o'tish" : language === 'ru' ? 'Регистрация' : 'Sign Up'}
               </Link>
@@ -471,22 +471,22 @@ export default function Index() {
       </nav>
 
       {/* ━━━ HERO ━━━ */}
-      <section className="relative min-h-[100vh] flex items-center pt-16 sm:pt-32 md:pt-36 pb-8 sm:pb-16 overflow-hidden">
+      <section className="relative min-h-[100vh] flex items-center pt-14 sm:pt-32 md:pt-36 pb-8 sm:pb-16 overflow-hidden">
         <div className="absolute inset-0 bg-mesh" />
         <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-primary/8 rounded-full blur-[120px]" />
         <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-accent/6 rounded-full blur-[100px]" />
         <FloatingParticles />
 
-        <div className="container mx-auto px-4 relative z-10">
+        <div className="container mx-auto px-3 sm:px-4 relative z-10">
           <div className="grid lg:grid-cols-2 gap-6 md:gap-12 lg:gap-16 items-center">
             <div className="max-w-2xl w-full mx-auto lg:mx-0 text-center lg:text-left">
               <div className="animate-fade-up">
-                <Badge className="mb-2 sm:mb-8 px-3 sm:px-4 py-1 sm:py-2 text-xs sm:text-sm font-medium bg-primary/10 text-primary border-primary/20">
+                <Badge className="mb-2 sm:mb-8 px-2.5 sm:px-4 py-1 sm:py-2 text-[11px] sm:text-sm font-medium bg-primary/10 text-primary border-primary/20">
                   {txt.badge}
                 </Badge>
               </div>
 
-              <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-3 sm:mb-8 font-display leading-tight animate-fade-up" style={{ animationDelay: '0.1s' }}>
+              <h1 className="text-[22px] sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-3 sm:mb-8 font-display leading-[1.2] animate-fade-up" style={{ animationDelay: '0.1s' }}>
                 <span className="text-foreground">{txt.heroTitle1}</span>
                 <br />
                 <span className="text-gradient">{txt.heroTitle2}</span>
@@ -494,19 +494,19 @@ export default function Index() {
                 <span className="text-foreground">{txt.heroTitle3}</span>
               </h1>
               
-              <p className="text-sm sm:text-lg text-muted-foreground mb-4 sm:mb-10 leading-relaxed animate-fade-up max-w-xl mx-auto lg:mx-0" style={{ animationDelay: '0.2s' }}>
+              <p className="text-[13px] sm:text-lg text-muted-foreground mb-4 sm:mb-10 leading-relaxed animate-fade-up max-w-xl mx-auto lg:mx-0" style={{ animationDelay: '0.2s' }}>
                 {txt.heroDesc}
               </p>
 
-              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 animate-fade-up justify-center lg:justify-start" style={{ animationDelay: '0.3s' }}>
-                <Button size="lg" className="text-base px-8 py-6 shadow-xl shadow-primary/25 hover:shadow-2xl hover:shadow-primary/30 transition-all group" asChild>
+              <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-4 animate-fade-up justify-center lg:justify-start" style={{ animationDelay: '0.3s' }}>
+                <Button size="lg" className="text-sm sm:text-base px-5 sm:px-8 py-5 sm:py-6 shadow-xl shadow-primary/25 hover:shadow-2xl hover:shadow-primary/30 transition-all group" asChild>
                   <Link to="/auth?mode=register">
-                    <Rocket className="mr-2 h-5 w-5" />
+                    <Rocket className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
                     {txt.cta}
-                    <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                    <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5 group-hover:translate-x-1 transition-transform" />
                   </Link>
                 </Button>
-                <Button size="lg" variant="outline" className="text-base px-8 py-6 glass" asChild>
+                <Button size="lg" variant="outline" className="text-sm sm:text-base px-5 sm:px-8 py-5 sm:py-6 glass" asChild>
                   <a href="#features">
                     <Sparkles className="mr-2 h-4 w-4" />
                     {txt.ctaSecondary}
@@ -515,29 +515,29 @@ export default function Index() {
               </div>
 
               {/* Trust badges */}
-              <div className="mt-10 flex flex-wrap items-center gap-4 animate-fade-up justify-center lg:justify-start" style={{ animationDelay: '0.45s' }}>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Shield className="h-4 w-4 text-primary" />
+              <div className="mt-6 sm:mt-10 flex flex-wrap items-center gap-3 sm:gap-4 animate-fade-up justify-center lg:justify-start" style={{ animationDelay: '0.45s' }}>
+                <div className="flex items-center gap-1.5 text-[11px] sm:text-sm text-muted-foreground">
+                  <Shield className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary shrink-0" />
                   <span>{txt.guarantee}</span>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Lock className="h-4 w-4 text-primary" />
-                  <span>SSL Secured</span>
+                <div className="flex items-center gap-1.5 text-[11px] sm:text-sm text-muted-foreground">
+                  <Lock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary shrink-0" />
+                  <span>SSL</span>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <FileCheck className="h-4 w-4 text-primary" />
+                <div className="flex items-center gap-1.5 text-[11px] sm:text-sm text-muted-foreground">
+                  <FileCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary shrink-0" />
                   <span>GDPR</span>
                 </div>
               </div>
 
               {/* Marketplace logos */}
-              <div className="mt-8 animate-fade-up text-center lg:text-left" style={{ animationDelay: '0.5s' }}>
-                <p className="text-xs text-muted-foreground mb-3 uppercase tracking-widest font-medium">{txt.trusted}</p>
-                <div className="flex items-center gap-6 md:gap-8 justify-center lg:justify-start">
+              <div className="mt-6 sm:mt-8 animate-fade-up text-center lg:text-left" style={{ animationDelay: '0.5s' }}>
+                <p className="text-[10px] sm:text-xs text-muted-foreground mb-2 sm:mb-3 uppercase tracking-widest font-medium">{txt.trusted}</p>
+                <div className="flex items-center gap-3 sm:gap-6 md:gap-8 justify-center lg:justify-start flex-wrap">
                   {Object.entries(MARKETPLACE_CONFIG).map(([key, mp]) => (
-                    <div key={key} className="flex items-center gap-1.5 opacity-70 hover:opacity-100 transition-opacity">
-                      <img src={mp.logo} alt={mp.name} className="w-5 h-5 rounded object-cover" />
-                      <span className="text-sm font-medium text-muted-foreground">{mp.name}</span>
+                    <div key={key} className="flex items-center gap-1 sm:gap-1.5 opacity-70 hover:opacity-100 transition-opacity">
+                      <img src={mp.logo} alt={mp.name} className="w-4 h-4 sm:w-5 sm:h-5 rounded object-cover" />
+                      <span className="text-[11px] sm:text-sm font-medium text-muted-foreground">{mp.name}</span>
                     </div>
                   ))}
                 </div>
@@ -620,22 +620,22 @@ export default function Index() {
       </section>
 
       {/* ━━━ Features ━━━ */}
-      <section id="features" className="py-24 md:py-32 relative overflow-hidden">
+      <section id="features" className="py-16 sm:py-24 md:py-32 relative overflow-hidden">
         <div className="absolute inset-0 bg-dot-pattern opacity-[0.03]" />
         <div className="absolute inset-0 flex items-center justify-center opacity-10 dark:opacity-5 pointer-events-none">
           <img src={abstractShapes} alt="" className="w-full h-full object-cover" loading="lazy" />
         </div>
         
-        <div className="container mx-auto px-4 relative">
-          <FadeInSection className="text-center mb-16 md:mb-20">
-            <Badge variant="outline" className="mb-4 px-4 py-1.5">
+        <div className="container mx-auto px-3 sm:px-4 relative">
+          <FadeInSection className="text-center mb-10 sm:mb-16 md:mb-20">
+            <Badge variant="outline" className="mb-3 sm:mb-4 px-3 sm:px-4 py-1 sm:py-1.5">
               <Sparkles className="h-3 w-3 mr-1.5" />
               Features
             </Badge>
-            <h2 className="text-3xl md:text-5xl font-bold mb-3 font-display">
+            <h2 className="text-xl sm:text-3xl md:text-5xl font-bold mb-2 sm:mb-3 font-display">
               {txt.featuresTitle} <span className="text-gradient">{txt.featuresSubtitle}</span>
             </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto text-lg">{txt.featuresDesc}</p>
+            <p className="text-muted-foreground max-w-2xl mx-auto text-sm sm:text-base md:text-lg">{txt.featuresDesc}</p>
           </FadeInSection>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8 max-w-6xl mx-auto">
@@ -681,12 +681,12 @@ export default function Index() {
       </section>
 
       {/* ━━━ How It Works ━━━ */}
-      <section id="how-it-works" className="py-24 md:py-32">
-        <div className="container mx-auto px-4">
-          <FadeInSection className="text-center mb-16 md:mb-20">
-            <Badge variant="outline" className="mb-4 px-4 py-1.5">Process</Badge>
-            <h2 className="text-3xl md:text-5xl font-bold mb-4 font-display">{txt.howTitle}</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto text-lg">{txt.howDesc}</p>
+      <section id="how-it-works" className="py-16 sm:py-24 md:py-32">
+        <div className="container mx-auto px-3 sm:px-4">
+          <FadeInSection className="text-center mb-10 sm:mb-16 md:mb-20">
+            <Badge variant="outline" className="mb-3 sm:mb-4 px-3 sm:px-4 py-1 sm:py-1.5">Process</Badge>
+            <h2 className="text-xl sm:text-3xl md:text-5xl font-bold mb-3 sm:mb-4 font-display">{txt.howTitle}</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto text-sm sm:text-base md:text-lg">{txt.howDesc}</p>
           </FadeInSection>
           
            <div className="grid md:grid-cols-3 gap-6 md:gap-12 max-w-5xl mx-auto relative">
@@ -768,27 +768,27 @@ export default function Index() {
       </section>
 
        {/* ━━━ Final CTA ━━━ */}
-       <section className="py-20 md:py-32 relative overflow-hidden">
+       <section className="py-16 sm:py-20 md:py-32 relative overflow-hidden">
          <div className="absolute inset-0 bg-gradient-to-br from-primary to-accent" />
          <div className="absolute inset-0 bg-dot-pattern opacity-10" />
          <FloatingParticles />
          
-         <div className="container mx-auto px-4 relative z-10 text-center">
+         <div className="container mx-auto px-3 sm:px-4 relative z-10 text-center">
            <FadeInSection>
-             <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-primary-foreground mb-3 font-display leading-tight">
+             <h2 className="text-xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-primary-foreground mb-2 sm:mb-3 font-display leading-tight">
                {txt.ctaTitle}
              </h2>
-             <p className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-primary-foreground/90 mb-6 sm:mb-8 font-display leading-tight">
+             <p className="text-xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-primary-foreground/90 mb-4 sm:mb-6 md:mb-8 font-display leading-tight">
                {txt.ctaSubtitle}
              </p>
-             <p className="text-primary-foreground/70 mb-8 sm:mb-12 max-w-2xl mx-auto text-sm sm:text-base md:text-lg">
+             <p className="text-primary-foreground/70 mb-6 sm:mb-8 md:mb-12 max-w-2xl mx-auto text-xs sm:text-base md:text-lg">
                {txt.ctaDesc}
              </p>
-            <Button size="lg" variant="secondary" className="text-lg px-10 py-7 shadow-2xl font-bold group" asChild>
+            <Button size="lg" variant="secondary" className="text-sm sm:text-lg px-6 sm:px-10 py-5 sm:py-7 shadow-2xl font-bold group" asChild>
               <Link to="/auth?mode=register">
-                <Rocket className="mr-2 h-5 w-5" />
+                <Rocket className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
                 {txt.ctaButton}
-                <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5 group-hover:translate-x-1 transition-transform" />
               </Link>
             </Button>
           </FadeInSection>
