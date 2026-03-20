@@ -59,7 +59,7 @@ const TutorialVideos = lazy(() => import('@/components/sellercloud/TutorialVideo
 // Consolidated hub components
 const InventoryControlHub = lazy(() => import('@/components/sellercloud/InventoryControlHub').then(m => ({ default: m.InventoryControlHub })));
 const PriceControlHub = lazy(() => import('@/components/sellercloud/PriceControlHub').then(m => ({ default: m.PriceControlHub })));
-const AIServicesPanel = lazy(() => import('@/components/sellercloud/AIServicesPanel').then(m => ({ default: m.AIServicesPanel })));
+const SellZenStudio = lazy(() => import('@/components/sellercloud/SellZenStudio').then(m => ({ default: m.SellZenStudio })));
 
 const TabLoader = React.forwardRef<HTMLDivElement>((_, ref) => <div ref={ref} className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>);
 TabLoader.displayName = 'TabLoader';
