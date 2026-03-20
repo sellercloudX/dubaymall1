@@ -362,22 +362,7 @@ const T = {
     faq5a: 'If your sales don\'t grow within 60 days, we refund the paid amount. That\'s our confidence in quality.',
     faq6q: 'Is my data secure?',
     faq6a: 'Yes. API keys are stored encrypted. SSL protection and GDPR compliance.',
-    pricingStarterTitle: 'Starter',
-    pricingStarterPrice: 'Free',
-    pricingStarterDesc: '1-day trial, then 99,000 UZS/month activation',
-    pricingStarterFeatures: ['1 store/marketplace', 'Analytics & reports', 'Order management', 'AI services — via balance'],
-    pricingBusinessTitle: 'Business',
-    pricingBusinessPrice: '990,000 UZS',
-    pricingBusinessDesc: '3 stores, AI 20% cheaper, 10 free cards/mo',
-    pricingBusinessFeatures: ['All Starter features', '3 stores/marketplace', 'AI services 20% cheaper', '10 free cards/cloning per month'],
-    pricingProTitle: 'Pro',
-    pricingProPrice: '2,490,000 UZS',
-    pricingProDesc: '5 stores, AI 40% cheaper, 50 free cards/mo',
-    pricingProFeatures: ['All Business features', '5 stores/marketplace', 'AI services 40% cheaper', '50 free cards/cloning per month'],
-    pricingEnterpriseTitle: 'Enterprise',
-    pricingEnterprisePrice: '4,990,000 UZS',
-    pricingEnterpriseDesc: 'Unlimited stores, AI 50% cheaper, 100 free cards',
-    pricingEnterpriseFeatures: ['All Pro features', 'Unlimited stores', 'AI services 50% cheaper', '100 free cards + SLA'],
+    // Pricing translations removed — now dynamic from DB
   },
 };
 
