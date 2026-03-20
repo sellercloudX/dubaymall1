@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { MarketplaceLogo, MARKETPLACE_CONFIG } from '@/lib/marketplaceConfig';
 import { PlanSelector } from '@/components/sellercloud/PlanSelector';
+import { OnboardingWizard } from '@/components/sellercloud/OnboardingWizard';
 import { SellerCloudSidebar, sellerMenuItems } from '@/components/sellercloud/SellerCloudSidebar';
 
 
