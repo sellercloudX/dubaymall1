@@ -2588,6 +2588,7 @@ export type Database = {
           is_trial: boolean
           marketplace_connected: boolean | null
           monthly_fee: number
+          plan_slug: string | null
           plan_type: string
           profile_completed: boolean | null
           started_at: string
@@ -2617,6 +2618,7 @@ export type Database = {
           is_trial?: boolean
           marketplace_connected?: boolean | null
           monthly_fee?: number
+          plan_slug?: string | null
           plan_type?: string
           profile_completed?: boolean | null
           started_at?: string
@@ -2646,6 +2648,7 @@ export type Database = {
           is_trial?: boolean
           marketplace_connected?: boolean | null
           monthly_fee?: number
+          plan_slug?: string | null
           plan_type?: string
           profile_completed?: boolean | null
           started_at?: string
@@ -2655,7 +2658,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sellercloud_subscriptions_plan_slug_fkey"
+            columns: ["plan_slug"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["slug"]
+          },
+        ]
       }
       shops: {
         Row: {
@@ -2766,6 +2777,78 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      subscription_plans: {
+        Row: {
+          balance_discount_percent: number
+          color: string | null
+          created_at: string
+          description: string | null
+          description_ru: string | null
+          description_uz: string | null
+          free_card_creation_monthly: number
+          free_cloning_monthly: number
+          icon: string | null
+          id: string
+          included_feature_keys: string[] | null
+          is_active: boolean
+          max_stores_per_marketplace: number
+          monthly_fee_uzs: number
+          name: string
+          name_ru: string | null
+          name_uz: string | null
+          onetime_price_uzs: number
+          slug: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          balance_discount_percent?: number
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          description_ru?: string | null
+          description_uz?: string | null
+          free_card_creation_monthly?: number
+          free_cloning_monthly?: number
+          icon?: string | null
+          id?: string
+          included_feature_keys?: string[] | null
+          is_active?: boolean
+          max_stores_per_marketplace?: number
+          monthly_fee_uzs?: number
+          name: string
+          name_ru?: string | null
+          name_uz?: string | null
+          onetime_price_uzs?: number
+          slug: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          balance_discount_percent?: number
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          description_ru?: string | null
+          description_uz?: string | null
+          free_card_creation_monthly?: number
+          free_cloning_monthly?: number
+          icon?: string | null
+          id?: string
+          included_feature_keys?: string[] | null
+          is_active?: boolean
+          max_stores_per_marketplace?: number
+          monthly_fee_uzs?: number
+          name?: string
+          name_ru?: string | null
+          name_uz?: string | null
+          onetime_price_uzs?: number
+          slug?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       support_messages: {
         Row: {
