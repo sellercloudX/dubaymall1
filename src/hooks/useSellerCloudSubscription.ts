@@ -148,7 +148,7 @@ export function useSellerCloudSubscription(): UseSellerCloudSubscriptionReturn {
   };
 
   const createSubscription = async (
-    planType: 'pro' | 'enterprise',
+    planType: string,
     monthlyFee: number = 0
   ): Promise<{ success: boolean; error?: string }> => {
     if (!user) {
