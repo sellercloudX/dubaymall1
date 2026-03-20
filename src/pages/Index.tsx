@@ -768,27 +768,27 @@ export default function Index() {
       </section>
 
        {/* ━━━ Final CTA ━━━ */}
-       <section className="py-20 md:py-32 relative overflow-hidden">
+       <section className="py-16 sm:py-20 md:py-32 relative overflow-hidden">
          <div className="absolute inset-0 bg-gradient-to-br from-primary to-accent" />
          <div className="absolute inset-0 bg-dot-pattern opacity-10" />
          <FloatingParticles />
          
-         <div className="container mx-auto px-4 relative z-10 text-center">
+         <div className="container mx-auto px-3 sm:px-4 relative z-10 text-center">
            <FadeInSection>
-             <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-primary-foreground mb-3 font-display leading-tight">
+             <h2 className="text-xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-primary-foreground mb-2 sm:mb-3 font-display leading-tight">
                {txt.ctaTitle}
              </h2>
-             <p className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-primary-foreground/90 mb-6 sm:mb-8 font-display leading-tight">
+             <p className="text-xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-primary-foreground/90 mb-4 sm:mb-6 md:mb-8 font-display leading-tight">
                {txt.ctaSubtitle}
              </p>
-             <p className="text-primary-foreground/70 mb-8 sm:mb-12 max-w-2xl mx-auto text-sm sm:text-base md:text-lg">
+             <p className="text-primary-foreground/70 mb-6 sm:mb-8 md:mb-12 max-w-2xl mx-auto text-xs sm:text-base md:text-lg">
                {txt.ctaDesc}
              </p>
-            <Button size="lg" variant="secondary" className="text-lg px-10 py-7 shadow-2xl font-bold group" asChild>
+            <Button size="lg" variant="secondary" className="text-sm sm:text-lg px-6 sm:px-10 py-5 sm:py-7 shadow-2xl font-bold group" asChild>
               <Link to="/auth?mode=register">
-                <Rocket className="mr-2 h-5 w-5" />
+                <Rocket className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
                 {txt.ctaButton}
-                <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5 group-hover:translate-x-1 transition-transform" />
               </Link>
             </Button>
           </FadeInSection>
