@@ -681,12 +681,12 @@ export default function Index() {
       </section>
 
       {/* ━━━ How It Works ━━━ */}
-      <section id="how-it-works" className="py-24 md:py-32">
-        <div className="container mx-auto px-4">
-          <FadeInSection className="text-center mb-16 md:mb-20">
-            <Badge variant="outline" className="mb-4 px-4 py-1.5">Process</Badge>
-            <h2 className="text-3xl md:text-5xl font-bold mb-4 font-display">{txt.howTitle}</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto text-lg">{txt.howDesc}</p>
+      <section id="how-it-works" className="py-16 sm:py-24 md:py-32">
+        <div className="container mx-auto px-3 sm:px-4">
+          <FadeInSection className="text-center mb-10 sm:mb-16 md:mb-20">
+            <Badge variant="outline" className="mb-3 sm:mb-4 px-3 sm:px-4 py-1 sm:py-1.5">Process</Badge>
+            <h2 className="text-xl sm:text-3xl md:text-5xl font-bold mb-3 sm:mb-4 font-display">{txt.howTitle}</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto text-sm sm:text-base md:text-lg">{txt.howDesc}</p>
           </FadeInSection>
           
            <div className="grid md:grid-cols-3 gap-6 md:gap-12 max-w-5xl mx-auto relative">
