@@ -57,7 +57,7 @@ interface UseSellerCloudSubscriptionReturn {
   accessStatus: AccessStatus | null;
   isLoading: boolean;
   error: string | null;
-  createSubscription: (planType: 'pro' | 'enterprise', monthlyFee?: number) => Promise<{ success: boolean; error?: string }>;
+  createSubscription: (planType: string, monthlyFee?: number) => Promise<{ success: boolean; error?: string }>;
   checkAccess: () => Promise<AccessStatus>;
   refetch: () => Promise<void>;
 }
@@ -148,7 +148,7 @@ export function useSellerCloudSubscription(): UseSellerCloudSubscriptionReturn {
   };
 
   const createSubscription = async (
-    planType: 'pro' | 'enterprise',
+    planType: string,
     monthlyFee: number = 0
   ): Promise<{ success: boolean; error?: string }> => {
     if (!user) {

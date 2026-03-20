@@ -18,7 +18,7 @@ import { toast } from 'sonner';
 import { useExchangeRate } from '@/hooks/useExchangeRate';
 import { Skeleton } from '@/components/ui/skeleton';
 import { MobileMoreMenu } from '@/components/mobile/MobileMoreMenu';
-import { OnboardingWizard } from '@/components/sellercloud/OnboardingWizard';
+import { PlanSelector } from '@/components/sellercloud/PlanSelector';
 
 // Lazy load ALL tab content components for instant tab switching
 const MobileAnalytics = lazy(() => import('@/components/mobile/MobileAnalytics').then(m => ({ default: m.MobileAnalytics })));
@@ -132,11 +132,11 @@ export default function SellerCloudMobile() {
   if (!subscription) {
     return (
       <div className="min-h-screen bg-background p-4 pb-20 overflow-y-auto">
-        <OnboardingWizard 
-          onActivate={async () => {
-            const result = await createSubscription('pro');
+        <PlanSelector 
+          onSelectPlan={async (plan) => {
+            const result = await createSubscription(plan.slug);
             if (result.success) {
-              toast.success('Obuna yaratildi! To\'lov sahifasiga o\'tyapsiz...');
+              toast.success('Obuna yaratildi!');
             } else {
               toast.error(result.error || 'Xatolik yuz berdi');
             }

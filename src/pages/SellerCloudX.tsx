@@ -21,7 +21,7 @@ import {
   Scan, AlertTriangle, RefreshCw, MessageCircle, CreditCard
 } from 'lucide-react';
 import { MarketplaceLogo, MARKETPLACE_CONFIG } from '@/lib/marketplaceConfig';
-import { OnboardingWizard } from '@/components/sellercloud/OnboardingWizard';
+import { PlanSelector } from '@/components/sellercloud/PlanSelector';
 import { SellerCloudSidebar, sellerMenuItems } from '@/components/sellercloud/SellerCloudSidebar';
 
 
@@ -190,9 +190,9 @@ export default function SellerCloudX() {
       <>
         <Navbar />
         <div className="container mx-auto px-4 py-8 max-w-2xl">
-          <OnboardingWizard 
-            onActivate={async () => {
-              const result = await createSubscription('pro');
+          <PlanSelector 
+            onSelectPlan={async (plan) => {
+              const result = await createSubscription(plan.slug);
               if (result.success) {
                 toast.success('Obuna yaratildi!');
               } else {
