@@ -744,32 +744,29 @@ export default function Index() {
              <p className="text-muted-foreground text-base sm:text-lg">{txt.pricingDesc}</p>
            </FadeInSection>
 
-          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-            {/* FREE */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 max-w-6xl mx-auto">
+            {/* STARTER */}
             <FadeInSection>
-              <Card className="relative border-2 border-primary/30 shadow-xl overflow-hidden h-full hover:shadow-2xl transition-shadow">
-                <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-primary to-accent" />
-                <CardContent className="p-6 md:p-8">
-                  <Badge className="mb-4 bg-primary/10 text-primary border-primary/20">
-                    <Star className="h-3 w-3 mr-1" />
-                    {language === 'uz' ? 'BEPUL BOSHLASH' : language === 'ru' ? 'НАЧАТЬ БЕСПЛАТНО' : 'START FREE'}
+              <Card className="relative border-2 border-border shadow-sm hover:shadow-xl transition-all h-full hover:-translate-y-1">
+                <CardContent className="p-5 sm:p-6">
+                  <Badge variant="outline" className="mb-3">
+                    <Zap className="h-3 w-3 mr-1" />
+                    Starter
                   </Badge>
-                  <h3 className="text-xl font-bold mb-1 font-display">{txt.pricingFreeTitle}</h3>
+                  <h3 className="text-lg font-bold mb-1 font-display">{txt.pricingStarterTitle}</h3>
                   <div className="flex items-baseline gap-1 mb-1">
-                    <span className="text-4xl font-bold text-primary font-display">{txt.pricingFreePrice}</span>
+                    <span className="text-3xl font-bold text-primary font-display">{txt.pricingStarterPrice}</span>
                   </div>
-                  <p className="text-xs text-muted-foreground mb-6">{txt.pricingFreeDesc}</p>
-                  <ul className="space-y-3 mb-8">
-                    {txt.pricingFreeFeatures.map((f, i) => (
+                  <p className="text-xs text-muted-foreground mb-5">{txt.pricingStarterDesc}</p>
+                  <ul className="space-y-2.5 mb-6">
+                    {txt.pricingStarterFeatures.map((f, i) => (
                       <li key={i} className="flex items-start gap-2 text-sm">
-                        <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                          <CheckCircle className="h-3.5 w-3.5 text-primary" />
-                        </div>
-                        <span className="font-medium">{f}</span>
+                        <CheckCircle className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                        <span>{f}</span>
                       </li>
                     ))}
                   </ul>
-                  <Button className="w-full shadow-lg shadow-primary/20" size="lg" asChild>
+                  <Button className="w-full" size="sm" asChild>
                     <Link to="/auth?mode=register">
                       {txt.startPro} <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
@@ -778,32 +775,30 @@ export default function Index() {
               </Card>
             </FadeInSection>
 
-            {/* PREMIUM */}
-            <FadeInSection delay={100}>
-              <Card className="relative border-2 border-amber-300/50 shadow-xl overflow-hidden h-full hover:shadow-2xl transition-shadow">
-                <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-400 to-amber-600" />
-                <CardContent className="p-6 md:p-8">
-                  <Badge className="mb-4 bg-amber-500/10 text-amber-600 border-amber-200">
+            {/* BUSINESS */}
+            <FadeInSection delay={80}>
+              <Card className="relative border-2 border-blue-300/50 shadow-lg hover:shadow-xl transition-all h-full hover:-translate-y-1">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-blue-500" />
+                <CardContent className="p-5 sm:p-6">
+                  <Badge className="mb-3 bg-blue-500/10 text-blue-600 border-blue-200">
                     <Crown className="h-3 w-3 mr-1" />
-                    Premium
+                    Business
                   </Badge>
-                  <h3 className="text-xl font-bold mb-1 font-display">{txt.pricingPremiumTitle}</h3>
+                  <h3 className="text-lg font-bold mb-1 font-display">{txt.pricingBusinessTitle}</h3>
                   <div className="flex items-baseline gap-1 mb-1">
-                    <span className="text-3xl font-bold font-display">{txt.pricingPremiumPrice}</span>
-                    <span className="text-muted-foreground text-sm">{txt.perMonth}</span>
+                    <span className="text-2xl font-bold font-display">{txt.pricingBusinessPrice}</span>
+                    <span className="text-muted-foreground text-xs">{txt.perMonth}</span>
                   </div>
-                  <p className="text-xs text-muted-foreground mb-6">{txt.pricingPremiumDesc}</p>
-                  <ul className="space-y-3 mb-8">
-                    {txt.pricingPremiumFeatures.map((f, i) => (
+                  <p className="text-xs text-muted-foreground mb-5">{txt.pricingBusinessDesc}</p>
+                  <ul className="space-y-2.5 mb-6">
+                    {txt.pricingBusinessFeatures.map((f, i) => (
                       <li key={i} className="flex items-start gap-2 text-sm">
-                        <div className="w-5 h-5 rounded-full bg-amber-500/10 flex items-center justify-center flex-shrink-0">
-                          <CheckCircle className="h-3.5 w-3.5 text-amber-500" />
-                        </div>
-                        <span className="font-medium">{f}</span>
+                        <CheckCircle className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
+                        <span>{f}</span>
                       </li>
                     ))}
                   </ul>
-                  <Button className="w-full bg-amber-500 hover:bg-amber-600 text-white" size="lg" asChild>
+                  <Button className="w-full bg-blue-500 hover:bg-blue-600 text-white" size="sm" asChild>
                     <Link to="/auth?mode=register">
                       {txt.startPro} <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
@@ -812,32 +807,68 @@ export default function Index() {
               </Card>
             </FadeInSection>
 
-            {/* ELEGANT */}
-            <FadeInSection delay={200}>
-              <Card className="relative border-2 border-violet-300/50 shadow-xl overflow-hidden h-full hover:shadow-2xl transition-shadow">
-                <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-violet-400 to-violet-600" />
-                <CardContent className="p-6 md:p-8">
-                  <Badge className="mb-4 bg-violet-500/10 text-violet-600 border-violet-200">
-                    <Sparkles className="h-3 w-3 mr-1" />
-                    Elegant
+            {/* PRO — Popular */}
+            <FadeInSection delay={160}>
+              <Card className="relative border-2 border-primary/50 shadow-xl hover:shadow-2xl transition-all h-full hover:-translate-y-1 ring-2 ring-primary/20">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-primary" />
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                  <Badge className="bg-primary text-primary-foreground text-[10px] px-3">
+                    <Star className="h-3 w-3 mr-1" />
+                    {language === 'uz' ? 'MASHHUR' : language === 'ru' ? 'ПОПУЛЯРНЫЙ' : 'POPULAR'}
                   </Badge>
-                  <h3 className="text-xl font-bold mb-1 font-display">{txt.pricingElegantTitle}</h3>
+                </div>
+                <CardContent className="p-5 sm:p-6 pt-6">
+                  <Badge className="mb-3 bg-primary/10 text-primary border-primary/20">
+                    <Crown className="h-3 w-3 mr-1" />
+                    Pro
+                  </Badge>
+                  <h3 className="text-lg font-bold mb-1 font-display">{txt.pricingProTitle}</h3>
                   <div className="flex items-baseline gap-1 mb-1">
-                    <span className="text-3xl font-bold font-display">{txt.pricingElegantPrice}</span>
-                    <span className="text-muted-foreground text-sm">{txt.perMonth}</span>
+                    <span className="text-2xl font-bold text-primary font-display">{txt.pricingProPrice}</span>
+                    <span className="text-muted-foreground text-xs">{txt.perMonth}</span>
                   </div>
-                  <p className="text-xs text-muted-foreground mb-6">{txt.pricingElegantDesc}</p>
-                  <ul className="space-y-3 mb-8">
-                    {txt.pricingElegantFeatures.map((f, i) => (
+                  <p className="text-xs text-muted-foreground mb-5">{txt.pricingProDesc}</p>
+                  <ul className="space-y-2.5 mb-6">
+                    {txt.pricingProFeatures.map((f, i) => (
                       <li key={i} className="flex items-start gap-2 text-sm">
-                        <div className="w-5 h-5 rounded-full bg-violet-500/10 flex items-center justify-center flex-shrink-0">
-                          <CheckCircle className="h-3.5 w-3.5 text-violet-500" />
-                        </div>
+                        <CheckCircle className="h-4 w-4 text-primary shrink-0 mt-0.5" />
                         <span className="font-medium">{f}</span>
                       </li>
                     ))}
                   </ul>
-                  <Button className="w-full bg-violet-500 hover:bg-violet-600 text-white" size="lg" asChild>
+                  <Button className="w-full shadow-lg shadow-primary/20" size="sm" asChild>
+                    <Link to="/auth?mode=register">
+                      {txt.startPro} <ArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            </FadeInSection>
+
+            {/* ENTERPRISE */}
+            <FadeInSection delay={240}>
+              <Card className="relative border-2 border-amber-300/50 shadow-lg hover:shadow-xl transition-all h-full hover:-translate-y-1">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-amber-600" />
+                <CardContent className="p-5 sm:p-6">
+                  <Badge className="mb-3 bg-amber-500/10 text-amber-600 border-amber-200">
+                    <Sparkles className="h-3 w-3 mr-1" />
+                    Enterprise
+                  </Badge>
+                  <h3 className="text-lg font-bold mb-1 font-display">{txt.pricingEnterpriseTitle}</h3>
+                  <div className="flex items-baseline gap-1 mb-1">
+                    <span className="text-2xl font-bold font-display">{txt.pricingEnterprisePrice}</span>
+                    <span className="text-muted-foreground text-xs">{txt.perMonth}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-5">{txt.pricingEnterpriseDesc}</p>
+                  <ul className="space-y-2.5 mb-6">
+                    {txt.pricingEnterpriseFeatures.map((f, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm">
+                        <CheckCircle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                        <span>{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button className="w-full bg-amber-500 hover:bg-amber-600 text-white" size="sm" asChild>
                     <a href="https://t.me/sellercloudx" target="_blank" rel="noopener noreferrer">
                       <MessageCircle className="mr-2 h-4 w-4" />
                       {txt.contactSales}
