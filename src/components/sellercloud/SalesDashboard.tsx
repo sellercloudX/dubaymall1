@@ -319,10 +319,10 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <KPICard icon={<Receipt className="h-4 w-4" />} label="Jami daromad" value={fmtPrice(stats.totalRevenue)} />
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3">
+        <KPICard icon={<Receipt className="h-4 w-4" />} label="Daromad" value={fmtPrice(stats.totalRevenue)} />
         <KPICard icon={<DollarSign className="h-4 w-4" />} label="Tannarx" value={fmtPrice(stats.totalCost)} variant="neutral" />
-        <KPICard icon={<TrendingDown className="h-4 w-4" />} label="Komissiya + logistika" value={fmtPrice(stats.totalCommission + stats.totalLogistics)} variant="loss" />
+        <KPICard icon={<TrendingDown className="h-4 w-4" />} label="Komissiya" value={fmtPrice(stats.totalCommission + stats.totalLogistics)} variant="loss" />
         <KPICard icon={<TrendingUp className="h-4 w-4" />} label="Sof foyda" value={fmtPrice(stats.totalNetProfit)} variant={stats.totalNetProfit >= 0 ? 'profit' : 'loss'} />
         <KPICard icon={<BarChart3 className="h-4 w-4" />} label="Marja" value={stats.avgMargin.toFixed(1) + '%'} variant={stats.avgMargin >= 15 ? 'profit' : stats.avgMargin >= 0 ? 'neutral' : 'loss'} />
       </div>
