@@ -496,12 +496,12 @@ function KPICard({ icon, label, value, variant = 'neutral' }: { icon: React.Reac
   const colorClass = variant === 'profit' ? 'text-emerald-600' : variant === 'loss' ? 'text-destructive' : 'text-foreground';
   return (
     <Card>
-      <CardContent className="p-3">
-        <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
+      <CardContent className="p-2.5 sm:p-3">
+        <div className="flex items-center gap-1 text-muted-foreground mb-0.5">
           {icon}
-          <span className="text-[11px] font-medium truncate">{label}</span>
+          <span className="text-[10px] sm:text-[11px] font-medium truncate">{label}</span>
         </div>
-        <div className={`text-base lg:text-lg font-bold truncate ${colorClass}`}>{value}</div>
+        <div className={`text-sm sm:text-base lg:text-lg font-bold truncate ${colorClass}`}>{value}</div>
       </CardContent>
     </Card>
   );
