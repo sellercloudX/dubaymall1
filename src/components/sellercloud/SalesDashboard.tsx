@@ -346,11 +346,11 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
       </div>
 
       {/* FBO/FBY/FBS Filter + Stats */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-0.5">
+      <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
+        <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-0.5 shrink-0">
           {(['all', 'FBO', 'FBS'] as const).map(ft => (
             <Button key={ft} variant={fulfillmentFilter === ft ? 'default' : 'ghost'}
-              size="sm" className="h-6 text-[11px] px-2.5 rounded-md"
+              size="sm" className="h-6 text-[10px] sm:text-[11px] px-2 sm:px-2.5 rounded-md"
               onClick={() => { setFulfillmentFilter(ft); setCurrentPage(1); }}>
               {ft === 'all' ? 'Hammasi' : ft === 'FBO' ? 'FBO/FBY' : ft}
               {ft === 'FBO' && stats.fboCount > 0 && <Badge variant="secondary" className="ml-1 h-4 text-[9px] px-1">{stats.fboCount}</Badge>}
@@ -359,7 +359,7 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
           ))}
         </div>
         {stats.fboCount > 0 && (
-          <div className="flex items-center gap-3 text-[11px] text-muted-foreground ml-2">
+          <div className="hidden sm:flex items-center gap-3 text-[11px] text-muted-foreground ml-2 shrink-0">
             <span>FBO/FBY: <strong className="text-foreground">{fmtPrice(stats.fboRevenue)}</strong></span>
             <span>FBS: <strong className="text-foreground">{fmtPrice(stats.fbsRevenue)}</strong></span>
           </div>
@@ -369,13 +369,13 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
       {/* Search + Export */}
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Buyurtma ID yoki mahsulot qidirish..." value={searchQuery}
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
+          <Input placeholder="Qidirish..." value={searchQuery}
             onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-            className="h-8 pl-8 text-sm" />
+            className="h-7 sm:h-8 pl-7 sm:pl-8 text-xs sm:text-sm" />
         </div>
-        <Button variant="outline" size="sm" onClick={handleExportCSV} className="shrink-0 gap-1">
-          <FileSpreadsheet className="h-3.5 w-3.5" /> Excel
+        <Button variant="outline" size="sm" onClick={handleExportCSV} className="shrink-0 gap-1 h-7 sm:h-8 text-xs">
+          <FileSpreadsheet className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Excel</span>
         </Button>
       </div>
 
