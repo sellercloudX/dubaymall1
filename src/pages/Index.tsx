@@ -710,7 +710,7 @@ export default function Index() {
       <DynamicPricing FadeInSection={FadeInSection} />
 
       {/* ━━━ Testimonials ━━━ */}
-      <section className="py-24 md:py-32">
+      <section className="py-16 sm:py-20 md:py-24">
         <div className="container mx-auto px-4">
           <FadeInSection className="text-center mb-16">
             <Badge variant="outline" className="mb-4 px-4 py-1.5">Testimonials</Badge>
