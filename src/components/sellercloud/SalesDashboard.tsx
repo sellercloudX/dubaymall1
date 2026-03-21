@@ -391,15 +391,30 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
             </div>
           ) : (
             <>
-              {/* Table header */}
-              <div className="grid grid-cols-[auto_1fr_auto_auto_auto_auto_auto] gap-2 px-3 py-2 text-[11px] font-medium text-muted-foreground border-b bg-muted/30 items-center">
+              {/* Table header - hidden on mobile */}
+              <div className="hidden sm:grid grid-cols-[auto_1fr_auto_auto_auto_auto_auto] gap-2 px-3 py-2 text-[11px] font-medium text-muted-foreground border-b bg-muted/30 items-center">
                 <span className="w-8"></span>
                 <SortButton label="Buyurtma" field="date" current={sortField} dir={sortDir} onClick={toggleSort} />
                 <span className="w-20 text-right">To'lov</span>
-                <span className="w-20 text-right hidden sm:block">Tannarx</span>
+                <span className="w-20 text-right">Tannarx</span>
                 <span className="w-20 text-right hidden md:block">Komissiya</span>
                 <SortButton label="Sof foyda" field="profit" current={sortField} dir={sortDir} onClick={toggleSort} className="w-24 text-right" />
                 <span className="w-16 text-center">Holat</span>
+              </div>
+
+              {/* Mobile sort bar */}
+              <div className="sm:hidden flex items-center gap-2 px-3 py-1.5 border-b bg-muted/30 text-[10px] text-muted-foreground">
+                <button onClick={() => toggleSort('date')} className={`flex items-center gap-0.5 ${sortField === 'date' ? 'text-foreground font-medium' : ''}`}>
+                  Sana {sortField === 'date' && <ArrowUpDown className="h-2.5 w-2.5" />}
+                </button>
+                <span>·</span>
+                <button onClick={() => toggleSort('total')} className={`flex items-center gap-0.5 ${sortField === 'total' ? 'text-foreground font-medium' : ''}`}>
+                  Summa {sortField === 'total' && <ArrowUpDown className="h-2.5 w-2.5" />}
+                </button>
+                <span>·</span>
+                <button onClick={() => toggleSort('profit')} className={`flex items-center gap-0.5 ${sortField === 'profit' ? 'text-foreground font-medium' : ''}`}>
+                  Foyda {sortField === 'profit' && <ArrowUpDown className="h-2.5 w-2.5" />}
+                </button>
               </div>
 
               {/* Rows */}
@@ -412,62 +427,70 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
                   const imgUrl = (firstItem as any)?.photo || product?.pictures?.[0];
 
                   return (
-                    <div key={`${e.marketplace}-${e.order.id}`}
-                      className="grid grid-cols-[auto_1fr_auto_auto_auto_auto_auto] gap-2 px-3 py-2.5 items-center hover:bg-muted/30 transition-colors text-sm">
-                      {/* Logo */}
-                      <div className="w-8">
-                        <MarketplaceLogo marketplace={e.marketplace} size={18} />
-                      </div>
-                      {/* Order info */}
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          {imgUrl && (
-                            <div className="w-7 h-7 rounded bg-muted overflow-hidden shrink-0">
-                              <img src={imgUrl} alt="" className="w-full h-full object-cover" onError={ev => (ev.currentTarget.style.display = 'none')} />
-                            </div>
-                          )}
-                          <div className="min-w-0">
-                            <div className="font-medium text-xs truncate">
-                              {product?.name || firstItem?.offerName || firstItem?.offerId || `#${e.order.id}`}
-                            </div>
-                            <div className="text-[10px] text-muted-foreground">
-                              <span className="font-mono text-primary/70">#{String(e.order.id)}</span>
-                              {' · '}{format(new Date(e.order.createdAt), 'dd.MM.yy HH:mm')}
-                              {e.order.items && e.order.items.length > 1 && ` · ${e.order.items.length} ta`}
-                              {(e.order as any).fulfillmentType && <Badge variant="outline" className="ml-1 text-[8px] px-1 h-3.5">{(e.order as any).fulfillmentType === 'FBO' && e.marketplace === 'yandex' ? 'FBY' : (e.order as any).fulfillmentType}</Badge>}
+                    <div key={`${e.marketplace}-${e.order.id}`}>
+                      {/* Desktop row */}
+                      <div className="hidden sm:grid grid-cols-[auto_1fr_auto_auto_auto_auto_auto] gap-2 px-3 py-2.5 items-center hover:bg-muted/30 transition-colors text-sm">
+                        <div className="w-8"><MarketplaceLogo marketplace={e.marketplace} size={18} /></div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            {imgUrl && (
+                              <div className="w-7 h-7 rounded bg-muted overflow-hidden shrink-0">
+                                <img src={imgUrl} alt="" className="w-full h-full object-cover" onError={ev => (ev.currentTarget.style.display = 'none')} />
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <div className="font-medium text-xs truncate">{product?.name || firstItem?.offerName || firstItem?.offerId || `#${e.order.id}`}</div>
+                              <div className="text-[10px] text-muted-foreground">
+                                <span className="font-mono text-primary/70">#{String(e.order.id)}</span>
+                                {' · '}{format(new Date(e.order.createdAt), 'dd.MM.yy HH:mm')}
+                                {e.order.items && e.order.items.length > 1 && ` · ${e.order.items.length} ta`}
+                                {(e.order as any).fulfillmentType && <Badge variant="outline" className="ml-1 text-[8px] px-1 h-3.5">{(e.order as any).fulfillmentType === 'FBO' && e.marketplace === 'yandex' ? 'FBY' : (e.order as any).fulfillmentType}</Badge>}
+                              </div>
                             </div>
                           </div>
                         </div>
+                        <div className="w-20 text-right text-xs font-medium">{formatNum(e.totalUzs)}</div>
+                        <div className="w-20 text-right text-xs text-muted-foreground">{e.costTotal > 0 ? formatNum(e.costTotal) : '—'}</div>
+                        <div className="w-20 text-right text-xs text-muted-foreground hidden md:block">-{formatNum(e.commission + e.logistics)}</div>
+                        <div className={`w-24 text-right text-xs font-bold ${e.netProfit >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
+                          {e.netProfit >= 0 ? '+' : ''}{formatNum(e.netProfit)}
+                          <span className="text-[10px] font-normal text-muted-foreground ml-0.5">({e.margin.toFixed(0)}%)</span>
+                        </div>
+                        <div className="w-16 flex justify-center">{getStatusIcon(e.statusCategory)}</div>
                       </div>
-                      {/* Total */}
-                      <div className="w-20 text-right text-xs font-medium">{formatNum(e.totalUzs)}</div>
-                      {/* Cost */}
-                      <div className="w-20 text-right text-xs text-muted-foreground hidden sm:block">
-                        {e.costTotal > 0 ? formatNum(e.costTotal) : '—'}
-                      </div>
-                      {/* Commission */}
-                      <div className="w-20 text-right text-xs text-muted-foreground hidden md:block">
-                        -{formatNum(e.commission + e.logistics)}
-                      </div>
-                      {/* Net Profit */}
-                      <div className={`w-24 text-right text-xs font-bold ${e.netProfit >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
-                        {e.netProfit >= 0 ? '+' : ''}{formatNum(e.netProfit)}
-                        <span className="text-[10px] font-normal text-muted-foreground ml-0.5">
-                          ({e.margin.toFixed(0)}%)
-                        </span>
-                      </div>
-                      {/* Status */}
-                      <div className="w-16 flex justify-center">
-                        {getStatusIcon(e.statusCategory)}
+
+                      {/* Mobile card row */}
+                      <div className="sm:hidden px-3 py-2.5 hover:bg-muted/30 transition-colors">
+                        <div className="flex items-start gap-2">
+                          <div className="shrink-0 mt-0.5"><MarketplaceLogo marketplace={e.marketplace} size={14} /></div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-start justify-between gap-1.5">
+                              <div className="min-w-0 flex-1">
+                                <div className="text-xs font-medium line-clamp-1">{product?.name || firstItem?.offerName || firstItem?.offerId || `#${e.order.id}`}</div>
+                                <div className="text-[10px] text-muted-foreground mt-0.5">
+                                  #{String(e.order.id)} · {format(new Date(e.order.createdAt), 'dd.MM.yy')}
+                                  {e.order.items && e.order.items.length > 1 && ` · ${e.order.items.length} ta`}
+                                </div>
+                              </div>
+                              <div className="shrink-0">{getStatusIcon(e.statusCategory)}</div>
+                            </div>
+                            <div className="flex items-center justify-between mt-1 text-[11px]">
+                              <span className="text-muted-foreground">{fmtPrice(e.totalUzs)}</span>
+                              <span className={`font-bold ${e.netProfit >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
+                                {e.netProfit >= 0 ? '+' : ''}{formatNum(e.netProfit)} <span className="font-normal text-[10px]">({e.margin.toFixed(0)}%)</span>
+                              </span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   );
                 })}
               </div>
 
-              {/* Footer summary + pagination */}
-              <div className="flex items-center justify-between px-3 py-2 border-t bg-muted/20 text-xs">
-                <div className="flex items-center gap-4">
+              {/* Footer */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1.5 px-3 py-2 border-t bg-muted/20 text-[11px]">
+                <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
                   <span className="text-muted-foreground">{sorted.length} buyurtma</span>
                   <span className="font-medium">Jami: {fmtPrice(sorted.reduce((s, e) => s + e.totalUzs, 0))}</span>
                   <span className={`font-bold ${sorted.reduce((s, e) => s + e.netProfit, 0) >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
@@ -476,11 +499,9 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
                 </div>
                 {totalPages > 1 && (
                   <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="sm" className="h-6 text-xs" disabled={currentPage <= 1}
-                      onClick={() => setCurrentPage(p => p - 1)}>←</Button>
+                    <Button variant="ghost" size="sm" className="h-6 text-xs" disabled={currentPage <= 1} onClick={() => setCurrentPage(p => p - 1)}>←</Button>
                     <span className="text-muted-foreground">{currentPage}/{totalPages}</span>
-                    <Button variant="ghost" size="sm" className="h-6 text-xs" disabled={currentPage >= totalPages}
-                      onClick={() => setCurrentPage(p => p + 1)}>→</Button>
+                    <Button variant="ghost" size="sm" className="h-6 text-xs" disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => p + 1)}>→</Button>
                   </div>
                 )}
               </div>
