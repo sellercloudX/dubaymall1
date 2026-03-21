@@ -748,7 +748,7 @@ export default function Index() {
 
 
       {/* ━━━ FAQ ━━━ */}
-      <section id="faq" className="py-24 md:py-32 bg-muted/30">
+      <section id="faq" className="py-16 sm:py-20 md:py-24 bg-muted/30">
         <div className="container mx-auto px-4">
           <FadeInSection className="text-center mb-16">
              <Badge variant="outline" className="mb-4 px-4 py-1.5">FAQ</Badge>
