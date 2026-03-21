@@ -84,7 +84,12 @@ function BalanceTopup({ userId }: { userId?: string }) {
         {useCustom && <input type="number" value={customAmount} onChange={(e) => setCustomAmount(e.target.value)} placeholder="Summa kiriting" min={MIN_TOPUP_UZS} className="flex-1 h-9 rounded-lg border border-border bg-background px-3 text-sm" />}
       </div>
       <Button className="w-full" size="lg" onClick={handleTopup} disabled={isProcessing || !amount || amount < MIN_TOPUP_UZS}>
-        {isProcessing ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Yuklanmoqda...</> : <><CreditCard className="h-4 w-4 mr-2" /> Click orqali {amount >= MIN_TOPUP_UZS ? `${amount.toLocaleString()} so'm` : ''} to'ldirish</>}
+        {isProcessing ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Yuklanmoqda...</> : (
+          <span className="flex items-center gap-1.5 truncate">
+            <CreditCard className="h-4 w-4 shrink-0" />
+            <span className="truncate">Click · {amount >= MIN_TOPUP_UZS ? `${amount.toLocaleString()} so'm` : "To'ldirish"}</span>
+          </span>
+        )}
       </Button>
     </div>
   );
