@@ -328,18 +328,18 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
       </div>
 
       {/* Status tabs */}
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-hide pb-1">
         {STATUS_CATEGORIES.map(cat => {
           const count = cat.key === 'all'
             ? statusCountBase.length
             : statusCountBase.filter(e => e.statusCategory === cat.key).length;
           return (
             <Button key={cat.key} variant={statusFilter === cat.key ? 'default' : 'outline'}
-              size="sm" className="h-7 text-[11px] px-2.5 gap-1 rounded-full"
+              size="sm" className="h-7 text-[10px] sm:text-[11px] px-2 sm:px-2.5 gap-1 rounded-full shrink-0"
               onClick={() => { setStatusFilter(cat.key); setCurrentPage(1); }}>
-              <cat.icon className={`h-3.5 w-3.5 ${cat.color}`} />
+              <cat.icon className={`h-3 w-3 sm:h-3.5 sm:w-3.5 ${cat.color}`} />
               {cat.label}
-              {count > 0 && <Badge variant="secondary" className="ml-0.5 h-4 min-w-4 text-[10px] px-1">{count}</Badge>}
+              {count > 0 && <Badge variant="secondary" className="ml-0.5 h-4 min-w-4 text-[9px] sm:text-[10px] px-1">{count}</Badge>}
             </Button>
           );
         })}

@@ -141,12 +141,12 @@ function DynamicPlanCard({ plan, isCurrentPlan, onSelect, isProcessing }: {
         )}
       </ul>
 
-      <Button className="w-full" variant={isCurrentPlan ? 'outline' : 'default'}
+      <Button className="w-full text-xs sm:text-sm" variant={isCurrentPlan ? 'outline' : 'default'}
         style={!isCurrentPlan ? { backgroundColor: plan.color || undefined } : undefined}
         onClick={() => onSelect(plan)} disabled={isProcessing}>
         {isProcessing
           ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Yuklanmoqda...</>
-          : <><CreditCard className="h-4 w-4 mr-2" /> {isCurrentPlan ? 'Muddatni uzaytirish' : 'Click orqali to\'lash'}</>}
+          : <span className="flex items-center gap-1.5 truncate"><CreditCard className="h-4 w-4 shrink-0" /><span className="truncate">{isCurrentPlan ? 'Uzaytirish' : "Click · To'lash"}</span></span>}
       </Button>
     </div>
   );
