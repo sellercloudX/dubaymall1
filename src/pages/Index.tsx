@@ -620,7 +620,7 @@ export default function Index() {
       </section>
 
       {/* ━━━ Features ━━━ */}
-      <section id="features" className="py-16 sm:py-24 md:py-32 relative overflow-hidden">
+      <section id="features" className="py-16 sm:py-20 md:py-24 relative overflow-hidden">
         <div className="absolute inset-0 bg-dot-pattern opacity-[0.03]" />
         <div className="absolute inset-0 flex items-center justify-center opacity-10 dark:opacity-5 pointer-events-none">
           <img src={abstractShapes} alt="" className="w-full h-full object-cover" loading="lazy" />
@@ -657,7 +657,7 @@ export default function Index() {
       </section>
 
       {/* ━━━ Results Banner ━━━ */}
-      <section className="py-20 bg-muted/30 border-y relative overflow-hidden">
+      <section className="py-12 sm:py-16 md:py-20 bg-muted/30 border-y relative overflow-hidden">
         <div className="absolute inset-0 bg-grid-pattern opacity-[0.03]" />
         <div className="container mx-auto px-4 relative">
           <FadeInSection className="text-center mb-12">
@@ -681,7 +681,7 @@ export default function Index() {
       </section>
 
       {/* ━━━ How It Works ━━━ */}
-      <section id="how-it-works" className="py-16 sm:py-24 md:py-32">
+      <section id="how-it-works" className="py-16 sm:py-20 md:py-24">
         <div className="container mx-auto px-3 sm:px-4">
           <FadeInSection className="text-center mb-10 sm:mb-16 md:mb-20">
             <Badge variant="outline" className="mb-3 sm:mb-4 px-3 sm:px-4 py-1 sm:py-1.5">Process</Badge>
@@ -710,7 +710,7 @@ export default function Index() {
       <DynamicPricing FadeInSection={FadeInSection} />
 
       {/* ━━━ Testimonials ━━━ */}
-      <section className="py-24 md:py-32">
+      <section className="py-16 sm:py-20 md:py-24">
         <div className="container mx-auto px-4">
           <FadeInSection className="text-center mb-16">
             <Badge variant="outline" className="mb-4 px-4 py-1.5">Testimonials</Badge>
@@ -748,7 +748,7 @@ export default function Index() {
 
 
       {/* ━━━ FAQ ━━━ */}
-      <section id="faq" className="py-24 md:py-32 bg-muted/30">
+      <section id="faq" className="py-16 sm:py-20 md:py-24 bg-muted/30">
         <div className="container mx-auto px-4">
           <FadeInSection className="text-center mb-16">
              <Badge variant="outline" className="mb-4 px-4 py-1.5">FAQ</Badge>
@@ -768,7 +768,7 @@ export default function Index() {
       </section>
 
        {/* ━━━ Final CTA ━━━ */}
-       <section className="py-16 sm:py-20 md:py-32 relative overflow-hidden">
+       <section className="py-16 sm:py-20 md:py-24 relative overflow-hidden">
          <div className="absolute inset-0 bg-gradient-to-br from-primary to-accent" />
          <div className="absolute inset-0 bg-dot-pattern opacity-10" />
          <FloatingParticles />

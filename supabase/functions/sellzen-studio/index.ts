@@ -8,10 +8,10 @@ const corsHeaders = {
 
 const SELLZEN_URL = "https://qqqzkrldaaqogwjvfgcg.supabase.co/functions/v1/api-generate";
 
-const STYLE_PRESETS: Record<string, { mode: string; style: string; scene: string; label: string }> = {
-  infographic: { mode: 'modelsiz', style: 'infografika', scene: 'premium', label: 'Infografika' },
-  lifestyle: { mode: 'modelsiz', style: 'lifestyle', scene: 'tabiat', label: 'Lifestyle' },
-  minimalist: { mode: 'modelsiz', style: 'tabiiy', scene: 'minimalist', label: 'Minimalist' },
+const STYLE_PRESETS: Record<string, { style: string; scene: string; label: string }> = {
+  infographic: { style: 'infografika', scene: 'premium', label: 'Infografika' },
+  lifestyle: { style: 'lifestyle', scene: 'tabiat', label: 'Lifestyle' },
+  minimalist: { style: 'tabiiy', scene: 'minimalist', label: 'Minimalist' },
 };
 
 async function checkRateLimit(supabase: any, userId: string): Promise<boolean> {
@@ -77,7 +77,7 @@ serve(async (req) => {
       });
     }
 
-    const { action, imageBase64, category, productName, styles, template } = await req.json();
+    const { action, imageBase64, category, productName, styles, template, mode } = await req.json();
 
     if (action === "generate_images") {
       // Generate multiple styled images from one source image
@@ -91,7 +91,7 @@ serve(async (req) => {
         try {
           const body = {
             imageBase64,
-            mode: preset.mode,
+            mode: mode || 'modelsiz',
             style: preset.style,
             scene: preset.scene,
             language: 'uz',
