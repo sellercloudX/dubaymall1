@@ -768,7 +768,7 @@ export default function Index() {
       </section>
 
        {/* ━━━ Final CTA ━━━ */}
-       <section className="py-16 sm:py-20 md:py-32 relative overflow-hidden">
+       <section className="py-16 sm:py-20 md:py-24 relative overflow-hidden">
          <div className="absolute inset-0 bg-gradient-to-br from-primary to-accent" />
          <div className="absolute inset-0 bg-dot-pattern opacity-10" />
          <FloatingParticles />
