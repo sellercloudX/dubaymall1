@@ -681,7 +681,7 @@ export default function Index() {
       </section>
 
       {/* ━━━ How It Works ━━━ */}
-      <section id="how-it-works" className="py-16 sm:py-24 md:py-32">
+      <section id="how-it-works" className="py-16 sm:py-20 md:py-24">
         <div className="container mx-auto px-3 sm:px-4">
           <FadeInSection className="text-center mb-10 sm:mb-16 md:mb-20">
             <Badge variant="outline" className="mb-3 sm:mb-4 px-3 sm:px-4 py-1 sm:py-1.5">Process</Badge>
