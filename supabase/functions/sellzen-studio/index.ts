@@ -77,7 +77,7 @@ serve(async (req) => {
       });
     }
 
-    const { action, imageBase64, category, productName, styles, template } = await req.json();
+    const { action, imageBase64, category, productName, styles, template, mode } = await req.json();
 
     if (action === "generate_images") {
       // Generate multiple styled images from one source image
