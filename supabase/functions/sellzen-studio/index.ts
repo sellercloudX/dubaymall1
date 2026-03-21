@@ -91,7 +91,7 @@ serve(async (req) => {
         try {
           const body = {
             imageBase64,
-            mode: preset.mode,
+            mode: mode || 'modelsiz',
             style: preset.style,
             scene: preset.scene,
             language: 'uz',
