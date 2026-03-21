@@ -657,7 +657,7 @@ export default function Index() {
       </section>
 
       {/* ━━━ Results Banner ━━━ */}
-      <section className="py-20 bg-muted/30 border-y relative overflow-hidden">
+      <section className="py-12 sm:py-16 md:py-20 bg-muted/30 border-y relative overflow-hidden">
         <div className="absolute inset-0 bg-grid-pattern opacity-[0.03]" />
         <div className="container mx-auto px-4 relative">
           <FadeInSection className="text-center mb-12">
