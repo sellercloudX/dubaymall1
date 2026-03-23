@@ -1,4 +1,4 @@
-import { BarChart3, Scan, Package, ShoppingCart, MoreHorizontal, Globe } from 'lucide-react';
+import { BarChart3, Package, ShoppingCart, MoreHorizontal, Globe } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export type MobileTabType = 
@@ -8,7 +8,7 @@ export type MobileTabType =
   | 'reports' | 'notifications' | 'subscription' | 'cost-prices'
   | 'reviews' | 'seller-analytics' | 'ads' | 'seo-keywords'
   | 'competitor' | 'sales' | 'support' | 'stores' | 'profile'
-  | 'stock-forecast' | 'tutorials';
+  | 'stock-forecast' | 'tutorials' | 'sellzen-studio';
 
 interface MobileSellerCloudNavProps {
   activeTab: MobileTabType;
@@ -17,15 +17,14 @@ interface MobileSellerCloudNavProps {
 }
 
 const navItems = [
-  { id: 'marketplaces' as const, icon: Globe, label: 'Marketplace' },
-  { id: 'analytics' as const, icon: BarChart3, label: 'Analitika' },
-  { id: 'scanner' as const, icon: Scan, label: 'Scanner' },
-  { id: 'products' as const, icon: Package, label: 'Mahsulot' },
   { id: 'orders' as const, icon: ShoppingCart, label: 'Buyurtma' },
+  { id: 'products' as const, icon: Package, label: 'Mahsulot' },
+  { id: 'financials' as const, icon: BarChart3, label: 'Moliya' },
+  { id: 'marketplaces' as const, icon: Globe, label: 'Marketplace' },
   { id: 'more' as const, icon: MoreHorizontal, label: "Ko'proq" },
 ];
 
-const primaryTabIds: MobileTabType[] = ['marketplaces', 'analytics', 'scanner', 'products', 'orders'];
+const primaryTabIds: MobileTabType[] = ['orders', 'products', 'financials', 'marketplaces'];
 
 export function MobileSellerCloudNav({ activeTab, onTabChange, onMorePress }: MobileSellerCloudNavProps) {
   const isMoreActive = !primaryTabIds.includes(activeTab);

@@ -6,6 +6,7 @@ import {
   ArrowDownUp, DollarSign, BarChart3,
   Copy, AlertOctagon, Tag, FileSpreadsheet, Bell, CreditCard, Coins,
   MessageCircle, Activity, Megaphone, Search, LayoutDashboard, UserCog, BookOpen,
+  Sparkles, Scan,
 } from 'lucide-react';
 
 interface MobileMoreMenuProps {
@@ -22,12 +23,12 @@ type MenuCategory = {
 
 const menuCategories: MenuCategory[] = [
   {
-    title: '💰 Moliya',
+    title: '💰 Moliya & Narxlar',
     items: [
-      { id: 'financials', icon: DollarSign, label: 'Moliya', color: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' },
       { id: 'sales', icon: BarChart3, label: 'Sotuvlar', color: 'bg-lime-500/15 text-lime-600 dark:text-lime-400' },
-      { id: 'cost-prices', icon: Coins, label: 'Tannarx', color: 'bg-amber-500/15 text-amber-600 dark:text-amber-400' },
       { id: 'pricing', icon: Tag, label: 'Narxlar', color: 'bg-violet-500/15 text-violet-600 dark:text-violet-400' },
+      { id: 'cost-prices', icon: Coins, label: 'Tannarx', color: 'bg-amber-500/15 text-amber-600 dark:text-amber-400' },
+      { id: 'stock-forecast', icon: Activity, label: 'Zaxira', color: 'bg-teal-500/15 text-teal-600 dark:text-teal-400' },
     ],
   },
   {
@@ -35,17 +36,18 @@ const menuCategories: MenuCategory[] = [
     items: [
       { id: 'abc-analysis', icon: BarChart3, label: 'ABC-analiz', color: 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400' },
       { id: 'seller-analytics', icon: Activity, label: 'Sotuvchi', color: 'bg-sky-500/15 text-sky-600 dark:text-sky-400' },
-      { id: 'seo-keywords', icon: Search, label: 'SEO & Kalit', color: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' },
       { id: 'competitor', icon: ArrowDownUp, label: 'Raqobat', color: 'bg-fuchsia-500/15 text-fuchsia-600 dark:text-fuchsia-400' },
+      { id: 'seo-keywords', icon: Search, label: 'SEO & Kalit', color: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' },
       { id: 'reviews', icon: MessageCircle, label: 'Sharhlar', color: 'bg-pink-500/15 text-pink-600 dark:text-pink-400' },
       { id: 'ads', icon: Megaphone, label: 'Reklama', color: 'bg-orange-500/15 text-orange-600 dark:text-orange-400' },
     ],
   },
   {
-    title: '🛠 Asboblar',
+    title: '🛠 AI & Asboblar',
     items: [
+      { id: 'sellzen-studio', icon: Sparkles, label: 'SellZen AI', color: 'bg-primary/15 text-primary' },
+      { id: 'scanner', icon: Scan, label: 'AI Scanner', color: 'bg-purple-500/15 text-purple-600 dark:text-purple-400' },
       { id: 'stores', icon: LayoutDashboard, label: "Do'konlar", color: 'bg-blue-500/15 text-blue-600 dark:text-blue-400' },
-      { id: 'stock-forecast', icon: Activity, label: 'Zaxira', color: 'bg-teal-500/15 text-teal-600 dark:text-teal-400' },
       { id: 'card-clone', icon: Copy, label: 'Klonlash', color: 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400' },
       { id: 'problems', icon: AlertOctagon, label: 'Muammolar', color: 'bg-rose-500/15 text-rose-600 dark:text-rose-400' },
       { id: 'mxik', icon: FileSpreadsheet, label: 'MXIK baza', color: 'bg-slate-500/15 text-slate-600 dark:text-slate-400' },
@@ -54,9 +56,9 @@ const menuCategories: MenuCategory[] = [
   {
     title: '⚙️ Tizim',
     items: [
-      { id: 'reports', icon: FileSpreadsheet, label: 'Hisobotlar', color: 'bg-gray-500/15 text-gray-600 dark:text-gray-400' },
-      { id: 'notifications', icon: Bell, label: 'Bildirishnoma', color: 'bg-yellow-500/15 text-yellow-600 dark:text-yellow-400' },
       { id: 'subscription', icon: CreditCard, label: 'Obuna', color: 'bg-primary/15 text-primary' },
+      { id: 'notifications', icon: Bell, label: 'Bildirishnoma', color: 'bg-yellow-500/15 text-yellow-600 dark:text-yellow-400' },
+      { id: 'reports', icon: FileSpreadsheet, label: 'Hisobotlar', color: 'bg-gray-500/15 text-gray-600 dark:text-gray-400' },
       { id: 'profile', icon: UserCog, label: 'Profil', color: 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400' },
       { id: 'tutorials', icon: BookOpen, label: 'Qo\'llanma', color: 'bg-blue-500/15 text-blue-600 dark:text-blue-400' },
       { id: 'support', icon: MessageCircle, label: 'Yordam', color: 'bg-green-500/15 text-green-600 dark:text-green-400' },
