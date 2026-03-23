@@ -394,52 +394,34 @@ serve(async (req) => {
     let resultImage: { url: string; isTextFree: boolean } | null = null;
     let engine = 'unknown';
 
-    // ═══ STAGE 1: Try SellZen AI (primary) ═══
+    // ═══ SellZen AI ONLY — no fallback to maintain quality ═══
     const SELLZEN_API_KEY = Deno.env.get("SELLZEN_API_KEY");
-    if (SELLZEN_API_KEY && productImage) {
-      console.log("🚀 Trying SellZen AI (primary)...");
-      const sellzenResult = await generateWithSellZen(
-        productImage, productName, category || '', style || 'professional', SELLZEN_API_KEY
-      );
-      if (sellzenResult) {
-        // Upload to our storage if it's base64
-        const storedUrl = await uploadToStorage(sellzenResult.url, style || 'professional');
-        if (storedUrl) {
-          resultImage = { url: storedUrl, isTextFree: sellzenResult.isTextFree };
-          engine = 'sellzen';
-        }
+    if (!SELLZEN_API_KEY) {
+      return new Response(JSON.stringify({ error: "SELLZEN_API_KEY sozlanmagan" }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!productImage) {
+      return new Response(JSON.stringify({ error: "Mahsulot rasmi kerak" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    console.log("🚀 SellZen AI (exclusive provider)...");
+    const sellzenResult = await generateWithSellZen(
+      productImage, productName, category || '', style || 'professional', SELLZEN_API_KEY
+    );
+    if (sellzenResult) {
+      const storedUrl = await uploadToStorage(sellzenResult.url, style || 'professional');
+      if (storedUrl) {
+        resultImage = { url: storedUrl, isTextFree: sellzenResult.isTextFree };
+        engine = 'sellzen';
       }
     }
 
-    // ═══ STAGE 2: Gemini Fallback ═══
     if (!resultImage) {
-      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-      if (!LOVABLE_API_KEY) {
-        return new Response(JSON.stringify({ error: "AI xizmati sozlanmagan" }), {
-          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      console.log("🔄 SellZen unavailable, using Gemini fallback...");
-      const prompt = buildGeminiPrompt(productName, category || '', style || 'professional', categoryKey);
-
-      let generatedUrl: string | null = null;
-
-      if (productImage) {
-        const refPrompt = `${prompt}\n\nCRITICAL: Use the attached product image as EXACT visual reference. Match shape, color, brand exactly. ABSOLUTELY NO TEXT.`;
-        generatedUrl = await generateWithGemini(refPrompt, LOVABLE_API_KEY, productImage);
-      }
-      if (!generatedUrl) {
-        generatedUrl = await generateWithGemini(prompt, LOVABLE_API_KEY);
-      }
-
-      if (generatedUrl) {
-        const storedUrl = await uploadToStorage(generatedUrl, style || 'professional');
-        if (storedUrl) {
-          resultImage = { url: storedUrl, isTextFree: true };
-          engine = 'gemini-fallback';
-        }
-      }
+      console.error("❌ SellZen rasm yaratmadi");
     }
 
     const images: Array<{ url: string; style: string; isTextFree: boolean }> = [];
