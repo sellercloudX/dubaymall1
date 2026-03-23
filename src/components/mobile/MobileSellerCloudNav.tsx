@@ -1,4 +1,4 @@
-import { BarChart3, Scan, Package, ShoppingCart, MoreHorizontal, Globe } from 'lucide-react';
+import { BarChart3, Package, ShoppingCart, MoreHorizontal, Globe } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export type MobileTabType = 
