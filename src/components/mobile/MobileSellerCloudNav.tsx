@@ -8,7 +8,7 @@ export type MobileTabType =
   | 'reports' | 'notifications' | 'subscription' | 'cost-prices'
   | 'reviews' | 'seller-analytics' | 'ads' | 'seo-keywords'
   | 'competitor' | 'sales' | 'support' | 'stores' | 'profile'
-  | 'stock-forecast' | 'tutorials';
+  | 'stock-forecast' | 'tutorials' | 'sellzen-studio';
 
 interface MobileSellerCloudNavProps {
   activeTab: MobileTabType;
