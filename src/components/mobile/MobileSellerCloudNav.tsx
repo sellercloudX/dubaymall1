@@ -17,11 +17,10 @@ interface MobileSellerCloudNavProps {
 }
 
 const navItems = [
-  { id: 'marketplaces' as const, icon: Globe, label: 'Marketplace' },
-  { id: 'analytics' as const, icon: BarChart3, label: 'Analitika' },
-  { id: 'scanner' as const, icon: Scan, label: 'Scanner' },
-  { id: 'products' as const, icon: Package, label: 'Mahsulot' },
   { id: 'orders' as const, icon: ShoppingCart, label: 'Buyurtma' },
+  { id: 'products' as const, icon: Package, label: 'Mahsulot' },
+  { id: 'financials' as const, icon: BarChart3, label: 'Moliya' },
+  { id: 'marketplaces' as const, icon: Globe, label: 'Marketplace' },
   { id: 'more' as const, icon: MoreHorizontal, label: "Ko'proq" },
 ];
 
