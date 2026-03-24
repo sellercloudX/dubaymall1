@@ -2805,7 +2805,7 @@ serve(async (req) => {
 
             if (response.ok) {
               const data = await response.json();
-              result = { success: true, data, updated: stockUpdates.length };
+              result = { success: true, data, updated: updates.length };
             } else {
               const errText = await response.text();
               result = { success: false, error: `Stock update failed: ${response.status}`, details: errText };
