@@ -108,7 +108,7 @@ export function AIServicesPanel() {
                       <h3 className="text-sm font-semibold truncate">{svc.titleKey}</h3>
                     </div>
                     <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">{svc.descKey}</p>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       {pricing ? (
                         pricing.is_free ? (
                           <Badge variant="secondary" className="text-[10px]">Bepul</Badge>
@@ -116,6 +116,7 @@ export function AIServicesPanel() {
                           <Badge variant="outline" className="text-[10px]">
                             <DollarSign className="h-2.5 w-2.5 mr-0.5" />
                             {(pricing.base_price_uzs || 0).toLocaleString()} so'm
+                            {(pricing as any).billing_type === 'monthly' ? '/oy' : '/dona'}
                           </Badge>
                         )
                       ) : (
