@@ -875,6 +875,7 @@ export type Database = {
       feature_pricing: {
         Row: {
           base_price_uzs: number | null
+          billing_type: string
           category: string | null
           created_at: string | null
           description: string | null
@@ -887,11 +888,13 @@ export type Database = {
           is_enabled: boolean | null
           is_free: boolean | null
           is_premium_only: boolean | null
+          monthly_limit: number | null
           sort_order: number | null
           updated_at: string | null
         }
         Insert: {
           base_price_uzs?: number | null
+          billing_type?: string
           category?: string | null
           created_at?: string | null
           description?: string | null
@@ -904,11 +907,13 @@ export type Database = {
           is_enabled?: boolean | null
           is_free?: boolean | null
           is_premium_only?: boolean | null
+          monthly_limit?: number | null
           sort_order?: number | null
           updated_at?: string | null
         }
         Update: {
           base_price_uzs?: number | null
+          billing_type?: string
           category?: string | null
           created_at?: string | null
           description?: string | null
@@ -921,6 +926,7 @@ export type Database = {
           is_enabled?: boolean | null
           is_free?: boolean | null
           is_premium_only?: boolean | null
+          monthly_limit?: number | null
           sort_order?: number | null
           updated_at?: string | null
         }

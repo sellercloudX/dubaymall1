@@ -28,9 +28,9 @@ export const sellerMenuItems: SellerMenuItem[] = [
   { id: 'marketplaces', label: 'Marketplacelar', icon: Globe, group: 'main' },
   { id: 'orders', label: 'Buyurtmalar', icon: ShoppingCart, group: 'main' },
   { id: 'products', label: 'Mahsulotlar', icon: Package, group: 'main' },
-  { id: 'sales', label: 'Sotuvlar', icon: DollarSign, group: 'main' },
-  { id: 'financials', label: 'Moliya', icon: DollarSign, group: 'main' },
-  { id: 'pricing', label: 'Narx boshqaruvi', icon: DollarSign, group: 'main' },
+  { id: 'sales', label: 'Sotuvlar', icon: Receipt, group: 'main' },
+  { id: 'financials', label: 'Moliya', icon: Wallet, group: 'main' },
+  { id: 'pricing', label: 'Narx boshqaruvi', icon: ArrowDownUp, group: 'main' },
   { id: 'cost-prices', label: 'Tannarx', icon: DollarSign, group: 'main' },
   { id: 'stock-forecast', label: 'Zaxira nazorat', icon: Activity, group: 'main' },
   // Analitika

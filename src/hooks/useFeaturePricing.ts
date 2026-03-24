@@ -19,6 +19,8 @@ export interface FeaturePrice {
   is_free: boolean;
   is_premium_only: boolean;
   elegant_limit: number | null;
+  monthly_limit: number | null;
+  billing_type: 'per_use' | 'monthly';
   description: string | null;
   sort_order: number;
 }
