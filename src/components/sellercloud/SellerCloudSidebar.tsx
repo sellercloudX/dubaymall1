@@ -24,33 +24,36 @@ export interface SellerMenuItem {
 }
 
 export const sellerMenuItems: SellerMenuItem[] = [
-  // Asosiy — eng ko'p ishlatiladigan bo'limlar
+  // 1-bosqich: Ulanish va sozlash
   { id: 'marketplaces', label: 'Marketplacelar', icon: Globe, group: 'main' },
-  { id: 'orders', label: 'Buyurtmalar', icon: ShoppingCart, group: 'main' },
+  { id: 'stores', label: 'Do\'konlar', icon: LayoutDashboard, group: 'main' },
+  // 2-bosqich: Mahsulot va buyurtmalar
   { id: 'products', label: 'Mahsulotlar', icon: Package, group: 'main' },
-  { id: 'sales', label: 'Sotuvlar', icon: Receipt, group: 'main' },
-  { id: 'financials', label: 'Moliya', icon: Wallet, group: 'main' },
+  { id: 'orders', label: 'Buyurtmalar', icon: ShoppingCart, group: 'main' },
+  // 3-bosqich: Narxlash va tannarx
   { id: 'pricing', label: 'Narx boshqaruvi', icon: ArrowDownUp, group: 'main' },
   { id: 'cost-prices', label: 'Tannarx', icon: DollarSign, group: 'main' },
+  // 4-bosqich: Moliya va sotuvlar
+  { id: 'sales', label: 'Sotuvlar', icon: Receipt, group: 'main' },
+  { id: 'financials', label: 'Moliya', icon: Wallet, group: 'main' },
   { id: 'stock-forecast', label: 'Zaxira nazorat', icon: Activity, group: 'main' },
   // Analitika
-  { id: 'product-analytics', label: 'Mahsulot analitika', icon: BarChart3, group: 'analytics' },
   { id: 'unit-economy', label: 'Unit-economy', icon: Receipt, group: 'analytics' },
+  { id: 'product-analytics', label: 'Mahsulot analitika', icon: BarChart3, group: 'analytics' },
   { id: 'abc', label: 'ABC-analiz', icon: BarChart3, group: 'analytics' },
   { id: 'wb-analytics', label: 'Sotuvchi analitika', icon: Activity, group: 'analytics' },
   { id: 'seo-monitor', label: 'SEO & Kalit so\'zlar', icon: Search, group: 'analytics' },
   { id: 'competitor', label: 'Raqobat narx', icon: ArrowDownUp, group: 'analytics' },
   { id: 'reviews', label: 'Sharhlar', icon: MessageCircle, group: 'analytics' },
   { id: 'ads', label: 'Reklama', icon: Megaphone, group: 'analytics' },
-  // Asboblar
+  // AI & Asboblar
   { id: 'scanner', label: 'AI Scanner', icon: Scan, group: 'tools' },
   { id: 'sellzen-studio', label: 'SellZen Studio', icon: Sparkles, group: 'tools' },
-  { id: 'stores', label: 'Do\'konlar', icon: LayoutDashboard, group: 'tools' },
   { id: 'clone', label: 'Klonlash', icon: Copy, group: 'tools' },
   { id: 'problems', label: 'Muammolar', icon: AlertOctagon, group: 'tools' },
   { id: 'mxik', label: 'MXIK baza', icon: FileSpreadsheet, group: 'tools' },
   // Sozlamalar
-  { id: 'subscription', label: 'Obuna', icon: CreditCard, group: 'settings' },
+  { id: 'subscription', label: 'Obuna & Balans', icon: CreditCard, group: 'settings' },
   { id: 'profile', label: 'Profil', icon: UserCog, group: 'settings' },
   { id: 'team', label: 'Jamoa', icon: Globe, group: 'settings' },
   { id: 'reports', label: 'Hisobotlar', icon: FileSpreadsheet, group: 'settings' },
