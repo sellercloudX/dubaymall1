@@ -252,6 +252,10 @@ export default function SellerCloudMobile() {
         return <div className="p-4"><TutorialVideos /></div>;
       case 'unit-economy':
         return <div className="p-4"><UnitEconomyDashboard connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
+      case 'sellzen-studio':
+        return <div className="p-4"><SellZenStudio /></div>;
+      case 'trend-hunter':
+        return <MobileTrendHunter />;
       default:
         return null;
     }
