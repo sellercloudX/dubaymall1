@@ -70,8 +70,8 @@ export function SellZenStudio() {
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
 
-  const imagePrice = getFeaturePrice('generate_infographic')?.base_price_uzs || 3000;
-  const videoPrice = getFeaturePrice('ai_video_generation')?.base_price_uzs || 15000;
+  const imagePrice = getFeaturePrice('sellzen-image-generate')?.base_price_uzs || 8000;
+  const videoPrice = getFeaturePrice('ai_video_generation')?.base_price_uzs || 18000;
 
   const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -118,7 +118,7 @@ export function SellZenStudio() {
 
     setIsGeneratingImages(true);
     try {
-      const result = await deductBalance('generate_infographic', `SellZen Studio: ${mode} ${styleType}`);
+      const result = await deductBalance('sellzen-image-generate', `SellZen Studio: ${mode} ${styleType}`);
       if (!result.success) {
         toast.error(result.error || 'Balans yechishda xatolik');
         setIsGeneratingImages(false);
