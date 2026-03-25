@@ -42,29 +42,66 @@ serve(async (req) => {
       });
     }
 
-    const { keywords, marketplace, categories } = await req.json();
+    const { category, period = 14, keywords, marketplace, include_source_links = true, global_trends = true } = await req.json();
 
-    // Build comprehensive prompt for Gemini
-    const keywordData = (keywords || []).slice(0, 50).map((k: any) => 
-      `"${k.text}" — chastota: ${k.totalFrequency}, buyurtma: ${k.totalOrders}, klik: ${k.totalClicks}, konversiya: ${k.totalClicks > 0 ? ((k.totalOrders/k.totalClicks)*100).toFixed(1) : 0}%`
-    ).join('\n');
+    // Build optional WB keyword context if provided
+    let keywordContext = '';
+    if (keywords && keywords.length > 0) {
+      const keywordData = keywords.slice(0, 30).map((k: any) =>
+        `"${k.text}" — chastota: ${k.totalFrequency}, buyurtma: ${k.totalOrders}, konversiya: ${k.totalClicks > 0 ? ((k.totalOrders / k.totalClicks) * 100).toFixed(1) : 0}%`
+      ).join('\n');
+      keywordContext = `\n\n## MARKETPLACE MA'LUMOTLARI (${marketplace || 'Wildberries'}, oxirgi 14 kun):\n${keywordData}`;
+    }
 
-    const prompt = `Sen professional e-commerce trend analitik ekspertisan. O'zbekiston va MDH bozori uchun marketplace (${marketplace || 'Wildberries'}) ma'lumotlarini tahlil qil.
+    const categoryFilter = category ? `\nFAQAT "${category}" kategoriyasiga tegishli mahsulotlarni tahlil qil.` : '';
 
-## HOZIRGI MA'LUMOTLAR (oxirgi 14 kun):
-${keywordData || 'Kalit so\'z ma\'lumotlari mavjud emas'}
+    const currentDate = new Date().toISOString().split('T')[0];
+    const currentMonth = new Date().toLocaleString('uz-UZ', { month: 'long' });
 
-${categories ? `Kategoriyalar: ${categories.join(', ')}` : ''}
+    const prompt = `Sen dunyo miqyosidagi professional e-commerce trend analitik va import/export mutaxassisisan.
 
 ## VAZIFA:
-1. Kelgusi 7-30 kun uchun ANIQ bashoratlar ber
-2. Har bir bashorat uchun: mahsulot nomi, kategoriya, talab darajasi (1-100), narx oralig'i (so'm), oylik sotuvlar bashorati, sof foyda potentsiali
-3. Nima uchun bu mahsulot trend ekanligini tushuntir
-4. Mavsum va bayramlar ta'sirini hisobga ol (hozirgi sana: ${new Date().toISOString().split('T')[0]})
-5. Raqobat darajasini baholash (past/o'rta/yuqori)
-6. Kamida 10 ta turli kategoriyadan mahsulotlar taklif qil
+Dunyo bozorida (AQSh, Yevropa, Xitoy, Janubi-Sharqiy Osiyo) hozirda TREND ga chiqayotgan, lekin O'zbekiston va MDH bozoriga hali KIRMAGAN yoki endigina kirish bosqichidagi mahsulotlarni aniqla.
 
-MUHIM: Faqat O'zbekiston bozoriga mos mahsulotlarni taklif qil. Narxlarni so'm da ber. Real bozor ma'lumotlariga asoslan.`;
+Hozirgi sana: ${currentDate} (${currentMonth})
+Bashorat muddati: ${period} kun
+
+${categoryFilter}
+${keywordContext}
+
+## TALAB:
+1. Har bir mahsulot uchun ANIQ ma'lumotlar ber:
+   - Mahsulot nomi (o'zbek tilida tushuntir)
+   - Kategoriya
+   - Talab darajasi (demand_score: 1-100)
+   - Narx oralig'i so'mda (O'zbekiston bozorida sotish narxi)
+   - Oylik sotuvlar bashorati (O'zbekiston bozorida necha dona sotilishi mumkin)
+   - Sof foyda potentsiali (so'm/oy) - import narxi va sotish narxi farqini hisobga ol
+   - Raqobat darajasi O'zbekiston bozorida
+   - Trend yo'nalishi
+   - Nima uchun trend ekanligini aniq sabablari
+   - Qachon kirish yaxshiligini ayt
+   - Risk darajasi
+   - Dunyo bozorida qanday trend ekanligi haqida qisqa ma'lumot
+
+2. Har bir mahsulot uchun XITOY OPTOM SAYTLARIDAN xarid qilish uchun havolalar ber:
+   - 1688.com (xitoy optom narxi eng arzon)
+   - alibaba.com (xalqaro optom)
+   - Zarur bo'lsa boshqa optom saytlar
+   - Har bir havola uchun taxminiy narx oralig'ini ko'rsat
+
+3. MUHIM qoidalar:
+   - Faqat HAQIQIY global trendlarni taklif qil (TikTok viral, Amazon bestseller, AliExpress top seller)
+   - Narxlarni real bozor asosida ber (taxminiy emas)
+   - O'zbekiston logistikasi va bojxona xarajatlarini hisobga ol
+   - Mavsumiy omillarni e'tiborga ol (hozirgi oy: ${currentMonth})
+   - Kamida 8-12 ta turli kategoriyadan mahsulotlar taklif qil
+   - Xitoy optom havolalari to'g'ridan-to'g'ri mahsulot sahifasiga olib borishi kerak
+
+4. HAVOLALAR FORMATI:
+   - 1688.com uchun: https://s.1688.com/selloffer/offer_search.htm?keywords=MAHSULOT_NOMI_XITOYCHA
+   - alibaba.com uchun: https://www.alibaba.com/trade/search?SearchText=MAHSULOT_NOMI_INGLIZCHA
+   - Bu havolalar qidiruv natijalari sahifasiga olib boradi`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -75,14 +112,17 @@ MUHIM: Faqat O'zbekiston bozoriga mos mahsulotlarni taklif qil. Narxlarni so'm d
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
         messages: [
-          { role: "system", content: "Sen professional marketplace trend analitik va talab bashoratchi (demand forecaster) san. Javoblarni JSON formatda ber." },
+          {
+            role: "system",
+            content: "Sen professional dunyo miqyosidagi marketplace trend analitik va import/export mutaxassisisan. Javoblarni JSON formatda, aniq va real ma'lumotlar asosida ber. Xitoy optom saytlariga havolalarni DOIM qo'sh."
+          },
           { role: "user", content: prompt },
         ],
         tools: [{
           type: "function",
           function: {
             name: "trend_predictions",
-            description: "Marketplace trend bashoratlari",
+            description: "Dunyo bozori trend bashoratlari va xitoy optom manbalari",
             parameters: {
               type: "object",
               properties: {
@@ -91,29 +131,43 @@ MUHIM: Faqat O'zbekiston bozoriga mos mahsulotlarni taklif qil. Narxlarni so'm d
                   items: {
                     type: "object",
                     properties: {
-                      product_name: { type: "string", description: "Mahsulot nomi" },
+                      product_name: { type: "string", description: "Mahsulot nomi (o'zbek tilida)" },
                       category: { type: "string", description: "Kategoriya" },
                       demand_score: { type: "number", description: "Talab darajasi 1-100" },
-                      price_min: { type: "number", description: "Minimal narx (so'm)" },
-                      price_max: { type: "number", description: "Maksimal narx (so'm)" },
-                      monthly_sales_estimate: { type: "number", description: "Oylik sotuvlar bashorati (dona)" },
+                      price_min: { type: "number", description: "Minimal narx (so'm) - O'zbekiston bozorida" },
+                      price_max: { type: "number", description: "Maksimal narx (so'm) - O'zbekiston bozorida" },
+                      monthly_sales_estimate: { type: "number", description: "Oylik sotuvlar bashorati O'zbekistonda (dona)" },
                       net_profit_potential: { type: "number", description: "Sof foyda potentsiali (so'm/oy)" },
                       competition_level: { type: "string", enum: ["past", "o'rta", "yuqori"] },
                       trend_direction: { type: "string", enum: ["tez_o'sish", "sekin_o'sish", "barqaror", "mavsumiy"] },
-                      reason: { type: "string", description: "Nima uchun trend" },
+                      reason: { type: "string", description: "Nima uchun trend (aniq sabablar)" },
                       best_time_to_enter: { type: "string", description: "Qachon kirish yaxshi" },
                       risk_level: { type: "string", enum: ["past", "o'rta", "yuqori"] },
+                      global_trend_data: { type: "string", description: "Dunyo bozorida qanday trend ekanligi" },
+                      source_links: {
+                        type: "array",
+                        description: "Xitoy optom saytlaridan xarid qilish havolalari",
+                        items: {
+                          type: "object",
+                          properties: {
+                            platform: { type: "string", description: "Platforma nomi (1688.com, Alibaba, AliExpress)" },
+                            url: { type: "string", description: "To'g'ridan-to'g'ri havola" },
+                            price_range: { type: "string", description: "Taxminiy optom narx oralig'i" },
+                          },
+                          required: ["platform", "url"],
+                        },
+                      },
                     },
-                    required: ["product_name", "category", "demand_score", "price_min", "price_max", "monthly_sales_estimate", "net_profit_potential", "competition_level", "trend_direction", "reason"],
+                    required: ["product_name", "category", "demand_score", "price_min", "price_max", "monthly_sales_estimate", "net_profit_potential", "competition_level", "trend_direction", "reason", "source_links"],
                   },
                 },
                 market_summary: {
                   type: "object",
                   properties: {
-                    overall_trend: { type: "string" },
-                    hot_categories: { type: "array", items: { type: "string" } },
-                    seasonal_factors: { type: "string" },
-                    recommendation: { type: "string" },
+                    overall_trend: { type: "string", description: "Umumiy bozor holati va trend yo'nalishi" },
+                    hot_categories: { type: "array", items: { type: "string" }, description: "Eng issiq kategoriyalar" },
+                    seasonal_factors: { type: "string", description: "Mavsumiy omillar" },
+                    recommendation: { type: "string", description: "Umumiy strategik tavsiya" },
                   },
                 },
               },
@@ -143,7 +197,7 @@ MUHIM: Faqat O'zbekiston bozoriga mos mahsulotlarni taklif qil. Narxlarni so'm d
 
     const aiData = await response.json();
     const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
-    
+
     let predictions: any = null;
     if (toolCall?.function?.arguments) {
       try {
@@ -158,7 +212,7 @@ MUHIM: Faqat O'zbekiston bozoriga mos mahsulotlarni taklif qil. Narxlarni so'm d
       user_id: user.id,
       action_type: "trend-prediction",
       model_used: "gemini-2.5-flash",
-      metadata: { marketplace, keyword_count: keywords?.length || 0 },
+      metadata: { category, period, global_trends, keyword_count: keywords?.length || 0 },
     });
 
     return new Response(JSON.stringify({
