@@ -1105,7 +1105,7 @@ serve(async (req) => {
               const errText = await tariffResponse.text();
               console.error("Tariff calc error:", tariffResponse.status, errText);
               
-              // Handle restricted categories: parse error, exclude them, retry
+              // Handle restricted categories: parse error, retry with sellingProgram + fallback category
               let restrictedRetryResult: any = null;
               if (tariffResponse.status === 400) {
                 try {
@@ -1114,7 +1114,6 @@ serve(async (req) => {
                     e.code === 'BAD_REQUEST' && e.message?.includes('restricted')
                   );
                   if (restrictedMsg) {
-                    // Extract restricted category IDs from error message
                     const catMatch = restrictedMsg.message.match(/restricted[^:]*:\s*(.+)/i);
                     if (catMatch) {
                       const restrictedCats = new Set(
@@ -1122,16 +1121,16 @@ serve(async (req) => {
                       );
                       console.log(`Restricted categories detected: ${[...restrictedCats].join(', ')}`);
                       
-                      // Tag each offer with its original index, then filter out restricted ones
                       const taggedOffers = offersForCalc.map((o: any, i: number) => ({ ...o, _originalIndex: i }));
                       const allowedOffers = taggedOffers.filter((o: any) => !restrictedCats.has(o.categoryId));
+                      const restrictedOffers = taggedOffers.filter((o: any) => restrictedCats.has(o.categoryId));
                       
-                      console.log(`Retrying tariff calc with ${allowedOffers.length}/${offersForCalc.length} non-restricted offers`);
+                      console.log(`Split: ${allowedOffers.length} allowed, ${restrictedOffers.length} restricted`);
                       
+                      // Step 1: Get tariffs for allowed categories (with campaignId)
+                      let parsedAllowed: any[] = [];
                       if (allowedOffers.length > 0) {
-                        // Build clean offers without _originalIndex for API call
                         const cleanOffers = allowedOffers.map(({ _originalIndex, ...rest }: any) => rest);
-                        
                         await sleep(500);
                         const retryResponse = await fetchWithRetry(
                           'https://api.partner.market.yandex.ru/v2/tariffs/calculate',
@@ -1144,61 +1143,111 @@ serve(async (req) => {
                             }),
                           }
                         );
-                        
                         if (retryResponse.ok) {
                           const retryData = await retryResponse.json();
                           const retryResults = retryData.result?.offers || [];
-                          console.log(`Retry got ${retryResults.length} tariff results`);
-                          
-                          const parsedAllowed = parseTariffResults(retryResults, allowedOffers);
-                          
-                          // Create null entries for restricted offers
-                          const restrictedEntries = taggedOffers
-                            .filter((o: any) => restrictedCats.has(o.categoryId))
-                            .map((o: any) => ({
-                              index: o._originalIndex,
-                              categoryId: o.categoryId,
-                              price: o.price || 0,
-                              agencyCommission: 0,
-                              commissionPercent: 0,
-                              fulfillment: 0,
-                              delivery: 0,
-                              sorting: 0,
-                              other: 0,
-                              totalTariff: 0,
-                              tariffPercent: 0,
-                              restricted: true,
-                              rawTariffs: [],
-                            }));
-                          
-                          // Merge and sort by original index
-                          const merged = [...parsedAllowed, ...restrictedEntries].sort((a, b) => a.index - b.index);
-                          console.log(`Merged ${merged.length} results (${parsedAllowed.length} calculated, ${restrictedEntries.length} restricted)`);
-                          
-                          restrictedRetryResult = {
-                            success: true,
-                            data: merged,
-                            restrictedCategories: [...restrictedCats],
-                          };
-                        } else {
-                          console.error("Retry also failed:", retryResponse.status);
+                          console.log(`Allowed retry got ${retryResults.length} tariff results`);
+                          parsedAllowed = parseTariffResults(retryResults, allowedOffers);
                         }
-                      } else {
-                        // All offers are restricted
-                        restrictedRetryResult = {
-                          success: true,
-                          data: offersForCalc.map((o: any, i: number) => ({
-                            index: i,
+                      }
+                      
+                      // Step 2: For restricted categories, try sellingProgram instead of campaignId
+                      let parsedRestricted: any[] = [];
+                      if (restrictedOffers.length > 0) {
+                        // Try with sellingProgram=FBS (bypasses country-specific campaign restrictions)
+                        for (const program of ['FBS', 'FBY', 'DBS']) {
+                          const restrictedClean = restrictedOffers.map(({ _originalIndex, ...rest }: any) => rest);
+                          await sleep(500);
+                          const progResponse = await fetchWithRetry(
+                            'https://api.partner.market.yandex.ru/v2/tariffs/calculate',
+                            {
+                              method: 'POST',
+                              headers,
+                              body: JSON.stringify({
+                                parameters: { sellingProgram: program },
+                                offers: restrictedClean,
+                              }),
+                            }
+                          );
+                          
+                          if (progResponse.ok) {
+                            const progData = await progResponse.json();
+                            const progResults = progData.result?.offers || [];
+                            console.log(`sellingProgram=${program} got ${progResults.length} results for restricted categories`);
+                            parsedRestricted = parseTariffResults(progResults, restrictedOffers);
+                            break; // Success, stop trying other programs
+                          } else {
+                            const progErr = await progResponse.text();
+                            console.log(`sellingProgram=${program} failed: ${progResponse.status}`);
+                            
+                            // If this program also has restricted categories, try the fallback category approach
+                            if (progResponse.status === 400) {
+                              continue; // Try next program
+                            }
+                          }
+                        }
+                        
+                        // Step 3: If sellingProgram didn't work, use fallback category (91491 = general goods)
+                        // This gets real logistics costs (based on weight/dimensions) and approximate commission
+                        if (parsedRestricted.length === 0) {
+                          console.log(`All programs failed for restricted categories, using fallback category 91491`);
+                          const fallbackOffers = restrictedOffers.map(({ _originalIndex, categoryId, ...rest }: any) => ({
+                            ...rest,
+                            categoryId: 91491, // General goods category (always allowed)
+                          }));
+                          
+                          await sleep(500);
+                          const fallbackResponse = await fetchWithRetry(
+                            'https://api.partner.market.yandex.ru/v2/tariffs/calculate',
+                            {
+                              method: 'POST',
+                              headers,
+                              body: JSON.stringify({
+                                parameters: { campaignId: Number(campaignId) },
+                                offers: fallbackOffers,
+                              }),
+                            }
+                          );
+                          
+                          if (fallbackResponse.ok) {
+                            const fallbackData = await fallbackResponse.json();
+                            const fallbackResults = fallbackData.result?.offers || [];
+                            console.log(`Fallback category got ${fallbackResults.length} results`);
+                            parsedRestricted = parseTariffResults(fallbackResults, restrictedOffers);
+                            // Mark as fallback (real logistics, approximate commission)
+                            parsedRestricted = parsedRestricted.map((p: any) => ({
+                              ...p,
+                              fallbackCategory: true,
+                            }));
+                          } else {
+                            console.error(`Fallback category also failed: ${fallbackResponse.status}`);
+                          }
+                        }
+                        
+                        // Step 4: If everything failed, mark as restricted with 0 values
+                        if (parsedRestricted.length === 0) {
+                          parsedRestricted = restrictedOffers.map((o: any) => ({
+                            index: o._originalIndex,
                             categoryId: o.categoryId,
                             price: o.price || 0,
                             agencyCommission: 0, commissionPercent: 0,
                             fulfillment: 0, delivery: 0, sorting: 0, other: 0,
                             totalTariff: 0, tariffPercent: 0,
                             restricted: true, rawTariffs: [],
-                          })),
-                          restrictedCategories: [...restrictedCats],
-                        };
+                          }));
+                        }
                       }
+                      
+                      // Merge all results and sort by original index
+                      const merged = [...parsedAllowed, ...parsedRestricted].sort((a, b) => a.index - b.index);
+                      console.log(`Final merged: ${merged.length} results (${parsedAllowed.length} allowed, ${parsedRestricted.length} restricted-recovered)`);
+                      
+                      restrictedRetryResult = {
+                        success: true,
+                        data: merged,
+                        restrictedCategories: [...restrictedCats],
+                        recoveredCount: parsedRestricted.filter((p: any) => !p.restricted).length,
+                      };
                     }
                   }
                 } catch (parseErr) {
