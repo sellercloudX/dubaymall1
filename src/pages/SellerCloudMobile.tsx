@@ -48,6 +48,7 @@ const TutorialVideos = lazy(() => import('@/components/sellercloud/TutorialVideo
 // Consolidated hub components
 const InventoryControlHub = lazy(() => import('@/components/sellercloud/InventoryControlHub').then(m => ({ default: m.InventoryControlHub })));
 const PriceControlHub = lazy(() => import('@/components/sellercloud/PriceControlHub').then(m => ({ default: m.PriceControlHub })));
+const UnitEconomyDashboard = lazy(() => import('@/components/sellercloud/UnitEconomyDashboard').then(m => ({ default: m.UnitEconomyDashboard })));
 
 // Lightweight tab loading skeleton
 function TabLoader() {
