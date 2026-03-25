@@ -47,6 +47,7 @@ export const sellerMenuItems: SellerMenuItem[] = [
   { id: 'reviews', label: 'Sharhlar', icon: MessageCircle, group: 'analytics' },
   { id: 'ads', label: 'Reklama', icon: Megaphone, group: 'analytics' },
   // AI & Asboblar
+  { id: 'trend-hunter', label: 'Trend Hunter', icon: Flame, group: 'tools' },
   { id: 'scanner', label: 'AI Scanner', icon: Scan, group: 'tools' },
   { id: 'sellzen-studio', label: 'SellZen Studio', icon: Sparkles, group: 'tools' },
   { id: 'clone', label: 'Klonlash', icon: Copy, group: 'tools' },
