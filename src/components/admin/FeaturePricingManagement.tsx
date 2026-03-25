@@ -64,7 +64,7 @@ function FeatureRow({ feature, onUpdate, plans }: { feature: FeaturePrice; onUpd
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <span className="font-medium text-sm text-foreground">{feature.feature_name_uz || feature.feature_name}</span>
             {feature.is_free && <Badge variant="secondary" className="text-[10px]">Bepul</Badge>}
-            {feature.is_premium_only && <Badge className="text-[10px] bg-amber-500/10 text-amber-600 border-amber-200">Premium</Badge>}
+            {/* Premium badge removed — replaced by plan-based inclusion */}
             {!feature.is_enabled && <Badge variant="destructive" className="text-[10px]">O'chirilgan</Badge>}
             <Badge variant="outline" className="text-[10px]">
               {billingType === 'monthly' ? <><Calendar className="h-2.5 w-2.5 mr-0.5" />Oylik</> : <><Hash className="h-2.5 w-2.5 mr-0.5" />Donalik</>}
@@ -92,10 +92,7 @@ function FeatureRow({ feature, onUpdate, plans }: { feature: FeaturePrice; onUpd
             <Label className="text-[10px] text-muted-foreground">Bepul</Label>
             <Switch checked={feature.is_free} onCheckedChange={(v) => onUpdate(feature.id, { is_free: v })} />
           </div>
-          <div className="flex items-center gap-1.5">
-            <Label className="text-[10px] text-muted-foreground">Premium</Label>
-            <Switch checked={feature.is_premium_only} onCheckedChange={(v) => onUpdate(feature.id, { is_premium_only: v })} />
-          </div>
+          {/* Premium toggle removed — access is controlled by subscription plans */}
         </div>
       </div>
 
@@ -541,7 +538,7 @@ function NewFeatureDialog() {
           <div className="flex items-center gap-4 col-span-2">
             <label className="flex items-center gap-1.5 text-xs"><input type="checkbox" checked={form.is_enabled} onChange={e => setForm({ ...form, is_enabled: e.target.checked })} className="rounded" />Yoqiq</label>
             <label className="flex items-center gap-1.5 text-xs"><input type="checkbox" checked={form.is_free} onChange={e => setForm({ ...form, is_free: e.target.checked })} className="rounded" />Bepul</label>
-            <label className="flex items-center gap-1.5 text-xs"><input type="checkbox" checked={form.is_premium_only} onChange={e => setForm({ ...form, is_premium_only: e.target.checked })} className="rounded" />Premium only</label>
+            {/* Premium only checkbox removed — access controlled by subscription plans */}
           </div>
         </div>
         <Button onClick={() => createFeature.mutate()} disabled={createFeature.isPending || !form.feature_key || !form.feature_name} className="w-full mt-2">
