@@ -60,6 +60,7 @@ const TutorialVideos = lazy(() => import('@/components/sellercloud/TutorialVideo
 const InventoryControlHub = lazy(() => import('@/components/sellercloud/InventoryControlHub').then(m => ({ default: m.InventoryControlHub })));
 const PriceControlHub = lazy(() => import('@/components/sellercloud/PriceControlHub').then(m => ({ default: m.PriceControlHub })));
 const SellZenStudio = lazy(() => import('@/components/sellercloud/SellZenStudio').then(m => ({ default: m.SellZenStudio })));
+const MobileTrendHunter = lazy(() => import('@/components/mobile/MobileTrendHunter').then(m => ({ default: m.MobileTrendHunter })));
 
 const TabLoader = React.forwardRef<HTMLDivElement>((_, ref) => <div ref={ref} className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>);
 TabLoader.displayName = 'TabLoader';
