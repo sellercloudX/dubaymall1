@@ -85,6 +85,7 @@ const pageTitles: Record<string, string> = {
   reviews: 'Sharhlar va savollar',
   ads: 'Reklama kampaniyalari',
   'sellzen-studio': 'SellZen AI Studio',
+  'trend-hunter': 'Trend Hunter AI',
   problems: 'Muammoli mahsulotlar',
   mxik: 'MXIK kodlar bazasi',
   subscription: 'Obuna va to\'lov',
