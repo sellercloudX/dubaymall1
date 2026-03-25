@@ -115,9 +115,9 @@ export function MobileTrendHunter() {
   const marketSummary: MarketSummary | null = predictionMutation.data?.market_summary || null;
 
   return (
-    <div className={isMobile ? "flex flex-col" : "flex flex-col h-full"} style={isMobile ? { height: 'calc(100vh - 3.5rem - env(safe-area-inset-top, 0px) - 5rem)' } : undefined}>
+    <div className={isMobile ? "flex flex-col pb-4" : "flex flex-col h-full"}>
       {/* Header */}
-      <div className={`bg-background z-30 border-b ${isMobile ? 'sticky top-14 px-3 py-3' : 'px-0 py-4'}`}>
+      <div className={`bg-background z-30 ${isMobile ? 'px-3 py-3' : 'px-0 py-4'}`}>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center">
@@ -125,32 +125,13 @@ export function MobileTrendHunter() {
             </div>
             <div>
               <h2 className="font-bold text-sm">Trend Hunter AI</h2>
-              <p className="text-[10px] text-muted-foreground">Xitoydan import uchun trend mahsulotlar</p>
+              <p className="text-[10px] text-muted-foreground">Import uchun trend mahsulotlar</p>
             </div>
           </div>
-          <Button
-            variant="default"
-            size="sm"
-            onClick={() => predictionMutation.mutate()}
-            disabled={predictionMutation.isPending}
-            className="text-xs gap-1.5"
-          >
-            {predictionMutation.isPending ? (
-              <>
-                <Brain className="h-3.5 w-3.5 animate-pulse" />
-                Tahlil...
-              </>
-            ) : (
-              <>
-                <Search className="h-3.5 w-3.5" />
-                Trendlarni topish
-              </>
-            )}
-          </Button>
         </div>
 
-        {/* Filters */}
-        <div className="flex gap-2">
+        {/* Filters + Button in one row */}
+        <div className="flex gap-2 items-center">
           <Select value={category} onValueChange={setCategory}>
             <SelectTrigger className="h-8 text-xs flex-1">
               <SelectValue />
@@ -162,7 +143,7 @@ export function MobileTrendHunter() {
             </SelectContent>
           </Select>
           <Select value={period} onValueChange={setPeriod}>
-            <SelectTrigger className="h-8 text-xs w-24">
+            <SelectTrigger className="h-8 text-xs w-20">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -171,6 +152,20 @@ export function MobileTrendHunter() {
               ))}
             </SelectContent>
           </Select>
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => predictionMutation.mutate()}
+            disabled={predictionMutation.isPending}
+            className="text-xs gap-1 shrink-0 h-8"
+          >
+            {predictionMutation.isPending ? (
+              <Brain className="h-3.5 w-3.5 animate-pulse" />
+            ) : (
+              <Search className="h-3.5 w-3.5" />
+            )}
+            {predictionMutation.isPending ? 'Tahlil...' : 'Topish'}
+          </Button>
         </div>
 
         {/* Market summary */}
@@ -200,50 +195,30 @@ export function MobileTrendHunter() {
       </div>
 
       {/* Content */}
-      <div className={`flex-1 overflow-y-auto py-3 space-y-3 ${isMobile ? 'px-3' : 'px-0'}`}>
+      <div className={`flex-1 py-3 space-y-3 ${isMobile ? 'px-3' : 'px-0'}`}>
         {predictionMutation.isPending ? (
           <div className="space-y-3">
             <Card className="bg-muted/50">
-              <CardContent className="p-6 text-center">
-                <Brain className="h-10 w-10 mx-auto text-primary mb-3 animate-pulse" />
-                <h4 className="font-semibold mb-1">AI dunyo bozorini tahlil qilmoqda...</h4>
-                <p className="text-xs text-muted-foreground">Amazon, TikTok Shop, AliExpress trendlarini skanerlash va Xitoy optom narxlarini taqqoslash</p>
+              <CardContent className="p-4 text-center">
+                <Brain className="h-8 w-8 mx-auto text-primary mb-2 animate-pulse" />
+                <p className="text-xs font-semibold">AI dunyo bozorini tahlil qilmoqda...</p>
+                <p className="text-[10px] text-muted-foreground mt-1">Amazon, TikTok, AliExpress trendlarini skanerlash</p>
               </CardContent>
             </Card>
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-48 rounded-xl" />
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-32 rounded-xl" />
             ))}
           </div>
         ) : predictions.length === 0 ? (
-          <Card className="bg-muted/30 border-dashed">
-            <CardContent className="p-8 text-center">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-500/10 to-red-500/10 flex items-center justify-center mx-auto mb-4">
-                <Globe className="h-8 w-8 text-orange-500" />
-              </div>
-              <h4 className="font-bold text-base mb-2">Import uchun trend tovarlarni toping</h4>
-              <p className="text-xs text-muted-foreground mb-1 max-w-md mx-auto">
-                AI dunyo bozorida qaysi tovarlar trendga chiqayotganini aniqlaydi va O'zbekistonga import qilish uchun eng foydali mahsulotlarni tavsiya qiladi.
-              </p>
-              <ul className="text-[11px] text-muted-foreground text-left max-w-xs mx-auto mt-3 space-y-1.5">
-                <li className="flex items-start gap-1.5">
-                  <TrendingUp className="h-3.5 w-3.5 text-green-500 shrink-0 mt-0.5" />
-                  Amazon, TikTok, AliExpress trendlarini tahlil qiladi
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <DollarSign className="h-3.5 w-3.5 text-emerald-500 shrink-0 mt-0.5" />
-                  Foyda va xarajatlarni hisoblab beradi
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <ExternalLink className="h-3.5 w-3.5 text-blue-500 shrink-0 mt-0.5" />
-                  1688.com va Alibaba'dan to'g'ridan-to'g'ri xarid havolalarini beradi
-                </li>
-              </ul>
-              <Button onClick={() => predictionMutation.mutate()} className="mt-5 gap-2">
-                <Search className="h-4 w-4" />
-                Trendlarni topish
-              </Button>
-            </CardContent>
-          </Card>
+          <div className="text-center py-6">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500/10 to-red-500/10 flex items-center justify-center mx-auto mb-3">
+              <Globe className="h-6 w-6 text-orange-500" />
+            </div>
+            <p className="text-sm font-semibold mb-1">Trend tovarlarni toping</p>
+            <p className="text-[11px] text-muted-foreground mb-3 max-w-xs mx-auto">
+              Kategoriyani tanlang va "Topish" tugmasini bosing. AI dunyo bozoridan O'zbekistonga import uchun eng foydali tovarlarni topadi.
+            </p>
+          </div>
         ) : (
           <div className={isMobile ? 'space-y-3' : 'grid grid-cols-1 xl:grid-cols-2 gap-4'}>
             {predictions.map((pred, idx) => (
