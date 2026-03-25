@@ -414,34 +414,58 @@ export function getTariffForProduct(
     };
   }
 
-  // Uzum fallback — no real data available, return zero (no estimates)
+  // Uzum fallback — use standard commission estimate (~15%) when no real data
   if (marketplace === 'uzum') {
+    const commRate = 0.15; // Uzum avg commission 15%
+    const commission = Math.round(price * commRate);
+    const logistics = price > 200000 ? 15000 : price > 100000 ? 10000 : 5000;
+    const totalFee = commission + logistics;
     return {
-      commission: 0,
-      logistics: 0,
+      commission,
+      logistics,
       withdrawal: 0,
-      totalFee: 0,
+      totalFee,
       isReal: false,
     };
   }
 
-  // WB fallback — no real data, return zero
+  // WB fallback — use standard commission estimate (~15%)
   if (marketplace === 'wildberries') {
+    const commRate = 0.15;
+    const commission = Math.round(price * commRate);
+    const logistics = Math.round(price * 0.05); // ~5% logistics estimate
+    const totalFee = commission + logistics;
     return {
-      commission: 0,
-      logistics: 0,
+      commission,
+      logistics,
       withdrawal: 0,
-      totalFee: 0,
+      totalFee,
       isReal: false,
     };
   }
 
-  // No real data available — return zero, not estimates
+  // Yandex fallback — use standard commission estimate (~7%) + logistics
+  if (marketplace === 'yandex') {
+    const commRate = 0.07;
+    const commission = Math.round(commBase * commRate);
+    const logistics = price > 200000 ? 20000 : price > 100000 ? 12000 : 6000;
+    const withdrawalFee = Math.round(price * 0.01);
+    const totalFee = commission + logistics + withdrawalFee;
+    return {
+      commission,
+      logistics,
+      withdrawal: withdrawalFee,
+      totalFee,
+      isReal: false,
+    };
+  }
+
+  // Generic fallback
   return {
-    commission: 0,
+    commission: Math.round(price * 0.10),
     logistics: 0,
     withdrawal: 0,
-    totalFee: 0,
+    totalFee: Math.round(price * 0.10),
     isReal: false,
   };
 }
