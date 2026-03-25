@@ -254,8 +254,6 @@ export default function SellerCloudX() {
         return <FBSOrderManager connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'sales':
         return <SalesDashboard connectedMarketplaces={connectedMarketplaces} store={store} />;
-      case 'orders-old':
-        return <MarketplaceOrders connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'analytics':
         return <MarketplaceAnalytics connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'product-analytics':

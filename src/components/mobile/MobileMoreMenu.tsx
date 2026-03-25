@@ -6,7 +6,7 @@ import {
   ArrowDownUp, DollarSign, BarChart3,
   Copy, AlertOctagon, Tag, FileSpreadsheet, Bell, CreditCard, Coins,
   MessageCircle, Activity, Megaphone, Search, LayoutDashboard, UserCog, BookOpen,
-  Sparkles, Scan,
+  Sparkles, Scan, Flame,
 } from 'lucide-react';
 
 interface MobileMoreMenuProps {
