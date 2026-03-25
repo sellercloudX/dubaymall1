@@ -118,7 +118,7 @@ export function SellZenStudio() {
 
     setIsGeneratingImages(true);
     try {
-      const result = await deductBalance('generate_infographic', `SellZen Studio: ${mode} ${styleType}`);
+      const result = await deductBalance('sellzen-image-generate', `SellZen Studio: ${mode} ${styleType}`);
       if (!result.success) {
         toast.error(result.error || 'Balans yechishda xatolik');
         setIsGeneratingImages(false);
