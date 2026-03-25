@@ -286,6 +286,8 @@ export default function SellerCloudX() {
         return <CardCloner connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'sellzen-studio':
         return <SellZenStudio />;
+      case 'trend-hunter':
+        return <MobileTrendHunter />;
       case 'problems':
         return <ProblematicProducts connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'mxik':
