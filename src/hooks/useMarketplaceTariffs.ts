@@ -98,7 +98,7 @@ export function useMarketplaceTariffs(
             if (realExp && (realExp.commission > 0 || realExp.logistics > 0)) {
               // Use real finance data from Finance API
               const totalTariff = realExp.commission + realExp.logistics;
-              tariffMap.set(p.offerId, {
+              const entry: TariffInfo = {
                 offerId: p.offerId,
                 agencyCommission: realExp.commission,
                 fulfillment: realExp.logistics,
@@ -106,12 +106,15 @@ export function useMarketplaceTariffs(
                 totalTariff,
                 tariffPercent: price > 0 ? (totalTariff / price) * 100 : 0,
                 commissionPercent: price > 0 ? (realExp.commission / price) * 100 : 0,
-              });
+              };
+              tariffMap.set(p.offerId, entry);
+              // Also index by product name (lowercased) for matching with cached order items using skuTitle
+              if (p.name) tariffMap.set(p.name.toLowerCase(), entry);
             } else if (p.commissionPercent && p.commissionPercent > 0) {
               // Use REAL commission from product catalog (commissionDto)
               const commissionPercent = p.commissionPercent / 100; // 17 → 0.17
               const commission = price * commissionPercent;
-              tariffMap.set(p.offerId, {
+              const entry: TariffInfo = {
                 offerId: p.offerId,
                 agencyCommission: commission,
                 fulfillment: 0, // No real logistics data available
@@ -119,7 +122,10 @@ export function useMarketplaceTariffs(
                 totalTariff: commission,
                 tariffPercent: price > 0 ? (commission / price) * 100 : 0,
                 commissionPercent: p.commissionPercent,
-              });
+              };
+              tariffMap.set(p.offerId, entry);
+              // Also index by product name for backwards compat with skuTitle-based offerId
+              if (p.name) tariffMap.set(p.name.toLowerCase(), entry);
             }
             // If no real data — don't add to tariffMap (no estimates)
           }
