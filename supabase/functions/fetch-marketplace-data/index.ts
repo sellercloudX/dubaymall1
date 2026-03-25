@@ -1036,27 +1036,21 @@ serve(async (req) => {
 
             console.log(`Tariff API response status: ${tariffResponse.status}`);
 
-            if (tariffResponse.ok) {
-              const tariffData = await tariffResponse.json();
-              const tariffResults = tariffData.result?.offers || [];
-              
-              console.log(`Got ${tariffResults.length} tariff results`);
-              
-              const parsed = tariffResults.map((t: any, idx: number) => {
+            // Helper to parse tariff results into structured data
+            function parseTariffResults(tariffResults: any[], sourceOffers: any[]) {
+              return tariffResults.map((t: any, idx: number) => {
                 const tariffs = t.tariffs || [];
                 let agencyCommission = 0;
                 let fulfillment = 0;
                 let delivery = 0;
                 let sorting = 0;
                 let other = 0;
-                // Extract EXACT commission percentage from API parameters
                 let commissionPercentFromApi = 0;
                 
                 tariffs.forEach((tariff: any) => {
                   const amount = tariff.amount || 0;
                   const type = tariff.type || '';
                   
-                  // Extract percentage from parameters array (most accurate source)
                   const params = tariff.parameters || [];
                   const valueParam = params.find((p: any) => p.name === 'value');
                   const valueType = params.find((p: any) => p.name === 'valueType');
@@ -1064,7 +1058,6 @@ serve(async (req) => {
                   
                   if (type === 'FEE' || type === 'AGENCY_COMMISSION' || type === 'PAYMENT_TRANSFER') {
                     agencyCommission += amount;
-                    // Accumulate exact % from API for commission-type fees
                     if (isRelative && valueParam?.value) {
                       commissionPercentFromApi += parseFloat(valueParam.value) || 0;
                     }
@@ -1077,15 +1070,14 @@ serve(async (req) => {
                   }
                 });
                 
-                const price = offersForCalc[idx]?.price || 0;
+                const price = sourceOffers[idx]?.price || 0;
                 const totalTariff = agencyCommission + fulfillment + delivery + sorting + other;
                 
                 return {
-                  index: idx,
-                  categoryId: offersForCalc[idx]?.categoryId,
+                  index: sourceOffers[idx]?._originalIndex ?? idx,
+                  categoryId: sourceOffers[idx]?.categoryId,
                   price,
                   agencyCommission,
-                  // EXACT commission % from API parameters (e.g. FEE 5.50% + PAYMENT_TRANSFER 1.50% = 7%)
                   commissionPercent: commissionPercentFromApi > 0 
                     ? Math.round(commissionPercentFromApi * 100) / 100
                     : (price > 0 ? Math.round((agencyCommission / price) * 10000) / 100 : 0),
@@ -1098,13 +1090,127 @@ serve(async (req) => {
                   rawTariffs: tariffs,
                 };
               });
+            }
+
+            if (tariffResponse.ok) {
+              const tariffData = await tariffResponse.json();
+              const tariffResults = tariffData.result?.offers || [];
+              
+              console.log(`Got ${tariffResults.length} tariff results`);
+              const parsed = parseTariffResults(tariffResults, offersForCalc);
               
               console.log(`Parsed tariffs sample:`, JSON.stringify(parsed[0] || {}));
               result = { success: true, data: parsed };
             } else {
               const errText = await tariffResponse.text();
               console.error("Tariff calc error:", tariffResponse.status, errText);
-              result = { success: false, error: `Tariff calculation failed: ${tariffResponse.status}`, details: errText };
+              
+              // Handle restricted categories: parse error, exclude them, retry
+              let restrictedRetryResult: any = null;
+              if (tariffResponse.status === 400) {
+                try {
+                  const errJson = JSON.parse(errText);
+                  const restrictedMsg = (errJson.errors || []).find((e: any) => 
+                    e.code === 'BAD_REQUEST' && e.message?.includes('restricted')
+                  );
+                  if (restrictedMsg) {
+                    // Extract restricted category IDs from error message
+                    const catMatch = restrictedMsg.message.match(/restricted[^:]*:\s*(.+)/i);
+                    if (catMatch) {
+                      const restrictedCats = new Set(
+                        catMatch[1].split(',').map((s: string) => parseInt(s.trim())).filter((n: number) => !isNaN(n))
+                      );
+                      console.log(`Restricted categories detected: ${[...restrictedCats].join(', ')}`);
+                      
+                      // Tag each offer with its original index, then filter out restricted ones
+                      const taggedOffers = offersForCalc.map((o: any, i: number) => ({ ...o, _originalIndex: i }));
+                      const allowedOffers = taggedOffers.filter((o: any) => !restrictedCats.has(o.categoryId));
+                      
+                      console.log(`Retrying tariff calc with ${allowedOffers.length}/${offersForCalc.length} non-restricted offers`);
+                      
+                      if (allowedOffers.length > 0) {
+                        // Build clean offers without _originalIndex for API call
+                        const cleanOffers = allowedOffers.map(({ _originalIndex, ...rest }: any) => rest);
+                        
+                        await sleep(500);
+                        const retryResponse = await fetchWithRetry(
+                          'https://api.partner.market.yandex.ru/v2/tariffs/calculate',
+                          {
+                            method: 'POST',
+                            headers,
+                            body: JSON.stringify({
+                              parameters: { campaignId: Number(campaignId) },
+                              offers: cleanOffers,
+                            }),
+                          }
+                        );
+                        
+                        if (retryResponse.ok) {
+                          const retryData = await retryResponse.json();
+                          const retryResults = retryData.result?.offers || [];
+                          console.log(`Retry got ${retryResults.length} tariff results`);
+                          
+                          const parsedAllowed = parseTariffResults(retryResults, allowedOffers);
+                          
+                          // Create null entries for restricted offers
+                          const restrictedEntries = taggedOffers
+                            .filter((o: any) => restrictedCats.has(o.categoryId))
+                            .map((o: any) => ({
+                              index: o._originalIndex,
+                              categoryId: o.categoryId,
+                              price: o.price || 0,
+                              agencyCommission: 0,
+                              commissionPercent: 0,
+                              fulfillment: 0,
+                              delivery: 0,
+                              sorting: 0,
+                              other: 0,
+                              totalTariff: 0,
+                              tariffPercent: 0,
+                              restricted: true,
+                              rawTariffs: [],
+                            }));
+                          
+                          // Merge and sort by original index
+                          const merged = [...parsedAllowed, ...restrictedEntries].sort((a, b) => a.index - b.index);
+                          console.log(`Merged ${merged.length} results (${parsedAllowed.length} calculated, ${restrictedEntries.length} restricted)`);
+                          
+                          restrictedRetryResult = {
+                            success: true,
+                            data: merged,
+                            restrictedCategories: [...restrictedCats],
+                          };
+                        } else {
+                          console.error("Retry also failed:", retryResponse.status);
+                        }
+                      } else {
+                        // All offers are restricted
+                        restrictedRetryResult = {
+                          success: true,
+                          data: offersForCalc.map((o: any, i: number) => ({
+                            index: i,
+                            categoryId: o.categoryId,
+                            price: o.price || 0,
+                            agencyCommission: 0, commissionPercent: 0,
+                            fulfillment: 0, delivery: 0, sorting: 0, other: 0,
+                            totalTariff: 0, tariffPercent: 0,
+                            restricted: true, rawTariffs: [],
+                          })),
+                          restrictedCategories: [...restrictedCats],
+                        };
+                      }
+                    }
+                  }
+                } catch (parseErr) {
+                  console.error("Error parsing restricted categories:", parseErr);
+                }
+              }
+              
+              if (restrictedRetryResult) {
+                result = restrictedRetryResult;
+              } else {
+                result = { success: false, error: `Tariff calculation failed: ${tariffResponse.status}`, details: errText };
+              }
             }
           }
         } catch (e) {
