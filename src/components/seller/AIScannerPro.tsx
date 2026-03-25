@@ -1121,10 +1121,9 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
                 {/* Header */}
                 <div className="bg-muted/50 px-4 py-3 border-b">
                   <h4 className="font-semibold flex items-center gap-2">
-                  <DollarSign className="h-4 w-4" />
+                    <DollarSign className="h-4 w-4" />
                     Narx tuzilmasi ({targetMarketplace === 'wildberries' ? 'Wildberries' : targetMarketplace === 'uzum' ? 'Uzum Market' : 'Yandex Market'})
-                </h4>
-                </h4>
+                  </h4>
                 </div>
 
                 {/* Cost Section */}
