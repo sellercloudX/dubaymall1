@@ -2492,6 +2492,9 @@ serve(async (req) => {
                     price: item.price || 0,
                     priceUZS: item.price || 0,
                     photo: itemPhoto,
+                    // Carry commission data from order item if available
+                    commissionPercent: item.commissionPercent || item.commission?.percent || 0,
+                    commissionBase: item.commissionBase || item.commissionAmount || 0,
                   };
                 }),
               };
