@@ -64,7 +64,7 @@ function FeatureRow({ feature, onUpdate, plans }: { feature: FeaturePrice; onUpd
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <span className="font-medium text-sm text-foreground">{feature.feature_name_uz || feature.feature_name}</span>
             {feature.is_free && <Badge variant="secondary" className="text-[10px]">Bepul</Badge>}
-            {feature.is_premium_only && <Badge className="text-[10px] bg-amber-500/10 text-amber-600 border-amber-200">Premium</Badge>}
+            {/* Premium badge removed — replaced by plan-based inclusion */}
             {!feature.is_enabled && <Badge variant="destructive" className="text-[10px]">O'chirilgan</Badge>}
             <Badge variant="outline" className="text-[10px]">
               {billingType === 'monthly' ? <><Calendar className="h-2.5 w-2.5 mr-0.5" />Oylik</> : <><Hash className="h-2.5 w-2.5 mr-0.5" />Donalik</>}
