@@ -2366,6 +2366,14 @@ serve(async (req) => {
                     return acc;
                   }, {});
                   console.log(`[UZUM ORDER SCHEMES] status=${orderStatus} distribution=${JSON.stringify(schemes)}`);
+                  // Log order item fields to debug offerId matching
+                  const sampleItems = sampleOrder.items || sampleOrder.orderItems || [];
+                  if (sampleItems.length > 0) {
+                    const si = sampleItems[0];
+                    console.log(`[UZUM ORDER ITEM KEYS] ${JSON.stringify(Object.keys(si))}`);
+                    console.log(`[UZUM ORDER ITEM IDS] id=${si.id}, productId=${si.productId}, skuId=${si.skuId}, skuTitle=${si.skuTitle}, barcode=${si.barcode}`);
+                    if (si.identifierInfo) console.log(`[UZUM ORDER ITEM IDENT] ${JSON.stringify(si.identifierInfo)}`);
+                  }
                 }
 
                 results.push(...orderList);
