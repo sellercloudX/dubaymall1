@@ -2366,6 +2366,14 @@ serve(async (req) => {
                     return acc;
                   }, {});
                   console.log(`[UZUM ORDER SCHEMES] status=${orderStatus} distribution=${JSON.stringify(schemes)}`);
+                  // Log order item fields to debug offerId matching
+                  const sampleItems = sampleOrder.items || sampleOrder.orderItems || [];
+                  if (sampleItems.length > 0) {
+                    const si = sampleItems[0];
+                    console.log(`[UZUM ORDER ITEM KEYS] ${JSON.stringify(Object.keys(si))}`);
+                    console.log(`[UZUM ORDER ITEM IDS] id=${si.id}, productId=${si.productId}, skuId=${si.skuId}, skuTitle=${si.skuTitle}, barcode=${si.barcode}`);
+                    if (si.identifierInfo) console.log(`[UZUM ORDER ITEM IDENT] ${JSON.stringify(si.identifierInfo)}`);
+                  }
                 }
 
                 results.push(...orderList);
@@ -2432,7 +2440,10 @@ serve(async (req) => {
                 items: items.map((item: any) => {
                   const identInfo = (item.identifierInfo && typeof item.identifierInfo === 'object') ? item.identifierInfo : {};
                   const itemBarcode = item.barcode || identInfo.barcode || '';
-                  const offerId = item.skuTitle || itemBarcode || String(item.id || '');
+                  // CRITICAL: Use numeric productId/skuId as offerId to match product catalog
+                  // item.skuTitle is a TEXT name and will never match productId in tariffMap
+                  const numericId = item.productId || identInfo.productId || item.skuId || identInfo.skuId || '';
+                  const offerId = numericId ? String(numericId) : (itemBarcode || item.skuTitle || String(item.id || ''));
                   
                   let itemPhoto = '';
                    try {
@@ -2481,6 +2492,9 @@ serve(async (req) => {
                     price: item.price || 0,
                     priceUZS: item.price || 0,
                     photo: itemPhoto,
+                    // Carry commission data from order item if available
+                    commissionPercent: item.commissionPercent || item.commission?.percent || 0,
+                    commissionBase: item.commissionBase || item.commissionAmount || 0,
                   };
                 }),
               };
