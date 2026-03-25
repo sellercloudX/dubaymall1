@@ -42,66 +42,54 @@ serve(async (req) => {
       });
     }
 
-    const { category, period = 14, keywords, marketplace, include_source_links = true, global_trends = true } = await req.json();
-
-    // Build optional WB keyword context if provided
-    let keywordContext = '';
-    if (keywords && keywords.length > 0) {
-      const keywordData = keywords.slice(0, 30).map((k: any) =>
-        `"${k.text}" — chastota: ${k.totalFrequency}, buyurtma: ${k.totalOrders}, konversiya: ${k.totalClicks > 0 ? ((k.totalOrders / k.totalClicks) * 100).toFixed(1) : 0}%`
-      ).join('\n');
-      keywordContext = `\n\n## MARKETPLACE MA'LUMOTLARI (${marketplace || 'Wildberries'}, oxirgi 14 kun):\n${keywordData}`;
-    }
+    const { category, period = 14 } = await req.json();
 
     const categoryFilter = category ? `\nFAQAT "${category}" kategoriyasiga tegishli mahsulotlarni tahlil qil.` : '';
-
     const currentDate = new Date().toISOString().split('T')[0];
-    const currentMonth = new Date().toLocaleString('uz-UZ', { month: 'long' });
+    const currentMonth = new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
-    const prompt = `Sen dunyo miqyosidagi professional e-commerce trend analitik va import/export mutaxassisisan.
-
-## VAZIFA:
-Dunyo bozorida (AQSh, Yevropa, Xitoy, Janubi-Sharqiy Osiyo) hozirda TREND ga chiqayotgan, lekin O'zbekiston va MDH bozoriga hali KIRMAGAN yoki endigina kirish bosqichidagi mahsulotlarni aniqla.
+    const prompt = `Sen professional e-commerce import/export analitikasan. Sening vazifang — Xitoydan O'zbekistonga import qilish uchun eng foydali va trendga chiqayotgan FIZIK MAHSULOTLARNI topish.
 
 Hozirgi sana: ${currentDate} (${currentMonth})
 Bashorat muddati: ${period} kun
-
 ${categoryFilter}
-${keywordContext}
 
-## TALAB:
-1. Har bir mahsulot uchun ANIQ ma'lumotlar ber:
-   - Mahsulot nomi (o'zbek tilida tushuntir)
-   - Kategoriya
-   - Talab darajasi (demand_score: 1-100)
-   - Narx oralig'i so'mda (O'zbekiston bozorida sotish narxi)
-   - Oylik sotuvlar bashorati (O'zbekiston bozorida necha dona sotilishi mumkin)
-   - Sof foyda potentsiali (so'm/oy) - import narxi va sotish narxi farqini hisobga ol
-   - Raqobat darajasi O'zbekiston bozorida
-   - Trend yo'nalishi
-   - Nima uchun trend ekanligini aniq sabablari
-   - Qachon kirish yaxshiligini ayt
-   - Risk darajasi
-   - Dunyo bozorida qanday trend ekanligi haqida qisqa ma'lumot
+## SEN NIMA QILISHING KERAK:
 
-2. Har bir mahsulot uchun XITOY OPTOM SAYTLARIDAN xarid qilish uchun havolalar ber:
-   - 1688.com (xitoy optom narxi eng arzon)
-   - alibaba.com (xalqaro optom)
-   - Zarur bo'lsa boshqa optom saytlar
-   - Har bir havola uchun taxminiy narx oralig'ini ko'rsat
+1. HOZIRDA dunyo bozorida (Amazon, TikTok Shop, AliExpress, Temu) eng ko'p sotilayotgan, viral bo'layotgan yoki tez o'sish trendidagi FIZIK mahsulotlarni aniqla.
 
-3. MUHIM qoidalar:
-   - Faqat HAQIQIY global trendlarni taklif qil (TikTok viral, Amazon bestseller, AliExpress top seller)
-   - Narxlarni real bozor asosida ber (taxminiy emas)
-   - O'zbekiston logistikasi va bojxona xarajatlarini hisobga ol
-   - Mavsumiy omillarni e'tiborga ol (hozirgi oy: ${currentMonth})
-   - Kamida 8-12 ta turli kategoriyadan mahsulotlar taklif qil
-   - Xitoy optom havolalari to'g'ridan-to'g'ri mahsulot sahifasiga olib borishi kerak
+2. Bu mahsulotlarning O'zbekiston bozorida hali KAM tarqalgani yoki UMUMAN yo'qligini tekshir.
 
-4. HAVOLALAR FORMATI:
-   - 1688.com uchun: https://s.1688.com/selloffer/offer_search.htm?keywords=MAHSULOT_NOMI_XITOYCHA
-   - alibaba.com uchun: https://www.alibaba.com/trade/search?SearchText=MAHSULOT_NOMI_INGLIZCHA
-   - Bu havolalar qidiruv natijalari sahifasiga olib boradi`;
+3. Har bir mahsulot uchun ANIQ XITOY OPTOM HAVOLALARNI ber — foydalanuvchi ssilkani bossa, 1688.com yoki alibaba.com saytida AYNAN SHU TURDAGI mahsulotni ko'rishi kerak.
+
+## QOIDALAR:
+
+- FAQAT Xitoydan import qilsa arziydigan mahsulotlar (elektronika, gadgetlar, uy-ro'zg'or buyumlari, aksessuarlar, go'zallik vositalari, sport anjomlari, bolalar uchun tovarlar, avto aksessuarlar)
+- HECH QACHON oziq-ovqat, meva, sabzavot, jam, konserva, ichimlik taklif QILMA
+- HECH QACHON dori-darmon, tibbiy asbob, kimyoviy moddalar taklif QILMA
+- Har bir mahsulot uchun HAQIQIY bozor narxlarini ber (O'zbekiston so'mida)
+- Xitoy optom narxini HAQIQIY ko'rsat (1688.com yoki Alibaba narxi asosida)
+- O'zbekistonga yetkazib berish xarajatini hisobga ol (taxminan 3-5 USD/kg havo yo'li, 1-2 USD/kg temir yo'l)
+- Import bojxona solig'i 12-30% oralig'ida ekanligini hisobga ol
+- Kamida 8-10 ta TURLI kategoriyadan mahsulot ber
+
+## HAVOLALAR QOIDASI (JUDA MUHIM):
+
+1688.com havolasi: https://s.1688.com/selloffer/offer_search.htm?keywords=XITOYCHA_KALIT_SO'Z
+- Kalit so'z ALBATTA XITOY TILIDA bo'lishi kerak (masalan: 无线耳机, 智能手表, LED灯带)
+- URL encode qilingan bo'lishi kerak
+
+Alibaba havolasi: https://www.alibaba.com/trade/search?SearchText=INGLIZCHA_KALIT_SO'Z
+- Kalit so'z INGLIZ TILIDA bo'lishi kerak (masalan: wireless earbuds, smart watch, LED strip lights)
+
+## MISOL MAHSULOTLAR (lekin bular emas, hozirgi trendlarni top):
+- Smart gadgetlar (mini proyektor, portativ monitor, TWS quloqchin yangi modellari)
+- TikTok'da viral bo'lgan uy buyumlari (LED chirog'lar, organayzerlar)
+- Sport va salomatlik (smart soat aksessuarlari, fitness asboblar)
+- Go'zallik texnologiyalari (mikrotokli yuz massajyor, LED maska)
+- Bolalar uchun innovatsion o'yinchoqlar
+
+Kamida 8-10 ta real trend mahsulotlarni aniqla va tavsiya qil.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -110,11 +98,11 @@ ${keywordContext}
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-3-flash-preview",
         messages: [
           {
             role: "system",
-            content: "Sen professional dunyo miqyosidagi marketplace trend analitik va import/export mutaxassisisan. Javoblarni JSON formatda, aniq va real ma'lumotlar asosida ber. Xitoy optom saytlariga havolalarni DOIM qo'sh."
+            content: "Sen professional Xitoy-O'zbekiston import analitikasan. Faqat FIZIK, import qilsa arziydigan mahsulotlarni tavsiya qil. Oziq-ovqat, dori, kimyo TAQIQLANGAN. Har bir mahsulot uchun 1688.com (xitoycha kalit so'z bilan) va Alibaba (inglizcha kalit so'z bilan) havolalarini ALBATTA ber. Narxlar REAL bo'lishi kerak."
           },
           { role: "user", content: prompt },
         ],
@@ -122,7 +110,7 @@ ${keywordContext}
           type: "function",
           function: {
             name: "trend_predictions",
-            description: "Dunyo bozori trend bashoratlari va xitoy optom manbalari",
+            description: "Import uchun trend mahsulotlar bashorati",
             parameters: {
               type: "object",
               properties: {
@@ -131,34 +119,35 @@ ${keywordContext}
                   items: {
                     type: "object",
                     properties: {
-                      product_name: { type: "string", description: "Mahsulot nomi (o'zbek tilida)" },
-                      category: { type: "string", description: "Kategoriya" },
-                      demand_score: { type: "number", description: "Talab darajasi 1-100" },
-                      price_min: { type: "number", description: "Minimal narx (so'm) - O'zbekiston bozorida" },
-                      price_max: { type: "number", description: "Maksimal narx (so'm) - O'zbekiston bozorida" },
-                      monthly_sales_estimate: { type: "number", description: "Oylik sotuvlar bashorati O'zbekistonda (dona)" },
-                      net_profit_potential: { type: "number", description: "Sof foyda potentsiali (so'm/oy)" },
+                      product_name: { type: "string", description: "Mahsulot nomi o'zbek tilida (masalan: Simsiz Bluetooth quloqchin TWS)" },
+                      category: { type: "string", description: "Kategoriya (Elektronika, Uy jihozlari, Go'zallik, Sport va h.k.)" },
+                      demand_score: { type: "number", description: "Talab darajasi 1-100 (100 = juda yuqori talab)" },
+                      price_min: { type: "number", description: "O'zbekistonda sotish narxi MIN (so'mda)" },
+                      price_max: { type: "number", description: "O'zbekistonda sotish narxi MAX (so'mda)" },
+                      china_price_usd: { type: "number", description: "Xitoy optom narxi (USD da, 1 dona uchun)" },
+                      monthly_sales_estimate: { type: "number", description: "O'zbekistonda oyiga taxminan necha dona sotilishi mumkin" },
+                      net_profit_potential: { type: "number", description: "Sof foyda potentsiali so'mda (oylik, logistika va soliq chegirib)" },
                       competition_level: { type: "string", enum: ["past", "o'rta", "yuqori"] },
                       trend_direction: { type: "string", enum: ["tez_o'sish", "sekin_o'sish", "barqaror", "mavsumiy"] },
-                      reason: { type: "string", description: "Nima uchun trend (aniq sabablar)" },
-                      best_time_to_enter: { type: "string", description: "Qachon kirish yaxshi" },
+                      reason: { type: "string", description: "Nima uchun hozir trend (TikTok viral, Amazon bestseller, yangi texnologiya va h.k.)" },
+                      best_time_to_enter: { type: "string", description: "Qachon bozorga kirish yaxshi" },
                       risk_level: { type: "string", enum: ["past", "o'rta", "yuqori"] },
-                      global_trend_data: { type: "string", description: "Dunyo bozorida qanday trend ekanligi" },
+                      global_trend_data: { type: "string", description: "Dunyo bozorida qanday trend: Amazon ranking, TikTok views, Google Trends" },
                       source_links: {
                         type: "array",
-                        description: "Xitoy optom saytlaridan xarid qilish havolalari",
+                        description: "Xitoy optom saytlaridan xarid qilish havolalari (kamida 2 ta: 1688.com va Alibaba)",
                         items: {
                           type: "object",
                           properties: {
-                            platform: { type: "string", description: "Platforma nomi (1688.com, Alibaba, AliExpress)" },
-                            url: { type: "string", description: "To'g'ridan-to'g'ri havola" },
-                            price_range: { type: "string", description: "Taxminiy optom narx oralig'i" },
+                            platform: { type: "string", description: "1688.com, Alibaba, AliExpress" },
+                            url: { type: "string", description: "To'liq havola (1688 uchun xitoycha, Alibaba uchun inglizcha kalit so'z)" },
+                            price_range: { type: "string", description: "Optom narx oralig'i (masalan: $2.5-$8.0 / dona)" },
                           },
-                          required: ["platform", "url"],
+                          required: ["platform", "url", "price_range"],
                         },
                       },
                     },
-                    required: ["product_name", "category", "demand_score", "price_min", "price_max", "monthly_sales_estimate", "net_profit_potential", "competition_level", "trend_direction", "reason", "source_links"],
+                    required: ["product_name", "category", "demand_score", "price_min", "price_max", "china_price_usd", "monthly_sales_estimate", "net_profit_potential", "competition_level", "trend_direction", "reason", "source_links"],
                   },
                 },
                 market_summary: {
@@ -166,8 +155,8 @@ ${keywordContext}
                   properties: {
                     overall_trend: { type: "string", description: "Umumiy bozor holati va trend yo'nalishi" },
                     hot_categories: { type: "array", items: { type: "string" }, description: "Eng issiq kategoriyalar" },
-                    seasonal_factors: { type: "string", description: "Mavsumiy omillar" },
-                    recommendation: { type: "string", description: "Umumiy strategik tavsiya" },
+                    seasonal_factors: { type: "string", description: "Mavsumiy omillar va tavsiyalar" },
+                    recommendation: { type: "string", description: "Yangi sotuvchilarga strategik tavsiya" },
                   },
                 },
               },
@@ -192,7 +181,7 @@ ${keywordContext}
       }
       const errText = await response.text();
       console.error("AI error:", response.status, errText);
-      throw new Error("AI gateway error");
+      throw new Error("AI gateway error: " + response.status);
     }
 
     const aiData = await response.json();
@@ -202,17 +191,22 @@ ${keywordContext}
     if (toolCall?.function?.arguments) {
       try {
         predictions = JSON.parse(toolCall.function.arguments);
-      } catch {
-        console.error("Failed to parse AI response");
+      } catch (e) {
+        console.error("Failed to parse AI response:", e);
+        throw new Error("AI javobini o'qib bo'lmadi");
       }
+    }
+
+    if (!predictions?.predictions?.length) {
+      throw new Error("AI natija bermadi, qaytadan urinib ko'ring");
     }
 
     // Log usage
     await supabase.from("ai_usage_log").insert({
       user_id: user.id,
       action_type: "trend-prediction",
-      model_used: "gemini-2.5-flash",
-      metadata: { category, period, global_trends, keyword_count: keywords?.length || 0 },
+      model_used: "gemini-3-flash-preview",
+      metadata: { category, period },
     });
 
     return new Response(JSON.stringify({
@@ -227,7 +221,7 @@ ${keywordContext}
     console.error("Trend prediction error:", error);
     return new Response(JSON.stringify({
       success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: error instanceof Error ? error.message : "Noma'lum xatolik",
     }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
