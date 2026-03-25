@@ -538,7 +538,7 @@ function NewFeatureDialog() {
           <div className="flex items-center gap-4 col-span-2">
             <label className="flex items-center gap-1.5 text-xs"><input type="checkbox" checked={form.is_enabled} onChange={e => setForm({ ...form, is_enabled: e.target.checked })} className="rounded" />Yoqiq</label>
             <label className="flex items-center gap-1.5 text-xs"><input type="checkbox" checked={form.is_free} onChange={e => setForm({ ...form, is_free: e.target.checked })} className="rounded" />Bepul</label>
-            <label className="flex items-center gap-1.5 text-xs"><input type="checkbox" checked={form.is_premium_only} onChange={e => setForm({ ...form, is_premium_only: e.target.checked })} className="rounded" />Premium only</label>
+            {/* Premium only checkbox removed — access controlled by subscription plans */}
           </div>
         </div>
         <Button onClick={() => createFeature.mutate()} disabled={createFeature.isPending || !form.feature_key || !form.feature_name} className="w-full mt-2">

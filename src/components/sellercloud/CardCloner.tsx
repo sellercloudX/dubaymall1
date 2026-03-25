@@ -452,7 +452,7 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
 
     // Pre-flight billing check — prevent 402 errors before starting
     const featureKey = targetMarketplaces.includes('yandex') ? 'clone-to-yandex' 
-      : targetMarketplaces.includes('wildberries') ? 'clone-to-wildberries' 
+      : targetMarketplaces.includes('wildberries') ? 'clone-to-wildberries'
       : 'clone-to-uzum';
     if (!(await checkBillingAccess(featureKey, user?.id))) return;
 
