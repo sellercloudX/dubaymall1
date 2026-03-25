@@ -2432,7 +2432,10 @@ serve(async (req) => {
                 items: items.map((item: any) => {
                   const identInfo = (item.identifierInfo && typeof item.identifierInfo === 'object') ? item.identifierInfo : {};
                   const itemBarcode = item.barcode || identInfo.barcode || '';
-                  const offerId = item.skuTitle || itemBarcode || String(item.id || '');
+                  // CRITICAL: Use numeric productId/skuId as offerId to match product catalog
+                  // item.skuTitle is a TEXT name and will never match productId in tariffMap
+                  const numericId = item.productId || identInfo.productId || item.skuId || identInfo.skuId || '';
+                  const offerId = numericId ? String(numericId) : (itemBarcode || item.skuTitle || String(item.id || ''));
                   
                   let itemPhoto = '';
                    try {
