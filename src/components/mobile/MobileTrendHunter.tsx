@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   TrendingUp, DollarSign, BarChart3, Flame, Package,
   ShoppingCart, Brain, Sparkles, Target, Shield, Clock, Zap,
-  ExternalLink, Globe, ArrowUpRight, Search,
+  Globe, ArrowUpRight, Search,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useMutation } from '@tanstack/react-query';
