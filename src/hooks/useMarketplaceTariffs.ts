@@ -279,31 +279,23 @@ export function useMarketplaceTariffs(
 
             const tariffResults = data.data || [];
 
-            tariffResults.forEach((t: any) => {
-              // Match by categoryId+price (server may have filtered restricted categories)
-              const tCatId = t.categoryId || 0;
-              const tPrice = t.price || 0;
-              
-              // Find matching offer(s) in sendBatch by category+price
-              const matchingOffers = sendBatch.filter(o => 
-                o.categoryId === tCatId && Math.abs(o.price - tPrice) < 1
-              );
-              
-              for (const match of matchingOffers) {
-                const commission = t.agencyCommission || 0;
-                const apiCommissionPercent = t.commissionPercent || (match.price > 0 ? (commission / match.price) * 100 : 0);
+            tariffResults.forEach((t: any, idx: number) => {
+              if (idx >= sendBatch.length) return;
+              const offerId = sendBatch[idx].offerId;
+              const commission = t.agencyCommission || 0;
+              const offerPrice = sendBatch[idx]?.price || 0;
+              const apiCommissionPercent = t.commissionPercent || (offerPrice > 0 ? (commission / offerPrice) * 100 : 0);
 
-                tariffMap.set(match.offerId, {
-                  offerId: match.offerId,
-                  agencyCommission: commission,
-                  fulfillment: t.fulfillment || 0,
-                  delivery: (t.delivery || 0) + (t.sorting || 0),
-                  otherFees: t.other || 0,
-                  totalTariff: t.totalTariff || 0,
-                  tariffPercent: t.tariffPercent || 0,
-                  commissionPercent: apiCommissionPercent,
-                });
-              }
+              tariffMap.set(offerId, {
+                offerId,
+                agencyCommission: commission,
+                fulfillment: t.fulfillment || 0,
+                delivery: (t.delivery || 0) + (t.sorting || 0),
+                otherFees: t.other || 0,
+                totalTariff: t.totalTariff || 0,
+                tariffPercent: t.tariffPercent || 0,
+                commissionPercent: apiCommissionPercent,
+              });
             });
           }
 

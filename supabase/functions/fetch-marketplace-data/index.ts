@@ -1019,49 +1019,20 @@ serve(async (req) => {
           if (offersForCalc.length === 0) {
             result = { success: true, data: [], message: "No offers provided" };
           } else {
-            // Helper to call tariff API
-            const callTariffApi = async (offers: any[]) => {
-              await sleep(500);
-              return fetchWithRetry(
-                'https://api.partner.market.yandex.ru/v2/tariffs/calculate',
-                {
-                  method: 'POST',
-                  headers,
-                  body: JSON.stringify({
-                    parameters: { campaignId: Number(campaignId) },
-                    offers,
-                  }),
-                }
-              );
-            };
-
-            let activeOffers = [...offersForCalc];
-            let tariffResponse = await callTariffApi(activeOffers);
-
-            // If 400 with restricted categories — filter them out and retry
-            if (tariffResponse.status === 400) {
-              const errBody = await tariffResponse.text();
-              console.warn("Tariff 400 response:", errBody);
-              try {
-                const errJson = JSON.parse(errBody);
-                const errMsg = errJson?.errors?.[0]?.message || errJson?.error?.message || '';
-                const restrictedMatch = errMsg.match(/restricted for your country:\s*([\d,\s]+)/i);
-                if (restrictedMatch) {
-                  const restrictedIds = new Set(
-                    restrictedMatch[1].split(',').map((s: string) => Number(s.trim())).filter((n: number) => n > 0)
-                  );
-                  console.log(`Filtering out ${restrictedIds.size} restricted categories, retrying...`);
-                  activeOffers = offersForCalc.filter((o: any) => !restrictedIds.has(o.categoryId));
-                  if (activeOffers.length > 0) {
-                    tariffResponse = await callTariffApi(activeOffers);
-                  } else {
-                    result = { success: true, data: [], message: "All categories restricted" };
-                  }
-                }
-              } catch (parseErr) {
-                console.error("Could not parse 400 error for retry:", parseErr);
+            await sleep(500);
+            const tariffResponse = await fetchWithRetry(
+              'https://api.partner.market.yandex.ru/v2/tariffs/calculate',
+              {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                  parameters: { 
+                    campaignId: Number(campaignId),
+                  },
+                  offers: offersForCalc,
+                }),
               }
-            }
+            );
 
             console.log(`Tariff API response status: ${tariffResponse.status}`);
 
@@ -1078,12 +1049,14 @@ serve(async (req) => {
                 let delivery = 0;
                 let sorting = 0;
                 let other = 0;
+                // Extract EXACT commission percentage from API parameters
                 let commissionPercentFromApi = 0;
                 
                 tariffs.forEach((tariff: any) => {
                   const amount = tariff.amount || 0;
                   const type = tariff.type || '';
                   
+                  // Extract percentage from parameters array (most accurate source)
                   const params = tariff.parameters || [];
                   const valueParam = params.find((p: any) => p.name === 'value');
                   const valueType = params.find((p: any) => p.name === 'valueType');
@@ -1091,6 +1064,7 @@ serve(async (req) => {
                   
                   if (type === 'FEE' || type === 'AGENCY_COMMISSION' || type === 'PAYMENT_TRANSFER') {
                     agencyCommission += amount;
+                    // Accumulate exact % from API for commission-type fees
                     if (isRelative && valueParam?.value) {
                       commissionPercentFromApi += parseFloat(valueParam.value) || 0;
                     }
@@ -1103,14 +1077,15 @@ serve(async (req) => {
                   }
                 });
                 
-                const price = activeOffers[idx]?.price || 0;
+                const price = offersForCalc[idx]?.price || 0;
                 const totalTariff = agencyCommission + fulfillment + delivery + sorting + other;
                 
                 return {
                   index: idx,
-                  categoryId: activeOffers[idx]?.categoryId,
+                  categoryId: offersForCalc[idx]?.categoryId,
                   price,
                   agencyCommission,
+                  // EXACT commission % from API parameters (e.g. FEE 5.50% + PAYMENT_TRANSFER 1.50% = 7%)
                   commissionPercent: commissionPercentFromApi > 0 
                     ? Math.round(commissionPercentFromApi * 100) / 100
                     : (price > 0 ? Math.round((agencyCommission / price) * 10000) / 100 : 0),
@@ -1126,7 +1101,7 @@ serve(async (req) => {
               
               console.log(`Parsed tariffs sample:`, JSON.stringify(parsed[0] || {}));
               result = { success: true, data: parsed };
-            } else if (!result) {
+            } else {
               const errText = await tariffResponse.text();
               console.error("Tariff calc error:", tariffResponse.status, errText);
               result = { success: false, error: `Tariff calculation failed: ${tariffResponse.status}`, details: errText };
