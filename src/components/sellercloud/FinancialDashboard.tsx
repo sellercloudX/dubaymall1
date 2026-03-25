@@ -328,14 +328,18 @@ export function FinancialDashboard({
                             <Badge variant="outline" className="text-[10px] border-primary/30 text-primary px-1.5 py-0">
                               <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />API
                             </Badge>
-                          ) : summary.totalMarketplaceFees === 0 ? (
+                          ) : summary.totalMarketplaceFees > 0 ? (
+                            <Badge variant="outline" className="text-[10px] border-warning/50 text-warning px-1.5 py-0">
+                              ~Taxminiy
+                            </Badge>
+                          ) : (
                             <Badge variant="outline" className="text-[10px] border-muted-foreground/30 text-muted-foreground px-1.5 py-0">
                               Ma'lumot yo'q
                             </Badge>
-                          ) : null}
+                          )}
                         </div>
                         <div className="text-xs text-muted-foreground truncate">
-                          {hasReal ? `${summary.feePercent}%` : 'API ma\'lumoti kutilmoqda'}
+                          {hasReal ? `${summary.feePercent}%` : summary.totalMarketplaceFees > 0 ? `~${summary.feePercent}% (taxminiy)` : 'API ulanmagan'}
                         </div>
                       </div>
                     </div>
