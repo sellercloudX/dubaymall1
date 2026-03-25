@@ -280,6 +280,8 @@ export default function SellerCloudMobile() {
                 'reports': '📑 Hisobotlar', 'notifications': '🔔 Bildirishnoma', 'subscription': '💳 Obuna',
                 'competitor': '🎯 Raqobat', 'sales': '📊 Sotuvlar', 'support': '💬 Yordam', 'stores': '🏪 Do\'konlar',
                 'tutorials': '📖 Qo\'llanma', 'profile': '👤 Profil',
+                'trend-hunter': '🔥 Trend Hunter', 'sellzen-studio': '✨ SellZen AI',
+                'unit-economy': '💵 Unit-econ',
               };
               return labels[activeTab] || activeTab;
             })()}
