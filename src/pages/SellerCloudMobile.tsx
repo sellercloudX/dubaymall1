@@ -49,6 +49,8 @@ const TutorialVideos = lazy(() => import('@/components/sellercloud/TutorialVideo
 const InventoryControlHub = lazy(() => import('@/components/sellercloud/InventoryControlHub').then(m => ({ default: m.InventoryControlHub })));
 const PriceControlHub = lazy(() => import('@/components/sellercloud/PriceControlHub').then(m => ({ default: m.PriceControlHub })));
 const UnitEconomyDashboard = lazy(() => import('@/components/sellercloud/UnitEconomyDashboard').then(m => ({ default: m.UnitEconomyDashboard })));
+const SellZenStudio = lazy(() => import('@/components/sellercloud/SellZenStudio').then(m => ({ default: m.SellZenStudio })));
+const MobileTrendHunter = lazy(() => import('@/components/mobile/MobileTrendHunter').then(m => ({ default: m.MobileTrendHunter })));
 
 // Lightweight tab loading skeleton
 function TabLoader() {
@@ -250,6 +252,10 @@ export default function SellerCloudMobile() {
         return <div className="p-4"><TutorialVideos /></div>;
       case 'unit-economy':
         return <div className="p-4"><UnitEconomyDashboard connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
+      case 'sellzen-studio':
+        return <div className="p-4"><SellZenStudio /></div>;
+      case 'trend-hunter':
+        return <MobileTrendHunter />;
       default:
         return null;
     }
@@ -274,6 +280,8 @@ export default function SellerCloudMobile() {
                 'reports': '📑 Hisobotlar', 'notifications': '🔔 Bildirishnoma', 'subscription': '💳 Obuna',
                 'competitor': '🎯 Raqobat', 'sales': '📊 Sotuvlar', 'support': '💬 Yordam', 'stores': '🏪 Do\'konlar',
                 'tutorials': '📖 Qo\'llanma', 'profile': '👤 Profil',
+                'trend-hunter': '🔥 Trend Hunter', 'sellzen-studio': '✨ SellZen AI',
+                'unit-economy': '💵 Unit-econ',
               };
               return labels[activeTab] || activeTab;
             })()}

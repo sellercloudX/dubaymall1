@@ -6,7 +6,7 @@ import {
   ArrowDownUp, DollarSign, BarChart3,
   Copy, AlertOctagon, Tag, FileSpreadsheet, Bell, CreditCard, Coins,
   MessageCircle, Activity, Megaphone, Search, LayoutDashboard, UserCog, BookOpen,
-  Sparkles, Scan,
+  Sparkles, Scan, Flame,
 } from 'lucide-react';
 
 interface MobileMoreMenuProps {
@@ -25,6 +25,7 @@ const menuCategories: MenuCategory[] = [
   {
     title: '💰 Narxlash & Moliya',
     items: [
+      { id: 'financials', icon: DollarSign, label: 'Moliya', color: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' },
       { id: 'pricing', icon: Tag, label: 'Narxlar', color: 'bg-violet-500/15 text-violet-600 dark:text-violet-400' },
       { id: 'cost-prices', icon: Coins, label: 'Tannarx', color: 'bg-amber-500/15 text-amber-600 dark:text-amber-400' },
       { id: 'sales', icon: BarChart3, label: 'Sotuvlar', color: 'bg-lime-500/15 text-lime-600 dark:text-lime-400' },
@@ -46,6 +47,7 @@ const menuCategories: MenuCategory[] = [
   {
     title: '🛠 AI & Asboblar',
     items: [
+      { id: 'trend-hunter', icon: Flame, label: 'Trend Hunter', color: 'bg-orange-500/15 text-orange-600 dark:text-orange-400' },
       { id: 'sellzen-studio', icon: Sparkles, label: 'SellZen AI', color: 'bg-primary/15 text-primary' },
       { id: 'scanner', icon: Scan, label: 'AI Scanner', color: 'bg-purple-500/15 text-purple-600 dark:text-purple-400' },
       { id: 'stores', icon: LayoutDashboard, label: "Do'konlar", color: 'bg-blue-500/15 text-blue-600 dark:text-blue-400' },
