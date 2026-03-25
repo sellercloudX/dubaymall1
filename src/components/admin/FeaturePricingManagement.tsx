@@ -92,10 +92,7 @@ function FeatureRow({ feature, onUpdate, plans }: { feature: FeaturePrice; onUpd
             <Label className="text-[10px] text-muted-foreground">Bepul</Label>
             <Switch checked={feature.is_free} onCheckedChange={(v) => onUpdate(feature.id, { is_free: v })} />
           </div>
-          <div className="flex items-center gap-1.5">
-            <Label className="text-[10px] text-muted-foreground">Premium</Label>
-            <Switch checked={feature.is_premium_only} onCheckedChange={(v) => onUpdate(feature.id, { is_premium_only: v })} />
-          </div>
+          {/* Premium toggle removed — access is controlled by subscription plans */}
         </div>
       </div>
 
