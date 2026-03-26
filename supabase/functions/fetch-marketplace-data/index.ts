@@ -2173,6 +2173,9 @@ serve(async (req) => {
                   
                   return {
                     offerId: String(card.productId || card.id || firstSku.skuId || ''),
+                    // CRITICAL: skuId is the numeric SKU identifier needed for stock/price updates
+                    // offerId = productId (for display), skuId = firstSku.skuId (for API calls)
+                    skuId: String(firstSku.skuId || ''),
                     name: card.title || card.name || '',
                     price,
                     shopSku: humanSku,
