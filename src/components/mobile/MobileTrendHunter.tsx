@@ -326,7 +326,7 @@ export function MobileTrendHunter() {
                     {pred.risk_level && (
                       <Badge variant="outline" className="text-[9px]">
                         <Shield className="h-2.5 w-2.5 mr-0.5" />
-                        Risk: {pred.risk_level}
+                        Xavf: {pred.risk_level}
                       </Badge>
                     )}
                     {pred.best_time_to_enter && (
