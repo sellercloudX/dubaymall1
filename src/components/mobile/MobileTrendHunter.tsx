@@ -117,27 +117,6 @@ const PERIODS = [
   { value: '30', label: '30 kun' },
 ];
 
-function ProductImage({ src, alt }: { src?: string; alt: string }) {
-  const [error, setError] = useState(false);
-  
-  if (!src || error) {
-    return (
-      <div className="w-full h-full bg-muted/50 flex items-center justify-center">
-        <ImageOff className="h-8 w-8 text-muted-foreground/30" />
-      </div>
-    );
-  }
-
-  return (
-    <img
-      src={src}
-      alt={alt}
-      className="w-full h-full object-cover"
-      onError={() => setError(true)}
-      loading="lazy"
-    />
-  );
-}
 
 export function MobileTrendHunter() {
   const [category, setCategory] = useState('all');
