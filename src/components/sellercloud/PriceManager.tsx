@@ -185,7 +185,7 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
     setIsSaving(true);
     try {
       // Group by marketplace — convert UZS prices back to marketplace currency (RUB for WB)
-      const byMarketplace = new Map<string, Array<{ offerId: string; price: number; nmID?: number }>>();
+      const byMarketplace = new Map<string, Array<{ offerId: string; price: number; nmID?: number; skuId?: string }>>();
       changedProducts.forEach(p => {
         const key = `${p.marketplace}-${p.id}`;
         const newPriceUzs = priceChanges[key];
@@ -194,7 +194,7 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
         const list = byMarketplace.get(p.marketplace) || [];
         // Convert from UZS display price back to marketplace-native currency
         const nativePrice = toMarketplaceCurrency(newPriceUzs, p.marketplace);
-        list.push({ offerId: p.id, price: nativePrice, nmID: p.nmID });
+        list.push({ offerId: p.id, price: nativePrice, nmID: p.nmID, skuId: p.skuId });
         byMarketplace.set(p.marketplace, list);
       });
 
