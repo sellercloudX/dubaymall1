@@ -33,6 +33,10 @@ export interface MarketplaceProduct {
   // WB-specific fields
   subjectName?: string;
   parentName?: string;
+  // Uzum-specific: numeric SKU ID needed for stock/price API calls
+  skuId?: string;
+  // Shop ID (Uzum multi-shop support)
+  shopId?: string;
 }
 
 export interface MarketplaceOrder {

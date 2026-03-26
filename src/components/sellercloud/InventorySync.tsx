@@ -34,6 +34,7 @@ interface ProductStock {
   id: string;
   name: string;
   sku: string;
+  skuId?: string; // Uzum numeric SKU ID for API calls
   stockFBO: number;
   stockFBS: number;
   totalStock: number;
@@ -103,6 +104,7 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
           id: product.offerId,
           name: product.name || 'Nomsiz',
           sku: product.shopSku || product.offerId,
+          skuId: product.skuId, // Uzum numeric SKU ID
           stockFBO, stockFBS, totalStock,
           lowStockAlert: totalStock < LOW_STOCK_THRESHOLD,
           marketplace,
@@ -320,6 +322,7 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
             stocks: prods.map(p => ({
               sku: p.sku,
               offerId: p.id,
+              skuId: p.skuId, // Uzum needs numeric skuId, not productId
               quantity: qty,
             })),
           },
