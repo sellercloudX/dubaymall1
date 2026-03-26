@@ -224,27 +224,27 @@ export function SellZenStudio() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-fuchsia-500 to-violet-600 flex items-center justify-center shadow-lg">
-            <Wand2 className="h-5 w-5 text-white" />
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-fuchsia-500 to-violet-600 flex items-center justify-center shadow-lg shrink-0">
+            <Wand2 className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
           </div>
-          <div>
-            <h2 className="text-lg font-bold">SellZen AI Studio</h2>
-            <p className="text-xs text-muted-foreground">Rasm va video generatsiya</p>
+          <div className="min-w-0">
+            <h2 className="text-base sm:text-lg font-bold truncate">SellZen AI Studio</h2>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">Rasm va video generatsiya</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 self-end sm:self-auto">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => setShowHistory(!showHistory)}
-            className="gap-1.5 text-xs"
+            className="gap-1 text-xs h-7 px-2"
           >
             <History className="h-3.5 w-3.5" />
-            Tarix
+            <span className="hidden xs:inline">Tarix</span>
           </Button>
-          <Badge variant="outline" className="gap-1.5">
+          <Badge variant="outline" className="gap-1 text-[10px] sm:text-xs">
             <Wallet className="h-3 w-3" />
             {(balance?.balance_uzs || 0).toLocaleString()} so'm
           </Badge>
@@ -314,19 +314,19 @@ export function SellZenStudio() {
           variant={activeTab === 'images' ? 'default' : 'outline'}
           size="sm"
           onClick={() => setActiveTab('images')}
-          className="gap-1.5"
+          className="gap-1 text-xs sm:text-sm flex-1 sm:flex-initial"
         >
-          <ImagePlus className="h-4 w-4" />
-          Rasmlar ({imagePrice.toLocaleString()} so'm)
+          <ImagePlus className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+          <span className="truncate">Rasm ({imagePrice.toLocaleString()})</span>
         </Button>
         <Button
           variant={activeTab === 'video' ? 'default' : 'outline'}
           size="sm"
           onClick={() => setActiveTab('video')}
-          className="gap-1.5"
+          className="gap-1 text-xs sm:text-sm flex-1 sm:flex-initial"
         >
-          <Film className="h-4 w-4" />
-          Video ({videoPrice.toLocaleString()} so'm)
+          <Film className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+          <span className="truncate">Video ({videoPrice.toLocaleString()})</span>
         </Button>
       </div>
 
