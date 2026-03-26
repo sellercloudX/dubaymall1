@@ -226,7 +226,7 @@ export function MobileTrendHunter() {
               <div className="flex items-start gap-2">
                 <Sparkles className="h-4 w-4 text-primary shrink-0 mt-0.5" />
                 <div className="min-w-0">
-                  <p className="text-xs font-semibold text-primary mb-1">AI Bozor xulosasi</p>
+                  <p className="text-xs font-semibold text-primary mb-1">Bozor xulosasi</p>
                   <p className="text-[11px] text-muted-foreground leading-relaxed">{marketSummary.overall_trend}</p>
                   {marketSummary.hot_categories?.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1.5">
