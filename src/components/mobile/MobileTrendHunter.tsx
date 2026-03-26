@@ -175,8 +175,8 @@ export function MobileTrendHunter() {
             <Flame className="h-4 w-4 text-white" />
           </div>
           <div>
-            <h2 className="font-bold text-sm">Trend Hunter AI</h2>
-            <p className="text-[10px] text-muted-foreground">Xitoydan import uchun trend tovarlar</p>
+            <h2 className="font-bold text-sm">Trend Ovchisi</h2>
+            <p className="text-[10px] text-muted-foreground">Xitoydan import uchun eng foydali tovarlar</p>
           </div>
         </div>
 
