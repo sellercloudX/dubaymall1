@@ -32,6 +32,7 @@ const formatPriceUzs = (price: number | undefined) => {
 interface ProductPrice {
   id: string;
   nmID?: number;
+  skuId?: string; // Uzum numeric SKU ID for API calls
   name: string;
   sku: string;
   price: number;
