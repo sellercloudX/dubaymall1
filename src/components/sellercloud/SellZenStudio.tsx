@@ -314,19 +314,19 @@ export function SellZenStudio() {
           variant={activeTab === 'images' ? 'default' : 'outline'}
           size="sm"
           onClick={() => setActiveTab('images')}
-          className="gap-1.5"
+          className="gap-1 text-xs sm:text-sm flex-1 sm:flex-initial"
         >
-          <ImagePlus className="h-4 w-4" />
-          Rasmlar ({imagePrice.toLocaleString()} so'm)
+          <ImagePlus className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+          <span className="truncate">Rasm ({imagePrice.toLocaleString()})</span>
         </Button>
         <Button
           variant={activeTab === 'video' ? 'default' : 'outline'}
           size="sm"
           onClick={() => setActiveTab('video')}
-          className="gap-1.5"
+          className="gap-1 text-xs sm:text-sm flex-1 sm:flex-initial"
         >
-          <Film className="h-4 w-4" />
-          Video ({videoPrice.toLocaleString()} so'm)
+          <Film className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+          <span className="truncate">Video ({videoPrice.toLocaleString()})</span>
         </Button>
       </div>
 
