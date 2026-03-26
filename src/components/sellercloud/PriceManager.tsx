@@ -100,6 +100,7 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
         allProducts.push({
           id: product.offerId,
           nmID: (product as any).nmID,
+          skuId: product.skuId, // Uzum numeric SKU ID
           name: product.name || 'Nomsiz',
           sku: product.shopSku || product.offerId,
           price: priceUzs,
