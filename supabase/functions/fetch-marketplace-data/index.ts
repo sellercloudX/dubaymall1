@@ -2958,29 +2958,42 @@ serve(async (req) => {
           if (!updates || updates.length === 0) {
             result = { success: false, error: "No stock updates provided" };
           } else {
-            const response = await fetch(
-              `${uzumBaseUrl}/v2/fbs/sku/stocks`,
-              {
-                method: 'POST',
-                headers: {
-                  ...uzumHeaders,
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  skuAmountList: updates.map((s: any) => ({
-                    skuId: s.skuId || s.offerId || s.sku,
-                    amount: s.amount || s.quantity || s.stock || 0,
-                  })),
-                }),
-              }
-            );
-
-            if (response.ok) {
-              const data = await response.json();
-              result = { success: true, data, updated: updates.length };
+            // CRITICAL: Uzum API needs skuId (numeric SKU identifier), NOT productId
+            // The client sends: { skuId, offerId (=productId), sku, quantity }
+            // We must use skuId first, then fall back to others
+            const skuAmountList = updates.map((s: any) => ({
+              skuId: parseInt(s.skuId || s.offerId || s.sku || '0'),
+              amount: s.amount || s.quantity || s.stock || 0,
+            }));
+            
+            // Validate: filter out entries where skuId is 0 or NaN
+            const validEntries = skuAmountList.filter((e: any) => e.skuId > 0);
+            
+            if (validEntries.length === 0) {
+              result = { success: false, error: "No valid skuId found for stock update. Ensure products have numeric skuId." };
             } else {
-              const errText = await response.text();
-              result = { success: false, error: `Stock update failed: ${response.status}`, details: errText };
+              console.log(`Uzum stock update: ${validEntries.length} valid SKUs, sample: ${JSON.stringify(validEntries[0])}`);
+              
+              const response = await fetch(
+                `${uzumBaseUrl}/v2/fbs/sku/stocks`,
+                {
+                  method: 'POST',
+                  headers: {
+                    ...uzumHeaders,
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({ skuAmountList: validEntries }),
+                }
+              );
+
+              if (response.ok) {
+                const data = await safeJson(response, { success: true });
+                result = { success: true, data, updated: validEntries.length };
+              } else {
+                const errText = await response.text();
+                console.error(`Uzum stock update failed: ${response.status}, body: ${errText}`);
+                result = { success: false, error: `Stock update failed: ${response.status}`, details: errText };
+              }
             }
           }
         } catch (e) {
