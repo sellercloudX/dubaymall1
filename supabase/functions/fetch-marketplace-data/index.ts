@@ -2919,29 +2919,40 @@ serve(async (req) => {
           } else if (!uzumShopId) {
             result = { success: false, error: "Shop ID required for price updates" };
           } else {
+            // CRITICAL: Uzum sendPriceData needs numeric skuId, NOT productId
             const priceData = priceOffers.map((o: any) => ({
-              skuId: o.offerId || o.skuId,
+              skuId: parseInt(o.skuId || o.offerId || '0'),
               price: o.price,
             }));
-
-            const response = await fetch(
-              `${uzumBaseUrl}/v1/product/${uzumShopId}/sendPriceData`,
-              {
-                method: 'POST',
-                headers: {
-                  ...uzumHeaders,
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ skuPriceList: priceData }),
-              }
-            );
-
-            if (response.ok) {
-              const data = await response.json();
-              result = { success: true, data, updated: priceOffers.length };
+            
+            // Filter out invalid entries
+            const validPriceData = priceData.filter((p: any) => p.skuId > 0 && p.price > 0);
+            
+            if (validPriceData.length === 0) {
+              result = { success: false, error: "No valid skuId found for price update" };
             } else {
-              const errText = await response.text();
-              result = { success: false, error: `Price update failed: ${response.status}`, details: errText };
+              console.log(`Uzum price update: ${validPriceData.length} valid SKUs, shopId: ${uzumShopId}, sample: ${JSON.stringify(validPriceData[0])}`);
+
+              const response = await fetch(
+                `${uzumBaseUrl}/v1/product/${uzumShopId}/sendPriceData`,
+                {
+                  method: 'POST',
+                  headers: {
+                    ...uzumHeaders,
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({ skuPriceList: validPriceData }),
+                }
+              );
+
+              if (response.ok) {
+                const data = await safeJson(response, { success: true });
+                result = { success: true, data, updated: validPriceData.length };
+              } else {
+                const errText = await response.text();
+                console.error(`Uzum price update failed: ${response.status}, body: ${errText}`);
+                result = { success: false, error: `Price update failed: ${response.status}`, details: errText };
+              }
             }
           }
         } catch (e) {
