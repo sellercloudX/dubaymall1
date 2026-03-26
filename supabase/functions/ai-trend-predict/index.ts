@@ -46,6 +46,8 @@ serve(async (req) => {
     const categoryFilter = category ? `\nFAQAT "${category}" kategoriyasiga tegishli mahsulotlarni tahlil qil.` : '';
     const currentDate = new Date().toISOString().split('T')[0];
 
+    console.log("Starting trend prediction:", { category, period, user: user.id });
+
     const prompt = `Sen professional e-commerce import/export analitikasan. Sening vazifang — Xitoydan O'zbekistonga import qilish uchun eng foydali va trendga chiqayotgan FIZIK MAHSULOTLARNI topish.
 
 Hozirgi sana: ${currentDate}
@@ -66,22 +68,23 @@ ${categoryFilter}
 - Kalit so'z ALBATTA XITOY TILIDA bo'lishi kerak
 - URL formati: https://s.1688.com/selloffer/offer_search.htm?keywords=KALIT_SOZ
 - Kalit so'z URL-encoded bo'lishi kerak
-- Har bir mahsulot uchun JUDA ANIQ kalit so'z ber. Masalan "simsiz quloqchin" emas, balki "TWS无线蓝牙耳机降噪" (TWS simsiz bluetooth quloqchin shovqin kamaytiruvchi) kabi ANIQ model/xususiyatni ko'rsatadigan kalit so'z.
+- Har bir mahsulot uchun JUDA ANIQ kalit so'z ber.
 
 Alibaba havolasi uchun:
 - Kalit so'z INGLIZ TILIDA bo'lishi kerak  
 - URL formati: https://www.alibaba.com/trade/search?SearchText=KALIT_SOZ
-- Har bir mahsulot uchun JUDA ANIQ kalit so'z ber. Masalan "earbuds" emas, balki "TWS wireless bluetooth earbuds noise cancelling 2024" kabi ANIQ.
+- Har bir mahsulot uchun JUDA ANIQ kalit so'z ber.
 
-## IMAGE QOIDASI (JUDA MUHIM):
-Har bir mahsulot uchun image_search_query maydoniga INGLIZ TILIDA qidiruv so'zini ber. Bu qidiruv so'zi orqali Google yoki Alibaba'da shu mahsulotning ANIQ rasmi topilishi kerak. Masalan: "mini portable projector 4K 2024 product photo", "LED face mask beauty device product", "smart watch ultra copy product photo white background".
+## RASM QOIDASI:
+Har bir mahsulot uchun image_url maydoniga shu mahsulotning Alibaba yoki AliExpress'dagi haqiqiy rasm URL'ini ber. Agar aniq rasm URL bilmasang, bo'sh qoldir.
 
 ## QOIDALAR:
 - FAQAT Xitoydan import qilsa arziydigan mahsulotlar
 - HECH QACHON oziq-ovqat, meva, sabzavot, jam, konserva, ichimlik taklif QILMA
 - HECH QACHON dori-darmon, tibbiy asbob, kimyoviy moddalar taklif QILMA
 - Narxlar REAL bo'lishi kerak
-- Kamida 8 ta TURLI mahsulot ber`;
+- Kamida 6 ta TURLI mahsulot ber
+- TEZKOR javob ber, ortiqcha tafsilotlarga kirma`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -90,11 +93,11 @@ Har bir mahsulot uchun image_search_query maydoniga INGLIZ TILIDA qidiruv so'zin
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-2.5-flash-lite",
         messages: [
           {
             role: "system",
-            content: "Sen professional Xitoy-O'zbekiston import analitikasan. Faqat FIZIK, import qilsa arziydigan mahsulotlarni tavsiya qil. Oziq-ovqat, dori, kimyo TAQIQLANGAN. Har bir mahsulot uchun 1688.com va Alibaba havolalarini ALBATTA ber. Narxlar REAL bo'lishi kerak. Har bir mahsulot uchun image_search_query maydonini ALBATTA to'ldir."
+            content: "Sen professional Xitoy-O'zbekiston import analitikasan. Faqat FIZIK mahsulotlarni tavsiya qil. Oziq-ovqat, dori TAQIQLANGAN. Har bir mahsulot uchun 1688.com va Alibaba havolalarini ALBATTA ber. TEZKOR va ANIQ javob ber."
           },
           { role: "user", content: prompt },
         ],
@@ -125,7 +128,6 @@ Har bir mahsulot uchun image_search_query maydoniga INGLIZ TILIDA qidiruv so'zin
                       best_time_to_enter: { type: "string" },
                       risk_level: { type: "string", enum: ["past", "o'rta", "yuqori"] },
                       global_trend_data: { type: "string" },
-                      image_search_query: { type: "string", description: "INGLIZ TILIDA aniq mahsulot qidiruv so'zi, masalan: 'portable mini projector 4K product photo white background'" },
                       source_links: {
                         type: "array",
                         items: {
@@ -139,7 +141,7 @@ Har bir mahsulot uchun image_search_query maydoniga INGLIZ TILIDA qidiruv so'zin
                         },
                       },
                     },
-                    required: ["product_name", "category", "demand_score", "price_min", "price_max", "china_price_usd", "monthly_sales_estimate", "net_profit_potential", "competition_level", "trend_direction", "reason", "source_links", "image_search_query"],
+                    required: ["product_name", "category", "demand_score", "price_min", "price_max", "china_price_usd", "monthly_sales_estimate", "net_profit_potential", "competition_level", "trend_direction", "reason", "source_links"],
                   },
                 },
                 market_summary: {
@@ -159,6 +161,8 @@ Har bir mahsulot uchun image_search_query maydoniga INGLIZ TILIDA qidiruv so'zin
         tool_choice: { type: "function", function: { name: "trend_predictions" } },
       }),
     });
+
+    console.log("AI response status:", response.status);
 
     if (!response.ok) {
       if (response.status === 429) {
@@ -193,61 +197,13 @@ Har bir mahsulot uchun image_search_query maydoniga INGLIZ TILIDA qidiruv so'zin
       throw new Error("AI natija bermadi, qaytadan urinib ko'ring");
     }
 
-    // Generate images for each prediction using AI
-    const imagePromises = predictions.predictions.map(async (pred: any) => {
-      const query = pred.image_search_query || pred.product_name;
-      try {
-        const imgResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "google/gemini-3.1-flash-image-preview",
-            messages: [
-              {
-                role: "user",
-                content: `Generate a clean product photo of: ${query}. White background, studio lighting, e-commerce style product photography. Show only the product, no text, no watermark.`
-              }
-            ],
-          }),
-        });
-        
-        if (imgResponse.ok) {
-          const imgData = await imgResponse.json();
-          const parts = imgData.choices?.[0]?.message?.content;
-          if (Array.isArray(parts)) {
-            for (const part of parts) {
-              if (part.type === "image_url" && part.image_url?.url) {
-                return part.image_url.url;
-              }
-            }
-          }
-          // Check inline_data format
-          if (typeof parts === 'string' && parts.startsWith('data:image')) {
-            return parts;
-          }
-        }
-      } catch (e) {
-        console.error("Image gen error for:", query, e);
-      }
-      return null;
-    });
-
-    const images = await Promise.allSettled(imagePromises);
-    predictions.predictions.forEach((pred: any, i: number) => {
-      const result = images[i];
-      if (result.status === 'fulfilled' && result.value) {
-        pred.image_url = result.value;
-      }
-    });
+    console.log("Predictions count:", predictions.predictions.length);
 
     // Log usage
     await supabase.from("ai_usage_log").insert({
       user_id: user.id,
       action_type: "trend-prediction",
-      model_used: "gemini-2.5-flash",
+      model_used: "gemini-2.5-flash-lite",
       metadata: { category, period },
     });
 
