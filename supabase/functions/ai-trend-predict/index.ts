@@ -6,6 +6,70 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+/** Search 1688/Alibaba via Firecrawl and get real product data */
+async function searchRealProducts(category: string, firecrawlKey: string): Promise<any[]> {
+  const categoryKeywords: Record<string, { en: string; zh: string }> = {
+    electronics: { en: "portable electronics gadgets wholesale", zh: "便携电子产品批发" },
+    fashion: { en: "women fashion clothing wholesale trending", zh: "女装批发爆款" },
+    home: { en: "home gadgets wholesale trending 2025", ch: "家居用品批发爆款" },
+    beauty: { en: "beauty skincare tools wholesale", zh: "美容护肤工具批发" },
+    toys: { en: "children toys educational wholesale trending", zh: "儿童玩具益智批发爆款" },
+    sports: { en: "sports fitness equipment wholesale", zh: "运动健身器材批发" },
+    auto: { en: "car accessories wholesale trending", zh: "汽车用品批发爆款" },
+    kitchen: { en: "kitchen gadgets wholesale trending 2025", zh: "厨房小工具批发爆款" },
+    pet: { en: "pet supplies wholesale trending", zh: "宠物用品批发爆款" },
+  };
+
+  const kw = categoryKeywords[category] || { en: "trending wholesale products 2025", zh: "爆款批发产品" };
+
+  // Search Alibaba for real products with prices
+  const alibabaResults = await searchFirecrawl(
+    `site:alibaba.com ${kw.en} 2025 trending`,
+    firecrawlKey,
+    5
+  );
+
+  // Search 1688 for Chinese wholesale prices
+  const results1688 = await searchFirecrawl(
+    `site:1688.com ${kw.zh} 爆款`,
+    firecrawlKey,
+    5
+  );
+
+  // Search for trending products globally
+  const trendResults = await searchFirecrawl(
+    `trending products to sell 2025 ${kw.en} wholesale China import`,
+    firecrawlKey,
+    5
+  );
+
+  return [...alibabaResults, ...results1688, ...trendResults];
+}
+
+async function searchFirecrawl(query: string, apiKey: string, limit: number): Promise<any[]> {
+  try {
+    const response = await fetch("https://api.firecrawl.dev/v1/search", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ query, limit, lang: "en" }),
+    });
+
+    if (!response.ok) {
+      console.error(`Firecrawl search error: ${response.status}`);
+      return [];
+    }
+
+    const data = await response.json();
+    return data.data || [];
+  } catch (e) {
+    console.error("Firecrawl search failed:", e);
+    return [];
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -14,6 +78,9 @@ serve(async (req) => {
   try {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+
+    const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
+    if (!FIRECRAWL_API_KEY) throw new Error("FIRECRAWL_API_KEY not configured");
 
     const authHeader = req.headers.get("Authorization");
     const supabase = createClient(
@@ -24,11 +91,12 @@ serve(async (req) => {
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      return new Response(JSON.stringify({ error: "Avtorizatsiya talab qilinadi" }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
+    // Rate limit: 5 per hour
     const { count } = await supabase
       .from("ai_usage_log")
       .select("*", { count: "exact", head: true })
@@ -42,49 +110,56 @@ serve(async (req) => {
     }
 
     const { category, period = 14 } = await req.json();
+    const cat = category || "all";
 
-    const categoryFilter = category ? `\nFAQAT "${category}" kategoriyasiga tegishli mahsulotlarni tahlil qil.` : '';
-    const currentDate = new Date().toISOString().split('T')[0];
+    console.log("Trend prediction start:", { category: cat, period, user: user.id });
 
-    console.log("Starting trend prediction:", { category, period, user: user.id });
+    // Step 1: Search real products from 1688/Alibaba via Firecrawl
+    const realProducts = await searchRealProducts(
+      cat === "all" ? "" : cat,
+      FIRECRAWL_API_KEY
+    );
 
-    const prompt = `Sen professional e-commerce import/export analitikasan. Sening vazifang — Xitoydan O'zbekistonga import qilish uchun eng foydali va trendga chiqayotgan FIZIK MAHSULOTLARNI topish.
+    console.log(`Firecrawl found ${realProducts.length} results`);
+
+    // Build context from real search results
+    const searchContext = realProducts
+      .map((r: any) => `- ${r.title || ""}: ${r.url || ""} | ${r.description || ""}`)
+      .join("\n");
+
+    const currentDate = new Date().toISOString().split("T")[0];
+    const categoryFilter = cat !== "all" && cat ? `\nFAQAT "${cat}" kategoriyasiga tegishli mahsulotlarni tahlil qil.` : "";
+
+    // Step 2: AI analyzes real search data
+    const prompt = `Sen professional e-commerce import analitikasan. Quyida Firecrawl orqali 1688.com va Alibaba.com dan olingan REAL qidiruv natijalari bor.
 
 Hozirgi sana: ${currentDate}
 Bashorat muddati: ${period} kun
 ${categoryFilter}
 
-## SEN NIMA QILISHING KERAK:
+## REAL QIDIRUV NATIJALARI (1688, Alibaba):
+${searchContext || "Qidiruv natijalari topilmadi, umumiy bilimingdan foydalanib tavsiya ber."}
 
-1. HOZIRDA dunyo bozorida (Amazon, TikTok Shop, AliExpress, Temu) eng ko'p sotilayotgan, viral bo'layotgan yoki tez o'sish trendidagi FIZIK mahsulotlarni aniqla.
+## VAZIFA:
+Yuqoridagi REAL ma'lumotlardan foydalanib, O'zbekistonga import qilish uchun eng foydali 6 ta mahsulotni tavsiya qil.
 
-2. Bu mahsulotlarning O'zbekiston bozorida hali KAM tarqalgani yoki UMUMAN yo'qligini tekshir.
+## NARXLAR QOIDASI (JUDA MUHIM):
+- Xitoy optom narxi ($): Yuqoridagi real qidiruv natijalaridan olingan HAQIQIY narxlarni yoz. Agar narx ko'rsatilmagan bo'lsa, shu turdagi tovarlarning 1688 dagi real optom narxi oralig'ini yoz.
+- O'zbekistonda sotish narxi (so'mda): Real bozor narxi. Masalan blender 150,000-350,000 so'm, power bank 80,000-200,000 so'm, kiyim 50,000-300,000 so'm kabi REAL narxlar.
+- HECH QACHON 250,000 so'mlik narx bilan $40 lik Xitoy narxini birga YOZMA - mantiqsiz. Import xarajatlari bilan foyda chiqishi kerak.
 
-3. Har bir mahsulot uchun ANIQ havolalar ber.
-
-## HAVOLALAR QOIDASI (JUDA MUHIM):
-
-1688.com havolasi uchun: 
-- Kalit so'z ALBATTA XITOY TILIDA bo'lishi kerak
-- URL formati: https://s.1688.com/selloffer/offer_search.htm?keywords=KALIT_SOZ
-- Kalit so'z URL-encoded bo'lishi kerak
-- Har bir mahsulot uchun JUDA ANIQ kalit so'z ber.
-
-Alibaba havolasi uchun:
-- Kalit so'z INGLIZ TILIDA bo'lishi kerak  
-- URL formati: https://www.alibaba.com/trade/search?SearchText=KALIT_SOZ
-- Har bir mahsulot uchun JUDA ANIQ kalit so'z ber.
-
-## RASM QOIDASI:
-Har bir mahsulot uchun image_url maydoniga shu mahsulotning Alibaba yoki AliExpress'dagi haqiqiy rasm URL'ini ber. Agar aniq rasm URL bilmasang, bo'sh qoldir.
+## HAVOLALAR QOIDASI:
+1688.com havolasi: XITOY TILIDA kalit so'z bilan https://s.1688.com/selloffer/offer_search.htm?keywords=KALIT_SOZ
+Alibaba havolasi: INGLIZ TILIDA kalit so'z bilan https://www.alibaba.com/trade/search?SearchText=KALIT_SOZ
+Kalit so'zlar URL-encoded bo'lishi kerak.
 
 ## QOIDALAR:
-- FAQAT Xitoydan import qilsa arziydigan mahsulotlar
-- HECH QACHON oziq-ovqat, meva, sabzavot, jam, konserva, ichimlik taklif QILMA
-- HECH QACHON dori-darmon, tibbiy asbob, kimyoviy moddalar taklif QILMA
-- Narxlar REAL bo'lishi kerak
+- FAQAT Xitoydan import qilsa arziydigan FIZIK mahsulotlar
+- HECH QACHON oziq-ovqat, meva, jam, ichimlik taklif QILMA
+- HECH QACHON dori-darmon, tibbiy asbob taklif QILMA
+- Narxlar ALBATTA REAL va MANTIQIY bo'lishi kerak
 - Kamida 6 ta TURLI mahsulot ber
-- TEZKOR javob ber, ortiqcha tafsilotlarga kirma`;
+- Barcha izohlar O'ZBEK TILIDA`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -93,11 +168,11 @@ Har bir mahsulot uchun image_url maydoniga shu mahsulotning Alibaba yoki AliExpr
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-lite",
+        model: "google/gemini-2.5-flash",
         messages: [
           {
             role: "system",
-            content: "Sen professional Xitoy-O'zbekiston import analitikasan. Faqat FIZIK mahsulotlarni tavsiya qil. Oziq-ovqat, dori TAQIQLANGAN. Har bir mahsulot uchun 1688.com va Alibaba havolalarini ALBATTA ber. TEZKOR va ANIQ javob ber. BARCHA izohlar, sabablar, tavsiyalar va global_trend_data FAQAT O'ZBEK TILIDA bo'lishi SHART. Inglizcha so'z ishlatma."
+            content: "Sen professional Xitoy-O'zbekiston import analitikasan. Senga REAL qidiruv natijalari berilgan. Faqat FIZIK mahsulotlarni tavsiya qil. Oziq-ovqat, dori TAQIQLANGAN. Har bir mahsulot uchun 1688.com va Alibaba havolalarini ber. BARCHA izohlar FAQAT O'ZBEK TILIDA. Narxlar MANTIQIY bo'lishi shart - Xitoy optom narxi va O'zbekiston sotish narxi o'rtasida kamida 2-3x farq bo'lishi kerak."
           },
           { role: "user", content: prompt },
         ],
@@ -119,7 +194,7 @@ Har bir mahsulot uchun image_url maydoniga shu mahsulotning Alibaba yoki AliExpr
                       demand_score: { type: "number", description: "1-100" },
                       price_min: { type: "number", description: "O'zbekistonda sotish narxi MIN (so'mda)" },
                       price_max: { type: "number", description: "O'zbekistonda sotish narxi MAX (so'mda)" },
-                      china_price_usd: { type: "number", description: "Xitoy optom narxi USD" },
+                      china_price_usd: { type: "number", description: "Xitoy optom narxi USD (REAL)" },
                       monthly_sales_estimate: { type: "number" },
                       net_profit_potential: { type: "number", description: "Sof foyda so'mda oylik" },
                       competition_level: { type: "string", enum: ["past", "o'rta", "yuqori"] },
@@ -170,14 +245,9 @@ Har bir mahsulot uchun image_url maydoniga shu mahsulotning Alibaba yoki AliExpr
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "AI kreditlari tugagan." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
       const errText = await response.text();
       console.error("AI error:", response.status, errText);
-      throw new Error("AI gateway error: " + response.status);
+      throw new Error("AI xatoligi: " + response.status);
     }
 
     const aiData = await response.json();
@@ -203,13 +273,15 @@ Har bir mahsulot uchun image_url maydoniga shu mahsulotning Alibaba yoki AliExpr
     await supabase.from("ai_usage_log").insert({
       user_id: user.id,
       action_type: "trend-prediction",
-      model_used: "gemini-2.5-flash-lite",
-      metadata: { category, period },
+      model_used: "gemini-2.5-flash+firecrawl",
+      metadata: { category: cat, period, real_results: realProducts.length },
     });
 
     return new Response(JSON.stringify({
       success: true,
       ...predictions,
+      data_source: "firecrawl+ai",
+      real_results_count: realProducts.length,
       generated_at: new Date().toISOString(),
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
