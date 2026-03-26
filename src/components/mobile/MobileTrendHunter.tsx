@@ -176,7 +176,7 @@ export function MobileTrendHunter() {
           </div>
           <div>
             <h2 className="font-bold text-sm">Trend Ovchisi</h2>
-            <p className="text-[10px] text-muted-foreground">Xitoydan import uchun eng foydali tovarlar</p>
+            <p className="text-[10px] text-muted-foreground">1688 va Alibaba'dan real narxlar bilan</p>
           </div>
         </div>
 
