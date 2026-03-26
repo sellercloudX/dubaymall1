@@ -250,7 +250,7 @@ export function MobileTrendHunter() {
               <CardContent className="p-4 text-center">
                 <Brain className="h-8 w-8 mx-auto text-primary mb-2 animate-pulse" />
                 <p className="text-xs font-semibold">AI dunyo bozorini tahlil qilmoqda...</p>
-                <p className="text-[10px] text-muted-foreground mt-1">Amazon, TikTok, AliExpress trendlarini skanerlash</p>
+                <p className="text-[10px] text-muted-foreground mt-1">1688 va Alibaba'dan real narxlarni qidirmoqda...</p>
               </CardContent>
             </Card>
             {Array.from({ length: 3 }).map((_, i) => (
