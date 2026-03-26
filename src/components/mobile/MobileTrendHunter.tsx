@@ -175,8 +175,8 @@ export function MobileTrendHunter() {
             <Flame className="h-4 w-4 text-white" />
           </div>
           <div>
-            <h2 className="font-bold text-sm">Trend Hunter AI</h2>
-            <p className="text-[10px] text-muted-foreground">Xitoydan import uchun trend tovarlar</p>
+            <h2 className="font-bold text-sm">Trend Ovchisi</h2>
+            <p className="text-[10px] text-muted-foreground">Xitoydan import uchun eng foydali tovarlar</p>
           </div>
         </div>
 
@@ -226,7 +226,7 @@ export function MobileTrendHunter() {
               <div className="flex items-start gap-2">
                 <Sparkles className="h-4 w-4 text-primary shrink-0 mt-0.5" />
                 <div className="min-w-0">
-                  <p className="text-xs font-semibold text-primary mb-1">AI Bozor xulosasi</p>
+                  <p className="text-xs font-semibold text-primary mb-1">Bozor xulosasi</p>
                   <p className="text-[11px] text-muted-foreground leading-relaxed">{marketSummary.overall_trend}</p>
                   {marketSummary.hot_categories?.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1.5">
@@ -326,7 +326,7 @@ export function MobileTrendHunter() {
                     {pred.risk_level && (
                       <Badge variant="outline" className="text-[9px]">
                         <Shield className="h-2.5 w-2.5 mr-0.5" />
-                        Risk: {pred.risk_level}
+                        Xavf: {pred.risk_level}
                       </Badge>
                     )}
                     {pred.best_time_to_enter && (
@@ -386,7 +386,7 @@ export function MobileTrendHunter() {
                   <div className="flex items-start gap-2">
                     <Target className="h-4 w-4 text-primary shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-xs font-semibold mb-1">AI strategik tavsiya</p>
+                      <p className="text-xs font-semibold mb-1">Strategik tavsiya</p>
                       <p className="text-[11px] text-muted-foreground leading-relaxed">{marketSummary.recommendation}</p>
                     </div>
                   </div>

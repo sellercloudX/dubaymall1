@@ -97,7 +97,7 @@ Har bir mahsulot uchun image_url maydoniga shu mahsulotning Alibaba yoki AliExpr
         messages: [
           {
             role: "system",
-            content: "Sen professional Xitoy-O'zbekiston import analitikasan. Faqat FIZIK mahsulotlarni tavsiya qil. Oziq-ovqat, dori TAQIQLANGAN. Har bir mahsulot uchun 1688.com va Alibaba havolalarini ALBATTA ber. TEZKOR va ANIQ javob ber."
+            content: "Sen professional Xitoy-O'zbekiston import analitikasan. Faqat FIZIK mahsulotlarni tavsiya qil. Oziq-ovqat, dori TAQIQLANGAN. Har bir mahsulot uchun 1688.com va Alibaba havolalarini ALBATTA ber. TEZKOR va ANIQ javob ber. BARCHA izohlar, sabablar, tavsiyalar va global_trend_data FAQAT O'ZBEK TILIDA bo'lishi SHART. Inglizcha so'z ishlatma."
           },
           { role: "user", content: prompt },
         ],
