@@ -8,12 +8,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   TrendingUp, DollarSign, BarChart3, Flame, Package,
   ShoppingCart, Brain, Sparkles, Target, Shield, Clock, Zap,
-  Globe, ArrowUpRight, Search, ImageOff,
+  Globe, ArrowUpRight, Search,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useMutation } from '@tanstack/react-query';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { AspectRatio } from '@/components/ui/aspect-ratio';
 
 interface TrendPrediction {
   product_name: string;
