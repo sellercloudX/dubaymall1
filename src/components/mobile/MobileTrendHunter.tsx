@@ -386,7 +386,7 @@ export function MobileTrendHunter() {
                   <div className="flex items-start gap-2">
                     <Target className="h-4 w-4 text-primary shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-xs font-semibold mb-1">AI strategik tavsiya</p>
+                      <p className="text-xs font-semibold mb-1">Strategik tavsiya</p>
                       <p className="text-[11px] text-muted-foreground leading-relaxed">{marketSummary.recommendation}</p>
                     </div>
                   </div>
