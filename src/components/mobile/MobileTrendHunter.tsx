@@ -293,27 +293,24 @@ export function MobileTrendHunter() {
           <div className={isMobile ? 'space-y-3' : 'grid grid-cols-1 xl:grid-cols-2 gap-4'}>
             {predictions.map((pred, idx) => (
               <Card key={idx} className="overflow-hidden hover:shadow-md transition-shadow">
-                {/* Product image */}
-                <div className="relative">
-                  <AspectRatio ratio={16 / 9}>
-                    <ProductImage src={pred.image_url} alt={pred.product_name} />
-                  </AspectRatio>
-                  {/* Overlay badges */}
-                  <div className="absolute top-2 left-2 flex gap-1">
-                    {idx < 3 && (
-                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center text-[10px] font-bold text-white shadow">
-                        {idx + 1}
+                {/* Product header */}
+                <div className="p-3 pb-0">
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {idx < 3 && (
+                        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center text-[10px] font-bold text-white shadow shrink-0">
+                          {idx + 1}
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold truncate">{pred.product_name}</p>
+                        <p className="text-[10px] text-muted-foreground">{pred.category}</p>
                       </div>
-                    )}
-                    {getDemandBadge(pred.demand_score)}
-                  </div>
-                  <div className="absolute top-2 right-2">
+                    </div>
                     {getCompBadge(pred.competition_level)}
                   </div>
-                  {/* Gradient overlay at bottom */}
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2 pt-6">
-                    <p className="text-white text-sm font-semibold truncate">{pred.product_name}</p>
-                    <p className="text-white/70 text-[10px]">{pred.category}</p>
+                  <div className="flex gap-1 mt-1">
+                    {getDemandBadge(pred.demand_score)}
                   </div>
                 </div>
 
