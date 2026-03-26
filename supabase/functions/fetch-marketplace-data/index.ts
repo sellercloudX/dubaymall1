@@ -5686,9 +5686,30 @@ serve(async (req) => {
         .eq("id", connection.id);
     }
 
+    // ========== SAVE TO CACHE ==========
+    if ((dataType === 'products' || dataType === 'orders') && result?.success !== false) {
+      const cacheKey = `${marketplace}-${dataType}`;
+      try {
+        await supabase
+          .from('marketplace_stats_cache')
+          .upsert({
+            user_id: user.id,
+            marketplace,
+            stats_date: cacheKey,
+            data: result,
+            synced_at: new Date().toISOString(),
+            total_products: dataType === 'products' ? (result.total || result.data?.length || 0) : null,
+            total_orders: dataType === 'orders' ? (result.total || result.data?.length || 0) : null,
+          }, { onConflict: 'user_id,marketplace,stats_date' });
+        console.log(`Cache saved for ${cacheKey}`);
+      } catch (e) {
+        console.warn(`Cache save failed for ${cacheKey}:`, e);
+      }
+    }
+
     return new Response(
       JSON.stringify(result),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json", "X-Cache": "MISS" } }
     );
   } catch (error) {
     console.error("Fetch marketplace data error:", error);
