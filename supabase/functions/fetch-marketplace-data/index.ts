@@ -265,6 +265,43 @@ serve(async (req) => {
 
     console.log(`Fetching ${dataType} from ${marketplace} for user ${user.id}, campaignId: ${campaignId}, businessId: ${businessId}`);
 
+    // ========== SERVER-SIDE CACHE LAYER ==========
+    // Check DB cache for products/orders to avoid hitting marketplace APIs on every request
+    const CACHE_TTL_PRODUCTS = 10 * 60 * 1000; // 10 min
+    const CACHE_TTL_ORDERS = 5 * 60 * 1000; // 5 min
+    const forceRefresh = requestBody.forceRefresh === true;
+
+    if ((dataType === 'products' || dataType === 'orders') && !forceRefresh) {
+      const cacheTable = dataType === 'products' ? 'marketplace_stats_cache' : 'marketplace_stats_cache';
+      const cacheTTL = dataType === 'products' ? CACHE_TTL_PRODUCTS : CACHE_TTL_ORDERS;
+      const cacheKey = `${marketplace}-${dataType}`;
+
+      try {
+        const { data: cached } = await supabase
+          .from('marketplace_stats_cache')
+          .select('data, synced_at')
+          .eq('user_id', user.id)
+          .eq('marketplace', marketplace)
+          .eq('stats_date', cacheKey)
+          .single();
+
+        if (cached?.data && cached?.synced_at) {
+          const cacheAge = Date.now() - new Date(cached.synced_at).getTime();
+          if (cacheAge < cacheTTL) {
+            console.log(`Cache hit for ${cacheKey}, age: ${Math.round(cacheAge / 1000)}s`);
+            return new Response(
+              JSON.stringify(cached.data),
+              { headers: { ...corsHeaders, "Content-Type": "application/json", "X-Cache": "HIT" } }
+            );
+          }
+          console.log(`Cache stale for ${cacheKey}, age: ${Math.round(cacheAge / 1000)}s — refetching`);
+        }
+      } catch (e) {
+        // Cache miss — proceed with API fetch
+        console.log(`Cache miss for ${cacheKey}`);
+      }
+    }
+
     let result: any = { success: true, data: [] };
 
     if (marketplace === "yandex" && (campaignId || businessId)) {
@@ -5649,9 +5686,30 @@ serve(async (req) => {
         .eq("id", connection.id);
     }
 
+    // ========== SAVE TO CACHE ==========
+    if ((dataType === 'products' || dataType === 'orders') && result?.success !== false) {
+      const cacheKey = `${marketplace}-${dataType}`;
+      try {
+        await supabase
+          .from('marketplace_stats_cache')
+          .upsert({
+            user_id: user.id,
+            marketplace,
+            stats_date: cacheKey,
+            data: result,
+            synced_at: new Date().toISOString(),
+            total_products: dataType === 'products' ? (result.total || result.data?.length || 0) : null,
+            total_orders: dataType === 'orders' ? (result.total || result.data?.length || 0) : null,
+          }, { onConflict: 'user_id,marketplace,stats_date' });
+        console.log(`Cache saved for ${cacheKey}`);
+      } catch (e) {
+        console.warn(`Cache save failed for ${cacheKey}:`, e);
+      }
+    }
+
     return new Response(
       JSON.stringify(result),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json", "X-Cache": "MISS" } }
     );
   } catch (error) {
     console.error("Fetch marketplace data error:", error);
