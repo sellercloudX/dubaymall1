@@ -69,10 +69,10 @@ export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceO
   const allOrders = store.getOrders(selectedMarketplace);
   const isLoading = store.isLoadingOrders;
 
-  // Client-side status filtering (no re-fetch needed)
+  // Client-side status filtering using unified categories
   const orders = statusFilter === 'all'
     ? allOrders
-    : allOrders.filter(o => o.status === statusFilter);
+    : allOrders.filter(o => getMarketplaceOrderStatusCategory(o, selectedMarketplace) === statusFilter);
   const total = orders.length;
 
   /** Format order total using unified revenue calculation (same as SalesDashboard) */
