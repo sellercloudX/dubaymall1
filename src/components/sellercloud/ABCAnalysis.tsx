@@ -43,10 +43,8 @@ const MARKETPLACE_NAMES: Record<string, string> = {
   yandex: 'Yandex', uzum: 'Uzum', wildberries: 'WB', ozon: 'Ozon',
 };
 
-const MARKETPLACE_TAX: Record<string, number> = {
-  yandex: 0.04,
-  uzum: 0.04,
-};
+// O'zbekiston YATT solig'i — barcha marketplace'lar uchun 4%
+const UZB_TAX_RATE = 0.04;
 
 const ABC_COLORS = {
   A: { bg: 'bg-primary/10', text: 'text-primary', border: 'border-primary/30', badge: 'bg-primary' },
@@ -74,7 +72,7 @@ export function ABCAnalysis({ connectedMarketplaces, store }: ABCAnalysisProps) 
     for (const marketplace of activeMarketplaces) {
       const productsList = store.getProducts(marketplace);
       const orders = store.getOrders(marketplace);
-      const taxRate = MARKETPLACE_TAX[marketplace] ?? 0;
+      const taxRate = UZB_TAX_RATE;
 
       // Build product lookup by offerId
       const productMap = new Map<string, typeof productsList[0]>();

@@ -40,10 +40,8 @@ const MARKETPLACE_FEE_DETAILS: Record<string, string> = {
   wildberries: 'API orqali real komissiya + logistika',
 };
 
-const MARKETPLACE_TAX: Record<string, number> = {
-  yandex: 0.04,
-  uzum: 0.04,
-};
+// O'zbekiston YATT solig'i — barcha marketplace'lar uchun 4%
+const UZB_TAX_RATE = 0.04;
 
 export function FinancialDashboard({ 
   connectedMarketplaces, store
@@ -152,8 +150,7 @@ export function FinancialDashboard({
     
     let totalTax = 0;
     activeMarketplaces.forEach(mp => {
-      const taxRate = MARKETPLACE_TAX[mp] ?? 0;
-      totalTax += (feesByMarketplace[mp]?.revenue || 0) * taxRate;
+      totalTax += (feesByMarketplace[mp]?.revenue || 0) * UZB_TAX_RATE;
     });
 
     const totalExpenses = totalProductCost + totalMarketplaceFees + totalTax;

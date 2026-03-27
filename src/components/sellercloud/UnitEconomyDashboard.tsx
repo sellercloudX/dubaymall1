@@ -103,7 +103,7 @@ export function UnitEconomyDashboard({ connectedMarketplaces, store }: Props) {
           const logisticsForItem = tariff.logistics * qty;
           const withdrawalForItem = (tariff.withdrawal || 0) * qty;
           const feesForItem = tariff.totalFee * qty;
-          const taxRate = mp === 'yandex' || mp === 'uzum' ? 0.04 : 0;
+          const taxRate = 0.04; // O'zbekiston YATT solig'i
           const taxForItem = itemRevenue * taxRate;
           const ft = (order as any).fulfillmentType;
 
