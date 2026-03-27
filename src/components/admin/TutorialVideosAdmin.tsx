@@ -116,7 +116,7 @@ export function TutorialVideosAdmin() {
       });
       if (error) throw error;
     },
-    onSuccess: () => { invalidate(); setShowAddFolder(false); setFolderForm({ name: '', description: '', cover_image_url: '' }); toast.success('Papka yaratildi'); },
+    onSuccess: () => { invalidate(); setShowAddFolder(false); setFolderForm({ name: '', description: '', cover_image_url: '', price_uzs: 0 }); toast.success('Papka yaratildi'); },
     onError: () => toast.error('Xatolik'),
   });
 
