@@ -169,13 +169,9 @@ export function ActivationsManagement() {
                 </TableHeader>
                 <TableBody>
                   {filteredCloud?.map((sub: any) => {
-                    const planType = (sub.plan_type || 'pro').toLowerCase();
-                    const isElegant = planType === 'elegant' || planType === 'enterprise';
-                    const planBadge = isElegant
-                      ? <Badge className="bg-violet-500/10 text-violet-600 border-violet-200">Elegant</Badge>
-                      : planType === 'premium'
-                      ? <Badge className="bg-amber-500/10 text-amber-600 border-amber-200">Premium</Badge>
-                      : <Badge variant="secondary">Free</Badge>;
+                    const planSlug = sub.plan_slug || sub.plan_type || 'starter';
+                    const currentPlan = plans?.find(p => p.slug === planSlug);
+                    const planName = currentPlan?.name_uz || currentPlan?.name || planSlug;
                     
                     const isActivePaid = sub.activation_paid_until && new Date(sub.activation_paid_until) > new Date();
                     
@@ -189,26 +185,27 @@ export function ActivationsManagement() {
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-col gap-1">
-                            {planBadge}
+                            <Badge variant="secondary">{planName}</Badge>
                             <select
-                              className="text-[10px] border rounded px-1 py-0.5 bg-background w-20"
-                              value={isElegant ? 'enterprise' : planType}
+                              className="text-[10px] border rounded px-1 py-0.5 bg-background w-24"
+                              value={planSlug}
                               onChange={async (e) => {
-                                const newPlan = e.target.value;
+                                const newSlug = e.target.value;
+                                const newPlan = plans?.find(p => p.slug === newSlug);
                                 const { error } = await supabase
                                   .from('sellercloud_subscriptions')
-                                  .update({ plan_type: newPlan })
+                                  .update({ plan_type: newSlug, plan_slug: newSlug })
                                   .eq('id', sub.id);
                                 if (error) toast.error('Xatolik: ' + error.message);
                                 else {
-                                  toast.success(`Tarif ${newPlan === 'enterprise' ? 'Elegant' : newPlan === 'premium' ? 'Premium' : 'Free'} ga o'zgartirildi`);
+                                  toast.success(`Tarif ${newPlan?.name || newSlug} ga o'zgartirildi`);
                                   queryClient.invalidateQueries({ queryKey: ['admin-cloud-subscriptions'] });
                                 }
                               }}
                             >
-                              <option value="pro">Free</option>
-                              <option value="premium">Premium</option>
-                              <option value="enterprise">Elegant</option>
+                              {plans?.filter(p => p.is_active).map(p => (
+                                <option key={p.slug} value={p.slug}>{p.name_uz || p.name}</option>
+                              ))}
                             </select>
                           </div>
                         </TableCell>
