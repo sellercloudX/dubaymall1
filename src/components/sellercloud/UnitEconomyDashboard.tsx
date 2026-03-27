@@ -103,6 +103,8 @@ export function UnitEconomyDashboard({ connectedMarketplaces, store }: Props) {
           const logisticsForItem = tariff.logistics * qty;
           const withdrawalForItem = (tariff.withdrawal || 0) * qty;
           const feesForItem = tariff.totalFee * qty;
+          const taxRate = mp === 'yandex' || mp === 'uzum' ? 0.04 : 0;
+          const taxForItem = itemRevenue * taxRate;
           const ft = (order as any).fulfillmentType;
 
           if (!map.has(key)) {
@@ -112,7 +114,7 @@ export function UnitEconomyDashboard({ connectedMarketplaces, store }: Props) {
               marketplace: mp,
               photo: item.photo,
               unitsSold: 0, revenue: 0, costPrice: costUzs, totalCost: 0,
-              commission: 0, logistics: 0, withdrawal: 0, totalFees: 0,
+              commission: 0, logistics: 0, withdrawal: 0, tax: 0, totalFees: 0,
               grossProfit: 0, netProfit: 0, margin: 0,
               avgSellingPrice: 0,
               fulfillmentBreakdown: { fbo: 0, fbs: 0 },
@@ -128,6 +130,7 @@ export function UnitEconomyDashboard({ connectedMarketplaces, store }: Props) {
           m.commission += commissionForItem;
           m.logistics += logisticsForItem;
           m.withdrawal += withdrawalForItem;
+          m.tax += taxForItem;
           m.totalFees += feesForItem;
           if (tariff.isReal) m.hasRealTariff = true;
           if (ft === 'FBO') m.fulfillmentBreakdown.fbo += qty;
