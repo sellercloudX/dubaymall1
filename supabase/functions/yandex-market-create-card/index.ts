@@ -1050,7 +1050,7 @@ function buildOffer(
     console.log(`🖼️ ${offer.pictures.length} images added`);
   }
 
-  // Parameters — filter out picker/URL params, ensure SINGLE VALUES only (no multi-variant!)
+  // Parameters — filter out picker/URL params, "прочие характеристики", ensure SINGLE VALUES only
   const BLOCKED_PARAM_IDS = [40164890]; // Known picker URL params
   if (ai?.parameterValues?.length) {
     // Track seen parameterIds to ensure ONLY ONE value per parameter (single variant!)
