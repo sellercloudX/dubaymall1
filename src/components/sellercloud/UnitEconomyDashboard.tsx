@@ -9,10 +9,10 @@ import {
   DollarSign, TrendingUp, TrendingDown, Search, Download,
   ArrowUpDown, Package, AlertTriangle, CheckCircle2, BarChart3
 } from 'lucide-react';
-import { toDisplayUzs } from '@/lib/currency';
 import { isExcludedOrder } from '@/lib/revenueCalculations';
 import { useCostPrices } from '@/hooks/useCostPrices';
-import { useMarketplaceTariffs, getTariffForProduct } from '@/hooks/useMarketplaceTariffs';
+import { useMarketplaceTariffs } from '@/hooks/useMarketplaceTariffs';
+import { calculateOrderFinancialBreakdown } from '@/lib/marketplaceFinancials';
 import { MarketplaceFilterBar } from './MarketplaceFilterBar';
 import { DateRangeFilter, getPresetDates, type DatePreset } from './DateRangeFilter';
 import { MarketplaceLogo } from '@/lib/marketplaceConfig';
@@ -89,52 +89,41 @@ export function UnitEconomyDashboard({ connectedMarketplaces, store }: Props) {
           if (dateTo) { const end = new Date(dateTo); end.setHours(23,59,59,999); if (d > end) continue; }
         }
 
-        for (const item of (order.items || [])) {
-          const key = `${mp}:${(item.offerId || '').toLowerCase()}`;
-          const qty = item.count || 1;
-          const itemPrice = toDisplayUzs(item.price || 0, mp);
-          const itemRevenue = itemPrice * qty;
-          const cp = getCostPrice(mp, item.offerId);
-          const costUzs = cp !== null ? toDisplayUzs(cp, mp) : 0;
-          const totalCostForItem = costUzs * qty;
-          const commBase = (item as any).commissionBase ? toDisplayUzs((item as any).commissionBase, mp) : undefined;
-          const tariff = getTariffForProduct(tariffMap, item.offerId, itemPrice, mp, commBase);
-          const commissionForItem = tariff.commission * qty;
-          const logisticsForItem = tariff.logistics * qty;
-          const withdrawalForItem = (tariff.withdrawal || 0) * qty;
-          const feesForItem = tariff.totalFee * qty;
-          const taxRate = 0.04; // O'zbekiston YATT solig'i
-          const taxForItem = itemRevenue * taxRate;
-          const ft = (order as any).fulfillmentType;
+        const breakdown = calculateOrderFinancialBreakdown(order, mp, getCostPrice, tariffMap);
+
+        for (const line of breakdown.lines) {
+          const key = `${mp}:${(line.offerId || '').toLowerCase()}`;
 
           if (!map.has(key)) {
             map.set(key, {
-              offerId: item.offerId,
-              name: item.offerName || item.offerId,
+              offerId: line.offerId,
+              name: line.offerName || line.offerId,
               marketplace: mp,
-              photo: item.photo,
-              unitsSold: 0, revenue: 0, costPrice: costUzs, totalCost: 0,
+              photo: line.photo,
+              unitsSold: 0, revenue: 0, costPrice: 0, totalCost: 0,
               commission: 0, logistics: 0, withdrawal: 0, tax: 0, totalFees: 0,
               grossProfit: 0, netProfit: 0, margin: 0,
               avgSellingPrice: 0,
               fulfillmentBreakdown: { fbo: 0, fbs: 0 },
-              hasCostPrice: cp !== null,
-              hasRealTariff: tariff.isReal,
+              hasCostPrice: line.hasCostPrice,
+              hasRealTariff: line.hasRealTariff,
             });
           }
 
           const m = map.get(key)!;
-          m.unitsSold += qty;
-          m.revenue += itemRevenue;
-          m.totalCost += totalCostForItem;
-          m.commission += commissionForItem;
-          m.logistics += logisticsForItem;
-          m.withdrawal += withdrawalForItem;
-          m.tax += taxForItem;
-          m.totalFees += feesForItem;
-          if (tariff.isReal) m.hasRealTariff = true;
-          if (ft === 'FBO') m.fulfillmentBreakdown.fbo += qty;
-          else m.fulfillmentBreakdown.fbs += qty;
+          if (!m.photo && line.photo) m.photo = line.photo;
+          m.unitsSold += line.quantity;
+          m.revenue += line.revenue;
+          m.totalCost += line.costTotal;
+          m.commission += line.commission;
+          m.logistics += line.logistics;
+          m.withdrawal += line.withdrawal;
+          m.tax += line.tax;
+          m.totalFees += line.totalFees;
+          m.hasCostPrice = m.hasCostPrice || line.hasCostPrice;
+          m.hasRealTariff = m.hasRealTariff || line.hasRealTariff;
+          if (line.fulfillmentType === 'FBO') m.fulfillmentBreakdown.fbo += line.quantity;
+          else if (line.fulfillmentType === 'FBS') m.fulfillmentBreakdown.fbs += line.quantity;
         }
       }
     }
@@ -142,6 +131,7 @@ export function UnitEconomyDashboard({ connectedMarketplaces, store }: Props) {
     // Calculate derived metrics
     const result: SkuMetrics[] = [];
     map.forEach(m => {
+      m.costPrice = m.unitsSold > 0 ? m.totalCost / m.unitsSold : 0;
       m.grossProfit = m.revenue - m.totalCost;
       m.netProfit = m.grossProfit - m.totalFees - m.tax;
       m.margin = m.revenue > 0 ? (m.netProfit / m.revenue) * 100 : 0;
@@ -322,7 +312,7 @@ export function UnitEconomyDashboard({ connectedMarketplaces, store }: Props) {
                   <td className="text-right py-2.5 px-3 hidden lg:table-cell">{fmt(s.logistics)}</td>
                   <td className="text-right py-2.5 px-3 hidden xl:table-cell">
                     <span className="font-medium">{fmt(s.totalFees)}</span>
-                    {s.withdrawal > 0 && <div className="text-[9px] text-muted-foreground">+{fmt(s.withdrawal)} chiqarish</div>}
+                    {s.withdrawal > 0 && <div className="text-[9px] text-muted-foreground">shu jumladan {fmt(s.withdrawal)} chiqarish</div>}
                   </td>
                   <td className={`text-right py-2.5 px-3 font-semibold ${s.netProfit >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
                     {s.netProfit >= 0 ? '+' : ''}{fmt(s.netProfit)}
