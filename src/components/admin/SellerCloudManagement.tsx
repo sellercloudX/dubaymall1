@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSellerCloudAdmin } from '@/hooks/useSellerCloudSubscription';
 import { supabase } from '@/integrations/supabase/client';
+import { useSubscriptionPlans } from '@/hooks/useSubscriptionPlans';
 import { toast } from 'sonner';
 import { 
   Crown, Users, CreditCard, AlertTriangle, CheckCircle2, 
@@ -33,7 +34,8 @@ export function SellerCloudManagement() {
     waiveBilling,
     markBillingPaid,
   } = useSellerCloudAdmin();
-
+  const { data: allPlans } = useSubscriptionPlans();
+  const activePlans = allPlans?.filter(p => p.is_active) || [];
   const [search, setSearch] = useState('');
   const [selectedSub, setSelectedSub] = useState<any>(null);
   const [selectedBilling, setSelectedBilling] = useState<any>(null);
@@ -45,7 +47,7 @@ export function SellerCloudManagement() {
   const [editingSub, setEditingSub] = useState<any>(null);
   const [editMonthlyFee, setEditMonthlyFee] = useState('');
   const [editCommission, setEditCommission] = useState('');
-  const [editPlanType, setEditPlanType] = useState<'pro' | 'enterprise'>('pro');
+  const [editPlanType, setEditPlanType] = useState<string>('starter');
 
   // Activation state  
   const [activatingSub, setActivatingSub] = useState<any>(null);
@@ -75,6 +77,7 @@ export function SellerCloudManagement() {
         monthly_fee: fee,
         commission_percent: comm,
         plan_type: editPlanType,
+        plan_slug: editPlanType,
         updated_at: new Date().toISOString(),
       })
       .eq('id', editingSub.id);
@@ -298,9 +301,11 @@ export function SellerCloudManagement() {
                       <TableRow key={sub.id}>
                          <TableCell className="font-medium">{profilesMap[sub.user_id] || sub.user_id.slice(0, 8)}</TableCell>
                         <TableCell>
-                          <Badge variant={sub.plan_type === 'pro' ? 'default' : 'secondary'}>
-                            {sub.plan_type === 'pro' ? 'Pro' : 'Individual'}
-                          </Badge>
+                          {(() => {
+                            const slug = sub.plan_slug || sub.plan_type || 'starter';
+                            const plan = allPlans?.find((p: any) => p.slug === slug);
+                            return <Badge variant="secondary">{plan?.name_uz || plan?.name || slug}</Badge>;
+                          })()}
                         </TableCell>
                         <TableCell>
                           <div className="text-sm font-medium">${sub.monthly_fee}/oy</div>
@@ -344,7 +349,7 @@ export function SellerCloudManagement() {
                               setEditingSub(sub);
                               setEditMonthlyFee(String(sub.monthly_fee));
                               setEditCommission(String(sub.commission_percent));
-                              setEditPlanType(sub.plan_type);
+                              setEditPlanType(sub.plan_slug || sub.plan_type || 'starter');
                             }}>
                               <Edit className="h-3 w-3" />
                             </Button>
@@ -597,8 +602,9 @@ export function SellerCloudManagement() {
               <Select value={editPlanType} onValueChange={(v: any) => setEditPlanType(v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="pro">Pro ($499 standart)</SelectItem>
-                  <SelectItem value="enterprise">Individual (kelishuv)</SelectItem>
+                  {activePlans.map(p => (
+                    <SelectItem key={p.slug} value={p.slug}>{p.name_uz || p.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -635,7 +641,11 @@ export function SellerCloudManagement() {
           <div className="space-y-4">
             {activatingSub && (
               <div className="bg-muted p-3 rounded-lg text-sm space-y-1">
-                <p>Tarif: <strong>{activatingSub.plan_type === 'pro' ? 'Pro' : 'Individual'}</strong></p>
+                {(() => {
+                  const slug = activatingSub.plan_slug || activatingSub.plan_type || 'starter';
+                  const plan = allPlans?.find((p: any) => p.slug === slug);
+                  return <p>Tarif: <strong>{plan?.name_uz || plan?.name || slug}</strong></p>;
+                })()}
                 <p>To'lov: <strong>${activatingSub.monthly_fee}/oy</strong></p>
               </div>
             )}

@@ -7,40 +7,48 @@ import { useSellerCloudSubscription } from '@/hooks/useSellerCloudSubscription';
 import { useSubscriptionPlans } from '@/hooks/useSubscriptionPlans';
 
 /**
- * Maps tab/section IDs to feature_pricing feature_keys.
- * Tabs NOT listed here are always accessible (free core features).
+ * Maps tab/section IDs to feature keys used in subscription_plans.included_feature_keys.
+ * Keys MUST match the DB values exactly (hyphenated).
  */
 const TAB_FEATURE_MAP: Record<string, string> = {
-  // AI tools (paid)
+  // AI tools
   scanner: 'ai_scanner',
   'sellzen-studio': 'sellzen-image-generate',
   'trend-hunter': 'trend_hunter',
   clone: 'clone_card',
   'card-clone': 'clone_card',
-  // Analytics (paid tiers)
-  'unit-economy': 'unit_economy',
-  'product-analytics': 'product_analytics',
-  abc: 'abc_analysis',
-  'abc-analysis': 'abc_analysis',
-  'wb-analytics': 'seller_analytics',
-  'seller-analytics': 'seller_analytics',
-  'seo-monitor': 'seo_monitor',
-  'seo-keywords': 'seo_monitor',
-  competitor: 'competitor_monitor',
-  ads: 'ads_campaigns',
+  // Analytics
+  'unit-economy': 'unit-economy',
+  'product-analytics': 'product-analytics',
+  abc: 'abc-analysis',
+  'abc-analysis': 'abc-analysis',
+  'wb-analytics': 'seller-analytics',
+  'seller-analytics': 'seller-analytics',
+  'seo-monitor': 'seo-monitor',
+  'seo-keywords': 'seo-monitor',
+  competitor: 'competitor-monitor',
+  ads: 'ads-campaigns',
   // Finance
-  financials: 'financial_dashboard',
+  financials: 'financial-dashboard',
   // Reports
-  reports: 'reports_export',
+  reports: 'reports-export',
   // Team
-  team: 'team_management',
+  team: 'team-management',
+  // Stock
+  'stock-forecast': 'stock-forecast',
+  // Auto reorder
+  'auto-reorder': 'auto-reorder',
+  // Reviews
+  'marketplace-reviews': 'marketplace-reviews',
+  // Min price
+  'min-price': 'min-price-protection',
 };
 
 /** Tabs that are always free and never gated */
 const ALWAYS_FREE_TABS = new Set([
   'marketplaces', 'stores', 'products', 'orders', 'sales',
-  'pricing', 'cost-prices', 'stock-forecast',
-  'reviews', 'problems', 'mxik',
+  'pricing', 'cost-prices',
+  'problems', 'mxik',
   'subscription', 'profile', 'notifications', 'tutorials', 'support',
 ]);
 
@@ -51,7 +59,7 @@ interface FeatureGateProps {
 }
 
 export function FeatureGate({ tabId, children, onNavigateToSubscription }: FeatureGateProps) {
-  const { subscription } = useSellerCloudSubscription();
+  const { subscription, accessStatus } = useSellerCloudSubscription();
   const { data: plans } = useSubscriptionPlans();
 
   const isLocked = useMemo(() => {
@@ -62,17 +70,20 @@ export function FeatureGate({ tabId, children, onNavigateToSubscription }: Featu
     // If no feature key mapped → treat as free
     if (!featureKey) return false;
 
-    // Get current plan
+    // No subscription or not active → lock paid features
+    if (!subscription || !accessStatus?.is_active) return true;
+
+    // Get current plan slug
     const currentPlanSlug = (subscription as any)?.plan_slug || subscription?.plan_type;
-    if (!currentPlanSlug || !plans) return false;
+    if (!currentPlanSlug || !plans) return false; // no plans loaded yet, don't lock
 
     const currentPlan = plans.find(p => p.slug === currentPlanSlug);
-    if (!currentPlan) return false;
+    if (!currentPlan) return false; // plan not found, don't lock (graceful)
 
     // Check if feature is included in current plan
     const includedKeys = currentPlan.included_feature_keys || [];
     return !includedKeys.includes(featureKey);
-  }, [tabId, subscription, plans]);
+  }, [tabId, subscription, accessStatus, plans]);
 
   // Find which plans include this feature
   const availablePlans = useMemo(() => {
