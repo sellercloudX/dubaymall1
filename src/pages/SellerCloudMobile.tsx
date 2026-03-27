@@ -19,6 +19,7 @@ import { useExchangeRate } from '@/hooks/useExchangeRate';
 import { Skeleton } from '@/components/ui/skeleton';
 import { MobileMoreMenu } from '@/components/mobile/MobileMoreMenu';
 import { PlanSelector } from '@/components/sellercloud/PlanSelector';
+import { FeatureGate } from '@/components/sellercloud/FeatureGate';
 
 // Lazy load ALL tab content components for instant tab switching
 const MobileAnalytics = lazy(() => import('@/components/mobile/MobileAnalytics').then(m => ({ default: m.MobileAnalytics })));
