@@ -733,10 +733,15 @@ export default function Index() {
               <div className="relative">
                 <div className="absolute -inset-2 bg-gradient-to-br from-primary/15 to-accent/15 rounded-2xl blur-xl" />
                 <img 
-                  src={heroDashboard} 
+                  src={heroDashboardMobile} 
                   alt="SellerCloudX Dashboard" 
+                  width={960}
+                  height={540}
+                  sizes="100vw"
                   className="relative rounded-xl shadow-xl border border-border/30 w-full"
                   loading="eager"
+                  fetchPriority="high"
+                  decoding="async"
                 />
               </div>
             </motion.div>
