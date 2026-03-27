@@ -950,6 +950,8 @@ JAVOB FAQAT JSON:
     const pass2Prompt = `VAZIFA: Quyidagi ${missingParams.length} ta BO'SH parametrni to'ldir!
 Bular birinchi bosqichda to'ldirilmagan parametrlar. HAR BIRINI ALBATTA to'ldir!
 
+⛔ MUHIM: "ПРОЧИЕ ХАРАКТЕРИСТИКИ" / "ПРОЧЕЕ" degan parametrni TO'LDIRMA! O'tkazib yubor!
+
 MAHSULOT: "${product.name}" — ${categoryName}
 Brend: ${result.vendor || product.brand || "OEM"}
 
