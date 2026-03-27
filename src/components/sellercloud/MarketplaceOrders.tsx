@@ -57,7 +57,7 @@ const findProductByOffer = (store: MarketplaceDataStore, marketplace: string, of
 
 export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceOrdersProps) {
   const [selectedMarketplace, setSelectedMarketplace] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState<OrderStatusCategory>('all');
   const [expandedOrder, setExpandedOrder] = useState<number | null>(null);
 
   useEffect(() => {
