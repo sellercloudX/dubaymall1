@@ -3008,6 +3008,7 @@ export type Database = {
           id: string
           is_published: boolean | null
           name: string
+          price_uzs: number | null
           sort_order: number | null
           updated_at: string | null
         }
@@ -3019,6 +3020,7 @@ export type Database = {
           id?: string
           is_published?: boolean | null
           name: string
+          price_uzs?: number | null
           sort_order?: number | null
           updated_at?: string | null
         }
@@ -3030,10 +3032,43 @@ export type Database = {
           id?: string
           is_published?: boolean | null
           name?: string
+          price_uzs?: number | null
           sort_order?: number | null
           updated_at?: string | null
         }
         Relationships: []
+      }
+      tutorial_purchases: {
+        Row: {
+          created_at: string | null
+          folder_id: string
+          id: string
+          price_paid: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          folder_id: string
+          id?: string
+          price_paid?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          folder_id?: string
+          id?: string
+          price_paid?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tutorial_purchases_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "tutorial_folders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tutorial_videos: {
         Row: {
@@ -4297,6 +4332,7 @@ export type Database = {
         Returns: Json
       }
       process_pending_payouts: { Args: never; Returns: number }
+      purchase_tutorial_folder: { Args: { p_folder_id: string }; Returns: Json }
       search_mxik_fuzzy: {
         Args: { p_limit?: number; p_search_term: string }
         Returns: {
