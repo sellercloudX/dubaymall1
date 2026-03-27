@@ -71,17 +71,16 @@ const formatTime = (dateStr: string) => {
   } catch { return ''; }
 };
 
-const getStatusBadge = (status: string) => {
-  const config: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string; className?: string }> = {
-    NEW: { variant: 'secondary', label: 'Yangi', className: 'bg-blue-100 text-blue-700 border-blue-200' },
-    PROCESSING: { variant: 'secondary', label: 'Jarayonda' },
-    DELIVERY: { variant: 'default', label: 'Yetkazilmoqda' },
-    PICKUP: { variant: 'default', label: 'Olib ketish' },
-    DELIVERED: { variant: 'outline', label: 'Yetkazildi', className: 'border-green-500 text-green-600' },
-    CANCELLED: { variant: 'destructive', label: 'Bekor' },
-    RETURNED: { variant: 'destructive', label: 'Qaytarildi' },
-  };
-  const c = config[status] || { variant: 'outline' as const, label: status };
+const STATUS_BADGE_CONFIG: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string; className?: string }> = {
+  new: { variant: 'secondary', label: 'Yangi', className: 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400' },
+  assembly: { variant: 'secondary', label: "Yig'ilmoqda", className: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400' },
+  active: { variant: 'default', label: "Yo'lda" },
+  delivered: { variant: 'outline', label: 'Yetkazildi', className: 'border-emerald-500 text-emerald-600 dark:text-emerald-400' },
+  cancelled: { variant: 'destructive', label: 'Bekor' },
+};
+
+const getStatusBadge = (category: string) => {
+  const c = STATUS_BADGE_CONFIG[category] || { variant: 'outline' as const, label: category };
   return <Badge variant={c.variant} className={`text-[10px] ${c.className || ''}`}>{c.label}</Badge>;
 };
 
