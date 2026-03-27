@@ -62,6 +62,17 @@ export class ErrorBoundary extends Component<Props, State> {
     try {
       localStorage.removeItem('sellercloud-cache');
     } catch {}
+    // Clear PWA service worker caches to prevent stale JS errors
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(regs => {
+        regs.forEach(r => r.unregister());
+      });
+      if ('caches' in window) {
+        caches.keys().then(keys => {
+          keys.forEach(key => caches.delete(key));
+        });
+      }
+    }
     window.location.reload();
   };
 
