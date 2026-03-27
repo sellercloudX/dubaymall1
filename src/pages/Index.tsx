@@ -15,6 +15,7 @@ import {
   ChevronDown, Lock, FileCheck
 } from 'lucide-react';
 import React, { useState, useEffect, useRef, ReactNode } from 'react';
+import { motion, useScroll, useTransform, useMotionValue, useSpring, useInView as useMotionInView } from 'framer-motion';
 import heroDashboard from '@/assets/hero-dashboard.png';
 import abstractShapes from '@/assets/abstract-shapes.png';
 import { MARKETPLACE_CONFIG } from '@/lib/marketplaceConfig';
@@ -51,32 +52,73 @@ function useInView(threshold = 0.15) {
 
 const FadeInSection = React.forwardRef<HTMLDivElement, { children: ReactNode; className?: string; delay?: number }>(
   ({ children, className = '', delay = 0 }, _ref) => {
-    const { ref, inView } = useInView(0.1);
+    const ref = useRef<HTMLDivElement>(null);
+    const isInView = useMotionInView(ref, { once: true, margin: "-50px" });
     return (
-      <div 
+      <motion.div 
         ref={ref} 
-        className={`transition-all duration-700 ${inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'} ${className}`}
-        style={{ transitionDelay: `${delay}ms` }}
+        className={className}
+        initial={{ opacity: 0, y: 40 }}
+        animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 40 }}
+        transition={{ duration: 0.7, delay: delay / 1000, ease: [0.25, 0.4, 0, 1] }}
       >
         {children}
-      </div>
+      </motion.div>
     );
   }
 );
 FadeInSection.displayName = 'FadeInSection';
 
+// Magnetic hover effect for cards
+function MagneticCard({ children, className = '' }: { children: ReactNode; className?: string }) {
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const springX = useSpring(x, { stiffness: 300, damping: 20 });
+  const springY = useSpring(y, { stiffness: 300, damping: 20 });
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    x.set((e.clientX - centerX) * 0.05);
+    y.set((e.clientY - centerY) * 0.05);
+  };
+
+  return (
+    <motion.div
+      className={className}
+      style={{ x: springX, y: springY }}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={() => { x.set(0); y.set(0); }}
+      whileHover={{ scale: 1.02 }}
+      transition={{ type: "spring", stiffness: 400, damping: 17 }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
 const FloatingParticles = React.memo(React.forwardRef<HTMLDivElement>((_props, ref) => {
   return (
     <div ref={ref} className="absolute inset-0 overflow-hidden pointer-events-none">
-      {Array.from({ length: 20 }).map((_, i) => (
-        <div 
+      {Array.from({ length: 15 }).map((_, i) => (
+        <motion.div 
           key={i}
-          className="absolute w-1 h-1 rounded-full bg-primary/30 animate-pulse"
+          className="absolute w-1 h-1 rounded-full bg-primary/20"
           style={{
             left: `${Math.random() * 100}%`,
             top: `${Math.random() * 100}%`,
-            animationDelay: `${Math.random() * 3}s`,
-            animationDuration: `${2 + Math.random() * 3}s`,
+          }}
+          animate={{
+            y: [0, -30, 0],
+            opacity: [0.2, 0.6, 0.2],
+            scale: [1, 1.5, 1],
+          }}
+          transition={{
+            duration: 3 + Math.random() * 4,
+            repeat: Infinity,
+            delay: Math.random() * 3,
+            ease: "easeInOut",
           }}
         />
       ))}
@@ -84,6 +126,26 @@ const FloatingParticles = React.memo(React.forwardRef<HTMLDivElement>((_props, r
   );
 }));
 FloatingParticles.displayName = 'FloatingParticles';
+
+// Glowing orb background
+function GlowOrbs() {
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      <motion.div 
+        className="absolute w-[500px] h-[500px] rounded-full bg-primary/8 blur-[120px]"
+        animate={{ x: [0, 50, 0], y: [0, -30, 0] }}
+        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+        style={{ top: '-10%', right: '-5%' }}
+      />
+      <motion.div 
+        className="absolute w-[400px] h-[400px] rounded-full bg-accent/6 blur-[100px]"
+        animate={{ x: [0, -40, 0], y: [0, 40, 0] }}
+        transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+        style={{ bottom: '-5%', left: '-5%' }}
+      />
+    </div>
+  );
+}
 
 // ─── FAQ Component ───
 function FAQItem({ question, answer }: { question: string; answer: string }) {
@@ -473,32 +535,57 @@ export default function Index() {
       {/* ━━━ HERO ━━━ */}
       <section className="relative min-h-[100vh] flex items-center pt-14 sm:pt-32 md:pt-36 pb-8 sm:pb-16 overflow-hidden">
         <div className="absolute inset-0 bg-mesh" />
-        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-primary/8 rounded-full blur-[120px]" />
-        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-accent/6 rounded-full blur-[100px]" />
+        <GlowOrbs />
         <FloatingParticles />
 
         <div className="container mx-auto px-3 sm:px-4 relative z-10">
           <div className="grid lg:grid-cols-2 gap-6 md:gap-12 lg:gap-16 items-center">
             <div className="max-w-2xl w-full mx-auto lg:mx-0 text-center lg:text-left">
-              <div className="animate-fade-up">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, ease: [0.25, 0.4, 0, 1] }}
+              >
                 <Badge className="mb-2 sm:mb-8 px-2.5 sm:px-4 py-1 sm:py-2 text-[11px] sm:text-sm font-medium bg-primary/10 text-primary border-primary/20">
                   {txt.badge}
                 </Badge>
-              </div>
+              </motion.div>
 
-              <h1 className="text-[22px] sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-3 sm:mb-8 font-display leading-[1.2] animate-fade-up" style={{ animationDelay: '0.1s' }}>
+              <motion.h1 
+                className="text-[22px] sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-3 sm:mb-8 font-display leading-[1.2]"
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.7, delay: 0.15, ease: [0.25, 0.4, 0, 1] }}
+              >
                 <span className="text-foreground">{txt.heroTitle1}</span>
                 <br />
-                <span className="text-gradient">{txt.heroTitle2}</span>
+                <motion.span 
+                  className="text-gradient inline-block"
+                  animate={{ backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'] }}
+                  transition={{ duration: 5, repeat: Infinity, ease: 'linear' }}
+                  style={{ backgroundSize: '200% auto' }}
+                >
+                  {txt.heroTitle2}
+                </motion.span>
                 <br />
                 <span className="text-foreground">{txt.heroTitle3}</span>
-              </h1>
+              </motion.h1>
               
-              <p className="text-[13px] sm:text-lg text-muted-foreground mb-4 sm:mb-10 leading-relaxed animate-fade-up max-w-xl mx-auto lg:mx-0" style={{ animationDelay: '0.2s' }}>
+              <motion.p 
+                className="text-[13px] sm:text-lg text-muted-foreground mb-4 sm:mb-10 leading-relaxed max-w-xl mx-auto lg:mx-0"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.3 }}
+              >
                 {txt.heroDesc}
-              </p>
+              </motion.p>
 
-              <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-4 animate-fade-up justify-center lg:justify-start" style={{ animationDelay: '0.3s' }}>
+              <motion.div 
+                className="flex flex-col sm:flex-row gap-2.5 sm:gap-4 justify-center lg:justify-start"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.4 }}
+              >
                 <Button size="lg" className="text-sm sm:text-base px-5 sm:px-8 py-5 sm:py-6 shadow-xl shadow-primary/25 hover:shadow-2xl hover:shadow-primary/30 transition-all group" asChild>
                   <Link to="/auth?mode=register">
                     <Rocket className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
@@ -512,10 +599,15 @@ export default function Index() {
                     {txt.ctaSecondary}
                   </a>
                 </Button>
-              </div>
+              </motion.div>
 
               {/* Trust badges */}
-              <div className="mt-6 sm:mt-10 flex flex-wrap items-center gap-3 sm:gap-4 animate-fade-up justify-center lg:justify-start" style={{ animationDelay: '0.45s' }}>
+              <motion.div 
+                className="mt-6 sm:mt-10 flex flex-wrap items-center gap-3 sm:gap-4 justify-center lg:justify-start"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.6, delay: 0.55 }}
+              >
                 <div className="flex items-center gap-1.5 text-[11px] sm:text-sm text-muted-foreground">
                   <Shield className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary shrink-0" />
                   <span>{txt.guarantee}</span>
@@ -528,33 +620,58 @@ export default function Index() {
                   <FileCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary shrink-0" />
                   <span>GDPR</span>
                 </div>
-              </div>
+              </motion.div>
 
               {/* Marketplace logos */}
-              <div className="mt-6 sm:mt-8 animate-fade-up text-center lg:text-left" style={{ animationDelay: '0.5s' }}>
+              <motion.div 
+                className="mt-6 sm:mt-8 text-center lg:text-left"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.6 }}
+              >
                 <p className="text-[10px] sm:text-xs text-muted-foreground mb-2 sm:mb-3 uppercase tracking-widest font-medium">{txt.trusted}</p>
                 <div className="flex items-center gap-3 sm:gap-6 md:gap-8 justify-center lg:justify-start flex-wrap">
-                  {Object.entries(MARKETPLACE_CONFIG).map(([key, mp]) => (
-                    <div key={key} className="flex items-center gap-1 sm:gap-1.5 opacity-70 hover:opacity-100 transition-opacity">
+                  {Object.entries(MARKETPLACE_CONFIG).map(([key, mp], i) => (
+                    <motion.div 
+                      key={key} 
+                      className="flex items-center gap-1 sm:gap-1.5 opacity-70 hover:opacity-100 transition-opacity"
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 0.7, x: 0 }}
+                      transition={{ delay: 0.7 + i * 0.1 }}
+                      whileHover={{ scale: 1.1, opacity: 1 }}
+                    >
                       <img src={mp.logo} alt={mp.name} className="w-4 h-4 sm:w-5 sm:h-5 rounded object-cover" />
                       <span className="text-[11px] sm:text-sm font-medium text-muted-foreground">{mp.name}</span>
-                    </div>
+                    </motion.div>
                   ))}
                 </div>
-              </div>
+              </motion.div>
             </div>
 
             {/* Right - Dashboard Image */}
-            <div className="relative animate-fade-up hidden lg:block" style={{ animationDelay: '0.4s' }}>
-              <div className="relative">
+            <motion.div 
+              className="relative hidden lg:block"
+              initial={{ opacity: 0, x: 60, rotateY: 5 }}
+              animate={{ opacity: 1, x: 0, rotateY: 0 }}
+              transition={{ duration: 0.9, delay: 0.3, ease: [0.25, 0.4, 0, 1] }}
+            >
+              <div className="relative" style={{ perspective: '1000px' }}>
                 <div className="absolute -inset-4 bg-gradient-to-br from-primary/20 to-accent/20 rounded-3xl blur-2xl" />
-                <img 
+                <motion.img 
                   src={heroDashboard} 
                   alt="SellerCloudX Dashboard" 
                   className="relative rounded-2xl shadow-2xl border border-border/30 w-full"
                   loading="eager"
+                  whileHover={{ scale: 1.02, rotateY: -2 }}
+                  transition={{ type: "spring", stiffness: 200, damping: 20 }}
                 />
-                <div className="absolute -bottom-4 -left-4 bg-card border shadow-xl rounded-xl px-4 py-3 flex items-center gap-3 animate-bounce-subtle">
+                <motion.div 
+                  className="absolute -bottom-4 -left-4 bg-card border shadow-xl rounded-xl px-4 py-3 flex items-center gap-3"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.8 }}
+                  whileHover={{ scale: 1.05 }}
+                >
                   <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
                     <Users className="h-5 w-5 text-emerald-500" />
                   </div>
@@ -562,8 +679,14 @@ export default function Index() {
                     <div className="text-sm font-bold">4-5 → 1</div>
                     <div className="text-xs text-muted-foreground">{txt.statsReplace}</div>
                   </div>
-                </div>
-                <div className="absolute -top-3 -right-3 bg-card border shadow-xl rounded-xl px-4 py-3 flex items-center gap-3">
+                </motion.div>
+                <motion.div 
+                  className="absolute -top-3 -right-3 bg-card border shadow-xl rounded-xl px-4 py-3 flex items-center gap-3"
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 1.0 }}
+                  whileHover={{ scale: 1.05 }}
+                >
                   <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
                     <Sparkles className="h-5 w-5 text-primary" />
                   </div>
@@ -571,12 +694,17 @@ export default function Index() {
                     <div className="text-sm font-bold">AI</div>
                     <div className="text-xs text-muted-foreground">Powered</div>
                   </div>
-                </div>
+                </motion.div>
               </div>
-            </div>
+            </motion.div>
 
             {/* Mobile hero image */}
-            <div className="relative lg:hidden animate-fade-up" style={{ animationDelay: '0.4s' }}>
+            <motion.div 
+              className="relative lg:hidden"
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.4 }}
+            >
               <div className="relative">
                 <div className="absolute -inset-2 bg-gradient-to-br from-primary/15 to-accent/15 rounded-2xl blur-xl" />
                 <img 
@@ -586,15 +714,23 @@ export default function Index() {
                   loading="eager"
                 />
               </div>
-            </div>
+            </motion.div>
           </div>
         </div>
 
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce-subtle hidden md:block">
+        <motion.div 
+          className="absolute bottom-8 left-1/2 -translate-x-1/2 hidden md:block"
+          animate={{ y: [0, 8, 0] }}
+          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+        >
           <div className="w-6 h-10 rounded-full border-2 border-muted-foreground/20 flex items-start justify-center p-1.5">
-            <div className="w-1.5 h-2.5 rounded-full bg-primary/50 animate-pulse" />
+            <motion.div 
+              className="w-1.5 h-2.5 rounded-full bg-primary/50"
+              animate={{ y: [0, 12, 0], opacity: [1, 0.3, 1] }}
+              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+            />
           </div>
-        </div>
+        </motion.div>
       </section>
 
       {/* ━━━ Stats Bar ━━━ */}
@@ -607,13 +743,21 @@ export default function Index() {
                { value: c3 >= 1000 ? `${(c3/1000).toFixed(0)}K+` : `${c3}+`, label: txt.statsOrders, icon: TrendingUp, color: 'text-emerald-500' },
                { value: '4-5', label: txt.statsReplace, icon: Users, color: 'text-amber-500' },
              ].map((stat, i) => (
-               <div key={i} className="text-center group cursor-default">
-                 <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-card border shadow-sm mx-auto mb-2 sm:mb-4 flex items-center justify-center group-hover:shadow-lg group-hover:scale-105 transition-all`}>
+               <motion.div 
+                 key={i} 
+                 className="text-center group cursor-default"
+                 initial={{ opacity: 0, scale: 0.8 }}
+                 whileInView={{ opacity: 1, scale: 1 }}
+                 viewport={{ once: true }}
+                 transition={{ delay: i * 0.1, type: "spring", stiffness: 200 }}
+                 whileHover={{ y: -4 }}
+               >
+                 <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-card border shadow-sm mx-auto mb-2 sm:mb-4 flex items-center justify-center group-hover:shadow-lg transition-all`}>
                    <stat.icon className={`h-5 w-5 sm:h-6 sm:w-6 ${stat.color}`} />
                  </div>
                  <div className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground font-display">{stat.value}</div>
                  <div className="text-xs sm:text-sm text-muted-foreground mt-1 font-medium">{stat.label}</div>
-               </div>
+               </motion.div>
              ))}
           </div>
         </div>
@@ -641,15 +785,21 @@ export default function Index() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8 max-w-6xl mx-auto">
              {features.map((feat, i) => (
                <FadeInSection key={i} delay={i * 80}>
-                 <Card className="group border shadow-sm hover:shadow-xl transition-all duration-500 overflow-hidden hover:-translate-y-2 h-full">
-                   <CardContent className="p-5 sm:p-6 md:p-8">
-                     <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl ${feat.bg} flex items-center justify-center mb-4 sm:mb-5 group-hover:scale-110 transition-transform duration-300`}>
-                       <feat.icon className={`h-6 w-6 sm:h-7 sm:w-7 ${feat.color}`} />
-                     </div>
-                     <h3 className="text-base sm:text-lg font-bold mb-2 font-display">{feat.title}</h3>
-                     <p className="text-muted-foreground text-xs sm:text-sm leading-relaxed">{feat.desc}</p>
-                   </CardContent>
-                 </Card>
+                 <MagneticCard className="h-full">
+                   <Card className="group border shadow-sm hover:shadow-xl transition-all duration-500 overflow-hidden h-full">
+                     <CardContent className="p-5 sm:p-6 md:p-8">
+                       <motion.div 
+                         className={`w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl ${feat.bg} flex items-center justify-center mb-4 sm:mb-5`}
+                         whileHover={{ rotate: [0, -5, 5, 0], scale: 1.15 }}
+                         transition={{ duration: 0.4 }}
+                       >
+                         <feat.icon className={`h-6 w-6 sm:h-7 sm:w-7 ${feat.color}`} />
+                       </motion.div>
+                       <h3 className="text-base sm:text-lg font-bold mb-2 font-display">{feat.title}</h3>
+                       <p className="text-muted-foreground text-xs sm:text-sm leading-relaxed">{feat.desc}</p>
+                     </CardContent>
+                   </Card>
+                 </MagneticCard>
                </FadeInSection>
              ))}
           </div>
@@ -690,14 +840,29 @@ export default function Index() {
           </FadeInSection>
           
            <div className="grid md:grid-cols-3 gap-6 md:gap-12 max-w-5xl mx-auto relative">
-             <div className="hidden md:block absolute top-14 left-[20%] right-[20%] h-px bg-gradient-to-r from-primary/20 via-primary/40 to-primary/20" />
+             <motion.div 
+               className="hidden md:block absolute top-14 left-[20%] right-[20%] h-px"
+               initial={{ scaleX: 0 }}
+               whileInView={{ scaleX: 1 }}
+               viewport={{ once: true }}
+               transition={{ duration: 1.2, delay: 0.3, ease: "easeOut" }}
+               style={{ background: 'linear-gradient(to right, hsl(var(--primary) / 0.2), hsl(var(--primary) / 0.4), hsl(var(--primary) / 0.2))' }}
+             />
              
              {steps.map((step, i) => (
                <FadeInSection key={i} delay={i * 200} className="relative text-center group">
-                 <div className="relative z-10 w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-2xl sm:rounded-3xl bg-card border-2 border-primary/10 flex flex-col items-center justify-center mx-auto mb-6 sm:mb-8 group-hover:border-primary/40 group-hover:shadow-xl group-hover:shadow-primary/10 transition-all duration-300">
+                 <motion.div 
+                   className="relative z-10 w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-2xl sm:rounded-3xl bg-card border-2 border-primary/10 flex flex-col items-center justify-center mx-auto mb-6 sm:mb-8"
+                   whileHover={{ 
+                     borderColor: 'hsl(var(--primary) / 0.4)', 
+                     boxShadow: '0 20px 40px -10px hsl(var(--primary) / 0.15)',
+                     y: -5 
+                   }}
+                   transition={{ type: "spring", stiffness: 300 }}
+                 >
                    <span className="text-xs font-bold text-primary/60 mb-0.5 tracking-wider">{step.num}</span>
                    <step.icon className="h-6 w-6 sm:h-8 sm:w-8 md:h-10 md:w-10 text-primary" />
-                 </div>
+                 </motion.div>
                  <h3 className="text-base sm:text-lg md:text-xl font-bold mb-2 font-display">{step.title}</h3>
                  <p className="text-xs sm:text-sm text-muted-foreground max-w-xs mx-auto">{step.desc}</p>
                </FadeInSection>
