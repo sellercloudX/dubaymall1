@@ -8,7 +8,6 @@ import { MarketplaceLogo } from '@/lib/marketplaceConfig';
 import { toDisplayUzs } from '@/lib/currency';
 import { getOrderRevenueUzs, isExcludedOrder, buildOrderMarketplaceMap } from '@/lib/revenueCalculations';
 import { getMarketplaceOrderStatusCategory } from '@/lib/marketplaceOrderStatus';
-import { getOrderRevenueUzs, isExcludedOrder, buildOrderMarketplaceMap } from '@/lib/revenueCalculations';
 
 interface MobileAnalyticsProps {
   connections: any[];
