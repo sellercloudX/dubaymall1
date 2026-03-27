@@ -109,22 +109,37 @@ export function TutorialVideos() {
     }
   };
 
+  const [playerError, setPlayerError] = useState<string | null>(null);
+
   const renderPlayer = (video: TutorialVideo) => {
     if (video.video_type === 'youtube') {
       const ytId = extractYouTubeId(video.content_url);
-      if (!ytId) return null;
+      // Also support direct embed_url (e.g. admin pasted full embed link)
+      const embedUrl = video.embed_url || (ytId ? `https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&origin=${window.location.origin}` : null);
+      if (!embedUrl) return (
+        <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground text-sm">
+          Video URL noto'g'ri yoki topilmadi
+        </div>
+      );
       return (
         <iframe
-          src={`https://www.youtube.com/embed/${ytId}?rel=0&modestbranding=1`}
+          src={embedUrl}
           title={video.title}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowFullScreen
           className="w-full h-full"
+          referrerPolicy="no-referrer"
+          onError={() => setPlayerError('Video yuklanmadi. Video "unlisted" (ro\'yxatga kiritilmagan) holatda bo\'lishi kerak.')}
         />
       );
     }
     if (video.video_type === 'instagram') {
       const igId = extractInstagramId(video.content_url);
+      if (!igId) return (
+        <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground text-sm">
+          Instagram URL noto'g'ri
+        </div>
+      );
       return (
         <iframe
           src={`https://www.instagram.com/p/${igId}/embed`}
@@ -135,8 +150,12 @@ export function TutorialVideos() {
       );
     }
     if (video.video_type === 'telegram') {
-      // Telegram posts can be embedded via embed_url or content_url
       const embedSrc = video.embed_url || video.content_url;
+      if (!embedSrc) return (
+        <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground text-sm">
+          Telegram URL noto'g'ri
+        </div>
+      );
       return (
         <iframe
           src={embedSrc}
