@@ -32,6 +32,7 @@ interface ProductPnL {
   id: string; name: string; sku: string; marketplace: string;
   price: number; totalSold: number; totalRevenue: number;
   estimatedCost: number; commissionAmount: number; logisticsCost: number;
+  taxAmount: number; costPriceTotal: number;
   netProfit: number; profitMargin: number;
   abcGroup: 'A' | 'B' | 'C'; revenueShare: number;
   isRealTariff: boolean;
