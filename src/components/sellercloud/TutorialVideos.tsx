@@ -210,22 +210,29 @@ export function TutorialVideos() {
   const renderPlayer = (video: TutorialVideo) => {
     if (video.video_type === 'youtube') {
       const ytId = extractYouTubeId(video.content_url);
-      const embedUrl = video.embed_url || (ytId ? `https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&origin=${window.location.origin}` : null);
-      if (!embedUrl) return <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground text-sm">Video URL noto'g'ri</div>;
+      if (!ytId) return <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground text-sm">Video URL noto'g'ri</div>;
+      // Use standard youtube.com/embed — youtube-nocookie.com causes Error 153 in some contexts
+      const embedUrl = `https://www.youtube.com/embed/${ytId}?rel=0&modestbranding=1&autoplay=0`;
       return (
-        <iframe src={embedUrl} title={video.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full" referrerPolicy="no-referrer"
-          onError={() => setPlayerError('Video yuklanmadi.')} />
+        <iframe 
+          src={embedUrl} 
+          title={video.title} 
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+          allowFullScreen 
+          className="w-full h-full rounded-lg"
+          style={{ border: 'none' }}
+        />
       );
     }
     if (video.video_type === 'instagram') {
       const igId = extractInstagramId(video.content_url);
       if (!igId) return <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground text-sm">Instagram URL noto'g'ri</div>;
-      return <iframe src={`https://www.instagram.com/p/${igId}/embed`} title={video.title} allowFullScreen className="w-full h-full" />;
+      return <iframe src={`https://www.instagram.com/p/${igId}/embed`} title={video.title} allowFullScreen className="w-full h-full" style={{ border: 'none' }} />;
     }
     if (video.video_type === 'telegram') {
       const embedSrc = video.embed_url || video.content_url;
       if (!embedSrc) return <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground text-sm">Telegram URL noto'g'ri</div>;
-      return <iframe src={embedSrc} title={video.title} allowFullScreen className="w-full h-full" />;
+      return <iframe src={embedSrc} title={video.title} allowFullScreen className="w-full h-full" style={{ border: 'none' }} />;
     }
     return null;
   };
