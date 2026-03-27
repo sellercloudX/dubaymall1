@@ -41,8 +41,8 @@ const MARKETPLACE_FEE_DETAILS: Record<string, string> = {
 };
 
 const MARKETPLACE_TAX: Record<string, number> = {
-  yandex: 0.04, // 4%
-  uzum: 0.04, // 4%
+  yandex: 0.04,
+  uzum: 0.04,
 };
 
 export function FinancialDashboard({ 
