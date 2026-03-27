@@ -77,6 +77,7 @@ export function SellerCloudManagement() {
         monthly_fee: fee,
         commission_percent: comm,
         plan_type: editPlanType,
+        plan_slug: editPlanType,
         updated_at: new Date().toISOString(),
       })
       .eq('id', editingSub.id);
