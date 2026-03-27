@@ -840,14 +840,29 @@ export default function Index() {
           </FadeInSection>
           
            <div className="grid md:grid-cols-3 gap-6 md:gap-12 max-w-5xl mx-auto relative">
-             <div className="hidden md:block absolute top-14 left-[20%] right-[20%] h-px bg-gradient-to-r from-primary/20 via-primary/40 to-primary/20" />
+             <motion.div 
+               className="hidden md:block absolute top-14 left-[20%] right-[20%] h-px"
+               initial={{ scaleX: 0 }}
+               whileInView={{ scaleX: 1 }}
+               viewport={{ once: true }}
+               transition={{ duration: 1.2, delay: 0.3, ease: "easeOut" }}
+               style={{ background: 'linear-gradient(to right, hsl(var(--primary) / 0.2), hsl(var(--primary) / 0.4), hsl(var(--primary) / 0.2))' }}
+             />
              
              {steps.map((step, i) => (
                <FadeInSection key={i} delay={i * 200} className="relative text-center group">
-                 <div className="relative z-10 w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-2xl sm:rounded-3xl bg-card border-2 border-primary/10 flex flex-col items-center justify-center mx-auto mb-6 sm:mb-8 group-hover:border-primary/40 group-hover:shadow-xl group-hover:shadow-primary/10 transition-all duration-300">
+                 <motion.div 
+                   className="relative z-10 w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-2xl sm:rounded-3xl bg-card border-2 border-primary/10 flex flex-col items-center justify-center mx-auto mb-6 sm:mb-8"
+                   whileHover={{ 
+                     borderColor: 'hsl(var(--primary) / 0.4)', 
+                     boxShadow: '0 20px 40px -10px hsl(var(--primary) / 0.15)',
+                     y: -5 
+                   }}
+                   transition={{ type: "spring", stiffness: 300 }}
+                 >
                    <span className="text-xs font-bold text-primary/60 mb-0.5 tracking-wider">{step.num}</span>
                    <step.icon className="h-6 w-6 sm:h-8 sm:w-8 md:h-10 md:w-10 text-primary" />
-                 </div>
+                 </motion.div>
                  <h3 className="text-base sm:text-lg md:text-xl font-bold mb-2 font-display">{step.title}</h3>
                  <p className="text-xs sm:text-sm text-muted-foreground max-w-xs mx-auto">{step.desc}</p>
                </FadeInSection>
