@@ -168,7 +168,7 @@ export function useMarketplaceDataStore(connectedMarketplaces: string[]) {
     // Fetch orders for each marketplace
     const orderQueries = useQueries({
       queries: connectedMarketplaces.map(mp => ({
-         queryKey: ['marketplace-orders', mp, 'v10-commission-base'],
+         queryKey: ['marketplace-orders', mp, 'v11-real-tariff-refresh'],
          queryFn: async () => {
            // Do NOT send date limits — let the edge function fetch all orders
            // The edge function defaults to 365 days which captures all active orders
