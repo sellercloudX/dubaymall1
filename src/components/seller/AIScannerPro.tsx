@@ -630,7 +630,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
 
       updateTaskProgress(5, 'completed');
       
-      // ═══ BILLING DEDUCT: charge once for the whole scanner pipeline ═══
+      // ═══ BILLING DEDUCT: charge after successful card creation ═══
       try {
         const userId = (await supabase.auth.getUser()).data.user?.id;
         if (userId) {
@@ -646,15 +646,22 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
               p_feature_key: scannerFeatureKey,
               p_description: `AI Scanner: ${normalizedProductName.substring(0, 50)} (${targetMarketplace})`,
             });
-          } else if (access?.tier === 'elegant') {
+          }
+          // Track usage for plan limits (elegant/free limits)
+          if (access?.tier === 'elegant' || access?.price === 0) {
             await supabase.from('elegant_usage').upsert(
-              { user_id: userId, feature_key: scannerFeatureKey, usage_month: new Date().toISOString().slice(0, 7) + '-01', usage_count: (access.used || 0) + 1 },
+              { 
+                user_id: userId, 
+                feature_key: scannerFeatureKey, 
+                usage_month: new Date().toISOString().slice(0, 7) + '-01', 
+                usage_count: (access.used || 0) + 1 
+              },
               { onConflict: 'user_id,feature_key,usage_month' }
             );
           }
         }
       } catch (billingErr) {
-        console.warn('Billing deduct failed:', billingErr);
+        console.warn('Billing deduct failed (non-critical):', billingErr);
       }
 
       updateTaskStatus('completed', generatedInfos);
