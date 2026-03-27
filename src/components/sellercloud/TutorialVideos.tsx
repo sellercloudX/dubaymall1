@@ -105,6 +105,7 @@ export function TutorialVideos() {
 
   const handleVideoClick = (video: TutorialVideo) => {
     if (canWatch(video)) {
+      setPlayerError(null);
       setSelectedVideo(video);
     }
   };
