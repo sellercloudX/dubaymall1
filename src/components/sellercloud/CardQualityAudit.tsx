@@ -216,6 +216,9 @@ export function CardQualityAudit({ connectedMarketplaces, store }: CardQualityAu
     );
   }
 
+  // Filter to only auditable marketplaces
+  const auditableMarketplaces = connectedMarketplaces.filter(mp => mp === 'yandex' || mp === 'wildberries');
+
   return (
     <div className="space-y-3">
       {/* Header - compact */}
