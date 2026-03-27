@@ -191,7 +191,7 @@ export const CostPriceManager = forwardRef<HTMLDivElement, CostPriceManagerProps
   }
 
   return (
-    <div className="space-y-4 overflow-hidden">
+    <div ref={ref} className="space-y-4 overflow-hidden">
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
         <Card className="overflow-hidden">
