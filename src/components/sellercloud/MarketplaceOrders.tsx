@@ -146,10 +146,10 @@ export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceO
           ))}
         </div>
         <div className="flex gap-2">
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as OrderStatusCategory)}>
             <SelectTrigger className="w-40"><SelectValue placeholder="Holat" /></SelectTrigger>
             <SelectContent>
-              {ORDER_STATUSES.map((s) => (
+              {ORDER_CATEGORIES.map((s) => (
                 <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
               ))}
             </SelectContent>

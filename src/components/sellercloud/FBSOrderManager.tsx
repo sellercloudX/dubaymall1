@@ -202,30 +202,17 @@ export function FBSOrderManager({ connectedMarketplaces, store }: FBSOrderManage
   }, [allOrders]);
 
   const ordersByTab = useMemo(() => {
+    const tabKeyMap: Record<string, string> = { shipping: 'active' };
     const map: Record<string, MarketplaceOrder[]> = {};
     for (const tab of FBS_TABS) {
+      const categoryKey = tabKeyMap[tab.key] || tab.key;
       map[tab.key] = mergedOrders.filter(o => {
-        const status = o.status?.toUpperCase();
-        const substatus = (o as any).substatus?.toUpperCase();
-        
-        // Yandex special: PROCESSING/STARTED or no substatus = new, PROCESSING/READY_TO_SHIP = assembly
-        if (selectedMp === 'yandex' && status === 'PROCESSING') {
-          if (substatus === 'READY_TO_SHIP' || substatus === 'SHIPPED') return tab.key === 'assembly';
-          // STARTED, empty substatus, or unrecognized → new (don't hide orders)
-          return tab.key === 'new';
-        }
-        if (selectedMp === 'yandex' && status === 'PENDING') {
-          return tab.key === 'new';
-        }
-        if (selectedMp === 'yandex' && status === 'DELIVERY') {
-          return tab.key === 'shipping';
-        }
-        
-        return tab.statuses.some(s => status === s.toUpperCase());
+        const cat = getMarketplaceOrderStatusCategory(o, selectedMp);
+        return cat === categoryKey;
       });
     }
     return map;
-  }, [mergedOrders]);
+  }, [mergedOrders, selectedMp]);
 
   const currentOrders = ordersByTab[activeTab] || [];
 
