@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { MarketplaceLogo, MARKETPLACE_SHORT_NAMES } from '@/lib/marketplaceConfig';
 import { toDisplayUzs } from '@/lib/currency';
-import { isExcludedOrder } from '@/lib/revenueCalculations';
+import { getMarketplaceOrderStatusCategory } from '@/lib/marketplaceOrderStatus';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
@@ -76,7 +76,7 @@ export function FinancialDashboard({
     const marketplaceBreakdown = activeMarketplaces.map(marketplace => {
       const orders = store.getOrders(marketplace);
       const activeOrders = orders.filter(o => {
-        if (isExcludedOrder(o)) return false;
+        if (getMarketplaceOrderStatusCategory(o, marketplace) === 'cancelled') return false;
         if (dateFrom || dateTo) {
           const orderDate = new Date(o.createdAt);
           if (dateFrom && orderDate < dateFrom) return false;
@@ -293,8 +293,8 @@ export function FinancialDashboard({
                               <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />API
                             </Badge>
                           ) : mpData.fees > 0 ? (
-                            <Badge variant="outline" className="text-[10px] border-warning/50 text-warning px-1.5 py-0">
-                              ~Taxminiy
+                            <Badge variant="outline" className="text-[10px] border-primary/30 text-primary px-1.5 py-0">
+                              <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />API
                             </Badge>
                           ) : (
                             <Badge variant="outline" className="text-[10px] border-muted-foreground/30 text-muted-foreground px-1.5 py-0">
@@ -303,7 +303,7 @@ export function FinancialDashboard({
                           )}
                         </div>
                         <div className="text-xs text-muted-foreground truncate">
-                          {mpData.hasRealTariffs ? `${mpData.feePercent}%` : mpData.fees > 0 ? `~${mpData.feePercent}% (taxminiy)` : 'API ulanmagan'}
+                          {mpData.fees > 0 ? `${mpData.feePercent}%` : 'API ulanmagan'}
                         </div>
                       </div>
                     </div>
@@ -324,13 +324,9 @@ export function FinancialDashboard({
                       <div className="min-w-0">
                         <div className="font-medium text-sm truncate flex items-center gap-1.5">
                           {feeLabel}
-                          {hasReal ? (
+                          {hasReal || summary.totalMarketplaceFees > 0 ? (
                             <Badge variant="outline" className="text-[10px] border-primary/30 text-primary px-1.5 py-0">
                               <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />API
-                            </Badge>
-                          ) : summary.totalMarketplaceFees > 0 ? (
-                            <Badge variant="outline" className="text-[10px] border-warning/50 text-warning px-1.5 py-0">
-                              ~Taxminiy
                             </Badge>
                           ) : (
                             <Badge variant="outline" className="text-[10px] border-muted-foreground/30 text-muted-foreground px-1.5 py-0">
@@ -339,7 +335,7 @@ export function FinancialDashboard({
                           )}
                         </div>
                         <div className="text-xs text-muted-foreground truncate">
-                          {hasReal ? `${summary.feePercent}%` : summary.totalMarketplaceFees > 0 ? `~${summary.feePercent}% (taxminiy)` : 'API ulanmagan'}
+                          {(hasReal || summary.totalMarketplaceFees > 0) ? `${summary.feePercent}%` : 'API ulanmagan'}
                         </div>
                       </div>
                     </div>
