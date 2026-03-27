@@ -15,6 +15,7 @@ import {
   ChevronDown, Lock, FileCheck
 } from 'lucide-react';
 import React, { useState, useEffect, useRef, ReactNode } from 'react';
+import { motion, useScroll, useTransform, useMotionValue, useSpring, useInView as useMotionInView } from 'framer-motion';
 import heroDashboard from '@/assets/hero-dashboard.png';
 import abstractShapes from '@/assets/abstract-shapes.png';
 import { MARKETPLACE_CONFIG } from '@/lib/marketplaceConfig';
