@@ -398,7 +398,9 @@ export default function SellerCloudX() {
               />
             )}
             <Suspense fallback={<TabLoader />}>
-              {renderContent()}
+              <FeatureGate tabId={activeTab} onNavigateToSubscription={() => handleTabChange('subscription')}>
+                {renderContent()}
+              </FeatureGate>
             </Suspense>
           </main>
         </div>

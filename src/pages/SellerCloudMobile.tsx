@@ -299,7 +299,9 @@ export default function SellerCloudMobile() {
         <PullToRefresh onRefresh={async () => { await refetch(); toast.success("Ma'lumotlar yangilandi"); }}>
         <Suspense fallback={<TabLoader />}>
           <div className="transition-none">
-            {renderContent()}
+            <FeatureGate tabId={activeTab} onNavigateToSubscription={() => setActiveTab('subscription')}>
+              {renderContent()}
+            </FeatureGate>
           </div>
         </Suspense>
         </PullToRefresh>
