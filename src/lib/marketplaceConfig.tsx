@@ -1,7 +1,7 @@
-import uzumLogo from '@/assets/logos/uzum-market-new.png';
-import wbLogo from '@/assets/logos/wildberries-new.jpg';
-import ozonLogo from '@/assets/logos/ozon-new.png';
-import magnitLogo from '@/assets/logos/magnit-new.png';
+import uzumLogo from '@/assets/logos/uzum-market-new.webp';
+import wbLogo from '@/assets/logos/wildberries-new.webp';
+import ozonLogo from '@/assets/logos/ozon-new.webp';
+import magnitLogo from '@/assets/logos/magnit-new.webp';
 
 export interface MarketplaceInfo {
   name: string;

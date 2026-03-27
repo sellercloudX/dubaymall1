@@ -16,8 +16,8 @@ import {
 } from 'lucide-react';
 import React, { useState, useEffect, useRef, ReactNode } from 'react';
 import { motion, useScroll, useTransform, useMotionValue, useSpring, useInView as useMotionInView } from 'framer-motion';
-import heroDashboard from '@/assets/hero-dashboard.png';
-import abstractShapes from '@/assets/abstract-shapes.png';
+import heroDashboard from '@/assets/hero-dashboard-desktop.webp';
+import abstractShapes from '@/assets/abstract-shapes.webp';
 import { MARKETPLACE_CONFIG } from '@/lib/marketplaceConfig';
 
 // ─── Animation hooks ───

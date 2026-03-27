@@ -30,6 +30,7 @@ import { PhoneCompletionDialog } from "@/components/PhoneCompletionDialog";
 
 // Skip PWA install banner in Capacitor native
 const isCapacitor = !!(window as any).Capacitor;
+const isPublicLandingPath = !isCapacitor && (window.location.pathname === "/" || window.location.pathname === "/index");
 
 // Lazy load pages for code splitting
 const Index = lazy(() => import("./pages/Index"));
@@ -50,6 +51,7 @@ const NotFound = lazy(() => import("./pages/NotFound"));
  
 function App() {
   const [showSplash, setShowSplash] = useState(() => {
+    if (isPublicLandingPath) return false;
     const shown = sessionStorage.getItem('splash-shown');
     return !shown;
   });

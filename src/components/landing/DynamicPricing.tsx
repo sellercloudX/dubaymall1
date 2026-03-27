@@ -1,14 +1,12 @@
 import { useSubscriptionPlans, type SubscriptionPlan } from '@/hooks/useSubscriptionPlans';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { Link } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CheckCircle, X, ArrowRight, Star, Crown, Zap, Sparkles, MessageCircle, Store, Image, Copy, Percent, Shield, CreditCard } from 'lucide-react';
-import React, { useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 const iconMap: Record<string, React.ElementType> = {
   zap: Zap, briefcase: Crown, crown: Crown, building: Sparkles, star: Crown,
@@ -77,9 +75,30 @@ interface DynamicPricingProps {
 
 export const DynamicPricing = React.forwardRef<HTMLElement, DynamicPricingProps>(function DynamicPricing({ FadeInSection }, _fwdRef) {
     const ref = useRef<HTMLElement>(null);
-    const { data: plans, isLoading } = useSubscriptionPlans();
+    const [shouldLoad, setShouldLoad] = useState(false);
     const { language } = useLanguage();
     const lang = (language || 'uz') as 'uz' | 'ru' | 'en';
+
+    useEffect(() => {
+      const node = ref.current;
+      if (!node || shouldLoad) return;
+
+      const observer = new IntersectionObserver(
+        ([entry]) => {
+          if (entry.isIntersecting) {
+            setShouldLoad(true);
+            observer.disconnect();
+          }
+        },
+        { rootMargin: '400px 0px' }
+      );
+
+      observer.observe(node);
+      return () => observer.disconnect();
+    }, [shouldLoad]);
+
+    const { data: plans, isLoading: isPlansLoading } = useSubscriptionPlans({ enabled: shouldLoad });
+    const isLoading = !shouldLoad || isPlansLoading;
 
     const t = {
       uz: {
