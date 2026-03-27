@@ -32,6 +32,7 @@ interface ProductPnL {
   id: string; name: string; sku: string; marketplace: string;
   price: number; totalSold: number; totalRevenue: number;
   estimatedCost: number; commissionAmount: number; logisticsCost: number;
+  taxAmount: number; costPriceTotal: number;
   netProfit: number; profitMargin: number;
   abcGroup: 'A' | 'B' | 'C'; revenueShare: number;
   isRealTariff: boolean;
@@ -135,6 +136,7 @@ export function ABCAnalysis({ connectedMarketplaces, store }: ABCAnalysisProps) 
           totalSold: sales.qty, totalRevenue, estimatedCost: totalCosts,
           commissionAmount: tariff.commission * sales.qty, 
           logisticsCost: tariff.logistics * sales.qty,
+          taxAmount, costPriceTotal: productCost,
           netProfit, profitMargin,
           abcGroup: 'C', revenueShare: 0,
           isRealTariff: tariff.isReal,
@@ -165,6 +167,7 @@ export function ABCAnalysis({ connectedMarketplaces, store }: ABCAnalysisProps) 
           totalSold: sales.qty, totalRevenue: sales.revenue, estimatedCost: totalCosts,
           commissionAmount: tariff.commission * sales.qty,
           logisticsCost: tariff.logistics * sales.qty,
+          taxAmount, costPriceTotal: productCost,
           netProfit, profitMargin,
           abcGroup: 'C', revenueShare: 0,
           isRealTariff: tariff.isReal,
@@ -352,12 +355,15 @@ export function ABCAnalysis({ connectedMarketplaces, store }: ABCAnalysisProps) 
                     {/* Unit Economy — per-item cost breakdown */}
                     {product.totalSold > 0 && (
                       <div className="bg-muted/50 rounded-md p-2 text-[11px] space-y-0.5">
-                        <div className="font-medium text-muted-foreground mb-1">📊 1 dona uchun:</div>
+                         <div className="font-medium text-muted-foreground mb-1">📊 1 dona uchun:</div>
                         <div className="flex justify-between"><span>Narx:</span><span className="font-medium">{formatPrice(product.price)}</span></div>
                         <div className="flex justify-between"><span>Komissiya:</span><span className="text-destructive">-{formatPrice(product.commissionAmount / product.totalSold)}</span></div>
                         <div className="flex justify-between"><span>Logistika:</span><span className="text-destructive">-{formatPrice(product.logisticsCost / product.totalSold)}</span></div>
-                        {product.estimatedCost > 0 && (
-                          <div className="flex justify-between"><span>Tannarx+soliq:</span><span className="text-destructive">-{formatPrice((product.estimatedCost - product.commissionAmount - product.logisticsCost) / product.totalSold)}</span></div>
+                        {product.costPriceTotal > 0 && (
+                          <div className="flex justify-between"><span>Tannarx:</span><span className="text-destructive">-{formatPrice(product.costPriceTotal / product.totalSold)}</span></div>
+                        )}
+                        {product.taxAmount > 0 && (
+                          <div className="flex justify-between"><span>Soliq (4%):</span><span className="text-destructive">-{formatPrice(product.taxAmount / product.totalSold)}</span></div>
                         )}
                         <div className="flex justify-between border-t border-border/50 pt-0.5 mt-0.5">
                           <span className="font-medium">Sof foyda:</span>

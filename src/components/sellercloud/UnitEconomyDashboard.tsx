@@ -35,6 +35,7 @@ interface SkuMetrics {
   commission: number;
   logistics: number;
   withdrawal: number;
+  tax: number;
   totalFees: number;
   grossProfit: number;
   netProfit: number;
@@ -102,6 +103,8 @@ export function UnitEconomyDashboard({ connectedMarketplaces, store }: Props) {
           const logisticsForItem = tariff.logistics * qty;
           const withdrawalForItem = (tariff.withdrawal || 0) * qty;
           const feesForItem = tariff.totalFee * qty;
+          const taxRate = mp === 'yandex' || mp === 'uzum' ? 0.04 : 0;
+          const taxForItem = itemRevenue * taxRate;
           const ft = (order as any).fulfillmentType;
 
           if (!map.has(key)) {
@@ -111,7 +114,7 @@ export function UnitEconomyDashboard({ connectedMarketplaces, store }: Props) {
               marketplace: mp,
               photo: item.photo,
               unitsSold: 0, revenue: 0, costPrice: costUzs, totalCost: 0,
-              commission: 0, logistics: 0, withdrawal: 0, totalFees: 0,
+              commission: 0, logistics: 0, withdrawal: 0, tax: 0, totalFees: 0,
               grossProfit: 0, netProfit: 0, margin: 0,
               avgSellingPrice: 0,
               fulfillmentBreakdown: { fbo: 0, fbs: 0 },
@@ -127,6 +130,7 @@ export function UnitEconomyDashboard({ connectedMarketplaces, store }: Props) {
           m.commission += commissionForItem;
           m.logistics += logisticsForItem;
           m.withdrawal += withdrawalForItem;
+          m.tax += taxForItem;
           m.totalFees += feesForItem;
           if (tariff.isReal) m.hasRealTariff = true;
           if (ft === 'FBO') m.fulfillmentBreakdown.fbo += qty;
@@ -139,7 +143,7 @@ export function UnitEconomyDashboard({ connectedMarketplaces, store }: Props) {
     const result: SkuMetrics[] = [];
     map.forEach(m => {
       m.grossProfit = m.revenue - m.totalCost;
-      m.netProfit = m.grossProfit - m.totalFees;
+      m.netProfit = m.grossProfit - m.totalFees - m.tax;
       m.margin = m.revenue > 0 ? (m.netProfit / m.revenue) * 100 : 0;
       m.avgSellingPrice = m.unitsSold > 0 ? m.revenue / m.unitsSold : 0;
       result.push(m);
@@ -164,10 +168,11 @@ export function UnitEconomyDashboard({ connectedMarketplaces, store }: Props) {
 
   // Summary stats
   const totals = useMemo(() => {
-    const t = { revenue: 0, cost: 0, commission: 0, logistics: 0, withdrawal: 0, fees: 0, profit: 0, units: 0, withCost: 0, total: 0 };
+    const t = { revenue: 0, cost: 0, commission: 0, logistics: 0, withdrawal: 0, tax: 0, fees: 0, profit: 0, units: 0, withCost: 0, total: 0 };
     skuMetrics.forEach(s => {
       t.revenue += s.revenue; t.cost += s.totalCost;
       t.commission += s.commission; t.logistics += s.logistics; t.withdrawal += s.withdrawal;
+      t.tax += s.tax;
       t.fees += s.totalFees;
       t.profit += s.netProfit; t.units += s.unitsSold; t.total++;
       if (s.hasCostPrice) t.withCost++;
@@ -223,12 +228,13 @@ export function UnitEconomyDashboard({ connectedMarketplaces, store }: Props) {
         <Card>
           <CardContent className="pt-4 pb-3">
             <div className="flex items-center gap-2 mb-1"><Package className="h-4 w-4 text-orange-500" /><span className="text-xs text-muted-foreground">Jami xarajat</span></div>
-            <p className="text-lg font-bold">{fmtPrice(totals.cost + totals.fees)}</p>
+            <p className="text-lg font-bold">{fmtPrice(totals.cost + totals.fees + totals.tax)}</p>
             <div className="text-[10px] text-muted-foreground space-y-0.5">
               <div>Tannarx: {fmtPrice(totals.cost)}</div>
               <div>Komissiya: {fmtPrice(totals.commission)}</div>
               <div>Logistika: {fmtPrice(totals.logistics)}</div>
               {totals.withdrawal > 0 && <div>Chiqarish: {fmtPrice(totals.withdrawal)}</div>}
+              {totals.tax > 0 && <div>Soliq (4%): {fmtPrice(totals.tax)}</div>}
             </div>
           </CardContent>
         </Card>

@@ -50,7 +50,7 @@ export function useMarketplaceTariffs(
   const stableKey = productIds.length > 0 ? productIds.substring(0, 200) : 'empty';
 
   return useQuery({
-    queryKey: ['marketplace-tariffs', 'v12-uzum-offerId-fix', connectedMarketplaces.join(','), stableKey],
+    queryKey: ['marketplace-tariffs', 'v13-uzum-perunit-fix', connectedMarketplaces.join(','), stableKey],
     queryFn: async () => {
       const tariffMap = new Map<string, TariffInfo>();
 
@@ -60,7 +60,9 @@ export function useMarketplaceTariffs(
 
         if (mp === 'uzum') {
           // Try to fetch real finance data from Uzum API
-          let realExpenses: Map<string, { commission: number; logistics: number }> | null = null;
+          // IMPORTANT: Finance API returns per-transaction entries which we accumulate.
+          // We must also track units to compute per-unit rates.
+          let realExpenses: Map<string, { commission: number; logistics: number; units: number }> | null = null;
           try {
             const { data, error } = await supabase.functions.invoke('fetch-marketplace-data', {
               body: { marketplace: 'uzum', dataType: 'finance' },
@@ -71,19 +73,21 @@ export function useMarketplaceTariffs(
               expenses.forEach((exp: any) => {
                 const offerId = String(exp.productId || exp.skuId || '');
                 if (!offerId) return;
-                const existing = realExpenses!.get(offerId) || { commission: 0, logistics: 0 };
+                const existing = realExpenses!.get(offerId) || { commission: 0, logistics: 0, units: 0 };
                 const amount = Math.abs(exp.amount || exp.value || 0);
                 const type = (exp.type || exp.expenseType || '').toLowerCase();
                 if (type.includes('commission') || type.includes('komissiya')) {
                   existing.commission += amount;
+                  // Each commission entry = 1 unit sold
+                  existing.units += 1;
                 } else if (type.includes('logist') || type.includes('deliver')) {
                   existing.logistics += amount;
                 } else {
-                  existing.commission += amount; // default to commission
+                  existing.commission += amount;
+                  existing.units += 1;
                 }
                 realExpenses!.set(offerId, existing);
               });
-              // Uzum finance loaded
             }
           } catch (e) {
             console.warn('Uzum finance fetch failed:', e);
@@ -96,35 +100,36 @@ export function useMarketplaceTariffs(
             
             const realExp = realExpenses?.get(p.offerId);
             if (realExp && (realExp.commission > 0 || realExp.logistics > 0)) {
-              // Use real finance data from Finance API
-              const totalTariff = realExp.commission + realExp.logistics;
+              // Finance data is ACCUMULATED totals — convert to per-unit
+              const units = Math.max(realExp.units, 1);
+              const perUnitCommission = realExp.commission / units;
+              const perUnitLogistics = realExp.logistics / units;
+              const totalTariffPerUnit = perUnitCommission + perUnitLogistics;
               const entry: TariffInfo = {
                 offerId: p.offerId,
-                agencyCommission: realExp.commission,
-                fulfillment: realExp.logistics,
+                agencyCommission: perUnitCommission,
+                fulfillment: perUnitLogistics,
                 delivery: 0,
-                totalTariff,
-                tariffPercent: price > 0 ? (totalTariff / price) * 100 : 0,
-                commissionPercent: price > 0 ? (realExp.commission / price) * 100 : 0,
+                totalTariff: totalTariffPerUnit,
+                tariffPercent: price > 0 ? (totalTariffPerUnit / price) * 100 : 0,
+                commissionPercent: price > 0 ? (perUnitCommission / price) * 100 : 0,
               };
               tariffMap.set(p.offerId, entry);
-              // Also index by product name (lowercased) for matching with cached order items using skuTitle
               if (p.name) tariffMap.set(p.name.toLowerCase(), entry);
             } else if (p.commissionPercent && p.commissionPercent > 0) {
               // Use REAL commission from product catalog (commissionDto)
-              const commissionPercent = p.commissionPercent / 100; // 17 → 0.17
+              const commissionPercent = p.commissionPercent / 100;
               const commission = price * commissionPercent;
               const entry: TariffInfo = {
                 offerId: p.offerId,
                 agencyCommission: commission,
-                fulfillment: 0, // No real logistics data available
+                fulfillment: 0,
                 delivery: 0,
                 totalTariff: commission,
                 tariffPercent: price > 0 ? (commission / price) * 100 : 0,
                 commissionPercent: p.commissionPercent,
               };
               tariffMap.set(p.offerId, entry);
-              // Also index by product name for backwards compat with skuTitle-based offerId
               if (p.name) tariffMap.set(p.name.toLowerCase(), entry);
             }
             // If no real data — don't add to tariffMap (no estimates)
