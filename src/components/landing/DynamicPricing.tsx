@@ -353,7 +353,4 @@ export function DynamicPricing({ FadeInSection }: DynamicPricingProps) {
         </div>
       </section>
     );
-  }
-);
-
-DynamicPricing.displayName = 'DynamicPricing';
+}
