@@ -2885,17 +2885,18 @@ serve(async (req) => {
                 orderList.forEach((fo: any) => {
                   const items = fo.items || fo.orderItems || [];
                   items.forEach((item: any) => {
-                    const productId = String(item.skuId || item.skuTitle || item.productId || '');
+                    const productId = String(item.productId || item.skuId || item.skuTitle || '');
+                    const qty = Math.max(Number(item.quantity || item.count || 1), 1);
                     if (!productId) return;
                     if (item.commission || item.commissionAmount) {
-                      financeExpenses.push({ productId, type: 'commission', amount: Math.abs(item.commission || item.commissionAmount || 0) });
+                      financeExpenses.push({ productId, type: 'commission', amount: Math.abs(item.commission || item.commissionAmount || 0), quantity: qty });
                     }
                     if (item.deliveryAmount || item.logisticsAmount || item.deliveryCost) {
-                      financeExpenses.push({ productId, type: 'logistics', amount: Math.abs(item.deliveryAmount || item.logisticsAmount || item.deliveryCost || 0) });
+                      financeExpenses.push({ productId, type: 'logistics', amount: Math.abs(item.deliveryAmount || item.logisticsAmount || item.deliveryCost || 0), quantity: qty });
                     }
                   });
                   if (fo.commissionAmount && !fo.items?.length) {
-                    financeExpenses.push({ productId: String(fo.orderId || fo.id || ''), type: 'commission', amount: Math.abs(fo.commissionAmount || 0) });
+                    financeExpenses.push({ productId: String(fo.productId || fo.skuId || fo.orderId || fo.id || ''), type: 'commission', amount: Math.abs(fo.commissionAmount || 0), quantity: 1 });
                   }
                 });
 

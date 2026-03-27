@@ -50,7 +50,7 @@ export function useMarketplaceTariffs(
   const stableKey = productIds.length > 0 ? productIds.substring(0, 200) : 'empty';
 
   return useQuery({
-    queryKey: ['marketplace-tariffs', 'v13-uzum-perunit-fix', connectedMarketplaces.join(','), stableKey],
+    queryKey: ['marketplace-tariffs', 'v14-finance-status-fix', connectedMarketplaces.join(','), stableKey],
     queryFn: async () => {
       const tariffMap = new Map<string, TariffInfo>();
 
@@ -59,33 +59,47 @@ export function useMarketplaceTariffs(
         if (products.length === 0) continue;
 
         if (mp === 'uzum') {
-          // Try to fetch real finance data from Uzum API
-          // IMPORTANT: Finance API returns per-transaction entries which we accumulate.
-          // We must also track units to compute per-unit rates.
-          let realExpenses: Map<string, { commission: number; logistics: number; units: number }> | null = null;
+          let realExpenses: Map<string, {
+            commission: number;
+            logistics: number;
+            commissionUnits: number;
+            logisticsUnits: number;
+          }> | null = null;
+
           try {
             const { data, error } = await supabase.functions.invoke('fetch-marketplace-data', {
               body: { marketplace: 'uzum', dataType: 'finance' },
             });
+
             if (!error && data?.success && data?.data?.expenses) {
               realExpenses = new Map();
               const expenses = Array.isArray(data.data.expenses) ? data.data.expenses : [];
+
               expenses.forEach((exp: any) => {
-                const offerId = String(exp.productId || exp.skuId || '');
+                const offerId = String(exp.productId || exp.skuId || '').trim();
                 if (!offerId) return;
-                const existing = realExpenses!.get(offerId) || { commission: 0, logistics: 0, units: 0 };
+
+                const existing = realExpenses!.get(offerId) || {
+                  commission: 0,
+                  logistics: 0,
+                  commissionUnits: 0,
+                  logisticsUnits: 0,
+                };
                 const amount = Math.abs(exp.amount || exp.value || 0);
-                const type = (exp.type || exp.expenseType || '').toLowerCase();
+                const quantity = Math.max(Number(exp.quantity || exp.qty || 1), 1);
+                const type = String(exp.type || exp.expenseType || '').toLowerCase();
+
                 if (type.includes('commission') || type.includes('komissiya')) {
                   existing.commission += amount;
-                  // Each commission entry = 1 unit sold
-                  existing.units += 1;
+                  existing.commissionUnits += quantity;
                 } else if (type.includes('logist') || type.includes('deliver')) {
                   existing.logistics += amount;
+                  existing.logisticsUnits += quantity;
                 } else {
                   existing.commission += amount;
-                  existing.units += 1;
+                  existing.commissionUnits += quantity;
                 }
+
                 realExpenses!.set(offerId, existing);
               });
             }
@@ -93,18 +107,21 @@ export function useMarketplaceTariffs(
             console.warn('Uzum finance fetch failed:', e);
           }
 
-          // Apply tariffs per product — ONLY real data from API
           for (const p of products) {
             const price = p.price || 0;
             if (price <= 0) continue;
-            
-            const realExp = realExpenses?.get(p.offerId);
+
+            const realExp = realExpenses?.get(p.offerId)
+              || (p.skuId ? realExpenses?.get(p.skuId) : undefined)
+              || (p.name ? realExpenses?.get(p.name.toLowerCase()) : undefined);
+
             if (realExp && (realExp.commission > 0 || realExp.logistics > 0)) {
-              // Finance data is ACCUMULATED totals — convert to per-unit
-              const units = Math.max(realExp.units, 1);
-              const perUnitCommission = realExp.commission / units;
-              const perUnitLogistics = realExp.logistics / units;
+              const commissionUnits = Math.max(realExp.commissionUnits, 1);
+              const logisticsUnits = Math.max(realExp.logisticsUnits, realExp.commissionUnits, 1);
+              const perUnitCommission = realExp.commission / commissionUnits;
+              const perUnitLogistics = realExp.logistics / logisticsUnits;
               const totalTariffPerUnit = perUnitCommission + perUnitLogistics;
+
               const entry: TariffInfo = {
                 offerId: p.offerId,
                 agencyCommission: perUnitCommission,
@@ -115,9 +132,9 @@ export function useMarketplaceTariffs(
                 commissionPercent: price > 0 ? (perUnitCommission / price) * 100 : 0,
               };
               tariffMap.set(p.offerId, entry);
+              if (p.skuId) tariffMap.set(p.skuId, entry);
               if (p.name) tariffMap.set(p.name.toLowerCase(), entry);
             } else if (p.commissionPercent && p.commissionPercent > 0) {
-              // Use REAL commission from product catalog (commissionDto)
               const commissionPercent = p.commissionPercent / 100;
               const commission = price * commissionPercent;
               const entry: TariffInfo = {
@@ -130,9 +147,9 @@ export function useMarketplaceTariffs(
                 commissionPercent: p.commissionPercent,
               };
               tariffMap.set(p.offerId, entry);
+              if (p.skuId) tariffMap.set(p.skuId, entry);
               if (p.name) tariffMap.set(p.name.toLowerCase(), entry);
             }
-            // If no real data — don't add to tariffMap (no estimates)
           }
           continue;
         }
