@@ -51,12 +51,23 @@ function useInView(threshold = 0.15) {
 }
 
 const FadeInSection = React.forwardRef<HTMLDivElement, { children: ReactNode; className?: string; delay?: number }>(
-  ({ children, className = '', delay = 0 }, _ref) => {
-    const ref = useRef<HTMLDivElement>(null);
-    const isInView = useMotionInView(ref, { once: true, margin: "-50px" });
+  ({ children, className = '', delay = 0 }, forwardedRef) => {
+    const localRef = useRef<HTMLDivElement>(null);
+    const isInView = useMotionInView(localRef, { once: true, margin: "-50px" });
+
+    const setRefs = (node: HTMLDivElement | null) => {
+      localRef.current = node;
+
+      if (typeof forwardedRef === 'function') {
+        forwardedRef(node);
+      } else if (forwardedRef) {
+        forwardedRef.current = node;
+      }
+    };
+
     return (
       <motion.div 
-        ref={ref} 
+        ref={setRefs}
         className={className}
         initial={{ opacity: 0, y: 40 }}
         animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 40 }}
@@ -70,33 +81,37 @@ const FadeInSection = React.forwardRef<HTMLDivElement, { children: ReactNode; cl
 FadeInSection.displayName = 'FadeInSection';
 
 // Magnetic hover effect for cards
-function MagneticCard({ children, className = '' }: { children: ReactNode; className?: string }) {
-  const x = useMotionValue(0);
-  const y = useMotionValue(0);
-  const springX = useSpring(x, { stiffness: 300, damping: 20 });
-  const springY = useSpring(y, { stiffness: 300, damping: 20 });
+const MagneticCard = React.forwardRef<HTMLDivElement, { children: ReactNode; className?: string }>(
+  function MagneticCard({ children, className = '' }, ref) {
+    const x = useMotionValue(0);
+    const y = useMotionValue(0);
+    const springX = useSpring(x, { stiffness: 300, damping: 20 });
+    const springY = useSpring(y, { stiffness: 300, damping: 20 });
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-    x.set((e.clientX - centerX) * 0.05);
-    y.set((e.clientY - centerY) * 0.05);
-  };
+    const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      x.set((e.clientX - centerX) * 0.05);
+      y.set((e.clientY - centerY) * 0.05);
+    };
 
-  return (
-    <motion.div
-      className={className}
-      style={{ x: springX, y: springY }}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={() => { x.set(0); y.set(0); }}
-      whileHover={{ scale: 1.02 }}
-      transition={{ type: "spring", stiffness: 400, damping: 17 }}
-    >
-      {children}
-    </motion.div>
-  );
-}
+    return (
+      <motion.div
+        ref={ref}
+        className={className}
+        style={{ x: springX, y: springY }}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={() => { x.set(0); y.set(0); }}
+        whileHover={{ scale: 1.02 }}
+        transition={{ type: "spring", stiffness: 400, damping: 17 }}
+      >
+        {children}
+      </motion.div>
+    );
+  }
+);
+MagneticCard.displayName = 'MagneticCard';
 
 const FloatingParticles = React.memo(React.forwardRef<HTMLDivElement>((_props, ref) => {
   return (
@@ -128,9 +143,9 @@ const FloatingParticles = React.memo(React.forwardRef<HTMLDivElement>((_props, r
 FloatingParticles.displayName = 'FloatingParticles';
 
 // Glowing orb background
-function GlowOrbs() {
+const GlowOrbs = React.forwardRef<HTMLDivElement>(function GlowOrbs(_props, ref) {
   return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+    <div ref={ref} className="absolute inset-0 overflow-hidden pointer-events-none">
       <motion.div 
         className="absolute w-[500px] h-[500px] rounded-full bg-primary/8 blur-[120px]"
         animate={{ x: [0, 50, 0], y: [0, -30, 0] }}
@@ -145,7 +160,8 @@ function GlowOrbs() {
       />
     </div>
   );
-}
+});
+GlowOrbs.displayName = 'GlowOrbs';
 
 // ─── FAQ Component ───
 const FAQItem = React.forwardRef<HTMLDivElement, { question: string; answer: string }>(
