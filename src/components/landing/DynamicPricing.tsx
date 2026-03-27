@@ -75,8 +75,8 @@ interface DynamicPricingProps {
   FadeInSection: React.ComponentType<{ children: React.ReactNode; className?: string; delay?: number }>;
 }
 
-export const DynamicPricing = React.forwardRef<HTMLElement, DynamicPricingProps>(
-  function DynamicPricingInner({ FadeInSection }, ref) {
+export function DynamicPricing({ FadeInSection }: DynamicPricingProps) {
+    const ref = useRef<HTMLElement>(null);
     const { data: plans, isLoading } = useSubscriptionPlans();
     const { language } = useLanguage();
     const lang = (language || 'uz') as 'uz' | 'ru' | 'en';
