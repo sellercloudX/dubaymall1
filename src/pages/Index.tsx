@@ -785,15 +785,21 @@ export default function Index() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8 max-w-6xl mx-auto">
              {features.map((feat, i) => (
                <FadeInSection key={i} delay={i * 80}>
-                 <Card className="group border shadow-sm hover:shadow-xl transition-all duration-500 overflow-hidden hover:-translate-y-2 h-full">
-                   <CardContent className="p-5 sm:p-6 md:p-8">
-                     <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl ${feat.bg} flex items-center justify-center mb-4 sm:mb-5 group-hover:scale-110 transition-transform duration-300`}>
-                       <feat.icon className={`h-6 w-6 sm:h-7 sm:w-7 ${feat.color}`} />
-                     </div>
-                     <h3 className="text-base sm:text-lg font-bold mb-2 font-display">{feat.title}</h3>
-                     <p className="text-muted-foreground text-xs sm:text-sm leading-relaxed">{feat.desc}</p>
-                   </CardContent>
-                 </Card>
+                 <MagneticCard className="h-full">
+                   <Card className="group border shadow-sm hover:shadow-xl transition-all duration-500 overflow-hidden h-full">
+                     <CardContent className="p-5 sm:p-6 md:p-8">
+                       <motion.div 
+                         className={`w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl ${feat.bg} flex items-center justify-center mb-4 sm:mb-5`}
+                         whileHover={{ rotate: [0, -5, 5, 0], scale: 1.15 }}
+                         transition={{ duration: 0.4 }}
+                       >
+                         <feat.icon className={`h-6 w-6 sm:h-7 sm:w-7 ${feat.color}`} />
+                       </motion.div>
+                       <h3 className="text-base sm:text-lg font-bold mb-2 font-display">{feat.title}</h3>
+                       <p className="text-muted-foreground text-xs sm:text-sm leading-relaxed">{feat.desc}</p>
+                     </CardContent>
+                   </Card>
+                 </MagneticCard>
                </FadeInSection>
              ))}
           </div>
