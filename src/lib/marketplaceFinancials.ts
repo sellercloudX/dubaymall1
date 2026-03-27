@@ -3,10 +3,8 @@ import { getOrderRevenueUzs } from '@/lib/revenueCalculations';
 import { getTariffForProduct, type TariffInfo } from '@/hooks/useMarketplaceTariffs';
 import type { MarketplaceOrder } from '@/hooks/useMarketplaceDataStore';
 
-const MARKETPLACE_TAX_RATES: Record<string, number> = {
-  yandex: 0.04,
-  uzum: 0.04,
-};
+// O'zbekiston YATT solig'i — barcha marketplace'lar uchun 4%
+const UZB_TAX_RATE = 0.04;
 
 export interface OrderItemFinancialLine {
   offerId: string;
