@@ -15,11 +15,11 @@ import { toast } from 'sonner';
 import { DateRangeFilter, getPresetDates, type DatePreset } from './DateRangeFilter';
 import { MarketplaceFilterBar } from './MarketplaceFilterBar';
 import { MarketplaceLogo, MARKETPLACE_SHORT_NAMES } from '@/lib/marketplaceConfig';
-import { toDisplayUzs, formatUzsFull } from '@/lib/currency';
-import { getOrderRevenueUzs, isExcludedOrder } from '@/lib/revenueCalculations';
+import { getOrderRevenueUzs } from '@/lib/revenueCalculations';
 import { getMarketplaceOrderStatusCategory } from '@/lib/marketplaceOrderStatus';
 import { useCostPrices } from '@/hooks/useCostPrices';
-import { useMarketplaceTariffs, getTariffForProduct } from '@/hooks/useMarketplaceTariffs';
+import { useMarketplaceTariffs } from '@/hooks/useMarketplaceTariffs';
+import { calculateOrderFinancialBreakdown } from '@/lib/marketplaceFinancials';
 import type { MarketplaceDataStore, MarketplaceOrder } from '@/hooks/useMarketplaceDataStore';
 
 interface SalesDashboardProps {
@@ -42,9 +42,6 @@ const STATUS_CATEGORIES = [
 const formatNum = (n: number) => new Intl.NumberFormat('uz-UZ').format(Math.round(n));
 const fmtPrice = (n: number) => formatNum(n) + " so'm";
 
-// O'zbekiston YATT solig'i — barcha marketplace'lar uchun 4%
-const UZB_TAX_RATE = 0.04;
-
 interface EnrichedOrder {
   order: MarketplaceOrder;
   marketplace: string;
@@ -53,6 +50,7 @@ interface EnrichedOrder {
   grossProfit: number;
   commission: number;
   logistics: number;
+  withdrawal: number;
   taxAmount: number;
   netProfit: number;
   margin: number;
@@ -84,7 +82,7 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
   const ITEMS_PER_PAGE = 30;
 
   const { getCostPrice } = useCostPrices();
-  const { data: tariffMap, dataUpdatedAt: tariffUpdatedAt } = useMarketplaceTariffs(connectedMarketplaces, store);
+  const { data: tariffMap, isLoading: tariffsLoading } = useMarketplaceTariffs(connectedMarketplaces, store);
 
   const mpList = selectedMp === 'all' ? connectedMarketplaces : [selectedMp];
 
@@ -93,55 +91,33 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
     const result: EnrichedOrder[] = [];
 
     for (const mp of mpList) {
-      const products = store.getProducts(mp);
-      const costMap = new Map<string, number>();
-      products.forEach(p => {
-        const cp = getCostPrice(mp, p.offerId);
-        if (cp !== null) costMap.set(p.offerId.toLowerCase(), toDisplayUzs(cp, mp));
-      });
-
       for (const order of store.getOrders(mp)) {
-        const totalUzs = getOrderRevenueUzs(order, mp);
-        
-        // Calculate cost from items
-        let costTotal = 0;
-        let itemCount = 0;
-        let totalFees = 0;
-        (order.items || []).forEach(item => {
-          const cpKey = (item.offerId || '').toLowerCase();
-          const cp = costMap.get(cpKey) || 0;
-          costTotal += cp * (item.count || 1);
-          itemCount += item.count || 1;
-
-          // Use real tariffs (same as Finance & ABC Analysis)
-          // For Yandex: use commissionBase (pre-subsidy price) for accurate fee calculation
-          const itemPrice = toDisplayUzs(item.price || 0, mp);
-          const commBase = (item as any).commissionBase ? toDisplayUzs((item as any).commissionBase, mp) : undefined;
-          const tariff = getTariffForProduct(tariffMap, item.offerId, itemPrice, mp, commBase);
-          totalFees += tariff.totalFee * (item.count || 1);
-        });
-
-        const commission = totalFees;
-        const logistics = 0; // Already included in tariff.totalFee
+        const breakdown = calculateOrderFinancialBreakdown(order, mp, getCostPrice, tariffMap);
+        const totalUzs = breakdown.revenue || getOrderRevenueUzs(order, mp);
         const subsidyAmount = 0;
-        const taxRate = UZB_TAX_RATE;
-        const taxAmount = totalUzs * taxRate;
-        
-        const grossProfit = totalUzs - costTotal;
-        const netProfit = grossProfit - commission - taxAmount + subsidyAmount;
-        const margin = totalUzs > 0 ? (netProfit / totalUzs) * 100 : 0;
 
         const statusCategory = getMarketplaceOrderStatusCategory(order, mp);
 
         result.push({
-          order, marketplace: mp, totalUzs, costTotal, grossProfit,
-          commission, logistics, taxAmount, netProfit, margin, subsidyAmount, statusCategory
+          order,
+          marketplace: mp,
+          totalUzs,
+          costTotal: breakdown.costTotal,
+          grossProfit: breakdown.grossProfit,
+          commission: breakdown.commission,
+          logistics: breakdown.logistics,
+          withdrawal: breakdown.withdrawal,
+          taxAmount: breakdown.taxAmount,
+          netProfit: breakdown.netProfit,
+          margin: breakdown.margin,
+          subsidyAmount,
+          statusCategory,
         });
       }
     }
 
     return result;
-  }, [mpList, store.dataVersion, getCostPrice, tariffUpdatedAt]);
+  }, [mpList, store.dataVersion, getCostPrice, tariffMap]);
 
   // Filter by date range — handle ISO strings, numeric timestamps, and invalid dates
   const dateFiltered = useMemo(() => {
@@ -224,7 +200,7 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
     const totalRevenue = nonCancelled.reduce((s, e) => s + e.totalUzs, 0);
     const totalCost = nonCancelled.reduce((s, e) => s + e.costTotal, 0);
     const totalCommission = nonCancelled.reduce((s, e) => s + e.commission, 0);
-    const totalLogistics = nonCancelled.reduce((s, e) => s + e.logistics, 0);
+    const totalLogistics = nonCancelled.reduce((s, e) => s + e.logistics + e.withdrawal, 0);
     const totalNetProfit = nonCancelled.reduce((s, e) => s + e.netProfit, 0);
     const avgMargin = totalRevenue > 0 ? (totalNetProfit / totalRevenue) * 100 : 0;
 
@@ -258,7 +234,7 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
   const handleExportCSV = () => {
     const headers = [
       'Marketplace', 'Buyurtma ID', 'Sana', 'Holat', 'Mahsulot',
-      "To'lov (so'm)", "Tannarx (so'm)", "Komissiya (so'm)", "Logistika (so'm)",
+      "To'lov (so'm)", "Tannarx (so'm)", "Komissiya (so'm)", "Logistika + chiqarish (so'm)",
       "Yalpi foyda (so'm)", "Sof foyda (so'm)", 'Marja (%)'
     ];
     const rows = sorted.map(e => [
@@ -270,7 +246,7 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
       String(Math.round(e.totalUzs)),
       String(Math.round(e.costTotal)),
       String(Math.round(e.commission)),
-      String(Math.round(e.logistics)),
+      String(Math.round(e.logistics + e.withdrawal)),
       String(Math.round(e.grossProfit)),
       String(Math.round(e.netProfit)),
       e.margin.toFixed(1) + '%',
@@ -298,6 +274,12 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
     );
   }
 
+  if (store.isLoadingOrders || tariffsLoading) {
+    return (
+      <Card><CardContent className="py-12 text-center"><Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" /></CardContent></Card>
+    );
+  }
+
   return (
     <div className="space-y-4">
       {/* Filters Row */}
@@ -320,7 +302,7 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3">
         <KPICard icon={<Receipt className="h-4 w-4" />} label="Daromad" value={fmtPrice(stats.totalRevenue)} />
         <KPICard icon={<DollarSign className="h-4 w-4" />} label="Tannarx" value={fmtPrice(stats.totalCost)} variant="neutral" />
-        <KPICard icon={<TrendingDown className="h-4 w-4" />} label="Komissiya" value={fmtPrice(stats.totalCommission + stats.totalLogistics)} variant="loss" />
+        <KPICard icon={<TrendingDown className="h-4 w-4" />} label="Xizmat haqi" value={fmtPrice(stats.totalCommission + stats.totalLogistics)} variant="loss" />
         <KPICard icon={<TrendingUp className="h-4 w-4" />} label="Sof foyda" value={fmtPrice(stats.totalNetProfit)} variant={stats.totalNetProfit >= 0 ? 'profit' : 'loss'} />
         <KPICard icon={<BarChart3 className="h-4 w-4" />} label="Marja" value={stats.avgMargin.toFixed(1) + '%'} variant={stats.avgMargin >= 15 ? 'profit' : stats.avgMargin >= 0 ? 'neutral' : 'loss'} />
       </div>
@@ -395,7 +377,7 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
                 <SortButton label="Buyurtma" field="date" current={sortField} dir={sortDir} onClick={toggleSort} />
                 <span className="w-20 text-right">To'lov</span>
                 <span className="w-20 text-right">Tannarx</span>
-                <span className="w-20 text-right hidden md:block">Komissiya</span>
+                <span className="w-20 text-right hidden md:block">Xizmat</span>
                 <SortButton label="Sof foyda" field="profit" current={sortField} dir={sortDir} onClick={toggleSort} className="w-24 text-right" />
                 <span className="w-16 text-center">Holat</span>
               </div>
@@ -449,7 +431,7 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
                         </div>
                         <div className="w-20 text-right text-xs font-medium">{formatNum(e.totalUzs)}</div>
                         <div className="w-20 text-right text-xs text-muted-foreground">{e.costTotal > 0 ? formatNum(e.costTotal) : '—'}</div>
-                        <div className="w-20 text-right text-xs text-muted-foreground hidden md:block">-{formatNum(e.commission + e.logistics)}</div>
+                        <div className="w-20 text-right text-xs text-muted-foreground hidden md:block">-{formatNum(e.commission + e.logistics + e.withdrawal)}</div>
                         <div className={`w-24 text-right text-xs font-bold ${e.netProfit >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
                           {e.netProfit >= 0 ? '+' : ''}{formatNum(e.netProfit)}
                           <span className="text-[10px] font-normal text-muted-foreground ml-0.5">({e.margin.toFixed(0)}%)</span>

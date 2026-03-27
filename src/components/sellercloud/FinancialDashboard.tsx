@@ -12,7 +12,8 @@ import {
   Wallet, Receipt, RefreshCw, Calculator, Percent, Package, CheckCircle2
 } from 'lucide-react';
 import { useCostPrices } from '@/hooks/useCostPrices';
-import { useMarketplaceTariffs, getTariffForProduct } from '@/hooks/useMarketplaceTariffs';
+import { useMarketplaceTariffs } from '@/hooks/useMarketplaceTariffs';
+import { calculateOrderFinancialBreakdown } from '@/lib/marketplaceFinancials';
 import { DateRangeFilter, getPresetDates, type DatePreset } from './DateRangeFilter';
 import { MarketplaceFilterBar } from './MarketplaceFilterBar';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
@@ -40,9 +41,6 @@ const MARKETPLACE_FEE_DETAILS: Record<string, string> = {
   wildberries: 'API orqali real komissiya + logistika',
 };
 
-// O'zbekiston YATT solig'i — barcha marketplace'lar uchun 4%
-const UZB_TAX_RATE = 0.04;
-
 export function FinancialDashboard({ 
   connectedMarketplaces, store
 }: FinancialDashboardProps) {
@@ -66,6 +64,7 @@ export function FinancialDashboard({
     let totalMarketplaceFees = 0;
     let realTariffCount = 0;
     let totalItemRevenue = 0;
+    let totalTax = 0;
     let totalWbSppAmount = 0;
     let totalWbForPay = 0;
 
@@ -91,29 +90,21 @@ export function FinancialDashboard({
       let mpItemCount = 0;
 
       activeOrders.forEach(order => {
-        (order.items || []).forEach(item => {
-          const cost = getCostPrice(marketplace, item.offerId);
-          const qty = item.count || 1;
-          const itemPrice = toDisplayUzs(item.price || 0, marketplace);
-          const itemRevenue = itemPrice * qty;
-          totalProductCount += qty;
-          mpItemCount += qty;
-          mpRevenue += itemRevenue;
-          
-          if (cost !== null) {
-            totalProductCost += toDisplayUzs(cost, marketplace) * qty;
-            costPricesCovered += qty;
-          }
+        const breakdown = calculateOrderFinancialBreakdown(order, marketplace, getCostPrice, tariffMap);
 
-          const commBase = (item as any).commissionBase ? toDisplayUzs((item as any).commissionBase, marketplace) : undefined;
-          const tariff = getTariffForProduct(tariffMap, item.offerId, itemPrice, marketplace, commBase);
-          const itemFees = tariff.totalFee * qty;
-          mpFees += itemFees;
-          totalMarketplaceFees += itemFees;
-          if (tariff.isReal) {
-            realTariffCount += qty;
-            mpRealTariffCount += qty;
-          }
+        totalProductCount += breakdown.itemCount;
+        mpItemCount += breakdown.itemCount;
+        mpRevenue += breakdown.revenue;
+        totalProductCost += breakdown.costTotal;
+        costPricesCovered += breakdown.costCoveredItems;
+        mpFees += breakdown.totalFees;
+        totalMarketplaceFees += breakdown.totalFees;
+        realTariffCount += breakdown.realTariffItems;
+        mpRealTariffCount += breakdown.realTariffItems;
+        totalTax += breakdown.taxAmount;
+
+        (order.items || []).forEach(item => {
+          const qty = item.count || 1;
 
           // WB SPP: WB discount to buyer (seller bears cost)
           if (marketplace === 'wildberries' && item.spp && item.spp > 0) {
@@ -147,11 +138,6 @@ export function FinancialDashboard({
 
     const totalRevenue = totalItemRevenue;
     const totalOrders = marketplaceBreakdown.reduce((s, m) => s + m.orders, 0);
-    
-    let totalTax = 0;
-    activeMarketplaces.forEach(mp => {
-      totalTax += (feesByMarketplace[mp]?.revenue || 0) * UZB_TAX_RATE;
-    });
 
     const totalExpenses = totalProductCost + totalMarketplaceFees + totalTax;
     const netProfit = totalRevenue - totalExpenses;
@@ -163,7 +149,7 @@ export function FinancialDashboard({
     const hasAnyRealTariffs = realTariffCount > 0;
 
     return { totalRevenue, totalOrders, totalMarketplaceFees, feePercent, totalTax, totalExpenses, netProfit, profitMargin, marketplaceBreakdown, totalProductCost, costCoverage, tariffCoverage, feesByMarketplace, hasWbSpp, totalWbSppAmount, totalWbForPay, hasAnyRealTariffs };
-  }, [activeMarketplaces, store.dataVersion, isLoading, getCostPrice, tariffUpdatedAt, dateFrom, dateTo, selectedMp]);
+  }, [activeMarketplaces, store.dataVersion, isLoading, getCostPrice, tariffMap, tariffUpdatedAt, dateFrom, dateTo]);
 
   const formatPrice = (price: number) => {
     const rounded = Math.round(price);

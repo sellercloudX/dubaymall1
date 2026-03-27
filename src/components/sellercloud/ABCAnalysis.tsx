@@ -18,7 +18,8 @@ import {
 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useCostPrices } from '@/hooks/useCostPrices';
-import { useMarketplaceTariffs, getTariffForProduct } from '@/hooks/useMarketplaceTariffs';
+import { useMarketplaceTariffs } from '@/hooks/useMarketplaceTariffs';
+import { calculateOrderFinancialBreakdown } from '@/lib/marketplaceFinancials';
 import { DateRangeFilter, getPresetDates, type DatePreset } from './DateRangeFilter';
 import { MarketplaceFilterBar } from './MarketplaceFilterBar';
 import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
@@ -32,6 +33,7 @@ interface ProductPnL {
   id: string; name: string; sku: string; marketplace: string;
   price: number; totalSold: number; totalRevenue: number;
   estimatedCost: number; commissionAmount: number; logisticsCost: number;
+  withdrawalAmount: number;
   taxAmount: number; costPriceTotal: number;
   netProfit: number; profitMargin: number;
   abcGroup: 'A' | 'B' | 'C'; revenueShare: number;
@@ -42,9 +44,6 @@ interface ProductPnL {
 const MARKETPLACE_NAMES: Record<string, string> = {
   yandex: 'Yandex', uzum: 'Uzum', wildberries: 'WB', ozon: 'Ozon',
 };
-
-// O'zbekiston YATT solig'i — barcha marketplace'lar uchun 4%
-const UZB_TAX_RATE = 0.04;
 
 const ABC_COLORS = {
   A: { bg: 'bg-primary/10', text: 'text-primary', border: 'border-primary/30', badge: 'bg-primary' },
@@ -72,13 +71,12 @@ export function ABCAnalysis({ connectedMarketplaces, store }: ABCAnalysisProps) 
     for (const marketplace of activeMarketplaces) {
       const productsList = store.getProducts(marketplace);
       const orders = store.getOrders(marketplace);
-      const taxRate = UZB_TAX_RATE;
 
       // Build product lookup by offerId
       const productMap = new Map<string, typeof productsList[0]>();
       productsList.forEach(p => productMap.set(p.offerId, p));
 
-      const salesMap = new Map<string, { qty: number; revenue: number; name?: string; photo?: string }>();
+      const salesMap = new Map<string, ProductPnL>();
       const activeOrders = orders.filter(o => {
         if (isExcludedOrder(o)) return false;
         if (dateFrom || dateTo) {
@@ -88,94 +86,87 @@ export function ABCAnalysis({ connectedMarketplaces, store }: ABCAnalysisProps) 
         }
         return true;
       });
+
       activeOrders.forEach(order => {
-        (order.items || []).forEach(item => {
-          const key = item.offerId;
+        const breakdown = calculateOrderFinancialBreakdown(order, marketplace, getCostPrice, tariffMap);
+
+        breakdown.lines.forEach(line => {
+          const key = line.offerId;
           if (!key) return;
-          const existing = salesMap.get(key) || { qty: 0, revenue: 0 };
-          existing.qty += item.count || 1;
-          const itemPrice = toDisplayUzs(item.price || 0, marketplace);
-          existing.revenue += itemPrice * (item.count || 1);
-          // Capture name/photo for orphan items (not in product list)
-          if (!existing.name && (item.offerName || item.offerId)) {
-            existing.name = item.offerName || item.offerId;
+          const product = productMap.get(key);
+          const existing = salesMap.get(key) || {
+            id: key,
+            name: line.offerName || product?.name || key,
+            sku: product?.shopSku || key,
+            marketplace,
+            price: 0,
+            totalSold: 0,
+            totalRevenue: 0,
+            estimatedCost: 0,
+            commissionAmount: 0,
+            logisticsCost: 0,
+            withdrawalAmount: 0,
+            taxAmount: 0,
+            costPriceTotal: 0,
+            netProfit: 0,
+            profitMargin: 0,
+            abcGroup: 'C',
+            revenueShare: 0,
+            isRealTariff: false,
+            imageUrl: line.photo || product?.pictures?.[0],
+          };
+
+          existing.totalSold += line.quantity;
+          existing.totalRevenue += line.revenue;
+          existing.estimatedCost += line.costTotal + line.totalFees + line.tax;
+          existing.commissionAmount += line.commission;
+          existing.logisticsCost += line.logistics;
+          existing.withdrawalAmount += line.withdrawal;
+          existing.taxAmount += line.tax;
+          existing.costPriceTotal += line.costTotal;
+          existing.isRealTariff = existing.isRealTariff || line.hasRealTariff;
+          if (!existing.imageUrl && (line.photo || product?.pictures?.[0])) {
+            existing.imageUrl = line.photo || product?.pictures?.[0];
           }
-          if (!existing.photo && (item as any).photo) {
-            existing.photo = (item as any).photo;
-          }
+
           salesMap.set(key, existing);
         });
       });
 
-      // Track which offerIds we've processed
-      const processedOfferIds = new Set<string>();
-
       productsList.forEach(product => {
-        processedOfferIds.add(product.offerId);
-        const sales = salesMap.get(product.offerId) || { qty: 0, revenue: 0 };
         const catalogPriceUzs = toDisplayUzs(product.price || 0, marketplace);
-        const totalRevenue = sales.revenue || sales.qty * catalogPriceUzs;
-        // Use ACTUAL average sold price for tariff calculation, not catalog price
-        // This handles promotions, discounts, and price changes over time
-        const avgSoldPrice = sales.qty > 0 && sales.revenue > 0
-          ? sales.revenue / sales.qty
-          : catalogPriceUzs;
-        
-        const rawCostPrice = getCostPrice(marketplace, product.offerId);
-        const costPriceUzs = rawCostPrice !== null ? toDisplayUzs(rawCostPrice, marketplace) : null;
-        const productCost = costPriceUzs !== null ? costPriceUzs * sales.qty : 0;
-        
-        const tariff = getTariffForProduct(tariffMap, product.offerId, avgSoldPrice, marketplace);
-        const marketplaceFees = tariff.totalFee * sales.qty;
-        
-        const taxAmount = totalRevenue * taxRate;
-        const totalCosts = productCost + marketplaceFees + taxAmount;
-        const netProfit = totalRevenue - totalCosts;
-        const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
-
-        allProducts.push({
-          id: product.offerId, name: product.name || 'Nomsiz',
-          sku: product.shopSku || product.offerId, marketplace, price: avgSoldPrice,
-          totalSold: sales.qty, totalRevenue, estimatedCost: totalCosts,
-          commissionAmount: tariff.commission * sales.qty, 
-          logisticsCost: tariff.logistics * sales.qty,
-          taxAmount, costPriceTotal: productCost,
-          netProfit, profitMargin,
-          abcGroup: 'C', revenueShare: 0,
-          isRealTariff: tariff.isReal,
-          imageUrl: product.pictures?.[0],
-        });
+        const existing = salesMap.get(product.offerId);
+        if (existing) {
+          existing.name = existing.name || product.name || 'Nomsiz';
+          existing.sku = product.shopSku || existing.sku;
+          existing.imageUrl = existing.imageUrl || product.pictures?.[0];
+          existing.price = existing.totalSold > 0 ? existing.totalRevenue / existing.totalSold : catalogPriceUzs;
+          existing.netProfit = existing.totalRevenue - existing.estimatedCost;
+          existing.profitMargin = existing.totalRevenue > 0 ? (existing.netProfit / existing.totalRevenue) * 100 : 0;
+          allProducts.push(existing);
+        } else {
+          allProducts.push({
+            id: product.offerId, name: product.name || 'Nomsiz',
+            sku: product.shopSku || product.offerId, marketplace, price: catalogPriceUzs,
+            totalSold: 0, totalRevenue: 0, estimatedCost: 0,
+            commissionAmount: 0,
+            logisticsCost: 0,
+            withdrawalAmount: 0,
+            taxAmount: 0, costPriceTotal: 0,
+            netProfit: 0, profitMargin: 0,
+            abcGroup: 'C', revenueShare: 0,
+            isRealTariff: false,
+            imageUrl: product.pictures?.[0],
+          });
+        }
       });
 
-      // Add orphan order items (items not in product list but present in orders)
-      salesMap.forEach((sales, offerId) => {
-        if (processedOfferIds.has(offerId)) return;
-        if (sales.qty === 0) return;
-        
-        const avgPrice = sales.revenue / sales.qty;
-        const rawCostPrice = getCostPrice(marketplace, offerId);
-        const costPriceUzs = rawCostPrice !== null ? toDisplayUzs(rawCostPrice, marketplace) : null;
-        const productCost = costPriceUzs !== null ? costPriceUzs * sales.qty : 0;
-        
-        const tariff = getTariffForProduct(tariffMap, offerId, avgPrice, marketplace);
-        const marketplaceFees = tariff.totalFee * sales.qty;
-        const taxAmount = sales.revenue * taxRate;
-        const totalCosts = productCost + marketplaceFees + taxAmount;
-        const netProfit = sales.revenue - totalCosts;
-        const profitMargin = sales.revenue > 0 ? (netProfit / sales.revenue) * 100 : 0;
-
-        allProducts.push({
-          id: offerId, name: sales.name || offerId,
-          sku: offerId, marketplace, price: avgPrice,
-          totalSold: sales.qty, totalRevenue: sales.revenue, estimatedCost: totalCosts,
-          commissionAmount: tariff.commission * sales.qty,
-          logisticsCost: tariff.logistics * sales.qty,
-          taxAmount, costPriceTotal: productCost,
-          netProfit, profitMargin,
-          abcGroup: 'C', revenueShare: 0,
-          isRealTariff: tariff.isReal,
-          imageUrl: sales.photo,
-        });
+      salesMap.forEach((product, offerId) => {
+        if (productMap.has(offerId)) return;
+        product.price = product.totalSold > 0 ? product.totalRevenue / product.totalSold : 0;
+        product.netProfit = product.totalRevenue - product.estimatedCost;
+        product.profitMargin = product.totalRevenue > 0 ? (product.netProfit / product.totalRevenue) * 100 : 0;
+        allProducts.push(product);
       });
     }
 
@@ -191,7 +182,7 @@ export function ABCAnalysis({ connectedMarketplaces, store }: ABCAnalysisProps) 
     });
 
     return allProducts;
-  }, [activeMarketplaces, store.dataVersion, isLoading, tariffUpdatedAt, dateFrom, dateTo, selectedMp]);
+  }, [activeMarketplaces, store.dataVersion, isLoading, getCostPrice, tariffMap, tariffUpdatedAt, dateFrom, dateTo]);
 
   const formatPrice = (price: number) => {
     if (Math.abs(price) >= 1000000) return (price / 1000000).toFixed(1) + ' mln';
