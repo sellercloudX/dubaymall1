@@ -22,6 +22,7 @@ import type { MarketplaceDataStore, MarketplaceOrder } from '@/hooks/useMarketpl
 import { MARKETPLACE_CONFIG, MarketplaceLogo } from '@/lib/marketplaceConfig';
 import { toDisplayUzs, formatUzs } from '@/lib/currency';
 import { useOrderManagement } from '@/hooks/useOrderManagement';
+import { getMarketplaceOrderStatusCategory } from '@/lib/marketplaceOrderStatus';
 
 interface FBSOrderManagerProps {
   connectedMarketplaces: string[];
