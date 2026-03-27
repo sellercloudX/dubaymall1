@@ -41,8 +41,8 @@ const MARKETPLACE_FEE_DETAILS: Record<string, string> = {
 };
 
 const MARKETPLACE_TAX: Record<string, number> = {
-  yandex: 0.04, // 4%
-  uzum: 0.04, // 4%
+  yandex: 0.04,
+  uzum: 0.04,
 };
 
 export function FinancialDashboard({ 
@@ -152,7 +152,7 @@ export function FinancialDashboard({
     
     let totalTax = 0;
     activeMarketplaces.forEach(mp => {
-      const taxRate = MARKETPLACE_TAX[mp] ?? 0.04;
+      const taxRate = MARKETPLACE_TAX[mp] ?? 0;
       totalTax += (feesByMarketplace[mp]?.revenue || 0) * taxRate;
     });
 
