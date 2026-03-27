@@ -207,6 +207,12 @@ export function TutorialVideos() {
           <div className="aspect-video w-full bg-black">
             {renderPlayer(selectedVideo)}
           </div>
+          {playerError && (
+            <div className="px-4 py-2 bg-destructive/10 border-b border-destructive/20 text-destructive text-xs flex items-center gap-2">
+              <Lock className="h-3.5 w-3.5 shrink-0" />
+              {playerError}
+            </div>
+          )}
           <CardContent className="pt-4 pb-4">
             <div className="flex items-center gap-2 mb-1">
               {(() => {
