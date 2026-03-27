@@ -535,32 +535,57 @@ export default function Index() {
       {/* ━━━ HERO ━━━ */}
       <section className="relative min-h-[100vh] flex items-center pt-14 sm:pt-32 md:pt-36 pb-8 sm:pb-16 overflow-hidden">
         <div className="absolute inset-0 bg-mesh" />
-        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-primary/8 rounded-full blur-[120px]" />
-        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-accent/6 rounded-full blur-[100px]" />
+        <GlowOrbs />
         <FloatingParticles />
 
         <div className="container mx-auto px-3 sm:px-4 relative z-10">
           <div className="grid lg:grid-cols-2 gap-6 md:gap-12 lg:gap-16 items-center">
             <div className="max-w-2xl w-full mx-auto lg:mx-0 text-center lg:text-left">
-              <div className="animate-fade-up">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, ease: [0.25, 0.4, 0, 1] }}
+              >
                 <Badge className="mb-2 sm:mb-8 px-2.5 sm:px-4 py-1 sm:py-2 text-[11px] sm:text-sm font-medium bg-primary/10 text-primary border-primary/20">
                   {txt.badge}
                 </Badge>
-              </div>
+              </motion.div>
 
-              <h1 className="text-[22px] sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-3 sm:mb-8 font-display leading-[1.2] animate-fade-up" style={{ animationDelay: '0.1s' }}>
+              <motion.h1 
+                className="text-[22px] sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-3 sm:mb-8 font-display leading-[1.2]"
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.7, delay: 0.15, ease: [0.25, 0.4, 0, 1] }}
+              >
                 <span className="text-foreground">{txt.heroTitle1}</span>
                 <br />
-                <span className="text-gradient">{txt.heroTitle2}</span>
+                <motion.span 
+                  className="text-gradient inline-block"
+                  animate={{ backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'] }}
+                  transition={{ duration: 5, repeat: Infinity, ease: 'linear' }}
+                  style={{ backgroundSize: '200% auto' }}
+                >
+                  {txt.heroTitle2}
+                </motion.span>
                 <br />
                 <span className="text-foreground">{txt.heroTitle3}</span>
-              </h1>
+              </motion.h1>
               
-              <p className="text-[13px] sm:text-lg text-muted-foreground mb-4 sm:mb-10 leading-relaxed animate-fade-up max-w-xl mx-auto lg:mx-0" style={{ animationDelay: '0.2s' }}>
+              <motion.p 
+                className="text-[13px] sm:text-lg text-muted-foreground mb-4 sm:mb-10 leading-relaxed max-w-xl mx-auto lg:mx-0"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.3 }}
+              >
                 {txt.heroDesc}
-              </p>
+              </motion.p>
 
-              <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-4 animate-fade-up justify-center lg:justify-start" style={{ animationDelay: '0.3s' }}>
+              <motion.div 
+                className="flex flex-col sm:flex-row gap-2.5 sm:gap-4 justify-center lg:justify-start"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.4 }}
+              >
                 <Button size="lg" className="text-sm sm:text-base px-5 sm:px-8 py-5 sm:py-6 shadow-xl shadow-primary/25 hover:shadow-2xl hover:shadow-primary/30 transition-all group" asChild>
                   <Link to="/auth?mode=register">
                     <Rocket className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
@@ -574,10 +599,15 @@ export default function Index() {
                     {txt.ctaSecondary}
                   </a>
                 </Button>
-              </div>
+              </motion.div>
 
               {/* Trust badges */}
-              <div className="mt-6 sm:mt-10 flex flex-wrap items-center gap-3 sm:gap-4 animate-fade-up justify-center lg:justify-start" style={{ animationDelay: '0.45s' }}>
+              <motion.div 
+                className="mt-6 sm:mt-10 flex flex-wrap items-center gap-3 sm:gap-4 justify-center lg:justify-start"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.6, delay: 0.55 }}
+              >
                 <div className="flex items-center gap-1.5 text-[11px] sm:text-sm text-muted-foreground">
                   <Shield className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary shrink-0" />
                   <span>{txt.guarantee}</span>
@@ -590,33 +620,58 @@ export default function Index() {
                   <FileCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary shrink-0" />
                   <span>GDPR</span>
                 </div>
-              </div>
+              </motion.div>
 
               {/* Marketplace logos */}
-              <div className="mt-6 sm:mt-8 animate-fade-up text-center lg:text-left" style={{ animationDelay: '0.5s' }}>
+              <motion.div 
+                className="mt-6 sm:mt-8 text-center lg:text-left"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.6 }}
+              >
                 <p className="text-[10px] sm:text-xs text-muted-foreground mb-2 sm:mb-3 uppercase tracking-widest font-medium">{txt.trusted}</p>
                 <div className="flex items-center gap-3 sm:gap-6 md:gap-8 justify-center lg:justify-start flex-wrap">
-                  {Object.entries(MARKETPLACE_CONFIG).map(([key, mp]) => (
-                    <div key={key} className="flex items-center gap-1 sm:gap-1.5 opacity-70 hover:opacity-100 transition-opacity">
+                  {Object.entries(MARKETPLACE_CONFIG).map(([key, mp], i) => (
+                    <motion.div 
+                      key={key} 
+                      className="flex items-center gap-1 sm:gap-1.5 opacity-70 hover:opacity-100 transition-opacity"
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 0.7, x: 0 }}
+                      transition={{ delay: 0.7 + i * 0.1 }}
+                      whileHover={{ scale: 1.1, opacity: 1 }}
+                    >
                       <img src={mp.logo} alt={mp.name} className="w-4 h-4 sm:w-5 sm:h-5 rounded object-cover" />
                       <span className="text-[11px] sm:text-sm font-medium text-muted-foreground">{mp.name}</span>
-                    </div>
+                    </motion.div>
                   ))}
                 </div>
-              </div>
+              </motion.div>
             </div>
 
             {/* Right - Dashboard Image */}
-            <div className="relative animate-fade-up hidden lg:block" style={{ animationDelay: '0.4s' }}>
-              <div className="relative">
+            <motion.div 
+              className="relative hidden lg:block"
+              initial={{ opacity: 0, x: 60, rotateY: 5 }}
+              animate={{ opacity: 1, x: 0, rotateY: 0 }}
+              transition={{ duration: 0.9, delay: 0.3, ease: [0.25, 0.4, 0, 1] }}
+            >
+              <div className="relative" style={{ perspective: '1000px' }}>
                 <div className="absolute -inset-4 bg-gradient-to-br from-primary/20 to-accent/20 rounded-3xl blur-2xl" />
-                <img 
+                <motion.img 
                   src={heroDashboard} 
                   alt="SellerCloudX Dashboard" 
                   className="relative rounded-2xl shadow-2xl border border-border/30 w-full"
                   loading="eager"
+                  whileHover={{ scale: 1.02, rotateY: -2 }}
+                  transition={{ type: "spring", stiffness: 200, damping: 20 }}
                 />
-                <div className="absolute -bottom-4 -left-4 bg-card border shadow-xl rounded-xl px-4 py-3 flex items-center gap-3 animate-bounce-subtle">
+                <motion.div 
+                  className="absolute -bottom-4 -left-4 bg-card border shadow-xl rounded-xl px-4 py-3 flex items-center gap-3"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.8 }}
+                  whileHover={{ scale: 1.05 }}
+                >
                   <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
                     <Users className="h-5 w-5 text-emerald-500" />
                   </div>
@@ -624,8 +679,14 @@ export default function Index() {
                     <div className="text-sm font-bold">4-5 → 1</div>
                     <div className="text-xs text-muted-foreground">{txt.statsReplace}</div>
                   </div>
-                </div>
-                <div className="absolute -top-3 -right-3 bg-card border shadow-xl rounded-xl px-4 py-3 flex items-center gap-3">
+                </motion.div>
+                <motion.div 
+                  className="absolute -top-3 -right-3 bg-card border shadow-xl rounded-xl px-4 py-3 flex items-center gap-3"
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 1.0 }}
+                  whileHover={{ scale: 1.05 }}
+                >
                   <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
                     <Sparkles className="h-5 w-5 text-primary" />
                   </div>
@@ -633,12 +694,17 @@ export default function Index() {
                     <div className="text-sm font-bold">AI</div>
                     <div className="text-xs text-muted-foreground">Powered</div>
                   </div>
-                </div>
+                </motion.div>
               </div>
-            </div>
+            </motion.div>
 
             {/* Mobile hero image */}
-            <div className="relative lg:hidden animate-fade-up" style={{ animationDelay: '0.4s' }}>
+            <motion.div 
+              className="relative lg:hidden"
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.4 }}
+            >
               <div className="relative">
                 <div className="absolute -inset-2 bg-gradient-to-br from-primary/15 to-accent/15 rounded-2xl blur-xl" />
                 <img 
@@ -648,15 +714,23 @@ export default function Index() {
                   loading="eager"
                 />
               </div>
-            </div>
+            </motion.div>
           </div>
         </div>
 
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce-subtle hidden md:block">
+        <motion.div 
+          className="absolute bottom-8 left-1/2 -translate-x-1/2 hidden md:block"
+          animate={{ y: [0, 8, 0] }}
+          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+        >
           <div className="w-6 h-10 rounded-full border-2 border-muted-foreground/20 flex items-start justify-center p-1.5">
-            <div className="w-1.5 h-2.5 rounded-full bg-primary/50 animate-pulse" />
+            <motion.div 
+              className="w-1.5 h-2.5 rounded-full bg-primary/50"
+              animate={{ y: [0, 12, 0], opacity: [1, 0.3, 1] }}
+              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+            />
           </div>
-        </div>
+        </motion.div>
       </section>
 
       {/* ━━━ Stats Bar ━━━ */}
