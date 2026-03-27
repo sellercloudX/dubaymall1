@@ -3002,39 +3002,48 @@ export type Database = {
       tutorial_videos: {
         Row: {
           category: string | null
+          content_url: string
           created_at: string
           created_by: string | null
           description: string | null
+          embed_url: string | null
           id: string
+          is_free: boolean
           is_published: boolean | null
           sort_order: number | null
           title: string
           updated_at: string
-          youtube_url: string
+          video_type: string
         }
         Insert: {
           category?: string | null
+          content_url: string
           created_at?: string
           created_by?: string | null
           description?: string | null
+          embed_url?: string | null
           id?: string
+          is_free?: boolean
           is_published?: boolean | null
           sort_order?: number | null
           title: string
           updated_at?: string
-          youtube_url: string
+          video_type?: string
         }
         Update: {
           category?: string | null
+          content_url?: string
           created_at?: string
           created_by?: string | null
           description?: string | null
+          embed_url?: string | null
           id?: string
+          is_free?: boolean
           is_published?: boolean | null
           sort_order?: number | null
           title?: string
           updated_at?: string
-          youtube_url?: string
+          video_type?: string
         }
         Relationships: []
       }
