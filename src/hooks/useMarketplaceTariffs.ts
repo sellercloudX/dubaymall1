@@ -50,7 +50,7 @@ export function useMarketplaceTariffs(
   const stableKey = productIds.length > 0 ? productIds.substring(0, 200) : 'empty';
 
   return useQuery({
-    queryKey: ['marketplace-tariffs', 'v14-finance-status-fix', connectedMarketplaces.join(','), stableKey],
+    queryKey: ['marketplace-tariffs', 'v15-real-api-only', connectedMarketplaces.join(','), stableKey],
     queryFn: async () => {
       const tariffMap = new Map<string, TariffInfo>();
 
@@ -199,9 +199,9 @@ export function useMarketplaceTariffs(
             if (priceRub <= 0) continue;
             
             // Find real commission for this product
-            // Priority: 1) per-product commissionPercent from API, 2) category match from tariffs, 3) fallback 15%
-            const productCategory = (p.category || '').toLowerCase();
-            let commissionPercent = 0.15; // fallback 15%
+            // Priority: 1) per-product commissionPercent from API, 2) category match from tariffs, 3) zero
+            const productCategory = (p.subjectName || p.category || p.parentName || '').toLowerCase();
+            let commissionPercent = 0;
             
             // Use real commission from product if available (enriched server-side)
             if (p.commissionPercent && p.commissionPercent > 0) {
@@ -218,18 +218,18 @@ export function useMarketplaceTariffs(
               }
             }
 
-            // Use real dimensions if available, else estimate by price
+            // Use only real logistics coefficients from API
             const volumeLiters = (p.lengthCm && p.widthCm && p.heightCm)
               ? (p.lengthCm * p.widthCm * p.heightCm) / 1000
-              : (priceRub > 7000 ? 8 : priceRub > 3000 ? 3 : 1.2);
+              : 0;
             const logisticsFromApiRub = wbLogisticsBaseRub > 0
               ? wbLogisticsBaseRub + (wbLogisticsLiterRub * volumeLiters)
               : 0;
-            const logisticsRub = logisticsFromApiRub > 0
-              ? logisticsFromApiRub
-              : (priceRub > 5000 ? 100 : priceRub > 1000 ? 50 : 30);
+            const logisticsRub = logisticsFromApiRub > 0 ? logisticsFromApiRub : 0;
             const commissionRub = priceRub * commissionPercent;
             const totalTariffRub = commissionRub + logisticsRub;
+
+            if (totalTariffRub <= 0) continue;
             
             // Store in UZS for uniform downstream consumers
             tariffMap.set(p.offerId, {
@@ -309,6 +309,8 @@ export function useMarketplaceTariffs(
 
             tariffResults.forEach((t: any, idx: number) => {
               if (idx >= sendBatch.length) return;
+              if (t?.restricted || t?.fallbackCategory) return;
+
               const offerId = sendBatch[idx].offerId;
               const commission = t.agencyCommission || 0;
               const offerPrice = sendBatch[idx]?.price || 0;
