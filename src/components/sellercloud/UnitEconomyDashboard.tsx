@@ -35,6 +35,7 @@ interface SkuMetrics {
   commission: number;
   logistics: number;
   withdrawal: number;
+  tax: number;
   totalFees: number;
   grossProfit: number;
   netProfit: number;
