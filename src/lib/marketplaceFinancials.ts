@@ -40,8 +40,8 @@ export interface OrderFinancialBreakdown {
   lines: OrderItemFinancialLine[];
 }
 
-export function getMarketplaceTaxRate(marketplace: string): number {
-  return MARKETPLACE_TAX_RATES[marketplace] ?? 0;
+export function getMarketplaceTaxRate(_marketplace: string): number {
+  return UZB_TAX_RATE;
 }
 
 export function calculateOrderFinancialBreakdown(
