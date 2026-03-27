@@ -26,7 +26,8 @@ interface TutorialVideo {
   created_at: string;
 }
 
-function extractYouTubeId(url: string): string | null {
+function extractYouTubeId(url: string | null | undefined): string | null {
+  if (!url) return null;
   const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([^&?\s]+)/);
   return match?.[1] || null;
 }

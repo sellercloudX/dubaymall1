@@ -15,7 +15,8 @@ function extractYouTubeId(url: string | null | undefined): string | null {
   return match?.[1] || null;
 }
 
-function extractInstagramId(url: string): string | null {
+function extractInstagramId(url: string | null | undefined): string | null {
+  if (!url) return null;
   const match = url.match(/instagram\.com\/(?:p|reel|tv)\/([^/?]+)/);
   return match?.[1] || null;
 }
