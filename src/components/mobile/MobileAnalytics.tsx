@@ -33,10 +33,23 @@ export function MobileAnalytics({ connections, connectedMarketplaces, store }: M
       return sum + getOrderRevenueUzs(o, orderMpMap.get(o.id) || '');
     }, 0);
     const avgCheck = validOrders.length > 0 ? Math.round(totalRevenue / validOrders.length) : 0;
-    const pendingOrders = allOrders.filter(o => o.status === 'PENDING').length;
-    const processingOrders = allOrders.filter(o => ['PROCESSING', 'DELIVERY', 'PICKUP'].includes(o.status)).length;
-    const deliveredOrders = allOrders.filter(o => o.status === 'DELIVERED').length;
-    const cancelledOrders = allOrders.filter(o => ['CANCELLED', 'RETURNED'].includes(o.status)).length;
+    const pendingOrders = allOrders.filter(o => {
+      const mp = orderMpMap.get(o.id) || '';
+      return getMarketplaceOrderStatusCategory(o, mp) === 'new';
+    }).length;
+    const processingOrders = allOrders.filter(o => {
+      const mp = orderMpMap.get(o.id) || '';
+      const cat = getMarketplaceOrderStatusCategory(o, mp);
+      return cat === 'assembly' || cat === 'active';
+    }).length;
+    const deliveredOrders = allOrders.filter(o => {
+      const mp = orderMpMap.get(o.id) || '';
+      return getMarketplaceOrderStatusCategory(o, mp) === 'delivered';
+    }).length;
+    const cancelledOrders = allOrders.filter(o => {
+      const mp = orderMpMap.get(o.id) || '';
+      return getMarketplaceOrderStatusCategory(o, mp) === 'cancelled';
+    }).length;
     const lowStockProducts = allProducts.filter(p => (p.stockCount || 0) > 0 && (p.stockCount || 0) < 5).length;
     const outOfStockProducts = allProducts.filter(p => (p.stockCount || 0) === 0).length;
 
