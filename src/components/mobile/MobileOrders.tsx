@@ -125,10 +125,9 @@ const getFirstProductName = (order: MarketplaceOrder, store: MarketplaceDataStor
 const OrderRow = memo(({ order, onClick, store, marketplace }: { order: MarketplaceOrder; onClick: (o: MarketplaceOrder) => void; store: MarketplaceDataStore; marketplace: string }) => {
   const productName = getFirstProductName(order, store, marketplace);
   const itemCount = order.items?.length || 0;
-  // Always convert from native currency — never trust *UZS fields (they may be RUB for WB)
   const totalPrice = toDisplayUzs(order.total || order.itemsTotal || 0, marketplace);
+  const statusCategory = getMarketplaceOrderStatusCategory(order, marketplace);
   
-  // Get product image: first from order item photo, then from store products
   const firstItem = order.items?.[0];
   const itemPhoto = firstItem?.photo;
   const matchedProduct = firstItem ? findProductByOffer(store, marketplace, firstItem.offerId, firstItem.nmID) : null;
@@ -145,7 +144,7 @@ const OrderRow = memo(({ order, onClick, store, marketplace }: { order: Marketpl
               {formatDate(order.createdAt)} {formatTime(order.createdAt)}
             </div>
           </div>
-          <div className="shrink-0">{getStatusBadge(order.status)}</div>
+          <div className="shrink-0">{getStatusBadge(statusCategory)}</div>
         </div>
         <div className="flex items-start gap-2">
           <div className="w-10 h-10 rounded bg-muted flex items-center justify-center overflow-hidden shrink-0">
