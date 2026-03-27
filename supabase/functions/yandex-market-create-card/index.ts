@@ -656,6 +656,150 @@ async function fetchCategoryParameters(apiKey: string, categoryId: number): Prom
 
 // ============ STEP 3: AI FILLS ALL CONTENT + PARAMETERS (2-PASS) ============
 
+// ═══ CATEGORY-SPECIFIC AI MANAGER ═══
+// Each product category gets specialized parameter filling rules
+function getCategorySpecificInstructions(categoryName: string, productName: string): string {
+  const catLower = (categoryName || '').toLowerCase();
+  const nameLower = (productName || '').toLowerCase();
+  
+  // ═══ PHONE CASES / ЧЕХЛЫ ═══
+  if (catLower.includes('чехол') || catLower.includes('чехл') || nameLower.includes('чехол') || nameLower.includes('chexol') || nameLower.includes('case') || nameLower.includes('cover') || nameLower.includes('qoplama')) {
+    // Extract phone model from product name
+    const phoneModels: { pattern: RegExp; model: string; brand: string }[] = [
+      // iPhone models
+      { pattern: /iphone\s*16\s*pro\s*max/i, model: 'iPhone 16 Pro Max', brand: 'Apple' },
+      { pattern: /iphone\s*16\s*pro/i, model: 'iPhone 16 Pro', brand: 'Apple' },
+      { pattern: /iphone\s*16\s*plus/i, model: 'iPhone 16 Plus', brand: 'Apple' },
+      { pattern: /iphone\s*16/i, model: 'iPhone 16', brand: 'Apple' },
+      { pattern: /iphone\s*15\s*pro\s*max/i, model: 'iPhone 15 Pro Max', brand: 'Apple' },
+      { pattern: /iphone\s*15\s*pro/i, model: 'iPhone 15 Pro', brand: 'Apple' },
+      { pattern: /iphone\s*15\s*plus/i, model: 'iPhone 15 Plus', brand: 'Apple' },
+      { pattern: /iphone\s*15/i, model: 'iPhone 15', brand: 'Apple' },
+      { pattern: /iphone\s*14\s*pro\s*max/i, model: 'iPhone 14 Pro Max', brand: 'Apple' },
+      { pattern: /iphone\s*14\s*pro/i, model: 'iPhone 14 Pro', brand: 'Apple' },
+      { pattern: /iphone\s*14/i, model: 'iPhone 14', brand: 'Apple' },
+      { pattern: /iphone\s*13\s*pro\s*max/i, model: 'iPhone 13 Pro Max', brand: 'Apple' },
+      { pattern: /iphone\s*13\s*pro/i, model: 'iPhone 13 Pro', brand: 'Apple' },
+      { pattern: /iphone\s*13/i, model: 'iPhone 13', brand: 'Apple' },
+      // Samsung models
+      { pattern: /galaxy\s*s2[45]\s*ultra/i, model: 'Galaxy S24 Ultra', brand: 'Samsung' },
+      { pattern: /galaxy\s*s2[45]\s*plus/i, model: 'Galaxy S24+', brand: 'Samsung' },
+      { pattern: /galaxy\s*s2[45]\b/i, model: 'Galaxy S24', brand: 'Samsung' },
+      { pattern: /galaxy\s*a5[45]/i, model: 'Galaxy A54', brand: 'Samsung' },
+      { pattern: /galaxy\s*a3[45]/i, model: 'Galaxy A34', brand: 'Samsung' },
+      { pattern: /galaxy\s*a2[45]/i, model: 'Galaxy A24', brand: 'Samsung' },
+      { pattern: /galaxy\s*a1[45]/i, model: 'Galaxy A14', brand: 'Samsung' },
+      // Xiaomi / Redmi / POCO
+      { pattern: /redmi\s*note\s*1[34]\s*pro\+?/i, model: 'Redmi Note 13 Pro', brand: 'Xiaomi' },
+      { pattern: /redmi\s*note\s*1[34]/i, model: 'Redmi Note 13', brand: 'Xiaomi' },
+      { pattern: /redmi\s*1[34]/i, model: 'Redmi 13', brand: 'Xiaomi' },
+      { pattern: /poco\s*x[67]/i, model: 'POCO X6', brand: 'Xiaomi' },
+      // Honor
+      { pattern: /honor\s*x9[a-z]?\b/i, model: 'Honor X9', brand: 'Honor' },
+      { pattern: /honor\s*x8[a-z]?\b/i, model: 'Honor X8', brand: 'Honor' },
+      { pattern: /honor\s*x7[a-z]?\b/i, model: 'Honor X7', brand: 'Honor' },
+      { pattern: /honor\s*90/i, model: 'Honor 90', brand: 'Honor' },
+      // Tecno
+      { pattern: /tecno\s*(spark|camon|pova|phantom)\s*\d+/i, model: '', brand: 'Tecno' },
+    ];
+
+    let detectedModel = '';
+    let detectedBrand = '';
+    for (const pm of phoneModels) {
+      if (pm.pattern.test(productName)) {
+        detectedModel = pm.model;
+        detectedBrand = pm.brand;
+        break;
+      }
+    }
+
+    return `
+═══ TELEFON CHEXOLI UCHUN MAXSUS QOIDALAR ═══
+Bu mahsulot TELEFON CHEXOLI (чехол). Sifat ballini MAKSIMAL qilish uchun quyidagilarni ALBATTA to'ldir:
+
+${detectedModel ? `🔍 ANIQLANGAN TELEFON MODELI: ${detectedModel} (${detectedBrand})
+- "Совместимая модель" (Compatible model) → "${detectedModel}"
+- "Совместимый бренд" → "${detectedBrand}"
+- Nomda ALBATTA model ko'rsatilsin: "Чехол для ${detectedModel}"` : `
+🔍 TELEFON MODELINI NOMDAN ANIQLA! Masalan:
+- "...Honor X9C..." → model: "Honor X9C", brand: "Honor"
+- "...iPhone 15 Pro Max..." → model: "iPhone 15 Pro Max", brand: "Apple"
+- "...Galaxy S24 Ultra..." → model: "Galaxy S24 Ultra", brand: "Samsung"
+`}
+
+MAJBURIY TO'LDIRISH KERAK:
+1. "Совместимая модель телефона" / "Совместимая модель" → ANIQ telefon modeli
+2. "Совместимый бренд" → Telefon brendi (Apple, Samsung, Xiaomi, Honor...)
+3. "Тип чехла" → Chexol turi (накладка, книжка, бампер, силиконовый...)
+4. "Материал" → Chexol materiali (силикон, пластик, кожа, TPU...)
+5. "Цвет товара" → Chexol rangi
+6. "Особенности" → Maxsus xususiyatlar (противоударный, прозрачный, с MagSafe...)
+7. "Дизайн" → Dizayn xususiyati (матовый, глянцевый, с рисунком...)
+
+MUHIM:
+- Agar nomda telefon modeli bo'lsa, UNI ALBATTA "Совместимая модель" ga yoz!
+- name_ru formatida model ANIQ ko'rinsin: "Чехол силиконовый для Samsung Galaxy S24 Ultra, прозрачный"
+- description_ru da chexolning barcha afzalliklari va telefon modeli bilan mosligi haqida yoz
+`;
+  }
+
+  // ═══ SCREEN PROTECTORS / ЗАЩИТНЫЕ СТЕКЛА ═══
+  if (catLower.includes('защитн') || catLower.includes('стекл') || catLower.includes('пленк') || nameLower.includes('himoya') || nameLower.includes('glass')) {
+    return `
+═══ HIMOYA SHISHA/PLYONKA UCHUN MAXSUS QOIDALAR ═══
+MAJBURIY:
+1. "Совместимая модель" → Telefon modeli ANIQ ko'rsat
+2. "Совместимый бренд" → Telefon brendi
+3. "Тип" → "защитное стекло" yoki "защитная пленка"
+4. "Покрытие" → "глянцевое" yoki "матовое"
+5. "Степень твёрдости" → "9H" (standart)
+6. Nomda telefon modeli va turi ANIQ ko'rsat
+`;
+  }
+
+  // ═══ EARPHONES / НАУШНИКИ ═══
+  if (catLower.includes('наушник') || catLower.includes('гарнитур') || nameLower.includes('naushnik') || nameLower.includes('quloqchin') || nameLower.includes('earbuds')) {
+    return `
+═══ QULOQCHIN UCHUN MAXSUS QOIDALAR ═══
+MAJBURIY:
+1. "Тип подключения" → "беспроводные" yoki "проводные"
+2. "Тип конструкции" → "вкладыши", "внутриканальные", "накладные"...
+3. "Интерфейс подключения" → "Bluetooth", "3.5mm", "Type-C"...
+4. "Микрофон" → "есть" yoki "нет"
+5. "Время работы от аккумулятора" → soat
+`;
+  }
+
+  // ═══ COSMETICS / КОСМЕТИКА ═══
+  if (catLower.includes('космет') || catLower.includes('крем') || catLower.includes('парфюм') || catLower.includes('помад') || catLower.includes('тушь') || nameLower.includes('krem') || nameLower.includes('parfum')) {
+    return `
+═══ KOSMETIKA UCHUN MAXSUS QOIDALAR ═══
+MAJBURIY:
+1. "Объём" → ml yoki ml
+2. "Тип кожи" → mos teri turi
+3. "Эффект" → asosiy effekt
+4. "Состав" → asosiy ingredientlar
+5. "Страна производства" → ishlab chiqaruvchi mamlakat
+6. shelfLife: ALBATTA 36 oy
+`;
+  }
+
+  // ═══ CLOTHING / ОДЕЖДА ═══
+  if (catLower.includes('одежд') || catLower.includes('платье') || catLower.includes('футболк') || catLower.includes('рубаш') || catLower.includes('куртк') || nameLower.includes('kiyim') || nameLower.includes('ko\'ylak')) {
+    return `
+═══ KIYIM UCHUN MAXSUS QOIDALAR ═══
+MAJBURIY:
+1. "Размер" → FAQAT BITTA o'lcham
+2. "Материал" → mato turi
+3. "Сезон" → fasl
+4. "Пол" → jins (мужской/женский/унисекс)
+5. "Страна производства" → ishlab chiqaruvchi mamlakat
+`;
+  }
+
+  return ''; // No special instructions for other categories
+}
+
 async function aiOptimize(
   product: ProductInput,
   categoryName: string,
@@ -671,7 +815,15 @@ async function aiOptimize(
     return true;
   });
   
-  const allParams = safeParams;
+  // ═══ CRITICAL: Filter out "Прочие характеристики" — ALWAYS leave empty ═══
+  const allParams = safeParams.filter((p: any) => {
+    const name = (p.name || '').toLowerCase();
+    if (name.includes('прочие') || name.includes('прочее') || name.includes('другие характеристик') || name.includes('другое')) {
+      console.log(`🚫 Skipping "Прочие характеристики" param: id=${p.id}, name="${p.name}"`);
+      return false;
+    }
+    return true;
+  });
 
   const formatParam = (p: any) => {
     let s = `  - id:${p.id}, "${p.name}", type:${p.type || "TEXT"}, required:${p.required || p.constraintType === "REQUIRED" ? "YES" : "no"}`;
@@ -684,7 +836,7 @@ async function aiOptimize(
     return s;
   };
 
-  console.log(`🤖 AI optimizing (2-pass): ${allParams.length} TOTAL params`);
+  console.log(`🤖 AI optimizing (2-pass): ${allParams.length} TOTAL params (after filtering "Прочие")`);
 
   const sourceCharacteristicsText = Array.isArray(product.sourceCharacteristics) && product.sourceCharacteristics.length > 0
     ? product.sourceCharacteristics
@@ -693,6 +845,9 @@ async function aiOptimize(
         .filter((s: string) => s && !s.endsWith(': '))
         .join('; ')
     : '';
+
+  // Get category-specific AI instructions
+  const categoryInstructions = getCategorySpecificInstructions(categoryName, product.name);
 
   const prompt = `VAZIFA: Yandex Market kartochkasi uchun BARCHA ${allParams.length} ta parametrni to'ldir!
 MAQSAD: MAKSIMAL ball olish. "Maydonlarni ko'rsatish" (Показать поля) ortidagi YASHIRIN parametrlar ham ALBATTA to'ldirilishi SHART!
@@ -707,6 +862,10 @@ ${sourceCharacteristicsText ? `- Manba xususiyatlari (Uzum/WB): ${sourceCharacte
 - Rang: ${product.color || "Nomdan aniqla"}
 - Model: ${product.model || "Nomdan aniqla"}
 - Narx: ${product.price} UZS
+${categoryInstructions}
+═══ UMUMIY QOIDALAR (BARCHA KATEGORIYALAR UCHUN) ═══
+⛔ "ПРОЧИЕ ХАРАКТЕРИСТИКИ" / "ПРОЧЕЕ" degan parametrni HECH QACHON TO'LDIRMA! BO'SH QOLDIR!
+⛔ Agar parametr nomi "прочие", "прочее", "другие" so'zlarini o'z ichiga olsa — UNI O'TKAZIB YUBOR!
 
 ═══ BARCHA PARAMETRLAR — HAR BIRINI TO'LDIR! ═══
 ${allParams.map(formatParam).join("\n")}
@@ -740,6 +899,7 @@ QOIDALAR:
 12. weightDimensions — REAL o'lchamlar:
    - Kosmetika/parfyum: weight=0.05-0.3kg, 5x5x10 ~ 10x10x15 sm
    - Telefon: weight=0.15-0.25kg, 8x1x16 sm
+   - Chexol: weight=0.03-0.08kg, 16x8x1 sm
    - Krossovka: weight=0.4-0.8kg, 35x25x12 sm  
    - Maishiy texnika (kichik): weight=0.5-3kg, 20x15x15 ~ 40x30x30 sm
    - KATTA qo'yma! Logistika narxi oshadi!
