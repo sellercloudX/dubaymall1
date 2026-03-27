@@ -1,14 +1,12 @@
 import { useSubscriptionPlans, type SubscriptionPlan } from '@/hooks/useSubscriptionPlans';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { Link } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CheckCircle, X, ArrowRight, Star, Crown, Zap, Sparkles, MessageCircle, Store, Image, Copy, Percent, Shield, CreditCard } from 'lucide-react';
-import React, { useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 const iconMap: Record<string, React.ElementType> = {
   zap: Zap, briefcase: Crown, crown: Crown, building: Sparkles, star: Crown,
@@ -77,9 +75,30 @@ interface DynamicPricingProps {
 
 export const DynamicPricing = React.forwardRef<HTMLElement, DynamicPricingProps>(function DynamicPricing({ FadeInSection }, _fwdRef) {
     const ref = useRef<HTMLElement>(null);
-    const { data: plans, isLoading } = useSubscriptionPlans();
+    const [shouldLoad, setShouldLoad] = useState(false);
     const { language } = useLanguage();
     const lang = (language || 'uz') as 'uz' | 'ru' | 'en';
+
+    useEffect(() => {
+      const node = ref.current;
+      if (!node || shouldLoad) return;
+
+      const observer = new IntersectionObserver(
+        ([entry]) => {
+          if (entry.isIntersecting) {
+            setShouldLoad(true);
+            observer.disconnect();
+          }
+        },
+        { rootMargin: '400px 0px' }
+      );
+
+      observer.observe(node);
+      return () => observer.disconnect();
+    }, [shouldLoad]);
+
+    const { data: plans, isLoading: isPlansLoading } = useSubscriptionPlans({ enabled: shouldLoad });
+    const isLoading = !shouldLoad || isPlansLoading;
 
     const t = {
       uz: {
@@ -168,17 +187,21 @@ export const DynamicPricing = React.forwardRef<HTMLElement, DynamicPricingProps>
       return lang === 'ru' ? labels.ru : lang === 'uz' ? labels.uz : labels.en;
     };
 
-    if (isLoading) {
+    if (!shouldLoad || isLoading) {
       return (
-        <section id="pricing" className="py-24 md:py-32 bg-muted/30">
+        <section ref={ref} id="pricing" className="py-24 md:py-32 bg-muted/30">
           <div className="container mx-auto px-4">
             <div className="text-center mb-16">
               <Badge variant="outline" className="mb-4 px-4 py-1.5">Pricing</Badge>
               <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 font-display">{txt.title}</h2>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 max-w-7xl mx-auto">
-              {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-[500px] rounded-xl" />)}
-            </div>
+            {shouldLoad ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 max-w-7xl mx-auto">
+                {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-[500px] rounded-xl" />)}
+              </div>
+            ) : (
+              <div className="h-[500px] max-w-7xl mx-auto" aria-hidden="true" />
+            )}
           </div>
         </section>
       );

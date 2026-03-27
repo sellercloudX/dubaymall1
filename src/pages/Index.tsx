@@ -16,8 +16,9 @@ import {
 } from 'lucide-react';
 import React, { useState, useEffect, useRef, ReactNode } from 'react';
 import { motion, useScroll, useTransform, useMotionValue, useSpring, useInView as useMotionInView } from 'framer-motion';
-import heroDashboard from '@/assets/hero-dashboard.png';
-import abstractShapes from '@/assets/abstract-shapes.png';
+import heroDashboard from '@/assets/hero-dashboard-desktop.webp';
+import heroDashboardMobile from '@/assets/hero-dashboard-mobile.webp';
+import abstractShapes from '@/assets/abstract-shapes.webp';
 import { MARKETPLACE_CONFIG } from '@/lib/marketplaceConfig';
 
 // ─── Animation hooks ───
@@ -659,7 +660,7 @@ export default function Index() {
                       transition={{ delay: 0.7 + i * 0.1 }}
                       whileHover={{ scale: 1.1, opacity: 1 }}
                     >
-                      <img src={mp.logo} alt={mp.name} className="w-4 h-4 sm:w-5 sm:h-5 rounded object-cover" />
+                      <img src={mp.logo} alt={mp.name} width={20} height={20} loading="lazy" decoding="async" className="w-4 h-4 sm:w-5 sm:h-5 rounded object-cover" />
                       <span className="text-[11px] sm:text-sm font-medium text-muted-foreground">{mp.name}</span>
                     </motion.div>
                   ))}
@@ -679,8 +680,13 @@ export default function Index() {
                 <motion.img 
                   src={heroDashboard} 
                   alt="SellerCloudX Dashboard" 
+                  width={1400}
+                  height={787}
+                  sizes="(min-width: 1024px) 50vw, 100vw"
                   className="relative rounded-2xl shadow-2xl border border-border/30 w-full"
                   loading="eager"
+                  fetchPriority="high"
+                  decoding="async"
                   whileHover={{ scale: 1.02, rotateY: -2 }}
                   transition={{ type: "spring", stiffness: 200, damping: 20 }}
                 />
@@ -727,10 +733,15 @@ export default function Index() {
               <div className="relative">
                 <div className="absolute -inset-2 bg-gradient-to-br from-primary/15 to-accent/15 rounded-2xl blur-xl" />
                 <img 
-                  src={heroDashboard} 
+                  src={heroDashboardMobile} 
                   alt="SellerCloudX Dashboard" 
+                  width={960}
+                  height={540}
+                  sizes="100vw"
                   className="relative rounded-xl shadow-xl border border-border/30 w-full"
                   loading="eager"
+                  fetchPriority="high"
+                  decoding="async"
                 />
               </div>
             </motion.div>
@@ -786,7 +797,7 @@ export default function Index() {
       <section id="features" className="py-16 sm:py-20 md:py-24 relative overflow-hidden">
         <div className="absolute inset-0 bg-dot-pattern opacity-[0.03]" />
         <div className="absolute inset-0 flex items-center justify-center opacity-10 dark:opacity-5 pointer-events-none">
-          <img src={abstractShapes} alt="" className="w-full h-full object-cover" loading="lazy" />
+          <img src={abstractShapes} alt="" width={1024} height={1024} className="w-full h-full object-cover" loading="lazy" decoding="async" />
         </div>
         
         <div className="container mx-auto px-3 sm:px-4 relative">

@@ -26,9 +26,10 @@ export interface SubscriptionPlan {
   updated_at: string;
 }
 
-export function useSubscriptionPlans() {
+export function useSubscriptionPlans(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['subscription-plans'],
+    enabled: options?.enabled ?? true,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('subscription_plans')
