@@ -25,6 +25,7 @@ import { PlanSelector } from '@/components/sellercloud/PlanSelector';
 import { OnboardingWizard } from '@/components/sellercloud/OnboardingWizard';
 import { SellerCloudSidebar, sellerMenuItems } from '@/components/sellercloud/SellerCloudSidebar';
 import { FeatureGate } from '@/components/sellercloud/FeatureGate';
+import { useMarketplaceRealtime } from '@/hooks/useMarketplaceRealtime';
 
 
 // Lazy load heavy tab components
