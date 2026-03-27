@@ -111,6 +111,7 @@ export function TutorialVideosAdmin() {
       const { error } = await supabase.from('tutorial_folders').insert({
         name: f.name, description: f.description || null,
         cover_image_url: f.cover_image_url || null,
+        price_uzs: f.price_uzs || 0,
         sort_order: folders.length, created_by: user?.id,
       });
       if (error) throw error;
