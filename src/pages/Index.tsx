@@ -797,7 +797,7 @@ export default function Index() {
       <section id="features" className="py-16 sm:py-20 md:py-24 relative overflow-hidden">
         <div className="absolute inset-0 bg-dot-pattern opacity-[0.03]" />
         <div className="absolute inset-0 flex items-center justify-center opacity-10 dark:opacity-5 pointer-events-none">
-          <img src={abstractShapes} alt="" className="w-full h-full object-cover" loading="lazy" />
+          <img src={abstractShapes} alt="" width={1024} height={1024} className="w-full h-full object-cover" loading="lazy" decoding="async" />
         </div>
         
         <div className="container mx-auto px-3 sm:px-4 relative">

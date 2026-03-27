@@ -187,17 +187,21 @@ export const DynamicPricing = React.forwardRef<HTMLElement, DynamicPricingProps>
       return lang === 'ru' ? labels.ru : lang === 'uz' ? labels.uz : labels.en;
     };
 
-    if (isLoading) {
+    if (!shouldLoad || isLoading) {
       return (
-        <section id="pricing" className="py-24 md:py-32 bg-muted/30">
+        <section ref={ref} id="pricing" className="py-24 md:py-32 bg-muted/30">
           <div className="container mx-auto px-4">
             <div className="text-center mb-16">
               <Badge variant="outline" className="mb-4 px-4 py-1.5">Pricing</Badge>
               <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 font-display">{txt.title}</h2>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 max-w-7xl mx-auto">
-              {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-[500px] rounded-xl" />)}
-            </div>
+            {shouldLoad ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 max-w-7xl mx-auto">
+                {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-[500px] rounded-xl" />)}
+              </div>
+            ) : (
+              <div className="h-[500px] max-w-7xl mx-auto" aria-hidden="true" />
+            )}
           </div>
         </section>
       );
