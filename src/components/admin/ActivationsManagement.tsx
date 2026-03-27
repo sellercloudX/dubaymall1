@@ -21,6 +21,7 @@ export function ActivationsManagement() {
   const [showDetailDialog, setShowDetailDialog] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const queryClient = useQueryClient();
+  const { data: plans } = useSubscriptionPlans();
 
   // Fetch SellerCloudX subscriptions
   const { data: cloudSubscriptions, isLoading: loadingCloud } = useQuery({
