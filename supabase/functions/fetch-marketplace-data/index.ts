@@ -2829,6 +2829,9 @@ serve(async (req) => {
             financeParams.append("dateTo", String(Date.now()));
             financeParams.append("size", "100");
             financeParams.append("page", "0");
+            for (const st of ['TO_WITHDRAW', 'PROCESSING', 'CANCELED', 'PARTIALLY_CANCELLED']) {
+              financeParams.append('statuses', st);
+            }
 
             let finPage = 0;
             let finHasMore = true;
