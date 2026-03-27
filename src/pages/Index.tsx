@@ -52,32 +52,73 @@ function useInView(threshold = 0.15) {
 
 const FadeInSection = React.forwardRef<HTMLDivElement, { children: ReactNode; className?: string; delay?: number }>(
   ({ children, className = '', delay = 0 }, _ref) => {
-    const { ref, inView } = useInView(0.1);
+    const ref = useRef<HTMLDivElement>(null);
+    const isInView = useMotionInView(ref, { once: true, margin: "-50px" });
     return (
-      <div 
+      <motion.div 
         ref={ref} 
-        className={`transition-all duration-700 ${inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'} ${className}`}
-        style={{ transitionDelay: `${delay}ms` }}
+        className={className}
+        initial={{ opacity: 0, y: 40 }}
+        animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 40 }}
+        transition={{ duration: 0.7, delay: delay / 1000, ease: [0.25, 0.4, 0, 1] }}
       >
         {children}
-      </div>
+      </motion.div>
     );
   }
 );
 FadeInSection.displayName = 'FadeInSection';
 
+// Magnetic hover effect for cards
+function MagneticCard({ children, className = '' }: { children: ReactNode; className?: string }) {
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const springX = useSpring(x, { stiffness: 300, damping: 20 });
+  const springY = useSpring(y, { stiffness: 300, damping: 20 });
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    x.set((e.clientX - centerX) * 0.05);
+    y.set((e.clientY - centerY) * 0.05);
+  };
+
+  return (
+    <motion.div
+      className={className}
+      style={{ x: springX, y: springY }}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={() => { x.set(0); y.set(0); }}
+      whileHover={{ scale: 1.02 }}
+      transition={{ type: "spring", stiffness: 400, damping: 17 }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
 const FloatingParticles = React.memo(React.forwardRef<HTMLDivElement>((_props, ref) => {
   return (
     <div ref={ref} className="absolute inset-0 overflow-hidden pointer-events-none">
-      {Array.from({ length: 20 }).map((_, i) => (
-        <div 
+      {Array.from({ length: 15 }).map((_, i) => (
+        <motion.div 
           key={i}
-          className="absolute w-1 h-1 rounded-full bg-primary/30 animate-pulse"
+          className="absolute w-1 h-1 rounded-full bg-primary/20"
           style={{
             left: `${Math.random() * 100}%`,
             top: `${Math.random() * 100}%`,
-            animationDelay: `${Math.random() * 3}s`,
-            animationDuration: `${2 + Math.random() * 3}s`,
+          }}
+          animate={{
+            y: [0, -30, 0],
+            opacity: [0.2, 0.6, 0.2],
+            scale: [1, 1.5, 1],
+          }}
+          transition={{
+            duration: 3 + Math.random() * 4,
+            repeat: Infinity,
+            delay: Math.random() * 3,
+            ease: "easeInOut",
           }}
         />
       ))}
@@ -85,6 +126,26 @@ const FloatingParticles = React.memo(React.forwardRef<HTMLDivElement>((_props, r
   );
 }));
 FloatingParticles.displayName = 'FloatingParticles';
+
+// Glowing orb background
+function GlowOrbs() {
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      <motion.div 
+        className="absolute w-[500px] h-[500px] rounded-full bg-primary/8 blur-[120px]"
+        animate={{ x: [0, 50, 0], y: [0, -30, 0] }}
+        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+        style={{ top: '-10%', right: '-5%' }}
+      />
+      <motion.div 
+        className="absolute w-[400px] h-[400px] rounded-full bg-accent/6 blur-[100px]"
+        animate={{ x: [0, -40, 0], y: [0, 40, 0] }}
+        transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+        style={{ bottom: '-5%', left: '-5%' }}
+      />
+    </div>
+  );
+}
 
 // ─── FAQ Component ───
 function FAQItem({ question, answer }: { question: string; answer: string }) {
