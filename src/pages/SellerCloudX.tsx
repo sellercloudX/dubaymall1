@@ -180,6 +180,17 @@ export default function SellerCloudX() {
   const expiryWarning = accessStatus?.warning === true;
   useAutoSync({ connectedMarketplaces, enabled: !!subscription && !isBlocked, onSyncComplete: refetch });
 
+  // Auto-create starter subscription for new users (no plan selection screen)
+  useEffect(() => {
+    if (!subscription && !subscriptionLoading && user) {
+      createSubscription('starter', 0).then(result => {
+        if (result.success) {
+          toast.success('Xush kelibsiz! 1 kunlik bepul sinov boshlandi.');
+        }
+      });
+    }
+  }, [subscription, subscriptionLoading, user]);
+
   if (authLoading || subscriptionLoading) {
     return (
       <>
@@ -191,17 +202,6 @@ export default function SellerCloudX() {
       </>
     );
   }
-
-  // Auto-create starter subscription for new users (no plan selection screen)
-  useEffect(() => {
-    if (!subscription && !subscriptionLoading && user) {
-      createSubscription('starter', 0).then(result => {
-        if (result.success) {
-          toast.success('Xush kelibsiz! 1 kunlik bepul sinov boshlandi.');
-        }
-      });
-    }
-  }, [subscription, subscriptionLoading, user]);
 
   if (!subscription) {
     return (
