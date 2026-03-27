@@ -76,7 +76,7 @@ export function FinancialDashboard({
     const marketplaceBreakdown = activeMarketplaces.map(marketplace => {
       const orders = store.getOrders(marketplace);
       const activeOrders = orders.filter(o => {
-        if (isExcludedOrder(o)) return false;
+        if (getMarketplaceOrderStatusCategory(o, marketplace) === 'cancelled') return false;
         if (dateFrom || dateTo) {
           const orderDate = new Date(o.createdAt);
           if (dateFrom && orderDate < dateFrom) return false;

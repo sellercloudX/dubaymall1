@@ -492,9 +492,9 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1.5 px-3 py-2 border-t bg-muted/20 text-[11px]">
                 <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
                   <span className="text-muted-foreground">{sorted.length} buyurtma</span>
-                  <span className="font-medium">Jami: {fmtPrice(sorted.reduce((s, e) => s + e.totalUzs, 0))}</span>
-                  <span className={`font-bold ${sorted.reduce((s, e) => s + e.netProfit, 0) >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
-                    Foyda: {fmtPrice(sorted.reduce((s, e) => s + e.netProfit, 0))}
+                  <span className="font-medium">Jami: {fmtPrice(sorted.filter(e => e.statusCategory !== 'cancelled').reduce((s, e) => s + e.totalUzs, 0))}</span>
+                  <span className={`font-bold ${sorted.filter(e => e.statusCategory !== 'cancelled').reduce((s, e) => s + e.netProfit, 0) >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
+                    Foyda: {fmtPrice(sorted.filter(e => e.statusCategory !== 'cancelled').reduce((s, e) => s + e.netProfit, 0))}
                   </span>
                 </div>
                 {totalPages > 1 && (
