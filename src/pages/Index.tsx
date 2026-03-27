@@ -660,7 +660,7 @@ export default function Index() {
                       transition={{ delay: 0.7 + i * 0.1 }}
                       whileHover={{ scale: 1.1, opacity: 1 }}
                     >
-                      <img src={mp.logo} alt={mp.name} className="w-4 h-4 sm:w-5 sm:h-5 rounded object-cover" />
+                      <img src={mp.logo} alt={mp.name} width={20} height={20} loading="lazy" decoding="async" className="w-4 h-4 sm:w-5 sm:h-5 rounded object-cover" />
                       <span className="text-[11px] sm:text-sm font-medium text-muted-foreground">{mp.name}</span>
                     </motion.div>
                   ))}
