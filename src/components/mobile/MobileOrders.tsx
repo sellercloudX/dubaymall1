@@ -30,14 +30,13 @@ interface MobileOrdersProps {
   store: MarketplaceDataStore;
 }
 
-const ORDER_STATUSES = [
+const ORDER_STATUSES: { value: OrderStatusCategory; label: string }[] = [
   { value: 'all', label: 'Barchasi' },
-  { value: 'NEW', label: 'Yangi' },
-  { value: 'PROCESSING', label: 'Jarayonda' },
-  { value: 'DELIVERY', label: 'Yetkazilmoqda' },
-  { value: 'DELIVERED', label: 'Yetkazildi' },
-  { value: 'CANCELLED', label: 'Bekor' },
-  { value: 'RETURNED', label: 'Qaytarildi' },
+  { value: 'new', label: 'Yangi' },
+  { value: 'assembly', label: "Yig'ish" },
+  { value: 'active', label: "Yo'lda" },
+  { value: 'delivered', label: 'Yetkazildi' },
+  { value: 'cancelled', label: 'Bekor' },
 ];
 
 /** Format a price that is ALREADY in UZS */
