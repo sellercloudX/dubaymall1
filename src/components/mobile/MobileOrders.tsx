@@ -282,7 +282,7 @@ export function MobileOrders({ connectedMarketplaces, store }: MobileOrdersProps
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Holat:</span>
-                {getStatusBadge(selectedOrder.status)}
+                {getStatusBadge(getMarketplaceOrderStatusCategory(selectedOrder, selectedMp))}
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Sana:</span>
