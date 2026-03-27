@@ -22,20 +22,13 @@ interface MarketplaceOrdersProps {
   store: MarketplaceDataStore;
 }
 
-const ORDER_STATUSES = [
-  { value: 'all', label: 'Barcha holatlar' },
-  { value: 'PROCESSING', label: 'Jarayonda' },
-  { value: 'DELIVERY', label: 'Yetkazilmoqda' },
-  { value: 'PICKUP', label: 'Olib ketish' },
-  { value: 'DELIVERED', label: 'Yetkazildi' },
-  { value: 'COMPLETED', label: 'Yakunlandi' },
-  { value: 'CANCELLED', label: 'Bekor qilindi' },
-  { value: 'CANCELED', label: 'Bekor qilindi' },
-  { value: 'PACKING', label: 'Yig\'ilmoqda' },
-  { value: 'CREATED', label: 'Yangi' },
-  { value: 'PENDING_DELIVERY', label: 'Yetkazishga tayyor' },
-  { value: 'DELIVERING', label: 'Yetkazilmoqda' },
-  { value: 'RETURNED', label: 'Qaytarildi' },
+const ORDER_CATEGORIES: { value: OrderStatusCategory; label: string }[] = [
+  { value: 'all', label: 'Hammasi' },
+  { value: 'new', label: 'Yangi' },
+  { value: 'assembly', label: "Yig'ish" },
+  { value: 'active', label: "Yo'lda" },
+  { value: 'delivered', label: 'Yetkazildi' },
+  { value: 'cancelled', label: 'Bekor' },
 ];
 
 const normalizeOfferKey = (value?: string) => String(value || '').trim().toLowerCase();
