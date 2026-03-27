@@ -192,24 +192,23 @@ export default function SellerCloudX() {
     );
   }
 
+  // Auto-create starter subscription for new users (no plan selection screen)
+  useEffect(() => {
+    if (!subscription && !subscriptionLoading && user) {
+      createSubscription('starter', 0).then(result => {
+        if (result.success) {
+          toast.success('Xush kelibsiz! 1 kunlik bepul sinov boshlandi.');
+        }
+      });
+    }
+  }, [subscription, subscriptionLoading, user]);
+
   if (!subscription) {
     return (
       <>
         <Navbar />
-        <div className="container mx-auto px-4 py-8 max-w-2xl">
-          <PlanSelector 
-            onSelectPlan={async (plan) => {
-              const result = await createSubscription(plan.slug);
-              if (result.success) {
-                toast.success('Obuna yaratildi!');
-              } else {
-                toast.error(result.error || 'Xatolik yuz berdi');
-              }
-            }}
-          />
-          <div className="text-center mt-6">
-            <Button variant="ghost" asChild><Link to="/">← Bosh sahifaga qaytish</Link></Button>
-          </div>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
         <Footer />
       </>

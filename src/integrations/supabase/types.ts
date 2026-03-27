@@ -2999,6 +2999,42 @@ export type Database = {
         }
         Relationships: []
       }
+      tutorial_folders: {
+        Row: {
+          cover_image_url: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          is_published: boolean | null
+          name: string
+          sort_order: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          cover_image_url?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_published?: boolean | null
+          name: string
+          sort_order?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          cover_image_url?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_published?: boolean | null
+          name?: string
+          sort_order?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       tutorial_videos: {
         Row: {
           category: string | null
@@ -3007,6 +3043,8 @@ export type Database = {
           created_by: string | null
           description: string | null
           embed_url: string | null
+          feature_key: string | null
+          folder_id: string | null
           id: string
           is_free: boolean
           is_published: boolean | null
@@ -3022,6 +3060,8 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           embed_url?: string | null
+          feature_key?: string | null
+          folder_id?: string | null
           id?: string
           is_free?: boolean
           is_published?: boolean | null
@@ -3037,6 +3077,8 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           embed_url?: string | null
+          feature_key?: string | null
+          folder_id?: string | null
           id?: string
           is_free?: boolean
           is_published?: boolean | null
@@ -3045,7 +3087,15 @@ export type Database = {
           updated_at?: string
           video_type?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "tutorial_videos_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "tutorial_folders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_addresses: {
         Row: {

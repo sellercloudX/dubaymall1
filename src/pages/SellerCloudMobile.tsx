@@ -135,20 +135,21 @@ export default function SellerCloudMobile() {
     );
   }
 
+  // Auto-create starter subscription for new users
+  useEffect(() => {
+    if (!subscription && !subscriptionLoading && user) {
+      createSubscription('starter', 0).then(result => {
+        if (result.success) {
+          toast.success('Xush kelibsiz! 1 kunlik bepul sinov boshlandi.');
+        }
+      });
+    }
+  }, [subscription, subscriptionLoading, user]);
+
   if (!subscription) {
     return (
-      <div className="min-h-screen bg-background p-4 pb-20 overflow-y-auto">
-        <PlanSelector 
-          onSelectPlan={async (plan) => {
-            const result = await createSubscription(plan.slug);
-            if (result.success) {
-              toast.success('Obuna yaratildi!');
-            } else {
-              toast.error(result.error || 'Xatolik yuz berdi');
-            }
-          }}
-          onGoHome={() => navigate('/')}
-        />
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
