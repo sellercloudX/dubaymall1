@@ -136,6 +136,7 @@ export function ABCAnalysis({ connectedMarketplaces, store }: ABCAnalysisProps) 
           totalSold: sales.qty, totalRevenue, estimatedCost: totalCosts,
           commissionAmount: tariff.commission * sales.qty, 
           logisticsCost: tariff.logistics * sales.qty,
+          taxAmount, costPriceTotal: productCost,
           netProfit, profitMargin,
           abcGroup: 'C', revenueShare: 0,
           isRealTariff: tariff.isReal,
