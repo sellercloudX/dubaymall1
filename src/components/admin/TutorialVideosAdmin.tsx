@@ -267,7 +267,14 @@ export function TutorialVideosAdmin() {
                 </div>
                 <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setSelectedFolderId(folder.id)}>
                   <h4 className="font-medium text-sm">{folder.name}</h4>
-                  <p className="text-xs text-muted-foreground">{count} ta video</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs text-muted-foreground">{count} ta video</p>
+                    {(folder as any).price_uzs > 0 ? (
+                      <Badge variant="outline" className="text-[10px]">{((folder as any).price_uzs).toLocaleString()} so'm</Badge>
+                    ) : (
+                      <Badge variant="secondary" className="text-[10px]">Bepul</Badge>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   <Switch checked={folder.is_published}
