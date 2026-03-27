@@ -772,9 +772,9 @@ serve(async (req) => {
               const totalCount = Math.max(1, rawItems.reduce((s: number, i: any) => s + (i.count || 1), 0));
               const normalizedItemsTotal = itemsTotal || total;
               
-              // IMPORTANT: buyerItemsTotalBeforeDiscount = price BEFORE Yandex subsidies/promotions
-              // Yandex charges FEE commission on THIS price, not on buyerItemsTotal
-              const itemsTotalBeforeDiscount = order.buyerItemsTotalBeforeDiscount || order.itemsTotal || normalizedItemsTotal;
+              // IMPORTANT: use ONLY explicit item-level before-discount price for commission base.
+              // Order-level buyerItemsTotalBeforeDiscount can overstate a single item's fee base
+              // and was causing impossible commissions (> sold price) in PnL.
               
               const mappedItems = rawItems.map((item: any, index: number) => {
                 const count = item.count || 1;
@@ -800,13 +800,9 @@ serve(async (req) => {
                 
                 // Extract the pre-discount price (commission base)
                 // Yandex charges FEE% on this price, not on the discounted buyer price
-                const rawBeforeDiscount = item.buyerPriceBeforeDiscount || item.priceBeforeDiscount || item.price || 0;
-                // Distribute order-level beforeDiscount proportionally if available
+                const rawBeforeDiscount = item.buyerPriceBeforeDiscount || item.priceBeforeDiscount || 0;
                 let commissionBase = unitPrice; // default: same as buyer price
-                if (itemsTotalBeforeDiscount > normalizedItemsTotal && normalizedItemsTotal > 0) {
-                  // There IS a subsidy — scale up the unit price proportionally
-                  commissionBase = Math.round(unitPrice * (itemsTotalBeforeDiscount / normalizedItemsTotal));
-                } else if (rawBeforeDiscount > 0 && rawBeforeDiscount > unitPrice) {
+                if (rawBeforeDiscount > 0 && rawBeforeDiscount > unitPrice) {
                   commissionBase = rawBeforeDiscount;
                 }
                 
@@ -1074,7 +1070,11 @@ serve(async (req) => {
             console.log(`Tariff API response status: ${tariffResponse.status}`);
 
             // Helper to parse tariff results into structured data
-            function parseTariffResults(tariffResults: any[], sourceOffers: any[]) {
+            function parseTariffResults(
+              tariffResults: any[],
+              sourceOffers: any[],
+              source: 'campaign' | 'sellingProgram' | 'fallbackCategory' = 'campaign'
+            ) {
               return tariffResults.map((t: any, idx: number) => {
                 const tariffs = t.tariffs || [];
                 let agencyCommission = 0;
@@ -1082,7 +1082,7 @@ serve(async (req) => {
                 let delivery = 0;
                 let sorting = 0;
                 let other = 0;
-                let commissionPercentFromApi = 0;
+                let feePercentFromApi = 0;
                 
                 tariffs.forEach((tariff: any) => {
                   const amount = tariff.amount || 0;
@@ -1093,21 +1093,37 @@ serve(async (req) => {
                   const valueType = params.find((p: any) => p.name === 'valueType');
                   const isRelative = valueType?.value === 'relative';
                   
-                  if (type === 'FEE' || type === 'AGENCY_COMMISSION' || type === 'PAYMENT_TRANSFER') {
+                  // PAYMENT_TRANSFER can contain multiple alternative payout options
+                  // (daily / weekly / delay weeks). Summing them inflated commissions badly.
+                  // We keep seller payout/withdrawal as a separate client-side fee instead.
+                  if (type === 'FEE' || type === 'AGENCY_COMMISSION') {
                     agencyCommission += amount;
                     if (isRelative && valueParam?.value) {
-                      commissionPercentFromApi += parseFloat(valueParam.value) || 0;
+                      feePercentFromApi += parseFloat(valueParam.value) || 0;
                     }
                   } else if (type === 'DELIVERY_TO_CUSTOMER' || type === 'CROSSREGIONAL_DELIVERY' || type === 'EXPRESS_DELIVERY' || type === 'MIDDLE_MILE') {
                     delivery += amount;
                   } else if (type === 'SORTING') {
                     sorting += amount;
+                  } else if (type === 'PAYMENT_TRANSFER') {
+                    // handled separately in UI as withdrawal/payout fee; do not merge into commission
+                    return;
                   } else {
                     other += amount;
                   }
                 });
                 
                 const price = sourceOffers[idx]?.price || 0;
+                let commissionPercent = feePercentFromApi > 0
+                  ? Math.round(feePercentFromApi * 100) / 100
+                  : (price > 0 ? Math.round((agencyCommission / price) * 10000) / 100 : 0);
+
+                const suspiciousRecoveredCommission = source !== 'campaign' && commissionPercent > 35;
+                if (source === 'fallbackCategory' || suspiciousRecoveredCommission) {
+                  agencyCommission = 0;
+                  commissionPercent = 0;
+                }
+
                 const totalTariff = agencyCommission + fulfillment + delivery + sorting + other;
                 
                 return {
@@ -1115,15 +1131,15 @@ serve(async (req) => {
                   categoryId: sourceOffers[idx]?.categoryId,
                   price,
                   agencyCommission,
-                  commissionPercent: commissionPercentFromApi > 0 
-                    ? Math.round(commissionPercentFromApi * 100) / 100
-                    : (price > 0 ? Math.round((agencyCommission / price) * 10000) / 100 : 0),
+                  commissionPercent,
                   fulfillment,
                   delivery,
                   sorting,
                   other,
                   totalTariff,
                   tariffPercent: price > 0 ? Math.round((totalTariff / price) * 10000) / 100 : 0,
+                  source,
+                  suspiciousRecoveredCommission,
                   rawTariffs: tariffs,
                 };
               });
@@ -1134,7 +1150,7 @@ serve(async (req) => {
               const tariffResults = tariffData.result?.offers || [];
               
               console.log(`Got ${tariffResults.length} tariff results`);
-              const parsed = parseTariffResults(tariffResults, offersForCalc);
+              const parsed = parseTariffResults(tariffResults, offersForCalc, 'campaign');
               
               console.log(`Parsed tariffs sample:`, JSON.stringify(parsed[0] || {}));
               result = { success: true, data: parsed };
@@ -1184,7 +1200,7 @@ serve(async (req) => {
                           const retryData = await retryResponse.json();
                           const retryResults = retryData.result?.offers || [];
                           console.log(`Allowed retry got ${retryResults.length} tariff results`);
-                          parsedAllowed = parseTariffResults(retryResults, allowedOffers);
+                          parsedAllowed = parseTariffResults(retryResults, allowedOffers, 'campaign');
                         }
                       }
                       
@@ -1211,7 +1227,7 @@ serve(async (req) => {
                             const progData = await progResponse.json();
                             const progResults = progData.result?.offers || [];
                             console.log(`sellingProgram=${program} got ${progResults.length} results for restricted categories`);
-                            parsedRestricted = parseTariffResults(progResults, restrictedOffers);
+                            parsedRestricted = parseTariffResults(progResults, restrictedOffers, 'sellingProgram');
                             break; // Success, stop trying other programs
                           } else {
                             const progErr = await progResponse.text();
@@ -1250,12 +1266,7 @@ serve(async (req) => {
                             const fallbackData = await fallbackResponse.json();
                             const fallbackResults = fallbackData.result?.offers || [];
                             console.log(`Fallback category got ${fallbackResults.length} results`);
-                            parsedRestricted = parseTariffResults(fallbackResults, restrictedOffers);
-                            // Mark as fallback (real logistics, approximate commission)
-                            parsedRestricted = parsedRestricted.map((p: any) => ({
-                              ...p,
-                              fallbackCategory: true,
-                            }));
+                            parsedRestricted = parseTariffResults(fallbackResults, restrictedOffers, 'fallbackCategory');
                           } else {
                             console.error(`Fallback category also failed: ${fallbackResponse.status}`);
                           }
