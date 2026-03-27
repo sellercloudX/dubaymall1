@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { CheckCircle2, Globe, Key, BarChart3, ArrowRight, Clock, Sparkles } from 'lucide-react';
+import { CheckCircle2, Globe, Key, BarChart3, ArrowRight, Clock, Sparkles, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface OnboardingWizardProps {
@@ -35,6 +35,16 @@ const STEPS = [
     check: (props: OnboardingWizardProps) => props.connectedMarketplaces.length > 0,
   },
   {
+    id: 'tutorials',
+    icon: BookOpen,
+    titleUz: 'Qo\'llanmalarni ko\'ring',
+    titleRu: 'Просмотрите обучение',
+    descUz: 'Video darsliklar orqali platformadan to\'liq foydalaning',
+    descRu: 'Изучите видеоуроки для полноценного использования',
+    tab: 'tutorials',
+    check: () => false,
+  },
+  {
     id: 'analytics',
     icon: BarChart3,
     titleUz: 'Analitikani ko\'ring',
@@ -42,7 +52,7 @@ const STEPS = [
     descUz: 'Sotuv, foyda va ABC tahlilni ko\'rib chiqing',
     descRu: 'Просмотрите продажи, прибыль и ABC-анализ',
     tab: 'sales',
-    check: () => false, // Always show
+    check: () => false,
   },
 ];
 
