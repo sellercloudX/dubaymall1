@@ -148,23 +148,26 @@ function GlowOrbs() {
 }
 
 // ─── FAQ Component ───
-function FAQItem({ question, answer }: { question: string; answer: string }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="border-b last:border-b-0">
-      <button 
-        onClick={() => setOpen(!open)} 
-        className="w-full flex items-center justify-between py-5 text-left group"
-      >
-        <span className="font-semibold text-sm md:text-base pr-4">{question}</span>
-        <ChevronDown className={`h-5 w-5 text-muted-foreground shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
-      </button>
-      <div className={`overflow-hidden transition-all duration-300 ${open ? 'max-h-40 pb-5' : 'max-h-0'}`}>
-        <p className="text-sm text-muted-foreground leading-relaxed">{answer}</p>
+const FAQItem = React.forwardRef<HTMLDivElement, { question: string; answer: string }>(
+  function FAQItem({ question, answer }, ref) {
+    const [open, setOpen] = useState(false);
+    return (
+      <div ref={ref} className="border-b last:border-b-0">
+        <button 
+          onClick={() => setOpen(!open)} 
+          className="w-full flex items-center justify-between py-5 text-left group"
+        >
+          <span className="font-semibold text-sm md:text-base pr-4">{question}</span>
+          <ChevronDown className={`h-5 w-5 text-muted-foreground shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+        </button>
+        <div className={`overflow-hidden transition-all duration-300 ${open ? 'max-h-40 pb-5' : 'max-h-0'}`}>
+          <p className="text-sm text-muted-foreground leading-relaxed">{answer}</p>
+        </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
+);
+FAQItem.displayName = 'FAQItem';
 
 // ─── Translations ───
 const T = {
