@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSellerCloudAdmin } from '@/hooks/useSellerCloudSubscription';
 import { supabase } from '@/integrations/supabase/client';
+import { useSubscriptionPlans } from '@/hooks/useSubscriptionPlans';
 import { toast } from 'sonner';
 import { 
   Crown, Users, CreditCard, AlertTriangle, CheckCircle2, 
