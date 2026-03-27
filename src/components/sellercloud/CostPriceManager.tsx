@@ -34,7 +34,7 @@ const MARKETPLACE_NAMES: Record<string, string> = {
 const getCurrencyLabel = () => "so'm";
 const getCurrencyLabelFull = () => "so'm";
 
-export function CostPriceManager({ connectedMarketplaces, store }: CostPriceManagerProps) {
+export const CostPriceManager = forwardRef<HTMLDivElement, CostPriceManagerProps>(function CostPriceManager({ connectedMarketplaces, store }, ref) {
   const isMobile = useIsMobile();
   const { getCostPrice, setCostPrice, bulkSetCostPrices, loading: costLoading, costPrices, refetch } = useCostPrices();
   const [selectedMp, setSelectedMp] = useState(connectedMarketplaces[0] || '');
