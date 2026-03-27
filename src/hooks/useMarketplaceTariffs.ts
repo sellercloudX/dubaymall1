@@ -50,7 +50,7 @@ export function useMarketplaceTariffs(
   const stableKey = productIds.length > 0 ? productIds.substring(0, 200) : 'empty';
 
   return useQuery({
-    queryKey: ['marketplace-tariffs', 'v15-real-api-only', connectedMarketplaces.join(','), stableKey],
+    queryKey: ['marketplace-tariffs', 'v16-real-recovered', connectedMarketplaces.join(','), stableKey],
     queryFn: async () => {
       const tariffMap = new Map<string, TariffInfo>();
 
@@ -309,11 +309,13 @@ export function useMarketplaceTariffs(
 
             tariffResults.forEach((t: any, idx: number) => {
               if (idx >= sendBatch.length) return;
-              if (t?.restricted || t?.fallbackCategory) return;
-
               const offerId = sendBatch[idx].offerId;
               const commission = t.agencyCommission || 0;
               const offerPrice = sendBatch[idx]?.price || 0;
+
+              // Skip only truly failed restricted products (zero tariff, restricted flag)
+              if (t?.restricted && commission === 0 && (t?.totalTariff || 0) === 0) return;
+
               const apiCommissionPercent = t.commissionPercent || (offerPrice > 0 ? (commission / offerPrice) * 100 : 0);
 
               tariffMap.set(offerId, {
