@@ -191,8 +191,11 @@ export function MobileOrders({ connectedMarketplaces, store }: MobileOrdersProps
   const orders = useMemo(() => {
     const allOrders = selectedMp ? store.getOrders(selectedMp) : store.allOrders;
     if (statusFilter === 'all') return allOrders;
-    return allOrders.filter(o => o.status === statusFilter);
-  }, [selectedMp, statusFilter, store.dataVersion]);
+    return allOrders.filter(o => {
+      const mp = selectedMp || connectedMarketplaces.find(m => store.getOrders(m).includes(o)) || '';
+      return getMarketplaceOrderStatusCategory(o, mp) === statusFilter;
+    });
+  }, [selectedMp, statusFilter, store.dataVersion, connectedMarketplaces]);
 
   const virtualizer = useVirtualizer({
     count: orders.length,
