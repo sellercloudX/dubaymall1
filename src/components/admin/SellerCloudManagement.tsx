@@ -349,7 +349,7 @@ export function SellerCloudManagement() {
                               setEditingSub(sub);
                               setEditMonthlyFee(String(sub.monthly_fee));
                               setEditCommission(String(sub.commission_percent));
-                              setEditPlanType(sub.plan_type);
+                              setEditPlanType(sub.plan_slug || sub.plan_type || 'starter');
                             }}>
                               <Edit className="h-3 w-3" />
                             </Button>
