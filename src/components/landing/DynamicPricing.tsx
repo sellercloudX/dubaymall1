@@ -352,4 +352,5 @@ export const DynamicPricing = React.forwardRef<HTMLElement, DynamicPricingProps>
         </div>
       </section>
     );
-}
+});
+DynamicPricing.displayName = 'DynamicPricing';
