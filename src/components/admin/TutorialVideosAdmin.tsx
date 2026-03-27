@@ -243,6 +243,7 @@ export function TutorialVideosAdmin() {
           <CardContent className="pt-4 space-y-3">
             <Input placeholder="Papka nomi *" value={folderForm.name} onChange={e => setFolderForm(f => ({ ...f, name: e.target.value }))} />
             <Input placeholder="Muqova rasm URL" value={folderForm.cover_image_url} onChange={e => setFolderForm(f => ({ ...f, cover_image_url: e.target.value }))} />
+            <Input type="number" placeholder="Narxi (so'm, 0 = bepul)" value={folderForm.price_uzs || ''} onChange={e => setFolderForm(f => ({ ...f, price_uzs: parseInt(e.target.value) || 0 }))} />
             <Textarea placeholder="Tavsif (ixtiyoriy)" value={folderForm.description} onChange={e => setFolderForm(f => ({ ...f, description: e.target.value }))} rows={2} />
             <Button size="sm" onClick={handleAddFolder} disabled={addFolderMutation.isPending}>
               <Save className="h-4 w-4 mr-1.5" />Saqlash
