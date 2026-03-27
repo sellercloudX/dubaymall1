@@ -42,10 +42,8 @@ const STATUS_CATEGORIES = [
 const formatNum = (n: number) => new Intl.NumberFormat('uz-UZ').format(Math.round(n));
 const fmtPrice = (n: number) => formatNum(n) + " so'm";
 
-const MARKETPLACE_TAX: Record<string, number> = {
-  yandex: 0.04,
-  uzum: 0.04,
-};
+// O'zbekiston YATT solig'i — barcha marketplace'lar uchun 4%
+const UZB_TAX_RATE = 0.04;
 
 interface EnrichedOrder {
   order: MarketplaceOrder;

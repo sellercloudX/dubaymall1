@@ -40,10 +40,8 @@ const MARKETPLACE_FEE_DETAILS: Record<string, string> = {
   wildberries: 'API orqali real komissiya + logistika',
 };
 
-const MARKETPLACE_TAX: Record<string, number> = {
-  yandex: 0.04,
-  uzum: 0.04,
-};
+// O'zbekiston YATT solig'i — barcha marketplace'lar uchun 4%
+const UZB_TAX_RATE = 0.04;
 
 export function FinancialDashboard({ 
   connectedMarketplaces, store
