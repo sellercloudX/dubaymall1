@@ -15,26 +15,20 @@ import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 import { MARKETPLACE_CONFIG, MarketplaceLogo } from '@/lib/marketplaceConfig';
 import { toDisplayUzs, formatUzs } from '@/lib/currency';
 import { getOrderRevenueUzs } from '@/lib/revenueCalculations';
+import { getMarketplaceOrderStatusCategory, type OrderStatusCategory } from '@/lib/marketplaceOrderStatus';
 
 interface MarketplaceOrdersProps {
   connectedMarketplaces: string[];
   store: MarketplaceDataStore;
 }
 
-const ORDER_STATUSES = [
-  { value: 'all', label: 'Barcha holatlar' },
-  { value: 'PROCESSING', label: 'Jarayonda' },
-  { value: 'DELIVERY', label: 'Yetkazilmoqda' },
-  { value: 'PICKUP', label: 'Olib ketish' },
-  { value: 'DELIVERED', label: 'Yetkazildi' },
-  { value: 'COMPLETED', label: 'Yakunlandi' },
-  { value: 'CANCELLED', label: 'Bekor qilindi' },
-  { value: 'CANCELED', label: 'Bekor qilindi' },
-  { value: 'PACKING', label: 'Yig\'ilmoqda' },
-  { value: 'CREATED', label: 'Yangi' },
-  { value: 'PENDING_DELIVERY', label: 'Yetkazishga tayyor' },
-  { value: 'DELIVERING', label: 'Yetkazilmoqda' },
-  { value: 'RETURNED', label: 'Qaytarildi' },
+const ORDER_CATEGORIES: { value: OrderStatusCategory; label: string }[] = [
+  { value: 'all', label: 'Hammasi' },
+  { value: 'new', label: 'Yangi' },
+  { value: 'assembly', label: "Yig'ish" },
+  { value: 'active', label: "Yo'lda" },
+  { value: 'delivered', label: 'Yetkazildi' },
+  { value: 'cancelled', label: 'Bekor' },
 ];
 
 const normalizeOfferKey = (value?: string) => String(value || '').trim().toLowerCase();
@@ -63,7 +57,7 @@ const findProductByOffer = (store: MarketplaceDataStore, marketplace: string, of
 
 export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceOrdersProps) {
   const [selectedMarketplace, setSelectedMarketplace] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState<OrderStatusCategory>('all');
   const [expandedOrder, setExpandedOrder] = useState<number | null>(null);
 
   useEffect(() => {
@@ -75,10 +69,10 @@ export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceO
   const allOrders = store.getOrders(selectedMarketplace);
   const isLoading = store.isLoadingOrders;
 
-  // Client-side status filtering (no re-fetch needed)
+  // Client-side status filtering using unified categories
   const orders = statusFilter === 'all'
     ? allOrders
-    : allOrders.filter(o => o.status === statusFilter);
+    : allOrders.filter(o => getMarketplaceOrderStatusCategory(o, selectedMarketplace) === statusFilter);
   const total = orders.length;
 
   /** Format order total using unified revenue calculation (same as SalesDashboard) */
@@ -152,10 +146,10 @@ export function MarketplaceOrders({ connectedMarketplaces, store }: MarketplaceO
           ))}
         </div>
         <div className="flex gap-2">
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as OrderStatusCategory)}>
             <SelectTrigger className="w-40"><SelectValue placeholder="Holat" /></SelectTrigger>
             <SelectContent>
-              {ORDER_STATUSES.map((s) => (
+              {ORDER_CATEGORIES.map((s) => (
                 <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
               ))}
             </SelectContent>
