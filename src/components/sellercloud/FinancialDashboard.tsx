@@ -335,7 +335,7 @@ export function FinancialDashboard({
                           )}
                         </div>
                         <div className="text-xs text-muted-foreground truncate">
-                          {hasReal ? `${summary.feePercent}%` : summary.totalMarketplaceFees > 0 ? `~${summary.feePercent}% (taxminiy)` : 'API ulanmagan'}
+                          {(hasReal || summary.totalMarketplaceFees > 0) ? `${summary.feePercent}%` : 'API ulanmagan'}
                         </div>
                       </div>
                     </div>
