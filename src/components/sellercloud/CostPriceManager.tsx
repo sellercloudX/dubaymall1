@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, forwardRef } from 'react';
 import { MarketplaceLogo } from '@/lib/marketplaceConfig';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -34,7 +34,7 @@ const MARKETPLACE_NAMES: Record<string, string> = {
 const getCurrencyLabel = () => "so'm";
 const getCurrencyLabelFull = () => "so'm";
 
-export function CostPriceManager({ connectedMarketplaces, store }: CostPriceManagerProps) {
+export const CostPriceManager = forwardRef<HTMLDivElement, CostPriceManagerProps>(function CostPriceManager({ connectedMarketplaces, store }, ref) {
   const isMobile = useIsMobile();
   const { getCostPrice, setCostPrice, bulkSetCostPrices, loading: costLoading, costPrices, refetch } = useCostPrices();
   const [selectedMp, setSelectedMp] = useState(connectedMarketplaces[0] || '');
@@ -191,7 +191,7 @@ export function CostPriceManager({ connectedMarketplaces, store }: CostPriceMana
   }
 
   return (
-    <div className="space-y-4 overflow-hidden">
+    <div ref={ref} className="space-y-4 overflow-hidden">
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
         <Card className="overflow-hidden">
@@ -432,4 +432,4 @@ export function CostPriceManager({ connectedMarketplaces, store }: CostPriceMana
       </Card>
     </div>
   );
-}
+});
