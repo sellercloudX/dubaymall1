@@ -23,20 +23,20 @@ import { toast } from 'sonner';
 import type { MarketplaceDataStore, MarketplaceOrder } from '@/hooks/useMarketplaceDataStore';
 import { MarketplaceLogo } from '@/lib/marketplaceConfig';
 import { toDisplayUzs, formatUzs } from '@/lib/currency';
+import { getMarketplaceOrderStatusCategory, type OrderStatusCategory } from '@/lib/marketplaceOrderStatus';
 
 interface MobileOrdersProps {
   connectedMarketplaces: string[];
   store: MarketplaceDataStore;
 }
 
-const ORDER_STATUSES = [
+const ORDER_STATUSES: { value: OrderStatusCategory; label: string }[] = [
   { value: 'all', label: 'Barchasi' },
-  { value: 'NEW', label: 'Yangi' },
-  { value: 'PROCESSING', label: 'Jarayonda' },
-  { value: 'DELIVERY', label: 'Yetkazilmoqda' },
-  { value: 'DELIVERED', label: 'Yetkazildi' },
-  { value: 'CANCELLED', label: 'Bekor' },
-  { value: 'RETURNED', label: 'Qaytarildi' },
+  { value: 'new', label: 'Yangi' },
+  { value: 'assembly', label: "Yig'ish" },
+  { value: 'active', label: "Yo'lda" },
+  { value: 'delivered', label: 'Yetkazildi' },
+  { value: 'cancelled', label: 'Bekor' },
 ];
 
 /** Format a price that is ALREADY in UZS */
@@ -71,17 +71,16 @@ const formatTime = (dateStr: string) => {
   } catch { return ''; }
 };
 
-const getStatusBadge = (status: string) => {
-  const config: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string; className?: string }> = {
-    NEW: { variant: 'secondary', label: 'Yangi', className: 'bg-blue-100 text-blue-700 border-blue-200' },
-    PROCESSING: { variant: 'secondary', label: 'Jarayonda' },
-    DELIVERY: { variant: 'default', label: 'Yetkazilmoqda' },
-    PICKUP: { variant: 'default', label: 'Olib ketish' },
-    DELIVERED: { variant: 'outline', label: 'Yetkazildi', className: 'border-green-500 text-green-600' },
-    CANCELLED: { variant: 'destructive', label: 'Bekor' },
-    RETURNED: { variant: 'destructive', label: 'Qaytarildi' },
-  };
-  const c = config[status] || { variant: 'outline' as const, label: status };
+const STATUS_BADGE_CONFIG: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string; className?: string }> = {
+  new: { variant: 'secondary', label: 'Yangi', className: 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400' },
+  assembly: { variant: 'secondary', label: "Yig'ilmoqda", className: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400' },
+  active: { variant: 'default', label: "Yo'lda" },
+  delivered: { variant: 'outline', label: 'Yetkazildi', className: 'border-emerald-500 text-emerald-600 dark:text-emerald-400' },
+  cancelled: { variant: 'destructive', label: 'Bekor' },
+};
+
+const getStatusBadge = (category: string) => {
+  const c = STATUS_BADGE_CONFIG[category] || { variant: 'outline' as const, label: category };
   return <Badge variant={c.variant} className={`text-[10px] ${c.className || ''}`}>{c.label}</Badge>;
 };
 
@@ -126,10 +125,9 @@ const getFirstProductName = (order: MarketplaceOrder, store: MarketplaceDataStor
 const OrderRow = memo(({ order, onClick, store, marketplace }: { order: MarketplaceOrder; onClick: (o: MarketplaceOrder) => void; store: MarketplaceDataStore; marketplace: string }) => {
   const productName = getFirstProductName(order, store, marketplace);
   const itemCount = order.items?.length || 0;
-  // Always convert from native currency — never trust *UZS fields (they may be RUB for WB)
   const totalPrice = toDisplayUzs(order.total || order.itemsTotal || 0, marketplace);
+  const statusCategory = getMarketplaceOrderStatusCategory(order, marketplace);
   
-  // Get product image: first from order item photo, then from store products
   const firstItem = order.items?.[0];
   const itemPhoto = firstItem?.photo;
   const matchedProduct = firstItem ? findProductByOffer(store, marketplace, firstItem.offerId, firstItem.nmID) : null;
@@ -146,7 +144,7 @@ const OrderRow = memo(({ order, onClick, store, marketplace }: { order: Marketpl
               {formatDate(order.createdAt)} {formatTime(order.createdAt)}
             </div>
           </div>
-          <div className="shrink-0">{getStatusBadge(order.status)}</div>
+          <div className="shrink-0">{getStatusBadge(statusCategory)}</div>
         </div>
         <div className="flex items-start gap-2">
           <div className="w-10 h-10 rounded bg-muted flex items-center justify-center overflow-hidden shrink-0">
@@ -193,8 +191,11 @@ export function MobileOrders({ connectedMarketplaces, store }: MobileOrdersProps
   const orders = useMemo(() => {
     const allOrders = selectedMp ? store.getOrders(selectedMp) : store.allOrders;
     if (statusFilter === 'all') return allOrders;
-    return allOrders.filter(o => o.status === statusFilter);
-  }, [selectedMp, statusFilter, store.dataVersion]);
+    return allOrders.filter(o => {
+      const mp = selectedMp || connectedMarketplaces.find(m => store.getOrders(m).includes(o)) || '';
+      return getMarketplaceOrderStatusCategory(o, mp) === statusFilter;
+    });
+  }, [selectedMp, statusFilter, store.dataVersion, connectedMarketplaces]);
 
   const virtualizer = useVirtualizer({
     count: orders.length,
@@ -281,7 +282,7 @@ export function MobileOrders({ connectedMarketplaces, store }: MobileOrdersProps
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Holat:</span>
-                {getStatusBadge(selectedOrder.status)}
+                {getStatusBadge(getMarketplaceOrderStatusCategory(selectedOrder, selectedMp))}
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Sana:</span>
