@@ -17,6 +17,7 @@ import {
 import React, { useState, useEffect, useRef, ReactNode } from 'react';
 import { motion, useScroll, useTransform, useMotionValue, useSpring, useInView as useMotionInView } from 'framer-motion';
 import heroDashboard from '@/assets/hero-dashboard-desktop.webp';
+import heroDashboardMobile from '@/assets/hero-dashboard-mobile.webp';
 import abstractShapes from '@/assets/abstract-shapes.webp';
 import { MARKETPLACE_CONFIG } from '@/lib/marketplaceConfig';
 
