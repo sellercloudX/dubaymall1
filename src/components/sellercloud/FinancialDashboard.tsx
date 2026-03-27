@@ -293,8 +293,8 @@ export function FinancialDashboard({
                               <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />API
                             </Badge>
                           ) : mpData.fees > 0 ? (
-                            <Badge variant="outline" className="text-[10px] border-warning/50 text-warning px-1.5 py-0">
-                              ~Taxminiy
+                            <Badge variant="outline" className="text-[10px] border-primary/30 text-primary px-1.5 py-0">
+                              <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />API
                             </Badge>
                           ) : (
                             <Badge variant="outline" className="text-[10px] border-muted-foreground/30 text-muted-foreground px-1.5 py-0">
