@@ -108,6 +108,7 @@ export default function SellerCloudMobile() {
     
     // Auto-dispatch Telegram notifications for new orders / low stock
     useAutoNotifications(connectedMarketplaces, store);
+    useMarketplaceRealtime(connectedMarketplaces);
    
    // Calculate revenue from actual order data with proper currency conversion
    const totalRevenue = useMemo(() => {
