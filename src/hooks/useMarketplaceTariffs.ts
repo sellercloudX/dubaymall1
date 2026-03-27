@@ -424,20 +424,25 @@ export function getTariffForProduct(
   if (tariff && tariff.totalTariff > 0) {
     const extraFees = tariff.otherFees || 0;
     let commission = tariff.agencyCommission;
-    let totalTariff = tariff.totalTariff;
 
-    if (marketplace === 'yandex' && commissionBase && commissionBase > 0 && tariff.commissionPercent > 0) {
-      // Recalculate commission using the REAL base (pre-subsidy price)
-      commission = Math.round(commBase * (tariff.commissionPercent / 100));
-      totalTariff = commission + tariff.fulfillment + tariff.delivery + extraFees;
+    // CRITICAL: Recalculate commission using actual item price × commission rate.
+    // Tariff map stores absolute values based on CATALOG price, but actual sold price
+    // may differ (promotions, discounts, price changes). Using commissionPercent × actual
+    // price ensures accurate per-order financial calculations.
+    if (tariff.commissionPercent > 0 && price > 0) {
+      const effectiveBase = (marketplace === 'yandex' && commissionBase && commissionBase > 0)
+        ? commBase : price;
+      commission = Math.round(effectiveBase * (tariff.commissionPercent / 100));
     }
 
+    const logistics = tariff.fulfillment + tariff.delivery + extraFees;
     const withdrawalFee = marketplace === 'yandex' ? Math.round(price * 0.01) : 0;
+    const totalFee = commission + logistics + withdrawalFee;
     return {
       commission,
-      logistics: tariff.fulfillment + tariff.delivery + extraFees,
+      logistics,
       withdrawal: withdrawalFee,
-      totalFee: totalTariff + withdrawalFee,
+      totalFee,
       isReal: true,
     };
   }
