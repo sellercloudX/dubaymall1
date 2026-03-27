@@ -277,6 +277,14 @@ export function TutorialVideosAdmin() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
+                  <Input type="number" className="w-20 h-7 text-xs" placeholder="Narx"
+                    defaultValue={(folder as any).price_uzs || 0}
+                    onBlur={e => {
+                      const val = parseInt(e.target.value) || 0;
+                      if (val !== ((folder as any).price_uzs || 0)) {
+                        updateFolderMutation.mutate({ id: folder.id, price_uzs: val } as any);
+                      }
+                    }} />
                   <Switch checked={folder.is_published}
                     onCheckedChange={checked => updateFolderMutation.mutate({ id: folder.id, is_published: checked })} />
                   <span className="text-[10px] text-muted-foreground w-10">{folder.is_published ? 'Faol' : 'Yashirin'}</span>
