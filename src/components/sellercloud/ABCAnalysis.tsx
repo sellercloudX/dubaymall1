@@ -72,7 +72,7 @@ export function ABCAnalysis({ connectedMarketplaces, store }: ABCAnalysisProps) 
     for (const marketplace of activeMarketplaces) {
       const productsList = store.getProducts(marketplace);
       const orders = store.getOrders(marketplace);
-      const taxRate = MARKETPLACE_TAX[marketplace] ?? 0;
+      const taxRate = UZB_TAX_RATE;
 
       // Build product lookup by offerId
       const productMap = new Map<string, typeof productsList[0]>();

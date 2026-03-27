@@ -150,8 +150,7 @@ export function FinancialDashboard({
     
     let totalTax = 0;
     activeMarketplaces.forEach(mp => {
-      const taxRate = MARKETPLACE_TAX[mp] ?? 0;
-      totalTax += (feesByMarketplace[mp]?.revenue || 0) * taxRate;
+      totalTax += (feesByMarketplace[mp]?.revenue || 0) * UZB_TAX_RATE;
     });
 
     const totalExpenses = totalProductCost + totalMarketplaceFees + totalTax;

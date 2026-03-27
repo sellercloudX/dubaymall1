@@ -124,7 +124,7 @@ export function SalesDashboard({ connectedMarketplaces, store }: SalesDashboardP
         const commission = totalFees;
         const logistics = 0; // Already included in tariff.totalFee
         const subsidyAmount = 0;
-        const taxRate = MARKETPLACE_TAX[mp] ?? 0;
+        const taxRate = UZB_TAX_RATE;
         const taxAmount = totalUzs * taxRate;
         
         const grossProfit = totalUzs - costTotal;
