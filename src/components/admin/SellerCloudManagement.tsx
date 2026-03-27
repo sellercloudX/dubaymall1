@@ -34,7 +34,8 @@ export function SellerCloudManagement() {
     waiveBilling,
     markBillingPaid,
   } = useSellerCloudAdmin();
-
+  const { data: allPlans } = useSubscriptionPlans();
+  const activePlans = allPlans?.filter(p => p.is_active) || [];
   const [search, setSearch] = useState('');
   const [selectedSub, setSelectedSub] = useState<any>(null);
   const [selectedBilling, setSelectedBilling] = useState<any>(null);
