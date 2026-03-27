@@ -1087,96 +1087,125 @@ serve(async (req) => {
           // Clone mode or pre-generated: reuse source images directly, no AI generation
           console.log(`⚡ Using ${sourceImages.length} source images (skipImageGeneration=${body.skipImageGeneration}, cloneMode=${body.cloneMode})`);
           images = [...sourceImages];
-        } else if (LOVABLE_KEY) {
-          // Generate images in edge function (direct call, not from scanner)
+        } else {
+          // Generate images via SellZen API (carousel variants: modelli + modelsiz)
+          const SELLZEN_API_KEY = Deno.env.get("SELLZEN_API_KEY");
           const sourceImg = sourceImages[0] || null;
           
-          const catLower = (product.category || product.name || "").toLowerCase();
-          let cardBg = "clean white-to-light-gray gradient";
-          let cardAccent = "soft blue accent glow";
-          let cardMood = "premium marketplace listing";
-          
-          if (catLower.includes("kosmetik") || catLower.includes("beauty") || catLower.includes("go'zallik") || catLower.includes("parfum") || catLower.includes("cream")) {
-            cardBg = "soft rose-gold to cream gradient with subtle golden sparkle particles";
-            cardAccent = "rose-gold shimmer and soft floral bokeh";
-            cardMood = "luxury beauty brand advertisement, Sephora/Charlotte Tilbury level";
-          } else if (catLower.includes("elektron") || catLower.includes("phone") || catLower.includes("smartfon") || catLower.includes("kompyuter") || catLower.includes("audio") || catLower.includes("tech")) {
-            cardBg = "sleek dark charcoal-to-black gradient (#0a0a0a to #1a1a2e) with subtle electric blue ambient glow";
-            cardAccent = "electric blue neon rim lighting and holographic shimmer";
-            cardMood = "Apple/Samsung flagship device launch, futuristic premium tech";
-          } else if (catLower.includes("kiyim") || catLower.includes("fashion") || catLower.includes("poyabzal") || catLower.includes("shoes")) {
-            cardBg = "warm off-white to beige gradient with subtle fabric texture overlay";
-            cardAccent = "warm gold accent lines and editorial composition";
-            cardMood = "ZARA/H&M catalog photography, clean fashion editorial";
-          } else if (catLower.includes("sport") || catLower.includes("fitness")) {
-            cardBg = "dynamic dark gradient with energetic orange-red accent streaks";
-            cardAccent = "fiery orange rim lighting and motion blur energy lines";
-            cardMood = "Nike/Adidas campaign photography, dynamic and powerful";
-          } else if (catLower.includes("bolalar") || catLower.includes("kids") || catLower.includes("baby") || catLower.includes("toy")) {
-            cardBg = "soft cheerful pastel rainbow gradient (light blue, mint, soft yellow)";
-            cardAccent = "bright playful shapes and confetti dots";
-            cardMood = "safe, bright, parent-friendly, Mothercare quality";
-          } else if (catLower.includes("oziq") || catLower.includes("food") || catLower.includes("ovqat") || catLower.includes("drink")) {
-            cardBg = "warm appetizing gradient with subtle wooden surface texture";
-            cardAccent = "warm amber lighting and freshness glow";
-            cardMood = "premium food photography, appetizing and inviting";
-          }
-
-          console.log(`🖼️ Generating 4 Pinterest-style marketplace card images (${cardMood})...`);
-          const creativeAngles = [
-            `Create a PREMIUM MARKETPLACE CARD image: ${cardBg} background. Product "${product.name}" centered, fills 75% of frame. ${cardAccent} around the product edges. Professional three-point studio lighting with dramatic rim light. Subtle reflection beneath. Style: ${cardMood}. NO text, NO watermarks, NO labels overlaid on the image. Ultra-sharp 4K quality, 3:4 marketplace card ratio.`,
-            `Create a LIFESTYLE MARKETPLACE CARD: ${cardBg} with subtle lifestyle elements (soft bokeh, ambient glow, aspirational setting). Product "${product.name}" slightly angled at 15 degrees for dynamic feel. Warm inviting lighting creating emotional connection and desire to purchase. ${cardAccent}. Style: ${cardMood}. NO text overlays. Premium marketplace listing quality.`,
-            `Create a PREMIUM ANGLE MARKETPLACE CARD: ${cardBg}. Three-quarter angle perspective of "${product.name}" showing 3D depth. Dramatic rim lighting creating stunning silhouette edge highlight. Sophisticated composition with artistic negative space. ${cardAccent}. Style: ${cardMood}. NO text overlays. Luxury catalog quality.`,
-            `Create a DETAIL SHOWCASE MARKETPLACE CARD: ${cardBg}. Close-up of "${product.name}" showing premium texture, material quality, branding details. Product fills 85% of frame. Bright even lighting emphasizing craftsmanship and quality. ${cardAccent}. Style: ${cardMood}. NO text overlays. Professional macro-style marketplace photography.`,
-          ];
-          
-          const imgPromises = creativeAngles.map((angle, i) => (async () => {
+          if (SELLZEN_API_KEY && sourceImg) {
+            console.log("🎨 Generating carousel images via SellZen API...");
+            
+            // Convert source image to base64 for SellZen
+            let imgBase64: string | null = null;
             try {
-              const genBody: any = {
-                model: "google/gemini-3-pro-image-preview",
-                modalities: ["image", "text"],
-                messages: [{
-                  role: "user",
-                  content: sourceImg ? [
-                    { type: "text", text: `You are an elite product photographer for a premium marketplace. Using this product as EXACT visual reference (same shape, color, brand, every detail must be IDENTICAL), create: ${angle}\n\nCRITICAL: The product must look 100% identical to the reference — same brand logo, same color, same shape. ONLY change the angle, background, and lighting. Do NOT add any text, watermarks, or labels to the image.` },
-                    { type: "image_url", image_url: { url: sourceImg } }
-                  ] : angle
-                }],
-              };
-              
-              const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-                method: "POST",
-                headers: { Authorization: `Bearer ${LOVABLE_KEY}`, "Content-Type": "application/json" },
-                body: JSON.stringify(genBody),
-              });
-              
-              if (res.ok) {
-                const data = await res.json();
-                const imgData = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-                if (imgData && imgData.startsWith("data:image")) {
-                  const base64 = imgData.split(",")[1];
-                  const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
-                  const fileName = `${user.id}/ym-gen-${Date.now()}-${i}.png`;
-                  const { error } = await supabase.storage.from('product-images').upload(fileName, bytes, {
-                    contentType: 'image/png', cacheControl: '31536000', upsert: false,
-                  });
-                  if (!error) {
-                    const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(fileName);
-                    if (urlData?.publicUrl) {
-                      console.log(`✅ Generated creative image ${i + 1}`);
-                      return urlData.publicUrl;
-                    }
+              if (sourceImg.startsWith('data:')) {
+                imgBase64 = sourceImg;
+              } else {
+                const imgResp = await fetch(sourceImg);
+                if (imgResp.ok) {
+                  const buffer = await imgResp.arrayBuffer();
+                  const bytes = new Uint8Array(buffer);
+                  const contentType = imgResp.headers.get('content-type') || 'image/jpeg';
+                  let binary = '';
+                  for (let i = 0; i < bytes.length; i++) {
+                    binary += String.fromCharCode(bytes[i]);
                   }
+                  imgBase64 = `data:${contentType};base64,${btoa(binary)}`;
                 }
               }
             } catch (e) {
-              console.error(`Image gen ${i} error:`, e);
+              console.error("Image to base64 error:", e);
             }
-            return null;
-          })());
-          
-          const generatedImgs = await Promise.all(imgPromises);
-          images = generatedImgs.filter(Boolean) as string[];
+            
+            if (imgBase64) {
+              // Map category to SellZen category
+              const catLower = (product.category || product.name || "").toLowerCase();
+              let sellzenCategory = 'home';
+              if (catLower.includes('elektr') || catLower.includes('techni') || catLower.includes('электрон') || catLower.includes('gadget') || catLower.includes('телефон') || catLower.includes('наушник') || catLower.includes('phone') || catLower.includes('audio') || catLower.includes('kompyuter')) sellzenCategory = 'electronics';
+              else if (catLower.includes('kiyim') || catLower.includes('fashion') || catLower.includes('одежд') || catLower.includes('обувь') || catLower.includes('poyabzal')) sellzenCategory = 'clothing';
+              else if (catLower.includes('kosmet') || catLower.includes('beauty') || catLower.includes('parfum') || catLower.includes('косметик') || catLower.includes('go\'zallik')) sellzenCategory = 'cosmetics';
+              else if (catLower.includes('auto') || catLower.includes('mashina') || catLower.includes('avto') || catLower.includes('авто')) sellzenCategory = 'auto';
+              else if (catLower.includes('sport') || catLower.includes('fitness') || catLower.includes('спорт')) sellzenCategory = 'sport';
+              
+              const SELLZEN_URL = "https://qqqzkrldaaqogwjvfgcg.supabase.co/functions/v1/api-generate";
+              const productDetails = (product.name || '').substring(0, 500);
+              
+              // Generate 4 carousel variants in parallel via SellZen
+              const sellzenConfigs = [
+                { mode: 'modelli', style: 'infografika', scene: 'premium', label: 'Hero Infographic' },
+                { mode: 'modelsiz', style: 'lifestyle', scene: 'tabiat', label: 'Lifestyle' },
+                { mode: 'modelli', style: 'tabiiy', scene: 'minimalist', label: 'Natural Model' },
+                { mode: 'modelsiz', style: 'infografika', scene: 'studiya', label: 'Studio Infographic' },
+              ];
+              
+              console.log(`🖼️ Generating ${sellzenConfigs.length} SellZen carousel images...`);
+              
+              const sellzenPromises = sellzenConfigs.map(async (config, i) => {
+                try {
+                  const response = await fetch(SELLZEN_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-api-key': SELLZEN_API_KEY },
+                    body: JSON.stringify({
+                      imageBase64: imgBase64,
+                      mode: config.mode,
+                      style: config.style,
+                      scene: config.scene,
+                      language: 'ru',
+                      category: sellzenCategory,
+                      productDetails,
+                    }),
+                  });
+                  
+                  if (!response.ok) {
+                    const errText = await response.text();
+                    console.error(`SellZen ${config.label} error ${response.status}: ${errText.substring(0, 150)}`);
+                    return null;
+                  }
+                  
+                  const data = await response.json();
+                  if (data.status === 'success') {
+                    const imageUrl = data.imageUrl || data.generatedImage;
+                    if (imageUrl) {
+                      // Upload to storage
+                      let bytes: Uint8Array;
+                      if (imageUrl.startsWith('data:')) {
+                        const base64Content = imageUrl.replace(/^data:image\/\w+;base64,/, '');
+                        bytes = Uint8Array.from(atob(base64Content), c => c.charCodeAt(0));
+                      } else {
+                        const dlResp = await fetch(imageUrl);
+                        if (!dlResp.ok) return null;
+                        bytes = new Uint8Array(await dlResp.arrayBuffer());
+                      }
+                      
+                      const fileName = `${user.id}/ym-sellzen-${Date.now()}-${i}.png`;
+                      const { error } = await supabase.storage.from('product-images').upload(fileName, bytes, {
+                        contentType: 'image/png', cacheControl: '31536000', upsert: false,
+                      });
+                      if (!error) {
+                        const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(fileName);
+                        if (urlData?.publicUrl) {
+                          console.log(`✅ SellZen ${config.label} image generated`);
+                          return urlData.publicUrl;
+                        }
+                      }
+                    }
+                  }
+                  console.warn(`SellZen ${config.label}: no image in response`);
+                  return null;
+                } catch (e) {
+                  console.error(`SellZen ${config.label} error:`, e);
+                  return null;
+                }
+              });
+              
+              const sellzenResults = await Promise.all(sellzenPromises);
+              images = sellzenResults.filter(Boolean) as string[];
+              console.log(`✅ SellZen generated ${images.length}/${sellzenConfigs.length} carousel images`);
+            }
+          } else if (!SELLZEN_API_KEY) {
+            console.warn("⚠️ SELLZEN_API_KEY not configured, using source images");
+            images = [...sourceImages];
+          }
         }
         
         // If no images at all, fall back to source
