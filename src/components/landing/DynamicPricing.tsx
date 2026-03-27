@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CheckCircle, X, ArrowRight, Star, Crown, Zap, Sparkles, MessageCircle, Store, Image, Copy, Percent, Shield, CreditCard } from 'lucide-react';
-import React from 'react';
+import React, { useRef } from 'react';
 
 const iconMap: Record<string, React.ElementType> = {
   zap: Zap, briefcase: Crown, crown: Crown, building: Sparkles, star: Crown,
@@ -75,8 +75,8 @@ interface DynamicPricingProps {
   FadeInSection: React.ComponentType<{ children: React.ReactNode; className?: string; delay?: number }>;
 }
 
-export const DynamicPricing = React.forwardRef<HTMLElement, DynamicPricingProps>(
-  function DynamicPricingInner({ FadeInSection }, ref) {
+export function DynamicPricing({ FadeInSection }: DynamicPricingProps) {
+    const ref = useRef<HTMLElement>(null);
     const { data: plans, isLoading } = useSubscriptionPlans();
     const { language } = useLanguage();
     const lang = (language || 'uz') as 'uz' | 'ru' | 'en';
@@ -353,7 +353,4 @@ export const DynamicPricing = React.forwardRef<HTMLElement, DynamicPricingProps>
         </div>
       </section>
     );
-  }
-);
-
-DynamicPricing.displayName = 'DynamicPricing';
+}
