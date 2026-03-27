@@ -743,13 +743,21 @@ export default function Index() {
                { value: c3 >= 1000 ? `${(c3/1000).toFixed(0)}K+` : `${c3}+`, label: txt.statsOrders, icon: TrendingUp, color: 'text-emerald-500' },
                { value: '4-5', label: txt.statsReplace, icon: Users, color: 'text-amber-500' },
              ].map((stat, i) => (
-               <div key={i} className="text-center group cursor-default">
-                 <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-card border shadow-sm mx-auto mb-2 sm:mb-4 flex items-center justify-center group-hover:shadow-lg group-hover:scale-105 transition-all`}>
+               <motion.div 
+                 key={i} 
+                 className="text-center group cursor-default"
+                 initial={{ opacity: 0, scale: 0.8 }}
+                 whileInView={{ opacity: 1, scale: 1 }}
+                 viewport={{ once: true }}
+                 transition={{ delay: i * 0.1, type: "spring", stiffness: 200 }}
+                 whileHover={{ y: -4 }}
+               >
+                 <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-card border shadow-sm mx-auto mb-2 sm:mb-4 flex items-center justify-center group-hover:shadow-lg transition-all`}>
                    <stat.icon className={`h-5 w-5 sm:h-6 sm:w-6 ${stat.color}`} />
                  </div>
                  <div className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground font-display">{stat.value}</div>
                  <div className="text-xs sm:text-sm text-muted-foreground mt-1 font-medium">{stat.label}</div>
-               </div>
+               </motion.div>
              ))}
           </div>
         </div>
