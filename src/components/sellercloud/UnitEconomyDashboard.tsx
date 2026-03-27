@@ -143,7 +143,7 @@ export function UnitEconomyDashboard({ connectedMarketplaces, store }: Props) {
     const result: SkuMetrics[] = [];
     map.forEach(m => {
       m.grossProfit = m.revenue - m.totalCost;
-      m.netProfit = m.grossProfit - m.totalFees;
+      m.netProfit = m.grossProfit - m.totalFees - m.tax;
       m.margin = m.revenue > 0 ? (m.netProfit / m.revenue) * 100 : 0;
       m.avgSellingPrice = m.unitsSold > 0 ? m.revenue / m.unitsSold : 0;
       result.push(m);
