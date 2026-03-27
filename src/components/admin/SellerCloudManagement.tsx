@@ -301,9 +301,11 @@ export function SellerCloudManagement() {
                       <TableRow key={sub.id}>
                          <TableCell className="font-medium">{profilesMap[sub.user_id] || sub.user_id.slice(0, 8)}</TableCell>
                         <TableCell>
-                          <Badge variant={sub.plan_type === 'pro' ? 'default' : 'secondary'}>
-                            {sub.plan_type === 'pro' ? 'Pro' : 'Individual'}
-                          </Badge>
+                          {(() => {
+                            const slug = sub.plan_slug || sub.plan_type || 'starter';
+                            const plan = allPlans?.find((p: any) => p.slug === slug);
+                            return <Badge variant="secondary">{plan?.name_uz || plan?.name || slug}</Badge>;
+                          })()}
                         </TableCell>
                         <TableCell>
                           <div className="text-sm font-medium">${sub.monthly_fee}/oy</div>
