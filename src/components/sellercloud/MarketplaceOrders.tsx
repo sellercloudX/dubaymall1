@@ -15,6 +15,7 @@ import type { MarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 import { MARKETPLACE_CONFIG, MarketplaceLogo } from '@/lib/marketplaceConfig';
 import { toDisplayUzs, formatUzs } from '@/lib/currency';
 import { getOrderRevenueUzs } from '@/lib/revenueCalculations';
+import { getMarketplaceOrderStatusCategory, type OrderStatusCategory } from '@/lib/marketplaceOrderStatus';
 
 interface MarketplaceOrdersProps {
   connectedMarketplaces: string[];
