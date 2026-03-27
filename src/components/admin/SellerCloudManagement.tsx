@@ -602,8 +602,9 @@ export function SellerCloudManagement() {
               <Select value={editPlanType} onValueChange={(v: any) => setEditPlanType(v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="pro">Pro ($499 standart)</SelectItem>
-                  <SelectItem value="enterprise">Individual (kelishuv)</SelectItem>
+                  {activePlans.map(p => (
+                    <SelectItem key={p.slug} value={p.slug}>{p.name_uz || p.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
