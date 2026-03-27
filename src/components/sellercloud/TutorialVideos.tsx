@@ -9,12 +9,14 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
-function extractYouTubeId(url: string): string | null {
+function extractYouTubeId(url: string | null | undefined): string | null {
+  if (!url) return null;
   const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([^&?\s]+)/);
   return match?.[1] || null;
 }
 
-function extractInstagramId(url: string): string | null {
+function extractInstagramId(url: string | null | undefined): string | null {
+  if (!url) return null;
   const match = url.match(/instagram\.com\/(?:p|reel|tv)\/([^/?]+)/);
   return match?.[1] || null;
 }
