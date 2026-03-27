@@ -158,14 +158,19 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
         body: { imageBase64 },
       });
 
-      if (analysisError) throw analysisError;
+      if (analysisError) {
+        console.error('Analysis edge function error:', analysisError);
+        throw new Error(analysisError.message || 'Tahlil xatosi');
+      }
+
+      if (!analysisData || !analysisData.name) {
+        throw new Error('AI mahsulotni aniqlay olmadi. Boshqa rasm bilan urinib ko\'ring.');
+      }
 
       setAnalyzedProduct(analysisData);
       
-      // Mahsulot nomini normallashtirish
       const normalizedName = normalizeProductName(analysisData.name);
       
-      // To'g'ridan-to'g'ri pricing bosqichiga o'tish (search/select olib tashlandi)
       setSelectedProduct({
         title: normalizedName,
         description: analysisData.description,

@@ -237,7 +237,7 @@ export function CardQualityAudit({ connectedMarketplaces, store }: CardQualityAu
             </div>
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {connectedMarketplaces.map(mp => (
+            {auditableMarketplaces.map(mp => (
               <Button
                 key={mp}
                 variant={auditedMarketplace === mp ? "default" : "outline"}
@@ -252,6 +252,19 @@ export function CardQualityAudit({ connectedMarketplaces, store }: CardQualityAu
                   <Play className="h-3 w-3" />
                 )}
                 {MARKETPLACE_NAMES[mp] || mp}
+              </Button>
+            ))}
+            {connectedMarketplaces.filter(mp => mp !== 'yandex' && mp !== 'wildberries').map(mp => (
+              <Button
+                key={mp}
+                variant="outline"
+                size="sm"
+                disabled
+                className="gap-1 h-8 text-xs px-2.5 opacity-50"
+                title="Tez orada qo'llab-quvvatlanadi"
+              >
+                {MARKETPLACE_NAMES[mp] || mp}
+                <Badge variant="secondary" className="text-[8px] px-1 py-0 ml-0.5">Tez kunda</Badge>
               </Button>
             ))}
           </div>
