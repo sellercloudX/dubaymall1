@@ -825,8 +825,13 @@ async function aiOptimize(
     return true;
   });
 
+  // ═══ SEPARATE REQUIRED vs OPTIONAL params ═══
+  const isRequired = (p: any) => p.required === true || p.constraintType === "REQUIRED" || p.mandatory === true;
+  const requiredParams = allParams.filter(isRequired);
+  const optionalParams = allParams.filter(p => !isRequired(p));
+
   const formatParam = (p: any) => {
-    let s = `  - id:${p.id}, "${p.name}", type:${p.type || "TEXT"}, required:${p.required || p.constraintType === "REQUIRED" ? "YES" : "no"}`;
+    let s = `  - id:${p.id}, "${p.name}", type:${p.type || "TEXT"}`;
     if (p.unit) s += `, unit:"${p.unit}"`;
     if (p.values?.length) {
       const vals = p.values.slice(0, 25).map((v: any) => `{id:${v.id},"${v.value}"}`).join(", ");
@@ -836,7 +841,7 @@ async function aiOptimize(
     return s;
   };
 
-  console.log(`🤖 AI optimizing (2-pass): ${allParams.length} TOTAL params (after filtering "Прочие")`);
+  console.log(`🤖 AI optimizing: ${requiredParams.length} REQUIRED + ${optionalParams.length} optional = ${allParams.length} total`);
 
   const sourceCharacteristicsText = Array.isArray(product.sourceCharacteristics) && product.sourceCharacteristics.length > 0
     ? product.sourceCharacteristics
@@ -849,8 +854,8 @@ async function aiOptimize(
   // Get category-specific AI instructions
   const categoryInstructions = getCategorySpecificInstructions(categoryName, product.name);
 
-  const prompt = `VAZIFA: Yandex Market kartochkasi uchun BARCHA ${allParams.length} ta parametrni to'ldir!
-MAQSAD: MAKSIMAL ball olish. "Maydonlarni ko'rsatish" (Показать поля) ortidagi YASHIRIN parametrlar ham ALBATTA to'ldirilishi SHART!
+  const prompt = `VAZIFA: Yandex Market kartochkasi uchun BARCHA parametrlarni to'ldir!
+MAQSAD: MAKSIMAL ball olish — 90+ ball!
 
 MAHSULOT:
 - Nom: ${product.name}
@@ -863,17 +868,24 @@ ${sourceCharacteristicsText ? `- Manba xususiyatlari (Uzum/WB): ${sourceCharacte
 - Model: ${product.model || "Nomdan aniqla"}
 - Narx: ${product.price} UZS
 ${categoryInstructions}
-═══ UMUMIY QOIDALAR (BARCHA KATEGORIYALAR UCHUN) ═══
-⛔ "ПРОЧИЕ ХАРАКТЕРИСТИКИ" / "ПРОЧЕЕ" degan parametrni HECH QACHON TO'LDIRMA! BO'SH QOLDIR!
-⛔ Agar parametr nomi "прочие", "прочее", "другие" so'zlarini o'z ichiga olsa — UNI O'TKAZIB YUBOR!
 
-═══ BARCHA PARAMETRLAR — HAR BIRINI TO'LDIR! ═══
-${allParams.map(formatParam).join("\n")}
+═══ UMUMIY QOIDALAR ═══
+⛔ "ПРОЧИЕ ХАРАКТЕРИСТИКИ" / "ПРОЧЕЕ" degan parametrni HECH QACHON TO'LDIRMA!
+
+═══════════════════════════════════════════════════════
+⚠️⚠️⚠️ BIRINCHI NAVBATDA: "ASOSIY XUSUSIYATLAR" (${requiredParams.length} ta MAJBURIY parametr) ⚠️⚠️⚠️
+Bu parametrlar TO'LDIRILMASA ball PAST bo'ladi! HAR BIRINI ALBATTA TO'LDIR!
+"Maydonlarni ko'rsatish" tugmasi ortidagi YASHIRIN parametrlar HAM shu yerda!
+═══════════════════════════════════════════════════════
+${requiredParams.map(formatParam).join("\n")}
+
+═══ QO'SHIMCHA PARAMETRLAR (${optionalParams.length} ta) — IMKON QADAR TO'LDIR ═══
+${optionalParams.map(formatParam).join("\n")}
 
 QOIDALAR:
 1. name_ru: Ruscha SEO-nom, 80-150 belgi. Format: "[Tur] [Brend] [Model] [Xususiyatlar], [rang]". MAJBURIY!
-2. name_uz: O'ZBEKCHA LOTIN yozuvida nom, 80-150 belgi. MAJBURIY! Bu KIRILL emas, LOTIN yozuvi! Masalan: "Tonal krem Estée Lauder Double Wear, to'q jigarrang". Ruscha so'zlar bo'lmasin!
-3. description_ru: 800-3000 belgi ruscha tavsif. HTML TEGLARISIZ! Oddiy matn. 6+ paragraf.
+2. name_uz: O'ZBEKCHA LOTIN yozuvida nom, 80-150 belgi. MAJBURIY! Masalan: "Tonal krem Estée Lauder Double Wear, to'q jigarrang".
+3. description_ru: 800-3000 belgi ruscha tavsif. HTML TEGLARISIZ! 6+ paragraf.
 4. description_uz: 600-2000 belgi o'zbekcha LOTIN tavsif. HTML TEGLARISIZ!
 5. vendor: Aniq brend nomi
 6. vendorCode: Model artikuli
@@ -886,28 +898,21 @@ QOIDALAR:
    - NUMBER parametr → value raqam
    - BOOLEAN parametr → "true" yoki "false"
    
-   *** JUDA MUHIM: HAR BIR ${allParams.length} ta parametrni to'ldir! ***
-   *** BO'SH QOLDIRMA! Bilmasang — mahsulotga mos taxminiy qiymat yoz! ***
+   *** JUDA MUHIM: BIRINCHI ${requiredParams.length} ta MAJBURIY parametrni HAR BIRINI to'ldir! ***
+   *** Bilmasang — mahsulotga mos taxminiy qiymat yoz! ***
    *** Har bir parametr uchun FAQAT value YOKI valueId ber, ikkalasini emas! ***
-   
-   ⚠️⚠️⚠️ BITTA VARIANT QOIDASI ⚠️⚠️⚠️:
-   - Har bir parametr uchun FAQAT BITTA qiymat ber!
-   - Masalan rang uchun FAQAT bitta rang: "белый" yoki "черный" — ikkalasini berma!
-   - O'lcham uchun FAQAT bitta o'lcham: "M" yoki "42" — bir nechtasini berma!
-   - Bu BITTA VARIANT kartochkasi — variantlar kerak emas!
+   *** FAQAT BITTA qiymat ber har bir parametrga! ***
 11. warranty: "1 год" yoki "2 года"
 12. weightDimensions — REAL o'lchamlar:
-   - Kosmetika/parfyum: weight=0.05-0.3kg, 5x5x10 ~ 10x10x15 sm
-   - Telefon: weight=0.15-0.25kg, 8x1x16 sm
    - Chexol: weight=0.03-0.08kg, 16x8x1 sm
-   - Krossovka: weight=0.4-0.8kg, 35x25x12 sm  
-   - Maishiy texnika (kichik): weight=0.5-3kg, 20x15x15 ~ 40x30x30 sm
-   - KATTA qo'yma! Logistika narxi oshadi!
+   - Telefon: weight=0.15-0.25kg, 8x1x16 sm
+   - Kosmetika: weight=0.05-0.3kg, 5x5x10 ~ 10x10x15 sm
+   - Krossovka: weight=0.4-0.8kg, 35x25x12 sm
 
 JAVOB FAQAT JSON:
 {"name_ru":"...","name_uz":"...","description_ru":"...","description_uz":"...","vendor":"...","vendorCode":"...","manufacturerCountry":"...","shelfLife":null,"lifeTime":null,"parameterValues":[{"parameterId":123,"valueId":456},{"parameterId":789,"value":"qiymat"}],"warranty":"1 год","adult":false,"weightKg":0.15,"lengthCm":10,"widthCm":8,"heightCm":5}`;
 
-  // Cost-optimized: flash for all modes
+  // Use stronger model for better parameter filling
   const aiModel = "google/gemini-2.5-flash";
   
   let result: any = null;
@@ -938,32 +943,43 @@ JAVOB FAQAT JSON:
   
   if (!result) return null;
 
-  // ═══ PASS 2: Find missing params and fill them ═══
+  // ═══ PASS 2: Focus on MISSING REQUIRED params ═══
   const filledParamIds = new Set(
     (result.parameterValues || []).map((p: any) => Number(p.parameterId))
   );
-  const missingParams = allParams.filter((p: any) => !filledParamIds.has(Number(p.id)));
   
-  if (missingParams.length > 0 && missingParams.length <= 80) {
-    console.log(`🔄 Pass 2: ${missingParams.length} params bo'sh qoldi, to'ldirish...`);
+  const missingRequired = requiredParams.filter((p: any) => !filledParamIds.has(Number(p.id)));
+  const missingOptional = optionalParams.filter((p: any) => !filledParamIds.has(Number(p.id)));
+  const allMissing = [...missingRequired, ...missingOptional];
+  
+  console.log(`📊 Pass 1 natija: ${result.parameterValues?.length || 0} to'ldirildi. Bo'sh: ${missingRequired.length} MAJBURIY + ${missingOptional.length} optional`);
+  
+  if (allMissing.length > 0 && allMissing.length <= 80) {
+    console.log(`🔄 Pass 2: ${missingRequired.length} MAJBURIY + ${missingOptional.length} optional to'ldirish...`);
     
-    const pass2Prompt = `VAZIFA: Quyidagi ${missingParams.length} ta BO'SH parametrni to'ldir!
-Bular birinchi bosqichda to'ldirilmagan parametrlar. HAR BIRINI ALBATTA to'ldir!
+    const pass2Prompt = `VAZIFA: Quyidagi BO'SH parametrlarni to'ldir!
+Bu birinchi bosqichda to'ldirilMAGAN parametrlar. BALL oshirish uchun HAR BIRINI to'ldir!
 
-⛔ MUHIM: "ПРОЧИЕ ХАРАКТЕРИСТИКИ" / "ПРОЧЕЕ" degan parametrni TO'LDIRMA! O'tkazib yubor!
+⛔ "ПРОЧИЕ ХАРАКТЕРИСТИКИ" / "ПРОЧЕЕ" parametrni TO'LDIRMA!
 
 MAHSULOT: "${product.name}" — ${categoryName}
 Brend: ${result.vendor || product.brand || "OEM"}
+${sourceCharacteristicsText ? `Manba xususiyatlari: ${sourceCharacteristicsText}` : ''}
 
-BO'SH PARAMETRLAR:
-${missingParams.map(formatParam).join("\n")}
+${missingRequired.length > 0 ? `⚠️⚠️⚠️ MAJBURIY — HAR BIRINI ALBATTA TO'LDIR (${missingRequired.length} ta):
+${missingRequired.map(formatParam).join("\n")}
+` : ''}
+${missingOptional.length > 0 ? `QO'SHIMCHA (${missingOptional.length} ta):
+${missingOptional.map(formatParam).join("\n")}
+` : ''}
 
 QOIDALAR:
-- OPTIONS bor → valueId (raqam) tanla
-- TEXT → FAQAT qiymat ("красный", "100 мл")
+- OPTIONS bor → valueId (raqam) tanla, eng mos
+- TEXT → FAQAT qiymat ("красный", "100 мл"), nom:qiymat formatda BERMA
 - NUMBER → raqam
 - BOOLEAN → "true"/"false"
-- Bilmasang ham — mahsulotga mos TAXMINIY qiymat yoz!
+- Bilmasang — mahsulotga mos TAXMINIY qiymat yoz!
+- BITTA parametr uchun FAQAT BITTA qiymat!
 
 JAVOB FAQAT JSON array:
 [{"parameterId":123,"valueId":456},{"parameterId":789,"value":"qiymat"}]`;
@@ -988,17 +1004,74 @@ JAVOB FAQAT JSON array:
           const extraParams = JSON.parse(arrMatch[0]);
           if (Array.isArray(extraParams) && extraParams.length > 0) {
             result.parameterValues = [...(result.parameterValues || []), ...extraParams];
-            console.log(`✅ Pass 2: +${extraParams.length} params to'ldirildi. Jami: ${result.parameterValues.length}`);
+            console.log(`✅ Pass 2: +${extraParams.length} params. Jami: ${result.parameterValues.length}`);
           }
         }
       }
     } catch (e) {
       console.error("AI Pass 2 error:", e);
     }
-  } else if (missingParams.length === 0) {
+    
+    // ═══ PASS 3: If REQUIRED params STILL missing, force-fill them ═══
+    const filledAfterP2 = new Set(
+      (result.parameterValues || []).map((p: any) => Number(p.parameterId))
+    );
+    const stillMissingRequired = requiredParams.filter((p: any) => !filledAfterP2.has(Number(p.id)));
+    
+    if (stillMissingRequired.length > 0) {
+      console.log(`⚠️ Pass 3: ${stillMissingRequired.length} MAJBURIY param hali bo'sh! Force-fill...`);
+      
+      const pass3Prompt = `FAQAT shu ${stillMissingRequired.length} ta MAJBURIY parametrni to'ldir. Bu parametrlar TO'LDIRILMASA kartochka sifati JUDA PAST bo'ladi!
+
+Mahsulot: "${product.name}" (${categoryName})
+Brend: ${result.vendor || product.brand || "OEM"}
+
+HAR BIRINI ALBATTA TO'LDIR — BO'SH QOLDIRMA!:
+${stillMissingRequired.map(formatParam).join("\n")}
+
+QOIDALAR: OPTIONS bor → valueId raqam tanla. TEXT → faqat qiymat. Bilmasang taxminiy yoz!
+JAVOB FAQAT JSON array: [{"parameterId":123,"valueId":456}]`;
+
+      try {
+        const resp3 = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${lovableApiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash",
+            messages: [{ role: "user", content: pass3Prompt }],
+            temperature: 0.2,
+            max_tokens: 4000,
+          }),
+        });
+
+        if (resp3.ok) {
+          const data3 = await resp3.json();
+          const content3 = data3.choices?.[0]?.message?.content || "";
+          const arrMatch3 = content3.match(/\[[\s\S]*\]/);
+          if (arrMatch3) {
+            const p3Params = JSON.parse(arrMatch3[0]);
+            if (Array.isArray(p3Params) && p3Params.length > 0) {
+              result.parameterValues = [...(result.parameterValues || []), ...p3Params];
+              console.log(`✅ Pass 3: +${p3Params.length} MAJBURIY params. Jami: ${result.parameterValues.length}`);
+            }
+          }
+        }
+      } catch (e) {
+        console.error("AI Pass 3 error:", e);
+      }
+    }
+  } else if (allMissing.length === 0) {
     console.log(`✅ Pass 1 da barcha ${allParams.length} param to'ldirildi!`);
   } else {
-    console.log(`⚠️ ${missingParams.length} param bo'sh qoldi (juda ko'p, pass 2 o'tkazildi)`);
+    console.log(`⚠️ ${allMissing.length} param bo'sh qoldi (juda ko'p, pass 2 o'tkazildi)`);
+  }
+  
+  // Final stats
+  const finalFilled = new Set((result.parameterValues || []).map((p: any) => Number(p.parameterId)));
+  const finalMissingReq = requiredParams.filter(p => !finalFilled.has(Number(p.id)));
+  console.log(`📊 YAKUNIY: ${result.parameterValues?.length || 0}/${allParams.length} to'ldirildi. MAJBURIY bo'sh: ${finalMissingReq.length}/${requiredParams.length}`);
+  if (finalMissingReq.length > 0) {
+    console.log(`⚠️ Bo'sh MAJBURIY: ${finalMissingReq.map(p => `"${p.name}"(${p.id})`).join(', ')}`);
   }
 
   return result;
