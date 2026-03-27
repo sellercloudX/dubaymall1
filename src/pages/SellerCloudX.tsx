@@ -25,6 +25,7 @@ import { PlanSelector } from '@/components/sellercloud/PlanSelector';
 import { OnboardingWizard } from '@/components/sellercloud/OnboardingWizard';
 import { SellerCloudSidebar, sellerMenuItems } from '@/components/sellercloud/SellerCloudSidebar';
 import { FeatureGate } from '@/components/sellercloud/FeatureGate';
+import { useMarketplaceRealtime } from '@/hooks/useMarketplaceRealtime';
 
 
 // Lazy load heavy tab components
@@ -149,6 +150,7 @@ export default function SellerCloudX() {
   const connectedMarketplaces = useMemo(() => connections.map(c => c.marketplace), [connections]);
   const store = useMarketplaceDataStore(connectedMarketplaces);
   useAutoNotifications(connectedMarketplaces, store);
+  useMarketplaceRealtime(connectedMarketplaces);
   
   const totalRevenue = useMemo(() => {
     if (store.allOrders.length === 0) return connections.reduce((sum, c) => sum + (c.total_revenue || 0), 0);
