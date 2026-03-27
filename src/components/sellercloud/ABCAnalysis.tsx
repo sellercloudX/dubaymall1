@@ -137,7 +137,7 @@ export function ABCAnalysis({ connectedMarketplaces, store }: ABCAnalysisProps) 
 
         allProducts.push({
           id: product.offerId, name: product.name || 'Nomsiz',
-          sku: product.shopSku || product.offerId, marketplace, price: priceUzs,
+          sku: product.shopSku || product.offerId, marketplace, price: avgSoldPrice,
           totalSold: sales.qty, totalRevenue, estimatedCost: totalCosts,
           commissionAmount: tariff.commission * sales.qty, 
           logisticsCost: tariff.logistics * sales.qty,
