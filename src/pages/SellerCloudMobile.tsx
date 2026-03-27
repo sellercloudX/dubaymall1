@@ -127,15 +127,7 @@ export default function SellerCloudMobile() {
     }
   }, [user, authLoading, navigate]);
 
-  if (authLoading || subscriptionLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  // Auto-create starter subscription for new users
+  // Auto-create starter subscription for new users (MUST be before any early return)
   useEffect(() => {
     if (!subscription && !subscriptionLoading && user) {
       createSubscription('starter', 0).then(result => {
@@ -145,6 +137,15 @@ export default function SellerCloudMobile() {
       });
     }
   }, [subscription, subscriptionLoading, user]);
+
+  // Early returns AFTER all hooks
+  if (authLoading || subscriptionLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   if (!subscription) {
     return (
