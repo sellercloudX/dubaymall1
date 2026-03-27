@@ -115,14 +115,19 @@ export function ABCAnalysis({ connectedMarketplaces, store }: ABCAnalysisProps) 
       productsList.forEach(product => {
         processedOfferIds.add(product.offerId);
         const sales = salesMap.get(product.offerId) || { qty: 0, revenue: 0 };
-        const priceUzs = toDisplayUzs(product.price || 0, marketplace);
-        const totalRevenue = sales.revenue || sales.qty * priceUzs;
+        const catalogPriceUzs = toDisplayUzs(product.price || 0, marketplace);
+        const totalRevenue = sales.revenue || sales.qty * catalogPriceUzs;
+        // Use ACTUAL average sold price for tariff calculation, not catalog price
+        // This handles promotions, discounts, and price changes over time
+        const avgSoldPrice = sales.qty > 0 && sales.revenue > 0
+          ? sales.revenue / sales.qty
+          : catalogPriceUzs;
         
         const rawCostPrice = getCostPrice(marketplace, product.offerId);
         const costPriceUzs = rawCostPrice !== null ? toDisplayUzs(rawCostPrice, marketplace) : null;
         const productCost = costPriceUzs !== null ? costPriceUzs * sales.qty : 0;
         
-        const tariff = getTariffForProduct(tariffMap, product.offerId, priceUzs, marketplace);
+        const tariff = getTariffForProduct(tariffMap, product.offerId, avgSoldPrice, marketplace);
         const marketplaceFees = tariff.totalFee * sales.qty;
         
         const taxAmount = totalRevenue * taxRate;
