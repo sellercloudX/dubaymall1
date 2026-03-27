@@ -641,7 +641,11 @@ export function SellerCloudManagement() {
           <div className="space-y-4">
             {activatingSub && (
               <div className="bg-muted p-3 rounded-lg text-sm space-y-1">
-                <p>Tarif: <strong>{activatingSub.plan_type === 'pro' ? 'Pro' : 'Individual'}</strong></p>
+                {(() => {
+                  const slug = activatingSub.plan_slug || activatingSub.plan_type || 'starter';
+                  const plan = allPlans?.find((p: any) => p.slug === slug);
+                  return <p>Tarif: <strong>{plan?.name_uz || plan?.name || slug}</strong></p>;
+                })()}
                 <p>To'lov: <strong>${activatingSub.monthly_fee}/oy</strong></p>
               </div>
             )}
