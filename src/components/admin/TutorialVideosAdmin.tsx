@@ -75,7 +75,7 @@ export function TutorialVideosAdmin() {
   });
 
   const [folderForm, setFolderForm] = useState({
-    name: '', description: '', cover_image_url: '',
+    name: '', description: '', cover_image_url: '', price_uzs: 0,
   });
 
   // ─── Queries ───
