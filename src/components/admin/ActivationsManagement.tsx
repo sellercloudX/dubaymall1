@@ -12,6 +12,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Store, Users, CheckCircle, XCircle, Clock, Search, Eye, ExternalLink, Globe } from 'lucide-react';
 import { format } from 'date-fns';
+import { useSubscriptionPlans } from '@/hooks/useSubscriptionPlans';
 
 export function ActivationsManagement() {
   const [activeTab, setActiveTab] = useState('cloud');
