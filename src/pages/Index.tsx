@@ -680,8 +680,13 @@ export default function Index() {
                 <motion.img 
                   src={heroDashboard} 
                   alt="SellerCloudX Dashboard" 
+                  width={1400}
+                  height={787}
+                  sizes="(min-width: 1024px) 50vw, 100vw"
                   className="relative rounded-2xl shadow-2xl border border-border/30 w-full"
                   loading="eager"
+                  fetchPriority="high"
+                  decoding="async"
                   whileHover={{ scale: 1.02, rotateY: -2 }}
                   transition={{ type: "spring", stiffness: 200, damping: 20 }}
                 />
