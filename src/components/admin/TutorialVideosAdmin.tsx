@@ -75,7 +75,7 @@ export function TutorialVideosAdmin() {
   });
 
   const [folderForm, setFolderForm] = useState({
-    name: '', description: '', cover_image_url: '',
+    name: '', description: '', cover_image_url: '', price_uzs: 0,
   });
 
   // ─── Queries ───
@@ -111,11 +111,12 @@ export function TutorialVideosAdmin() {
       const { error } = await supabase.from('tutorial_folders').insert({
         name: f.name, description: f.description || null,
         cover_image_url: f.cover_image_url || null,
+        price_uzs: f.price_uzs || 0,
         sort_order: folders.length, created_by: user?.id,
       });
       if (error) throw error;
     },
-    onSuccess: () => { invalidate(); setShowAddFolder(false); setFolderForm({ name: '', description: '', cover_image_url: '' }); toast.success('Papka yaratildi'); },
+    onSuccess: () => { invalidate(); setShowAddFolder(false); setFolderForm({ name: '', description: '', cover_image_url: '', price_uzs: 0 }); toast.success('Papka yaratildi'); },
     onError: () => toast.error('Xatolik'),
   });
 
@@ -242,6 +243,7 @@ export function TutorialVideosAdmin() {
           <CardContent className="pt-4 space-y-3">
             <Input placeholder="Papka nomi *" value={folderForm.name} onChange={e => setFolderForm(f => ({ ...f, name: e.target.value }))} />
             <Input placeholder="Muqova rasm URL" value={folderForm.cover_image_url} onChange={e => setFolderForm(f => ({ ...f, cover_image_url: e.target.value }))} />
+            <Input type="number" placeholder="Narxi (so'm, 0 = bepul)" value={folderForm.price_uzs || ''} onChange={e => setFolderForm(f => ({ ...f, price_uzs: parseInt(e.target.value) || 0 }))} />
             <Textarea placeholder="Tavsif (ixtiyoriy)" value={folderForm.description} onChange={e => setFolderForm(f => ({ ...f, description: e.target.value }))} rows={2} />
             <Button size="sm" onClick={handleAddFolder} disabled={addFolderMutation.isPending}>
               <Save className="h-4 w-4 mr-1.5" />Saqlash
@@ -265,9 +267,24 @@ export function TutorialVideosAdmin() {
                 </div>
                 <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setSelectedFolderId(folder.id)}>
                   <h4 className="font-medium text-sm">{folder.name}</h4>
-                  <p className="text-xs text-muted-foreground">{count} ta video</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs text-muted-foreground">{count} ta video</p>
+                    {(folder as any).price_uzs > 0 ? (
+                      <Badge variant="outline" className="text-[10px]">{((folder as any).price_uzs).toLocaleString()} so'm</Badge>
+                    ) : (
+                      <Badge variant="secondary" className="text-[10px]">Bepul</Badge>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
+                  <Input type="number" className="w-20 h-7 text-xs" placeholder="Narx"
+                    defaultValue={(folder as any).price_uzs || 0}
+                    onBlur={e => {
+                      const val = parseInt(e.target.value) || 0;
+                      if (val !== ((folder as any).price_uzs || 0)) {
+                        updateFolderMutation.mutate({ id: folder.id, price_uzs: val } as any);
+                      }
+                    }} />
                   <Switch checked={folder.is_published}
                     onCheckedChange={checked => updateFolderMutation.mutate({ id: folder.id, is_published: checked })} />
                   <span className="text-[10px] text-muted-foreground w-10">{folder.is_published ? 'Faol' : 'Yashirin'}</span>

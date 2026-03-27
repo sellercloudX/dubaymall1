@@ -3,15 +3,19 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { PlayCircle, BookOpen, Search, Lock, Youtube, Instagram, Send, FolderOpen, ArrowLeft } from 'lucide-react';
+import { PlayCircle, BookOpen, Search, Lock, Youtube, Instagram, Send, FolderOpen, ArrowLeft, ShoppingCart, CheckCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 function extractYouTubeId(url: string | null | undefined): string | null {
   if (!url) return null;
-  // Support: watch?v=, youtu.be/, embed/, v/, shorts/
   const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|shorts\/|watch\?v=|watch\?.+&v=))([^&?\s]+)/);
   return match?.[1] || null;
 }
@@ -28,6 +32,7 @@ interface TutorialFolder {
   description: string | null;
   cover_image_url: string | null;
   sort_order: number;
+  price_uzs: number;
 }
 
 interface TutorialVideo {
@@ -49,11 +54,13 @@ const platformLabels: Record<string, string> = { youtube: 'YouTube', instagram: 
 
 export function TutorialVideos() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [selectedVideo, setSelectedVideo] = useState<TutorialVideo | null>(null);
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   const [selectedPlatform, setSelectedPlatform] = useState<string>('all');
   const [playerError, setPlayerError] = useState<string | null>(null);
+  const [purchaseDialog, setPurchaseDialog] = useState<TutorialFolder | null>(null);
 
   const { data: subscription } = useQuery({
     queryKey: ['user-subscription-status', user?.id],
@@ -107,18 +114,89 @@ export function TutorialVideos() {
     },
   });
 
-  const isLoading = foldersLoading || videosLoading;
-
-  // Videos in current folder (or uncategorized)
-  const folderVideos = selectedFolder
-    ? videos.filter(v => v.folder_id === selectedFolder)
-    : videos.filter(v => !v.folder_id);
-
-  const filtered = folderVideos.filter(v => {
-    if (selectedPlatform !== 'all' && v.video_type !== selectedPlatform) return false;
-    if (search && !v.title.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
+  // User's purchased folders
+  const { data: purchases = [] } = useQuery({
+    queryKey: ['tutorial-purchases', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      const { data } = await supabase
+        .from('tutorial_purchases')
+        .select('folder_id')
+        .eq('user_id', user.id);
+      return (data || []).map(p => p.folder_id);
+    },
+    enabled: !!user,
   });
+
+  // User balance
+  const { data: userBalance } = useQuery({
+    queryKey: ['user-balance', user?.id],
+    queryFn: async () => {
+      if (!user) return 0;
+      const { data } = await supabase
+        .from('user_balances')
+        .select('balance_uzs')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      return data?.balance_uzs || 0;
+    },
+    enabled: !!user,
+  });
+
+  const purchaseMutation = useMutation({
+    mutationFn: async (folderId: string) => {
+      const { data, error } = await supabase.rpc('purchase_tutorial_folder', { p_folder_id: folderId });
+      if (error) throw error;
+      const result = data as any;
+      if (!result?.success) {
+        if (result?.error === 'insufficient_balance') {
+          toast.error(`Balans yetarli emas. Kerakli: ${result.price?.toLocaleString()} so'm, Balans: ${result.balance?.toLocaleString()} so'm`, {
+            duration: 5000,
+            action: { label: "Balansni to'ldirish", onClick: () => { window.location.hash = 'subscription'; } },
+          });
+          throw new Error('insufficient_balance');
+        }
+        throw new Error(result?.error || 'Xatolik');
+      }
+      return result;
+    },
+    onSuccess: (data, folderId) => {
+      queryClient.invalidateQueries({ queryKey: ['tutorial-purchases'] });
+      queryClient.invalidateQueries({ queryKey: ['user-balance'] });
+      if (data.message === 'already_purchased') {
+        setSelectedFolder(folderId);
+      } else {
+        toast.success("Papka muvaffaqiyatli sotib olindi! Doimiy kirish huquqi berildi.");
+        setSelectedFolder(folderId);
+      }
+      setPurchaseDialog(null);
+    },
+    onError: (err: any) => {
+      if (err.message !== 'insufficient_balance') {
+        toast.error("Xatolik yuz berdi");
+      }
+    },
+  });
+
+  const isFolderPurchased = (folderId: string) => purchases.includes(folderId);
+  const isFolderFree = (folder: TutorialFolder) => !folder.price_uzs || folder.price_uzs <= 0;
+
+  const canAccessFolder = (folder: TutorialFolder) => {
+    if (isFolderFree(folder)) return true;
+    if (isFolderPurchased(folder.id)) return true;
+    return false;
+  };
+
+  const handleFolderClick = (folder: TutorialFolder) => {
+    if (canAccessFolder(folder)) {
+      setSelectedFolder(folder.id);
+      return;
+    }
+    // Show purchase dialog
+    setPurchaseDialog(folder);
+  };
+
+  const isLoading = foldersLoading || videosLoading;
 
   const canWatch = (video: TutorialVideo) => video.is_free || isActive;
 
@@ -136,7 +214,7 @@ export function TutorialVideos() {
       if (!embedUrl) return <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground text-sm">Video URL noto'g'ri</div>;
       return (
         <iframe src={embedUrl} title={video.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full" referrerPolicy="no-referrer"
-          onError={() => setPlayerError('Video yuklanmadi. Video "unlisted" holatda bo\'lishi kerak.')} />
+          onError={() => setPlayerError('Video yuklanmadi.')} />
       );
     }
     if (video.video_type === 'instagram') {
@@ -183,7 +261,7 @@ export function TutorialVideos() {
     );
   }
 
-  // Folder view
+  // Folder view (main)
   if (!selectedFolder && folders.length > 0) {
     const uncategorizedCount = videos.filter(v => !v.folder_id).length;
 
@@ -197,10 +275,13 @@ export function TutorialVideos() {
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           {folders.map(folder => {
             const count = videos.filter(v => v.folder_id === folder.id).length;
+            const purchased = isFolderPurchased(folder.id);
+            const free = isFolderFree(folder);
+
             return (
               <button
                 key={folder.id}
-                onClick={() => setSelectedFolder(folder.id)}
+                onClick={() => handleFolderClick(folder)}
                 className="group text-left rounded-xl border border-border overflow-hidden hover:shadow-md hover:border-primary/30 transition-all"
               >
                 <div className="aspect-[4/3] relative bg-muted overflow-hidden">
@@ -209,6 +290,23 @@ export function TutorialVideos() {
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-primary/5">
                       <FolderOpen className="h-10 w-10 text-primary/30" />
+                    </div>
+                  )}
+                  {/* Overlay for paid & not purchased */}
+                  {!free && !purchased && (
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                      <div className="text-center text-white">
+                        <Lock className="h-6 w-6 mx-auto mb-1" />
+                        <p className="text-xs font-bold">{folder.price_uzs.toLocaleString()} so'm</p>
+                      </div>
+                    </div>
+                  )}
+                  {/* Purchased badge */}
+                  {purchased && (
+                    <div className="absolute top-2 right-2">
+                      <Badge className="text-[10px] bg-green-600 hover:bg-green-700 gap-1">
+                        <CheckCircle className="h-3 w-3" /> Sotib olingan
+                      </Badge>
                     </div>
                   )}
                   <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 to-transparent p-3 pt-8">
@@ -236,7 +334,47 @@ export function TutorialVideos() {
           )}
         </div>
 
-        {/* Subscription prompt */}
+        {/* Purchase dialog */}
+        <AlertDialog open={!!purchaseDialog} onOpenChange={() => setPurchaseDialog(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>📚 {purchaseDialog?.name}</AlertDialogTitle>
+              <AlertDialogDescription className="space-y-3">
+                <p>{purchaseDialog?.description || "Bu papkadagi barcha video darsliklarni doimiy ko'rish uchun sotib oling."}</p>
+                <div className="bg-muted rounded-lg p-3 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Narxi:</span>
+                    <span className="font-bold">{purchaseDialog?.price_uzs?.toLocaleString()} so'm</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Balans:</span>
+                    <span className={`font-medium ${(userBalance || 0) < (purchaseDialog?.price_uzs || 0) ? 'text-destructive' : 'text-green-600'}`}>
+                      {(userBalance || 0).toLocaleString()} so'm
+                    </span>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">✅ Bir martalik to'lov — papka doimiy ochiq qoladi</p>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Bekor qilish</AlertDialogCancel>
+              {(userBalance || 0) < (purchaseDialog?.price_uzs || 0) ? (
+                <Button onClick={() => { setPurchaseDialog(null); window.location.hash = 'subscription'; }}>
+                  Balansni to'ldirish
+                </Button>
+              ) : (
+                <AlertDialogAction
+                  onClick={() => purchaseDialog && purchaseMutation.mutate(purchaseDialog.id)}
+                  disabled={purchaseMutation.isPending}
+                >
+                  <ShoppingCart className="h-4 w-4 mr-1.5" />
+                  {purchaseMutation.isPending ? "To'lanmoqda..." : "Sotib olish"}
+                </AlertDialogAction>
+              )}
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         {!isActive && videos.some(v => !v.is_free) && (
           <Card className="border-primary/30 bg-primary/5">
             <CardContent className="py-4 text-center">
@@ -251,7 +389,7 @@ export function TutorialVideos() {
     );
   }
 
-  // Inside a folder (or uncategorized or no folders at all)
+  // Inside a folder
   const currentFolder = folders.find(f => f.id === selectedFolder);
   const displayVideos = selectedFolder === '__uncategorized__'
     ? videos.filter(v => !v.folder_id)
@@ -269,14 +407,12 @@ export function TutorialVideos() {
 
   return (
     <div className="space-y-4">
-      {/* Back button */}
       {(selectedFolder || folders.length > 0) && (
         <Button variant="ghost" size="sm" onClick={() => { setSelectedFolder(null); setSelectedVideo(null); }} className="gap-1.5">
           <ArrowLeft className="h-4 w-4" /> {currentFolder?.name || 'Papkalar'}
         </Button>
       )}
 
-      {/* Selected video player */}
       {selectedVideo && canWatch(selectedVideo) && (
         <Card className="overflow-hidden">
           <div className="aspect-video w-full bg-black">{renderPlayer(selectedVideo)}</div>
@@ -290,7 +426,6 @@ export function TutorialVideos() {
               {(() => { const Icon = platformIcons[selectedVideo.video_type] || PlayCircle; return <Icon className="h-4 w-4 text-muted-foreground" />; })()}
               <Badge variant="outline" className="text-[10px]">{platformLabels[selectedVideo.video_type] || selectedVideo.video_type}</Badge>
               {selectedVideo.is_free && <Badge variant="secondary" className="text-[10px]">Bepul</Badge>}
-              {selectedVideo.feature_key && <Badge variant="outline" className="text-[10px]">{selectedVideo.feature_key}</Badge>}
             </div>
             <h3 className="font-semibold text-lg">{selectedVideo.title}</h3>
             {selectedVideo.description && <p className="text-sm text-muted-foreground mt-1">{selectedVideo.description}</p>}
@@ -298,7 +433,6 @@ export function TutorialVideos() {
         </Card>
       )}
 
-      {/* Search & filter */}
       <div className="flex flex-col sm:flex-row gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -322,7 +456,6 @@ export function TutorialVideos() {
         )}
       </div>
 
-      {/* Video grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {displayFiltered.map(video => {
           const thumbnail = getThumbnail(video);
@@ -347,7 +480,6 @@ export function TutorialVideos() {
                   )}
                 </div>
                 <div className="absolute top-2 left-2 flex gap-1">
-                  {video.feature_key && <Badge variant="secondary" className="text-[10px]">{video.feature_key}</Badge>}
                   {video.is_free && <Badge className="text-[10px] bg-green-600 hover:bg-green-700">Bepul</Badge>}
                 </div>
                 <div className="absolute top-2 right-2"><Icon className="h-4 w-4 text-white/80" /></div>
@@ -361,7 +493,6 @@ export function TutorialVideos() {
         })}
       </div>
 
-      {/* Subscription prompt */}
       {!isActive && displayVideos.some(v => !v.is_free) && (
         <Card className="border-primary/30 bg-primary/5">
           <CardContent className="py-4 text-center">
