@@ -287,29 +287,28 @@ export function DynamicPricing({ FadeInSection }: DynamicPricingProps) {
                         </Badge>
                       </div>
 
-                      {/* Feature checklist from DB */}
+                      {/* Feature checklist from DB - sorted: included first, then excluded */}
                       <div className="flex-1 mb-4">
                         <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">{txt.features}</p>
                         <ul className="space-y-1.5">
-                          {LANDING_FEATURE_KEYS.map(key => {
-                            const isIncluded = includedKeys.includes(key);
-                            const label = getFeatureLabel(key);
-                            return (
+                          {/* Included features first */}
+                          {LANDING_FEATURE_KEYS
+                            .filter(key => includedKeys.includes(key))
+                            .map(key => (
                               <li key={key} className="flex items-center gap-1.5 text-[11px]">
-                                {isIncluded ? (
-                                  <>
-                                    <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" />
-                                    <span className="text-foreground">{label}</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <X className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
-                                    <span className="text-muted-foreground/50 line-through">{label}</span>
-                                  </>
-                                )}
+                                <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                                <span className="text-foreground">{getFeatureLabel(key)}</span>
                               </li>
-                            );
-                          })}
+                            ))}
+                          {/* Excluded features after */}
+                          {LANDING_FEATURE_KEYS
+                            .filter(key => !includedKeys.includes(key))
+                            .map(key => (
+                              <li key={key} className="flex items-center gap-1.5 text-[11px]">
+                                <X className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
+                                <span className="text-muted-foreground/50 line-through">{getFeatureLabel(key)}</span>
+                              </li>
+                            ))}
                         </ul>
                       </div>
 
