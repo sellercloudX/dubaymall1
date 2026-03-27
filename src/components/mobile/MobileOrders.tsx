@@ -23,6 +23,7 @@ import { toast } from 'sonner';
 import type { MarketplaceDataStore, MarketplaceOrder } from '@/hooks/useMarketplaceDataStore';
 import { MarketplaceLogo } from '@/lib/marketplaceConfig';
 import { toDisplayUzs, formatUzs } from '@/lib/currency';
+import { getMarketplaceOrderStatusCategory, type OrderStatusCategory } from '@/lib/marketplaceOrderStatus';
 
 interface MobileOrdersProps {
   connectedMarketplaces: string[];
