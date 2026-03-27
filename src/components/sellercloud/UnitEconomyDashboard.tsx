@@ -228,12 +228,13 @@ export function UnitEconomyDashboard({ connectedMarketplaces, store }: Props) {
         <Card>
           <CardContent className="pt-4 pb-3">
             <div className="flex items-center gap-2 mb-1"><Package className="h-4 w-4 text-orange-500" /><span className="text-xs text-muted-foreground">Jami xarajat</span></div>
-            <p className="text-lg font-bold">{fmtPrice(totals.cost + totals.fees)}</p>
+            <p className="text-lg font-bold">{fmtPrice(totals.cost + totals.fees + totals.tax)}</p>
             <div className="text-[10px] text-muted-foreground space-y-0.5">
               <div>Tannarx: {fmtPrice(totals.cost)}</div>
               <div>Komissiya: {fmtPrice(totals.commission)}</div>
               <div>Logistika: {fmtPrice(totals.logistics)}</div>
               {totals.withdrawal > 0 && <div>Chiqarish: {fmtPrice(totals.withdrawal)}</div>}
+              {totals.tax > 0 && <div>Soliq (4%): {fmtPrice(totals.tax)}</div>}
             </div>
           </CardContent>
         </Card>
