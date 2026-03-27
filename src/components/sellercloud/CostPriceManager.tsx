@@ -432,4 +432,4 @@ export const CostPriceManager = forwardRef<HTMLDivElement, CostPriceManagerProps
       </Card>
     </div>
   );
-}
+});

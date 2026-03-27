@@ -128,7 +128,7 @@ export default function UzumDashboard({ marketplace = 'uzum' }: UzumDashboardPro
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [user, marketplace]);
 
   useEffect(() => {
     loadStats();
