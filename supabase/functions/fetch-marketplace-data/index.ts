@@ -771,6 +771,14 @@ serve(async (req) => {
               const rawItems = order.items || [];
               const totalCount = Math.max(1, rawItems.reduce((s: number, i: any) => s + (i.count || 1), 0));
               const normalizedItemsTotal = itemsTotal || total;
+              const itemWeights = rawItems.map((item: any) => {
+                const count = item.count || 1;
+                const buyerUnitPrice = Number(item.buyerPrice || item.price || item.offerPrice || 0);
+                const fallbackUnitPrice = Number(item.buyerPriceBeforeDiscount || item.priceBeforeDiscount || 0);
+                const unitWeight = buyerUnitPrice > 0 ? buyerUnitPrice : fallbackUnitPrice;
+                return Math.max(unitWeight, 0) * count;
+              });
+              const weightedTotal = itemWeights.reduce((sum: number, value: number) => sum + value, 0);
               
               // IMPORTANT: use ONLY explicit item-level before-discount price for commission base.
               // Order-level buyerItemsTotalBeforeDiscount can overstate a single item's fee base
@@ -783,7 +791,16 @@ serve(async (req) => {
                 // Always distribute the real order-level amount across items
                 let allocatedTotal = 0;
                 if (normalizedItemsTotal > 0) {
-                  if (index === rawItems.length - 1) {
+                  if (weightedTotal > 0) {
+                    if (index === rawItems.length - 1) {
+                      const alreadyAllocated = itemWeights.slice(0, index).reduce((sum: number, weight: number) => {
+                        return sum + Math.round((normalizedItemsTotal * weight) / weightedTotal);
+                      }, 0);
+                      allocatedTotal = Math.max(0, normalizedItemsTotal - alreadyAllocated);
+                    } else {
+                      allocatedTotal = Math.round((normalizedItemsTotal * itemWeights[index]) / weightedTotal);
+                    }
+                  } else if (index === rawItems.length - 1) {
                     const alreadyAllocated = rawItems.slice(0, index).reduce((sum: number, prev: any) => {
                       const prevCount = prev.count || 1;
                       return sum + Math.round((normalizedItemsTotal * prevCount) / totalCount);
@@ -2675,7 +2692,7 @@ serve(async (req) => {
                     return innerItems.length > 0 ? innerItems : [fo];
                   });
                   const itemsTotal = items.reduce((sum: number, item: any) => {
-                    const price = item.price || item.sellerAmount || item.amount || 0;
+                    const price = item.price || item.totalPrice || item.buyerPrice || item.amount || item.accrualAmount || item.sellerAmount || 0;
                     const qty = item.quantity || item.count || 1;
                     return sum + (price > 0 && qty > 1 ? price * qty : price);
                   }, 0);
@@ -2697,8 +2714,8 @@ serve(async (req) => {
                     parsedDate = new Date().toISOString();
                   }
 
-                  const orderTotal = firstItem.totalAmount || firstItem.price || firstItem.totalPrice || 
-                                     firstItem.sellerAmount || firstItem.orderAmount || itemsTotal;
+                  const orderTotal = firstItem.totalAmount || firstItem.orderAmount || firstItem.totalPrice || 
+                                     firstItem.price || itemsTotal || firstItem.accrualAmount || firstItem.sellerAmount || 0;
                   const finStatus = firstItem.status || firstItem.paymentStatus || firstItem.orderStatus || 'COMPLETED';
 
                   allOrders.push({
@@ -2714,15 +2731,18 @@ serve(async (req) => {
                     deliveryTotal: firstItem.deliveryPrice || firstItem.deliveryAmount || 0,
                     deliveryTotalUZS: firstItem.deliveryPrice || firstItem.deliveryAmount || 0,
                     buyer: { firstName: firstItem.customerName || firstItem.buyerName || '', lastName: '' },
-                    items: items.map((item: any) => ({
-                      offerId: item.skuTitle || item.barcode || String(item.skuId || item.productId || item.id || ''),
+                    items: items.map((item: any) => {
+                      const numericId = item.productId || item.skuId || item.id || '';
+                      return {
+                      offerId: numericId ? String(numericId) : String(item.barcode || item.skuTitle || ''),
                       skuId: String(item.skuId || item.id || ''),
                       barcode: item.barcode || '',
                       offerName: item.title || item.skuTitle || item.productTitle || item.name || '',
                       count: item.quantity || item.count || 1,
-                      price: item.price || item.sellerAmount || 0,
-                      priceUZS: item.price || item.sellerAmount || 0,
-                    })),
+                      price: item.price || item.totalPrice || item.buyerPrice || item.amount || item.accrualAmount || item.sellerAmount || 0,
+                      priceUZS: item.price || item.totalPrice || item.buyerPrice || item.amount || item.accrualAmount || item.sellerAmount || 0,
+                    };
+                    }),
                   });
                 }
 
