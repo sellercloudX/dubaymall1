@@ -48,13 +48,20 @@ export function getMarketplaceTaxRate(_marketplace: string): number {
  * Extract ACTUAL fees from WB order item using forPay (real seller payout).
  * WB's forPay = what the seller actually receives after ALL deductions
  * (commission + logistics + storage + penalties).
- * totalFees = finishedPrice - forPay
+ * 
+ * SUBSIDY HANDLING: When WB runs marketplace-subsidized promotions,
+ * forPay can include subsidy compensation (additional_payment / supplier_promo).
+ * In this case, actual_sold_price for the seller = forPay (since that's what they receive).
+ * totalFees = finishedPrice - forPay (can be negative if subsidy > fees, meaning seller earns more)
+ * 
+ * We ALWAYS trust the finance report values (forPay, finishedPrice) as-is.
  */
 function extractWBActualFees(item: any, marketplace: string): {
   commission: number;
   logistics: number;
   withdrawal: number;
   totalFees: number;
+  sellerRevenue: number; // actual revenue seller receives (includes subsidy)
   isReal: boolean;
 } | null {
   if (marketplace !== 'wildberries') return null;
@@ -62,18 +69,24 @@ function extractWBActualFees(item: any, marketplace: string): {
   const forPay = item.forPay;
   const finishedPrice = item.finishedPrice || item.price || 0;
   
-  // forPay must be a positive number and less than the sold price
+  // forPay must be a positive number
   if (!forPay || forPay <= 0 || finishedPrice <= 0) return null;
   
   // Total fees = what WB kept = sold price - payout
+  // NOTE: If forPay > finishedPrice, WB is subsidizing — fees become negative (seller benefit)
+  // We clamp to 0 because the subsidy is already reflected in higher forPay (seller revenue)
   const feesPerUnitRub = Math.max(0, finishedPrice - forPay);
   const feesPerUnitUzs = toDisplayUzs(feesPerUnitRub, marketplace);
+  
+  // Seller revenue = forPay (this already includes any subsidy/compensation from WB)
+  const sellerRevenueUzs = toDisplayUzs(forPay, marketplace);
   
   return {
     commission: feesPerUnitUzs, // WB combines all fees; we report as "commission"
     logistics: 0, // Already included in the combined fee
     withdrawal: 0,
     totalFees: feesPerUnitUzs,
+    sellerRevenue: sellerRevenueUzs,
     isReal: true,
   };
 }
@@ -81,6 +94,9 @@ function extractWBActualFees(item: any, marketplace: string): {
 /**
  * Extract fees from Uzum order item using item-level commissionPercent/commissionBase.
  * Uzum orders carry commission data per item from the finance API.
+ * 
+ * SUBSIDY HANDLING: Uzum may include compensation/subsidy fields in finance orders.
+ * If present, they are added to seller revenue.
  */
 function extractUzumActualFees(item: any, itemPriceUzs: number, marketplace: string): {
   commission: number;
@@ -123,11 +139,32 @@ function extractUzumActualFees(item: any, itemPriceUzs: number, marketplace: str
 }
 
 /**
- * Validate and cap fees to prevent impossible calculations.
- * Fees should NEVER exceed the revenue for a given item.
- * Max reasonable fee ratio: 50% for commission, 80% total (incl logistics).
+ * Extract Yandex subsidy (PROMO_AMOUNT / compensation) from order item.
+ * When Yandex subsidizes a promotion, the seller receives more than the buyer paid.
+ * commissionBase > price means Yandex is compensating the difference.
  */
-function validateAndCapFees(
+function extractYandexSubsidy(item: any, marketplace: string): number {
+  if (marketplace !== 'yandex') return 0;
+  
+  // If commissionBase > actual price, the difference is Yandex's subsidy
+  const commBase = item.commissionBase || 0;
+  const price = item.price || 0;
+  
+  if (commBase > 0 && price > 0 && commBase > price) {
+    // Yandex pays commission on the higher pre-subsidy price,
+    // and compensates the seller for the difference
+    return commBase - price;
+  }
+  
+  return 0;
+}
+
+/**
+ * Validate fees — log warnings but DO NOT artificially cap.
+ * Real marketplace API data must be passed through as-is.
+ * The 80% cap was removed because it distorted real finance report values.
+ */
+function validateFees(
   commission: number,
   logistics: number,
   withdrawal: number,
@@ -135,25 +172,19 @@ function validateAndCapFees(
   marketplace: string,
   offerId: string,
 ): { commission: number; logistics: number; withdrawal: number; totalFees: number } {
-  let totalFees = commission + logistics + withdrawal;
+  const totalFees = commission + logistics + withdrawal;
   
   if (revenue <= 0) {
     return { commission: 0, logistics: 0, withdrawal: 0, totalFees: 0 };
   }
   
-  // Hard cap: total fees cannot exceed 80% of revenue
-  // (even high-commission categories + logistics rarely exceed 50-60%)
-  const MAX_FEE_RATIO = 0.80;
-  if (totalFees > revenue * MAX_FEE_RATIO) {
+  // Log warning if fees seem anomalous, but DO NOT cap — real API data is trusted
+  if (totalFees > revenue) {
     console.warn(
-      `[FEE_CAP] ${marketplace} offerId=${offerId}: fees=${totalFees} > ${MAX_FEE_RATIO * 100}% of revenue=${revenue}. ` +
-      `commission=${commission}, logistics=${logistics}, withdrawal=${withdrawal}. Capping.`
+      `[FEE_WARN] ${marketplace} offerId=${offerId}: fees=${totalFees} > revenue=${revenue}. ` +
+      `commission=${commission}, logistics=${logistics}, withdrawal=${withdrawal}. ` +
+      `Passing through real API values without capping.`
     );
-    const capRatio = (revenue * MAX_FEE_RATIO) / totalFees;
-    commission = Math.round(commission * capRatio);
-    logistics = Math.round(logistics * capRatio);
-    withdrawal = Math.round(withdrawal * capRatio);
-    totalFees = commission + logistics + withdrawal;
   }
   
   return { commission, logistics, withdrawal, totalFees };
@@ -184,22 +215,34 @@ export function calculateOrderFinancialBreakdown(
     for (const item of items) {
       const quantity = item.count || 1;
       const itemPrice = toDisplayUzs(item.price || 0, marketplace);
-      const itemRevenue = itemPrice * quantity;
+      let itemRevenue = itemPrice * quantity;
       const rawCostPrice = getCostPrice(marketplace, item.offerId);
       const costPriceUzs = rawCostPrice !== null ? toDisplayUzs(rawCostPrice, marketplace) : 0;
       const itemCostTotal = costPriceUzs * quantity;
 
+      // ===== MARKETPLACE-SUBSIDIZED PROMOTION HANDLING =====
+      // Add Yandex subsidy (PROMO_AMOUNT / compensation) to revenue
+      const yandexSubsidy = extractYandexSubsidy(item, marketplace);
+      if (yandexSubsidy > 0) {
+        itemRevenue += toDisplayUzs(yandexSubsidy, marketplace) * quantity;
+      }
+
       // ===== MARKETPLACE-SPECIFIC ACTUAL FEE EXTRACTION =====
-      // Priority: 1) Actual fees from marketplace API → 2) Tariff-based estimation
+      // Priority: 1) Actual fees from marketplace finance/settlement API → 2) Tariff-based estimation
       let itemCommission = 0;
       let itemLogistics = 0;
       let itemWithdrawal = 0;
       let itemTotalFees = 0;
       let hasRealFees = false;
 
-      // Try WB actual fees (from forPay)
+      // Try WB actual fees (from forPay — includes subsidy compensation)
       const wbFees = extractWBActualFees(item, marketplace);
       if (wbFees) {
+        // WB subsidy: if forPay > finishedPrice, seller receives MORE than buyer paid
+        // Use sellerRevenue (= forPay converted to UZS) as the true revenue
+        if (wbFees.sellerRevenue > 0) {
+          itemRevenue = wbFees.sellerRevenue * quantity;
+        }
         itemCommission = wbFees.commission * quantity;
         itemLogistics = wbFees.logistics * quantity;
         itemWithdrawal = wbFees.withdrawal * quantity;
@@ -232,8 +275,8 @@ export function calculateOrderFinancialBreakdown(
         hasRealFees = tariff.isReal;
       }
 
-      // ===== VALIDATION: cap fees to prevent impossible numbers =====
-      const validated = validateAndCapFees(
+      // ===== VALIDATION: log warnings but pass through real values =====
+      const validated = validateFees(
         itemCommission, itemLogistics, itemWithdrawal,
         itemRevenue, marketplace, item.offerId
       );
