@@ -441,7 +441,25 @@ export function getTariffForProduct(
 
     const logistics = tariff.fulfillment + tariff.delivery + extraFees;
     const withdrawalFee = marketplace === 'yandex' ? Math.round(price * 0.01) : 0;
-    const totalFee = commission + logistics + withdrawalFee;
+    let totalFee = commission + logistics + withdrawalFee;
+    
+    // SAFETY: Total fees from tariff API must never exceed 80% of sold price
+    // This prevents impossible PnL when tariff data is wrong/stale
+    if (price > 0 && totalFee > price * 0.80) {
+      const capRatio = (price * 0.80) / totalFee;
+      commission = Math.round(commission * capRatio);
+      const cappedLogistics = Math.round(logistics * capRatio);
+      const cappedWithdrawal = Math.round(withdrawalFee * capRatio);
+      totalFee = commission + cappedLogistics + cappedWithdrawal;
+      return {
+        commission,
+        logistics: cappedLogistics,
+        withdrawal: cappedWithdrawal,
+        totalFee,
+        isReal: true,
+      };
+    }
+    
     return {
       commission,
       logistics,
