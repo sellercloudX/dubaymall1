@@ -2733,14 +2733,19 @@ serve(async (req) => {
                     buyer: { firstName: firstItem.customerName || firstItem.buyerName || '', lastName: '' },
                     items: items.map((item: any) => {
                       const numericId = item.productId || item.skuId || item.id || '';
+                      // Revenue: prefer gross/buyer price fields over net sellerAmount
+                      const grossPrice = item.totalPrice || item.buyerPrice || item.accrualAmount || item.price || item.amount || item.sellerAmount || 0;
                       return {
                       offerId: numericId ? String(numericId) : String(item.barcode || item.skuTitle || ''),
                       skuId: String(item.skuId || item.id || ''),
                       barcode: item.barcode || '',
                       offerName: item.title || item.skuTitle || item.productTitle || item.name || '',
                       count: item.quantity || item.count || 1,
-                      price: item.price || item.totalPrice || item.buyerPrice || item.amount || item.accrualAmount || item.sellerAmount || 0,
-                      priceUZS: item.price || item.totalPrice || item.buyerPrice || item.amount || item.accrualAmount || item.sellerAmount || 0,
+                      price: grossPrice,
+                      priceUZS: grossPrice,
+                      // Carry commission data from finance API for accurate PnL
+                      commissionPercent: item.commissionPercent || item.commission?.percent || 0,
+                      commissionBase: item.commissionAmount || item.commission?.amount || item.commissionBase || 0,
                     };
                     }),
                   });
