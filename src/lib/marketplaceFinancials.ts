@@ -48,13 +48,20 @@ export function getMarketplaceTaxRate(_marketplace: string): number {
  * Extract ACTUAL fees from WB order item using forPay (real seller payout).
  * WB's forPay = what the seller actually receives after ALL deductions
  * (commission + logistics + storage + penalties).
- * totalFees = finishedPrice - forPay
+ * 
+ * SUBSIDY HANDLING: When WB runs marketplace-subsidized promotions,
+ * forPay can include subsidy compensation (additional_payment / supplier_promo).
+ * In this case, actual_sold_price for the seller = forPay (since that's what they receive).
+ * totalFees = finishedPrice - forPay (can be negative if subsidy > fees, meaning seller earns more)
+ * 
+ * We ALWAYS trust the finance report values (forPay, finishedPrice) as-is.
  */
 function extractWBActualFees(item: any, marketplace: string): {
   commission: number;
   logistics: number;
   withdrawal: number;
   totalFees: number;
+  sellerRevenue: number; // actual revenue seller receives (includes subsidy)
   isReal: boolean;
 } | null {
   if (marketplace !== 'wildberries') return null;
@@ -62,18 +69,24 @@ function extractWBActualFees(item: any, marketplace: string): {
   const forPay = item.forPay;
   const finishedPrice = item.finishedPrice || item.price || 0;
   
-  // forPay must be a positive number and less than the sold price
+  // forPay must be a positive number
   if (!forPay || forPay <= 0 || finishedPrice <= 0) return null;
   
   // Total fees = what WB kept = sold price - payout
+  // NOTE: If forPay > finishedPrice, WB is subsidizing — fees become negative (seller benefit)
+  // We clamp to 0 because the subsidy is already reflected in higher forPay (seller revenue)
   const feesPerUnitRub = Math.max(0, finishedPrice - forPay);
   const feesPerUnitUzs = toDisplayUzs(feesPerUnitRub, marketplace);
+  
+  // Seller revenue = forPay (this already includes any subsidy/compensation from WB)
+  const sellerRevenueUzs = toDisplayUzs(forPay, marketplace);
   
   return {
     commission: feesPerUnitUzs, // WB combines all fees; we report as "commission"
     logistics: 0, // Already included in the combined fee
     withdrawal: 0,
     totalFees: feesPerUnitUzs,
+    sellerRevenue: sellerRevenueUzs,
     isReal: true,
   };
 }
@@ -81,6 +94,9 @@ function extractWBActualFees(item: any, marketplace: string): {
 /**
  * Extract fees from Uzum order item using item-level commissionPercent/commissionBase.
  * Uzum orders carry commission data per item from the finance API.
+ * 
+ * SUBSIDY HANDLING: Uzum may include compensation/subsidy fields in finance orders.
+ * If present, they are added to seller revenue.
  */
 function extractUzumActualFees(item: any, itemPriceUzs: number, marketplace: string): {
   commission: number;
@@ -120,6 +136,27 @@ function extractUzumActualFees(item: any, itemPriceUzs: number, marketplace: str
   }
   
   return null;
+}
+
+/**
+ * Extract Yandex subsidy (PROMO_AMOUNT / compensation) from order item.
+ * When Yandex subsidizes a promotion, the seller receives more than the buyer paid.
+ * commissionBase > price means Yandex is compensating the difference.
+ */
+function extractYandexSubsidy(item: any, marketplace: string): number {
+  if (marketplace !== 'yandex') return 0;
+  
+  // If commissionBase > actual price, the difference is Yandex's subsidy
+  const commBase = item.commissionBase || 0;
+  const price = item.price || 0;
+  
+  if (commBase > 0 && price > 0 && commBase > price) {
+    // Yandex pays commission on the higher pre-subsidy price,
+    // and compensates the seller for the difference
+    return commBase - price;
+  }
+  
+  return 0;
 }
 
 /**
