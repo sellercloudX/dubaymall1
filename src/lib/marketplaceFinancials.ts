@@ -123,11 +123,11 @@ function extractUzumActualFees(item: any, itemPriceUzs: number, marketplace: str
 }
 
 /**
- * Validate and cap fees to prevent impossible calculations.
- * Fees should NEVER exceed the revenue for a given item.
- * Max reasonable fee ratio: 50% for commission, 80% total (incl logistics).
+ * Validate fees — log warnings but DO NOT artificially cap.
+ * Real marketplace API data must be passed through as-is.
+ * The 80% cap was removed because it distorted real finance report values.
  */
-function validateAndCapFees(
+function validateFees(
   commission: number,
   logistics: number,
   withdrawal: number,
@@ -135,25 +135,19 @@ function validateAndCapFees(
   marketplace: string,
   offerId: string,
 ): { commission: number; logistics: number; withdrawal: number; totalFees: number } {
-  let totalFees = commission + logistics + withdrawal;
+  const totalFees = commission + logistics + withdrawal;
   
   if (revenue <= 0) {
     return { commission: 0, logistics: 0, withdrawal: 0, totalFees: 0 };
   }
   
-  // Hard cap: total fees cannot exceed 80% of revenue
-  // (even high-commission categories + logistics rarely exceed 50-60%)
-  const MAX_FEE_RATIO = 0.80;
-  if (totalFees > revenue * MAX_FEE_RATIO) {
+  // Log warning if fees seem anomalous, but DO NOT cap — real API data is trusted
+  if (totalFees > revenue) {
     console.warn(
-      `[FEE_CAP] ${marketplace} offerId=${offerId}: fees=${totalFees} > ${MAX_FEE_RATIO * 100}% of revenue=${revenue}. ` +
-      `commission=${commission}, logistics=${logistics}, withdrawal=${withdrawal}. Capping.`
+      `[FEE_WARN] ${marketplace} offerId=${offerId}: fees=${totalFees} > revenue=${revenue}. ` +
+      `commission=${commission}, logistics=${logistics}, withdrawal=${withdrawal}. ` +
+      `Passing through real API values without capping.`
     );
-    const capRatio = (revenue * MAX_FEE_RATIO) / totalFees;
-    commission = Math.round(commission * capRatio);
-    logistics = Math.round(logistics * capRatio);
-    withdrawal = Math.round(withdrawal * capRatio);
-    totalFees = commission + logistics + withdrawal;
   }
   
   return { commission, logistics, withdrawal, totalFees };
