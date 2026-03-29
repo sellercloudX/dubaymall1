@@ -443,21 +443,12 @@ export function getTariffForProduct(
     const withdrawalFee = marketplace === 'yandex' ? Math.round(price * 0.01) : 0;
     let totalFee = commission + logistics + withdrawalFee;
     
-    // SAFETY: Total fees from tariff API must never exceed 80% of sold price
-    // This prevents impossible PnL when tariff data is wrong/stale
-    if (price > 0 && totalFee > price * 0.80) {
-      const capRatio = (price * 0.80) / totalFee;
-      commission = Math.round(commission * capRatio);
-      const cappedLogistics = Math.round(logistics * capRatio);
-      const cappedWithdrawal = Math.round(withdrawalFee * capRatio);
-      totalFee = commission + cappedLogistics + cappedWithdrawal;
-      return {
-        commission,
-        logistics: cappedLogistics,
-        withdrawal: cappedWithdrawal,
-        totalFee,
-        isReal: true,
-      };
+    // No artificial cap — real API data is passed through as-is
+    // If fees seem high, it's because the marketplace really charges that much
+    if (price > 0 && totalFee > price) {
+      console.warn(
+        `[TARIFF_WARN] ${marketplace} offerId=${offerId}: totalFee=${totalFee} > price=${price}. Passing through real values.`
+      );
     }
     
     return {

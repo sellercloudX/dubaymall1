@@ -226,8 +226,8 @@ export function calculateOrderFinancialBreakdown(
         hasRealFees = tariff.isReal;
       }
 
-      // ===== VALIDATION: cap fees to prevent impossible numbers =====
-      const validated = validateAndCapFees(
+      // ===== VALIDATION: log warnings but pass through real values =====
+      const validated = validateFees(
         itemCommission, itemLogistics, itemWithdrawal,
         itemRevenue, marketplace, item.offerId
       );
