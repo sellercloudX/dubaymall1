@@ -215,22 +215,34 @@ export function calculateOrderFinancialBreakdown(
     for (const item of items) {
       const quantity = item.count || 1;
       const itemPrice = toDisplayUzs(item.price || 0, marketplace);
-      const itemRevenue = itemPrice * quantity;
+      let itemRevenue = itemPrice * quantity;
       const rawCostPrice = getCostPrice(marketplace, item.offerId);
       const costPriceUzs = rawCostPrice !== null ? toDisplayUzs(rawCostPrice, marketplace) : 0;
       const itemCostTotal = costPriceUzs * quantity;
 
+      // ===== MARKETPLACE-SUBSIDIZED PROMOTION HANDLING =====
+      // Add Yandex subsidy (PROMO_AMOUNT / compensation) to revenue
+      const yandexSubsidy = extractYandexSubsidy(item, marketplace);
+      if (yandexSubsidy > 0) {
+        itemRevenue += toDisplayUzs(yandexSubsidy, marketplace) * quantity;
+      }
+
       // ===== MARKETPLACE-SPECIFIC ACTUAL FEE EXTRACTION =====
-      // Priority: 1) Actual fees from marketplace API → 2) Tariff-based estimation
+      // Priority: 1) Actual fees from marketplace finance/settlement API → 2) Tariff-based estimation
       let itemCommission = 0;
       let itemLogistics = 0;
       let itemWithdrawal = 0;
       let itemTotalFees = 0;
       let hasRealFees = false;
 
-      // Try WB actual fees (from forPay)
+      // Try WB actual fees (from forPay — includes subsidy compensation)
       const wbFees = extractWBActualFees(item, marketplace);
       if (wbFees) {
+        // WB subsidy: if forPay > finishedPrice, seller receives MORE than buyer paid
+        // Use sellerRevenue (= forPay converted to UZS) as the true revenue
+        if (wbFees.sellerRevenue > 0) {
+          itemRevenue = wbFees.sellerRevenue * quantity;
+        }
         itemCommission = wbFees.commission * quantity;
         itemLogistics = wbFees.logistics * quantity;
         itemWithdrawal = wbFees.withdrawal * quantity;
