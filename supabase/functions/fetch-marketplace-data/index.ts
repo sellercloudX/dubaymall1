@@ -2560,9 +2560,11 @@ serve(async (req) => {
                     price: item.price || 0,
                     priceUZS: item.price || 0,
                     photo: itemPhoto,
-                    // Carry commission data from order item if available
+                    // Carry ALL available finance fields from FBS order items
                     commissionPercent: item.commissionPercent || item.commission?.percent || 0,
-                    commissionBase: item.commissionBase || item.commissionAmount || 0,
+                    commissionBase: item.commissionBase || item.commissionAmount || item.commission?.amount || 0,
+                    deliveryAmount: item.deliveryAmount || item.logisticsAmount || item.deliveryCost || 0,
+                    sellerAmount: item.sellerAmount || item.payoutAmount || 0,
                   };
                 }),
               };
