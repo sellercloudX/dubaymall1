@@ -92,11 +92,15 @@ function extractWBActualFees(item: any, marketplace: string): {
 }
 
 /**
- * Extract fees from Uzum order item using item-level commissionPercent/commissionBase.
- * Uzum orders carry commission data per item from the finance API.
+ * Extract fees from Uzum order item using item-level finance data.
+ * Uzum Finance API (/v1/finance/orders) returns per-item:
+ *   - commissionPercent / commissionBase (commissionAmount) = actual commission
+ *   - deliveryAmount / logisticsAmount = actual logistics/delivery fee
+ *   - sellerAmount = net payout after all deductions
+ *   - totalPrice / buyerPrice = gross sale price
  * 
- * SUBSIDY HANDLING: Uzum may include compensation/subsidy fields in finance orders.
- * If present, they are added to seller revenue.
+ * Priority: 1) Absolute commissionBase amount  2) commissionPercent × price  3) null (fallback)
+ * Logistics: deliveryAmount from finance API (NEVER hardcode defaults)
  */
 function extractUzumActualFees(item: any, itemPriceUzs: number, marketplace: string): {
   commission: number;
@@ -107,30 +111,32 @@ function extractUzumActualFees(item: any, itemPriceUzs: number, marketplace: str
 } | null {
   if (marketplace !== 'uzum') return null;
   
-  // Check if item has actual commission data from the order/finance API
   const itemCommPercent = item.commissionPercent;
-  const itemCommBase = item.commissionBase; // absolute commission amount
+  const itemCommBase = item.commissionBase; // absolute commission amount from Finance API
+  const itemDelivery = item.deliveryAmount || 0; // actual logistics from Finance API
   
+  let commission = 0;
+  let hasRealCommission = false;
+  
+  // Priority 1: Absolute commission amount from Finance API
   if (itemCommBase && itemCommBase > 0) {
-    // Absolute commission amount from the API
-    const commission = itemCommBase;
-    return {
-      commission,
-      logistics: 0,
-      withdrawal: 0,
-      totalFees: commission,
-      isReal: true,
-    };
+    commission = itemCommBase;
+    hasRealCommission = true;
+  }
+  // Priority 2: Commission percentage from Finance API × actual sold price
+  else if (itemCommPercent && itemCommPercent > 0 && itemPriceUzs > 0) {
+    commission = Math.round(itemPriceUzs * (itemCommPercent / 100));
+    hasRealCommission = true;
   }
   
-  if (itemCommPercent && itemCommPercent > 0 && itemPriceUzs > 0) {
-    // Commission percentage from the API applied to actual sold price
-    const commission = Math.round(itemPriceUzs * (itemCommPercent / 100));
+  // If we have EITHER real commission OR real logistics data, return it
+  if (hasRealCommission || itemDelivery > 0) {
+    const logistics = itemDelivery > 0 ? itemDelivery : 0;
     return {
       commission,
-      logistics: 0,
+      logistics,
       withdrawal: 0,
-      totalFees: commission,
+      totalFees: commission + logistics,
       isReal: true,
     };
   }

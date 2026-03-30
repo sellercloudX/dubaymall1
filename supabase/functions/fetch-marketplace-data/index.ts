@@ -2560,9 +2560,11 @@ serve(async (req) => {
                     price: item.price || 0,
                     priceUZS: item.price || 0,
                     photo: itemPhoto,
-                    // Carry commission data from order item if available
+                    // Carry ALL available finance fields from FBS order items
                     commissionPercent: item.commissionPercent || item.commission?.percent || 0,
-                    commissionBase: item.commissionBase || item.commissionAmount || 0,
+                    commissionBase: item.commissionBase || item.commissionAmount || item.commission?.amount || 0,
+                    deliveryAmount: item.deliveryAmount || item.logisticsAmount || item.deliveryCost || 0,
+                    sellerAmount: item.sellerAmount || item.payoutAmount || 0,
                   };
                 }),
               };
@@ -2735,6 +2737,12 @@ serve(async (req) => {
                       const numericId = item.productId || item.skuId || item.id || '';
                       // Revenue: prefer gross/buyer price fields over net sellerAmount
                       const grossPrice = item.totalPrice || item.buyerPrice || item.accrualAmount || item.price || item.amount || item.sellerAmount || 0;
+                      // Extract actual commission from finance API (absolute amount)
+                      const commissionAmt = item.commissionAmount || item.commission?.amount || item.commissionBase || 0;
+                      // Extract actual logistics/delivery from finance API
+                      const logisticsAmt = item.deliveryAmount || item.logisticsAmount || item.deliveryCost || item.logistics || 0;
+                      // Seller payout (net after all deductions)
+                      const sellerPayout = item.sellerAmount || item.payoutAmount || item.forPay || 0;
                       return {
                       offerId: numericId ? String(numericId) : String(item.barcode || item.skuTitle || ''),
                       skuId: String(item.skuId || item.id || ''),
@@ -2743,9 +2751,11 @@ serve(async (req) => {
                       count: item.quantity || item.count || 1,
                       price: grossPrice,
                       priceUZS: grossPrice,
-                      // Carry commission data from finance API for accurate PnL
+                      // Carry ALL finance fields from Uzum Finance API for accurate PnL
                       commissionPercent: item.commissionPercent || item.commission?.percent || 0,
-                      commissionBase: item.commissionAmount || item.commission?.amount || item.commissionBase || 0,
+                      commissionBase: commissionAmt,
+                      deliveryAmount: logisticsAmt,
+                      sellerAmount: sellerPayout,
                     };
                     }),
                   });
