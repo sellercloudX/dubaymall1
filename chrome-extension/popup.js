@@ -1,224 +1,215 @@
 /**
- * SellerCloudX Extension — Popup Script
+ * SellerCloudX Extension v2.0 — Popup Script
  */
 
 const SUPABASE_URL = 'https://idcshubgqrzdvkttnslz.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlkY3NodWJncXJ6ZHZrdHRuc2x6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxMzE4NjksImV4cCI6MjA4NTcwNzg2OX0.7am0dzPKSQXLXhOwNHRZbHqxi8pRQLkwO-XQDt-_DI8';
 
-const loginSection = document.getElementById('login-section');
-const dashboardSection = document.getElementById('dashboard-section');
-const loginBtn = document.getElementById('login-btn');
-const logoutBtn = document.getElementById('logout-btn');
-const refreshBtn = document.getElementById('refresh-btn');
-const openSellerBtn = document.getElementById('open-seller-btn');
-const loginError = document.getElementById('login-error');
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => document.querySelectorAll(s);
+
+// ===== Tabs =====
+$$('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    $$('.tab').forEach(t => t.classList.remove('active'));
+    $$('.tab-content').forEach(c => c.classList.remove('active'));
+    tab.classList.add('active');
+    $(`#tab-${tab.dataset.tab}`).classList.add('active');
+  });
+});
+
+// ===== Toggles =====
+$$('.toggle').forEach(toggle => {
+  toggle.addEventListener('click', () => {
+    toggle.classList.toggle('active');
+    const id = toggle.id.replace('toggle-', '');
+    chrome.storage.local.set({ [`setting_${id}`]: toggle.classList.contains('active') });
+    if (id === 'overlay' || id === 'profit') {
+      notifyContent({ type: 'SCX_SETTING', setting: id, value: toggle.classList.contains('active') });
+    }
+  });
+});
+
+async function loadToggles() {
+  const keys = ['setting_overlay', 'setting_profit', 'setting_notifications', 'setting_autoconnect', 'setting_dark-overlay'];
+  const r = await chrome.storage.local.get(keys);
+  keys.forEach(k => {
+    const id = k.replace('setting_', '');
+    const t = $(`#toggle-${id}`);
+    if (t && r[k] === false) t.classList.remove('active');
+  });
+}
+
+async function notifyContent(msg) {
+  try {
+    const tabs = await chrome.tabs.query({ url: 'https://seller.uzum.uz/*' });
+    for (const tab of tabs) chrome.tabs.sendMessage(tab.id, msg).catch(() => {});
+  } catch {}
+}
 
 // ===== Init =====
 async function init() {
   const config = await chrome.storage.local.get(['accessToken', 'userId', 'userEmail']);
-  
-  if (config.accessToken && config.userId) {
-    showDashboard(config);
-  } else {
-    showLogin();
-  }
+  if (config.accessToken && config.userId) showDashboard(config);
+  else showLogin();
+  loadToggles();
 }
 
 function showLogin() {
-  loginSection.style.display = 'block';
-  dashboardSection.style.display = 'none';
+  $('#login-section').style.display = 'block';
+  $('#dashboard-section').style.display = 'none';
 }
 
 function showDashboard(config) {
-  loginSection.style.display = 'none';
-  dashboardSection.style.display = 'block';
-  
-  document.getElementById('user-email').textContent = config.userEmail || '—';
-  
-  checkConnectionStatus();
+  $('#login-section').style.display = 'none';
+  $('#dashboard-section').style.display = 'block';
+  $('#user-email').textContent = config.userEmail || '—';
+  checkConnection();
   checkSellerTab();
-  loadCommandStats(config);
+  loadStats(config);
+  loadHistory(config);
 }
 
 // ===== Login =====
-loginBtn.addEventListener('click', async () => {
-  const email = document.getElementById('login-email').value.trim();
-  const password = document.getElementById('login-password').value;
-  
-  if (!email || !password) {
-    showError('Email va parolni kiriting');
-    return;
-  }
-  
-  loginBtn.disabled = true;
-  loginBtn.textContent = '⏳ Kirilmoqda...';
-  
+$('#login-btn').addEventListener('click', async () => {
+  const email = $('#login-email').value.trim();
+  const password = $('#login-password').value;
+  if (!email || !password) { showError('Email va parolni kiriting'); return; }
+
+  const btn = $('#login-btn');
+  btn.disabled = true; btn.textContent = '⏳ Kirilmoqda...';
+
   try {
     const resp = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': SUPABASE_ANON_KEY,
-      },
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
       body: JSON.stringify({ email, password }),
     });
-    
     const data = await resp.json();
-    
-    if (!resp.ok) {
-      showError(data.error_description || data.msg || 'Login xatosi');
-      return;
-    }
-    
-    const { access_token, user } = data;
-    
-    await chrome.storage.local.set({
-      accessToken: access_token,
-      userId: user.id,
-      userEmail: user.email,
-    });
-    
-    // Notify background to connect WebSocket
-    chrome.runtime.sendMessage({
-      type: 'SCX_LOGIN',
-      accessToken: access_token,
-      userId: user.id,
-    });
-    
-    showDashboard({ accessToken: access_token, userId: user.id, userEmail: user.email });
+    if (!resp.ok) { showError(data.error_description || data.msg || 'Login xatosi'); return; }
+
+    await chrome.storage.local.set({ accessToken: data.access_token, userId: data.user.id, userEmail: data.user.email });
+    chrome.runtime.sendMessage({ type: 'SCX_LOGIN', accessToken: data.access_token, userId: data.user.id });
+    showDashboard({ accessToken: data.access_token, userId: data.user.id, userEmail: data.user.email });
   } catch (e) {
     showError('Tarmoq xatosi: ' + e.message);
   } finally {
-    loginBtn.disabled = false;
-    loginBtn.innerHTML = '🚀 Kirish';
+    btn.disabled = false; btn.innerHTML = '🚀 Kirish';
   }
 });
 
 function showError(msg) {
-  loginError.textContent = msg;
-  loginError.style.display = 'block';
-  setTimeout(() => { loginError.style.display = 'none'; }, 5000);
+  const el = $('#login-error');
+  el.textContent = msg; el.style.display = 'block';
+  setTimeout(() => { el.style.display = 'none'; }, 5000);
 }
 
-// ===== Logout =====
-logoutBtn.addEventListener('click', async () => {
+$('#logout-btn').addEventListener('click', async () => {
   chrome.runtime.sendMessage({ type: 'SCX_LOGOUT' });
   await chrome.storage.local.clear();
   showLogin();
 });
 
-// ===== Connection Status =====
-function checkConnectionStatus() {
-  chrome.runtime.sendMessage({ type: 'SCX_STATUS' }, (response) => {
-    const statusEl = document.getElementById('connection-status');
-    if (response?.isConnected) {
-      statusEl.innerHTML = '<span class="status-dot dot-green"></span>Ulangan';
-    } else {
-      statusEl.innerHTML = '<span class="status-dot dot-red"></span>Ulanmagan';
-    }
+// ===== Status =====
+function checkConnection() {
+  chrome.runtime.sendMessage({ type: 'SCX_STATUS' }, (r) => {
+    $('#connection-status').innerHTML = r?.isConnected
+      ? '<span class="dot dot-green"></span> Ulangan'
+      : '<span class="dot dot-red"></span> Ulanmagan';
   });
 }
 
-// ===== Seller Tab Check =====
 async function checkSellerTab() {
   const tabs = await chrome.tabs.query({ url: 'https://seller.uzum.uz/*' });
-  const sellerStatus = document.getElementById('seller-status');
-  if (tabs.length > 0) {
-    sellerStatus.innerHTML = '<span class="status-dot dot-green"></span>Ochiq';
-  } else {
-    sellerStatus.innerHTML = '<span class="status-dot dot-red"></span>Yopiq';
-  }
+  $('#seller-status').innerHTML = tabs.length > 0
+    ? '<span class="dot dot-green"></span> Ochiq'
+    : '<span class="dot dot-red"></span> Yopiq';
 }
 
-// ===== Command Stats =====
-async function loadCommandStats(config) {
+// ===== Stats =====
+async function loadStats(config) {
+  const headers = { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${config.accessToken}` };
   try {
-    const headers = {
-      'apikey': SUPABASE_ANON_KEY,
-      'Authorization': `Bearer ${config.accessToken}`,
-    };
-    
-    // Pending count
-    const pendingResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/uzum_extension_commands?user_id=eq.${config.userId}&status=eq.pending&select=id`,
-      { headers }
-    );
+    const [connResp, pendingResp, completedResp] = await Promise.all([
+      fetch(`${SUPABASE_URL}/rest/v1/marketplace_connections?user_id=eq.${config.userId}&marketplace=eq.uzum&is_active=eq.true&select=products_count,orders_count,total_revenue&limit=1`, { headers }),
+      fetch(`${SUPABASE_URL}/rest/v1/uzum_extension_commands?user_id=eq.${config.userId}&status=eq.pending&select=id`, { headers }),
+      fetch(`${SUPABASE_URL}/rest/v1/uzum_extension_commands?user_id=eq.${config.userId}&status=eq.completed&created_at=gte.${new Date().toISOString().split('T')[0]}T00:00:00&select=id`, { headers }),
+    ]);
+
+    const conns = await connResp.json();
+    if (Array.isArray(conns) && conns[0]) {
+      const c = conns[0];
+      $('#stat-products').textContent = c.products_count || '0';
+      $('#stat-orders').textContent = c.orders_count || '0';
+      const rev = c.total_revenue || 0;
+      $('#stat-revenue').textContent = rev >= 1e6 ? `${(rev / 1e6).toFixed(1)}M` : rev >= 1e3 ? `${(rev / 1e3).toFixed(0)}K` : String(rev);
+    }
+
     const pending = await pendingResp.json();
-    document.getElementById('stat-pending').textContent = Array.isArray(pending) ? pending.length : '0';
-    
-    // Completed today
-    const today = new Date().toISOString().split('T')[0];
-    const completedResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/uzum_extension_commands?user_id=eq.${config.userId}&status=eq.completed&created_at=gte.${today}T00:00:00&select=id`,
-      { headers }
-    );
+    const pCount = Array.isArray(pending) ? pending.length : 0;
+    $('#stat-pending').textContent = pCount;
+    const badge = $('#pending-badge');
+    if (pCount > 0) { badge.textContent = pCount; badge.style.display = 'inline-block'; }
+    else badge.style.display = 'none';
+
     const completed = await completedResp.json();
-    document.getElementById('stat-completed').textContent = Array.isArray(completed) ? completed.length : '0';
-    
-    // Recent commands
-    const recentResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/uzum_extension_commands?user_id=eq.${config.userId}&order=created_at.desc&limit=5&select=id,command_type,status,created_at`,
-      { headers }
-    );
-    const recent = await recentResp.json();
-    renderCommands(recent);
-  } catch (e) {
-    console.error('[SCX] Stats error:', e);
-  }
+    $('#stat-completed').textContent = Array.isArray(completed) ? completed.length : '0';
+  } catch {}
 }
 
-function renderCommands(commands) {
-  const list = document.getElementById('commands-list');
-  
-  if (!Array.isArray(commands) || commands.length === 0) {
-    list.innerHTML = '<div class="command-item" style="justify-content: center; color: #64748b;">Hali buyruqlar yo\'q</div>';
+// ===== History =====
+async function loadHistory(config) {
+  const headers = { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${config.accessToken}` };
+  try {
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/uzum_extension_commands?user_id=eq.${config.userId}&order=created_at.desc&limit=10&select=id,command_type,status,created_at,error_message`, { headers });
+    const cmds = await resp.json();
+    renderCommands(cmds);
+  } catch {}
+}
+
+function renderCommands(cmds) {
+  const list = $('#commands-list');
+  if (!Array.isArray(cmds) || cmds.length === 0) {
+    list.innerHTML = '<div class="empty-state"><div class="icon">📋</div><div class="text">Hali buyruqlar yo\'q</div></div>';
     return;
   }
-  
-  const icons = {
-    create_product: '📦',
-    toggle_boost: '⚡',
-    generate_label: '🏷️',
-    batch_labels: '📋',
-    update_price: '💰',
-    update_stock: '📊',
-  };
-  
-  const statusColors = {
-    pending: '#eab308',
-    processing: '#3b82f6',
-    completed: '#22c55e',
-    failed: '#ef4444',
-  };
-  
-  list.innerHTML = commands.map(cmd => {
-    const icon = icons[cmd.command_type] || '📌';
-    const time = new Date(cmd.created_at).toLocaleTimeString('uz', { hour: '2-digit', minute: '2-digit' });
-    const statusColor = statusColors[cmd.status] || '#94a3b8';
-    
-    return `
-      <div class="command-item">
-        <span class="command-icon">${icon}</span>
-        <span>${cmd.command_type.replace(/_/g, ' ')}</span>
-        <span class="command-status" style="color: ${statusColor}">${cmd.status} · ${time}</span>
+  const icons = { create_product: '📦', toggle_boost: '🚀', generate_label: '🏷️', batch_labels: '📋', update_price: '💰', update_stock: '📊' };
+  const names = { create_product: 'Kartochka yaratish', toggle_boost: 'Boost', generate_label: 'Etiketka', batch_labels: 'Ommaviy etiketka', update_price: 'Narx yangilash', update_stock: 'Zaxira' };
+  const statusText = { pending: 'Kutilmoqda', processing: 'Bajarilmoqda', completed: 'Tayyor', failed: 'Xato' };
+
+  list.innerHTML = cmds.map(c => `
+    <div class="command-item">
+      <span class="command-icon">${icons[c.command_type] || '📌'}</span>
+      <div class="command-info">
+        <div class="command-name">${names[c.command_type] || c.command_type}</div>
+        <div class="command-time">${new Date(c.created_at).toLocaleString('uz', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}${c.error_message ? ' · ' + c.error_message.substring(0, 30) : ''}</div>
       </div>
-    `;
-  }).join('');
+      <span class="command-status cmd-${c.status}">${statusText[c.status] || c.status}</span>
+    </div>`).join('');
 }
 
 // ===== Actions =====
-openSellerBtn.addEventListener('click', () => {
-  chrome.tabs.create({ url: 'https://seller.uzum.uz/' });
-});
+$('#open-seller-btn').addEventListener('click', () => chrome.tabs.create({ url: 'https://seller.uzum.uz/' }));
+$('#open-dashboard-btn').addEventListener('click', () => chrome.tabs.create({ url: 'https://sellercloudx.lovable.app/seller-cloud-mobile' }));
 
-refreshBtn.addEventListener('click', async () => {
-  refreshBtn.textContent = '⏳ Yangilanmoqda...';
+$('#refresh-btn').addEventListener('click', async () => {
+  $('#refresh-btn').textContent = '⏳ Yangilanmoqda...';
   const config = await chrome.storage.local.get(['accessToken', 'userId', 'userEmail']);
-  await loadCommandStats(config);
-  checkConnectionStatus();
-  checkSellerTab();
-  refreshBtn.innerHTML = '🔄 Ma\'lumotlarni yangilash';
+  await Promise.all([loadStats(config), loadHistory(config)]);
+  checkConnection(); checkSellerTab();
+  $('#refresh-btn').innerHTML = '🔄 Ma\'lumotlarni yangilash';
 });
 
-// Init on popup open
+$('#action-create-product')?.addEventListener('click', () => chrome.tabs.create({ url: 'https://sellercloudx.lovable.app/seller-cloud-mobile' }));
+$('#action-boost')?.addEventListener('click', () => chrome.tabs.create({ url: 'https://seller.uzum.uz/advertising' }));
+$('#action-labels')?.addEventListener('click', () => chrome.tabs.create({ url: 'https://seller.uzum.uz/orders' }));
+$('#action-price')?.addEventListener('click', () => chrome.tabs.create({ url: 'https://sellercloudx.lovable.app/seller-cloud-mobile' }));
+$('#action-stock')?.addEventListener('click', () => chrome.tabs.create({ url: 'https://sellercloudx.lovable.app/seller-cloud-mobile' }));
+$('#action-analytics')?.addEventListener('click', async () => {
+  await notifyContent({ type: 'SCX_SETTING', setting: 'overlay', value: true });
+  const tabs = await chrome.tabs.query({ url: 'https://seller.uzum.uz/*' });
+  if (tabs.length > 0) chrome.tabs.update(tabs[0].id, { active: true });
+  else chrome.tabs.create({ url: 'https://seller.uzum.uz/' });
+});
+
 init();
