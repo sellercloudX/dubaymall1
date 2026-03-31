@@ -2,6 +2,7 @@ import { toDisplayUzs } from '@/lib/currency';
 import { getOrderRevenueUzs } from '@/lib/revenueCalculations';
 import { getTariffForProduct, type TariffInfo } from '@/hooks/useMarketplaceTariffs';
 import type { MarketplaceOrder } from '@/hooks/useMarketplaceDataStore';
+import { normalizeMarketplaceFinance } from '@/lib/marketplaceDataNormalizer';
 
 // O'zbekiston YATT solig'i — barcha marketplace'lar uchun 4%
 const UZB_TAX_RATE = 0.04;
@@ -58,83 +59,25 @@ function normalizeMarketplaceMoney(value: number, marketplace: string): number {
   return marketplace === 'wildberries' ? toDisplayUzs(value, marketplace) : value;
 }
 
-function extractDirectItemFees(item: any, marketplace: string): {
+function extractWildberriesActualFees(item: any, marketplace: string): {
   commission: number;
   logistics: number;
   withdrawal: number;
   totalFees: number;
-  additionalRevenue: number;
-  isReal: boolean;
-} | null {
-  const commissionRaw = getPositiveAmount(item.commissionAmount ?? item.commissionBase);
-  const logisticsRaw = getPositiveAmount(item.deliveryAmount);
-  const withdrawalRaw = getPositiveAmount(item.withdrawalAmount);
-  const additionalRaw = getSignedAmount(item.additionalPayment ?? item.subsidyAmount ?? item.promoAmount);
-
-  if (commissionRaw <= 0 && logisticsRaw <= 0 && withdrawalRaw <= 0 && additionalRaw === 0) {
-    return null;
-  }
-
-  const commission = normalizeMarketplaceMoney(commissionRaw, marketplace);
-  const logistics = normalizeMarketplaceMoney(logisticsRaw, marketplace);
-  const withdrawal = normalizeMarketplaceMoney(withdrawalRaw, marketplace);
-  const additionalRevenue = normalizeMarketplaceMoney(Math.max(0, additionalRaw), marketplace);
-
-  return {
-    commission,
-    logistics,
-    withdrawal,
-    totalFees: commission + logistics + withdrawal,
-    additionalRevenue,
-    isReal: true,
-  };
-}
-
-/**
- * Extract ACTUAL fees from WB order item using forPay (real seller payout).
- * WB's forPay = what the seller actually receives after ALL deductions
- * (commission + logistics + storage + penalties).
- * 
- * SUBSIDY HANDLING: When WB runs marketplace-subsidized promotions,
- * forPay can include subsidy compensation (additional_payment / supplier_promo).
- * In this case, actual_sold_price for the seller = forPay (since that's what they receive).
- * totalFees = finishedPrice - forPay (can be negative if subsidy > fees, meaning seller earns more)
- * 
- * We ALWAYS trust the finance report values (forPay, finishedPrice) as-is.
- */
-function extractWBActualFees(item: any, marketplace: string): {
-  commission: number;
-  logistics: number;
-  withdrawal: number;
-  totalFees: number;
-  additionalRevenue: number;
+  actualSoldPrice: number;
   isReal: boolean;
 } | null {
   if (marketplace !== 'wildberries') return null;
 
-  const direct = extractDirectItemFees(item, marketplace);
-  if (direct) return direct;
-  
-  const forPay = getPositiveAmount(item.forPay || item.sellerAmount);
-  const finishedPrice = getPositiveAmount(item.finishedPrice || item.price || 0);
-  const additionalPayment = normalizeMarketplaceMoney(
-    Math.max(0, getSignedAmount(item.additionalPayment)),
-    marketplace,
-  );
-  
-  // forPay must be a positive number
-  if (!forPay || forPay <= 0 || finishedPrice <= 0) return null;
-  
-  // Fallback when only payout is available: derive combined fees from sold price and payout.
-  const feesPerUnitRub = Math.max(0, finishedPrice - forPay);
-  const feesPerUnitUzs = toDisplayUzs(feesPerUnitRub, marketplace);
-  
+  const normalized = normalizeMarketplaceFinance(item, marketplace);
+  if (!normalized.isExact) return null;
+
   return {
-    commission: feesPerUnitUzs,
-    logistics: 0,
-    withdrawal: 0,
-    totalFees: feesPerUnitUzs,
-    additionalRevenue: additionalPayment,
+    commission: normalized.actualCommission,
+    logistics: normalized.actualLogisticsFee,
+    withdrawal: normalized.actualOtherFees,
+    totalFees: normalized.actualCommission + normalized.actualLogisticsFee + normalized.actualOtherFees,
+    actualSoldPrice: normalized.actualSoldPrice,
     isReal: true,
   };
 }
@@ -150,53 +93,50 @@ function extractWBActualFees(item: any, marketplace: string): {
  * Priority: 1) Absolute commissionBase amount  2) commissionPercent × price  3) null (fallback)
  * Logistics: deliveryAmount from finance API (NEVER hardcode defaults)
  */
-function extractUzumActualFees(item: any, itemPriceUzs: number, marketplace: string): {
+function extractUzumActualFees(item: any, _itemPriceUzs: number, marketplace: string): {
   commission: number;
   logistics: number;
   withdrawal: number;
   totalFees: number;
+  actualSoldPrice: number;
   isReal: boolean;
 } | null {
   if (marketplace !== 'uzum') return null;
-  
-  // === COMMISSION (from Finance API fields) ===
-  // commissionBase = absolute commission amount (commissionAmount from FinanceItemEntity)
-  // commissionPercent = percentage rate from Finance API
-  const itemCommBase = Number(item.commissionBase || item.commissionAmount || 0);
-  const itemCommPercent = Number(item.commissionPercent || 0);
-  
-  let commission = 0;
-  let hasRealCommission = false;
-  
-  // Priority 1: Absolute commission amount from Finance API
-  if (itemCommBase > 0) {
-    commission = itemCommBase;
-    hasRealCommission = true;
-  }
-  // Priority 2: Commission percentage × SOLD price (not catalog price)
-  else if (itemCommPercent > 0 && itemPriceUzs > 0) {
-    commission = Math.round(itemPriceUzs * (itemCommPercent / 100));
-    hasRealCommission = true;
-  }
-  
-  // === LOGISTICS / DELIVERY (SEPARATE field from Finance API) ===
-  // deliveryAmount / logisticsAmount / deliveryCost = actual delivery fee
-  // These are NEVER part of commission — they are separate marketplace charges
-  const itemDelivery = Number(item.deliveryAmount || item.logisticsAmount || item.deliveryCost || 0);
-  
-  // If we have ANY real finance data, return it
-  // Even if commission is 0 but logistics > 0, that's valid real data
-  if (hasRealCommission || itemDelivery > 0) {
-    return {
-      commission,
-      logistics: itemDelivery,
-      withdrawal: 0,
-      totalFees: commission + itemDelivery,
-      isReal: true,
-    };
-  }
-  
-  return null;
+
+  const normalized = normalizeMarketplaceFinance(item, marketplace);
+  if (!normalized.isExact) return null;
+
+  return {
+    commission: normalized.actualCommission,
+    logistics: normalized.actualLogisticsFee,
+    withdrawal: normalized.actualOtherFees,
+    totalFees: normalized.actualCommission + normalized.actualLogisticsFee + normalized.actualOtherFees,
+    actualSoldPrice: normalized.actualSoldPrice,
+    isReal: true,
+  };
+}
+
+function extractYandexActualFees(item: any, marketplace: string): {
+  commission: number;
+  logistics: number;
+  withdrawal: number;
+  totalFees: number;
+  actualSoldPrice: number;
+  isReal: boolean;
+} | null {
+  if (marketplace !== 'yandex') return null;
+
+  const normalized = normalizeMarketplaceFinance(item, marketplace);
+  if (!normalized.isExact) return null;
+
+  return {
+    commission: normalized.actualCommission,
+    logistics: normalized.actualLogisticsFee,
+    withdrawal: normalized.actualOtherFees,
+    totalFees: normalized.actualCommission + normalized.actualLogisticsFee + normalized.actualOtherFees,
+    actualSoldPrice: normalized.actualSoldPrice,
+    isReal: true,
+  };
 }
 
 /**
@@ -265,68 +205,40 @@ export function calculateOrderFinancialBreakdown(
     for (const item of items) {
       const quantity = item.count || 1;
       const itemPrice = toDisplayUzs(item.price || 0, marketplace);
-      let itemRevenue = itemPrice * quantity;
+      let itemRevenue = 0;
       const rawCostPrice = getCostPrice(marketplace, item.offerId);
       const costPriceUzs = rawCostPrice !== null ? toDisplayUzs(rawCostPrice, marketplace) : 0;
       const itemCostTotal = costPriceUzs * quantity;
 
       // ===== MARKETPLACE-SUBSIDIZED PROMOTION HANDLING =====
       // Add Yandex subsidy (PROMO_AMOUNT / compensation) to revenue
-      const yandexSubsidy = extractYandexSubsidy(item, marketplace);
-      if (yandexSubsidy > 0) {
-        itemRevenue += toDisplayUzs(yandexSubsidy, marketplace) * quantity;
-      }
-
       // ===== MARKETPLACE-SPECIFIC ACTUAL FEE EXTRACTION =====
-      // Priority: 1) Actual fees from marketplace finance/settlement API → 2) Tariff-based estimation
+      // Strict exact mode: use only official finance/report fields. No tariff fallback.
       let itemCommission = 0;
       let itemLogistics = 0;
       let itemWithdrawal = 0;
       let itemTotalFees = 0;
       let hasRealFees = false;
 
-      const directFees = extractDirectItemFees(item, marketplace);
-      if (directFees) {
-        itemRevenue += directFees.additionalRevenue * quantity;
-        itemCommission = directFees.commission * quantity;
-        itemLogistics = directFees.logistics * quantity;
-        itemWithdrawal = directFees.withdrawal * quantity;
-        itemTotalFees = directFees.totalFees * quantity;
+      const wbFees = extractWildberriesActualFees(item, marketplace);
+      const uzumFees = extractUzumActualFees(item, itemPrice, marketplace);
+      const yandexFees = extractYandexActualFees(item, marketplace);
+      const exactFees = wbFees ?? uzumFees ?? yandexFees;
+
+      if (exactFees) {
+        itemRevenue = exactFees.actualSoldPrice;
+        itemCommission = exactFees.commission;
+        itemLogistics = exactFees.logistics;
+        itemWithdrawal = exactFees.withdrawal;
+        itemTotalFees = exactFees.totalFees;
         hasRealFees = true;
-      }
-
-      // Try WB actual fees (from forPay — includes subsidy compensation)
-      const wbFees = !hasRealFees ? extractWBActualFees(item, marketplace) : null;
-      if (wbFees) {
-        itemRevenue += wbFees.additionalRevenue * quantity;
-        itemCommission = wbFees.commission * quantity;
-        itemLogistics = wbFees.logistics * quantity;
-        itemWithdrawal = wbFees.withdrawal * quantity;
-        itemTotalFees = wbFees.totalFees * quantity;
-        hasRealFees = true;
-      }
-
-      // Try Uzum actual fees (from item-level commission data)
-      if (!hasRealFees) {
-        const uzumFees = extractUzumActualFees(item, itemPrice, marketplace);
-        if (uzumFees) {
-          itemCommission = uzumFees.commission * quantity;
-          itemLogistics = uzumFees.logistics * quantity;
-          itemWithdrawal = uzumFees.withdrawal * quantity;
-          itemTotalFees = uzumFees.totalFees * quantity;
-          hasRealFees = true;
-        }
-      }
-
-      // Fallback: tariff-based calculation
-      if (!hasRealFees) {
-        // CRITICAL: Always use actual sold price (itemPrice) for tariff calculation.
-        // Never use commissionBase — it inflates fees beyond sold price.
+      } else {
         const tariff = getTariffForProduct(tariffMap, item.offerId, itemPrice, marketplace);
-        itemCommission = tariff.commission * quantity;
-        itemLogistics = tariff.logistics * quantity;
-        itemWithdrawal = (tariff.withdrawal || 0) * quantity;
-        itemTotalFees = tariff.totalFee * quantity;
+        itemCommission = tariff.commission;
+        itemLogistics = tariff.logistics;
+        itemWithdrawal = tariff.withdrawal || 0;
+        itemTotalFees = tariff.totalFee;
+        itemRevenue = 0;
         hasRealFees = tariff.isReal;
       }
 

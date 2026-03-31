@@ -64,6 +64,7 @@ export interface MarketplaceOrder {
     count: number;
     price: number;
     priceUZS: number;
+    grossPrice?: number;
     photo?: string;
     nmID?: number;
     // Yandex: price before Yandex subsidy — commission is charged on THIS, not on buyer price
@@ -77,6 +78,12 @@ export interface MarketplaceOrder {
     withdrawalAmount?: number;
     additionalPayment?: number;
     sellerAmount?: number;
+    actualCommission?: number;
+    actualLogisticsFee?: number;
+    actualOtherFees?: number;
+    actualSoldPrice?: number;
+    subsidyAmount?: number;
+    financeSource?: string;
   }>;
 }
 
@@ -173,7 +180,7 @@ export function useMarketplaceDataStore(connectedMarketplaces: string[]) {
     // Fetch orders for each marketplace
     const orderQueries = useQueries({
       queries: connectedMarketplaces.map(mp => ({
-         queryKey: ['marketplace-orders', mp, 'v21-uzum-delivery-separate'],
+         queryKey: ['marketplace-orders', mp, 'v22-strict-exact-all-marketplaces'],
          queryFn: async () => {
            // Do NOT send date limits — let the edge function fetch all orders
            // The edge function defaults to 365 days which captures all active orders

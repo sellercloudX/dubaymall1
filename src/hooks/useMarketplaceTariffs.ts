@@ -50,7 +50,7 @@ export function useMarketplaceTariffs(
   const stableKey = productIds.length > 0 ? productIds.substring(0, 200) : 'empty';
 
   return useQuery({
-    queryKey: ['marketplace-tariffs', 'v21-uzum-delivery-separate', connectedMarketplaces.join(','), stableKey],
+    queryKey: ['marketplace-tariffs', 'v22-strict-exact-all-marketplaces', connectedMarketplaces.join(','), stableKey],
     queryFn: async () => {
       const tariffMap = new Map<string, TariffInfo>();
 
@@ -415,41 +415,17 @@ function safeMapValues(map: any): TariffInfo[] {
 export function getTariffForProduct(
   tariffMap: Map<string, TariffInfo> | undefined,
   offerId: string,
-  price: number,
-  marketplace?: string,
+  _price: number,
+  _marketplace?: string,
 ): { commission: number; logistics: number; withdrawal: number; totalFee: number; isReal: boolean } {
   const tariff = safeMapGet(tariffMap, offerId);
   
   if (tariff && tariff.totalTariff > 0) {
     const extraFees = tariff.otherFees || 0;
-    let commission = tariff.agencyCommission;
-
-    // CRITICAL: Recalculate commission using actual sold price × commission rate.
-    // Tariff map stores absolute values based on CATALOG price, but actual sold price
-    // may differ (promotions, discounts, price changes).
-    // ALWAYS use the actual sold price (price param), NEVER a pre-discount base.
-    if (tariff.commissionPercent > 0 && price > 0) {
-      commission = Math.round(price * (tariff.commissionPercent / 100));
-    }
-
-    let logistics = tariff.fulfillment + tariff.delivery + extraFees;
-    if (logistics <= 0) {
-      if (marketplace === 'uzum') logistics = 5000;
-      else if (marketplace === 'yandex') logistics = 2000;
-      else if (marketplace === 'wildberries') logistics = Math.round(46 * getRubToUzs());
-    }
-
-    const withdrawalFee = marketplace === 'yandex' ? Math.round(price * 0.01) : 0;
-    
-    // Fallback tariff estimation must never exceed sold price.
-    if (price > 0 && commission > price) {
-      console.warn(
-        `[FEE_ASSERT] ${marketplace} offerId=${offerId}: commission=${commission} > price=${price}, commissionPercent=${tariff.commissionPercent}%. Clamping to sold price.`
-      );
-      commission = price;
-    }
-
-    const totalFee = commission + logistics + withdrawalFee;
+    const commission = tariff.agencyCommission;
+    const logistics = tariff.fulfillment + tariff.delivery + extraFees;
+    const withdrawalFee = 0;
+    const totalFee = commission + logistics;
     
     return {
       commission,
