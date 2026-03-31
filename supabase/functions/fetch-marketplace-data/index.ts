@@ -2766,7 +2766,8 @@ serve(async (req) => {
           try {
             const finShopIds = allShopIds.length > 0 ? allShopIds : (uzumShopId ? [String(uzumShopId)] : []);
             console.log(`Uzum Finance orders: querying with ${finShopIds.length} shopIds: ${finShopIds.join(',')}`);
-            const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
+            // Use 365-day lookback for finance data (90 days was too short for some sellers)
+            const ninetyDaysAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
             let fboCount = 0;
 
             // Try multiple approaches to get finance data:
@@ -2971,16 +2972,17 @@ serve(async (req) => {
             // Build a map of orderCode → finance items, then patch FBS order items.
             const financeItemMap = new Map<string, any[]>();
             // Re-scan ALL finance pages to build enrichment map (use no-status-filter first, then all-statuses)
-            const enrichStatuses: string[][] = [[], ['TO_WITHDRAW', 'PROCESSING', 'CANCELED', 'PARTIALLY_CANCELLED']];
+            const enrichStatuses: string[][] = [[], ['TO_WITHDRAW', 'PROCESSING', 'CANCELED', 'PARTIALLY_CANCELLED', 'COMPLETED']];
             
             for (const statuses of enrichStatuses) {
               if (financeItemMap.size > 0) break; // Already got data
               
               let enrichPage = 0;
               let enrichHasMore = true;
-              while (enrichHasMore && enrichPage < 20) {
+              while (enrichHasMore && enrichPage < 30) {
                 const enrichParams = new URLSearchParams();
-                enrichParams.append('dateFrom', String(ninetyDaysAgo));
+                // Use same 365-day lookback for enrichment
+                enrichParams.append('dateFrom', String(Date.now() - 365 * 24 * 60 * 60 * 1000));
                 enrichParams.append('dateTo', String(Date.now()));
                 enrichParams.append('size', '100');
                 enrichParams.append('page', String(enrichPage));
@@ -4692,6 +4694,9 @@ serve(async (req) => {
               const statsWh = (o.warehouseName || '').toLowerCase();
               const statsFboKw = ['коледино', 'подольск', 'электросталь', 'казань', 'краснодар', 'екатеринбург', 'новосибирск', 'хабаровск', 'тула', 'wb'];
               const statsIsFBO = statsFboKw.some(kw => statsWh.includes(kw));
+
+              // CRITICAL FIX: compute wbFinance for this order (was undefined before v25)
+              const wbFinance = getWbItemFinanceFields(o);
 
               allOrders.push({
                 id: cleanId || o.nmId || Math.random(),
