@@ -1551,9 +1551,9 @@ serve(async (req) => {
               result = { success: true, data: parsed };
             } else {
               const errText = await tariffResponse.text();
-              console.error("Tariff calc error (sellingProgram):", tariffResponse.status, errText);
+              console.error("Tariff calc error (campaignId):", tariffResponse.status, errText);
               
-              // Fallback: try with campaignId
+              // Fallback: try with sellingProgram if campaignId fails (restricted categories)
               let fallbackResult: any = null;
               
               if (tariffResponse.status === 400) {
