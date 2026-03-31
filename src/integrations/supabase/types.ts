@@ -3813,13 +3813,6 @@ export type Database = {
             referencedRelation: "wildberries_connections"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "wildberries_financials_connection_id_fkey"
-            columns: ["connection_id"]
-            isOneToOne: false
-            referencedRelation: "wildberries_connections_safe"
-            referencedColumns: ["id"]
-          },
         ]
       }
       wildberries_orders: {
@@ -3888,13 +3881,6 @@ export type Database = {
             referencedRelation: "wildberries_connections"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "wildberries_orders_connection_id_fkey"
-            columns: ["connection_id"]
-            isOneToOne: false
-            referencedRelation: "wildberries_connections_safe"
-            referencedColumns: ["id"]
-          },
         ]
       }
       wildberries_products: {
@@ -3952,13 +3938,6 @@ export type Database = {
             columns: ["connection_id"]
             isOneToOne: false
             referencedRelation: "wildberries_connections"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "wildberries_products_connection_id_fkey"
-            columns: ["connection_id"]
-            isOneToOne: false
-            referencedRelation: "wildberries_connections_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -4063,8 +4042,8 @@ export type Database = {
           courier_id?: string | null
           created_at?: string | null
           customer_address?: never
-          customer_name?: string | null
-          customer_phone?: string | null
+          customer_name?: never
+          customer_phone?: never
           customer_telegram?: never
           delivered_at?: string | null
           delivery_otp?: never
@@ -4089,8 +4068,8 @@ export type Database = {
           courier_id?: string | null
           created_at?: string | null
           customer_address?: never
-          customer_name?: string | null
-          customer_phone?: string | null
+          customer_name?: never
+          customer_phone?: never
           customer_telegram?: never
           delivered_at?: string | null
           delivery_otp?: never
@@ -4263,13 +4242,13 @@ export type Database = {
           id: string | null
           is_active: boolean | null
           last_sync_at: string | null
+          marketplace: string | null
           orders_count: number | null
           products_count: number | null
-          supplier_id: number | null
+          shop_id: string | null
           total_revenue: number | null
           updated_at: string | null
           user_id: string | null
-          warehouse_id: number | null
         }
         Insert: {
           account_info?: Json | null
@@ -4277,13 +4256,13 @@ export type Database = {
           id?: string | null
           is_active?: boolean | null
           last_sync_at?: string | null
+          marketplace?: string | null
           orders_count?: number | null
           products_count?: number | null
-          supplier_id?: number | null
+          shop_id?: string | null
           total_revenue?: number | null
           updated_at?: string | null
           user_id?: string | null
-          warehouse_id?: number | null
         }
         Update: {
           account_info?: Json | null
@@ -4291,15 +4270,30 @@ export type Database = {
           id?: string | null
           is_active?: boolean | null
           last_sync_at?: string | null
+          marketplace?: string | null
           orders_count?: number | null
           products_count?: number | null
-          supplier_id?: number | null
+          shop_id?: string | null
           total_revenue?: number | null
           updated_at?: string | null
           user_id?: string | null
-          warehouse_id?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_connections_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_connections_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops_public"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Functions: {
