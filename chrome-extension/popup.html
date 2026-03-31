@@ -7,183 +7,138 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      width: 340px;
-      min-height: 420px;
+      width: 380px; min-height: 500px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-      background: #0f0f23;
-      color: #e2e8f0;
+      background: #0a0a1a; color: #e2e8f0; overflow-x: hidden;
     }
     .header {
-      background: linear-gradient(135deg, #8b5cf6, #6366f1);
-      padding: 16px 20px;
-      display: flex; align-items: center; gap: 10px;
+      background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 50%, #2563eb 100%);
+      padding: 14px 16px; display: flex; align-items: center; gap: 10px;
+      position: relative; overflow: hidden;
     }
-    .header-icon {
-      width: 32px; height: 32px;
-      background: rgba(255,255,255,0.2);
-      border-radius: 8px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 18px;
+    .header::after {
+      content: ''; position: absolute; inset: 0;
+      background: url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23fff' fill-opacity='.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/svg%3E");
+      pointer-events: none;
     }
-    .header h1 { font-size: 16px; font-weight: 700; color: white; }
-    .header p { font-size: 11px; color: rgba(255,255,255,0.7); }
-    
-    .content { padding: 16px; }
-    
-    .status-card {
-      background: #1a1a2e;
-      border: 1px solid #2d2d44;
-      border-radius: 12px;
-      padding: 14px;
-      margin-bottom: 12px;
-    }
-    .status-row {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 6px 0;
-    }
-    .status-label { font-size: 12px; color: #94a3b8; }
-    .status-value { font-size: 12px; font-weight: 600; }
-    .status-dot {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      display: inline-block;
-      margin-right: 6px;
-    }
-    .dot-green { background: #22c55e; box-shadow: 0 0 6px #22c55e55; }
-    .dot-red { background: #ef4444; box-shadow: 0 0 6px #ef444455; }
-    .dot-yellow { background: #eab308; box-shadow: 0 0 6px #eab30855; }
-    
-    .section-title {
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: #64748b;
-      margin: 16px 0 8px;
-    }
-    
-    .btn {
-      width: 100%;
-      padding: 10px 16px;
-      border: none;
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      transition: all 0.15s;
-      margin-bottom: 8px;
-    }
-    .btn:hover { transform: translateY(-1px); }
+    .header-icon { width: 36px; height: 36px; background: rgba(255,255,255,0.15); backdrop-filter: blur(10px); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; position: relative; z-index: 1; }
+    .header-text { position: relative; z-index: 1; }
+    .header h1 { font-size: 15px; font-weight: 700; color: white; }
+    .header p { font-size: 10px; color: rgba(255,255,255,0.7); margin-top: 1px; }
+    .header-version { margin-left: auto; background: rgba(255,255,255,0.15); padding: 2px 8px; border-radius: 10px; font-size: 9px; color: rgba(255,255,255,0.8); position: relative; z-index: 1; }
+
+    .tabs { display: flex; background: #111128; border-bottom: 1px solid #1e1e3a; }
+    .tab { flex: 1; padding: 10px 6px; font-size: 10px; font-weight: 600; text-align: center; cursor: pointer; color: #64748b; border-bottom: 2px solid transparent; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 3px; }
+    .tab:hover { color: #a5b4fc; }
+    .tab.active { color: #a5b4fc; border-bottom-color: #7c3aed; }
+    .tab-icon { font-size: 13px; }
+    .tab-content { display: none; padding: 12px; min-height: 320px; }
+    .tab-content.active { display: block; }
+
+    .status-card { background: linear-gradient(135deg, #131330, #1a1a3a); border: 1px solid #252550; border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+    .status-row { display: flex; align-items: center; justify-content: space-between; padding: 5px 0; }
+    .status-label { font-size: 11px; color: #94a3b8; }
+    .status-value { font-size: 11px; font-weight: 600; display: flex; align-items: center; gap: 4px; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+    .dot-green { background: #22c55e; box-shadow: 0 0 8px rgba(34,197,94,0.3); }
+    .dot-red { background: #ef4444; box-shadow: 0 0 8px rgba(239,68,68,0.3); }
+    .dot-yellow { background: #eab308; box-shadow: 0 0 8px rgba(234,179,8,0.3); }
+
+    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
+    .stats-grid-2 { grid-template-columns: 1fr 1fr; }
+    .stat-card { background: #131330; border: 1px solid #252550; border-radius: 8px; padding: 10px 8px; text-align: center; }
+    .stat-value { font-size: 18px; font-weight: 800; }
+    .stat-value.purple { color: #a78bfa; }
+    .stat-value.green { color: #4ade80; }
+    .stat-value.blue { color: #60a5fa; }
+    .stat-value.orange { color: #fb923c; }
+    .stat-label { font-size: 9px; color: #64748b; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.3px; }
+
+    .section-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; color: #475569; margin: 12px 0 6px; font-weight: 700; }
+
+    .btn { width: 100%; padding: 9px 14px; border: none; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.15s; margin-bottom: 6px; }
+    .btn:hover { transform: translateY(-1px); filter: brightness(1.1); }
     .btn:active { transform: translateY(0); }
-    
-    .btn-primary {
-      background: linear-gradient(135deg, #8b5cf6, #6366f1);
-      color: white;
-    }
-    .btn-primary:hover { box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4); }
-    
-    .btn-success {
-      background: linear-gradient(135deg, #22c55e, #16a34a);
-      color: white;
-    }
-    
-    .btn-outline {
-      background: transparent;
-      border: 1px solid #2d2d44;
-      color: #94a3b8;
-    }
-    .btn-outline:hover { border-color: #8b5cf6; color: #c4b5fd; }
-    
-    .btn-danger {
-      background: transparent;
-      border: 1px solid #7f1d1d;
-      color: #fca5a5;
-    }
-    .btn-danger:hover { background: #7f1d1d33; }
-    
-    .input-group {
-      margin-bottom: 12px;
-    }
-    .input-group label {
-      display: block;
-      font-size: 11px;
-      color: #94a3b8;
-      margin-bottom: 4px;
-    }
-    .input-group input {
-      width: 100%;
-      padding: 8px 12px;
-      background: #1a1a2e;
-      border: 1px solid #2d2d44;
-      border-radius: 8px;
-      color: #e2e8f0;
-      font-size: 13px;
-      outline: none;
-    }
-    .input-group input:focus { border-color: #8b5cf6; }
-    
-    .stats-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-    }
-    .stat-card {
-      background: #1a1a2e;
-      border: 1px solid #2d2d44;
-      border-radius: 8px;
-      padding: 10px;
-      text-align: center;
-    }
-    .stat-value { font-size: 18px; font-weight: 700; color: #c4b5fd; }
-    .stat-label { font-size: 10px; color: #64748b; margin-top: 2px; }
-    
-    .footer {
-      padding: 12px 16px;
-      border-top: 1px solid #2d2d44;
-      text-align: center;
-      font-size: 10px;
-      color: #475569;
-    }
-    
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .btn-primary { background: linear-gradient(135deg, #7c3aed, #4f46e5); color: white; }
+    .btn-success { background: linear-gradient(135deg, #059669, #10b981); color: white; }
+    .btn-outline { background: transparent; border: 1px solid #252550; color: #94a3b8; }
+    .btn-outline:hover { border-color: #7c3aed; color: #c4b5fd; }
+    .btn-danger { background: transparent; border: 1px solid #7f1d1d; color: #fca5a5; font-size: 11px; }
+    .btn-sm { padding: 6px 10px; font-size: 11px; }
+
+    .input-group { margin-bottom: 10px; }
+    .input-group label { display: block; font-size: 10px; color: #94a3b8; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.3px; }
+    .input-group input { width: 100%; padding: 8px 10px; background: #131330; border: 1px solid #252550; border-radius: 8px; color: #e2e8f0; font-size: 12px; outline: none; transition: border-color 0.2s; }
+    .input-group input:focus { border-color: #7c3aed; }
+
+    .feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .feature-card { background: #131330; border: 1px solid #252550; border-radius: 8px; padding: 10px; cursor: pointer; transition: all 0.2s; text-align: center; }
+    .feature-card:hover { border-color: #7c3aed; transform: translateY(-1px); }
+    .feature-icon { font-size: 22px; margin-bottom: 4px; }
+    .feature-name { font-size: 10px; font-weight: 600; color: #cbd5e1; }
+    .feature-desc { font-size: 8px; color: #64748b; margin-top: 2px; }
+
+    .notif-badge { background: #ef4444; color: white; font-size: 8px; font-weight: 700; padding: 1px 4px; border-radius: 6px; min-width: 14px; text-align: center; }
+
+    .command-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: #131330; border: 1px solid #252550; border-radius: 8px; margin-bottom: 5px; font-size: 11px; transition: border-color 0.2s; }
+    .command-item:hover { border-color: rgba(124,58,237,0.5); }
+    .command-icon { font-size: 14px; }
+    .command-info { flex: 1; }
+    .command-name { font-weight: 600; font-size: 11px; }
+    .command-time { font-size: 9px; color: #64748b; }
+    .command-status { font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 4px; }
+    .cmd-pending { background: #422006; color: #fbbf24; }
+    .cmd-processing { background: #172554; color: #60a5fa; }
+    .cmd-completed { background: #052e16; color: #4ade80; }
+    .cmd-failed { background: #450a0a; color: #f87171; }
+
+    .setting-row { display: flex; align-items: center; justify-content: space-between; padding: 10px; background: #131330; border: 1px solid #252550; border-radius: 8px; margin-bottom: 6px; }
+    .setting-info { flex: 1; }
+    .setting-name { font-size: 12px; font-weight: 600; }
+    .setting-desc { font-size: 9px; color: #64748b; margin-top: 1px; }
+    .toggle { width: 36px; height: 20px; background: #252550; border-radius: 10px; position: relative; cursor: pointer; transition: background 0.2s; flex-shrink: 0; }
+    .toggle.active { background: #7c3aed; }
+    .toggle::after { content: ''; width: 16px; height: 16px; background: white; border-radius: 50%; position: absolute; top: 2px; left: 2px; transition: transform 0.2s; }
+    .toggle.active::after { transform: translateX(16px); }
+
+    .overlay-setting { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: linear-gradient(135deg, #131330, #1a1a3a); border: 1px solid #252550; border-radius: 8px; margin-bottom: 8px; }
+    .overlay-setting .emoji { font-size: 20px; }
+    .overlay-setting .info { flex: 1; }
+    .overlay-setting .title { font-size: 11px; font-weight: 600; }
+    .overlay-setting .desc { font-size: 9px; color: #64748b; }
+
+    .footer { padding: 8px 16px; border-top: 1px solid #1e1e3a; text-align: center; font-size: 9px; color: #334155; display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .footer a { color: #7c3aed; text-decoration: none; }
+
     #login-section, #dashboard-section { display: none; }
-    
-    .command-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px;
-      background: #1a1a2e;
-      border: 1px solid #2d2d44;
-      border-radius: 8px;
-      margin-bottom: 6px;
-      font-size: 11px;
-    }
-    .command-icon { font-size: 16px; }
-    .command-status { margin-left: auto; font-size: 10px; }
+    .login-logo { text-align: center; padding: 20px 0 12px; }
+    .login-logo .icon { font-size: 48px; }
+    .login-logo h2 { font-size: 18px; font-weight: 800; margin-top: 8px; background: linear-gradient(135deg, #a78bfa, #60a5fa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .login-logo p { font-size: 11px; color: #64748b; margin-top: 4px; }
+
+    .empty-state { text-align: center; padding: 24px 16px; color: #475569; }
+    .empty-state .icon { font-size: 32px; margin-bottom: 8px; }
+    .empty-state .text { font-size: 12px; }
   </style>
 </head>
 <body>
   <div class="header">
     <div class="header-icon">⚡</div>
-    <div>
+    <div class="header-text">
       <h1>SellerCloudX Pro</h1>
-      <p>Uzum Market Avtomatlashtirish</p>
+      <p>Marketplace Avtomatlashtirish</p>
     </div>
+    <span class="header-version">v2.0</span>
   </div>
 
-  <!-- Login Section -->
-  <div id="login-section" class="content">
-    <div class="status-card">
-      <div style="text-align: center; padding: 8px 0;">
-        <div style="font-size: 32px; margin-bottom: 8px;">🔐</div>
-        <div style="font-size: 13px; font-weight: 600; margin-bottom: 4px;">Tizimga kirish</div>
-        <div style="font-size: 11px; color: #94a3b8;">SellerCloudX akkauntingiz bilan ulaning</div>
-      </div>
+  <!-- LOGIN -->
+  <div id="login-section" style="padding: 16px;">
+    <div class="login-logo">
+      <div class="icon">🚀</div>
+      <h2>SellerCloudX</h2>
+      <p>Marketplace sotuvchilar uchun eng kuchli vosita</p>
     </div>
-    
     <div class="input-group">
       <label>Email</label>
       <input type="email" id="login-email" placeholder="email@example.com" />
@@ -192,68 +147,78 @@
       <label>Parol</label>
       <input type="password" id="login-password" placeholder="••••••••" />
     </div>
-    
-    <button class="btn btn-primary" id="login-btn">
-      🚀 Kirish
-    </button>
-    
-    <div id="login-error" style="color: #fca5a5; font-size: 11px; text-align: center; margin-top: 8px; display: none;"></div>
+    <button class="btn btn-primary" id="login-btn">🚀 Kirish</button>
+    <div id="login-error" style="color: #fca5a5; font-size: 11px; text-align: center; margin-top: 6px; display: none;"></div>
+    <div style="text-align: center; margin-top: 12px;">
+      <a href="https://sellercloudx.lovable.app" target="_blank" style="color: #7c3aed; font-size: 11px; text-decoration: none;">Akkaunt yaratish →</a>
+    </div>
   </div>
 
-  <!-- Dashboard Section -->
-  <div id="dashboard-section" class="content">
-    <div class="status-card">
-      <div class="status-row">
-        <span class="status-label">Ulanish holati</span>
-        <span class="status-value" id="connection-status">
-          <span class="status-dot dot-yellow"></span>Tekshirilmoqda...
-        </span>
-      </div>
-      <div class="status-row">
-        <span class="status-label">Uzum Seller</span>
-        <span class="status-value" id="seller-status">—</span>
-      </div>
-      <div class="status-row">
-        <span class="status-label">Foydalanuvchi</span>
-        <span class="status-value" id="user-email" style="font-size: 11px;">—</span>
-      </div>
+  <!-- DASHBOARD -->
+  <div id="dashboard-section">
+    <div class="tabs">
+      <div class="tab active" data-tab="overview"><span class="tab-icon">📊</span> Umumiy</div>
+      <div class="tab" data-tab="actions"><span class="tab-icon">⚡</span> Amallar</div>
+      <div class="tab" data-tab="history"><span class="tab-icon">📋</span> Tarix <span class="notif-badge" id="pending-badge" style="display:none">0</span></div>
+      <div class="tab" data-tab="settings"><span class="tab-icon">⚙️</span></div>
     </div>
-    
-    <div class="section-title">Statistika</div>
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-value" id="stat-pending">0</div>
-        <div class="stat-label">Kutilmoqda</div>
+
+    <!-- OVERVIEW -->
+    <div class="tab-content active" id="tab-overview">
+      <div class="status-card">
+        <div class="status-row"><span class="status-label">🔗 Ulanish</span><span class="status-value" id="connection-status"><span class="dot dot-yellow"></span> Tekshirilmoqda</span></div>
+        <div class="status-row"><span class="status-label">🏪 Uzum Seller</span><span class="status-value" id="seller-status">—</span></div>
+        <div class="status-row"><span class="status-label">👤 Foydalanuvchi</span><span class="status-value" id="user-email" style="font-size:10px;max-width:180px;overflow:hidden;text-overflow:ellipsis;">—</span></div>
       </div>
-      <div class="stat-card">
-        <div class="stat-value" id="stat-completed">0</div>
-        <div class="stat-label">Bajarildi</div>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-value purple" id="stat-products">—</div><div class="stat-label">Mahsulotlar</div></div>
+        <div class="stat-card"><div class="stat-value green" id="stat-orders">—</div><div class="stat-label">Buyurtmalar</div></div>
+        <div class="stat-card"><div class="stat-value blue" id="stat-revenue">—</div><div class="stat-label">Daromad</div></div>
       </div>
+      <div class="stats-grid stats-grid-2">
+        <div class="stat-card"><div class="stat-value orange" id="stat-pending">0</div><div class="stat-label">Kutilmoqda</div></div>
+        <div class="stat-card"><div class="stat-value green" id="stat-completed">0</div><div class="stat-label">Bajarildi</div></div>
+      </div>
+      <button class="btn btn-success" id="open-seller-btn">🏪 Uzum Seller'ni ochish</button>
+      <button class="btn btn-outline btn-sm" id="open-dashboard-btn">📊 SellerCloudX Dashboard →</button>
     </div>
-    
-    <div class="section-title">Oxirgi buyruqlar</div>
-    <div id="commands-list">
-      <div class="command-item" style="justify-content: center; color: #64748b;">
-        Hali buyruqlar yo'q
+
+    <!-- ACTIONS -->
+    <div class="tab-content" id="tab-actions">
+      <div class="section-title">Tez amallar</div>
+      <div class="feature-grid">
+        <div class="feature-card" id="action-create-product"><div class="feature-icon">📦</div><div class="feature-name">Kartochka yaratish</div><div class="feature-desc">AI bilan avtomatik</div></div>
+        <div class="feature-card" id="action-boost"><div class="feature-icon">🚀</div><div class="feature-name">Boost boshqarish</div><div class="feature-desc">Reklama on/off</div></div>
+        <div class="feature-card" id="action-labels"><div class="feature-icon">🏷️</div><div class="feature-name">Etiketka chop</div><div class="feature-desc">FBS buyurtmalar</div></div>
+        <div class="feature-card" id="action-price"><div class="feature-icon">💰</div><div class="feature-name">Narx yangilash</div><div class="feature-desc">Ommaviy o'zgartirish</div></div>
+        <div class="feature-card" id="action-stock"><div class="feature-icon">📊</div><div class="feature-name">Zaxira yangilash</div><div class="feature-desc">Stock boshqarish</div></div>
+        <div class="feature-card" id="action-analytics"><div class="feature-icon">📈</div><div class="feature-name">Analitika</div><div class="feature-desc">Inline ko'rsatish</div></div>
       </div>
+      <div class="section-title" style="margin-top:14px;">Overlay boshqarish</div>
+      <div class="overlay-setting"><span class="emoji">👁️</span><div class="info"><div class="title">Inline analitika</div><div class="desc">Uzum sahifasida mahsulot analitikasini ko'rsatish</div></div><div class="toggle active" id="toggle-overlay"></div></div>
+      <div class="overlay-setting"><span class="emoji">💹</span><div class="info"><div class="title">Foyda kalkulyator</div><div class="desc">Har bir mahsulotda real-time foyda</div></div><div class="toggle active" id="toggle-profit"></div></div>
     </div>
-    
-    <div class="section-title">Tez harakatlar</div>
-    <button class="btn btn-success" id="open-seller-btn">
-      🏪 Uzum Seller'ni ochish
-    </button>
-    <button class="btn btn-outline" id="refresh-btn">
-      🔄 Ma'lumotlarni yangilash
-    </button>
-    <button class="btn btn-danger" id="logout-btn">
-      Chiqish
-    </button>
+
+    <!-- HISTORY -->
+    <div class="tab-content" id="tab-history">
+      <div class="section-title">Oxirgi buyruqlar</div>
+      <div id="commands-list"><div class="empty-state"><div class="icon">📋</div><div class="text">Hali buyruqlar yo'q</div></div></div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="tab-content" id="tab-settings">
+      <div class="section-title">Sozlamalar</div>
+      <div class="setting-row"><div class="setting-info"><div class="setting-name">Bildirishnomalar</div><div class="setting-desc">Buyruq yakunlanganda</div></div><div class="toggle active" id="toggle-notifications"></div></div>
+      <div class="setting-row"><div class="setting-info"><div class="setting-name">Avtomatik ulanish</div><div class="setting-desc">Chrome ochilganda</div></div><div class="toggle active" id="toggle-autoconnect"></div></div>
+      <div class="setting-row"><div class="setting-info"><div class="setting-name">Dark overlay</div><div class="setting-desc">Uzum sahifasida qorong'u rejim</div></div><div class="toggle" id="toggle-dark-overlay"></div></div>
+      <div class="section-title">Hisob</div>
+      <button class="btn btn-outline btn-sm" id="refresh-btn">🔄 Ma'lumotlarni yangilash</button>
+      <button class="btn btn-danger btn-sm" id="logout-btn">🚪 Chiqish</button>
+      <div style="margin-top:16px;text-align:center;"><a href="https://sellercloudx.lovable.app" target="_blank" style="color:#7c3aed;font-size:10px;text-decoration:none;">🌐 SellerCloudX Dashboard</a></div>
+    </div>
   </div>
 
-  <div class="footer">
-    SellerCloudX Pro v1.0 · sellercloudx.lovable.app
-  </div>
-
+  <div class="footer"><span>SellerCloudX Pro v2.0</span><span>·</span><a href="https://sellercloudx.lovable.app" target="_blank">sellercloudx.com</a></div>
   <script src="popup.js"></script>
 </body>
 </html>

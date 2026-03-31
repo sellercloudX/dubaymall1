@@ -1,4 +1,297 @@
-/* SellerCloudX Extension — Content Script Styles */
-#scx-status-badge {
+/* SellerCloudX Content Script Styles v2.0 */
+
+/* ===== Floating Toolbar ===== */
+#scx-toolbar {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  z-index: 999998;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#scx-toolbar.scx-minimized .scx-toolbar-actions {
+  display: none;
+}
+
+#scx-toolbar.scx-minimized .scx-toolbar-inner {
+  padding: 6px 10px;
+}
+
+.scx-toolbar-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #1a1040 0%, #0f0a2a 100%);
+  border: 1px solid rgba(124, 58, 237, 0.35);
+  border-radius: 14px;
+  padding: 6px 8px 6px 12px;
+  box-shadow: 0 8px 32px rgba(124, 58, 237, 0.25), 0 2px 8px rgba(0,0,0,0.4);
+  backdrop-filter: blur(16px);
+}
+
+.scx-toolbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding-right: 8px;
+  border-right: 1px solid rgba(255,255,255,0.08);
+}
+
+.scx-logo { font-size: 16px; }
+
+.scx-brand-text {
+  font-size: 11px;
+  font-weight: 800;
+  color: #c4b5fd;
+  letter-spacing: 0.5px;
+}
+
+.scx-status-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: #eab308;
+  transition: all 0.3s;
+}
+
+.scx-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.scx-tb-btn {
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s;
+  color: #94a3b8;
+}
+
+.scx-tb-btn:hover {
+  background: rgba(124, 58, 237, 0.15);
+  transform: scale(1.1);
+}
+
+.scx-tb-close { font-size: 12px; color: #64748b; }
+
+/* ===== Profit Calculator ===== */
+#scx-profit-calc {
+  position: fixed;
+  top: 50%; right: 20px;
+  transform: translateY(-50%);
+  z-index: 999999;
+  width: 280px;
+  background: linear-gradient(135deg, #0f0a2a, #1a1040);
+  border: 1px solid rgba(124, 58, 237, 0.35);
+  border-radius: 16px;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.5), 0 0 0 1px rgba(124, 58, 237, 0.1);
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  animation: scxSlideIn 0.3s ease;
+}
+
+.scx-calc-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.2), rgba(79, 70, 229, 0.12));
+  border-bottom: 1px solid rgba(124, 58, 237, 0.2);
+  font-size: 13px; font-weight: 700; color: #c4b5fd;
+}
+
+.scx-calc-body { padding: 14px; }
+
+.scx-calc-row { margin-bottom: 10px; }
+
+.scx-calc-row label {
+  display: block; font-size: 10px; color: #94a3b8;
+  margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.3px;
+}
+
+.scx-calc-row input {
+  width: 100%; padding: 7px 10px;
+  background: #131330; border: 1px solid #252550;
+  border-radius: 8px; color: #e2e8f0; font-size: 13px;
+  outline: none; transition: border-color 0.2s; font-family: inherit;
+}
+
+.scx-calc-row input:focus { border-color: #7c3aed; }
+
+.scx-calc-result {
+  background: #131330; border: 1px solid #252550;
+  border-radius: 10px; padding: 10px 12px; margin-top: 12px;
+}
+
+.scx-result-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 4px 0; font-size: 12px; color: #94a3b8;
+}
+
+.scx-result-value { font-weight: 700; font-size: 13px; color: #4ade80; }
+
+/* ===== Analytics Panel ===== */
+#scx-analytics-panel {
+  position: fixed;
+  top: 60px; right: 16px;
+  z-index: 999997;
+  width: 300px;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  background: linear-gradient(135deg, #0f0a2a, #1a1040);
+  border: 1px solid rgba(124, 58, 237, 0.35);
+  border-radius: 16px;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  animation: scxSlideIn 0.3s ease;
+}
+
+.scx-panel-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.2), rgba(79, 70, 229, 0.12));
+  border-bottom: 1px solid rgba(124, 58, 237, 0.2);
+  font-size: 13px; font-weight: 700; color: #c4b5fd;
+  border-radius: 16px 16px 0 0;
+}
+
+.scx-panel-body { padding: 12px; }
+
+.scx-metric-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.scx-metric-card {
+  background: #131330;
+  border: 1px solid #252550;
+  border-radius: 10px;
+  padding: 10px;
+  text-align: center;
+}
+
+.scx-metric-value {
+  font-size: 18px; font-weight: 800;
+}
+
+.scx-metric-value.purple { color: #a78bfa; }
+.scx-metric-value.green { color: #4ade80; }
+.scx-metric-value.blue { color: #60a5fa; }
+.scx-metric-value.orange { color: #fb923c; }
+.scx-metric-value.red { color: #f87171; }
+
+.scx-metric-label {
+  font-size: 9px; color: #64748b;
+  margin-top: 2px; text-transform: uppercase; letter-spacing: 0.3px;
+}
+
+.scx-metric-change {
+  font-size: 9px; margin-top: 2px; font-weight: 600;
+}
+
+.scx-metric-change.up { color: #4ade80; }
+.scx-metric-change.down { color: #f87171; }
+
+/* Product list items */
+.scx-product-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px;
+  background: #131330;
+  border: 1px solid #252550;
+  border-radius: 8px;
+  margin-bottom: 6px;
+  font-size: 11px;
+  transition: border-color 0.2s;
+}
+
+.scx-product-item:hover { border-color: rgba(124, 58, 237, 0.5); }
+
+.scx-product-img {
+  width: 36px; height: 36px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: #252550;
+}
+
+.scx-product-info { flex: 1; min-width: 0; }
+.scx-product-name { font-weight: 600; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.scx-product-sku { font-size: 9px; color: #64748b; }
+.scx-product-stats { text-align: right; }
+.scx-product-price { font-weight: 700; color: #a78bfa; font-size: 12px; }
+.scx-product-stock { font-size: 9px; color: #64748b; }
+
+/* ===== Inline Badges ===== */
+.scx-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 3px !important;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(79, 70, 229, 0.12)) !important;
+  border: 1px solid rgba(124, 58, 237, 0.25) !important;
+  border-radius: 6px !important;
+  padding: 2px 6px !important;
+  font-size: 10px !important;
+  color: #a78bfa !important;
+  margin-left: 6px !important;
+  cursor: pointer !important;
+  font-weight: 600 !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif !important;
+  animation: scxFadeIn 0.3s ease !important;
+}
+
+.scx-badge:hover {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.2), rgba(79, 70, 229, 0.2)) !important;
+}
+
+/* Quick action buttons */
+.scx-quick-btn {
+  background: rgba(124, 58, 237, 0.12) !important;
+  border: 1px solid rgba(124, 58, 237, 0.25) !important;
+  border-radius: 4px !important;
+  padding: 2px 6px !important;
+  cursor: pointer !important;
+  font-size: 12px !important;
+  margin-left: 4px !important;
+  transition: all 0.15s !important;
+}
+
+.scx-quick-btn:hover {
+  background: rgba(124, 58, 237, 0.25) !important;
+  transform: scale(1.1) !important;
+}
+
+/* ===== Animations ===== */
+@keyframes scxSlideIn {
+  from { opacity: 0; transform: translateX(20px) translateY(-50%); }
+  to { opacity: 1; transform: translateX(0) translateY(-50%); }
+}
+
+@keyframes scxFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ===== Toast ===== */
+.scx-toast {
+  position: fixed !important;
+  top: 16px !important;
+  right: 16px !important;
+  z-index: 999999 !important;
+  padding: 10px 16px !important;
+  border-radius: 8px !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3) !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif !important;
+  animation: scxToastIn 0.3s ease !important;
+}
+
+@keyframes scxToastIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
