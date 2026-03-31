@@ -2845,6 +2845,7 @@ serve(async (req) => {
                   }
                   break;
                 }
+                financeDataFound = true; // We got data with this approach
 
                 // Log first item structure
                 if (fboCount === 0 && finList.length > 0) {
