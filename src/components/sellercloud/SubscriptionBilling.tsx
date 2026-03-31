@@ -22,7 +22,7 @@ import {
 import { format } from 'date-fns';
 import { PromoCodeInput, type PromoValidation } from './PromoCodeInput';
 import { notifyAffiliatePayment } from '@/lib/affiliateWebhook';
-import { ReferralProgram } from './ReferralProgram';
+import { cn } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 
 interface SubscriptionBillingProps {

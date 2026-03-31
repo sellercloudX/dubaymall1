@@ -145,14 +145,6 @@ export default function Auth() {
             variant: 'destructive',
           });
         } else {
-          // Apply pending referral bonus
-          const pendingRef = localStorage.getItem('scx_pending_ref');
-          if (pendingRef) {
-            localStorage.removeItem('scx_pending_ref');
-            try {
-              await supabase.rpc('apply_referral_bonus', { p_referred_id: (await supabase.auth.getUser()).data.user?.id, p_referral_code: pendingRef });
-            } catch {}
-          }
           toast({
             title: 'Muvaffaqiyat',
             description: t.loginSuccess,
