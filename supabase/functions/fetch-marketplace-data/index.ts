@@ -127,21 +127,25 @@ function getWbItemFinanceFields(source: any) {
     source.commissionAmount,
     source.commission,
   ));
-  const deliveryAmount = Math.abs(sumPositiveAmounts(
+  // IMPORTANT: logistics and delivery_rub are the SAME field from different API versions
+  // Use pickPositiveAmount (not sum) to avoid double-counting
+  const deliveryAmount = Math.abs(pickPositiveAmount(
     source.logistics,
     source.delivery_rub,
     source.deliveryAmount,
     source.logisticsAmount,
   ));
-  const withdrawalAmount = Math.abs(sumPositiveAmounts(
+  // storage_fee, penalty, acceptance are distinct fee types — sum them
+  // But payment_sale_amount and payment_schedule can overlap — pick the highest
+  const paymentFee = Math.abs(pickPositiveAmount(
     source.payment_sale_amount,
     source.payment_schedule,
-    source.storage_fee,
-    source.penalty,
-    source.acceptance,
-    source.withdrawalAmount,
   ));
-  const subsidyAmount = sumPositiveAmounts(
+  const storageFee = toPositiveAmount(source.storage_fee);
+  const penaltyFee = toPositiveAmount(source.penalty);
+  const acceptanceFee = toPositiveAmount(source.acceptance);
+  const withdrawalAmount = paymentFee + storageFee + penaltyFee + acceptanceFee;
+  const subsidyAmount = pickPositiveAmount(
     source.supplier_promo,
     source.product_discount_for_report,
     source.additional_payment,
