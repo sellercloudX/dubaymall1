@@ -111,6 +111,10 @@ function validateFees(
   return { commission, logistics, withdrawal, totalFees };
 }
 
+// Debug counter for order-level logging
+const _orderDebugCounts: Record<string, number> = {};
+const ORDER_DEBUG_LIMIT = 3;
+
 export function calculateOrderFinancialBreakdown(
   order: MarketplaceOrder,
   marketplace: string,
@@ -129,6 +133,11 @@ export function calculateOrderFinancialBreakdown(
   let itemCount = 0;
   let costCoveredItems = 0;
   let realTariffItems = 0;
+
+  // Track if we should debug-log this order
+  const dbgKey = marketplace;
+  _orderDebugCounts[dbgKey] = (_orderDebugCounts[dbgKey] || 0) + 1;
+  const shouldDebugLog = _orderDebugCounts[dbgKey] <= ORDER_DEBUG_LIMIT;
 
   if (items.length === 0) {
     revenue = getOrderRevenueUzs(order, marketplace);
