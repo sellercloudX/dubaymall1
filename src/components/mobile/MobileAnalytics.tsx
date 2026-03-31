@@ -224,11 +224,12 @@ function StatCard({ icon: Icon, label, value, suffix, className, iconClass }: {
   );
 }
 
-function MiniStat({ label, value, color }: { label: string; value: number; color: string }) {
-  return (
-    <div className="text-center p-2 rounded-xl bg-muted/50">
+const MiniStat = React.forwardRef<HTMLDivElement, { label: string; value: number; color: string }>(
+  ({ label, value, color }, ref) => (
+    <div ref={ref} className="text-center p-2 rounded-xl bg-muted/50">
       <div className={`text-lg font-bold ${color}`}>{value}</div>
       <div className="text-[10px] text-muted-foreground font-medium leading-tight">{label}</div>
     </div>
-  );
-}
+  )
+);
+MiniStat.displayName = 'MiniStat';
