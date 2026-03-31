@@ -50,7 +50,7 @@ export function useMarketplaceTariffs(
   const stableKey = productIds.length > 0 ? productIds.substring(0, 200) : 'empty';
 
   return useQuery({
-    queryKey: ['marketplace-tariffs', 'v20-official-docs', connectedMarketplaces.join(','), stableKey],
+    queryKey: ['marketplace-tariffs', 'v21-commission-fix', connectedMarketplaces.join(','), stableKey],
     queryFn: async () => {
       const tariffMap = new Map<string, TariffInfo>();
 
@@ -418,37 +418,39 @@ export function getTariffForProduct(
   offerId: string,
   price: number,
   marketplace?: string,
-  /** Yandex: price before subsidy — commission is charged on this, not buyer price */
-  commissionBase?: number,
 ): { commission: number; logistics: number; withdrawal: number; totalFee: number; isReal: boolean } {
   const tariff = safeMapGet(tariffMap, offerId);
-  // For Yandex: commission is on pre-subsidy price, not buyer price
-  const commBase = commissionBase && commissionBase > price ? commissionBase : price;
   
   if (tariff && tariff.totalTariff > 0) {
     const extraFees = tariff.otherFees || 0;
     let commission = tariff.agencyCommission;
 
-    // CRITICAL: Recalculate commission using actual item price × commission rate.
+    // CRITICAL: Recalculate commission using actual sold price × commission rate.
     // Tariff map stores absolute values based on CATALOG price, but actual sold price
-    // may differ (promotions, discounts, price changes). Using commissionPercent × actual
-    // price ensures accurate per-order financial calculations.
+    // may differ (promotions, discounts, price changes).
+    // ALWAYS use the actual sold price (price param), NEVER a pre-discount base.
     if (tariff.commissionPercent > 0 && price > 0) {
-      const effectiveBase = (marketplace === 'yandex' && commissionBase && commissionBase > 0)
-        ? commBase : price;
-      commission = Math.round(effectiveBase * (tariff.commissionPercent / 100));
+      commission = Math.round(price * (tariff.commissionPercent / 100));
     }
 
     const logistics = tariff.fulfillment + tariff.delivery + extraFees;
     const withdrawalFee = marketplace === 'yandex' ? Math.round(price * 0.01) : 0;
-    let totalFee = commission + logistics + withdrawalFee;
+    const totalFee = commission + logistics + withdrawalFee;
     
-    // No artificial cap — real API data is passed through as-is
-    // If fees seem high, it's because the marketplace really charges that much
-    if (price > 0 && totalFee > price) {
+    // Safety assertion: commission should never exceed sold price
+    if (price > 0 && commission > price) {
       console.warn(
-        `[TARIFF_WARN] ${marketplace} offerId=${offerId}: totalFee=${totalFee} > price=${price}. Passing through real values.`
+        `[FEE_ASSERT] ${marketplace} offerId=${offerId}: commission=${commission} > price=${price}, commissionPercent=${tariff.commissionPercent}%. Clamping to 40% of price.`
       );
+      commission = Math.round(price * 0.40); // Maximum realistic commission
+      const clampedTotal = commission + logistics + withdrawalFee;
+      return {
+        commission,
+        logistics,
+        withdrawal: withdrawalFee,
+        totalFee: clampedTotal,
+        isReal: true,
+      };
     }
     
     return {
