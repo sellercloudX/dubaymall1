@@ -330,6 +330,7 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
               offerId: p.id,
               skuId: p.skuId,
               shopId: p.shopId,
+              barcode: (p as any).barcode || '',
               quantity: qty,
             })),
           },
