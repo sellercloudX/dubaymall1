@@ -328,7 +328,8 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
             stocks: prods.map(p => ({
               sku: p.sku,
               offerId: p.id,
-              skuId: p.skuId, // Uzum needs numeric skuId, not productId
+              skuId: p.skuId,
+              shopId: p.shopId,
               quantity: qty,
             })),
           },
