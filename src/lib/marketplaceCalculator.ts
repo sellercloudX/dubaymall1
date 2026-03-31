@@ -123,9 +123,22 @@ export function calcMarketplaceMetrics(input: CalcInput): MarketplaceMetrics {
  * Get the minimum logistics for a marketplace in UZS.
  */
 export function getMinLogisticsUzs(marketplace: string): number {
-  const native = MIN_LOGISTICS[marketplace] || 0;
+  const step = LOGISTICS_STEP[marketplace] || 0;
   const rate = isRubMarketplace(marketplace) ? getRubToUzs() : 1;
-  return Math.round(native * rate);
+  return Math.round(step * rate);
+}
+
+/**
+ * Normalize logistics to valid billing step (round UP to nearest multiple).
+ * For Yandex: 2000, 4000, 6000...
+ * For Uzum: 5000, 10000, 15000...
+ */
+export function normalizeLogistics(rawUzs: number, marketplace: string): number {
+  const step = LOGISTICS_STEP[marketplace] || 0;
+  if (step <= 0) return Math.round(rawUzs);
+  const rate = isRubMarketplace(marketplace) ? getRubToUzs() : 1;
+  const stepUzs = Math.round(step * rate);
+  return Math.max(stepUzs, Math.ceil(rawUzs / stepUzs) * stepUzs);
 }
 
 /**
