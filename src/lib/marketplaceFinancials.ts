@@ -178,7 +178,32 @@ export function calculateOrderFinancialBreakdown(
         hasRealFees = tariff.isReal;
       }
 
-      // ===== VALIDATION: log warnings but pass through real values =====
+      // Debug log per-item breakdown
+      if (shouldDebugLog) {
+        console.log(
+          `[ORDER_FINANCE_DEBUG] ${marketplace} order=${order.id} item=${item.offerId}`,
+          {
+            source: exactFees ? 'EXACT_API' : 'TARIFF_FALLBACK',
+            financeSource: item.financeSource || 'none',
+            itemPrice,
+            itemRevenue,
+            itemCommission,
+            itemLogistics,
+            itemWithdrawal,
+            itemTotalFees,
+            hasRealFees,
+            rawFields: {
+              actualCommission: item.actualCommission,
+              actualLogisticsFee: item.actualLogisticsFee,
+              actualSoldPrice: item.actualSoldPrice,
+              sellerAmount: item.sellerAmount,
+              commissionAmount: item.commissionAmount,
+              deliveryAmount: item.deliveryAmount,
+            },
+          },
+        );
+      }
+
       const validated = validateFees(
         itemCommission, itemLogistics, itemWithdrawal,
         itemRevenue, marketplace, item.offerId
