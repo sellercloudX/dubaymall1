@@ -132,6 +132,11 @@ function mapWBOrder(o: any, defaultStatus: string, fromNewApi = false) {
   const forPay = o.forPay || 0;
   // finishedPrice: price buyer actually paid (after WB discount) — always in RUB
   const finishedPrice = o.finishedPrice || 0;
+  const commissionAmount = Math.abs(o.ppvz_sales_commission || o.commissionAmount || o.commission || 0);
+  const deliveryAmount = Math.abs(o.delivery_rub || o.deliveryAmount || o.logisticsAmount || 0);
+  const withdrawalAmount = Math.abs(o.payment_sale_amount || o.payment_schedule || 0);
+  const additionalPayment = o.additional_payment || o.additionalPayment || 0;
+  const sellerAmount = o.ppvz_for_pay || forPay || 0;
 
   // Use best available RUB price: finishedPrice > priceWithDisc > raw price
   // DO NOT use convertedFinalPrice here — it's in seller's local currency (UZS), not RUB
@@ -167,6 +172,11 @@ function mapWBOrder(o: any, defaultStatus: string, fromNewApi = false) {
       spp: spp > 0 ? spp : undefined,
       finishedPrice: finishedPrice > 0 ? finishedPrice : undefined,
       forPay: forPay > 0 ? forPay : undefined,
+      commissionAmount: commissionAmount > 0 ? commissionAmount : undefined,
+      deliveryAmount: deliveryAmount > 0 ? deliveryAmount : undefined,
+      withdrawalAmount: withdrawalAmount > 0 ? withdrawalAmount : undefined,
+      additionalPayment: additionalPayment !== 0 ? additionalPayment : undefined,
+      sellerAmount: sellerAmount > 0 ? sellerAmount : undefined,
     }],
     buyer: { firstName: buyerLocation, lastName: "" },
     nmID: o.nmId,
@@ -827,6 +837,11 @@ serve(async (req) => {
                   price: unitPrice,
                   priceUZS: unitPrice,
                   categoryId: item.marketCategoryId,
+                  commissionAmount: Number(item.commissionAmount || item.feeAmount || 0) || undefined,
+                  deliveryAmount: Number(item.deliveryAmount || item.deliveryCost || 0) || undefined,
+                  withdrawalAmount: Number(item.paymentTransferAmount || item.withdrawalAmount || 0) || undefined,
+                  additionalPayment: Number(item.promoAmount || item.compensationAmount || item.subsidyAmount || 0) || undefined,
+                  sellerAmount: Number(item.bankSum || item.transactionSum || item.sellerAmount || 0) || undefined,
                 };
               });
 
@@ -2553,14 +2568,15 @@ serve(async (req) => {
                     barcode: itemBarcode,
                     offerName: item.title || item.skuTitle || item.productTitle || item.name || '',
                     count: item.quantity || item.count || item.amount || 1,
-                    price: item.price || 0,
-                    priceUZS: item.price || 0,
+                    price: item.totalPrice || item.buyerPrice || item.accrualAmount || item.price || item.amount || item.sellerAmount || 0,
+                    priceUZS: item.totalPrice || item.buyerPrice || item.accrualAmount || item.price || item.amount || item.sellerAmount || 0,
                     photo: itemPhoto,
                     // Carry ALL available finance fields from FBS order items
                     commissionPercent: item.commissionPercent || item.commission?.percent || 0,
                     commissionBase: item.commissionBase || item.commissionAmount || item.commission?.amount || 0,
                     deliveryAmount: item.deliveryAmount || item.logisticsAmount || item.deliveryCost || 0,
                     sellerAmount: item.sellerAmount || item.payoutAmount || 0,
+                    additionalPayment: item.additionalPayment || item.additional_payment || 0,
                   };
                 }),
               };
@@ -2752,6 +2768,7 @@ serve(async (req) => {
                       commissionBase: commissionAmt,
                       deliveryAmount: logisticsAmt,
                       sellerAmount: sellerPayout,
+                      additionalPayment: item.additionalPayment || item.additional_payment || 0,
                     };
                     }),
                   });
@@ -4416,6 +4433,11 @@ serve(async (req) => {
                   spp: spp > 0 ? spp : undefined,
                   finishedPrice: o.finishedPrice || undefined,
                   forPay: forPay > 0 ? forPay : undefined,
+                  commissionAmount: Math.abs(o.ppvz_sales_commission || o.commissionAmount || 0) || undefined,
+                  deliveryAmount: Math.abs(o.delivery_rub || o.deliveryAmount || 0) || undefined,
+                  withdrawalAmount: Math.abs(o.payment_sale_amount || o.payment_schedule || 0) || undefined,
+                  additionalPayment: (o.additional_payment || 0) || undefined,
+                  sellerAmount: (o.ppvz_for_pay || forPay || 0) || undefined,
                 }],
                 buyer: { firstName: buyerRegion, lastName: "" },
                 nmID: o.nmId,
@@ -4487,6 +4509,11 @@ serve(async (req) => {
                   spp: spp > 0 ? spp : undefined,
                   finishedPrice: sale.finishedPrice || undefined,
                   forPay: forPay > 0 ? forPay : undefined,
+                  commissionAmount: Math.abs(sale.ppvz_sales_commission || sale.commissionAmount || 0) || undefined,
+                  deliveryAmount: Math.abs(sale.delivery_rub || sale.deliveryAmount || 0) || undefined,
+                  withdrawalAmount: Math.abs(sale.payment_sale_amount || sale.payment_schedule || 0) || undefined,
+                  additionalPayment: (sale.additional_payment || 0) || undefined,
+                  sellerAmount: (sale.ppvz_for_pay || forPay || 0) || undefined,
                 }],
                 buyer: { firstName: sale.regionName || sale.oblast || "", lastName: "" },
               });

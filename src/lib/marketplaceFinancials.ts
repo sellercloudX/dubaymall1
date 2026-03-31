@@ -44,6 +44,52 @@ export function getMarketplaceTaxRate(_marketplace: string): number {
   return UZB_TAX_RATE;
 }
 
+function getPositiveAmount(value: unknown): number {
+  const amount = Number(value || 0);
+  return Number.isFinite(amount) && amount > 0 ? amount : 0;
+}
+
+function getSignedAmount(value: unknown): number {
+  const amount = Number(value || 0);
+  return Number.isFinite(amount) ? amount : 0;
+}
+
+function normalizeMarketplaceMoney(value: number, marketplace: string): number {
+  return marketplace === 'wildberries' ? toDisplayUzs(value, marketplace) : value;
+}
+
+function extractDirectItemFees(item: any, marketplace: string): {
+  commission: number;
+  logistics: number;
+  withdrawal: number;
+  totalFees: number;
+  additionalRevenue: number;
+  isReal: boolean;
+} | null {
+  const commissionRaw = getPositiveAmount(item.commissionAmount ?? item.commissionBase);
+  const logisticsRaw = getPositiveAmount(item.deliveryAmount);
+  const withdrawalRaw = getPositiveAmount(item.withdrawalAmount);
+  const additionalRaw = getSignedAmount(item.additionalPayment ?? item.subsidyAmount ?? item.promoAmount);
+
+  if (commissionRaw <= 0 && logisticsRaw <= 0 && withdrawalRaw <= 0 && additionalRaw === 0) {
+    return null;
+  }
+
+  const commission = normalizeMarketplaceMoney(commissionRaw, marketplace);
+  const logistics = normalizeMarketplaceMoney(logisticsRaw, marketplace);
+  const withdrawal = normalizeMarketplaceMoney(withdrawalRaw, marketplace);
+  const additionalRevenue = normalizeMarketplaceMoney(Math.max(0, additionalRaw), marketplace);
+
+  return {
+    commission,
+    logistics,
+    withdrawal,
+    totalFees: commission + logistics + withdrawal,
+    additionalRevenue,
+    isReal: true,
+  };
+}
+
 /**
  * Extract ACTUAL fees from WB order item using forPay (real seller payout).
  * WB's forPay = what the seller actually receives after ALL deductions
@@ -61,32 +107,34 @@ function extractWBActualFees(item: any, marketplace: string): {
   logistics: number;
   withdrawal: number;
   totalFees: number;
-  sellerRevenue: number; // actual revenue seller receives (includes subsidy)
+  additionalRevenue: number;
   isReal: boolean;
 } | null {
   if (marketplace !== 'wildberries') return null;
+
+  const direct = extractDirectItemFees(item, marketplace);
+  if (direct) return direct;
   
-  const forPay = item.forPay;
-  const finishedPrice = item.finishedPrice || item.price || 0;
+  const forPay = getPositiveAmount(item.forPay || item.sellerAmount);
+  const finishedPrice = getPositiveAmount(item.finishedPrice || item.price || 0);
+  const additionalPayment = normalizeMarketplaceMoney(
+    Math.max(0, getSignedAmount(item.additionalPayment)),
+    marketplace,
+  );
   
   // forPay must be a positive number
   if (!forPay || forPay <= 0 || finishedPrice <= 0) return null;
   
-  // Total fees = what WB kept = sold price - payout
-  // NOTE: If forPay > finishedPrice, WB is subsidizing — fees become negative (seller benefit)
-  // We clamp to 0 because the subsidy is already reflected in higher forPay (seller revenue)
+  // Fallback when only payout is available: derive combined fees from sold price and payout.
   const feesPerUnitRub = Math.max(0, finishedPrice - forPay);
   const feesPerUnitUzs = toDisplayUzs(feesPerUnitRub, marketplace);
   
-  // Seller revenue = forPay (this already includes any subsidy/compensation from WB)
-  const sellerRevenueUzs = toDisplayUzs(forPay, marketplace);
-  
   return {
-    commission: feesPerUnitUzs, // WB combines all fees; we report as "commission"
-    logistics: 0, // Already included in the combined fee
+    commission: feesPerUnitUzs,
+    logistics: 0,
     withdrawal: 0,
     totalFees: feesPerUnitUzs,
-    sellerRevenue: sellerRevenueUzs,
+    additionalRevenue: additionalPayment,
     isReal: true,
   };
 }
@@ -230,14 +278,20 @@ export function calculateOrderFinancialBreakdown(
       let itemTotalFees = 0;
       let hasRealFees = false;
 
+      const directFees = extractDirectItemFees(item, marketplace);
+      if (directFees) {
+        itemRevenue += directFees.additionalRevenue * quantity;
+        itemCommission = directFees.commission * quantity;
+        itemLogistics = directFees.logistics * quantity;
+        itemWithdrawal = directFees.withdrawal * quantity;
+        itemTotalFees = directFees.totalFees * quantity;
+        hasRealFees = true;
+      }
+
       // Try WB actual fees (from forPay — includes subsidy compensation)
-      const wbFees = extractWBActualFees(item, marketplace);
+      const wbFees = !hasRealFees ? extractWBActualFees(item, marketplace) : null;
       if (wbFees) {
-        // WB subsidy: if forPay > finishedPrice, seller receives MORE than buyer paid
-        // Use sellerRevenue (= forPay converted to UZS) as the true revenue
-        if (wbFees.sellerRevenue > 0) {
-          itemRevenue = wbFees.sellerRevenue * quantity;
-        }
+        itemRevenue += wbFees.additionalRevenue * quantity;
         itemCommission = wbFees.commission * quantity;
         itemLogistics = wbFees.logistics * quantity;
         itemWithdrawal = wbFees.withdrawal * quantity;
