@@ -1425,10 +1425,14 @@ serve(async (req) => {
                   : (price > 0 ? Math.round((agencyCommission / price) * 10000) / 100 : 0);
 
                 const suspiciousRecoveredCommission = source !== 'campaign' && commissionPercent > 35;
-                if (source === 'fallbackCategory' || suspiciousRecoveredCommission) {
+                if (suspiciousRecoveredCommission) {
+                  // Only zero truly suspicious (>35%) non-campaign commissions
                   agencyCommission = 0;
                   commissionPercent = 0;
                 }
+                // NOTE: fallbackCategory commissions are kept as estimates (previously zeroed).
+                // The FEE from fallback category may differ from the real category commission,
+                // but it's better than 0%. Finance enrichment should override with real data.
 
                 const totalTariff = agencyCommission + fulfillment + delivery + sorting + other;
                 
