@@ -977,8 +977,11 @@ MAHSULOT: "${product.name}" — ${categoryName}
 Brend: ${result.vendor || product.brand || "OEM"}
 ${sourceCharacteristicsText ? `Manba xususiyatlari: ${sourceCharacteristicsText}` : ''}
 
-${missingRequired.length > 0 ? `⚠️⚠️⚠️ MAJBURIY — HAR BIRINI ALBATTA TO'LDIR (${missingRequired.length} ta):
+${missingRequired.length > 0 ? `⚠️⚠️⚠️ MAJBURIY — "ASOSIY XUSUSIYATLAR" 12 BALL — HAR BIRINI ALBATTA TO'LDIR (${missingRequired.length} ta):
 ${missingRequired.map(formatParam).join("\n")}
+` : ''}
+${missingRecommended.length > 0 ? `⚠️ FILTRLAR — "QO'SHIMCHA XUSUSIYATLAR" 8 BALL — Qidiruvda chiqish uchun TO'LDIR (${missingRecommended.length} ta):
+${missingRecommended.map(formatParam).join("\n")}
 ` : ''}
 ${missingOptional.length > 0 ? `QO'SHIMCHA (${missingOptional.length} ta):
 ${missingOptional.map(formatParam).join("\n")}
