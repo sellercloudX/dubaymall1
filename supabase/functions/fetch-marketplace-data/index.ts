@@ -1076,7 +1076,11 @@ serve(async (req) => {
 
                   const soItems = so.items || [];
                   for (const soItem of soItems) {
-                    const matchedItem = order.items.find((oi: any) => oi.offerId === soItem.offerId);
+                    // stats/orders API returns shopSku (not offerId)
+                    const soOfferId = soItem.offerId || soItem.shopSku || soItem.marketSku || '';
+                    const matchedItem = order.items.find((oi: any) => 
+                      oi.offerId === soOfferId || oi.offerId === soItem.shopSku || oi.offerId === soItem.marketSku
+                    );
                     if (!matchedItem) continue;
 
                     // Extract commissions by type
