@@ -452,14 +452,8 @@ export default function Index() {
   const { language } = useLanguage();
   const txt = T[language] || T.en;
 
-  // Capture referral code from URL
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const ref = params.get('ref');
-    if (ref && ref.startsWith('SCX-')) {
-      localStorage.setItem('scx_ref', ref);
-    }
-  }, []);
+
+
   
   const stats = useInView();
   const c1 = useCountUp(4, 1500, stats.inView);
