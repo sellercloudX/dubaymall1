@@ -88,13 +88,14 @@ export function parseUzumFinance(item: any): NormalizedMarketplaceFinance {
     'compensation',
     'promoAmount',
   );
-  const sellerRevenue = pickFirst(item,
-    'actualSoldPrice',
-    'sellerAmount',
-    'forPay',
-    'payoutAmount',
-    'sellerPayout',
-  );
+  // CRITICAL: actualSoldPrice from edge function ALREADY includes subsidy.
+  // If we pick it, do NOT add subsidy again.
+  const rawActualSoldPrice = toPositiveNumber(item.actualSoldPrice);
+  const sellerRevenue = rawActualSoldPrice > 0
+    ? rawActualSoldPrice
+    : pickFirst(item, 'sellerAmount', 'forPay', 'payoutAmount', 'sellerPayout');
+  const subsidyAlreadyIncluded = rawActualSoldPrice > 0;
+
   const grossPrice = pickFirst(item,
     'grossPrice',
     'totalPrice',
@@ -107,7 +108,9 @@ export function parseUzumFinance(item: any): NormalizedMarketplaceFinance {
     actualCommission: finalCommission,
     actualLogisticsFee,
     actualOtherFees,
-    actualSoldPrice: sellerRevenue > 0 || subsidyAmount > 0 ? sellerRevenue + subsidyAmount : 0,
+    actualSoldPrice: subsidyAlreadyIncluded
+      ? sellerRevenue
+      : (sellerRevenue > 0 || subsidyAmount > 0 ? sellerRevenue + subsidyAmount : 0),
     grossPrice,
     subsidyAmount,
     isExact: hasAnyData,
