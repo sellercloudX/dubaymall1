@@ -2896,6 +2896,7 @@ serve(async (req) => {
             ];
 
             let financeDataFound = false;
+            let fboCount = 0;
 
             for (const approach of financeApproaches) {
               if (financeDataFound) break;
