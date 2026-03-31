@@ -195,7 +195,9 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
         const nativePrice = toMarketplaceCurrency(newPriceUzs, p.marketplace);
         // Include shopId for Uzum multi-shop support
         const storeProduct = store.getProducts(p.marketplace).find(sp => sp.offerId === p.id);
-        list.push({ offerId: p.id, price: nativePrice, nmID: p.nmID, skuId: p.skuId, shopId: storeProduct?.shopId });
+        const shopId = storeProduct?.shopId;
+        console.log(`[Narx] ${p.marketplace}: offerId=${p.id}, skuId=${p.skuId}, shopId=${shopId}, narx=${nativePrice}`);
+        list.push({ offerId: p.id, price: nativePrice, nmID: p.nmID, skuId: p.skuId, shopId });
         byMarketplace.set(p.marketplace, list);
       });
 

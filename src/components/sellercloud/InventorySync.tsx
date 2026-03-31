@@ -339,9 +339,13 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
           successCount += prods.length;
         } else {
           failCount += prods.length;
+          const errMsg = data?.error || error?.message || 'Noma\'lum xato';
+          console.error(`[${marketplace}] Qoldiq yangilash xatosi:`, errMsg);
+          toast.error(`${marketplace}: ${errMsg}`, { duration: 8000 });
         }
       } catch (e) {
         failCount += prods.length;
+        console.error(`[${marketplace}] Qoldiq yangilash exception:`, e);
       }
     }
     
