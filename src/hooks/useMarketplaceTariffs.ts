@@ -50,7 +50,7 @@ export function useMarketplaceTariffs(
   const stableKey = productIds.length > 0 ? productIds.substring(0, 200) : 'empty';
 
   return useQuery({
-    queryKey: ['marketplace-tariffs', 'v20-official-docs', connectedMarketplaces.join(','), stableKey],
+    queryKey: ['marketplace-tariffs', 'v21-commission-fix', connectedMarketplaces.join(','), stableKey],
     queryFn: async () => {
       const tariffMap = new Map<string, TariffInfo>();
 
