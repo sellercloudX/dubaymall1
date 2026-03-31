@@ -3199,28 +3199,43 @@ serve(async (req) => {
             if (enrichedCount === 0 && financeItemMap.size === 0) {
               console.log(`[UZUM FALLBACK] Finance API returned empty — estimating commission from product catalog`);
               
-              // Build product commission map from marketplace_products_cache
+              // Build product commission map by fetching first page of products from each shop
               const productCommissionMap = new Map<string, { commissionPercent: number; dimensionalGroup: string }>();
               try {
-                const { data: cachedProducts } = await supabase
-                  .from('marketplace_products_cache')
-                  .select('offer_id, data')
-                  .eq('user_id', user.id)
-                  .eq('marketplace', 'uzum');
-                
-                if (cachedProducts && cachedProducts.length > 0) {
-                  for (const cp of cachedProducts) {
-                    const pd = typeof cp.data === 'string' ? JSON.parse(cp.data) : cp.data;
-                    const commPercent = pd?.commissionPercent || pd?.commission?.percent || 0;
-                    const dimGroup = pd?.dimensionalGroup || '';
-                    if (commPercent > 0) {
-                      productCommissionMap.set(cp.offer_id, { commissionPercent: commPercent, dimensionalGroup: dimGroup });
+                for (const sid of finShopIds) {
+                  const prodParams = new URLSearchParams();
+                  prodParams.append('size', '100');
+                  prodParams.append('page', '0');
+                  const prodResp = await fetch(
+                    `${uzumBaseUrl}/v1/product/shop/${sid}?${prodParams.toString()}`,
+                    { headers: uzumHeaders }
+                  );
+                  if (!prodResp.ok) continue;
+                  const prodData = await prodResp.json();
+                  const cards = prodData.productCards || prodData.payload?.productCards || [];
+                  for (const card of cards) {
+                    const commDto = card.commissionDto || {};
+                    const commPercent = commDto.minCommission || commDto.maxCommission || commDto.commission || commDto.percent || 0;
+                    const dimGroup = card.dimensionalGroup?.name || card.dimensionalGroup || '';
+                    const skus = card.skuList || card.skus || [];
+                    // Map commission to each SKU's productId
+                    for (const sku of skus) {
+                      const skuProductId = String(sku.productId || sku.skuId || sku.id || '');
+                      if (skuProductId && commPercent > 0) {
+                        productCommissionMap.set(skuProductId, { commissionPercent: commPercent, dimensionalGroup: dimGroup });
+                      }
+                    }
+                    // Also map by card-level productId
+                    const cardProductId = String(card.productId || card.id || '');
+                    if (cardProductId && commPercent > 0) {
+                      productCommissionMap.set(cardProductId, { commissionPercent: commPercent, dimensionalGroup: dimGroup });
                     }
                   }
-                  console.log(`[UZUM FALLBACK] Loaded ${productCommissionMap.size} products with commission data from cache`);
+                  await sleep(200);
                 }
+                console.log(`[UZUM FALLBACK] Loaded ${productCommissionMap.size} products with commission data from API`);
               } catch (cacheErr) {
-                console.warn(`[UZUM FALLBACK] Could not load product cache:`, cacheErr);
+                console.warn(`[UZUM FALLBACK] Could not load product data:`, cacheErr);
               }
 
               // Apply estimated commission to order items that have no finance data
