@@ -49,16 +49,18 @@ function extractExactFees(item: any, marketplace: string) {
   const hasAnyRealData =
     normalized.actualCommission > 0 || normalized.actualLogisticsFee > 0 || normalized.actualSoldPrice > 0;
 
-  // Debug logs removed for production
+  // CRITICAL: normalizeMarketplaceFinance returns values in the marketplace's native currency
+  // (RUB for WB, UZS for Uzum/Yandex). We MUST convert to UZS for uniform downstream use.
+  const c = (v: number) => toDisplayUzs(v, marketplace);
 
   return {
-    commission: normalized.actualCommission,
-    logistics: normalized.actualLogisticsFee,
-    withdrawal: normalized.actualOtherFees,
-    totalFees: normalized.actualCommission + normalized.actualLogisticsFee + normalized.actualOtherFees,
-    actualSoldPrice: normalized.actualSoldPrice || 0,
-    grossPrice: normalized.grossPrice || 0,
-    subsidyAmount: normalized.subsidyAmount || 0,
+    commission: c(normalized.actualCommission),
+    logistics: c(normalized.actualLogisticsFee),
+    withdrawal: c(normalized.actualOtherFees),
+    totalFees: c(normalized.actualCommission) + c(normalized.actualLogisticsFee) + c(normalized.actualOtherFees),
+    actualSoldPrice: c(normalized.actualSoldPrice || 0),
+    grossPrice: c(normalized.grossPrice || 0),
+    subsidyAmount: c(normalized.subsidyAmount || 0),
     isReal: hasAnyRealData,
     financeSource: normalized.financeSource || "unknown",
   };
