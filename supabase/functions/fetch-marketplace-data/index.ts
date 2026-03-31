@@ -1425,10 +1425,14 @@ serve(async (req) => {
                   : (price > 0 ? Math.round((agencyCommission / price) * 10000) / 100 : 0);
 
                 const suspiciousRecoveredCommission = source !== 'campaign' && commissionPercent > 35;
-                if (source === 'fallbackCategory' || suspiciousRecoveredCommission) {
+                if (suspiciousRecoveredCommission) {
+                  // Only zero truly suspicious (>35%) non-campaign commissions
                   agencyCommission = 0;
                   commissionPercent = 0;
                 }
+                // NOTE: fallbackCategory commissions are kept as estimates (previously zeroed).
+                // The FEE from fallback category may differ from the real category commission,
+                // but it's better than 0%. Finance enrichment should override with real data.
 
                 const totalTariff = agencyCommission + fulfillment + delivery + sorting + other;
                 
@@ -1617,6 +1621,105 @@ serve(async (req) => {
                 result = restrictedRetryResult;
               } else {
                 result = { success: false, error: `Tariff calculation failed: ${tariffResponse.status}`, details: errText };
+              }
+            }
+          }
+
+          // === FINANCE-BASED COMMISSION ENRICHMENT ===
+          // For restricted/fallback categories, the tariff API returns incorrect commission rates.
+          // Use real commission data from recent order stats to calculate accurate per-product rates.
+          if (result?.success && result?.data?.length > 0 && campaignId) {
+            const fallbackItems = result.data.filter((t: any) => t.source === 'fallbackCategory' || t.source === 'sellingProgram');
+            if (fallbackItems.length > 0) {
+              console.log(`[YANDEX TARIFF ENRICH] ${fallbackItems.length} items from fallback/sellingProgram — enriching with real finance data`);
+              try {
+                // Fetch recent stats/orders to get real commission amounts
+                const now = new Date();
+                const from30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+                const fromDate = from30.toISOString().split('T')[0];
+                const toDate = now.toISOString().split('T')[0];
+
+                await sleep(500);
+                const statsResp = await fetchWithRetry(
+                  `https://api.partner.market.yandex.ru/campaigns/${campaignId}/stats/orders`,
+                  {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({
+                      dateFrom: fromDate,
+                      dateTo: toDate,
+                      limit: 200,
+                    }),
+                  }
+                );
+
+                if (statsResp.ok) {
+                  const statsData = await statsResp.json();
+                  const statsOrders = statsData.result?.orders || [];
+                  
+                  // Build per-offerId commission rate from real data
+                  const commRates = new Map<string, { totalCommission: number; totalPrice: number; count: number }>();
+                  
+                  for (const so of statsOrders) {
+                    for (const soItem of (so.items || [])) {
+                      const oid = soItem.offerId || soItem.shopSku || '';
+                      if (!oid) continue;
+                      
+                      const commissions = soItem.commissions || [];
+                      let itemCommission = 0;
+                      for (const comm of commissions) {
+                        const type = (comm.type || '').toUpperCase();
+                        // Only count FEE-type commissions (not logistics)
+                        if (type === 'FEE' || type.includes('COMMISSION') || type.includes('_FEE')) {
+                          itemCommission += Math.abs(comm.actual || comm.amount || 0);
+                        }
+                      }
+                      
+                      const itemPrice = soItem.prices?.find((p: any) => p.type === 'BUYER')?.costPerItem || 0;
+                      if (itemCommission > 0 && itemPrice > 0) {
+                        const existing = commRates.get(oid) || { totalCommission: 0, totalPrice: 0, count: 0 };
+                        existing.totalCommission += itemCommission;
+                        existing.totalPrice += itemPrice;
+                        existing.count += 1;
+                        commRates.set(oid, existing);
+                      }
+                    }
+                  }
+                  
+                  console.log(`[YANDEX TARIFF ENRICH] Found commission data for ${commRates.size} products from ${statsOrders.length} orders`);
+                  
+                  // Map tariff offers back to offerIds from the original request
+                  const offerIdByIndex = new Map<number, string>();
+                  (tariffOffers || []).forEach((o: any, i: number) => {
+                    if (o.offerId) offerIdByIndex.set(i, o.offerId);
+                  });
+                  
+                  // Override fallback commissions with real data
+                  let enriched = 0;
+                  for (const t of result.data) {
+                    if (t.source !== 'fallbackCategory' && t.source !== 'sellingProgram') continue;
+                    
+                    const offerId = offerIdByIndex.get(t.index);
+                    if (!offerId) continue;
+                    
+                    const realRate = commRates.get(offerId);
+                    if (realRate && realRate.totalPrice > 0) {
+                      const realCommPercent = (realRate.totalCommission / realRate.totalPrice) * 100;
+                      const realCommAmount = (t.price || 0) * (realCommPercent / 100);
+                      
+                      // Override with real commission data
+                      t.agencyCommission = Math.round(realCommAmount);
+                      t.commissionPercent = Math.round(realCommPercent * 100) / 100;
+                      t.totalTariff = t.agencyCommission + (t.fulfillment || 0) + (t.delivery || 0) + (t.sorting || 0) + (t.other || 0);
+                      t.tariffPercent = t.price > 0 ? Math.round((t.totalTariff / t.price) * 10000) / 100 : 0;
+                      t.source = 'finance-enriched';
+                      enriched++;
+                    }
+                  }
+                  console.log(`[YANDEX TARIFF ENRICH] Enriched ${enriched}/${fallbackItems.length} fallback items with real commission rates`);
+                }
+              } catch (enrichErr) {
+                console.warn(`[YANDEX TARIFF ENRICH] Finance enrichment failed (non-fatal):`, enrichErr);
               }
             }
           }
