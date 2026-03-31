@@ -1732,7 +1732,8 @@ serve(async (req) => {
                       t.agencyCommission = Math.round(realCommAmount);
                       t.commissionPercent = Math.round(realCommPercent * 100) / 100;
                       t.totalTariff = t.agencyCommission + (t.fulfillment || 0) + (t.delivery || 0) + (t.sorting || 0) + (t.other || 0);
-                      t.tariffPercent = t.price > 0 ? Math.round((t.totalTariff / t.price) * 10000) / 100 : 0;
+                      // tariffPercent = commission% + paymentTransfer% only (no logistics conversion)
+                      t.tariffPercent = Math.round((t.commissionPercent + (t.paymentTransferPercent || 0)) * 100) / 100;
                       t.source = 'finance-enriched';
                       enriched++;
                     }
