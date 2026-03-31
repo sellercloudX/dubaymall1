@@ -185,16 +185,17 @@ export function PriceManager({ connectedMarketplaces, store }: PriceManagerProps
     setIsSaving(true);
     try {
       // Group by marketplace — convert UZS prices back to marketplace currency (RUB for WB)
-      const byMarketplace = new Map<string, Array<{ offerId: string; price: number; nmID?: number; skuId?: string }>>();
+      const byMarketplace = new Map<string, Array<{ offerId: string; price: number; nmID?: number; skuId?: string; shopId?: string }>>();
       changedProducts.forEach(p => {
         const key = `${p.marketplace}-${p.id}`;
         const newPriceUzs = priceChanges[key];
         if (newPriceUzs === undefined || newPriceUzs === p.price) return;
 
         const list = byMarketplace.get(p.marketplace) || [];
-        // Convert from UZS display price back to marketplace-native currency
         const nativePrice = toMarketplaceCurrency(newPriceUzs, p.marketplace);
-        list.push({ offerId: p.id, price: nativePrice, nmID: p.nmID, skuId: p.skuId });
+        // Include shopId for Uzum multi-shop support
+        const storeProduct = store.getProducts(p.marketplace).find(sp => sp.offerId === p.id);
+        list.push({ offerId: p.id, price: nativePrice, nmID: p.nmID, skuId: p.skuId, shopId: storeProduct?.shopId });
         byMarketplace.set(p.marketplace, list);
       });
 
