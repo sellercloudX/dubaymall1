@@ -3379,7 +3379,7 @@ serve(async (req) => {
             // Try expense endpoints for this shop
             const shopExpParams = new URLSearchParams();
             shopExpParams.append("shopIds", sid);
-            shopExpParams.append("dateFrom", String(ninetyDaysAgo));
+            shopExpParams.append("dateFrom", String(finDateFrom365));
             shopExpParams.append("dateTo", String(Date.now()));
             shopExpParams.append("size", "100");
             shopExpParams.append("page", "0");
