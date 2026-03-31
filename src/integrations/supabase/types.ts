@@ -633,6 +633,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "commissions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_seller_view"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "commissions_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
@@ -781,6 +788,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dropshipping_orders_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_seller_view"
             referencedColumns: ["id"]
           },
           {
@@ -1523,6 +1537,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "order_financials_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "orders_seller_view"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "order_financials_shop_id_fkey"
             columns: ["shop_id"]
             isOneToOne: false
@@ -1575,6 +1596,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_seller_view"
             referencedColumns: ["id"]
           },
           {
@@ -4147,6 +4175,48 @@ export type Database = {
           },
         ]
       }
+      orders_seller_view: {
+        Row: {
+          created_at: string | null
+          id: string | null
+          notes: string | null
+          order_number: string | null
+          payment_method: string | null
+          payment_status: string | null
+          shipping_address: Json | null
+          status: string | null
+          total_amount: number | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string | null
+          notes?: string | null
+          order_number?: string | null
+          payment_method?: string | null
+          payment_status?: string | null
+          shipping_address?: Json | null
+          status?: string | null
+          total_amount?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string | null
+          notes?: string | null
+          order_number?: string | null
+          payment_method?: string | null
+          payment_status?: string | null
+          shipping_address?: Json | null
+          status?: string | null
+          total_amount?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       profiles_public: {
         Row: {
           avatar_url: string | null
@@ -4458,6 +4528,10 @@ export type Database = {
         }[]
       }
       seller_has_order_products: {
+        Args: { _order_id: string; _user_id: string }
+        Returns: boolean
+      }
+      seller_order_has_no_otp_access: {
         Args: { _order_id: string; _user_id: string }
         Returns: boolean
       }
