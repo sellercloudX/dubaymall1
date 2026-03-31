@@ -825,10 +825,15 @@ async function aiOptimize(
     return true;
   });
 
-  // ═══ SEPARATE REQUIRED vs OPTIONAL params ═══
+  // ═══ SEPARATE REQUIRED vs RECOMMENDED (FILTER) vs OPTIONAL params ═══
+  // REQUIRED = "Основные характеристики" (12 ball)
+  // RECOMMENDED = "Фильтры" (8 ball) — Yandex uses these for search filters
+  // OPTIONAL = everything else
   const isRequired = (p: any) => p.required === true || p.constraintType === "REQUIRED" || p.mandatory === true;
+  const isRecommended = (p: any) => p.constraintType === "RECOMMENDED";
   const requiredParams = allParams.filter(isRequired);
-  const optionalParams = allParams.filter(p => !isRequired(p));
+  const recommendedParams = allParams.filter(p => !isRequired(p) && isRecommended(p));
+  const optionalParams = allParams.filter(p => !isRequired(p) && !isRecommended(p));
 
   const formatParam = (p: any) => {
     let s = `  - id:${p.id}, "${p.name}", type:${p.type || "TEXT"}`;
