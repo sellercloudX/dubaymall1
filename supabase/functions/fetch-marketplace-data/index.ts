@@ -3194,6 +3194,78 @@ serve(async (req) => {
             }
             console.log(`Enriched ${enrichedCount} FBS order items with finance data`);
 
+            // ===== FALLBACK: Estimate commission from product catalog when Finance API returns empty =====
+            // If finance enrichment found 0 items, use commissionPercent from product catalog
+            if (enrichedCount === 0 && financeItemMap.size === 0) {
+              console.log(`[UZUM FALLBACK] Finance API returned empty — estimating commission from product catalog`);
+              
+              // Build product commission map by fetching first page of products from each shop
+              const productCommissionMap = new Map<string, { commissionPercent: number; dimensionalGroup: string }>();
+              try {
+                for (const sid of finShopIds) {
+                  const prodParams = new URLSearchParams();
+                  prodParams.append('size', '100');
+                  prodParams.append('page', '0');
+                  const prodResp = await fetch(
+                    `${uzumBaseUrl}/v1/product/shop/${sid}?${prodParams.toString()}`,
+                    { headers: uzumHeaders }
+                  );
+                  if (!prodResp.ok) continue;
+                  const prodData = await prodResp.json();
+                  const cards = prodData.productCards || prodData.payload?.productCards || [];
+                  for (const card of cards) {
+                    const commDto = card.commissionDto || {};
+                    const commPercent = commDto.minCommission || commDto.maxCommission || commDto.commission || commDto.percent || 0;
+                    const dimGroup = card.dimensionalGroup?.name || card.dimensionalGroup || '';
+                    const skus = card.skuList || card.skus || [];
+                    // Map commission to each SKU's productId
+                    for (const sku of skus) {
+                      const skuProductId = String(sku.productId || sku.skuId || sku.id || '');
+                      if (skuProductId && commPercent > 0) {
+                        productCommissionMap.set(skuProductId, { commissionPercent: commPercent, dimensionalGroup: dimGroup });
+                      }
+                    }
+                    // Also map by card-level productId
+                    const cardProductId = String(card.productId || card.id || '');
+                    if (cardProductId && commPercent > 0) {
+                      productCommissionMap.set(cardProductId, { commissionPercent: commPercent, dimensionalGroup: dimGroup });
+                    }
+                  }
+                  await sleep(200);
+                }
+                console.log(`[UZUM FALLBACK] Loaded ${productCommissionMap.size} products with commission data from API`);
+              } catch (cacheErr) {
+                console.warn(`[UZUM FALLBACK] Could not load product data:`, cacheErr);
+              }
+
+              // Apply estimated commission to order items that have no finance data
+              let fallbackCount = 0;
+              for (const order of allOrders) {
+                for (const orderItem of (order.items || [])) {
+                  // Skip items already enriched
+                  if (orderItem.actualCommission > 0 || orderItem.actualLogisticsFee > 0) continue;
+                  
+                  const productInfo = productCommissionMap.get(orderItem.offerId);
+                  if (productInfo && productInfo.commissionPercent > 0) {
+                    const itemPrice = orderItem.price || orderItem.priceUZS || 0;
+                    const estimatedCommission = Math.round(itemPrice * productInfo.commissionPercent / 100);
+                    
+                    orderItem.actualCommission = estimatedCommission;
+                    orderItem.commissionPercent = productInfo.commissionPercent;
+                    orderItem.commissionBase = estimatedCommission;
+                    // Estimate seller payout: price - commission
+                    if (!orderItem.sellerAmount && !orderItem.actualSoldPrice) {
+                      orderItem.sellerAmount = itemPrice - estimatedCommission;
+                      orderItem.actualSoldPrice = itemPrice - estimatedCommission;
+                    }
+                    orderItem.financeSource = 'uzum-catalog-estimate';
+                    fallbackCount++;
+                  }
+                }
+              }
+              console.log(`[UZUM FALLBACK] Estimated commission for ${fallbackCount} order items from product catalog`);
+            }
+
           } catch (fboErr) {
             console.error("Uzum Finance fetch error:", fboErr);
           }
