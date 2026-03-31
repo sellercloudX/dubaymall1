@@ -225,7 +225,8 @@ export function useMarketplaceTariffs(
             const logisticsFromApiRub = wbLogisticsBaseRub > 0
               ? wbLogisticsBaseRub + (wbLogisticsLiterRub * volumeLiters)
               : 0;
-            const logisticsRub = logisticsFromApiRub > 0 ? logisticsFromApiRub : 0;
+            const WB_MIN_LOGISTICS_RUB = 46;
+            const logisticsRub = Math.max(logisticsFromApiRub, WB_MIN_LOGISTICS_RUB);
             const commissionRub = priceRub * commissionPercent;
             const totalTariffRub = commissionRub + logisticsRub;
 
