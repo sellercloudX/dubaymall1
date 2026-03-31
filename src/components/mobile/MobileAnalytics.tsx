@@ -196,14 +196,15 @@ export function MobileAnalytics({ connections, connectedMarketplaces, store }: M
 }
 
 // Sub-components
-function SectionTitle({ children, icon: Icon }: { children: React.ReactNode; icon?: React.ElementType }) {
-  return (
-    <div className="flex items-center gap-1.5 mb-2.5">
+const SectionTitle = React.forwardRef<HTMLDivElement, { children: React.ReactNode; icon?: React.ElementType }>(
+  ({ children, icon: Icon }, ref) => (
+    <div ref={ref} className="flex items-center gap-1.5 mb-2.5">
       {Icon && <Icon className="h-3.5 w-3.5 text-muted-foreground" />}
       <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{children}</h3>
     </div>
-  );
-}
+  )
+);
+SectionTitle.displayName = 'SectionTitle';
 
 function StatCard({ icon: Icon, label, value, suffix, className, iconClass }: {
   icon: React.ElementType; label: string; value: string | null; suffix?: string; className?: string; iconClass?: string;
