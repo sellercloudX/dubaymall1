@@ -4693,6 +4693,9 @@ serve(async (req) => {
               const statsFboKw = ['коледино', 'подольск', 'электросталь', 'казань', 'краснодар', 'екатеринбург', 'новосибирск', 'хабаровск', 'тула', 'wb'];
               const statsIsFBO = statsFboKw.some(kw => statsWh.includes(kw));
 
+              // CRITICAL FIX: compute wbFinance for this order (was undefined before v25)
+              const wbFinance = getWbItemFinanceFields(o);
+
               allOrders.push({
                 id: cleanId || o.nmId || Math.random(),
                 status,
