@@ -286,7 +286,7 @@ export function FinancialDashboard({
                           )}
                         </div>
                         <div className="text-xs text-muted-foreground truncate">
-                          {mpData.fees > 0 ? `${mpData.feePercent}%` : 'API ulanmagan'}
+                          {mpData.fees > 0 ? `${mpData.feePercent}%` : 'Ma\'lumot yuklanmagan'}
                         </div>
                       </div>
                     </div>
