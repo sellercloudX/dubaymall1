@@ -1514,13 +1514,23 @@ serve(async (req) => {
                   commissionPercent = 0;
                 }
 
-                const totalTariff = agencyCommission + fulfillment + delivery + sorting + other;
+                // Enforce minimum logistics: Yandex UZ min 2000 so'm
+                const MIN_YANDEX_LOGISTICS = 2000;
+                const rawDelivery = delivery + sorting;
+                const enforcedDelivery = Math.max(rawDelivery, MIN_YANDEX_LOGISTICS);
+                // Redistribute enforced minimum back to delivery
+                if (rawDelivery < MIN_YANDEX_LOGISTICS) {
+                  delivery = MIN_YANDEX_LOGISTICS;
+                  sorting = 0;
+                }
+
+                const totalTariff = agencyCommission + fulfillment + enforcedDelivery + other;
                 
                 // tariffPercent = ONLY percentage-based fees (commission + payment transfer)
                 const tariffPercent = commissionPercent + minPaymentTransferPct;
                 
                 if (idx < 3) {
-                  console.log(`[YANDEX TARIFF CALC] #${idx} commission%=${commissionPercent}, paymentTransfer%=${minPaymentTransferPct}, tariffPercent=${tariffPercent}%, delivery=${delivery}(fixed), price=${price}`);
+                  console.log(`[YANDEX TARIFF CALC] #${idx} commission%=${commissionPercent}, paymentTransfer%=${minPaymentTransferPct}, tariffPercent=${tariffPercent}%, delivery=${enforcedDelivery}(min=${MIN_YANDEX_LOGISTICS}), price=${price}`);
                 }
                 
                 return {
@@ -1535,7 +1545,7 @@ serve(async (req) => {
                   other,
                   totalTariff,
                   tariffPercent: Math.round(tariffPercent * 100) / 100,
-                  deliveryAmount: delivery + sorting,
+                  deliveryAmount: enforcedDelivery,
                   paymentTransferPercent: minPaymentTransferPct,
                   source,
                   suspiciousRecoveredCommission,
