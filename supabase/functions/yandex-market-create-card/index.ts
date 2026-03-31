@@ -907,7 +907,8 @@ QOIDALAR:
    - NUMBER parametr → value raqam
    - BOOLEAN parametr → "true" yoki "false"
    
-   *** JUDA MUHIM: BIRINCHI ${requiredParams.length} ta MAJBURIY parametrni HAR BIRINI to'ldir! ***
+   *** JUDA MUHIM: ${requiredParams.length} ta MAJBURIY + ${recommendedParams.length} ta FILTR parametrni HAR BIRINI to'ldir! ***
+   *** FILTR parametrlari to'ldirilmasa mahsulot qidiruv natijalarida CHIQMAYDI! ***
    *** Bilmasang — mahsulotga mos taxminiy qiymat yoz! ***
    *** Har bir parametr uchun FAQAT value YOKI valueId ber, ikkalasini emas! ***
    *** FAQAT BITTA qiymat ber har bir parametrga! ***
