@@ -213,12 +213,13 @@ export function parseWildberriesFinance(item: any): NormalizedMarketplaceFinance
     'additional_payment',
     'additionalPayment',
   );
-  const sellerRevenueRub = pickFirst(item,
-    'actualSoldPrice',
-    'forPay',
-    'ppvz_for_pay',
-    'sellerAmount',
-  );
+  // CRITICAL: actualSoldPrice from edge function ALREADY includes subsidy
+  const rawActualSoldPriceRub = toPositiveNumber(item.actualSoldPrice);
+  const sellerRevenueRub = rawActualSoldPriceRub > 0
+    ? rawActualSoldPriceRub
+    : pickFirst(item, 'forPay', 'ppvz_for_pay', 'sellerAmount');
+  const subsidyAlreadyIncluded = rawActualSoldPriceRub > 0;
+
   const grossPriceRub = pickFirst(item,
     'grossPrice',
     'finishedPrice',
@@ -230,14 +231,15 @@ export function parseWildberriesFinance(item: any): NormalizedMarketplaceFinance
 
   const hasAnyData = actualCommissionRub > 0 || actualLogisticsRub > 0 || actualOtherFeesRub > 0 || sellerRevenueRub > 0 || subsidyRub > 0;
 
+  const finalSoldPriceRub = subsidyAlreadyIncluded
+    ? sellerRevenueRub
+    : (sellerRevenueRub > 0 || subsidyRub > 0 ? sellerRevenueRub + subsidyRub : 0);
+
   return {
     actualCommission: normalizeMarketplaceMoney(actualCommissionRub, 'wildberries'),
     actualLogisticsFee: normalizeMarketplaceMoney(actualLogisticsRub, 'wildberries'),
     actualOtherFees: normalizeMarketplaceMoney(actualOtherFeesRub, 'wildberries'),
-    actualSoldPrice: normalizeMarketplaceMoney(
-      sellerRevenueRub > 0 || subsidyRub > 0 ? sellerRevenueRub + subsidyRub : 0,
-      'wildberries',
-    ),
+    actualSoldPrice: normalizeMarketplaceMoney(finalSoldPriceRub, 'wildberries'),
     grossPrice: normalizeMarketplaceMoney(grossPriceRub, 'wildberries'),
     subsidyAmount: normalizeMarketplaceMoney(subsidyRub, 'wildberries'),
     isExact: hasAnyData,
