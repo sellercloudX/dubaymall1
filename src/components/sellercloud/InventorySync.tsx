@@ -372,6 +372,7 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
             offerId: product.id,
             skuId: product.skuId,
             shopId: product.shopId,
+            barcode: (product as any).barcode || '',
             quantity: newQty,
           }],
         },
