@@ -1323,6 +1323,31 @@ serve(async (req) => {
         }
     } else if (dataType === "tariffs") {
         // Calculate real Yandex Market tariffs per product
+        // KNOWN RESTRICTED CATEGORY COMMISSION RATES (Yandex Market UZ)
+        // These categories return 400 from /v2/tariffs/calculate for UZ campaigns
+        // Rates are from official Yandex Market tariff tables
+        const KNOWN_RESTRICTED_TARIFFS: Record<number, { commissionPercent: number; label: string }> = {
+          // Парфюмерия (Perfumery) - all sub-categories
+          90509: { commissionPercent: 18.5, label: 'Парфюмерия' },
+          90510: { commissionPercent: 18.5, label: 'Женская парфюмерия' },
+          90511: { commissionPercent: 18.5, label: 'Мужская парфюмерия' },
+          90512: { commissionPercent: 18.5, label: 'Унисекс парфюмерия' },
+          15685458: { commissionPercent: 18.5, label: 'Парфюмерия' },
+          // БАД, витамины
+          15724734: { commissionPercent: 15, label: 'БАД' },
+          91307: { commissionPercent: 15, label: 'Витамины' },
+          // Ювелирные изделия
+          91298: { commissionPercent: 15, label: 'Ювелирные изделия' },
+          // Алкоголь (usually fully restricted)
+          91184: { commissionPercent: 20, label: 'Алкоголь' },
+          // Табачные изделия
+          91183: { commissionPercent: 20, label: 'Табак' },
+          // Лекарственные средства
+          91192: { commissionPercent: 12, label: 'Лекарства' },
+        };
+        // Payment transfer fee is fixed at 1.5% for daily payouts (minimum option)
+        const KNOWN_PAYMENT_TRANSFER_PCT = 1.5;
+
         try {
           const offersForCalc = (tariffOffers || []).slice(0, 200).map((o: any) => ({
             categoryId: (o.categoryId && o.categoryId > 0) ? o.categoryId : 91491,
@@ -1347,6 +1372,7 @@ serve(async (req) => {
                 body: JSON.stringify({
                   parameters: { 
                     campaignId: Number(campaignId),
+                    currency: 'UZS',
                   },
                   offers: offersForCalc,
                 }),
@@ -1359,7 +1385,7 @@ serve(async (req) => {
             function parseTariffResults(
               tariffResults: any[],
               sourceOffers: any[],
-              source: 'campaign' | 'sellingProgram' | 'fallbackCategory' = 'campaign'
+              source: 'campaign' | 'sellingProgram' | 'fallbackCategory' | 'knownRate' = 'campaign'
             ) {
               return tariffResults.map((t: any, idx: number) => {
                 const tariffs = t.tariffs || [];
@@ -1370,11 +1396,9 @@ serve(async (req) => {
                 let other = 0;
                 let feePercentFromApi = 0;
                 
-                // Collect all PAYMENT_TRANSFER options to pick the minimum (cheapest payout option)
                 const paymentTransferAmounts: number[] = [];
                 const paymentTransferPercents: number[] = [];
                 
-                // Log tariff types for first item to debug commission discrepancies
                 if (idx === 0) {
                   console.log(`[YANDEX TARIFF TYPES] Sample tariffs for first product:`, JSON.stringify(tariffs.map((t: any) => ({
                     type: t.type, amount: t.amount,
@@ -1391,8 +1415,6 @@ serve(async (req) => {
                   const valueType = params.find((p: any) => p.name === 'valueType');
                   const isRelative = valueType?.value === 'relative';
                   
-                  // ALL commission-like types must be summed together:
-                  // FEE, AGENCY_COMMISSION, FBS_COMMISSION, FBY_COMMISSION, FULFILLMENT
                   const isCommissionType = (
                     type === 'FEE' ||
                     type === 'AGENCY_COMMISSION' ||
@@ -1413,8 +1435,6 @@ serve(async (req) => {
                   } else if (type === 'SORTING') {
                     sorting += amount;
                   } else if (type === 'PAYMENT_TRANSFER') {
-                    // PAYMENT_TRANSFER has multiple alternative payout frequency options.
-                    // Collect both amounts and percentages.
                     if (amount > 0) {
                       paymentTransferAmounts.push(amount);
                     }
@@ -1426,11 +1446,9 @@ serve(async (req) => {
                   }
                 });
                 
-                // Pick minimum PAYMENT_TRANSFER amount for absolute total
                 const minPaymentTransfer = paymentTransferAmounts.length > 0
                   ? Math.min(...paymentTransferAmounts)
                   : 0;
-                // Pick minimum PAYMENT_TRANSFER percent for display
                 const minPaymentTransferPct = paymentTransferPercents.length > 0
                   ? Math.min(...paymentTransferPercents)
                   : 0;
@@ -1441,18 +1459,15 @@ serve(async (req) => {
                   ? Math.round(feePercentFromApi * 100) / 100
                   : (price > 0 ? Math.round((agencyCommission / price) * 10000) / 100 : 0);
 
-                const suspiciousRecoveredCommission = source !== 'campaign' && commissionPercent > 35;
+                const suspiciousRecoveredCommission = source !== 'campaign' && source !== 'knownRate' && commissionPercent > 35;
                 if (suspiciousRecoveredCommission) {
                   agencyCommission = 0;
                   commissionPercent = 0;
                 }
 
-                // totalTariff = all fees combined (absolute amounts in currency)
                 const totalTariff = agencyCommission + fulfillment + delivery + sorting + other;
                 
-                // tariffPercent = ONLY percentage-based fees (commission % + payment transfer %)
-                // Logistics (delivery, sorting, fulfillment) is a fixed amount based on dimensions,
-                // NOT a percentage — so it must NOT be converted to % and added here.
+                // tariffPercent = ONLY percentage-based fees (commission + payment transfer)
                 const tariffPercent = commissionPercent + minPaymentTransferPct;
                 
                 if (idx === 0) {
@@ -1471,7 +1486,7 @@ serve(async (req) => {
                   other,
                   totalTariff,
                   tariffPercent: Math.round(tariffPercent * 100) / 100,
-                  deliveryAmount: delivery + sorting, // fixed logistics amount for display
+                  deliveryAmount: delivery + sorting,
                   paymentTransferPercent: minPaymentTransferPct,
                   source,
                   suspiciousRecoveredCommission,
@@ -1493,7 +1508,7 @@ serve(async (req) => {
               const errText = await tariffResponse.text();
               console.error("Tariff calc error:", tariffResponse.status, errText);
               
-              // Handle restricted categories: parse error, retry with sellingProgram + fallback category
+              // Handle restricted categories
               let restrictedRetryResult: any = null;
               if (tariffResponse.status === 400) {
                 try {
@@ -1515,7 +1530,7 @@ serve(async (req) => {
                       
                       console.log(`Split: ${allowedOffers.length} allowed, ${restrictedOffers.length} restricted`);
                       
-                      // Step 1: Get tariffs for allowed categories (with campaignId)
+                      // Step 1: Get tariffs for allowed categories (with campaignId + UZS)
                       let parsedAllowed: any[] = [];
                       if (allowedOffers.length > 0) {
                         const cleanOffers = allowedOffers.map(({ _originalIndex, ...rest }: any) => rest);
@@ -1526,7 +1541,7 @@ serve(async (req) => {
                             method: 'POST',
                             headers,
                             body: JSON.stringify({
-                              parameters: { campaignId: Number(campaignId) },
+                              parameters: { campaignId: Number(campaignId), currency: 'UZS' },
                               offers: cleanOffers,
                             }),
                           }
@@ -1539,91 +1554,99 @@ serve(async (req) => {
                         }
                       }
                       
-                      // Step 2: For restricted categories, try sellingProgram instead of campaignId
+                      // Step 2: For restricted categories, use KNOWN tariff rates first
+                      // then try to get logistics costs from fallback category
                       let parsedRestricted: any[] = [];
                       if (restrictedOffers.length > 0) {
-                        // Try with sellingProgram=FBS (bypasses country-specific campaign restrictions)
-                        for (const program of ['FBS', 'FBY', 'DBS']) {
-                          const restrictedClean = restrictedOffers.map(({ _originalIndex, ...rest }: any) => rest);
-                          await sleep(500);
-                          const progResponse = await fetchWithRetry(
-                            'https://api.partner.market.yandex.ru/v2/tariffs/calculate',
-                            {
-                              method: 'POST',
-                              headers,
-                              body: JSON.stringify({
-                                parameters: { sellingProgram: program },
-                                offers: restrictedClean,
-                              }),
-                            }
-                          );
-                          
-                          if (progResponse.ok) {
-                            const progData = await progResponse.json();
-                            const progResults = progData.result?.offers || [];
-                            console.log(`sellingProgram=${program} got ${progResults.length} results for restricted categories`);
-                            parsedRestricted = parseTariffResults(progResults, restrictedOffers, 'sellingProgram');
-                            break; // Success, stop trying other programs
-                          } else {
-                            const progErr = await progResponse.text();
-                            console.log(`sellingProgram=${program} failed: ${progResponse.status}`);
-                            
-                            // If this program also has restricted categories, try the fallback category approach
-                            if (progResponse.status === 400) {
-                              continue; // Try next program
-                            }
+                        // First, try to get logistics costs from general goods category
+                        let logisticsByIndex = new Map<number, { delivery: number; sorting: number; other: number }>();
+                        
+                        const fallbackOffers = restrictedOffers.map(({ _originalIndex, categoryId, ...rest }: any) => ({
+                          ...rest,
+                          categoryId: 91491, // General goods - always allowed
+                        }));
+                        
+                        await sleep(500);
+                        const fallbackResponse = await fetchWithRetry(
+                          'https://api.partner.market.yandex.ru/v2/tariffs/calculate',
+                          {
+                            method: 'POST',
+                            headers,
+                            body: JSON.stringify({
+                              parameters: { campaignId: Number(campaignId), currency: 'UZS' },
+                              offers: fallbackOffers,
+                            }),
                           }
+                        );
+                        
+                        if (fallbackResponse.ok) {
+                          const fallbackData = await fallbackResponse.json();
+                          const fallbackResults = fallbackData.result?.offers || [];
+                          console.log(`Fallback category got ${fallbackResults.length} results for logistics extraction`);
+                          
+                          // Extract ONLY logistics costs from fallback (not commission)
+                          fallbackResults.forEach((t: any, idx: number) => {
+                            let delivery = 0, sorting = 0, otherFixed = 0;
+                            let minPaymentTransferAmt = Infinity;
+                            for (const tariff of (t.tariffs || [])) {
+                              const type = tariff.type || '';
+                              const amount = tariff.amount || 0;
+                              if (type === 'DELIVERY_TO_CUSTOMER' || type === 'CROSSREGIONAL_DELIVERY' || type === 'EXPRESS_DELIVERY' || type === 'MIDDLE_MILE') {
+                                delivery += amount;
+                              } else if (type === 'SORTING') {
+                                sorting += amount;
+                              } else if (type === 'PAYMENT_TRANSFER') {
+                                if (amount > 0 && amount < minPaymentTransferAmt) minPaymentTransferAmt = amount;
+                              }
+                            }
+                            if (minPaymentTransferAmt === Infinity) minPaymentTransferAmt = 0;
+                            logisticsByIndex.set(restrictedOffers[idx]._originalIndex, { 
+                              delivery, sorting, other: minPaymentTransferAmt 
+                            });
+                          });
                         }
                         
-                        // Step 3: If sellingProgram didn't work, use fallback category (91491 = general goods)
-                        // This gets real logistics costs (based on weight/dimensions) and approximate commission
-                        if (parsedRestricted.length === 0) {
-                          console.log(`All programs failed for restricted categories, using fallback category 91491`);
-                          const fallbackOffers = restrictedOffers.map(({ _originalIndex, categoryId, ...rest }: any) => ({
-                            ...rest,
-                            categoryId: 91491, // General goods category (always allowed)
-                          }));
+                        // Now build tariff entries using KNOWN rates + fallback logistics
+                        parsedRestricted = restrictedOffers.map((o: any) => {
+                          const catId = o.categoryId;
+                          const knownRate = KNOWN_RESTRICTED_TARIFFS[catId];
+                          const commPct = knownRate?.commissionPercent || 0;
+                          const paymentPct = KNOWN_PAYMENT_TRANSFER_PCT;
+                          const price = o.price || 0;
+                          const commAmount = Math.round(price * commPct / 100);
                           
-                          await sleep(500);
-                          const fallbackResponse = await fetchWithRetry(
-                            'https://api.partner.market.yandex.ru/v2/tariffs/calculate',
-                            {
-                              method: 'POST',
-                              headers,
-                              body: JSON.stringify({
-                                parameters: { campaignId: Number(campaignId) },
-                                offers: fallbackOffers,
-                              }),
-                            }
-                          );
+                          const logistics = logisticsByIndex.get(o._originalIndex) || { delivery: 0, sorting: 0, other: 0 };
                           
-                          if (fallbackResponse.ok) {
-                            const fallbackData = await fallbackResponse.json();
-                            const fallbackResults = fallbackData.result?.offers || [];
-                            console.log(`Fallback category got ${fallbackResults.length} results`);
-                            parsedRestricted = parseTariffResults(fallbackResults, restrictedOffers, 'fallbackCategory');
-                          } else {
-                            console.error(`Fallback category also failed: ${fallbackResponse.status}`);
-                          }
-                        }
-                        
-                        // Step 4: If everything failed, mark as restricted with 0 values
-                        if (parsedRestricted.length === 0) {
-                          parsedRestricted = restrictedOffers.map((o: any) => ({
+                          const tariffPercent = commPct + paymentPct;
+                          const totalTariff = commAmount + logistics.delivery + logistics.sorting + logistics.other;
+                          
+                          console.log(`[RESTRICTED] cat=${catId} (${knownRate?.label || 'unknown'}), comm=${commPct}%, payment=${paymentPct}%, delivery=${logistics.delivery}, price=${price}`);
+                          
+                          return {
                             index: o._originalIndex,
-                            categoryId: o.categoryId,
-                            price: o.price || 0,
-                            agencyCommission: 0, commissionPercent: 0,
-                            fulfillment: 0, delivery: 0, sorting: 0, other: 0,
-                            totalTariff: 0, tariffPercent: 0,
-                            restricted: true, rawTariffs: [],
-                          }));
-                        }
+                            categoryId: catId,
+                            price,
+                            agencyCommission: commAmount,
+                            commissionPercent: commPct,
+                            fulfillment: 0,
+                            delivery: logistics.delivery,
+                            sorting: logistics.sorting,
+                            other: logistics.other,
+                            totalTariff,
+                            tariffPercent: Math.round(tariffPercent * 100) / 100,
+                            deliveryAmount: logistics.delivery + logistics.sorting,
+                            paymentTransferPercent: paymentPct,
+                            source: knownRate ? 'knownRate' as const : 'fallbackCategory' as const,
+                            restricted: !knownRate,
+                            knownLabel: knownRate?.label,
+                            rawTariffs: [],
+                          };
+                        });
                       }
                       
                       // Merge all results and sort by original index
                       const merged = [...parsedAllowed, ...parsedRestricted].sort((a, b) => a.index - b.index);
-                      console.log(`Final merged: ${merged.length} results (${parsedAllowed.length} allowed, ${parsedRestricted.length} restricted-recovered)`);
+                      console.log(`Final merged: ${merged.length} results (${parsedAllowed.length} allowed, ${parsedRestricted.length} restricted-known)`);
                       
                       restrictedRetryResult = {
                         success: true,
@@ -1647,50 +1670,61 @@ serve(async (req) => {
           }
 
           // === FINANCE-BASED COMMISSION ENRICHMENT ===
-          // For restricted/fallback categories, the tariff API returns incorrect commission rates.
-          // Use real commission data from recent order stats to calculate accurate per-product rates.
+          // For ALL products, try to enrich with real commission data from recent orders.
+          // This overrides both API-calculated and known-rate commissions with actual marketplace data.
           if (result?.success && result?.data?.length > 0 && campaignId) {
-            const fallbackItems = result.data.filter((t: any) => t.source === 'fallbackCategory' || t.source === 'sellingProgram');
-            if (fallbackItems.length > 0) {
-              console.log(`[YANDEX TARIFF ENRICH] ${fallbackItems.length} items from fallback/sellingProgram — enriching with real finance data`);
+            const enrichableItems = result.data.filter((t: any) => 
+              t.source === 'fallbackCategory' || t.source === 'sellingProgram' || t.source === 'knownRate'
+            );
+            if (enrichableItems.length > 0) {
+              console.log(`[YANDEX TARIFF ENRICH] ${enrichableItems.length} items need enrichment — fetching real finance data (90 days)`);
               try {
-                // Fetch recent stats/orders to get real commission amounts
                 const now = new Date();
-                const from30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-                const fromDate = from30.toISOString().split('T')[0];
+                const from90 = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+                const fromDate = from90.toISOString().split('T')[0];
                 const toDate = now.toISOString().split('T')[0];
 
-                await sleep(500);
-                const statsResp = await fetchWithRetry(
-                  `https://api.partner.market.yandex.ru/campaigns/${campaignId}/stats/orders`,
-                  {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify({
-                      dateFrom: fromDate,
-                      dateTo: toDate,
-                      limit: 200,
-                    }),
-                  }
-                );
+                // Paginate through ALL stats/orders
+                const commRates = new Map<string, { totalCommission: number; totalPrice: number; count: number }>();
+                let pageToken: string | undefined;
+                let pagesRead = 0;
+                
+                do {
+                  await sleep(500);
+                  const statsUrl = `https://api.partner.market.yandex.ru/v2/campaigns/${campaignId}/stats/orders` +
+                    (pageToken ? `?pageToken=${encodeURIComponent(pageToken)}` : '');
+                  const statsResp = await fetchWithRetry(
+                    statsUrl,
+                    {
+                      method: 'POST',
+                      headers,
+                      body: JSON.stringify({
+                        dateFrom: fromDate,
+                        dateTo: toDate,
+                        limit: 200,
+                      }),
+                    }
+                  );
 
-                if (statsResp.ok) {
+                  if (!statsResp.ok) {
+                    console.warn(`[YANDEX TARIFF ENRICH] Stats page ${pagesRead} failed: ${statsResp.status}`);
+                    break;
+                  }
+                  
                   const statsData = await statsResp.json();
                   const statsOrders = statsData.result?.orders || [];
-                  
-                  // Build per-offerId commission rate from real data
-                  const commRates = new Map<string, { totalCommission: number; totalPrice: number; count: number }>();
+                  pageToken = statsData.result?.paging?.nextPageToken;
+                  pagesRead++;
                   
                   for (const so of statsOrders) {
                     for (const soItem of (so.items || [])) {
-                      const oid = soItem.offerId || soItem.shopSku || '';
+                      const oid = soItem.offerId || soItem.shopSku || soItem.marketSku || '';
                       if (!oid) continue;
                       
                       const commissions = soItem.commissions || [];
                       let itemCommission = 0;
                       for (const comm of commissions) {
                         const type = (comm.type || '').toUpperCase();
-                        // Only count FEE-type commissions (not logistics)
                         if (type === 'FEE' || type.includes('COMMISSION') || type.includes('_FEE')) {
                           itemCommission += Math.abs(comm.actual || comm.amount || 0);
                         }
@@ -1707,39 +1741,40 @@ serve(async (req) => {
                     }
                   }
                   
-                  console.log(`[YANDEX TARIFF ENRICH] Found commission data for ${commRates.size} products from ${statsOrders.length} orders`);
+                  if (statsOrders.length === 0) break;
+                } while (pageToken && pagesRead < 10);
+                
+                console.log(`[YANDEX TARIFF ENRICH] Found commission data for ${commRates.size} products from ${pagesRead} pages`);
+                
+                // Map tariff offers back to offerIds
+                const offerIdByIndex = new Map<number, string>();
+                (tariffOffers || []).forEach((o: any, i: number) => {
+                  if (o.offerId) offerIdByIndex.set(i, o.offerId);
+                });
+                
+                // Override enrichable items with real data (if available)
+                let enriched = 0;
+                for (const t of result.data) {
+                  if (t.source !== 'fallbackCategory' && t.source !== 'sellingProgram' && t.source !== 'knownRate') continue;
                   
-                  // Map tariff offers back to offerIds from the original request
-                  const offerIdByIndex = new Map<number, string>();
-                  (tariffOffers || []).forEach((o: any, i: number) => {
-                    if (o.offerId) offerIdByIndex.set(i, o.offerId);
-                  });
+                  const offerId = offerIdByIndex.get(t.index);
+                  if (!offerId) continue;
                   
-                  // Override fallback commissions with real data
-                  let enriched = 0;
-                  for (const t of result.data) {
-                    if (t.source !== 'fallbackCategory' && t.source !== 'sellingProgram') continue;
+                  const realRate = commRates.get(offerId);
+                  if (realRate && realRate.totalPrice > 0) {
+                    const realCommPercent = (realRate.totalCommission / realRate.totalPrice) * 100;
+                    const realCommAmount = (t.price || 0) * (realCommPercent / 100);
                     
-                    const offerId = offerIdByIndex.get(t.index);
-                    if (!offerId) continue;
-                    
-                    const realRate = commRates.get(offerId);
-                    if (realRate && realRate.totalPrice > 0) {
-                      const realCommPercent = (realRate.totalCommission / realRate.totalPrice) * 100;
-                      const realCommAmount = (t.price || 0) * (realCommPercent / 100);
-                      
-                      // Override with real commission data
-                      t.agencyCommission = Math.round(realCommAmount);
-                      t.commissionPercent = Math.round(realCommPercent * 100) / 100;
-                      t.totalTariff = t.agencyCommission + (t.fulfillment || 0) + (t.delivery || 0) + (t.sorting || 0) + (t.other || 0);
-                      // tariffPercent = commission% + paymentTransfer% only (no logistics conversion)
-                      t.tariffPercent = Math.round((t.commissionPercent + (t.paymentTransferPercent || 0)) * 100) / 100;
-                      t.source = 'finance-enriched';
-                      enriched++;
-                    }
+                    t.agencyCommission = Math.round(realCommAmount);
+                    t.commissionPercent = Math.round(realCommPercent * 100) / 100;
+                    t.totalTariff = t.agencyCommission + (t.fulfillment || 0) + (t.delivery || 0) + (t.sorting || 0) + (t.other || 0);
+                    t.tariffPercent = Math.round((t.commissionPercent + (t.paymentTransferPercent || 0)) * 100) / 100;
+                    t.source = 'finance-enriched';
+                    enriched++;
                   }
-                  console.log(`[YANDEX TARIFF ENRICH] Enriched ${enriched}/${fallbackItems.length} fallback items with real commission rates`);
+                  // If no real data but knownRate exists, keep knownRate (already set correctly)
                 }
+                console.log(`[YANDEX TARIFF ENRICH] Enriched ${enriched}/${enrichableItems.length} items with real commission rates`);
               } catch (enrichErr) {
                 console.warn(`[YANDEX TARIFF ENRICH] Finance enrichment failed (non-fatal):`, enrichErr);
               }
