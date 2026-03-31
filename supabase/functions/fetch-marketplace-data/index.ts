@@ -2907,8 +2907,8 @@ serve(async (req) => {
 
             while (finHasMore && finPage < 20) {
               const finParams = new URLSearchParams();
-              finParams.append('dateFrom', finDateFrom);
-              finParams.append('dateTo', finDateTo);
+              finParams.append('dateFrom', String(finDateFrom));
+              finParams.append('dateTo', String(finDateTo));
               finParams.append('size', '100');
               finParams.append('page', String(finPage));
               // Add statuses only if specified
