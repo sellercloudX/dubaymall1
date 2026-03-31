@@ -3426,13 +3426,11 @@ serve(async (req) => {
             for (const o of priceOffers) {
               const shopId = o.shopId || uzumShopId;
               const list = byShop.get(shopId) || [];
-              // Uzum API expects price in TIYINS (so'm × 100)
-              // Client sends price in so'm, so we convert here
-              const priceInSom = o.price;
-              const priceInTiyins = Math.round(priceInSom * 100);
+              // Uzum sendPriceData expects price in SO'M (same unit as catalog price)
+              // Client sends price in so'm via toMarketplaceCurrency()
               list.push({
                 skuId: parseInt(o.skuId || o.offerId || '0'),
-                price: priceInTiyins,
+                price: Math.round(o.price),
               });
               byShop.set(shopId, list);
             }
