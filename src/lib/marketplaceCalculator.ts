@@ -145,5 +145,7 @@ export function normalizeLogistics(rawUzs: number, marketplace: string): number 
  * Enforce minimum logistics on a raw value (native currency).
  */
 export function enforceMinLogistics(logisticsNative: number, marketplace: string): number {
-  return Math.max(logisticsNative, MIN_LOGISTICS[marketplace] || 0);
+  const step = LOGISTICS_STEP[marketplace] || 0;
+  if (step <= 0) return logisticsNative;
+  return Math.max(step, Math.ceil(logisticsNative / step) * step);
 }
