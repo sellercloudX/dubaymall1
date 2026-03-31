@@ -6,7 +6,7 @@ import { TRIAL_DAYS, ACTIVATION_FEE_UZS } from '@/hooks/useFeaturePricing';
 interface SellerCloudSubscription {
   id: string;
   user_id: string;
-  plan_type: 'pro' | 'enterprise';
+  plan_type: string;
   monthly_fee: number;
   is_active: boolean;
   is_trial: boolean;
