@@ -1399,7 +1399,7 @@ serve(async (req) => {
               }
             );
 
-            console.log(`Tariff API (sellingProgram=FBS) response status: ${tariffResponse.status}`);
+            console.log(`Tariff API (campaignId=${campaignId}) response status: ${tariffResponse.status}`);
 
             // Helper to parse tariff results into structured data
             function parseTariffResults(
