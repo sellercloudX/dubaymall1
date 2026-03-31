@@ -1645,7 +1645,7 @@ serve(async (req) => {
                           method: 'POST',
                           headers,
                           body: JSON.stringify({
-                            parameters: { sellingProgram: 'FBS' },
+                            parameters: { campaignId: Number(campaignId) },
                             offers: fallbackOffers,
                           }),
                         }
