@@ -5320,7 +5320,9 @@ serve(async (req) => {
               : [];
             console.log(`WB commissions API: ${commissions.length} entries, sample keys: ${commissions[0] ? JSON.stringify(Object.keys(commissions[0])) : 'none'}`);
             if (commissions[0]) {
-              console.log(`WB commission sample: subjectName=${commissions[0].subjectName}, kgvpMarketplace=${commissions[0].kgvpMarketplace}, kgvpSupplier=${commissions[0].kgvpSupplier}`);
+              const s = commissions[0];
+              const commRate = s.kgvpMarketplace ?? s.kgvpMarketplaceUz ?? s.kgvpSupplier ?? s.kgvpSupplierUz ?? 'none';
+              console.log(`WB commission sample: subjectName=${s.subjectName}, rate=${commRate}, keys=${Object.keys(s).filter(k => k.startsWith('kgvp')).join(',')}`);
             }
           } else {
             const errText = await commResp.text();
