@@ -299,7 +299,7 @@ Javobni faqat JSON array: ["so'z1", "so'z2", ...]`;
           method: "POST",
           headers: { Authorization: `Bearer ${lovableApiKey}`, "Content-Type": "application/json" },
           body: JSON.stringify({
-            model: "google/gemini-2.5-flash",
+            model: "google/gemini-3-flash-preview",
             messages: [{ role: "user", content: `VAZIFA: Mahsulotga ENG TO'G'RI MXIK (IKPU) kodni tanla.
 
 Mahsulot: "${name}"
@@ -310,6 +310,11 @@ MUHIM QOIDALAR:
 2. Kategoriya bo'yicha mos kelmaydigan kodlarni TANLAMA
 3. Eng ANIQ mos keladigan kodni tanla
 4. Agar hech biri mos kelmasa, 0 yoz
+5. DIQQAT: "alkogol", "tamaki", "dori-darmon", "qurol" kategoriyalariga KIRMAYDIGAN mahsulotlar uchun BU kategoriyalardagi kodlarni TANLAMA!
+6. Mahsulot nomidagi ASOSIY so'zga e'tibor ber:
+   - "Чехол для iPhone" → "чехол" (telefon aksessuari), "пластмассовые изделия" EMAS
+   - "Кроссовки Nike" → "обувь спортивная", "полимерные материалы" EMAS
+   - "Шампунь" → "средства для волос", "химические реактивы" EMAS
 
 Variantlar:
 ${options}
