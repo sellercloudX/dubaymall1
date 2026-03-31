@@ -3287,7 +3287,7 @@ serve(async (req) => {
           const finShopIds = allShopIds.length > 0 ? allShopIds : (uzumShopId ? [String(uzumShopId)] : []);
           console.log(`Uzum finance: querying ${finShopIds.length} shops individually: ${finShopIds.join(',')}`);
 
-          const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
+            const finDateFrom365 = Date.now() - 365 * 24 * 60 * 60 * 1000;
 
           for (let si = 0; si < finShopIds.length; si++) {
             const sid = finShopIds[si];
@@ -3295,13 +3295,11 @@ serve(async (req) => {
 
             const financeParams = new URLSearchParams();
             financeParams.append("shopIds", sid);
-            financeParams.append("dateFrom", String(ninetyDaysAgo));
+            financeParams.append("dateFrom", String(finDateFrom365));
             financeParams.append("dateTo", String(Date.now()));
             financeParams.append("size", "100");
             financeParams.append("page", "0");
-            for (const st of ['TO_WITHDRAW', 'PROCESSING', 'CANCELED', 'PARTIALLY_CANCELLED']) {
-              financeParams.append('statuses', st);
-            }
+            // Don't add statuses filter — let API return ALL finance items
 
             let finPage = 0;
             let finHasMore = true;
