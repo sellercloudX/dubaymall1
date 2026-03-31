@@ -953,19 +953,20 @@ JAVOB FAQAT JSON:
   
   if (!result) return null;
 
-  // ═══ PASS 2: Focus on MISSING REQUIRED params ═══
+  // ═══ PASS 2: Focus on MISSING REQUIRED + RECOMMENDED (FILTER) params ═══
   const filledParamIds = new Set(
     (result.parameterValues || []).map((p: any) => Number(p.parameterId))
   );
   
   const missingRequired = requiredParams.filter((p: any) => !filledParamIds.has(Number(p.id)));
+  const missingRecommended = recommendedParams.filter((p: any) => !filledParamIds.has(Number(p.id)));
   const missingOptional = optionalParams.filter((p: any) => !filledParamIds.has(Number(p.id)));
-  const allMissing = [...missingRequired, ...missingOptional];
+  const allMissing = [...missingRequired, ...missingRecommended, ...missingOptional];
   
-  console.log(`📊 Pass 1 natija: ${result.parameterValues?.length || 0} to'ldirildi. Bo'sh: ${missingRequired.length} MAJBURIY + ${missingOptional.length} optional`);
+  console.log(`📊 Pass 1 natija: ${result.parameterValues?.length || 0} to'ldirildi. Bo'sh: ${missingRequired.length} MAJBURIY + ${missingRecommended.length} FILTR + ${missingOptional.length} optional`);
   
   if (allMissing.length > 0 && allMissing.length <= 80) {
-    console.log(`🔄 Pass 2: ${missingRequired.length} MAJBURIY + ${missingOptional.length} optional to'ldirish...`);
+    console.log(`🔄 Pass 2: ${missingRequired.length} MAJBURIY + ${missingRecommended.length} FILTR + ${missingOptional.length} optional to'ldirish...`);
     
     const pass2Prompt = `VAZIFA: Quyidagi BO'SH parametrlarni to'ldir!
 Bu birinchi bosqichda to'ldirilMAGAN parametrlar. BALL oshirish uchun HAR BIRINI to'ldir!
