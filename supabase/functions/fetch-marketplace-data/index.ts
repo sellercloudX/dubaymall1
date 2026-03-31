@@ -3278,7 +3278,7 @@ serve(async (req) => {
 
           // Server-side date filtering — Uzum API may ignore dateFrom/dateTo params
           // so we filter manually to ensure only requested date range is returned
-          const effectiveFrom = fromDate ? new Date(fromDate).getTime() : Date.now() - 90 * 24 * 60 * 60 * 1000;
+          const effectiveFrom = fromDate ? new Date(fromDate).getTime() : Date.now() - 365 * 24 * 60 * 60 * 1000;
           const effectiveTo = toDate ? new Date(toDate).getTime() : Date.now();
           
           const dateFilteredOrders = allOrders.filter((o: any) => {
