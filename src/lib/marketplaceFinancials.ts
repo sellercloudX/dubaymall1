@@ -41,29 +41,21 @@ export interface OrderFinancialBreakdown {
 }
 
 /**
- * STRICT exact fees extraction
- * Hech qanday taxmin yo'q — faqat normalizerdan kelgan qiymatlar
+ * Exact fees extraction - debug bilan kuchaytirilgan
  */
 function extractExactFees(item: any, marketplace: string) {
   const normalized = normalizeMarketplaceFinance(item, marketplace);
 
-  const hasAnyRealData = 
-    normalized.actualCommission > 0 || 
-    normalized.actualLogisticsFee > 0 || 
-    normalized.actualSoldPrice > 0;
+  const hasAnyRealData =
+    normalized.actualCommission > 0 || normalized.actualLogisticsFee > 0 || normalized.actualSoldPrice > 0;
 
-  // Debug — har bir item uchun aniq ko'rsatadi
-  console.log(`[EXACT_FEES_DEBUG] ${marketplace} | item=${item.offerId || item.id || 'unknown'}`, {
+  console.log(`[EXACT_FEES_DEBUG] ${marketplace} | ${item.offerId || item.id || "unknown"}`, {
     isExact: normalized.isExact,
-    hasAnyRealData,
+    hasRealData: hasAnyRealData,
     commission: normalized.actualCommission,
     logistics: normalized.actualLogisticsFee,
     soldPrice: normalized.actualSoldPrice,
-    subsidy: normalized.subsidyAmount,
-    financeSource: normalized.financeSource || 'unknown',
-    rawKeys: Object.keys(item).filter(k => 
-      /commission|delivery|logistics|forPay|seller|bankSum|ppvz/i.test(k)
-    ).slice(0, 15)
+    financeSource: normalized.financeSource || "unknown",
   });
 
   return {
@@ -98,8 +90,6 @@ export function calculateOrderFinancialBreakdown(
   let costCoveredItems = 0;
   let realTariffItems = 0;
 
-  const shouldDebugLog = true;
-
   for (const item of items) {
     const quantity = item.count || 1;
     const rawCostPrice = getCostPrice(marketplace, item.offerId);
@@ -108,10 +98,7 @@ export function calculateOrderFinancialBreakdown(
 
     const fees = extractExactFees(item, marketplace);
 
-    // Eng muhim: actualSoldPrice mavjud bo'lsa uni ishlat, bo'lmasa oddiy price
-    const itemRevenue = fees.actualSoldPrice > 0 
-      ? fees.actualSoldPrice 
-      : toDisplayUzs(item.price || 0, marketplace);
+    const itemRevenue = fees.actualSoldPrice > 0 ? fees.actualSoldPrice : toDisplayUzs(item.price || 0, marketplace);
 
     const itemCommission = fees.commission;
     const itemLogistics = fees.logistics;
@@ -120,26 +107,15 @@ export function calculateOrderFinancialBreakdown(
 
     const hasRealFees = fees.isReal || itemCommission > 0 || itemLogistics > 0;
 
-    if (shouldDebugLog) {
-      console.log(`[ORDER_FINANCE_DEBUG] ${marketplace} | item=${item.offerId || item.id}`, {
-        source: hasRealFees ? "EXACT_API" : "TARIFF_FALLBACK",
-        financeSource: fees.financeSource,
-        itemRevenue,
-        commission: itemCommission,
-        logistics: itemLogistics,
-        totalFees: itemTotalFees,
-        hasRealFees,
-        rawFields: {
-          actualSoldPrice: item.actualSoldPrice,
-          sellerAmount: item.sellerAmount,
-          forPay: item.forPay,
-          ppvz_for_pay: item.ppvz_for_pay,
-          commissionAmount: item.commissionAmount,
-          deliveryAmount: item.deliveryAmount,
-          logisticsAmount: item.logisticsAmount,
-        },
-      });
-    }
+    console.log(`[ORDER_FINANCE_DEBUG] ${marketplace} | item=${item.offerId || item.id}`, {
+      source: hasRealFees ? "EXACT_API" : "TARIFF_FALLBACK",
+      financeSource: fees.financeSource,
+      itemRevenue,
+      commission: itemCommission,
+      logistics: itemLogistics,
+      totalFees: itemTotalFees,
+      hasRealFees,
+    });
 
     const itemTax = itemRevenue * UZB_TAX_RATE;
 
@@ -161,39 +137,6 @@ export function calculateOrderFinancialBreakdown(
       quantity,
       revenue: itemRevenue,
       costTotal: itemCostTotal,
-      commission: itemCommission,
-      logistics: itemLogistics,
-      withdrawal: itemWithdrawal,
-      totalFees: itemTotalFees,
-      tax: itemTax,
-      hasCostPrice: rawCostPrice !== null,
-      hasRealTariff: hasRealFees,
-      fulfillmentType: order.fulfillmentType,
-    });
-  }
-
-  const taxAmount = revenue * UZB_TAX_RATE;
-  const grossProfit = revenue - costTotal;
-  const netProfit = grossProfit - totalFees - taxAmount;
-  const margin = revenue > 0 ? (netProfit / revenue) * 100 : 0;
-
-  return {
-    revenue,
-    costTotal,
-    commission,
-    logistics,
-    withdrawal,
-    totalFees,
-    taxAmount,
-    grossProfit,
-    netProfit,
-    margin,
-    itemCount,
-    costCoveredItems,
-    realTariffItems,
-    lines,
-  };
-}      costTotal: itemCostTotal,
       commission: itemCommission,
       logistics: itemLogistics,
       withdrawal: itemWithdrawal,
