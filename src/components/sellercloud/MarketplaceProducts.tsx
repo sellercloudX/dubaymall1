@@ -197,7 +197,7 @@ export function MarketplaceProducts({ connectedMarketplaces, store }: Marketplac
                     <TableHead className="min-w-[200px]">Mahsulot</TableHead>
                     <TableHead className="w-32">SKU</TableHead>
                     <TableHead className="w-36 text-right">Narxi</TableHead>
-                    <TableHead className="w-28 text-right">Komissiya</TableHead>
+                    <TableHead className="w-28 text-right">To'lovlar %</TableHead>
                     <TableHead className="w-24 text-center">FBO</TableHead>
                     <TableHead className="w-24 text-center">FBS</TableHead>
                     <TableHead className="w-28 text-center">Holat</TableHead>
