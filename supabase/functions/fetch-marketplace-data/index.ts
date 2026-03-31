@@ -1099,6 +1099,8 @@ serve(async (req) => {
                     if (!matchedItem) continue;
 
                     // Extract commissions by type
+                    // CRITICAL: Only pure marketplace commission goes to totalCommission
+                    // FBS_COMMISSION, FBY_COMMISSION are logistics fees, NOT sales commission
                     const commissions = soItem.commissions || [];
                     let totalCommission = 0;
                     let totalLogistics = 0;
@@ -1106,11 +1108,26 @@ serve(async (req) => {
                     for (const comm of commissions) {
                       const amount = Math.abs(comm.actual || comm.amount || 0);
                       const type = (comm.type || '').toUpperCase();
-                      if (type.includes('FEE') || type.includes('COMMISSION') || type === 'FBS_COMMISSION' || type === 'FBY_COMMISSION' || type === 'AGENCY_COMMISSION') {
+                      
+                      // Only pure marketplace/agency commission
+                      if (type === 'FEE' || type === 'AGENCY_COMMISSION') {
                         totalCommission += amount;
-                      } else if (type.includes('DELIVERY') || type.includes('SORTING') || type.includes('LOGISTICS') || type.includes('MIDDLE_MILE') || type.includes('LAST_MILE') || type.includes('RETURN_PROCESSING')) {
+                      }
+                      // Logistics: FBS/FBY commission, delivery, sorting, etc.
+                      else if (
+                        type === 'FBS_COMMISSION' || type === 'FBY_COMMISSION' ||
+                        type === 'FULFILLMENT' ||
+                        type.includes('DELIVERY') || type.includes('SORTING') ||
+                        type.includes('LOGISTICS') || type.includes('MIDDLE_MILE') ||
+                        type.includes('LAST_MILE') || type.includes('RETURN_PROCESSING')
+                      ) {
                         totalLogistics += amount;
-                      } else {
+                      }
+                      // Payment transfer fee goes to other fees
+                      else if (type === 'PAYMENT_TRANSFER' || type === 'PAYMENT_TRANSFER_FEE') {
+                        totalOther += amount;
+                      }
+                      else {
                         totalOther += amount;
                       }
                     }
