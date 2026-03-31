@@ -91,16 +91,31 @@ export function calculateOrderFinancialBreakdown(
 
     const fees = extractExactFees(item, marketplace);
 
-    const itemRevenue = fees.actualSoldPrice > 0 ? fees.actualSoldPrice : toDisplayUzs(item.price || 0, marketplace);
+    // Revenue: prefer actualSoldPrice from finance enrichment, then gross price, then item price
+    const basePrice = toDisplayUzs(item.price || 0, marketplace);
+    const itemRevenue = fees.actualSoldPrice > 0
+      ? fees.actualSoldPrice
+      : (fees.grossPrice > 0 ? fees.grossPrice : basePrice);
 
-    const itemCommission = fees.commission;
-    const itemLogistics = fees.logistics;
-    const itemWithdrawal = fees.withdrawal;
-    const itemTotalFees = fees.totalFees;
+    // Fees: prefer exact fees from finance reports; fallback to tariffMap estimates
+    let itemCommission = fees.commission;
+    let itemLogistics = fees.logistics;
+    let itemWithdrawal = fees.withdrawal;
+    let itemTotalFees = fees.totalFees;
+    let hasRealFees = fees.isReal;
 
-    const hasRealFees = fees.isReal || itemCommission > 0 || itemLogistics > 0;
-
-    // Debug logs removed for production
+    // CRITICAL: If no exact fees from finance enrichment, use tariffMap as fallback
+    if (!hasRealFees && tariffMap && item.offerId) {
+      const tariffFallback = getTariffForProduct(tariffMap, item.offerId, basePrice, marketplace);
+      if (tariffFallback.isReal && tariffFallback.totalFee > 0) {
+        // Tariff is per-unit, multiply by quantity
+        itemCommission = tariffFallback.commission * quantity;
+        itemLogistics = tariffFallback.logistics * quantity;
+        itemWithdrawal = tariffFallback.withdrawal * quantity;
+        itemTotalFees = tariffFallback.totalFee * quantity;
+        hasRealFees = true;
+      }
+    }
 
     const itemTax = itemRevenue * UZB_TAX_RATE;
 
