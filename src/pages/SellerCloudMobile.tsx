@@ -114,7 +114,7 @@ export default function SellerCloudMobile() {
    const totalRevenue = useMemo(() => {
      if (store.allOrders.length === 0) return connections.reduce((sum, c) => sum + (c.total_revenue || 0), 0);
      return calculateTotalRevenue(store.getOrders, connectedMarketplaces);
-   }, [store.dataVersion, connections, connectedMarketplaces]);
+   }, [store.allOrders.length, connections, connectedMarketplaces]);
 
   const handleMarketplaceConnect = async () => {
     await refetch();
