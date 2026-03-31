@@ -54,11 +54,18 @@ function extractExactFees(item: any, marketplace: string) {
   // (RUB for WB, UZS for Uzum/Yandex). We MUST convert to UZS for uniform downstream use.
   const c = (v: number) => toDisplayUzs(v, marketplace);
 
+  const rawLogisticsUzs = c(normalized.actualLogisticsFee);
+  const minLogisticsUzs = getMinLogisticsUzs(marketplace);
+  const enforcedLogisticsUzs = Math.max(rawLogisticsUzs, hasAnyRealData ? minLogisticsUzs : 0);
+
+  const commissionUzs = c(normalized.actualCommission);
+  const otherFeesUzs = c(normalized.actualOtherFees);
+
   return {
-    commission: c(normalized.actualCommission),
-    logistics: c(normalized.actualLogisticsFee),
-    withdrawal: c(normalized.actualOtherFees),
-    totalFees: c(normalized.actualCommission) + c(normalized.actualLogisticsFee) + c(normalized.actualOtherFees),
+    commission: commissionUzs,
+    logistics: enforcedLogisticsUzs,
+    withdrawal: otherFeesUzs,
+    totalFees: commissionUzs + enforcedLogisticsUzs + otherFeesUzs,
     actualSoldPrice: c(normalized.actualSoldPrice || 0),
     grossPrice: c(normalized.grossPrice || 0),
     subsidyAmount: c(normalized.subsidyAmount || 0),
