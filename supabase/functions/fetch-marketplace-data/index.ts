@@ -1029,6 +1029,121 @@ serve(async (req) => {
 
         console.log(`Total orders fetched: ${allOrders.length}, active: ${activeYandexOrders.length}, revenue: ${yandexTotalRevenue}`);
 
+        // ===== YANDEX FINANCE ENRICHMENT via stats/orders =====
+        // Raw orders API does NOT return commission/logistics.
+        // Use campaigns/{id}/stats/orders to get per-item commission breakdown.
+        if (campaignId && allOrders.length > 0) {
+          try {
+            console.log(`[YANDEX FINANCE] Starting stats/orders enrichment for ${allOrders.length} orders`);
+            const orderIds = allOrders.map(o => o.id).filter(Boolean);
+            const batchSize = 200; // Yandex allows up to 200 order IDs per request
+            let statsEnriched = 0;
+
+            for (let i = 0; i < orderIds.length; i += batchSize) {
+              const batch = orderIds.slice(i, i + batchSize);
+              try {
+                const statsResp = await fetchWithRetry(
+                  `https://api.partner.market.yandex.ru/campaigns/${campaignId}/stats/orders`,
+                  {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ orders: batch }),
+                  }
+                );
+                if (!statsResp.ok) {
+                  const errBody = await statsResp.text();
+                  console.warn(`[YANDEX FINANCE] stats/orders batch ${i} failed: ${statsResp.status}, ${errBody.substring(0, 200)}`);
+                  await sleep(1000);
+                  continue;
+                }
+                const statsData = await statsResp.json();
+                const statOrders = statsData.result?.orders || statsData.orders || [];
+                
+                if (i === 0 && statOrders.length > 0) {
+                  const sample = statOrders[0];
+                  console.log(`[YANDEX FINANCE] Sample stats order keys: ${JSON.stringify(Object.keys(sample))}`);
+                  if (sample.items?.[0]) {
+                    console.log(`[YANDEX FINANCE] Sample item keys: ${JSON.stringify(Object.keys(sample.items[0]))}`);
+                    if (sample.items[0].commissions?.[0]) {
+                      console.log(`[YANDEX FINANCE] Sample commission: ${JSON.stringify(sample.items[0].commissions[0])}`);
+                    }
+                  }
+                }
+
+                for (const so of statOrders) {
+                  const order = allOrders.find(o => o.id === so.id);
+                  if (!order || !order.items) continue;
+
+                  const soItems = so.items || [];
+                  for (const soItem of soItems) {
+                    const matchedItem = order.items.find((oi: any) => oi.offerId === soItem.offerId);
+                    if (!matchedItem) continue;
+
+                    // Extract commissions by type
+                    const commissions = soItem.commissions || [];
+                    let totalCommission = 0;
+                    let totalLogistics = 0;
+                    let totalOther = 0;
+                    for (const comm of commissions) {
+                      const amount = Math.abs(comm.actual || comm.amount || 0);
+                      const type = (comm.type || '').toUpperCase();
+                      if (type.includes('FEE') || type.includes('COMMISSION') || type === 'FBS_COMMISSION' || type === 'FBY_COMMISSION' || type === 'AGENCY_COMMISSION') {
+                        totalCommission += amount;
+                      } else if (type.includes('DELIVERY') || type.includes('SORTING') || type.includes('LOGISTICS') || type.includes('MIDDLE_MILE') || type.includes('LAST_MILE') || type.includes('RETURN_PROCESSING')) {
+                        totalLogistics += amount;
+                      } else {
+                        totalOther += amount;
+                      }
+                    }
+
+                    if (totalCommission > 0) {
+                      matchedItem.commissionAmount = totalCommission;
+                      matchedItem.actualCommission = totalCommission;
+                    }
+                    if (totalLogistics > 0) {
+                      matchedItem.deliveryAmount = totalLogistics;
+                      matchedItem.actualLogisticsFee = totalLogistics;
+                    }
+                    if (totalOther > 0) {
+                      matchedItem.withdrawalAmount = totalOther;
+                      matchedItem.actualOtherFees = totalOther;
+                    }
+                    // payments array
+                    const payments = soItem.payments || [];
+                    let totalPayment = 0;
+                    let totalSubsidy = 0;
+                    for (const pay of payments) {
+                      const amount = Math.abs(pay.amount || 0);
+                      const type = (pay.type || '').toUpperCase();
+                      if (type.includes('PAYMENT') || type.includes('PAYOUT') || type === 'PAYMENT') {
+                        totalPayment += amount;
+                      } else if (type.includes('SUBSIDY') || type.includes('PROMO') || type.includes('COMPENSATION')) {
+                        totalSubsidy += amount;
+                      }
+                    }
+                    if (totalPayment > 0) {
+                      matchedItem.sellerAmount = totalPayment;
+                      matchedItem.actualSoldPrice = totalPayment + totalSubsidy;
+                    }
+                    if (totalSubsidy > 0) {
+                      matchedItem.subsidyAmount = totalSubsidy;
+                      matchedItem.additionalPayment = totalSubsidy;
+                    }
+                    matchedItem.financeSource = 'yandex-stats-orders';
+                    statsEnriched++;
+                  }
+                }
+                await sleep(300);
+              } catch (batchErr) {
+                console.warn(`[YANDEX FINANCE] Batch error:`, batchErr);
+              }
+            }
+            console.log(`[YANDEX FINANCE] Enriched ${statsEnriched} items via stats/orders`);
+          } catch (finErr) {
+            console.warn(`[YANDEX FINANCE] enrichment error (non-fatal):`, finErr);
+          }
+        }
+
         result = {
           success: true,
           data: allOrders,
@@ -2767,14 +2882,16 @@ serve(async (req) => {
             const finShopIds = allShopIds.length > 0 ? allShopIds : (uzumShopId ? [String(uzumShopId)] : []);
             console.log(`Uzum Finance orders: querying with ${finShopIds.length} shopIds: ${finShopIds.join(',')}`);
             // Use 365-day lookback for finance data (90 days was too short for some sellers)
-            const ninetyDaysAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
-            let fboCount = 0;
+            // CRITICAL FIX: Uzum Finance API expects ISO date strings (YYYY-MM-DD), NOT milliseconds
+            const finDateFrom = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+            const finDateTo = new Date().toISOString().split('T')[0];
+            console.log(`[UZUM FINANCE] Date range: ${finDateFrom} to ${finDateTo}`);
 
             // Try multiple approaches to get finance data:
             // Approach 1: Without statuses filter (gets ALL finance items)
             // Approach 2: With specific statuses if approach 1 fails
             const financeApproaches = [
-              { label: 'no-status-filter', statuses: [] },
+              { label: 'no-status-filter', statuses: [] as string[] },
               { label: 'all-statuses', statuses: ['TO_WITHDRAW', 'PROCESSING', 'CANCELED', 'PARTIALLY_CANCELLED'] },
             ];
 
@@ -2789,8 +2906,8 @@ serve(async (req) => {
 
             while (finHasMore && finPage < 20) {
               const finParams = new URLSearchParams();
-              finParams.append('dateFrom', String(ninetyDaysAgo));
-              finParams.append('dateTo', String(Date.now()));
+              finParams.append('dateFrom', finDateFrom);
+              finParams.append('dateTo', finDateTo);
               finParams.append('size', '100');
               finParams.append('page', String(finPage));
               // Add statuses only if specified
@@ -2981,9 +3098,9 @@ serve(async (req) => {
               let enrichHasMore = true;
               while (enrichHasMore && enrichPage < 30) {
                 const enrichParams = new URLSearchParams();
-                // Use same 365-day lookback for enrichment
-                enrichParams.append('dateFrom', String(Date.now() - 365 * 24 * 60 * 60 * 1000));
-                enrichParams.append('dateTo', String(Date.now()));
+                // Use same 365-day lookback for enrichment with ISO date format
+                enrichParams.append('dateFrom', finDateFrom);
+                enrichParams.append('dateTo', finDateTo);
                 enrichParams.append('size', '100');
                 enrichParams.append('page', String(enrichPage));
                 for (const st of statuses) enrichParams.append('statuses', st);
