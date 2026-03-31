@@ -118,8 +118,8 @@ export function useMarketplaceTariffs(
             if (realExp && (realExp.commission > 0 || realExp.logistics > 0)) {
               const commissionUnits = Math.max(realExp.commissionUnits, 1);
               const logisticsUnits = Math.max(realExp.logisticsUnits, realExp.commissionUnits, 1);
-              const perUnitCommission = realExp.commission / commissionUnits;
-              const perUnitLogistics = realExp.logistics / logisticsUnits;
+              const perUnitCommission = Math.round(realExp.commission / commissionUnits);
+              const perUnitLogistics = Math.round(realExp.logistics / logisticsUnits);
               const totalTariffPerUnit = perUnitCommission + perUnitLogistics;
 
               const entry: TariffInfo = {
