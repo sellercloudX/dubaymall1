@@ -1380,9 +1380,10 @@ serve(async (req) => {
           if (offersForCalc.length === 0) {
             result = { success: true, data: [], message: "No offers provided" };
           } else {
-            // === PRIMARY APPROACH: Use sellingProgram instead of campaignId ===
-            // UZ campaigns return 400 "restricted" for ALL categories when using campaignId.
-            // sellingProgram: 'FBS' works for most categories without this restriction.
+            // === PRIMARY APPROACH: Use campaignId to get region-specific (UZ) tariffs ===
+            // sellingProgram: 'FBS' returns RU tariffs (45%+ for perfumery) — WRONG for UZ.
+            // campaignId returns the correct UZ tariffs for the seller's actual campaign.
+            // NOTE: Do NOT pass 'currency' together with campaignId — causes 400 error.
             await sleep(500);
             const tariffResponse = await fetchWithRetry(
               'https://api.partner.market.yandex.ru/v2/tariffs/calculate',
@@ -1391,14 +1392,14 @@ serve(async (req) => {
                 headers,
                 body: JSON.stringify({
                   parameters: { 
-                    sellingProgram: 'FBS',
+                    campaignId: Number(campaignId),
                   },
                   offers: offersForCalc,
                 }),
               }
             );
 
-            console.log(`Tariff API (sellingProgram=FBS) response status: ${tariffResponse.status}`);
+            console.log(`Tariff API (campaignId=${campaignId}) response status: ${tariffResponse.status}`);
 
             // Helper to parse tariff results into structured data
             function parseTariffResults(
@@ -1525,8 +1526,8 @@ serve(async (req) => {
               const tariffData = await tariffResponse.json();
               const tariffResults = tariffData.result?.offers || [];
               
-              console.log(`Got ${tariffResults.length} tariff results via sellingProgram=FBS`);
-              const parsed = parseTariffResults(tariffResults, offersForCalc, 'sellingProgram');
+              console.log(`Got ${tariffResults.length} tariff results via campaignId=${campaignId}`);
+              const parsed = parseTariffResults(tariffResults, offersForCalc, 'campaign');
               
               // Check if some got 0% commission — these might be restricted
               const zeroComm = parsed.filter((p: any) => p.commissionPercent === 0);
@@ -1550,9 +1551,9 @@ serve(async (req) => {
               result = { success: true, data: parsed };
             } else {
               const errText = await tariffResponse.text();
-              console.error("Tariff calc error (sellingProgram):", tariffResponse.status, errText);
+              console.error("Tariff calc error (campaignId):", tariffResponse.status, errText);
               
-              // Fallback: try with campaignId
+              // Fallback: try with sellingProgram if campaignId fails (restricted categories)
               let fallbackResult: any = null;
               
               if (tariffResponse.status === 400) {
