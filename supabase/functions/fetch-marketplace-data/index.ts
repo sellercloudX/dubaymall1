@@ -2783,6 +2783,82 @@ serve(async (req) => {
             }
 
             console.log(`Uzum Finance orders total: ${fboCount} (deduplicated with FBS)`);
+
+            // ===== ENRICH FBS orders with Finance API data (commission, logistics) =====
+            // /v2/fbs/orders does NOT return financial fields — only /v1/finance/orders has them.
+            // Build a map of orderCode → finance items, then patch FBS order items.
+            const financeItemMap = new Map<string, any[]>();
+            // Re-scan ALL finance pages to build enrichment map
+            let enrichPage = 0;
+            let enrichHasMore = true;
+            while (enrichHasMore && enrichPage < 20) {
+              const enrichParams = new URLSearchParams();
+              enrichParams.append('dateFrom', String(ninetyDaysAgo));
+              enrichParams.append('dateTo', String(Date.now()));
+              enrichParams.append('size', '100');
+              enrichParams.append('page', String(enrichPage));
+              for (const st of financeStatuses) enrichParams.append('statuses', st);
+              for (const sid of finShopIds) enrichParams.append('shopIds', sid);
+
+              try {
+                const enrichResp = await fetch(`${uzumBaseUrl}/v1/finance/orders?${enrichParams.toString()}`, { headers: uzumHeaders });
+                if (!enrichResp.ok) break;
+                const enrichData = await enrichResp.json();
+                const enrichList = Array.isArray(enrichData.orderItems || enrichData.content || []) 
+                  ? (enrichData.orderItems || enrichData.content || []) : [];
+                if (enrichList.length === 0) break;
+
+                for (const fo of enrichList) {
+                  const foId = String(fo.orderCode || fo.orderNumber || fo.orderId || fo.id || fo.code || '');
+                  if (!foId) continue;
+                  const items = fo.items || fo.orderItems || [];
+                  const flatItems = items.length > 0 ? items : [fo];
+                  if (!financeItemMap.has(foId)) financeItemMap.set(foId, []);
+                  financeItemMap.get(foId)!.push(...flatItems);
+                }
+
+                if (enrichList.length < 100) enrichHasMore = false;
+                else { enrichPage++; await sleep(150); }
+              } catch (_) { break; }
+            }
+
+            console.log(`Finance enrichment map: ${financeItemMap.size} orders`);
+
+            // Patch FBS orders with finance data
+            let enrichedCount = 0;
+            for (const order of allOrders) {
+              if (order.fulfillmentType !== 'FBS') continue;
+              const finItems = financeItemMap.get(String(order.id));
+              if (!finItems || finItems.length === 0) continue;
+
+              for (const orderItem of (order.items || [])) {
+                // Match by productId/skuId
+                const matchedFin = finItems.find((fi: any) => {
+                  const fiProductId = String(fi.productId || fi.skuId || '');
+                  return fiProductId && (fiProductId === orderItem.offerId || fiProductId === orderItem.skuId);
+                }) || finItems.find((fi: any) => {
+                  // Fallback: match by barcode or title
+                  return (fi.barcode && fi.barcode === orderItem.barcode) ||
+                         (fi.skuTitle && fi.skuTitle === orderItem.offerName);
+                });
+
+                if (matchedFin) {
+                  // Only overwrite if finance data has real values (> 0)
+                  const finCommission = matchedFin.commissionAmount || matchedFin.commission?.amount || matchedFin.commissionBase || 0;
+                  const finDelivery = matchedFin.deliveryAmount || matchedFin.logisticsAmount || matchedFin.deliveryCost || matchedFin.logistics || 0;
+                  const finSeller = matchedFin.sellerAmount || matchedFin.payoutAmount || matchedFin.forPay || 0;
+                  const finCommPercent = matchedFin.commissionPercent || matchedFin.commission?.percent || 0;
+
+                  if (finCommission > 0) orderItem.commissionBase = finCommission;
+                  if (finDelivery > 0) orderItem.deliveryAmount = finDelivery;
+                  if (finSeller > 0) orderItem.sellerAmount = finSeller;
+                  if (finCommPercent > 0) orderItem.commissionPercent = finCommPercent;
+                  enrichedCount++;
+                }
+              }
+            }
+            console.log(`Enriched ${enrichedCount} FBS order items with finance data`);
+
           } catch (fboErr) {
             console.error("Uzum Finance fetch error:", fboErr);
           }
