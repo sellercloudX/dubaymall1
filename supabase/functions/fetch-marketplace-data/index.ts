@@ -1041,7 +1041,7 @@ serve(async (req) => {
             const nettingDateFrom = new Date(Date.now() - 89 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
             // Step 1: Generate report
-            const generateUrl = `https://api.partner.market.yandex.ru/reports/united-netting/generate`;
+            const generateUrl = `https://api.partner.market.yandex.ru/reports/united-netting/generate?format=FILE`;
             const generateBody = {
               businessId: Number(effectiveBusinessId),
               dateTimeFrom: `${nettingDateFrom}T00:00:00+05:00`,
