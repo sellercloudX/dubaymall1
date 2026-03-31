@@ -1,59 +1,73 @@
 /**
  * Unified revenue calculation for SellerCloudX.
- * 
- * ALL components MUST use these functions to prevent metric inconsistencies.
- * 
- * Revenue rule: Use item-level calculation (price * count) as the source of truth,
- * falling back to order.total only when items are missing.
- * 
- * Excluded statuses: CANCELLED, CANCELED, RETURNED, REJECTED
+ * ALL components MUST use these functions.
  */
 
-import { toDisplayUzs } from '@/lib/currency';
-import type { MarketplaceOrder } from '@/hooks/useMarketplaceDataStore';
+import { toDisplayUzs } from "@/lib/currency";
+import type { MarketplaceOrder } from "@/hooks/useMarketplaceDataStore";
 
-const EXCLUDED_STATUSES = new Set(['CANCELLED', 'CANCELED', 'RETURNED', 'REJECTED']);
+const EXCLUDED_STATUSES = new Set(["CANCELLED", "CANCELED", "RETURNED", "REJECTED", "BEKOR", "VOZVRAT"]);
 
 /** Check if an order should be excluded from revenue calculations */
 export function isExcludedOrder(order: MarketplaceOrder): boolean {
-  return EXCLUDED_STATUSES.has(String(order.status).toUpperCase());
+  const status = String(order.status || "")
+    .toUpperCase()
+    .trim();
+  return EXCLUDED_STATUSES.has(status);
 }
 
 /**
- * Get the revenue of a single order in its native currency.
- * Prefers item-level aggregation for accuracy; falls back to order.total.
+ * Get the TRUE seller revenue of a single order (native currency).
+ * Priority:
+ * 1. actualSoldPrice (from finance enrichment)
+ * 2. sellerAmount / forPay / ppvz_for_pay / bankSum
+ * 3. item-level price * count
+ * 4. order.total as last fallback
  */
 export function getOrderRevenueNative(order: MarketplaceOrder): number {
-  // Item-level: most accurate (handles multi-item orders)
-  if (order.items && order.items.length > 0) {
-    const hasExactSoldPrice = order.items.some(item => item.actualSoldPrice !== undefined);
-    const itemTotal = order.items.reduce(
-      (sum, item) => sum + (hasExactSoldPrice
-        ? (item.actualSoldPrice || 0)
-        : (item.price || 0) * (item.count || 1)),
-      0
-    );
-    if (itemTotal > 0 || hasExactSoldPrice) return itemTotal;
+  if (!order.items || order.items.length === 0) {
+    return order.total || order.itemsTotal || 0;
   }
-  // Fallback chain
-  return order.total || order.itemsTotal || 0;
+
+  let totalRevenue = 0;
+
+  for (const item of order.items) {
+    // 1. Eng ishonchli — finance dan kelgan actualSoldPrice
+    if (typeof item.actualSoldPrice === "number" && item.actualSoldPrice > 0) {
+      totalRevenue += item.actualSoldPrice * (item.count || 1);
+      continue;
+    }
+
+    // 2. Seller ga to‘lanadigan haqiqiy summa (eng muhim!)
+    const sellerPayout =
+      item.sellerAmount || item.forPay || item.ppvz_for_pay || item.bankSum || item.payoutAmount || 0;
+
+    if (sellerPayout > 0) {
+      totalRevenue += sellerPayout * (item.count || 1);
+      continue;
+    }
+
+    // 3. Oddiy item narxi (agar yuqoridagilar bo‘lmasa)
+    const itemPrice = item.price || 0;
+    totalRevenue += itemPrice * (item.count || 1);
+  }
+
+  // Agar itemlardan hech narsa chiqmasa — order darajasidagi total ni ishlat
+  return totalRevenue > 0 ? totalRevenue : order.total || order.itemsTotal || 0;
 }
 
 /**
- * Get the revenue of a single order converted to UZS (display currency).
+ * Get revenue in UZS (display currency)
  */
 export function getOrderRevenueUzs(order: MarketplaceOrder, marketplace: string): number {
   return toDisplayUzs(getOrderRevenueNative(order), marketplace);
 }
 
 /**
- * Calculate total revenue across orders (in UZS) for given marketplaces.
+ * Calculate total revenue across orders (in UZS)
  * Excludes cancelled/returned orders.
  */
-export function calculateTotalRevenue(
-  getOrders: (mp: string) => MarketplaceOrder[],
-  marketplaces: string[],
-): number {
+export function calculateTotalRevenue(getOrders: (mp: string) => MarketplaceOrder[], marketplaces: string[]): number {
   let total = 0;
   for (const mp of marketplaces) {
     for (const order of getOrders(mp)) {
@@ -65,16 +79,16 @@ export function calculateTotalRevenue(
 }
 
 /**
- * Build a Map<orderId, marketplace> for efficient lookup.
+ * Build orderId → marketplace map
  */
 export function buildOrderMarketplaceMap(
   getOrders: (mp: string) => MarketplaceOrder[],
   marketplaces: string[],
-): Map<number, string> {
-  const map = new Map<number, string>();
+): Map<number | string, string> {
+  const map = new Map<number | string, string>();
   for (const mp of marketplaces) {
     for (const order of getOrders(mp)) {
-      map.set(order.id, mp);
+      if (order.id) map.set(order.id, mp);
     }
   }
   return map;
