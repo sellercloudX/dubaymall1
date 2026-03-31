@@ -16,7 +16,7 @@ import { toast } from 'sonner';
 import {
   CreditCard, AlertTriangle, CheckCircle2, Clock, Crown,
   Calendar, DollarSign, TrendingUp, XCircle, FileText,
-  ArrowRight, Wallet, History, Zap, ArrowUpDown, Gift,
+  ArrowRight, Wallet, History, Zap, ArrowUpDown,
   Sparkles, Settings2, Key, Rocket, Loader2, Store, Image, Copy, Percent,
 } from 'lucide-react';
 import { format } from 'date-fns';
