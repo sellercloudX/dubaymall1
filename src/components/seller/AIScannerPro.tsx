@@ -1033,14 +1033,6 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
               >
                 🟣 WB
               </Button>
-              <Button
-                variant={targetMarketplace === 'uzum' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setTargetMarketplace('uzum')}
-                className="flex-1"
-              >
-                🟢 Uzum
-              </Button>
             </div>
             {/* Selected Product Preview */}
             <div className="flex gap-3 p-3 bg-muted/50 rounded-lg border">
