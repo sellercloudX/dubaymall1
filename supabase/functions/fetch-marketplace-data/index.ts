@@ -1029,258 +1029,118 @@ serve(async (req) => {
 
         console.log(`Total orders fetched: ${allOrders.length}, active: ${activeYandexOrders.length}, revenue: ${yandexTotalRevenue}`);
 
-        // ===== YANDEX UNITED-NETTING ENRICHMENT =====
-        // Raw orders API does NOT return commission, logistics, forPay.
-        // We must fetch the united-netting financial report to get real fees.
-        // Pipeline: Generate report → Poll for completion → Download → Parse → Enrich orders
-        if (effectiveBusinessId && allOrders.length > 0) {
+        // ===== YANDEX FINANCE ENRICHMENT via stats/orders =====
+        // Raw orders API does NOT return commission/logistics.
+        // Use campaigns/{id}/stats/orders to get per-item commission breakdown.
+        if (campaignId && allOrders.length > 0) {
           try {
-            console.log(`[YANDEX FINANCE] Starting united-netting enrichment for businessId=${effectiveBusinessId}`);
-            // IMPORTANT: Yandex united-netting max 3 months! Split into 3-month chunks
-            const nettingDateTo = new Date().toISOString().split('T')[0];
-            const nettingDateFrom = new Date(Date.now() - 89 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+            console.log(`[YANDEX FINANCE] Starting stats/orders enrichment for ${allOrders.length} orders`);
+            const orderIds = allOrders.map(o => o.id).filter(Boolean);
+            const batchSize = 200; // Yandex allows up to 200 order IDs per request
+            let statsEnriched = 0;
 
-            // Step 1: Generate report
-            const generateUrl = `https://api.partner.market.yandex.ru/reports/united-netting/generate?format=FILE`;
-            const generateBody = {
-              businessId: Number(effectiveBusinessId),
-              dateTimeFrom: `${nettingDateFrom}T00:00:00+05:00`,
-              dateTimeTo: `${nettingDateTo}T23:59:59+05:00`,
-            };
-            console.log(`[YANDEX FINANCE] Generating united-netting report: ${nettingDateFrom} to ${nettingDateTo}`);
-            
-            const genResp = await fetchWithRetry(generateUrl, {
-              method: 'POST',
-              headers,
-              body: JSON.stringify(generateBody),
-            });
-
-            if (genResp.ok) {
-              const genData = await genResp.json();
-              const reportId = genData.result?.reportId || genData.reportId;
-              console.log(`[YANDEX FINANCE] Report requested, reportId=${reportId}`);
-
-              if (reportId) {
-                // Step 2: Poll for completion (max 60s = 20 attempts × 3s)
-                let reportReady = false;
-                let fileUrl = '';
-                for (let poll = 0; poll < 20; poll++) {
-                  await sleep(3000);
-                  const infoResp = await fetchWithRetry(
-                    `https://api.partner.market.yandex.ru/reports/info/${reportId}`,
-                    { headers }
-                  );
-                  if (!infoResp.ok) {
-                    console.warn(`[YANDEX FINANCE] Report info failed: ${infoResp.status}`);
-                    break;
-                  }
-                  const infoData = await infoResp.json();
-                  const status = infoData.result?.status || infoData.status || '';
-                  console.log(`[YANDEX FINANCE] Poll ${poll + 1}: status=${status}`);
-
-                  if (status === 'DONE') {
-                    fileUrl = infoData.result?.file || infoData.result?.url || '';
-                    reportReady = true;
-                    break;
-                  }
-                  if (status === 'FAILED' || status === 'CANCELLED') {
-                    console.warn(`[YANDEX FINANCE] Report failed with status: ${status}`);
-                    break;
-                  }
-                }
-
-                // Step 3: Download and parse
-                if (reportReady && fileUrl) {
-                  console.log(`[YANDEX FINANCE] Downloading report from: ${fileUrl.substring(0, 100)}...`);
-                  const csvResp = await fetch(fileUrl);
-                  if (csvResp.ok) {
-                    const csvText = await csvResp.text();
-                    const lines = csvText.split('\n').filter(l => l.trim());
-                    console.log(`[YANDEX FINANCE] Downloaded ${lines.length} lines`);
-
-                    if (lines.length > 1) {
-                      // Parse CSV header to find column indices
-                      const headerLine = lines[0];
-                      // Handle both semicolon and comma separators
-                      const sep = headerLine.includes(';') ? ';' : ',';
-                      const headers_csv = headerLine.split(sep).map(h => h.trim().replace(/"/g, '').toLowerCase());
-                      
-                      const colIdx = {
-                        orderId: headers_csv.findIndex(h => h.includes('заказ') || h.includes('order') || h === 'orderid' || h === 'order_id'),
-                        offerId: headers_csv.findIndex(h => h.includes('ваш sku') || h.includes('offer') || h === 'offerid' || h === 'your_sku' || h.includes('shop_sku')),
-                        commission: headers_csv.findIndex(h => h.includes('комисси') || h.includes('commission') || h.includes('fee')),
-                        logistics: headers_csv.findIndex(h => h.includes('логистик') || h.includes('logistic') || h.includes('доставк') || h.includes('delivery')),
-                        payment: headers_csv.findIndex(h => h.includes('к выплате') || h.includes('payment') || h.includes('payout') || h.includes('перевод')),
-                        subsidy: headers_csv.findIndex(h => h.includes('субсиди') || h.includes('subsid') || h.includes('компенсац') || h.includes('промо')),
-                        amount: headers_csv.findIndex(h => h.includes('сумма') || h === 'amount' || h.includes('total')),
-                      };
-                      console.log(`[YANDEX FINANCE] Column indices: ${JSON.stringify(colIdx)}`);
-                      console.log(`[YANDEX FINANCE] Headers: ${headers_csv.slice(0, 15).join(' | ')}`);
-
-                      // Build enrichment map: orderId → finance data
-                      const financeMap = new Map<number, { commission: number; logistics: number; payment: number; subsidy: number }>();
-                      
-                      for (let i = 1; i < lines.length; i++) {
-                        const cols = lines[i].split(sep).map(c => c.trim().replace(/"/g, ''));
-                        const rawOrderId = colIdx.orderId >= 0 ? cols[colIdx.orderId] : '';
-                        const orderId = parseInt(rawOrderId, 10);
-                        if (!orderId || isNaN(orderId)) continue;
-
-                        const parseNum = (idx: number) => {
-                          if (idx < 0 || idx >= cols.length) return 0;
-                          const val = parseFloat(cols[idx].replace(/\s/g, '').replace(',', '.'));
-                          return Number.isFinite(val) ? Math.abs(val) : 0;
-                        };
-
-                        const commission = parseNum(colIdx.commission);
-                        const logistics = parseNum(colIdx.logistics);
-                        const payment = parseNum(colIdx.payment);
-                        const subsidy = parseNum(colIdx.subsidy);
-
-                        const existing = financeMap.get(orderId) || { commission: 0, logistics: 0, payment: 0, subsidy: 0 };
-                        existing.commission += commission;
-                        existing.logistics += logistics;
-                        existing.payment += payment;
-                        existing.subsidy += subsidy;
-                        financeMap.set(orderId, existing);
-                      }
-
-                      console.log(`[YANDEX FINANCE] Enrichment map: ${financeMap.size} orders with finance data`);
-
-                      // Step 4: Enrich orders
-                      let yandexEnrichedCount = 0;
-                      for (const order of allOrders) {
-                        const fin = financeMap.get(order.id);
-                        if (!fin) continue;
-
-                        // Distribute finance data proportionally across items
-                        const itemCount = (order.items || []).length;
-                        if (itemCount === 0) continue;
-
-                        const totalItemValue = (order.items || []).reduce((s: number, it: any) => s + (it.price * (it.count || 1)), 0);
-
-                        for (const item of (order.items || [])) {
-                          const weight = totalItemValue > 0 
-                            ? (item.price * (item.count || 1)) / totalItemValue 
-                            : 1 / itemCount;
-
-                          const itemCommission = Math.round(fin.commission * weight);
-                          const itemLogistics = Math.round(fin.logistics * weight);
-                          const itemPayment = Math.round(fin.payment * weight);
-                          const itemSubsidy = Math.round(fin.subsidy * weight);
-
-                          if (itemCommission > 0) {
-                            item.commissionAmount = itemCommission;
-                            item.actualCommission = itemCommission;
-                          }
-                          if (itemLogistics > 0) {
-                            item.deliveryAmount = itemLogistics;
-                            item.actualLogisticsFee = itemLogistics;
-                          }
-                          if (itemPayment > 0) {
-                            item.sellerAmount = itemPayment;
-                            item.actualSoldPrice = itemPayment + (itemSubsidy || 0);
-                          }
-                          if (itemSubsidy > 0) {
-                            item.subsidyAmount = itemSubsidy;
-                            item.additionalPayment = itemSubsidy;
-                          }
-                          item.financeSource = 'yandex-united-netting';
-                        }
-                        yandexEnrichedCount++;
-                      }
-                      console.log(`[YANDEX FINANCE] Enriched ${yandexEnrichedCount}/${allOrders.length} orders with united-netting data`);
-                    }
-                  } else {
-                    console.warn(`[YANDEX FINANCE] CSV download failed: ${csvResp.status}`);
-                  }
-                } else if (!reportReady) {
-                  console.warn(`[YANDEX FINANCE] Report did not complete in time`);
-                }
-              }
-            } else {
-              const errText = await genResp.text();
-              console.warn(`[YANDEX FINANCE] Report generation failed: ${genResp.status}, ${errText.substring(0, 300)}`);
-              
-              // Fallback: Try /v2/campaigns/{campaignId}/stats/orders for per-order finance
-              // This endpoint returns commission details per order
-              console.log(`[YANDEX FINANCE] Trying fallback: campaigns stats/orders`);
+            for (let i = 0; i < orderIds.length; i += batchSize) {
+              const batch = orderIds.slice(i, i + batchSize);
               try {
-                // Yandex also has order-level finance via campaigns/{id}/stats/orders
-                // But it requires POST with order IDs in batches
-                const orderIds = allOrders.map(o => o.id).filter(Boolean);
-                const batchSize = 50;
-                let statsEnriched = 0;
-
-                for (let i = 0; i < orderIds.length; i += batchSize) {
-                  const batch = orderIds.slice(i, i + batchSize);
-                  const statsResp = await fetchWithRetry(
-                    `https://api.partner.market.yandex.ru/campaigns/${campaignId}/stats/orders`,
-                    {
-                      method: 'POST',
-                      headers,
-                      body: JSON.stringify({ orders: batch.map(id => ({ id })) }),
-                    }
-                  );
-                  if (!statsResp.ok) {
-                    console.warn(`[YANDEX FINANCE FALLBACK] Stats failed: ${statsResp.status}`);
-                    break;
+                const statsResp = await fetchWithRetry(
+                  `https://api.partner.market.yandex.ru/campaigns/${campaignId}/stats/orders`,
+                  {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ orders: batch }),
                   }
-                  const statsData = await statsResp.json();
-                  const statOrders = statsData.result?.orders || statsData.orders || [];
-
-                  for (const so of statOrders) {
-                    const order = allOrders.find(o => o.id === so.id);
-                    if (!order || !order.items) continue;
-
-                    const soItems = so.items || [];
-                    for (const soItem of soItems) {
-                      const matchedItem = order.items.find((oi: any) => oi.offerId === soItem.offerId);
-                      if (!matchedItem) continue;
-
-                      // Extract commission from warehousing/delivery fees
-                      const commissions = soItem.commissions || [];
-                      let totalCommission = 0;
-                      let totalLogistics = 0;
-                      for (const comm of commissions) {
-                        const amount = Math.abs(comm.actual || comm.amount || 0);
-                        const type = (comm.type || '').toLowerCase();
-                        if (type.includes('fee') || type.includes('commission') || type.includes('fulfillment')) {
-                          totalCommission += amount;
-                        } else if (type.includes('delivery') || type.includes('logistics') || type.includes('sorting') || type.includes('transfer')) {
-                          totalLogistics += amount;
-                        } else {
-                          totalCommission += amount; // Default to commission
-                        }
-                      }
-
-                      if (totalCommission > 0) {
-                        matchedItem.commissionAmount = totalCommission;
-                        matchedItem.actualCommission = totalCommission;
-                      }
-                      if (totalLogistics > 0) {
-                        matchedItem.deliveryAmount = totalLogistics;
-                        matchedItem.actualLogisticsFee = totalLogistics;
-                      }
-                      // bankPaymentAmount = amount transferred to seller
-                      const bankPayment = soItem.bankPaymentAmount || 0;
-                      if (bankPayment > 0) {
-                        matchedItem.sellerAmount = bankPayment;
-                        matchedItem.actualSoldPrice = bankPayment;
-                      }
-                      matchedItem.financeSource = 'yandex-stats-orders';
-                      statsEnriched++;
-                    }
-                  }
-                  await sleep(500); // Rate limit
+                );
+                if (!statsResp.ok) {
+                  const errBody = await statsResp.text();
+                  console.warn(`[YANDEX FINANCE] stats/orders batch ${i} failed: ${statsResp.status}, ${errBody.substring(0, 200)}`);
+                  await sleep(1000);
+                  continue;
                 }
-                console.log(`[YANDEX FINANCE FALLBACK] Enriched ${statsEnriched} items via stats/orders`);
-              } catch (fallbackErr) {
-                console.warn(`[YANDEX FINANCE FALLBACK] Error:`, fallbackErr);
+                const statsData = await statsResp.json();
+                const statOrders = statsData.result?.orders || statsData.orders || [];
+                
+                if (i === 0 && statOrders.length > 0) {
+                  const sample = statOrders[0];
+                  console.log(`[YANDEX FINANCE] Sample stats order keys: ${JSON.stringify(Object.keys(sample))}`);
+                  if (sample.items?.[0]) {
+                    console.log(`[YANDEX FINANCE] Sample item keys: ${JSON.stringify(Object.keys(sample.items[0]))}`);
+                    if (sample.items[0].commissions?.[0]) {
+                      console.log(`[YANDEX FINANCE] Sample commission: ${JSON.stringify(sample.items[0].commissions[0])}`);
+                    }
+                  }
+                }
+
+                for (const so of statOrders) {
+                  const order = allOrders.find(o => o.id === so.id);
+                  if (!order || !order.items) continue;
+
+                  const soItems = so.items || [];
+                  for (const soItem of soItems) {
+                    const matchedItem = order.items.find((oi: any) => oi.offerId === soItem.offerId);
+                    if (!matchedItem) continue;
+
+                    // Extract commissions by type
+                    const commissions = soItem.commissions || [];
+                    let totalCommission = 0;
+                    let totalLogistics = 0;
+                    let totalOther = 0;
+                    for (const comm of commissions) {
+                      const amount = Math.abs(comm.actual || comm.amount || 0);
+                      const type = (comm.type || '').toUpperCase();
+                      if (type.includes('FEE') || type.includes('COMMISSION') || type === 'FBS_COMMISSION' || type === 'FBY_COMMISSION' || type === 'AGENCY_COMMISSION') {
+                        totalCommission += amount;
+                      } else if (type.includes('DELIVERY') || type.includes('SORTING') || type.includes('LOGISTICS') || type.includes('MIDDLE_MILE') || type.includes('LAST_MILE') || type.includes('RETURN_PROCESSING')) {
+                        totalLogistics += amount;
+                      } else {
+                        totalOther += amount;
+                      }
+                    }
+
+                    if (totalCommission > 0) {
+                      matchedItem.commissionAmount = totalCommission;
+                      matchedItem.actualCommission = totalCommission;
+                    }
+                    if (totalLogistics > 0) {
+                      matchedItem.deliveryAmount = totalLogistics;
+                      matchedItem.actualLogisticsFee = totalLogistics;
+                    }
+                    if (totalOther > 0) {
+                      matchedItem.withdrawalAmount = totalOther;
+                      matchedItem.actualOtherFees = totalOther;
+                    }
+                    // payments array
+                    const payments = soItem.payments || [];
+                    let totalPayment = 0;
+                    let totalSubsidy = 0;
+                    for (const pay of payments) {
+                      const amount = Math.abs(pay.amount || 0);
+                      const type = (pay.type || '').toUpperCase();
+                      if (type.includes('PAYMENT') || type.includes('PAYOUT') || type === 'PAYMENT') {
+                        totalPayment += amount;
+                      } else if (type.includes('SUBSIDY') || type.includes('PROMO') || type.includes('COMPENSATION')) {
+                        totalSubsidy += amount;
+                      }
+                    }
+                    if (totalPayment > 0) {
+                      matchedItem.sellerAmount = totalPayment;
+                      matchedItem.actualSoldPrice = totalPayment + totalSubsidy;
+                    }
+                    if (totalSubsidy > 0) {
+                      matchedItem.subsidyAmount = totalSubsidy;
+                      matchedItem.additionalPayment = totalSubsidy;
+                    }
+                    matchedItem.financeSource = 'yandex-stats-orders';
+                    statsEnriched++;
+                  }
+                }
+                await sleep(300);
+              } catch (batchErr) {
+                console.warn(`[YANDEX FINANCE] Batch error:`, batchErr);
               }
             }
-          } catch (nettingErr) {
-            console.warn(`[YANDEX FINANCE] united-netting enrichment error (non-fatal):`, nettingErr);
+            console.log(`[YANDEX FINANCE] Enriched ${statsEnriched} items via stats/orders`);
+          } catch (finErr) {
+            console.warn(`[YANDEX FINANCE] enrichment error (non-fatal):`, finErr);
           }
         }
 
