@@ -1585,7 +1585,7 @@ serve(async (req) => {
                     
                     console.log(`Split: ${allowedOffers.length} allowed, ${restrictedOffers.length} restricted`);
                     
-                    // Get tariffs for allowed categories
+                    // Get tariffs for allowed categories using campaignId (UZ-specific rates)
                     let parsedAllowed: any[] = [];
                     if (allowedOffers.length > 0) {
                       const cleanOffers = allowedOffers.map(({ _originalIndex, ...rest }: any) => rest);
@@ -1596,14 +1596,34 @@ serve(async (req) => {
                           method: 'POST',
                           headers,
                           body: JSON.stringify({
-                            parameters: { sellingProgram: 'FBS' },
+                            parameters: { campaignId: Number(campaignId) },
                             offers: cleanOffers,
                           }),
                         }
                       );
                       if (retryResponse.ok) {
                         const retryData = await retryResponse.json();
-                        parsedAllowed = parseTariffResults(retryData.result?.offers || [], allowedOffers, 'sellingProgram');
+                        parsedAllowed = parseTariffResults(retryData.result?.offers || [], allowedOffers, 'campaign');
+                        console.log(`[ALLOWED RETRY] Got ${parsedAllowed.length} results with campaignId (UZ tariffs)`);
+                      } else {
+                        console.warn(`[ALLOWED RETRY] campaignId failed (${retryResponse.status}), trying sellingProgram`);
+                        // Last resort fallback to sellingProgram
+                        await sleep(500);
+                        const fallbackRetry = await fetchWithRetry(
+                          'https://api.partner.market.yandex.ru/v2/tariffs/calculate',
+                          {
+                            method: 'POST',
+                            headers,
+                            body: JSON.stringify({
+                              parameters: { sellingProgram: 'FBS' },
+                              offers: cleanOffers,
+                            }),
+                          }
+                        );
+                        if (fallbackRetry.ok) {
+                          const fallbackData = await fallbackRetry.json();
+                          parsedAllowed = parseTariffResults(fallbackData.result?.offers || [], allowedOffers, 'sellingProgram');
+                        }
                       }
                     }
                     
