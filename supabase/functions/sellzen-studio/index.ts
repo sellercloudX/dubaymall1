@@ -9,9 +9,8 @@ const corsHeaders = {
 const SELLZEN_URL = "https://qqqzkrldaaqogwjvfgcg.supabase.co/functions/v1/api-generate";
 
 const STYLE_PRESETS: Record<string, { style: string; scene: string; label: string }> = {
-  infographic: { style: 'infografika', scene: 'premium', label: 'Infografika' },
-  lifestyle: { style: 'lifestyle', scene: 'tabiat', label: 'Lifestyle' },
-  minimalist: { style: 'tabiiy', scene: 'minimalist', label: 'Minimalist' },
+  infographic: { style: 'infografika', scene: 'premium', label: 'Modelli Infografika' },
+  lifestyle: { style: 'lifestyle', scene: 'tabiat', label: 'Lifestyle / Ishlatilish' },
 };
 
 async function checkRateLimit(supabase: any, userId: string): Promise<boolean> {
