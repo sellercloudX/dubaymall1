@@ -127,21 +127,25 @@ function getWbItemFinanceFields(source: any) {
     source.commissionAmount,
     source.commission,
   ));
-  const deliveryAmount = Math.abs(sumPositiveAmounts(
+  // IMPORTANT: logistics and delivery_rub are the SAME field from different API versions
+  // Use pickPositiveAmount (not sum) to avoid double-counting
+  const deliveryAmount = Math.abs(pickPositiveAmount(
     source.logistics,
     source.delivery_rub,
     source.deliveryAmount,
     source.logisticsAmount,
   ));
-  const withdrawalAmount = Math.abs(sumPositiveAmounts(
+  // storage_fee, penalty, acceptance are distinct fee types — sum them
+  // But payment_sale_amount and payment_schedule can overlap — pick the highest
+  const paymentFee = Math.abs(pickPositiveAmount(
     source.payment_sale_amount,
     source.payment_schedule,
-    source.storage_fee,
-    source.penalty,
-    source.acceptance,
-    source.withdrawalAmount,
   ));
-  const subsidyAmount = sumPositiveAmounts(
+  const storageFee = toPositiveAmount(source.storage_fee);
+  const penaltyFee = toPositiveAmount(source.penalty);
+  const acceptanceFee = toPositiveAmount(source.acceptance);
+  const withdrawalAmount = paymentFee + storageFee + penaltyFee + acceptanceFee;
+  const subsidyAmount = pickPositiveAmount(
     source.supplier_promo,
     source.product_discount_for_report,
     source.additional_payment,
@@ -1076,7 +1080,11 @@ serve(async (req) => {
 
                   const soItems = so.items || [];
                   for (const soItem of soItems) {
-                    const matchedItem = order.items.find((oi: any) => oi.offerId === soItem.offerId);
+                    // stats/orders API returns shopSku (not offerId)
+                    const soOfferId = soItem.offerId || soItem.shopSku || soItem.marketSku || '';
+                    const matchedItem = order.items.find((oi: any) => 
+                      oi.offerId === soOfferId || oi.offerId === soItem.shopSku || oi.offerId === soItem.marketSku
+                    );
                     if (!matchedItem) continue;
 
                     // Extract commissions by type
@@ -3279,7 +3287,7 @@ serve(async (req) => {
           const finShopIds = allShopIds.length > 0 ? allShopIds : (uzumShopId ? [String(uzumShopId)] : []);
           console.log(`Uzum finance: querying ${finShopIds.length} shops individually: ${finShopIds.join(',')}`);
 
-          const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
+            const finDateFrom365 = Date.now() - 365 * 24 * 60 * 60 * 1000;
 
           for (let si = 0; si < finShopIds.length; si++) {
             const sid = finShopIds[si];
@@ -3287,13 +3295,11 @@ serve(async (req) => {
 
             const financeParams = new URLSearchParams();
             financeParams.append("shopIds", sid);
-            financeParams.append("dateFrom", String(ninetyDaysAgo));
+            financeParams.append("dateFrom", String(finDateFrom365));
             financeParams.append("dateTo", String(Date.now()));
             financeParams.append("size", "100");
             financeParams.append("page", "0");
-            for (const st of ['TO_WITHDRAW', 'PROCESSING', 'CANCELED', 'PARTIALLY_CANCELLED']) {
-              financeParams.append('statuses', st);
-            }
+            // Don't add statuses filter — let API return ALL finance items
 
             let finPage = 0;
             let finHasMore = true;
@@ -3373,7 +3379,7 @@ serve(async (req) => {
             // Try expense endpoints for this shop
             const shopExpParams = new URLSearchParams();
             shopExpParams.append("shopIds", sid);
-            shopExpParams.append("dateFrom", String(ninetyDaysAgo));
+            shopExpParams.append("dateFrom", String(finDateFrom365));
             shopExpParams.append("dateTo", String(Date.now()));
             shopExpParams.append("size", "100");
             shopExpParams.append("page", "0");
