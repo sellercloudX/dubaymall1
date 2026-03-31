@@ -111,25 +111,5 @@ export function normalizeMarketplaceFinance(item: any, marketplace: string): Nor
     };
   }
 
-  // Debug log (faqat birinchi 5 ta item uchun)
-  if (!globalThis._debugCounts) globalThis._debugCounts = {};
-  const key = marketplace;
-  globalThis._debugCounts[key] = (globalThis._debugCounts[key] || 0) + 1;
-
-  if (globalThis._debugCounts[key] <= 5) {
-    console.log(`[NORMALIZER_DEBUG] ${marketplace} #${globalThis._debugCounts[key]}`, {
-      raw: {
-        commissionAmount: item.commissionAmount,
-        deliveryAmount: item.deliveryAmount,
-        forPay: item.forPay,
-        ppvz_for_pay: item.ppvz_for_pay,
-        bankSum: item.bankSum,
-        sellerAmount: item.sellerAmount,
-        financeSource: item.financeSource,
-      },
-      normalized: result,
-    });
-  }
-
   return result;
 }
