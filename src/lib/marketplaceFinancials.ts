@@ -145,23 +145,12 @@ function extractUzumActualFees(item: any, itemPriceUzs: number, marketplace: str
 }
 
 /**
- * Extract Yandex subsidy (PROMO_AMOUNT / compensation) from order item.
- * When Yandex subsidizes a promotion, the seller receives more than the buyer paid.
- * commissionBase > price means Yandex is compensating the difference.
+ * Extract Yandex subsidy — DISABLED.
+ * commissionBase was removed from order items because it caused
+ * commission inflation (commission > sold price). Subsidies will be
+ * handled when/if we integrate the united-netting finance report.
  */
-function extractYandexSubsidy(item: any, marketplace: string): number {
-  if (marketplace !== 'yandex') return 0;
-  
-  // If commissionBase > actual price, the difference is Yandex's subsidy
-  const commBase = item.commissionBase || 0;
-  const price = item.price || 0;
-  
-  if (commBase > 0 && price > 0 && commBase > price) {
-    // Yandex pays commission on the higher pre-subsidy price,
-    // and compensates the seller for the difference
-    return commBase - price;
-  }
-  
+function extractYandexSubsidy(_item: any, _marketplace: string): number {
   return 0;
 }
 
