@@ -3442,18 +3442,29 @@ serve(async (req) => {
 
               console.log(`Uzum price update: ${validItems.length} SKUs, shopId: ${shopId}, sample: ${JSON.stringify(validItems[0])}`);
 
-              const response = await fetch(
-                `${uzumBaseUrl}/v1/product/${shopId}/sendPriceData`,
-                {
-                  method: 'POST',
-                  headers: { ...uzumHeaders, "Content-Type": "application/json" },
-                  body: JSON.stringify({ skuPriceList: validItems }),
+              // Retry with backoff for rate limits (429)
+              let response: Response | null = null;
+              for (let attempt = 0; attempt < 3; attempt++) {
+                response = await fetch(
+                  `${uzumBaseUrl}/v1/product/${shopId}/sendPriceData`,
+                  {
+                    method: 'POST',
+                    headers: { ...uzumHeaders, "Content-Type": "application/json" },
+                    body: JSON.stringify({ skuPriceList: validItems }),
+                  }
+                );
+                if (response.status === 429) {
+                  const waitMs = Math.min(2000 * Math.pow(2, attempt), 10000);
+                  console.warn(`Uzum price update 429, waiting ${waitMs}ms (attempt ${attempt + 1}/3)`);
+                  await sleep(waitMs);
+                  continue;
                 }
-              );
+                break;
+              }
 
-              if (response.ok) {
+              if (response && response.ok) {
                 totalUpdated += validItems.length;
-              } else {
+              } else if (response) {
                 const errText = await response.text();
                 console.error(`Uzum price update failed for shop ${shopId}: ${response.status}, body: ${errText}`);
                 lastError = `Price update failed: ${response.status}`;
