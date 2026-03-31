@@ -23,7 +23,6 @@ import { format } from 'date-fns';
 import { PromoCodeInput, type PromoValidation } from './PromoCodeInput';
 import { notifyAffiliatePayment } from '@/lib/affiliateWebhook';
 import { cn } from '@/lib/utils';
-import { cn } from '@/lib/utils';
 
 interface SubscriptionBillingProps {
   totalSalesVolume?: number;
