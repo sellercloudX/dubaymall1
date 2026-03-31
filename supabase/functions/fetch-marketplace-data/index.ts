@@ -815,13 +815,10 @@ serve(async (req) => {
 
                 const unitPrice = count > 0 ? Math.round(allocatedTotal / count) : allocatedTotal;
                 
-                // Extract the pre-discount price (commission base)
-                // Yandex charges FEE% on this price, not on the discounted buyer price
-                const rawBeforeDiscount = item.buyerPriceBeforeDiscount || item.priceBeforeDiscount || 0;
-                let commissionBase = unitPrice; // default: same as buyer price
-                if (rawBeforeDiscount > 0 && rawBeforeDiscount > unitPrice) {
-                  commissionBase = rawBeforeDiscount;
-                }
+                // CRITICAL FIX: Do NOT use buyerPriceBeforeDiscount as commission base.
+                // Commission must be calculated on actual_sold_price (unitPrice),
+                // not on the pre-discount catalog price which can be 2-4x higher.
+                // Yandex subsidies are handled separately via revenue adjustment.
                 
                 return {
                   offerId: item.offerId,
@@ -829,7 +826,6 @@ serve(async (req) => {
                   count,
                   price: unitPrice,
                   priceUZS: unitPrice,
-                  commissionBase, // price before Yandex subsidy — used for fee calculation
                   categoryId: item.marketCategoryId,
                 };
               });

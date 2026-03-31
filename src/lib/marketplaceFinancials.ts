@@ -259,10 +259,9 @@ export function calculateOrderFinancialBreakdown(
 
       // Fallback: tariff-based calculation
       if (!hasRealFees) {
-        const commBase = (item as any).commissionBase
-          ? toDisplayUzs((item as any).commissionBase, marketplace)
-          : undefined;
-        const tariff = getTariffForProduct(tariffMap, item.offerId, itemPrice, marketplace, commBase);
+        // CRITICAL: Always use actual sold price (itemPrice) for tariff calculation.
+        // Never use commissionBase — it inflates fees beyond sold price.
+        const tariff = getTariffForProduct(tariffMap, item.offerId, itemPrice, marketplace);
         itemCommission = tariff.commission * quantity;
         itemLogistics = tariff.logistics * quantity;
         itemWithdrawal = (tariff.withdrawal || 0) * quantity;
