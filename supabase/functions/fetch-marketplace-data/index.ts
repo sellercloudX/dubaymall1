@@ -3526,25 +3526,37 @@ serve(async (req) => {
             } else {
               console.log(`Uzum stock update: ${validEntries.length} valid SKUs, sample: ${JSON.stringify(validEntries[0])}`);
               
-              const response = await fetch(
-                `${uzumBaseUrl}/v2/fbs/sku/stocks`,
-                {
-                  method: 'POST',
-                  headers: {
-                    ...uzumHeaders,
-                    "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify({ skuAmountList: validEntries }),
+              // Retry with backoff for rate limits (429)
+              let response: Response | null = null;
+              for (let attempt = 0; attempt < 3; attempt++) {
+                response = await fetch(
+                  `${uzumBaseUrl}/v2/fbs/sku/stocks`,
+                  {
+                    method: 'POST',
+                    headers: {
+                      ...uzumHeaders,
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ skuAmountList: validEntries }),
+                  }
+                );
+                if (response.status === 429) {
+                  const waitMs = Math.min(2000 * Math.pow(2, attempt), 10000);
+                  console.warn(`Uzum stock update 429, waiting ${waitMs}ms (attempt ${attempt + 1}/3)`);
+                  await sleep(waitMs);
+                  continue;
                 }
-              );
+                break;
+              }
 
-              if (response.ok) {
+              if (response && response.ok) {
                 const data = await safeJson(response, { success: true });
                 result = { success: true, data, updated: validEntries.length };
               } else {
-                const errText = await response.text();
-                console.error(`Uzum stock update failed: ${response.status}, body: ${errText}`);
-                result = { success: false, error: `Stock update failed: ${response.status}`, details: errText };
+                const errText = response ? await response.text() : 'No response';
+                const status = response ? response.status : 0;
+                console.error(`Uzum stock update failed: ${status}, body: ${errText}`);
+                result = { success: false, error: `Stock update failed: ${status}`, details: errText };
               }
             }
           }
