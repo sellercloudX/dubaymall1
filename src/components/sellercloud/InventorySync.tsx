@@ -573,36 +573,98 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
                 <div className="space-y-2 max-h-[600px] overflow-y-auto">
                   {filteredProducts
                     .sort((a, b) => a.totalStock - b.totalStock)
-                    .map(product => (
-                      <div 
-                        key={`${product.id}-${product.marketplace}`} 
-                        className={`flex items-center gap-2.5 p-3 rounded-lg border cursor-pointer transition-colors ${stockSelectedIds.has(`${product.id}-${product.marketplace}`) ? 'bg-primary/5 border-primary/30' : 'hover:bg-muted'}`}
-                        onClick={() => toggleStockSelect(`${product.id}-${product.marketplace}`)}
-                      >
-                        <Checkbox checked={stockSelectedIds.has(`${product.id}-${product.marketplace}`)} className="shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <div className="font-medium text-sm truncate">{product.name}</div>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <Badge variant="outline" className="text-xs">{MARKETPLACE_NAMES[product.marketplace]}</Badge>
-                            <span className="truncate">{product.sku}</span>
+                    .map(product => {
+                      const pKey = `${product.id}-${product.marketplace}`;
+                      const currentEditQty = individualStockChanges[pKey];
+                      const displayQty = currentEditQty !== undefined ? currentEditQty : product.stockFBS;
+                      const hasChange = currentEditQty !== undefined && currentEditQty !== product.stockFBS;
+                      const isSavingThis = savingStockIds.has(pKey);
+
+                      return (
+                        <div 
+                          key={pKey} 
+                          className={`p-3 rounded-lg border transition-colors ${stockSelectedIds.has(pKey) ? 'bg-primary/5 border-primary/30' : 'hover:bg-muted'}`}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <Checkbox 
+                              checked={stockSelectedIds.has(pKey)} 
+                              className="shrink-0"
+                              onCheckedChange={() => toggleStockSelect(pKey)}
+                            />
+                            <div className="min-w-0 flex-1" onClick={() => toggleStockSelect(pKey)}>
+                              <div className="font-medium text-sm truncate">{product.name}</div>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <Badge variant="outline" className="text-xs">{MARKETPLACE_NAMES[product.marketplace]}</Badge>
+                                <span className="truncate">{product.sku}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 ml-2 shrink-0">
+                              <div className="text-right">
+                                <div className="text-[10px] text-muted-foreground">FBO</div>
+                                <div className="font-medium text-sm">{product.stockFBO}</div>
+                              </div>
+                              <Badge variant={product.totalStock === 0 ? 'destructive' : product.lowStockAlert ? 'outline' : 'default'}
+                                className={product.lowStockAlert && product.totalStock > 0 ? 'bg-amber-100 text-amber-800 border-amber-300' : ''}>
+                                Σ {product.totalStock}
+                              </Badge>
+                            </div>
+                          </div>
+                          {/* Per-product FBS stock +/- control */}
+                          <div className="flex items-center gap-2 mt-2 pl-8">
+                            <span className="text-[10px] text-muted-foreground shrink-0">FBS:</span>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-7 w-7 shrink-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const newVal = Math.max(0, displayQty - 1);
+                                setIndividualStockChanges(prev => ({ ...prev, [pKey]: newVal }));
+                              }}
+                            >
+                              <Minus className="h-3 w-3" />
+                            </Button>
+                            <Input
+                              type="number"
+                              min={0}
+                              value={displayQty}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                const val = Math.max(0, parseInt(e.target.value) || 0);
+                                setIndividualStockChanges(prev => ({ ...prev, [pKey]: val }));
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              className={`h-7 w-16 text-center text-sm ${hasChange ? 'border-primary ring-1 ring-primary/30' : ''}`}
+                            />
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-7 w-7 shrink-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setIndividualStockChanges(prev => ({ ...prev, [pKey]: displayQty + 1 }));
+                              }}
+                            >
+                              <Plus className="h-3 w-3" />
+                            </Button>
+                            {hasChange && (
+                              <Button
+                                size="sm"
+                                className="h-7 text-xs shrink-0"
+                                disabled={isSavingThis}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleIndividualStockSave(product);
+                                }}
+                              >
+                                {isSavingThis ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3 mr-1" />}
+                                {isSavingThis ? '' : 'Saqlash'}
+                              </Button>
+                            )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-3 ml-2 shrink-0">
-                          <div className="text-right">
-                            <div className="text-xs text-muted-foreground">FBO</div>
-                            <div className="font-medium text-sm">{product.stockFBO}</div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-xs text-muted-foreground">FBS</div>
-                            <div className="font-medium text-sm">{product.stockFBS}</div>
-                          </div>
-                          <Badge variant={product.totalStock === 0 ? 'destructive' : product.lowStockAlert ? 'outline' : 'default'}
-                            className={product.lowStockAlert && product.totalStock > 0 ? 'bg-amber-100 text-amber-800 border-amber-300' : ''}>
-                            {product.totalStock}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                 </div>
               )}
             </CardContent>
