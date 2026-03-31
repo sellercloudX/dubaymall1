@@ -878,11 +878,15 @@ ${categoryInstructions}
 ⛔ "ПРОЧИЕ ХАРАКТЕРИСТИКИ" / "ПРОЧЕЕ" degan parametrni HECH QACHON TO'LDIRMA!
 
 ═══════════════════════════════════════════════════════
-⚠️⚠️⚠️ BIRINCHI NAVBATDA: "ASOSIY XUSUSIYATLAR" (${requiredParams.length} ta MAJBURIY parametr) ⚠️⚠️⚠️
+⚠️⚠️⚠️ BIRINCHI NAVBATDA: "ASOSIY XUSUSIYATLAR" (${requiredParams.length} ta MAJBURIY parametr) — 12 BALL ⚠️⚠️⚠️
 Bu parametrlar TO'LDIRILMASA ball PAST bo'ladi! HAR BIRINI ALBATTA TO'LDIR!
 "Maydonlarni ko'rsatish" tugmasi ortidagi YASHIRIN parametrlar HAM shu yerda!
 ═══════════════════════════════════════════════════════
 ${requiredParams.map(formatParam).join("\n")}
+
+═══ "FILTRLAR UCHUN QO'SHIMCHA XUSUSIYATLAR" (${recommendedParams.length} ta RECOMMENDED) — 8 BALL ═══
+⚠️ Bu parametrlar FILTR sifatida ishlaydi! Qidiruv natijalarida chiqish uchun ALBATTA TO'LDIR!
+${recommendedParams.map(formatParam).join("\n")}
 
 ═══ QO'SHIMCHA PARAMETRLAR (${optionalParams.length} ta) — IMKON QADAR TO'LDIR ═══
 ${optionalParams.map(formatParam).join("\n")}
