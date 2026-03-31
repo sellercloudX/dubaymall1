@@ -93,6 +93,10 @@ export function calculateOrderFinancialBreakdown(
   let costCoveredItems = 0;
   let realTariffItems = 0;
 
+  // Helper: round monetary values for UZS marketplaces (Yandex, Uzum)
+  const isUzs = marketplace === 'yandex' || marketplace === 'uzum';
+  const r = (v: number) => isUzs ? Math.round(v) : v;
+
   for (const item of items) {
     const quantity = item.count || 1;
     const rawCostPrice = getCostPrice(marketplace, item.offerId);
@@ -108,10 +112,10 @@ export function calculateOrderFinancialBreakdown(
       : (fees.grossPrice > 0 ? fees.grossPrice : basePrice);
 
     // Fees: prefer exact fees from finance reports; fallback to tariffMap estimates
-    let itemCommission = fees.commission;
-    let itemLogistics = fees.logistics;
-    let itemWithdrawal = fees.withdrawal;
-    let itemTotalFees = fees.totalFees;
+    let itemCommission = r(fees.commission);
+    let itemLogistics = r(fees.logistics);
+    let itemWithdrawal = r(fees.withdrawal);
+    let itemTotalFees = r(fees.totalFees);
     let hasRealFees = fees.isReal;
 
     // CRITICAL: If no exact fees from finance enrichment, use tariffMap as fallback
@@ -119,15 +123,15 @@ export function calculateOrderFinancialBreakdown(
       const tariffFallback = getTariffForProduct(tariffMap, item.offerId, basePrice, marketplace);
       if (tariffFallback.isReal && tariffFallback.totalFee > 0) {
         // Tariff is per-unit, multiply by quantity
-        itemCommission = tariffFallback.commission * quantity;
-        itemLogistics = tariffFallback.logistics * quantity;
-        itemWithdrawal = tariffFallback.withdrawal * quantity;
-        itemTotalFees = tariffFallback.totalFee * quantity;
+        itemCommission = r(tariffFallback.commission * quantity);
+        itemLogistics = r(tariffFallback.logistics * quantity);
+        itemWithdrawal = r(tariffFallback.withdrawal * quantity);
+        itemTotalFees = r(tariffFallback.totalFee * quantity);
         hasRealFees = true;
       }
     }
 
-    const itemTax = itemRevenue * UZB_TAX_RATE;
+    const itemTax = r(itemRevenue * UZB_TAX_RATE);
 
     revenue += itemRevenue;
     costTotal += itemCostTotal;
@@ -158,7 +162,7 @@ export function calculateOrderFinancialBreakdown(
     });
   }
 
-  const taxAmount = revenue * UZB_TAX_RATE;
+  const taxAmount = r(revenue * UZB_TAX_RATE);
   const grossProfit = revenue - costTotal;
   const netProfit = grossProfit - totalFees - taxAmount;
   const margin = revenue > 0 ? (netProfit / revenue) * 100 : 0;
