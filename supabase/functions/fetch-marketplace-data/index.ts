@@ -2765,12 +2765,23 @@ serve(async (req) => {
           // statuses: TO_WITHDRAW, PROCESSING, CANCELED, PARTIALLY_CANCELLED
           try {
             const finShopIds = allShopIds.length > 0 ? allShopIds : (uzumShopId ? [String(uzumShopId)] : []);
-            console.log(`Uzum Finance orders: querying with ${finShopIds.length} shopIds`);
+            console.log(`Uzum Finance orders: querying with ${finShopIds.length} shopIds: ${finShopIds.join(',')}`);
             const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
             let fboCount = 0;
 
-            // Query ALL finance statuses to get complete FBO picture
-            const financeStatuses = ['TO_WITHDRAW', 'PROCESSING', 'CANCELED', 'PARTIALLY_CANCELLED'];
+            // Try multiple approaches to get finance data:
+            // Approach 1: Without statuses filter (gets ALL finance items)
+            // Approach 2: With specific statuses if approach 1 fails
+            const financeApproaches = [
+              { label: 'no-status-filter', statuses: [] },
+              { label: 'all-statuses', statuses: ['TO_WITHDRAW', 'PROCESSING', 'CANCELED', 'PARTIALLY_CANCELLED'] },
+            ];
+
+            let financeDataFound = false;
+
+            for (const approach of financeApproaches) {
+              if (financeDataFound) break;
+              console.log(`[UZUM FINANCE] Trying approach: ${approach.label}`);
 
             let finPage = 0;
             let finHasMore = true;
@@ -2781,8 +2792,8 @@ serve(async (req) => {
               finParams.append('dateTo', String(Date.now()));
               finParams.append('size', '100');
               finParams.append('page', String(finPage));
-              // Add ALL statuses to get complete data
-              for (const st of financeStatuses) {
+              // Add statuses only if specified
+              for (const st of approach.statuses) {
                 finParams.append('statuses', st);
               }
               // Add ALL shopIds as array params: shopIds=40852&shopIds=71592...
@@ -2792,7 +2803,7 @@ serve(async (req) => {
 
               try {
                 const finUrl = `${uzumBaseUrl}/v1/finance/orders?${finParams.toString()}`;
-                console.log(`Uzum Finance orders page ${finPage}, shops=${finShopIds.join(',')}`);
+                console.log(`Uzum Finance orders page ${finPage} (${approach.label}), shops=${finShopIds.join(',')}`);
                 
                 const finResp = await fetch(finUrl, { headers: uzumHeaders });
 
@@ -2834,6 +2845,7 @@ serve(async (req) => {
                   }
                   break;
                 }
+                financeDataFound = true; // We got data with this approach
 
                 // Log first item structure
                 if (fboCount === 0 && finList.length > 0) {
@@ -2949,46 +2961,53 @@ serve(async (req) => {
                 console.error(`Uzum Finance page error:`, pageErr);
                 break;
               }
-            }
+            } // end while finHasMore
+            } // end for financeApproaches
 
-            console.log(`Uzum Finance orders total: ${fboCount} (deduplicated with FBS)`);
+            console.log(`Uzum Finance orders total: ${fboCount} (deduplicated with FBS), financeDataFound=${financeDataFound}`);
 
             // ===== ENRICH FBS orders with Finance API data (commission, logistics) =====
             // /v2/fbs/orders does NOT return financial fields — only /v1/finance/orders has them.
             // Build a map of orderCode → finance items, then patch FBS order items.
             const financeItemMap = new Map<string, any[]>();
-            // Re-scan ALL finance pages to build enrichment map
-            let enrichPage = 0;
-            let enrichHasMore = true;
-            while (enrichHasMore && enrichPage < 20) {
-              const enrichParams = new URLSearchParams();
-              enrichParams.append('dateFrom', String(ninetyDaysAgo));
-              enrichParams.append('dateTo', String(Date.now()));
-              enrichParams.append('size', '100');
-              enrichParams.append('page', String(enrichPage));
-              for (const st of financeStatuses) enrichParams.append('statuses', st);
-              for (const sid of finShopIds) enrichParams.append('shopIds', sid);
+            // Re-scan ALL finance pages to build enrichment map (use no-status-filter first, then all-statuses)
+            const enrichStatuses: string[][] = [[], ['TO_WITHDRAW', 'PROCESSING', 'CANCELED', 'PARTIALLY_CANCELLED']];
+            
+            for (const statuses of enrichStatuses) {
+              if (financeItemMap.size > 0) break; // Already got data
+              
+              let enrichPage = 0;
+              let enrichHasMore = true;
+              while (enrichHasMore && enrichPage < 20) {
+                const enrichParams = new URLSearchParams();
+                enrichParams.append('dateFrom', String(ninetyDaysAgo));
+                enrichParams.append('dateTo', String(Date.now()));
+                enrichParams.append('size', '100');
+                enrichParams.append('page', String(enrichPage));
+                for (const st of statuses) enrichParams.append('statuses', st);
+                for (const sid of finShopIds) enrichParams.append('shopIds', sid);
 
-              try {
-                const enrichResp = await fetch(`${uzumBaseUrl}/v1/finance/orders?${enrichParams.toString()}`, { headers: uzumHeaders });
-                if (!enrichResp.ok) break;
-                const enrichData = await enrichResp.json();
-                const enrichList = Array.isArray(enrichData.orderItems || enrichData.content || []) 
-                  ? (enrichData.orderItems || enrichData.content || []) : [];
-                if (enrichList.length === 0) break;
+                try {
+                  const enrichResp = await fetch(`${uzumBaseUrl}/v1/finance/orders?${enrichParams.toString()}`, { headers: uzumHeaders });
+                  if (!enrichResp.ok) break;
+                  const enrichData = await enrichResp.json();
+                  const enrichList = Array.isArray(enrichData.orderItems || enrichData.content || []) 
+                    ? (enrichData.orderItems || enrichData.content || []) : [];
+                  if (enrichList.length === 0) break;
 
-                for (const fo of enrichList) {
-                  const foId = String(fo.orderCode || fo.orderNumber || fo.orderId || fo.id || fo.code || '');
-                  if (!foId) continue;
-                  const items = fo.items || fo.orderItems || [];
-                  const flatItems = items.length > 0 ? items : [fo];
-                  if (!financeItemMap.has(foId)) financeItemMap.set(foId, []);
-                  financeItemMap.get(foId)!.push(...flatItems);
-                }
+                  for (const fo of enrichList) {
+                    const foId = String(fo.orderCode || fo.orderNumber || fo.orderId || fo.id || fo.code || '');
+                    if (!foId) continue;
+                    const items = fo.items || fo.orderItems || [];
+                    const flatItems = items.length > 0 ? items : [fo];
+                    if (!financeItemMap.has(foId)) financeItemMap.set(foId, []);
+                    financeItemMap.get(foId)!.push(...flatItems);
+                  }
 
-                if (enrichList.length < 100) enrichHasMore = false;
-                else { enrichPage++; await sleep(150); }
-              } catch (_) { break; }
+                  if (enrichList.length < 100) enrichHasMore = false;
+                  else { enrichPage++; await sleep(150); }
+                } catch (_) { break; }
+              }
             }
 
             console.log(`Finance enrichment map: ${financeItemMap.size} orders`);
@@ -4798,6 +4817,144 @@ serve(async (req) => {
               });
             }
             console.log(`WB sales: ${salesAdded} added, ${salesSkipped} skipped (dedup)`);
+          }
+
+          // ===== 4. ENRICH with reportDetailByPeriod (real commission, logistics, forPay) =====
+          // This is the ONLY WB endpoint that returns actual financial breakdowns per sale
+          try {
+            await sleep(300);
+            const reportDateFrom = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+            const reportDateTo = new Date().toISOString().split('T')[0];
+            
+            let allReportRows: any[] = [];
+            let rrdid = 0;
+            let reportHasMore = true;
+            let reportPage = 0;
+            
+            while (reportHasMore && reportPage < 30) {
+              const reportUrl = `https://statistics-api.wildberries.ru/api/v5/supplier/reportDetailByPeriod?dateFrom=${reportDateFrom}&dateTo=${reportDateTo}&rrdid=${rrdid}&limit=100000`;
+              const reportResp = await fetch(reportUrl, { headers: wbHeaders });
+              
+              if (!reportResp.ok && reportResp.status !== 204) {
+                const errText = await reportResp.text();
+                console.warn(`WB reportDetailByPeriod failed: ${reportResp.status}, ${errText.substring(0, 300)}`);
+                break;
+              }
+              
+              const reportData = await safeJson(reportResp, []);
+              const reportRows = Array.isArray(reportData) ? reportData : [];
+              
+              if (reportRows.length === 0) {
+                reportHasMore = false;
+                break;
+              }
+              
+              allReportRows.push(...reportRows);
+              
+              // Get last rrdid for pagination
+              const lastRow = reportRows[reportRows.length - 1];
+              rrdid = lastRow.rrd_id || lastRow.rrdid || 0;
+              reportPage++;
+              
+              if (reportRows.length < 100000) reportHasMore = false;
+              else await sleep(500);
+            }
+            
+            console.log(`WB reportDetailByPeriod: ${allReportRows.length} rows fetched`);
+            
+            if (allReportRows.length > 0) {
+              // Log sample row structure
+              const sampleRow = allReportRows[0];
+              console.log(`[WB REPORT KEYS] ${JSON.stringify(Object.keys(sampleRow))}`);
+              console.log(`[WB REPORT SAMPLE] ppvz_for_pay=${sampleRow.ppvz_for_pay}, ppvz_sales_commission=${sampleRow.ppvz_sales_commission}, logistics=${sampleRow.delivery_rub}, supplier_oper_name=${sampleRow.supplier_oper_name}, sa_name=${sampleRow.sa_name}`);
+              
+              // Build enrichment map: srid → report row (most accurate match)
+              // Also build by supplierArticle+nmId for fallback
+              const reportBySrid = new Map<string, any>();
+              const reportByNmId = new Map<number, any[]>();
+              
+              for (const row of allReportRows) {
+                // Only use "Продажа" (sale) rows, not returns/penalties
+                const opName = (row.supplier_oper_name || '').toLowerCase();
+                if (!opName.includes('продажа') && !opName.includes('sale')) continue;
+                
+                if (row.srid) {
+                  const sridKey = String(row.srid);
+                  // Clean srid: strip ".0.0" suffix
+                  const cleanSrid = sridKey.endsWith('.0.0') ? sridKey.slice(0, -4) : sridKey;
+                  reportBySrid.set(cleanSrid, row);
+                  reportBySrid.set(sridKey, row);
+                }
+                if (row.nm_id) {
+                  if (!reportByNmId.has(row.nm_id)) reportByNmId.set(row.nm_id, []);
+                  reportByNmId.get(row.nm_id)!.push(row);
+                }
+              }
+              
+              console.log(`WB report enrichment map: ${reportBySrid.size} by srid, ${reportByNmId.size} by nmId`);
+              
+              // Enrich existing orders with report data
+              let wbEnrichedCount = 0;
+              for (const order of allOrders) {
+                const orderId = String(order.id || '');
+                const nmId = order.nmID;
+                
+                // Try srid match first
+                let reportRow = reportBySrid.get(orderId);
+                
+                // Fallback: match by nmId (use first matching row)
+                if (!reportRow && nmId && reportByNmId.has(nmId)) {
+                  const candidates = reportByNmId.get(nmId)!;
+                  // Try to match by date too
+                  const orderDate = order.createdAt ? order.createdAt.substring(0, 10) : '';
+                  reportRow = candidates.find((r: any) => {
+                    const rDate = (r.rr_dt || r.date_from || '').substring(0, 10);
+                    return rDate === orderDate;
+                  }) || candidates[0];
+                }
+                
+                if (reportRow && order.items && order.items.length > 0) {
+                  const item = order.items[0];
+                  const rpFinance = getWbItemFinanceFields(reportRow);
+                  
+                  if (rpFinance.commissionAmount > 0) {
+                    item.commissionAmount = rpFinance.commissionAmount;
+                    item.actualCommission = rpFinance.commissionAmount;
+                  }
+                  if (rpFinance.deliveryAmount > 0) {
+                    item.deliveryAmount = rpFinance.deliveryAmount;
+                    item.actualLogisticsFee = rpFinance.deliveryAmount;
+                  }
+                  if (rpFinance.withdrawalAmount > 0) {
+                    item.withdrawalAmount = rpFinance.withdrawalAmount;
+                    item.actualOtherFees = rpFinance.withdrawalAmount;
+                  }
+                  if (rpFinance.sellerAmount > 0) {
+                    item.sellerAmount = rpFinance.sellerAmount;
+                    item.forPay = rpFinance.sellerAmount;
+                  }
+                  if (rpFinance.subsidyAmount > 0) {
+                    item.additionalPayment = rpFinance.subsidyAmount;
+                    item.subsidyAmount = rpFinance.subsidyAmount;
+                  }
+                  if (rpFinance.actualSoldPrice > 0) {
+                    item.actualSoldPrice = rpFinance.actualSoldPrice;
+                  }
+                  if (rpFinance.grossPrice > 0) {
+                    item.grossPrice = rpFinance.grossPrice;
+                  }
+                  item.financeSource = 'wb-report-enriched';
+                  
+                  // Also update order-level forPay
+                  if (rpFinance.sellerAmount > 0) order.forPay = rpFinance.sellerAmount;
+                  
+                  wbEnrichedCount++;
+                }
+              }
+              console.log(`WB enriched ${wbEnrichedCount} orders with reportDetailByPeriod data`);
+            }
+          } catch (reportErr) {
+            console.warn("WB reportDetailByPeriod enrichment error (non-fatal):", reportErr);
           }
 
           console.log(`WB total orders: ${allOrders.length}`);
