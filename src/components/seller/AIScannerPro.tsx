@@ -673,7 +673,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
         { name: 'Tavsif yaratish', status: 'pending', model: 'AI', icon: <FileText className="h-4 w-4" /> },
         { name: 'MXIK aniqlash', status: 'pending', model: 'Gemini + DB', icon: <Hash className="h-4 w-4" /> },
         { name: 'Rasm + Infografika', status: 'pending', model: 'OpenAI gpt-image-1', icon: <ImageLucide className="h-4 w-4" /> },
-        { name: 'Kartochka yaratish', status: 'pending', model: targetMarketplace === 'wildberries' ? 'WB API' : targetMarketplace === 'uzum' ? 'Uzum API' : 'Yandex API', icon: <Store className="h-4 w-4" /> },
+        { name: 'Kartochka yaratish', status: 'pending', model: targetMarketplace === 'wildberries' ? 'WB API' : 'Yandex API', icon: <Store className="h-4 w-4" /> },
       ],
       generatedImages: [],
       startedAt: new Date(),
