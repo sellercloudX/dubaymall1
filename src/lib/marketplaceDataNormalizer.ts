@@ -94,7 +94,8 @@ export function normalizeMarketplaceFinance(item: any, marketplace: string): Nor
       actualCommission: commission,
       actualLogisticsFee: logistics,
       actualOtherFees: sumFields(item, "otherFees", "storage_fee", "penalty"),
-      actualSoldPrice: Math.max(sellerRevenue, sellerRevenue + subsidy),
+      // sellerRevenue (forPay/ppvz_for_pay) already includes subsidy; avoid double-counting
+      actualSoldPrice: sellerRevenue > 0 ? sellerRevenue : subsidy,
       grossPrice: pickFirst(item, "grossPrice", "finishedPrice", "retail_price_withdisc_rub"),
       subsidyAmount: subsidy,
       isExact: commission > 0 || logistics > 0 || sellerRevenue > 0,

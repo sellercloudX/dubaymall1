@@ -80,7 +80,8 @@ serve(async (req) => {
 
     if (action === "generate_images") {
       // Generate multiple styled images from one source image
-      const selectedStyles = styles || ['infographic', 'lifestyle', 'minimalist'];
+      // Always generate exactly 2 images: infographic + lifestyle
+      const selectedStyles = ['infographic', 'lifestyle'];
       const results: Array<{ style: string; label: string; url: string | null; error?: string }> = [];
 
       const promises = selectedStyles.map(async (styleKey: string) => {
