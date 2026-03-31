@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'app.lovable.af1b8d1ef9cb42f38678575d0e45e819',
+  appId: 'com.sellercloudx.app',
   appName: 'SellerCloudX',
   webDir: 'dist',
   server: {
@@ -13,24 +13,34 @@ const config: CapacitorConfig = {
     allowMixedContent: true,
     captureInput: true,
     webContentsDebuggingEnabled: false,
+    minWebViewVersion: '55',
+    overrideUserAgent: 'SellerCloudX-Android/1.0',
   },
   ios: {
     contentInset: 'automatic',
     allowsLinkPreview: false,
     scrollEnabled: true,
+    scheme: 'sellercloudx',
   },
   plugins: {
     SplashScreen: {
-      launchShowDuration: 0,
+      launchShowDuration: 2000,
       launchAutoHide: true,
+      backgroundColor: '#3B82F6',
+      showSpinner: true,
+      spinnerColor: '#FFFFFF',
+      launchFadeOutDuration: 500,
     },
     StatusBar: {
       style: 'LIGHT',
-      backgroundColor: '#FCFCFD',
+      backgroundColor: '#3B82F6',
     },
     Keyboard: {
       resize: 'body',
       resizeOnFullScreen: true,
+    },
+    PushNotifications: {
+      presentationOptions: ['badge', 'sound', 'alert'],
     },
   },
 };

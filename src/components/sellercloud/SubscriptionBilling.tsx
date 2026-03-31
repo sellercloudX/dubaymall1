@@ -16,12 +16,13 @@ import { toast } from 'sonner';
 import {
   CreditCard, AlertTriangle, CheckCircle2, Clock, Crown,
   Calendar, DollarSign, TrendingUp, XCircle, FileText,
-  ArrowRight, Wallet, History, Zap, ArrowUpDown,
+  ArrowRight, Wallet, History, Zap, ArrowUpDown, Gift,
   Sparkles, Settings2, Key, Rocket, Loader2, Store, Image, Copy, Percent,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { PromoCodeInput, type PromoValidation } from './PromoCodeInput';
 import { notifyAffiliatePayment } from '@/lib/affiliateWebhook';
+import { ReferralProgram } from './ReferralProgram';
 import { cn } from '@/lib/utils';
 
 interface SubscriptionBillingProps {
@@ -366,9 +367,10 @@ export const SubscriptionBilling = forwardRef<HTMLDivElement, SubscriptionBillin
       )}
 
       <Tabs defaultValue="subscription">
-        <TabsList className="grid w-full grid-cols-4 h-auto">
+        <TabsList className="grid w-full grid-cols-5 h-auto">
           <TabsTrigger value="subscription" className="gap-1 text-[10px] sm:text-xs px-1 sm:px-3 py-2 flex-col sm:flex-row"><Crown className="h-3.5 w-3.5 shrink-0" /><span className="truncate">Obuna</span></TabsTrigger>
           <TabsTrigger value="balance" className="gap-1 text-[10px] sm:text-xs px-1 sm:px-3 py-2 flex-col sm:flex-row"><Wallet className="h-3.5 w-3.5 shrink-0" /><span className="truncate">Balans</span></TabsTrigger>
+          <TabsTrigger value="referral" className="gap-1 text-[10px] sm:text-xs px-1 sm:px-3 py-2 flex-col sm:flex-row"><Gift className="h-3.5 w-3.5 shrink-0" /><span className="truncate">Taklif</span></TabsTrigger>
           <TabsTrigger value="transactions" className="gap-1 text-[10px] sm:text-xs px-1 sm:px-3 py-2 flex-col sm:flex-row"><History className="h-3.5 w-3.5 shrink-0" /><span className="truncate">Tarix</span></TabsTrigger>
           <TabsTrigger value="pricing" className="gap-1 text-[10px] sm:text-xs px-1 sm:px-3 py-2 flex-col sm:flex-row"><DollarSign className="h-3.5 w-3.5 shrink-0" /><span className="truncate">Narxlar</span></TabsTrigger>
         </TabsList>
@@ -462,7 +464,12 @@ export const SubscriptionBilling = forwardRef<HTMLDivElement, SubscriptionBillin
           </Card>
         </TabsContent>
 
-        {/* TAB 3: TRANSACTIONS */}
+        {/* TAB 3: REFERRAL */}
+        <TabsContent value="referral" className="mt-4">
+          <ReferralProgram />
+        </TabsContent>
+
+        {/* TAB 4: TRANSACTIONS */}
         <TabsContent value="transactions" className="space-y-4 mt-4">
           <Card>
             <CardHeader><CardTitle className="flex items-center gap-2"><History className="h-5 w-5" /> Tranzaksiyalar tarixi</CardTitle></CardHeader>
