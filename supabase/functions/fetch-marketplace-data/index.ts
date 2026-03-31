@@ -3502,7 +3502,7 @@ serve(async (req) => {
         }
 
       } else if (dataType === "update-stock") {
-        // POST /v2/fbs/sku/stocks
+        // POST /v2/fbs/sku/stocks — FBS stock only (FBO is managed by Uzum warehouse)
         try {
           const { stocks, stockUpdates } = requestBody;
           const updates = stocks || stockUpdates;
@@ -3510,22 +3510,27 @@ serve(async (req) => {
           if (!updates || updates.length === 0) {
             result = { success: false, error: "No stock updates provided" };
           } else {
-            // CRITICAL: Uzum API needs skuId (numeric SKU identifier), NOT productId
-            // The client sends: { skuId, offerId (=productId), sku, quantity }
-            // We must use skuId first, then fall back to others
-            const skuAmountList = updates.map((s: any) => ({
-              skuId: parseInt(s.skuId || s.offerId || s.sku || '0'),
-              amount: s.amount || s.quantity || s.stock || 0,
-            }));
-            
-            // Validate: filter out entries where skuId is 0 or NaN
-            const validEntries = skuAmountList.filter((e: any) => e.skuId > 0);
-            
-            if (validEntries.length === 0) {
-              result = { success: false, error: "No valid skuId found for stock update. Ensure products have numeric skuId." };
-            } else {
-              console.log(`Uzum stock update: ${validEntries.length} valid SKUs, sample: ${JSON.stringify(validEntries[0])}`);
-              
+            // Group by shopId for multi-shop support (same as price updates)
+            const byShop = new Map<string, any[]>();
+            for (const s of updates) {
+              const shopId = String(s.shopId || uzumShopId || '');
+              const list = byShop.get(shopId) || [];
+              list.push({
+                skuId: parseInt(s.skuId || s.offerId || s.sku || '0'),
+                amount: s.amount || s.quantity || s.stock || 0,
+              });
+              byShop.set(shopId, list);
+            }
+
+            let totalUpdated = 0;
+            let lastError = '';
+
+            for (const [shopId, items] of byShop) {
+              const validEntries = items.filter((e: any) => e.skuId > 0);
+              if (validEntries.length === 0) continue;
+
+              console.log(`Uzum stock update: ${validEntries.length} SKUs, shopId: ${shopId}, sample: ${JSON.stringify(validEntries[0])}`);
+
               // Retry with backoff for rate limits (429)
               let response: Response | null = null;
               for (let attempt = 0; attempt < 3; attempt++) {
@@ -3536,6 +3541,7 @@ serve(async (req) => {
                     headers: {
                       ...uzumHeaders,
                       "Content-Type": "application/json",
+                      "X-Shop-Id": shopId,
                     },
                     body: JSON.stringify({ skuAmountList: validEntries }),
                   }
@@ -3550,15 +3556,18 @@ serve(async (req) => {
               }
 
               if (response && response.ok) {
-                const data = await safeJson(response, { success: true });
-                result = { success: true, data, updated: validEntries.length };
+                totalUpdated += validEntries.length;
               } else {
                 const errText = response ? await response.text() : 'No response';
                 const status = response ? response.status : 0;
-                console.error(`Uzum stock update failed: ${status}, body: ${errText}`);
-                result = { success: false, error: `Stock update failed: ${status}`, details: errText };
+                console.error(`Uzum stock update failed for shop ${shopId}: ${status}, body: ${errText}`);
+                lastError = `Stock update failed: ${status} (shop ${shopId}). FBO qoldiqlarini API orqali o'zgartirib bo'lmaydi — faqat FBS.`;
               }
             }
+
+            result = totalUpdated > 0
+              ? { success: true, updated: totalUpdated }
+              : { success: false, error: lastError || "No valid SKUs to update. FBO mahsulotlarga qoldiq qo'yib bo'lmaydi." };
           }
         } catch (e) {
           console.error("Uzum stock update error:", e);
