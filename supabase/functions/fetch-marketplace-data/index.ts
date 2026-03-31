@@ -2970,38 +2970,44 @@ serve(async (req) => {
             // /v2/fbs/orders does NOT return financial fields — only /v1/finance/orders has them.
             // Build a map of orderCode → finance items, then patch FBS order items.
             const financeItemMap = new Map<string, any[]>();
-            // Re-scan ALL finance pages to build enrichment map
-            let enrichPage = 0;
-            let enrichHasMore = true;
-            while (enrichHasMore && enrichPage < 20) {
-              const enrichParams = new URLSearchParams();
-              enrichParams.append('dateFrom', String(ninetyDaysAgo));
-              enrichParams.append('dateTo', String(Date.now()));
-              enrichParams.append('size', '100');
-              enrichParams.append('page', String(enrichPage));
-              for (const st of financeStatuses) enrichParams.append('statuses', st);
-              for (const sid of finShopIds) enrichParams.append('shopIds', sid);
+            // Re-scan ALL finance pages to build enrichment map (use no-status-filter first, then all-statuses)
+            const enrichStatuses: string[][] = [[], ['TO_WITHDRAW', 'PROCESSING', 'CANCELED', 'PARTIALLY_CANCELLED']];
+            
+            for (const statuses of enrichStatuses) {
+              if (financeItemMap.size > 0) break; // Already got data
+              
+              let enrichPage = 0;
+              let enrichHasMore = true;
+              while (enrichHasMore && enrichPage < 20) {
+                const enrichParams = new URLSearchParams();
+                enrichParams.append('dateFrom', String(ninetyDaysAgo));
+                enrichParams.append('dateTo', String(Date.now()));
+                enrichParams.append('size', '100');
+                enrichParams.append('page', String(enrichPage));
+                for (const st of statuses) enrichParams.append('statuses', st);
+                for (const sid of finShopIds) enrichParams.append('shopIds', sid);
 
-              try {
-                const enrichResp = await fetch(`${uzumBaseUrl}/v1/finance/orders?${enrichParams.toString()}`, { headers: uzumHeaders });
-                if (!enrichResp.ok) break;
-                const enrichData = await enrichResp.json();
-                const enrichList = Array.isArray(enrichData.orderItems || enrichData.content || []) 
-                  ? (enrichData.orderItems || enrichData.content || []) : [];
-                if (enrichList.length === 0) break;
+                try {
+                  const enrichResp = await fetch(`${uzumBaseUrl}/v1/finance/orders?${enrichParams.toString()}`, { headers: uzumHeaders });
+                  if (!enrichResp.ok) break;
+                  const enrichData = await enrichResp.json();
+                  const enrichList = Array.isArray(enrichData.orderItems || enrichData.content || []) 
+                    ? (enrichData.orderItems || enrichData.content || []) : [];
+                  if (enrichList.length === 0) break;
 
-                for (const fo of enrichList) {
-                  const foId = String(fo.orderCode || fo.orderNumber || fo.orderId || fo.id || fo.code || '');
-                  if (!foId) continue;
-                  const items = fo.items || fo.orderItems || [];
-                  const flatItems = items.length > 0 ? items : [fo];
-                  if (!financeItemMap.has(foId)) financeItemMap.set(foId, []);
-                  financeItemMap.get(foId)!.push(...flatItems);
-                }
+                  for (const fo of enrichList) {
+                    const foId = String(fo.orderCode || fo.orderNumber || fo.orderId || fo.id || fo.code || '');
+                    if (!foId) continue;
+                    const items = fo.items || fo.orderItems || [];
+                    const flatItems = items.length > 0 ? items : [fo];
+                    if (!financeItemMap.has(foId)) financeItemMap.set(foId, []);
+                    financeItemMap.get(foId)!.push(...flatItems);
+                  }
 
-                if (enrichList.length < 100) enrichHasMore = false;
-                else { enrichPage++; await sleep(150); }
-              } catch (_) { break; }
+                  if (enrichList.length < 100) enrichHasMore = false;
+                  else { enrichPage++; await sleep(150); }
+                } catch (_) { break; }
+              }
             }
 
             console.log(`Finance enrichment map: ${financeItemMap.size} orders`);
