@@ -2972,7 +2972,7 @@ serve(async (req) => {
             // Build a map of orderCode → finance items, then patch FBS order items.
             const financeItemMap = new Map<string, any[]>();
             // Re-scan ALL finance pages to build enrichment map (use no-status-filter first, then all-statuses)
-            const enrichStatuses: string[][] = [[], ['TO_WITHDRAW', 'PROCESSING', 'CANCELED', 'PARTIALLY_CANCELLED']];
+            const enrichStatuses: string[][] = [[], ['TO_WITHDRAW', 'PROCESSING', 'CANCELED', 'PARTIALLY_CANCELLED', 'COMPLETED']];
             
             for (const statuses of enrichStatuses) {
               if (financeItemMap.size > 0) break; // Already got data
