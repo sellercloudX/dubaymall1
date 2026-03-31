@@ -1026,22 +1026,26 @@ JAVOB FAQAT JSON array:
       console.error("AI Pass 2 error:", e);
     }
     
-    // ═══ PASS 3: If REQUIRED params STILL missing, force-fill them ═══
+    // ═══ PASS 3: If REQUIRED or RECOMMENDED params STILL missing, force-fill them ═══
     const filledAfterP2 = new Set(
       (result.parameterValues || []).map((p: any) => Number(p.parameterId))
     );
     const stillMissingRequired = requiredParams.filter((p: any) => !filledAfterP2.has(Number(p.id)));
+    const stillMissingRecommended = recommendedParams.filter((p: any) => !filledAfterP2.has(Number(p.id)));
+    const stillMissingHighPriority = [...stillMissingRequired, ...stillMissingRecommended];
     
-    if (stillMissingRequired.length > 0) {
-      console.log(`⚠️ Pass 3: ${stillMissingRequired.length} MAJBURIY param hali bo'sh! Force-fill...`);
+    if (stillMissingHighPriority.length > 0) {
+      console.log(`⚠️ Pass 3: ${stillMissingRequired.length} MAJBURIY + ${stillMissingRecommended.length} FILTR param hali bo'sh! Force-fill...`);
       
-      const pass3Prompt = `FAQAT shu ${stillMissingRequired.length} ta MAJBURIY parametrni to'ldir. Bu parametrlar TO'LDIRILMASA kartochka sifati JUDA PAST bo'ladi!
+      const pass3Prompt = `FAQAT shu ${stillMissingHighPriority.length} ta parametrni to'ldir. Bu parametrlar TO'LDIRILMASA kartochka sifati JUDA PAST bo'ladi!
+${stillMissingRequired.length > 0 ? `\n⚠️ MAJBURIY (12 BALL — "Asosiy xususiyatlar"):` : ''}
+${stillMissingRecommended.length > 0 ? `⚠️ FILTR (8 BALL — "Qo'shimcha xususiyatlar"):` : ''}
 
 Mahsulot: "${product.name}" (${categoryName})
 Brend: ${result.vendor || product.brand || "OEM"}
 
 HAR BIRINI ALBATTA TO'LDIR — BO'SH QOLDIRMA!:
-${stillMissingRequired.map(formatParam).join("\n")}
+${stillMissingHighPriority.map(formatParam).join("\n")}
 
 QOIDALAR: OPTIONS bor → valueId raqam tanla. TEXT → faqat qiymat. Bilmasang taxminiy yoz!
 JAVOB FAQAT JSON array: [{"parameterId":123,"valueId":456}]`;
