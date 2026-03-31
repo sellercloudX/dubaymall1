@@ -4027,6 +4027,87 @@ export type Database = {
           },
         ]
       }
+      logistics_orders_safe: {
+        Row: {
+          accepted_at: string | null
+          accepted_by: string | null
+          barcode: string | null
+          confirmation_code: string | null
+          courier_assigned_at: string | null
+          courier_id: string | null
+          created_at: string | null
+          customer_address: string | null
+          customer_name: string | null
+          customer_phone: string | null
+          customer_telegram: string | null
+          delivered_at: string | null
+          delivery_otp: string | null
+          delivery_type: string | null
+          id: string | null
+          notes: string | null
+          payment_amount: number | null
+          product_name: string | null
+          seller_name: string | null
+          status: string | null
+          status_history: Json | null
+          target_point_id: string | null
+          tracking_url: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          barcode?: string | null
+          confirmation_code?: never
+          courier_assigned_at?: string | null
+          courier_id?: string | null
+          created_at?: string | null
+          customer_address?: never
+          customer_name?: string | null
+          customer_phone?: string | null
+          customer_telegram?: never
+          delivered_at?: string | null
+          delivery_otp?: never
+          delivery_type?: string | null
+          id?: string | null
+          notes?: string | null
+          payment_amount?: number | null
+          product_name?: string | null
+          seller_name?: string | null
+          status?: string | null
+          status_history?: Json | null
+          target_point_id?: string | null
+          tracking_url?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          barcode?: string | null
+          confirmation_code?: never
+          courier_assigned_at?: string | null
+          courier_id?: string | null
+          created_at?: string | null
+          customer_address?: never
+          customer_name?: string | null
+          customer_phone?: string | null
+          customer_telegram?: never
+          delivered_at?: string | null
+          delivery_otp?: never
+          delivery_type?: string | null
+          id?: string | null
+          notes?: string | null
+          payment_amount?: number | null
+          product_name?: string | null
+          seller_name?: string | null
+          status?: string | null
+          status_history?: Json | null
+          target_point_id?: string | null
+          tracking_url?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       marketplace_connections_safe: {
         Row: {
           account_info: Json | null
