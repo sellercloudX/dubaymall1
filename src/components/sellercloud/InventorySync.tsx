@@ -380,7 +380,8 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
         setIndividualStockChanges(prev => { const n = { ...prev }; delete n[key]; return n; });
         store.refetchProducts();
       } else {
-        toast.error(`${product.name}: xatolik`);
+        const errMsg = data?.error || error?.message || 'Noma\'lum xato';
+        toast.error(`${product.name}: ${errMsg}`, { duration: 8000 });
       }
     } catch {
       toast.error(`Qoldiq yangilashda xato`);
