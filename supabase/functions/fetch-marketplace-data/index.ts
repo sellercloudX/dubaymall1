@@ -3549,7 +3549,13 @@ serve(async (req) => {
               } else if (response) {
                 const errText = await response.text();
                 console.error(`Uzum price update failed for shop ${shopId}: ${response.status}, body: ${errText}`);
-                lastError = `Narx yangilash xato: ${response.status} (do'kon ${shopId})`;
+                if (response.status === 403) {
+                  lastError = `API kalitingizda narx sozlash ruxsati yo'q. Uzum kabinetida API kalitiga "Tovarlar" ruxsatini bering.`;
+                } else if (response.status === 400) {
+                  lastError = `Noto'g'ri ma'lumot yuborildi (skuId yoki narx). Xato: ${errText.substring(0, 200)}`;
+                } else {
+                  lastError = `Narx yangilash xato: ${response.status} (do'kon ${shopId}). ${errText.substring(0, 150)}`;
+                }
               }
             }
 
