@@ -4039,7 +4039,6 @@ export type Database = {
           accepted_at: string | null
           accepted_by: string | null
           barcode: string | null
-          confirmation_code: string | null
           courier_assigned_at: string | null
           courier_id: string | null
           created_at: string | null
@@ -4048,7 +4047,6 @@ export type Database = {
           customer_phone: string | null
           customer_telegram: string | null
           delivered_at: string | null
-          delivery_otp: string | null
           delivery_type: string | null
           id: string | null
           notes: string | null
@@ -4065,7 +4063,6 @@ export type Database = {
           accepted_at?: string | null
           accepted_by?: string | null
           barcode?: string | null
-          confirmation_code?: never
           courier_assigned_at?: string | null
           courier_id?: string | null
           created_at?: string | null
@@ -4074,7 +4071,6 @@ export type Database = {
           customer_phone?: never
           customer_telegram?: never
           delivered_at?: string | null
-          delivery_otp?: never
           delivery_type?: string | null
           id?: string | null
           notes?: string | null
@@ -4091,7 +4087,6 @@ export type Database = {
           accepted_at?: string | null
           accepted_by?: string | null
           barcode?: string | null
-          confirmation_code?: never
           courier_assigned_at?: string | null
           courier_id?: string | null
           created_at?: string | null
@@ -4100,7 +4095,6 @@ export type Database = {
           customer_phone?: never
           customer_telegram?: never
           delivered_at?: string | null
-          delivery_otp?: never
           delivery_type?: string | null
           id?: string | null
           notes?: string | null
