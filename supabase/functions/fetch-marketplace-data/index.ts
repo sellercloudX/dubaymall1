@@ -292,17 +292,28 @@ serve(async (req) => {
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Get user from auth token
+    // Validate JWT via getClaims (local verification, no server roundtrip)
     const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    const anonClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(token);
     
-    if (userError || !user) {
-      return new Response(
-        JSON.stringify({ error: "Invalid authentication" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (claimsError || !claimsData?.claims?.sub) {
+      // Fallback to getUser if getClaims fails
+      const { data: { user: fallbackUser }, error: fallbackError } = await supabase.auth.getUser(token);
+      if (fallbackError || !fallbackUser) {
+        return new Response(
+          JSON.stringify({ error: "Invalid authentication" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      var user = fallbackUser;
+    } else {
+      var user = { id: claimsData.claims.sub as string, email: claimsData.claims.email as string } as any;
     }
 
     // Get marketplace connection
