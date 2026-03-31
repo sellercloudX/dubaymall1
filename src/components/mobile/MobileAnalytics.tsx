@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DollarSign, Package, ShoppingCart, Globe, AlertTriangle, Wallet, TrendingUp } from 'lucide-react';
