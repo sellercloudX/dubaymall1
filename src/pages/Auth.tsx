@@ -168,6 +168,13 @@ export default function Auth() {
             variant: 'destructive',
           });
         } else {
+          // Apply referral code if present
+          const refCode = searchParams.get('ref') || localStorage.getItem('scx_ref');
+          if (refCode) {
+            localStorage.removeItem('scx_ref');
+            // Will be applied after email verification and first login
+            localStorage.setItem('scx_pending_ref', refCode);
+          }
           toast({
             title: 'Muvaffaqiyat',
             description: t.registrationSuccess,
