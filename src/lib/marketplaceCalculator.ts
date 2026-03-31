@@ -9,11 +9,11 @@ import { getRubToUzs, isRubMarketplace } from "@/lib/currency";
 
 // ============ CONSTANTS ============
 
-/** Minimum logistics per marketplace (in native currency) */
-const MIN_LOGISTICS: Record<string, number> = {
-  yandex: 2000,    // 2000 so'm
-  uzum: 5000,      // 5000 so'm
-  wildberries: 46,  // 46 RUB
+/** Logistics billing step per marketplace (in native currency) */
+const LOGISTICS_STEP: Record<string, number> = {
+  yandex: 2000,    // 2000 so'm steps
+  uzum: 5000,      // 5000 so'm steps
+  wildberries: 46,  // 46 RUB base
 };
 
 /** UZB YATT tax rate */
@@ -73,10 +73,12 @@ export function calcMarketplaceMetrics(input: CalcInput): MarketplaceMetrics {
   const { marketplace, priceNative, costNative, commissionPercent, logisticsNative, otherFeesNative, quantity } = input;
   
   const rate = isRubMarketplace(marketplace) ? getRubToUzs() : 1;
-  const minLogisticsNative = MIN_LOGISTICS[marketplace] || 0;
+  const step = LOGISTICS_STEP[marketplace] || 0;
   
-  // Enforce minimum logistics
-  const enforcedLogisticsNative = Math.max(logisticsNative, minLogisticsNative);
+  // Enforce step-based logistics (round UP to nearest multiple of step)
+  const enforcedLogisticsNative = step > 0
+    ? Math.max(step, Math.ceil(logisticsNative / step) * step)
+    : logisticsNative;
   
   // Convert to UZS
   const price = Math.round(priceNative * rate);
@@ -121,14 +123,29 @@ export function calcMarketplaceMetrics(input: CalcInput): MarketplaceMetrics {
  * Get the minimum logistics for a marketplace in UZS.
  */
 export function getMinLogisticsUzs(marketplace: string): number {
-  const native = MIN_LOGISTICS[marketplace] || 0;
+  const step = LOGISTICS_STEP[marketplace] || 0;
   const rate = isRubMarketplace(marketplace) ? getRubToUzs() : 1;
-  return Math.round(native * rate);
+  return Math.round(step * rate);
+}
+
+/**
+ * Normalize logistics to valid billing step (round UP to nearest multiple).
+ * For Yandex: 2000, 4000, 6000...
+ * For Uzum: 5000, 10000, 15000...
+ */
+export function normalizeLogistics(rawUzs: number, marketplace: string): number {
+  const step = LOGISTICS_STEP[marketplace] || 0;
+  if (step <= 0) return Math.round(rawUzs);
+  const rate = isRubMarketplace(marketplace) ? getRubToUzs() : 1;
+  const stepUzs = Math.round(step * rate);
+  return Math.max(stepUzs, Math.ceil(rawUzs / stepUzs) * stepUzs);
 }
 
 /**
  * Enforce minimum logistics on a raw value (native currency).
  */
 export function enforceMinLogistics(logisticsNative: number, marketplace: string): number {
-  return Math.max(logisticsNative, MIN_LOGISTICS[marketplace] || 0);
+  const step = LOGISTICS_STEP[marketplace] || 0;
+  if (step <= 0) return logisticsNative;
+  return Math.max(step, Math.ceil(logisticsNative / step) * step);
 }

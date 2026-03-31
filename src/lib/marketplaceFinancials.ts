@@ -1,7 +1,7 @@
 import { toDisplayUzs } from "@/lib/currency";
 import { getOrderRevenueUzs } from "@/lib/revenueCalculations";
 import { getTariffForProduct, type TariffInfo } from "@/hooks/useMarketplaceTariffs";
-import { getMinLogisticsUzs } from "@/lib/marketplaceCalculator";
+import { getMinLogisticsUzs, normalizeLogistics } from "@/lib/marketplaceCalculator";
 import type { MarketplaceOrder } from "@/hooks/useMarketplaceDataStore";
 import { normalizeMarketplaceFinance } from "@/lib/marketplaceDataNormalizer";
 
@@ -55,8 +55,9 @@ function extractExactFees(item: any, marketplace: string) {
   const c = (v: number) => toDisplayUzs(v, marketplace);
 
   const rawLogisticsUzs = c(normalized.actualLogisticsFee);
-  const minLogisticsUzs = getMinLogisticsUzs(marketplace);
-  const enforcedLogisticsUzs = Math.max(rawLogisticsUzs, hasAnyRealData ? minLogisticsUzs : 0);
+  const enforcedLogisticsUzs = hasAnyRealData
+    ? normalizeLogistics(rawLogisticsUzs, marketplace)
+    : 0;
 
   const commissionUzs = c(normalized.actualCommission);
   const otherFeesUzs = c(normalized.actualOtherFees);

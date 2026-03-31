@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { MarketplaceDataStore, MarketplaceProduct } from './useMarketplaceDataStore';
 import { getRubToUzs } from '@/lib/currency';
+import { normalizeLogistics } from '@/lib/marketplaceCalculator';
 
 export interface TariffInfo {
   offerId: string;
@@ -413,19 +414,6 @@ function safeMapValues(map: any): TariffInfo[] {
  * Always prefer finance/report endpoints first.
  * Tariff map is only a fallback and MUST use the sold-time order price, not the current catalog price.
  */
-/**
- * Minimum logistics fees per marketplace (in UZS).
- * Uses dynamic RUB→UZS rate for WB.
- */
-function getMinimumLogistics(marketplace?: string): number {
-  switch (marketplace) {
-    case 'yandex': return 2000;
-    case 'uzum': return 5000;
-    case 'wildberries': return Math.round(46 * getRubToUzs()); // 46 RUB minimum
-    default: return 0;
-  }
-}
-
 export function getTariffForProduct(
   tariffMap: Map<string, TariffInfo> | undefined,
   offerId: string,
@@ -435,8 +423,6 @@ export function getTariffForProduct(
   const tariff = safeMapGet(tariffMap, offerId);
   
   if (tariff && tariff.totalTariff > 0) {
-    // Re-calculate commission using ORDER-TIME price and the commission PERCENT
-    // instead of using pre-computed amounts based on catalog price
     const commissionPercent = (tariff.commissionPercent || 0) / 100;
     const commission = Math.round(
       orderPrice > 0 && commissionPercent > 0
@@ -446,8 +432,9 @@ export function getTariffForProduct(
 
     const extraFees = tariff.otherFees || 0;
     const rawLogistics = Math.round(tariff.fulfillment + tariff.delivery + extraFees);
-    const minLogistics = getMinimumLogistics(marketplace);
-    const logistics = Math.max(rawLogistics, minLogistics);
+    const logistics = marketplace
+      ? normalizeLogistics(rawLogistics, marketplace)
+      : rawLogistics;
     const totalFee = commission + logistics;
     
     return {
