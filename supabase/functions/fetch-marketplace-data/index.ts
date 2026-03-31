@@ -3549,7 +3549,13 @@ serve(async (req) => {
               } else if (response) {
                 const errText = await response.text();
                 console.error(`Uzum price update failed for shop ${shopId}: ${response.status}, body: ${errText}`);
-                lastError = `Narx yangilash xato: ${response.status} (do'kon ${shopId})`;
+                if (response.status === 403) {
+                  lastError = `API kalitingizda narx sozlash ruxsati yo'q. Uzum kabinetida API kalitiga "Tovarlar" ruxsatini bering.`;
+                } else if (response.status === 400) {
+                  lastError = `Noto'g'ri ma'lumot yuborildi (skuId yoki narx). Xato: ${errText.substring(0, 200)}`;
+                } else {
+                  lastError = `Narx yangilash xato: ${response.status} (do'kon ${shopId}). ${errText.substring(0, 150)}`;
+                }
               }
             }
 
@@ -3617,14 +3623,17 @@ serve(async (req) => {
 
               if (response && response.ok) {
                 totalUpdated += validEntries.length;
+                console.log(`Uzum stock update succeeded for shop ${shopId}: ${validEntries.length} SKUs`);
               } else {
                 const errText = response ? await response.text() : 'No response';
                 const status = response ? response.status : 0;
                 console.error(`Uzum stock update failed for shop ${shopId}: ${status}, body: ${errText}`);
                 if (status === 400) {
-                  lastError = `FBS ombori sozlanmagan yoki SKU FBS uchun ro'yxatdan o'tmagan. Uzum kabinetida FBS omborini yarating va qoldiqlarni Excel orqali yangilang.`;
+                  lastError = `FBS ombori sozlanmagan yoki SKU FBS uchun ro'yxatdan o'tmagan. Uzum kabinetida FBS omborini yarating.`;
+                } else if (status === 403) {
+                  lastError = `API kalitingizda qoldiq boshqarish ruxsati yo'q. Uzum kabinetida API kalitiga "Tovarlar" ruxsatini bering.`;
                 } else {
-                  lastError = `Stock update failed: ${status} (shop ${shopId})`;
+                  lastError = `Qoldiq yangilash xato: ${status} (do'kon ${shopId}). ${errText.substring(0, 150)}`;
                 }
               }
             }
