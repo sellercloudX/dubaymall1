@@ -120,7 +120,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
   const [isCalculating, setIsCalculating] = useState(false);
   const [isRealTariff, setIsRealTariff] = useState(false);
   const [generateInfographics, setGenerateInfographics] = useState(true);
-  const [infographicCount, setInfographicCount] = useState(4);
+  const [infographicCount, setInfographicCount] = useState(2);
   const [targetMarketplace, setTargetMarketplace] = useState<TargetMarketplace>('yandex');
   
   // Background processing state
@@ -543,7 +543,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
               costPrice: pricingData.costPrice,
               images: cardImages,
             },
-            skipImageGeneration: generatedInfos.length >= 2,
+            skipImageGeneration: true,
             cloneMode: false,
             skipBilling: true,
           },
@@ -568,7 +568,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
               images: cardImages,
               category: analyzed?.category,
             },
-            skipImageGeneration: generatedInfos.length >= 2,
+            skipImageGeneration: true,
           },
         });
 
@@ -603,7 +603,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
               mxikCode: mxikResult?.mxik_code,
               mxikName: mxikResult?.mxik_name,
             },
-            skipImageGeneration: hasAiImages,
+            skipImageGeneration: true,
             skipBilling: true,
             pricing: {
               costPrice: pricingData.costPrice,

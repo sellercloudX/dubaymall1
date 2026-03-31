@@ -242,15 +242,18 @@ async function searchLocalDB(
   category?: string
 ): Promise<MxikDbRow[]> {
   const db = getMxikClient();
+  const words = productName.toLowerCase().split(/\s+/).filter(w => w.length > 2);
   const synonymTerms = expandSearchTerms(productName, category).slice(0, 5);
+  const baseTerms = Array.from(new Set([
+    productName.toLowerCase().trim(),
+    latinToCyrillic(productName).trim(),
+    ...words.slice(0, 4),
+    ...synonymTerms,
+    (category || '').toLowerCase().trim(),
+  ].filter(t => t.length > 2)));
   
   // Run all searches in parallel
-  const searches = [
-    ...synonymTerms.map(t => ilikeSearch(db, t, 10)),
-  ];
-  
-  // Also search category
-  if (category) searches.push(ilikeSearch(db, category, 8));
+  const searches = baseTerms.slice(0, 8).map(t => ilikeSearch(db, t, 12));
 
   const results = (await Promise.all(searches)).flat();
 
@@ -618,22 +621,26 @@ serve(async (req) => {
 
     // STEP 2: Search tasnif.soliq.uz API (parallel with synonym expansion)
     const synonymTerms = expandSearchTerms(productName, category);
-    const searchTerms = [
+    const descriptionTerms = (description || '')
+      .toLowerCase()
+      .split(/[^\p{L}\p{N}]+/u)
+      .filter(term => term.length > 3)
+      .slice(0, 2);
+    const searchTerms = Array.from(new Set([
       productName.slice(0, 50),
-      ...synonymTerms.slice(0, 3),
+      latinToCyrillic(productName).slice(0, 50),
+      ...productName.split(/\s+/).filter(term => term.length > 3).slice(0, 3),
+      ...synonymTerms.slice(0, 4),
       category || '',
-    ].filter(Boolean);
+      ...descriptionTerms,
+    ].filter(Boolean)));
 
-    const allTasnif: any[] = [];
-    for (const term of searchTerms) {
-      if (!term || term.length < 2) continue;
-      const [ruRes, uzRes] = await Promise.all([
-        searchTasnif(term, 'ru'),
-        searchTasnif(term, 'uz'),
-      ]);
-      allTasnif.push(...ruRes, ...uzRes);
-      if (allTasnif.length >= 30) break;
-    }
+    const allTasnif = (await Promise.all(
+      searchTerms.slice(0, 8).flatMap(term => {
+        if (!term || term.length < 2) return [] as Promise<any[]>[];
+        return [searchTasnif(term, 'ru'), searchTasnif(term, 'uz')];
+      })
+    )).flat();
     const uniqueTasnif = Array.from(new Map(allTasnif.map(i => [i.mxikCode, i])).values());
 
     console.log(`[MXIK] DB: ${dbResults.length}, Tasnif: ${uniqueTasnif.length}`);

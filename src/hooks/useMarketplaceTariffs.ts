@@ -50,7 +50,7 @@ export function useMarketplaceTariffs(
   const stableKey = productIds.length > 0 ? productIds.substring(0, 200) : 'empty';
 
   return useQuery({
-    queryKey: ['marketplace-tariffs', 'v21-commission-fix', connectedMarketplaces.join(','), stableKey],
+    queryKey: ['marketplace-tariffs', 'v22-sold-price-fees', connectedMarketplaces.join(','), stableKey],
     queryFn: async () => {
       const tariffMap = new Map<string, TariffInfo>();
 
@@ -409,9 +409,8 @@ function safeMapValues(map: any): TariffInfo[] {
  * Get tariff for a specific product.
  * Marketplace-aware: uses real data when available, sensible fallbacks otherwise.
  * 
- * Yandex: FEE (~15.5%) + PAYMENT_TRANSFER (~1.5%) + DELIVERY (~6000) + withdrawal (~1%)
- * Uzum: Commission (10-20%) + Service fee (2%) + Logistics (4000-20000)
- * WB: Commission (5-25%) + Logistics (base + per-liter)
+ * Always prefer finance/report endpoints first.
+ * Tariff map is only a fallback and MUST use the sold-time order price, not the current catalog price.
  */
 export function getTariffForProduct(
   tariffMap: Map<string, TariffInfo> | undefined,
@@ -433,25 +432,24 @@ export function getTariffForProduct(
       commission = Math.round(price * (tariff.commissionPercent / 100));
     }
 
-    const logistics = tariff.fulfillment + tariff.delivery + extraFees;
+    let logistics = tariff.fulfillment + tariff.delivery + extraFees;
+    if (logistics <= 0) {
+      if (marketplace === 'uzum') logistics = 5000;
+      else if (marketplace === 'yandex') logistics = 2000;
+      else if (marketplace === 'wildberries') logistics = Math.round(46 * getRubToUzs());
+    }
+
     const withdrawalFee = marketplace === 'yandex' ? Math.round(price * 0.01) : 0;
-    const totalFee = commission + logistics + withdrawalFee;
     
-    // Safety assertion: commission should never exceed sold price
+    // Fallback tariff estimation must never exceed sold price.
     if (price > 0 && commission > price) {
       console.warn(
-        `[FEE_ASSERT] ${marketplace} offerId=${offerId}: commission=${commission} > price=${price}, commissionPercent=${tariff.commissionPercent}%. Clamping to 40% of price.`
+        `[FEE_ASSERT] ${marketplace} offerId=${offerId}: commission=${commission} > price=${price}, commissionPercent=${tariff.commissionPercent}%. Clamping to sold price.`
       );
-      commission = Math.round(price * 0.40); // Maximum realistic commission
-      const clampedTotal = commission + logistics + withdrawalFee;
-      return {
-        commission,
-        logistics,
-        withdrawal: withdrawalFee,
-        totalFee: clampedTotal,
-        isReal: true,
-      };
+      commission = price;
     }
+
+    const totalFee = commission + logistics + withdrawalFee;
     
     return {
       commission,
