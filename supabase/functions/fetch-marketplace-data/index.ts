@@ -3560,7 +3560,11 @@ serve(async (req) => {
                 const errText = response ? await response.text() : 'No response';
                 const status = response ? response.status : 0;
                 console.error(`Uzum stock update failed for shop ${shopId}: ${status}, body: ${errText}`);
-                lastError = `Stock update failed: ${status} (shop ${shopId}). FBO qoldiqlarini API orqali o'zgartirib bo'lmaydi — faqat FBS.`;
+                if (status === 400) {
+                  lastError = `FBS ombori sozlanmagan yoki SKU FBS uchun ro'yxatdan o'tmagan. Uzum kabinetida FBS omborini yarating va qoldiqlarni Excel orqali yangilang.`;
+                } else {
+                  lastError = `Stock update failed: ${status} (shop ${shopId})`;
+                }
               }
             }
 
