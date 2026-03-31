@@ -159,32 +159,39 @@ function extractUzumActualFees(item: any, itemPriceUzs: number, marketplace: str
 } | null {
   if (marketplace !== 'uzum') return null;
   
-  const itemCommPercent = item.commissionPercent;
-  const itemCommBase = item.commissionBase; // absolute commission amount from Finance API
-  const itemDelivery = item.deliveryAmount || 0; // actual logistics from Finance API
+  // === COMMISSION (from Finance API fields) ===
+  // commissionBase = absolute commission amount (commissionAmount from FinanceItemEntity)
+  // commissionPercent = percentage rate from Finance API
+  const itemCommBase = Number(item.commissionBase || item.commissionAmount || 0);
+  const itemCommPercent = Number(item.commissionPercent || 0);
   
   let commission = 0;
   let hasRealCommission = false;
   
   // Priority 1: Absolute commission amount from Finance API
-  if (itemCommBase && itemCommBase > 0) {
+  if (itemCommBase > 0) {
     commission = itemCommBase;
     hasRealCommission = true;
   }
-  // Priority 2: Commission percentage from Finance API × actual sold price
-  else if (itemCommPercent && itemCommPercent > 0 && itemPriceUzs > 0) {
+  // Priority 2: Commission percentage × SOLD price (not catalog price)
+  else if (itemCommPercent > 0 && itemPriceUzs > 0) {
     commission = Math.round(itemPriceUzs * (itemCommPercent / 100));
     hasRealCommission = true;
   }
   
-  // If we have EITHER real commission OR real logistics data, return it
+  // === LOGISTICS / DELIVERY (SEPARATE field from Finance API) ===
+  // deliveryAmount / logisticsAmount / deliveryCost = actual delivery fee
+  // These are NEVER part of commission — they are separate marketplace charges
+  const itemDelivery = Number(item.deliveryAmount || item.logisticsAmount || item.deliveryCost || 0);
+  
+  // If we have ANY real finance data, return it
+  // Even if commission is 0 but logistics > 0, that's valid real data
   if (hasRealCommission || itemDelivery > 0) {
-    const logistics = itemDelivery > 0 ? itemDelivery : 0;
     return {
       commission,
-      logistics,
+      logistics: itemDelivery,
       withdrawal: 0,
-      totalFees: commission + logistics,
+      totalFees: commission + itemDelivery,
       isReal: true,
     };
   }
