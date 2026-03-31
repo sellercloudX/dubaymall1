@@ -152,13 +152,13 @@ export function parseYandexFinance(item: any): NormalizedMarketplaceFinance {
     'compensationAmount',
     'additionalPayment',
   );
-  const sellerRevenue = pickFirst(item,
-    'actualSoldPrice',
-    'bankSum',
-    'sellerAmount',
-    'transactionSum',
-    'forPay',
-  );
+  // CRITICAL: actualSoldPrice from edge function ALREADY includes subsidy
+  const rawActualSoldPrice = toPositiveNumber(item.actualSoldPrice);
+  const sellerRevenue = rawActualSoldPrice > 0
+    ? rawActualSoldPrice
+    : pickFirst(item, 'bankSum', 'sellerAmount', 'transactionSum', 'forPay');
+  const subsidyAlreadyIncluded = rawActualSoldPrice > 0;
+
   const grossPrice = pickFirst(item,
     'grossPrice',
     'customer_payment_amount',
@@ -174,7 +174,9 @@ export function parseYandexFinance(item: any): NormalizedMarketplaceFinance {
     actualCommission,
     actualLogisticsFee,
     actualOtherFees,
-    actualSoldPrice: sellerRevenue > 0 || subsidyAmount > 0 ? sellerRevenue + subsidyAmount : 0,
+    actualSoldPrice: subsidyAlreadyIncluded
+      ? sellerRevenue
+      : (sellerRevenue > 0 || subsidyAmount > 0 ? sellerRevenue + subsidyAmount : 0),
     grossPrice,
     subsidyAmount,
     isExact: hasAnyData,
