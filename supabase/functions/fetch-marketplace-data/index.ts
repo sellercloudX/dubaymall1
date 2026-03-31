@@ -2961,9 +2961,10 @@ serve(async (req) => {
                 console.error(`Uzum Finance page error:`, pageErr);
                 break;
               }
-            }
+            } // end while finHasMore
+            } // end for financeApproaches
 
-            console.log(`Uzum Finance orders total: ${fboCount} (deduplicated with FBS)`);
+            console.log(`Uzum Finance orders total: ${fboCount} (deduplicated with FBS), financeDataFound=${financeDataFound}`);
 
             // ===== ENRICH FBS orders with Finance API data (commission, logistics) =====
             // /v2/fbs/orders does NOT return financial fields — only /v1/finance/orders has them.
