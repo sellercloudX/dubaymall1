@@ -846,7 +846,7 @@ async function aiOptimize(
     return s;
   };
 
-  console.log(`🤖 AI optimizing: ${requiredParams.length} REQUIRED + ${optionalParams.length} optional = ${allParams.length} total`);
+  console.log(`🤖 AI optimizing: ${requiredParams.length} REQUIRED + ${recommendedParams.length} RECOMMENDED (filters) + ${optionalParams.length} optional = ${allParams.length} total`);
 
   const sourceCharacteristicsText = Array.isArray(product.sourceCharacteristics) && product.sourceCharacteristics.length > 0
     ? product.sourceCharacteristics
