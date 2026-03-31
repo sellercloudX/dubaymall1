@@ -244,11 +244,12 @@ export function MarketplaceProducts({ connectedMarketplaces, store }: Marketplac
                           const priceUzs = toDisplayUzs(price, selectedMarketplace);
                           const tariff = getTariffForProduct(tariffMap, product.offerId, priceUzs, selectedMarketplace);
                           const tariffInfo = tariffMap instanceof Map ? tariffMap?.get(product.offerId) : (tariffMap as any)?.[product.offerId];
-                          const commPct = tariffInfo?.commissionPercent;
+                          // Show total tariff % (commission + delivery + all fees) — matches what marketplace dashboards display
+                          const displayPct = tariffInfo?.tariffPercent ?? tariffInfo?.commissionPercent;
                           return (
                             <div className="flex flex-col items-end">
                               <span className="text-sm font-medium">
-                                {commPct !== undefined ? `${commPct.toFixed(1)}%` : '—'}
+                                {displayPct !== undefined && displayPct > 0 ? `${displayPct.toFixed(1)}%` : '—'}
                               </span>
                               {tariff.isReal ? (
                                 <Badge variant="outline" className="text-[9px] px-1 py-0 border-primary/30 text-primary">Real</Badge>
