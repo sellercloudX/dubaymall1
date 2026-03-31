@@ -299,7 +299,7 @@ Javobni faqat JSON array: ["so'z1", "so'z2", ...]`;
           method: "POST",
           headers: { Authorization: `Bearer ${lovableApiKey}`, "Content-Type": "application/json" },
           body: JSON.stringify({
-            model: "google/gemini-2.5-flash",
+            model: "google/gemini-3-flash-preview",
             messages: [{ role: "user", content: `VAZIFA: Mahsulotga ENG TO'G'RI MXIK (IKPU) kodni tanla.
 
 Mahsulot: "${name}"
@@ -310,6 +310,11 @@ MUHIM QOIDALAR:
 2. Kategoriya bo'yicha mos kelmaydigan kodlarni TANLAMA
 3. Eng ANIQ mos keladigan kodni tanla
 4. Agar hech biri mos kelmasa, 0 yoz
+5. DIQQAT: "alkogol", "tamaki", "dori-darmon", "qurol" kategoriyalariga KIRMAYDIGAN mahsulotlar uchun BU kategoriyalardagi kodlarni TANLAMA!
+6. Mahsulot nomidagi ASOSIY so'zga e'tibor ber:
+   - "Чехол для iPhone" → "чехол" (telefon aksessuari), "пластмассовые изделия" EMAS
+   - "Кроссовки Nike" → "обувь спортивная", "полимерные материалы" EMAS
+   - "Шампунь" → "средства для волос", "химические реактивы" EMAS
 
 Variantlar:
 ${options}
@@ -825,10 +830,15 @@ async function aiOptimize(
     return true;
   });
 
-  // ═══ SEPARATE REQUIRED vs OPTIONAL params ═══
+  // ═══ SEPARATE REQUIRED vs RECOMMENDED (FILTER) vs OPTIONAL params ═══
+  // REQUIRED = "Основные характеристики" (12 ball)
+  // RECOMMENDED = "Фильтры" (8 ball) — Yandex uses these for search filters
+  // OPTIONAL = everything else
   const isRequired = (p: any) => p.required === true || p.constraintType === "REQUIRED" || p.mandatory === true;
+  const isRecommended = (p: any) => p.constraintType === "RECOMMENDED";
   const requiredParams = allParams.filter(isRequired);
-  const optionalParams = allParams.filter(p => !isRequired(p));
+  const recommendedParams = allParams.filter(p => !isRequired(p) && isRecommended(p));
+  const optionalParams = allParams.filter(p => !isRequired(p) && !isRecommended(p));
 
   const formatParam = (p: any) => {
     let s = `  - id:${p.id}, "${p.name}", type:${p.type || "TEXT"}`;
@@ -841,7 +851,7 @@ async function aiOptimize(
     return s;
   };
 
-  console.log(`🤖 AI optimizing: ${requiredParams.length} REQUIRED + ${optionalParams.length} optional = ${allParams.length} total`);
+  console.log(`🤖 AI optimizing: ${requiredParams.length} REQUIRED + ${recommendedParams.length} RECOMMENDED (filters) + ${optionalParams.length} optional = ${allParams.length} total`);
 
   const sourceCharacteristicsText = Array.isArray(product.sourceCharacteristics) && product.sourceCharacteristics.length > 0
     ? product.sourceCharacteristics
@@ -873,11 +883,15 @@ ${categoryInstructions}
 ⛔ "ПРОЧИЕ ХАРАКТЕРИСТИКИ" / "ПРОЧЕЕ" degan parametrni HECH QACHON TO'LDIRMA!
 
 ═══════════════════════════════════════════════════════
-⚠️⚠️⚠️ BIRINCHI NAVBATDA: "ASOSIY XUSUSIYATLAR" (${requiredParams.length} ta MAJBURIY parametr) ⚠️⚠️⚠️
+⚠️⚠️⚠️ BIRINCHI NAVBATDA: "ASOSIY XUSUSIYATLAR" (${requiredParams.length} ta MAJBURIY parametr) — 12 BALL ⚠️⚠️⚠️
 Bu parametrlar TO'LDIRILMASA ball PAST bo'ladi! HAR BIRINI ALBATTA TO'LDIR!
 "Maydonlarni ko'rsatish" tugmasi ortidagi YASHIRIN parametrlar HAM shu yerda!
 ═══════════════════════════════════════════════════════
 ${requiredParams.map(formatParam).join("\n")}
+
+═══ "FILTRLAR UCHUN QO'SHIMCHA XUSUSIYATLAR" (${recommendedParams.length} ta RECOMMENDED) — 8 BALL ═══
+⚠️ Bu parametrlar FILTR sifatida ishlaydi! Qidiruv natijalarida chiqish uchun ALBATTA TO'LDIR!
+${recommendedParams.map(formatParam).join("\n")}
 
 ═══ QO'SHIMCHA PARAMETRLAR (${optionalParams.length} ta) — IMKON QADAR TO'LDIR ═══
 ${optionalParams.map(formatParam).join("\n")}
@@ -898,7 +912,8 @@ QOIDALAR:
    - NUMBER parametr → value raqam
    - BOOLEAN parametr → "true" yoki "false"
    
-   *** JUDA MUHIM: BIRINCHI ${requiredParams.length} ta MAJBURIY parametrni HAR BIRINI to'ldir! ***
+   *** JUDA MUHIM: ${requiredParams.length} ta MAJBURIY + ${recommendedParams.length} ta FILTR parametrni HAR BIRINI to'ldir! ***
+   *** FILTR parametrlari to'ldirilmasa mahsulot qidiruv natijalarida CHIQMAYDI! ***
    *** Bilmasang — mahsulotga mos taxminiy qiymat yoz! ***
    *** Har bir parametr uchun FAQAT value YOKI valueId ber, ikkalasini emas! ***
    *** FAQAT BITTA qiymat ber har bir parametrga! ***
@@ -943,19 +958,20 @@ JAVOB FAQAT JSON:
   
   if (!result) return null;
 
-  // ═══ PASS 2: Focus on MISSING REQUIRED params ═══
+  // ═══ PASS 2: Focus on MISSING REQUIRED + RECOMMENDED (FILTER) params ═══
   const filledParamIds = new Set(
     (result.parameterValues || []).map((p: any) => Number(p.parameterId))
   );
   
   const missingRequired = requiredParams.filter((p: any) => !filledParamIds.has(Number(p.id)));
+  const missingRecommended = recommendedParams.filter((p: any) => !filledParamIds.has(Number(p.id)));
   const missingOptional = optionalParams.filter((p: any) => !filledParamIds.has(Number(p.id)));
-  const allMissing = [...missingRequired, ...missingOptional];
+  const allMissing = [...missingRequired, ...missingRecommended, ...missingOptional];
   
-  console.log(`📊 Pass 1 natija: ${result.parameterValues?.length || 0} to'ldirildi. Bo'sh: ${missingRequired.length} MAJBURIY + ${missingOptional.length} optional`);
+  console.log(`📊 Pass 1 natija: ${result.parameterValues?.length || 0} to'ldirildi. Bo'sh: ${missingRequired.length} MAJBURIY + ${missingRecommended.length} FILTR + ${missingOptional.length} optional`);
   
   if (allMissing.length > 0 && allMissing.length <= 80) {
-    console.log(`🔄 Pass 2: ${missingRequired.length} MAJBURIY + ${missingOptional.length} optional to'ldirish...`);
+    console.log(`🔄 Pass 2: ${missingRequired.length} MAJBURIY + ${missingRecommended.length} FILTR + ${missingOptional.length} optional to'ldirish...`);
     
     const pass2Prompt = `VAZIFA: Quyidagi BO'SH parametrlarni to'ldir!
 Bu birinchi bosqichda to'ldirilMAGAN parametrlar. BALL oshirish uchun HAR BIRINI to'ldir!
@@ -966,8 +982,11 @@ MAHSULOT: "${product.name}" — ${categoryName}
 Brend: ${result.vendor || product.brand || "OEM"}
 ${sourceCharacteristicsText ? `Manba xususiyatlari: ${sourceCharacteristicsText}` : ''}
 
-${missingRequired.length > 0 ? `⚠️⚠️⚠️ MAJBURIY — HAR BIRINI ALBATTA TO'LDIR (${missingRequired.length} ta):
+${missingRequired.length > 0 ? `⚠️⚠️⚠️ MAJBURIY — "ASOSIY XUSUSIYATLAR" 12 BALL — HAR BIRINI ALBATTA TO'LDIR (${missingRequired.length} ta):
 ${missingRequired.map(formatParam).join("\n")}
+` : ''}
+${missingRecommended.length > 0 ? `⚠️ FILTRLAR — "QO'SHIMCHA XUSUSIYATLAR" 8 BALL — Qidiruvda chiqish uchun TO'LDIR (${missingRecommended.length} ta):
+${missingRecommended.map(formatParam).join("\n")}
 ` : ''}
 ${missingOptional.length > 0 ? `QO'SHIMCHA (${missingOptional.length} ta):
 ${missingOptional.map(formatParam).join("\n")}
@@ -1012,22 +1031,26 @@ JAVOB FAQAT JSON array:
       console.error("AI Pass 2 error:", e);
     }
     
-    // ═══ PASS 3: If REQUIRED params STILL missing, force-fill them ═══
+    // ═══ PASS 3: If REQUIRED or RECOMMENDED params STILL missing, force-fill them ═══
     const filledAfterP2 = new Set(
       (result.parameterValues || []).map((p: any) => Number(p.parameterId))
     );
     const stillMissingRequired = requiredParams.filter((p: any) => !filledAfterP2.has(Number(p.id)));
+    const stillMissingRecommended = recommendedParams.filter((p: any) => !filledAfterP2.has(Number(p.id)));
+    const stillMissingHighPriority = [...stillMissingRequired, ...stillMissingRecommended];
     
-    if (stillMissingRequired.length > 0) {
-      console.log(`⚠️ Pass 3: ${stillMissingRequired.length} MAJBURIY param hali bo'sh! Force-fill...`);
+    if (stillMissingHighPriority.length > 0) {
+      console.log(`⚠️ Pass 3: ${stillMissingRequired.length} MAJBURIY + ${stillMissingRecommended.length} FILTR param hali bo'sh! Force-fill...`);
       
-      const pass3Prompt = `FAQAT shu ${stillMissingRequired.length} ta MAJBURIY parametrni to'ldir. Bu parametrlar TO'LDIRILMASA kartochka sifati JUDA PAST bo'ladi!
+      const pass3Prompt = `FAQAT shu ${stillMissingHighPriority.length} ta parametrni to'ldir. Bu parametrlar TO'LDIRILMASA kartochka sifati JUDA PAST bo'ladi!
+${stillMissingRequired.length > 0 ? `\n⚠️ MAJBURIY (12 BALL — "Asosiy xususiyatlar"):` : ''}
+${stillMissingRecommended.length > 0 ? `⚠️ FILTR (8 BALL — "Qo'shimcha xususiyatlar"):` : ''}
 
 Mahsulot: "${product.name}" (${categoryName})
 Brend: ${result.vendor || product.brand || "OEM"}
 
 HAR BIRINI ALBATTA TO'LDIR — BO'SH QOLDIRMA!:
-${stillMissingRequired.map(formatParam).join("\n")}
+${stillMissingHighPriority.map(formatParam).join("\n")}
 
 QOIDALAR: OPTIONS bor → valueId raqam tanla. TEXT → faqat qiymat. Bilmasang taxminiy yoz!
 JAVOB FAQAT JSON array: [{"parameterId":123,"valueId":456}]`;
@@ -1069,9 +1092,13 @@ JAVOB FAQAT JSON array: [{"parameterId":123,"valueId":456}]`;
   // Final stats
   const finalFilled = new Set((result.parameterValues || []).map((p: any) => Number(p.parameterId)));
   const finalMissingReq = requiredParams.filter(p => !finalFilled.has(Number(p.id)));
-  console.log(`📊 YAKUNIY: ${result.parameterValues?.length || 0}/${allParams.length} to'ldirildi. MAJBURIY bo'sh: ${finalMissingReq.length}/${requiredParams.length}`);
+  const finalMissingRec = recommendedParams.filter(p => !finalFilled.has(Number(p.id)));
+  console.log(`📊 YAKUNIY: ${result.parameterValues?.length || 0}/${allParams.length} to'ldirildi. MAJBURIY bo'sh: ${finalMissingReq.length}/${requiredParams.length}, FILTR bo'sh: ${finalMissingRec.length}/${recommendedParams.length}`);
   if (finalMissingReq.length > 0) {
     console.log(`⚠️ Bo'sh MAJBURIY: ${finalMissingReq.map(p => `"${p.name}"(${p.id})`).join(', ')}`);
+  }
+  if (finalMissingRec.length > 0) {
+    console.log(`⚠️ Bo'sh FILTR: ${finalMissingRec.map(p => `"${p.name}"(${p.id})`).join(', ')}`);
   }
 
   return result;

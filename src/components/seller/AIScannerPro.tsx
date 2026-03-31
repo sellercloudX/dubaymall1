@@ -96,7 +96,7 @@ interface BackgroundTask {
 }
 
 type Step = 'capture' | 'analyzing' | 'pricing';
-type TargetMarketplace = 'yandex' | 'wildberries' | 'uzum';
+type TargetMarketplace = 'yandex' | 'wildberries';
 
 interface AIScannerProProps {
   shopId: string;
@@ -371,7 +371,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
 
     try {
       // ═══ BILLING: One check for the entire scanner pipeline ═══
-      const scannerFeatureKey = targetMarketplace === 'wildberries' ? 'wb-card-create' : targetMarketplace === 'uzum' ? 'uzum-card-create' : 'yandex-card-create';
+      const scannerFeatureKey = targetMarketplace === 'wildberries' ? 'wb-card-create' : 'yandex-card-create';
       if (!(await checkBillingAccess(scannerFeatureKey))) {
         updateTaskStatus('failed');
         return;
@@ -556,31 +556,6 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
         if (cardResult && !cardResult.success && cardResult.error) {
           throw new Error(`WB: ${cardResult.error}`);
         }
-      } else if (targetMarketplace === 'uzum') {
-        // Uzum API does NOT support product creation — only prepare data + offer extension auto-fill
-        const { data: cardResult, error } = await supabase.functions.invoke('create-uzum-card', {
-          body: {
-            product: {
-              name: normalizedProductName,
-              description: product.description || analyzed?.description,
-              price: pricingData.sellingPrice,
-              costPrice: pricingData.costPrice,
-              images: cardImages,
-              category: analyzed?.category,
-            },
-            skipImageGeneration: true,
-          },
-        });
-
-        if (error) {
-          const errDetail = cardResult?.error || error.message || 'Uzum xatosi';
-          throw new Error(`Uzum: ${errDetail}`);
-        }
-        if (cardResult && !cardResult.success && cardResult.error) {
-          throw new Error(`Uzum: ${cardResult.error}`);
-        }
-        // Uzum API doesn't support card creation — always "prepared" mode
-        // Card data saved for potential extension auto-fill use
       } else {
         // Yandex card creation — ALWAYS skip image gen since AIScannerPro already generated them
         const hasAiImages = generatedInfos.length >= 1;
@@ -665,11 +640,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
       }
 
       updateTaskStatus('completed', generatedInfos);
-      if (targetMarketplace === 'uzum') {
-        toast.success(`"${normalizedProductName}" — AI kontent tayyor! Extension orqali avtomatik to'ldiriladi ✨`, { duration: 6000 });
-      } else {
-        toast.success(`"${normalizedProductName}" kartochkasi tayyor!`);
-      }
+      toast.success(`"${normalizedProductName}" kartochkasi tayyor!`);
       
       if (onSuccess) onSuccess();
     } catch (error: any) {
@@ -702,7 +673,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
         { name: 'Tavsif yaratish', status: 'pending', model: 'AI', icon: <FileText className="h-4 w-4" /> },
         { name: 'MXIK aniqlash', status: 'pending', model: 'Gemini + DB', icon: <Hash className="h-4 w-4" /> },
         { name: 'Rasm + Infografika', status: 'pending', model: 'OpenAI gpt-image-1', icon: <ImageLucide className="h-4 w-4" /> },
-        { name: 'Kartochka yaratish', status: 'pending', model: targetMarketplace === 'wildberries' ? 'WB API' : targetMarketplace === 'uzum' ? 'Uzum API' : 'Yandex API', icon: <Store className="h-4 w-4" /> },
+        { name: 'Kartochka yaratish', status: 'pending', model: targetMarketplace === 'wildberries' ? 'WB API' : 'Yandex API', icon: <Store className="h-4 w-4" /> },
       ],
       generatedImages: [],
       startedAt: new Date(),
@@ -1033,14 +1004,6 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
               >
                 🟣 WB
               </Button>
-              <Button
-                variant={targetMarketplace === 'uzum' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setTargetMarketplace('uzum')}
-                className="flex-1"
-              >
-                🟢 Uzum
-              </Button>
             </div>
             {/* Selected Product Preview */}
             <div className="flex gap-3 p-3 bg-muted/50 rounded-lg border">
@@ -1134,7 +1097,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
                 <div className="bg-muted/50 px-4 py-3 border-b">
                   <h4 className="font-semibold flex items-center gap-2">
                     <DollarSign className="h-4 w-4" />
-                    Narx tuzilmasi ({targetMarketplace === 'wildberries' ? 'Wildberries' : targetMarketplace === 'uzum' ? 'Uzum Market' : 'Yandex Market'})
+                    Narx tuzilmasi ({targetMarketplace === 'wildberries' ? 'Wildberries' : 'Yandex Market'})
                   </h4>
                 </div>
 
