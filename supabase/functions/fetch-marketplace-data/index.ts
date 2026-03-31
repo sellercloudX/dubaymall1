@@ -1372,7 +1372,6 @@ serve(async (req) => {
                 body: JSON.stringify({
                   parameters: { 
                     campaignId: Number(campaignId),
-                    currency: 'UZS',
                   },
                   offers: offersForCalc,
                 }),
