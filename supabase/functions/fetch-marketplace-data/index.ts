@@ -3589,7 +3589,8 @@ serve(async (req) => {
         }
 
       } else if (dataType === "update-stock") {
-        // POST /v2/fbs/sku/stocks — FBS stock only (FBO is managed by Uzum warehouse)
+        // POST /v2/fbs/sku/stocks — FBS/DBS stock only
+        // Swagger schema: { skuAmountList: [{ skuId, barcode (required!), amount }] }
         try {
           const { stocks, stockUpdates } = requestBody;
           const updates = stocks || stockUpdates;
@@ -3597,44 +3598,33 @@ serve(async (req) => {
           if (!updates || updates.length === 0) {
             result = { success: false, error: "No stock updates provided" };
           } else {
-            // Group by shopId for multi-shop support (same as price updates)
-            const byShop = new Map<string, any[]>();
-            for (const s of updates) {
-              const shopId = String(s.shopId || uzumShopId || '');
-              const list = byShop.get(shopId) || [];
-              list.push({
-                skuId: parseInt(s.skuId || s.offerId || s.sku || '0'),
+            // Build skuAmountList with required barcode field
+            const skuAmountList = updates
+              .filter((s: any) => parseInt(s.skuId || s.offerId || '0') > 0)
+              .map((s: any) => ({
+                skuId: parseInt(s.skuId || s.offerId || '0'),
+                barcode: String(s.barcode || ''),
                 amount: s.amount || s.quantity || s.stock || 0,
-              });
-              byShop.set(shopId, list);
-            }
+              }));
 
-            let totalUpdated = 0;
-            let lastError = '';
+            if (skuAmountList.length === 0) {
+              result = { success: false, error: "No valid SKUs to update" };
+            } else {
+              console.log(`Uzum stock update: ${skuAmountList.length} SKUs, sample: ${JSON.stringify(skuAmountList[0])}`);
 
-            for (const [shopId, items] of byShop) {
-              const validEntries = items.filter((e: any) => e.skuId > 0);
-              if (validEntries.length === 0) continue;
-
-              console.log(`Uzum stock update: ${validEntries.length} SKUs, shopId: ${shopId}, sample: ${JSON.stringify(validEntries[0])}`);
-
-              // Retry with backoff for rate limits (429)
               let response: Response | null = null;
               for (let attempt = 0; attempt < 3; attempt++) {
                 response = await fetch(
                   `${uzumBaseUrl}/v2/fbs/sku/stocks`,
                   {
                     method: 'POST',
-                    headers: {
-                      ...uzumHeaders,
-                      "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({ skuAmountList: validEntries }),
+                    headers: { ...uzumHeaders, "Content-Type": "application/json" },
+                    body: JSON.stringify({ skuAmountList }),
                   }
                 );
                 if (response.status === 429) {
                   const waitMs = Math.min(2000 * Math.pow(2, attempt), 10000);
-                  console.warn(`Uzum stock update 429, waiting ${waitMs}ms (attempt ${attempt + 1}/3)`);
+                  console.warn(`Uzum stock 429, waiting ${waitMs}ms (attempt ${attempt + 1}/3)`);
                   await sleep(waitMs);
                   continue;
                 }
@@ -3642,25 +3632,23 @@ serve(async (req) => {
               }
 
               if (response && response.ok) {
-                totalUpdated += validEntries.length;
-                console.log(`Uzum stock update succeeded for shop ${shopId}: ${validEntries.length} SKUs`);
+                const resData = await safeJson(response, {});
+                const updated = resData?.payload?.updatedRecords || skuAmountList.length;
+                console.log(`Uzum stock update succeeded: ${updated} records`);
+                result = { success: true, updated };
               } else {
                 const errText = response ? await response.text() : 'No response';
                 const status = response ? response.status : 0;
-                console.error(`Uzum stock update failed for shop ${shopId}: ${status}, body: ${errText}`);
+                console.error(`Uzum stock update failed: ${status}, body: ${errText}`);
                 if (status === 400) {
-                  lastError = `FBS ombori sozlanmagan yoki SKU FBS uchun ro'yxatdan o'tmagan. Uzum kabinetida FBS omborini yarating.`;
+                  result = { success: false, error: `FBS ombori sozlanmagan yoki SKU FBS uchun ro'yxatdan o'tmagan. Uzum kabinetida FBS omborini yarating va SKU'larni ulang.` };
                 } else if (status === 403) {
-                  lastError = `API kalitingizda qoldiq boshqarish ruxsati yo'q. Uzum kabinetida API kalitiga "Tovarlar" ruxsatini bering.`;
+                  result = { success: false, error: `API kalitingizda qoldiq boshqarish ruxsati yo'q.` };
                 } else {
-                  lastError = `Qoldiq yangilash xato: ${status} (do'kon ${shopId}). ${errText.substring(0, 150)}`;
+                  result = { success: false, error: `Qoldiq yangilash xato: ${status}. ${errText.substring(0, 150)}` };
                 }
               }
             }
-
-            result = totalUpdated > 0
-              ? { success: true, updated: totalUpdated }
-              : { success: false, error: lastError || "No valid SKUs to update. FBO mahsulotlarga qoldiq qo'yib bo'lmaydi." };
           }
         } catch (e) {
           console.error("Uzum stock update error:", e);
