@@ -2767,14 +2767,16 @@ serve(async (req) => {
             const finShopIds = allShopIds.length > 0 ? allShopIds : (uzumShopId ? [String(uzumShopId)] : []);
             console.log(`Uzum Finance orders: querying with ${finShopIds.length} shopIds: ${finShopIds.join(',')}`);
             // Use 365-day lookback for finance data (90 days was too short for some sellers)
-            const ninetyDaysAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
-            let fboCount = 0;
+            // CRITICAL FIX: Uzum Finance API expects ISO date strings (YYYY-MM-DD), NOT milliseconds
+            const finDateFrom = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+            const finDateTo = new Date().toISOString().split('T')[0];
+            console.log(`[UZUM FINANCE] Date range: ${finDateFrom} to ${finDateTo}`);
 
             // Try multiple approaches to get finance data:
             // Approach 1: Without statuses filter (gets ALL finance items)
             // Approach 2: With specific statuses if approach 1 fails
             const financeApproaches = [
-              { label: 'no-status-filter', statuses: [] },
+              { label: 'no-status-filter', statuses: [] as string[] },
               { label: 'all-statuses', statuses: ['TO_WITHDRAW', 'PROCESSING', 'CANCELED', 'PARTIALLY_CANCELLED'] },
             ];
 
@@ -2789,8 +2791,8 @@ serve(async (req) => {
 
             while (finHasMore && finPage < 20) {
               const finParams = new URLSearchParams();
-              finParams.append('dateFrom', String(ninetyDaysAgo));
-              finParams.append('dateTo', String(Date.now()));
+              finParams.append('dateFrom', finDateFrom);
+              finParams.append('dateTo', finDateTo);
               finParams.append('size', '100');
               finParams.append('page', String(finPage));
               // Add statuses only if specified
