@@ -640,11 +640,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
       }
 
       updateTaskStatus('completed', generatedInfos);
-      if (targetMarketplace === 'uzum') {
-        toast.success(`"${normalizedProductName}" — AI kontent tayyor! Extension orqali avtomatik to'ldiriladi ✨`, { duration: 6000 });
-      } else {
-        toast.success(`"${normalizedProductName}" kartochkasi tayyor!`);
-      }
+      toast.success(`"${normalizedProductName}" kartochkasi tayyor!`);
       
       if (onSuccess) onSuccess();
     } catch (error: any) {
