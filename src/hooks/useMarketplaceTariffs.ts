@@ -118,8 +118,8 @@ export function useMarketplaceTariffs(
             if (realExp && (realExp.commission > 0 || realExp.logistics > 0)) {
               const commissionUnits = Math.max(realExp.commissionUnits, 1);
               const logisticsUnits = Math.max(realExp.logisticsUnits, realExp.commissionUnits, 1);
-              const perUnitCommission = realExp.commission / commissionUnits;
-              const perUnitLogistics = realExp.logistics / logisticsUnits;
+              const perUnitCommission = Math.round(realExp.commission / commissionUnits);
+              const perUnitLogistics = Math.round(realExp.logistics / logisticsUnits);
               const totalTariffPerUnit = perUnitCommission + perUnitLogistics;
 
               const entry: TariffInfo = {
@@ -438,12 +438,14 @@ export function getTariffForProduct(
     // Re-calculate commission using ORDER-TIME price and the commission PERCENT
     // instead of using pre-computed amounts based on catalog price
     const commissionPercent = (tariff.commissionPercent || 0) / 100;
-    const commission = orderPrice > 0 && commissionPercent > 0
-      ? orderPrice * commissionPercent
-      : tariff.agencyCommission;
+    const commission = Math.round(
+      orderPrice > 0 && commissionPercent > 0
+        ? orderPrice * commissionPercent
+        : tariff.agencyCommission
+    );
 
     const extraFees = tariff.otherFees || 0;
-    const rawLogistics = tariff.fulfillment + tariff.delivery + extraFees;
+    const rawLogistics = Math.round(tariff.fulfillment + tariff.delivery + extraFees);
     const minLogistics = getMinimumLogistics(marketplace);
     const logistics = Math.max(rawLogistics, minLogistics);
     const totalFee = commission + logistics;
