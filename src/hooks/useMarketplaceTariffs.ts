@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { MarketplaceDataStore, MarketplaceProduct } from './useMarketplaceDataStore';
 import { getRubToUzs } from '@/lib/currency';
+import { normalizeLogistics } from '@/lib/marketplaceCalculator';
 
 export interface TariffInfo {
   offerId: string;
