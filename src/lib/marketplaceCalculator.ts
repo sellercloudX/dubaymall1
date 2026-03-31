@@ -9,11 +9,11 @@ import { getRubToUzs, isRubMarketplace } from "@/lib/currency";
 
 // ============ CONSTANTS ============
 
-/** Minimum logistics per marketplace (in native currency) */
-const MIN_LOGISTICS: Record<string, number> = {
-  yandex: 2000,    // 2000 so'm
-  uzum: 5000,      // 5000 so'm
-  wildberries: 46,  // 46 RUB
+/** Logistics billing step per marketplace (in native currency) */
+const LOGISTICS_STEP: Record<string, number> = {
+  yandex: 2000,    // 2000 so'm steps
+  uzum: 5000,      // 5000 so'm steps
+  wildberries: 46,  // 46 RUB base
 };
 
 /** UZB YATT tax rate */
