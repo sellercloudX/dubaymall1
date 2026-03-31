@@ -462,10 +462,8 @@ export const SubscriptionBilling = forwardRef<HTMLDivElement, SubscriptionBillin
           </Card>
         </TabsContent>
 
-        {/* TAB 3: REFERRAL */}
-        <TabsContent value="referral" className="mt-4">
-          <ReferralProgram />
-        </TabsContent>
+
+
 
         {/* TAB 4: TRANSACTIONS */}
         <TabsContent value="transactions" className="space-y-4 mt-4">
