@@ -26,11 +26,14 @@ export function isExcludedOrder(order: MarketplaceOrder): boolean {
 export function getOrderRevenueNative(order: MarketplaceOrder): number {
   // Item-level: most accurate (handles multi-item orders)
   if (order.items && order.items.length > 0) {
+    const hasExactSoldPrice = order.items.some(item => item.actualSoldPrice !== undefined);
     const itemTotal = order.items.reduce(
-      (sum, item) => sum + (item.price || 0) * (item.count || 1),
+      (sum, item) => sum + (hasExactSoldPrice
+        ? (item.actualSoldPrice || 0)
+        : (item.price || 0) * (item.count || 1)),
       0
     );
-    if (itemTotal > 0) return itemTotal;
+    if (itemTotal > 0 || hasExactSoldPrice) return itemTotal;
   }
   // Fallback chain
   return order.total || order.itemsTotal || 0;
