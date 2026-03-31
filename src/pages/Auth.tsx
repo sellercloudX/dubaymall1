@@ -145,14 +145,6 @@ export default function Auth() {
             variant: 'destructive',
           });
         } else {
-          // Apply pending referral bonus
-          const pendingRef = localStorage.getItem('scx_pending_ref');
-          if (pendingRef) {
-            localStorage.removeItem('scx_pending_ref');
-            try {
-              await supabase.rpc('apply_referral_bonus', { p_referred_id: (await supabase.auth.getUser()).data.user?.id, p_referral_code: pendingRef });
-            } catch {}
-          }
           toast({
             title: 'Muvaffaqiyat',
             description: t.loginSuccess,
@@ -176,13 +168,6 @@ export default function Auth() {
             variant: 'destructive',
           });
         } else {
-          // Apply referral code if present
-          const refCode = searchParams.get('ref') || localStorage.getItem('scx_ref');
-          if (refCode) {
-            localStorage.removeItem('scx_ref');
-            // Will be applied after email verification and first login
-            localStorage.setItem('scx_pending_ref', refCode);
-          }
           toast({
             title: 'Muvaffaqiyat',
             description: t.registrationSuccess,

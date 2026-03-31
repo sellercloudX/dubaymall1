@@ -2026,75 +2026,6 @@ export type Database = {
           },
         ]
       }
-      referral_codes: {
-        Row: {
-          code: string
-          created_at: string | null
-          id: string
-          is_active: boolean | null
-          total_bonus_uzs: number | null
-          total_invites: number | null
-          updated_at: string | null
-          user_id: string
-        }
-        Insert: {
-          code: string
-          created_at?: string | null
-          id?: string
-          is_active?: boolean | null
-          total_bonus_uzs?: number | null
-          total_invites?: number | null
-          updated_at?: string | null
-          user_id: string
-        }
-        Update: {
-          code?: string
-          created_at?: string | null
-          id?: string
-          is_active?: boolean | null
-          total_bonus_uzs?: number | null
-          total_invites?: number | null
-          updated_at?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
-      referral_rewards: {
-        Row: {
-          created_at: string | null
-          id: string
-          paid_at: string | null
-          referral_code: string
-          referred_bonus_uzs: number | null
-          referred_id: string
-          referrer_bonus_uzs: number | null
-          referrer_id: string
-          status: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          paid_at?: string | null
-          referral_code: string
-          referred_bonus_uzs?: number | null
-          referred_id: string
-          referrer_bonus_uzs?: number | null
-          referrer_id: string
-          status?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          paid_at?: string | null
-          referral_code?: string
-          referred_bonus_uzs?: number | null
-          referred_id?: string
-          referrer_bonus_uzs?: number | null
-          referrer_id?: string
-          status?: string | null
-        }
-        Relationships: []
-      }
       regional_shipping_rates: {
         Row: {
           base_rate: number
@@ -4380,10 +4311,6 @@ export type Database = {
         }
         Returns: Json
       }
-      apply_referral_bonus: {
-        Args: { p_referral_code: string; p_referred_id: string }
-        Returns: Json
-      }
       calculate_order_financials: {
         Args: { p_order_id: string; p_platform_commission_percent?: number }
         Returns: Json
@@ -4451,10 +4378,6 @@ export type Database = {
       generate_delivery_otp: { Args: { p_order_id: string }; Returns: string }
       generate_expiry_warnings: { Args: never; Returns: undefined }
       generate_order_number: { Args: never; Returns: string }
-      get_or_create_referral_code: {
-        Args: { p_user_id: string }
-        Returns: string
-      }
       get_product_rating: {
         Args: { p_product_id: string }
         Returns: {
