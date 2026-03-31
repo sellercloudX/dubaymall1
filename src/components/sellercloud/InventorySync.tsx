@@ -36,6 +36,7 @@ interface ProductStock {
   name: string;
   sku: string;
   skuId?: string; // Uzum numeric SKU ID for API calls
+  shopId?: string; // Uzum shop ID for multi-shop stock updates
   stockFBO: number;
   stockFBS: number;
   totalStock: number;
