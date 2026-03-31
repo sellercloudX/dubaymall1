@@ -3194,6 +3194,63 @@ serve(async (req) => {
             }
             console.log(`Enriched ${enrichedCount} FBS order items with finance data`);
 
+            // ===== FALLBACK: Estimate commission from product catalog when Finance API returns empty =====
+            // If finance enrichment found 0 items, use commissionPercent from product catalog
+            if (enrichedCount === 0 && financeItemMap.size === 0) {
+              console.log(`[UZUM FALLBACK] Finance API returned empty — estimating commission from product catalog`);
+              
+              // Build product commission map from marketplace_products_cache
+              const productCommissionMap = new Map<string, { commissionPercent: number; dimensionalGroup: string }>();
+              try {
+                const { data: cachedProducts } = await supabase
+                  .from('marketplace_products_cache')
+                  .select('offer_id, data')
+                  .eq('user_id', userId)
+                  .eq('marketplace', 'uzum');
+                
+                if (cachedProducts && cachedProducts.length > 0) {
+                  for (const cp of cachedProducts) {
+                    const pd = typeof cp.data === 'string' ? JSON.parse(cp.data) : cp.data;
+                    const commPercent = pd?.commissionPercent || pd?.commission?.percent || 0;
+                    const dimGroup = pd?.dimensionalGroup || '';
+                    if (commPercent > 0) {
+                      productCommissionMap.set(cp.offer_id, { commissionPercent: commPercent, dimensionalGroup: dimGroup });
+                    }
+                  }
+                  console.log(`[UZUM FALLBACK] Loaded ${productCommissionMap.size} products with commission data from cache`);
+                }
+              } catch (cacheErr) {
+                console.warn(`[UZUM FALLBACK] Could not load product cache:`, cacheErr);
+              }
+
+              // Apply estimated commission to order items that have no finance data
+              let fallbackCount = 0;
+              for (const order of allOrders) {
+                for (const orderItem of (order.items || [])) {
+                  // Skip items already enriched
+                  if (orderItem.actualCommission > 0 || orderItem.actualLogisticsFee > 0) continue;
+                  
+                  const productInfo = productCommissionMap.get(orderItem.offerId);
+                  if (productInfo && productInfo.commissionPercent > 0) {
+                    const itemPrice = orderItem.price || orderItem.priceUZS || 0;
+                    const estimatedCommission = Math.round(itemPrice * productInfo.commissionPercent / 100);
+                    
+                    orderItem.actualCommission = estimatedCommission;
+                    orderItem.commissionPercent = productInfo.commissionPercent;
+                    orderItem.commissionBase = estimatedCommission;
+                    // Estimate seller payout: price - commission
+                    if (!orderItem.sellerAmount && !orderItem.actualSoldPrice) {
+                      orderItem.sellerAmount = itemPrice - estimatedCommission;
+                      orderItem.actualSoldPrice = itemPrice - estimatedCommission;
+                    }
+                    orderItem.financeSource = 'uzum-catalog-estimate';
+                    fallbackCount++;
+                  }
+                }
+              }
+              console.log(`[UZUM FALLBACK] Estimated commission for ${fallbackCount} order items from product catalog`);
+            }
+
           } catch (fboErr) {
             console.error("Uzum Finance fetch error:", fboErr);
           }
