@@ -60,7 +60,8 @@ export function normalizeMarketplaceFinance(item: any, marketplace: string): Nor
       actualCommission: commission,
       actualLogisticsFee: logistics,
       actualOtherFees: pickFirst(item, "actualOtherFees", "withdrawalAmount", "otherFees"),
-      actualSoldPrice: Math.max(sellerRevenue, sellerRevenue + subsidy),
+      // sellerRevenue already includes subsidy in most API responses; avoid double-counting
+      actualSoldPrice: sellerRevenue > 0 ? sellerRevenue : subsidy,
       grossPrice: pickFirst(item, "grossPrice", "totalPrice", "buyerPrice", "price"),
       subsidyAmount: subsidy,
       isExact: commission > 0 || logistics > 0 || sellerRevenue > 0,
