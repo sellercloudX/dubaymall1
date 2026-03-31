@@ -1,10 +1,9 @@
-import { toDisplayUzs } from '@/lib/currency';
-import { getOrderRevenueUzs } from '@/lib/revenueCalculations';
-import { getTariffForProduct, type TariffInfo } from '@/hooks/useMarketplaceTariffs';
-import type { MarketplaceOrder } from '@/hooks/useMarketplaceDataStore';
-import { normalizeMarketplaceFinance } from '@/lib/marketplaceDataNormalizer';
+import { toDisplayUzs } from "@/lib/currency";
+import { getOrderRevenueUzs } from "@/lib/revenueCalculations";
+import { getTariffForProduct, type TariffInfo } from "@/hooks/useMarketplaceTariffs";
+import type { MarketplaceOrder } from "@/hooks/useMarketplaceDataStore";
+import { normalizeMarketplaceFinance } from "@/lib/marketplaceDataNormalizer";
 
-// O'zbekiston YATT solig'i — barcha marketplace'lar uchun 4%
 const UZB_TAX_RATE = 0.04;
 
 export interface OrderItemFinancialLine {
@@ -21,7 +20,7 @@ export interface OrderItemFinancialLine {
   tax: number;
   hasCostPrice: boolean;
   hasRealTariff: boolean;
-  fulfillmentType?: 'FBO' | 'FBS';
+  fulfillmentType?: "FBO" | "FBS";
 }
 
 export interface OrderFinancialBreakdown {
@@ -41,79 +40,25 @@ export interface OrderFinancialBreakdown {
   lines: OrderItemFinancialLine[];
 }
 
-export function getMarketplaceTaxRate(_marketplace: string): number {
-  return UZB_TAX_RATE;
-}
-
 /**
- * Extract exact fees from any marketplace order item using the unified normalizer.
- * Returns null if no real finance data is present — caller should fall back to tariff estimates.
- *
- * STRICT RULES:
- * - No hardcoded defaults (no 500, 1000, 5000 so'm floors)
- * - No % estimation or tariff/calculate calls
- * - If a field is missing/0 → 0
- * - actual_sold_price = sellerAmount + subsidyAmount
+ * STRICT exact fees extraction — hech qanday taxmin yo'q
  */
-function extractExactFees(item: any, marketplace: string): {
-  commission: number;
-  logistics: number;
-  withdrawal: number;
-  totalFees: number;
-  actualSoldPrice: number;
-  grossPrice: number;
-  subsidyAmount: number;
-  isReal: boolean;
-} | null {
+function extractExactFees(item: any, marketplace: string) {
   const normalized = normalizeMarketplaceFinance(item, marketplace);
-  if (!normalized.isExact) return null;
 
-  // For WB, the normalizer already converts RUB→UZS via normalizeMarketplaceMoney
+  // Agar normalizer hech narsa topmasa ham, hech bo'lmaganda 0 qiymatlarni qaytarish
   return {
     commission: normalized.actualCommission,
     logistics: normalized.actualLogisticsFee,
     withdrawal: normalized.actualOtherFees,
     totalFees: normalized.actualCommission + normalized.actualLogisticsFee + normalized.actualOtherFees,
-    actualSoldPrice: normalized.actualSoldPrice,
-    grossPrice: normalized.grossPrice,
-    subsidyAmount: normalized.subsidyAmount,
-    isReal: true,
+    actualSoldPrice: normalized.actualSoldPrice || 0,
+    grossPrice: normalized.grossPrice || 0,
+    subsidyAmount: normalized.subsidyAmount || 0,
+    isReal: normalized.isExact || normalized.actualCommission > 0 || normalized.actualLogisticsFee > 0,
+    financeSource: normalized.financeSource || "unknown",
   };
 }
-
-/**
- * Validate fees — log warnings but DO NOT artificially cap.
- * Real marketplace API data must be passed through as-is.
- */
-function validateFees(
-  commission: number,
-  logistics: number,
-  withdrawal: number,
-  revenue: number,
-  marketplace: string,
-  offerId: string,
-): { commission: number; logistics: number; withdrawal: number; totalFees: number } {
-  const totalFees = commission + logistics + withdrawal;
-  
-  if (revenue <= 0) {
-    return { commission: 0, logistics: 0, withdrawal: 0, totalFees: 0 };
-  }
-  
-  // Log warning if fees seem anomalous, but DO NOT cap — real API data is trusted
-  if (totalFees > revenue) {
-    console.warn(
-      `[FEE_WARN] ${marketplace} offerId=${offerId}: fees=${totalFees} > revenue=${revenue}. ` +
-      `commission=${commission}, logistics=${logistics}, withdrawal=${withdrawal}. ` +
-      `Passing through real API values without capping.`
-    );
-  }
-  
-  return { commission, logistics, withdrawal, totalFees };
-}
-
-// Debug counter for order-level logging
-const _orderDebugCounts: Record<string, number> = {};
-const ORDER_DEBUG_LIMIT = 3;
 
 export function calculateOrderFinancialBreakdown(
   order: MarketplaceOrder,
@@ -122,7 +67,7 @@ export function calculateOrderFinancialBreakdown(
   tariffMap: Map<string, TariffInfo> | undefined,
 ): OrderFinancialBreakdown {
   const lines: OrderItemFinancialLine[] = [];
-      const items = order.items || [];
+  const items = order.items || [];
 
   let revenue = 0;
   let costTotal = 0;
@@ -134,118 +79,78 @@ export function calculateOrderFinancialBreakdown(
   let costCoveredItems = 0;
   let realTariffItems = 0;
 
-  // Track if we should debug-log this order
-  const dbgKey = marketplace;
-  _orderDebugCounts[dbgKey] = (_orderDebugCounts[dbgKey] || 0) + 1;
-  const shouldDebugLog = _orderDebugCounts[dbgKey] <= ORDER_DEBUG_LIMIT;
+  const shouldDebugLog = true; // birinchi marta debugni yoqamiz
 
-  if (items.length === 0) {
-    revenue = getOrderRevenueUzs(order, marketplace);
-  } else {
-    for (const item of items) {
-      const quantity = item.count || 1;
-      const itemPrice = toDisplayUzs(item.price || 0, marketplace);
-      let itemRevenue = 0;
-      const rawCostPrice = getCostPrice(marketplace, item.offerId);
-      const costPriceUzs = rawCostPrice !== null ? toDisplayUzs(rawCostPrice, marketplace) : 0;
-      const itemCostTotal = costPriceUzs * quantity;
+  for (const item of items) {
+    const quantity = item.count || 1;
+    const itemPrice = toDisplayUzs(item.price || 0, marketplace);
+    const rawCostPrice = getCostPrice(marketplace, item.offerId);
+    const costPriceUzs = rawCostPrice !== null ? toDisplayUzs(rawCostPrice, marketplace) : 0;
+    const itemCostTotal = costPriceUzs * quantity;
 
-      // ===== MARKETPLACE-SPECIFIC ACTUAL FEE EXTRACTION =====
-      // Single unified path via normalizer — no marketplace-specific branches needed
-      let itemCommission = 0;
-      let itemLogistics = 0;
-      let itemWithdrawal = 0;
-      let itemTotalFees = 0;
-      let hasRealFees = false;
+    // === ASOSIY O'ZGARISH: Hech qachon null qaytarmaslik ===
+    const fees = extractExactFees(item, marketplace);
 
-      // Try extracting exact fees from normalizer (checks direct + finance.* fields)
-      const exactFees = extractExactFees(item, marketplace);
+    const itemRevenue = fees.actualSoldPrice > 0 ? fees.actualSoldPrice : toDisplayUzs(item.price || 0, marketplace); // fallback faqat narx
 
-      if (exactFees) {
-        itemRevenue = exactFees.actualSoldPrice;
-        itemCommission = exactFees.commission;
-        itemLogistics = exactFees.logistics;
-        itemWithdrawal = exactFees.withdrawal;
-        itemTotalFees = exactFees.totalFees;
-        hasRealFees = true;
-      } else {
-        // Fallback: tariff map (only used when finance data is unavailable)
-        const tariff = getTariffForProduct(tariffMap, item.offerId, itemPrice, marketplace);
-        itemCommission = tariff.commission;
-        itemLogistics = tariff.logistics;
-        itemWithdrawal = tariff.withdrawal || 0;
-        itemTotalFees = tariff.totalFee;
-        itemRevenue = 0;
-        hasRealFees = tariff.isReal;
-      }
+    const itemCommission = fees.commission;
+    const itemLogistics = fees.logistics;
+    const itemWithdrawal = fees.withdrawal;
+    const itemTotalFees = fees.totalFees;
 
-      // Debug log per-item breakdown
-      if (shouldDebugLog) {
-        console.log(
-          `[ORDER_FINANCE_DEBUG] ${marketplace} order=${order.id} item=${item.offerId}`,
-          {
-            source: exactFees ? 'EXACT_API' : 'TARIFF_FALLBACK',
-            financeSource: item.financeSource || 'none',
-            itemPrice,
-            itemRevenue,
-            itemCommission,
-            itemLogistics,
-            itemWithdrawal,
-            itemTotalFees,
-            hasRealFees,
-            rawFields: {
-              actualCommission: item.actualCommission,
-              actualLogisticsFee: item.actualLogisticsFee,
-              actualSoldPrice: item.actualSoldPrice,
-              sellerAmount: item.sellerAmount,
-              commissionAmount: item.commissionAmount,
-              deliveryAmount: item.deliveryAmount,
-            },
-          },
-        );
-      }
+    const hasRealFees = fees.isReal || itemCommission > 0 || itemLogistics > 0;
 
-      const validated = validateFees(
-        itemCommission, itemLogistics, itemWithdrawal,
-        itemRevenue, marketplace, item.offerId
-      );
-      itemCommission = validated.commission;
-      itemLogistics = validated.logistics;
-      itemWithdrawal = validated.withdrawal;
-      itemTotalFees = validated.totalFees;
-
-      const itemTax = itemRevenue * getMarketplaceTaxRate(marketplace);
-
-      revenue += itemRevenue;
-      costTotal += itemCostTotal;
-      commission += itemCommission;
-      logistics += itemLogistics;
-      withdrawal += itemWithdrawal;
-      totalFees += itemTotalFees;
-      itemCount += quantity;
-      if (rawCostPrice !== null) costCoveredItems += quantity;
-      if (hasRealFees) realTariffItems += quantity;
-
-      lines.push({
-        offerId: item.offerId,
-        offerName: item.offerName || item.offerId,
-        photo: item.photo,
-        quantity,
-        revenue: itemRevenue,
-        costTotal: itemCostTotal,
+    if (shouldDebugLog) {
+      console.log(`[ORDER_FINANCE_DEBUG] ${marketplace} | item=${item.offerId}`, {
+        source: hasRealFees ? "EXACT_API" : "FALLBACK",
+        financeSource: fees.financeSource,
+        itemRevenue,
         commission: itemCommission,
         logistics: itemLogistics,
-        withdrawal: itemWithdrawal,
         totalFees: itemTotalFees,
-        tax: itemTax,
-        hasCostPrice: rawCostPrice !== null,
-        hasRealTariff: hasRealFees,
-        fulfillmentType: order.fulfillmentType,
+        rawFields: {
+          actualSoldPrice: item.actualSoldPrice,
+          sellerAmount: item.sellerAmount,
+          forPay: item.forPay,
+          ppvz_for_pay: item.ppvz_for_pay,
+          commissionAmount: item.commissionAmount,
+          deliveryAmount: item.deliveryAmount,
+        },
       });
     }
+
+    const itemTax = itemRevenue * UZB_TAX_RATE;
+
+    revenue += itemRevenue;
+    costTotal += itemCostTotal;
+    commission += itemCommission;
+    logistics += itemLogistics;
+    withdrawal += itemWithdrawal;
+    totalFees += itemTotalFees;
+    itemCount += quantity;
+
+    if (rawCostPrice !== null) costCoveredItems += quantity;
+    if (hasRealFees) realTariffItems += quantity;
+
+    lines.push({
+      offerId: item.offerId,
+      offerName: item.offerName || item.offerId,
+      photo: item.photo,
+      quantity,
+      revenue: itemRevenue,
+      costTotal: itemCostTotal,
+      commission: itemCommission,
+      logistics: itemLogistics,
+      withdrawal: itemWithdrawal,
+      totalFees: itemTotalFees,
+      tax: itemTax,
+      hasCostPrice: rawCostPrice !== null,
+      hasRealTariff: hasRealFees,
+      fulfillmentType: order.fulfillmentType,
+    });
   }
 
-  const taxAmount = revenue * getMarketplaceTaxRate(marketplace);
+  const taxAmount = revenue * UZB_TAX_RATE;
   const grossProfit = revenue - costTotal;
   const netProfit = grossProfit - totalFees - taxAmount;
   const margin = revenue > 0 ? (netProfit / revenue) * 100 : 0;
