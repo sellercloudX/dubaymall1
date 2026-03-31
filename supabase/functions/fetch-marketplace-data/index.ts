@@ -1380,9 +1380,10 @@ serve(async (req) => {
           if (offersForCalc.length === 0) {
             result = { success: true, data: [], message: "No offers provided" };
           } else {
-            // === PRIMARY APPROACH: Use sellingProgram instead of campaignId ===
-            // UZ campaigns return 400 "restricted" for ALL categories when using campaignId.
-            // sellingProgram: 'FBS' works for most categories without this restriction.
+            // === PRIMARY APPROACH: Use campaignId to get region-specific (UZ) tariffs ===
+            // sellingProgram: 'FBS' returns RU tariffs (45%+ for perfumery) — WRONG for UZ.
+            // campaignId returns the correct UZ tariffs for the seller's actual campaign.
+            // NOTE: Do NOT pass 'currency' together with campaignId — causes 400 error.
             await sleep(500);
             const tariffResponse = await fetchWithRetry(
               'https://api.partner.market.yandex.ru/v2/tariffs/calculate',
@@ -1391,7 +1392,7 @@ serve(async (req) => {
                 headers,
                 body: JSON.stringify({
                   parameters: { 
-                    sellingProgram: 'FBS',
+                    campaignId: Number(campaignId),
                   },
                   offers: offersForCalc,
                 }),
