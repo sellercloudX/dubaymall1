@@ -3426,9 +3426,11 @@ serve(async (req) => {
             for (const o of priceOffers) {
               const shopId = o.shopId || uzumShopId;
               const list = byShop.get(shopId) || [];
+              // Uzum sendPriceData expects price in SO'M (same unit as catalog price)
+              // Client sends price in so'm via toMarketplaceCurrency()
               list.push({
                 skuId: parseInt(o.skuId || o.offerId || '0'),
-                price: o.price, // Uzum API expects so'm (same unit as fullPrice)
+                price: Math.round(o.price),
               });
               byShop.set(shopId, list);
             }
@@ -3440,7 +3442,7 @@ serve(async (req) => {
               const validItems = items.filter((p: any) => p.skuId > 0 && p.price > 0);
               if (validItems.length === 0) continue;
 
-              console.log(`Uzum price update: ${validItems.length} SKUs, shopId: ${shopId}, sample: ${JSON.stringify(validItems[0])}`);
+              console.log(`Uzum price update: ${validItems.length} SKUs, shopId: ${shopId}, sample: ${JSON.stringify(validItems[0])} (tiyins)`);
 
               // Retry with backoff for rate limits (429)
               let response: Response | null = null;
@@ -3464,31 +3466,11 @@ serve(async (req) => {
 
               if (response && response.ok) {
                 totalUpdated += validItems.length;
+                console.log(`Uzum price update succeeded for shop ${shopId}: ${validItems.length} SKUs`);
               } else if (response) {
                 const errText = await response.text();
                 console.error(`Uzum price update failed for shop ${shopId}: ${response.status}, body: ${errText}`);
-                lastError = `Price update failed: ${response.status}`;
-                // If price is in wrong unit, try with tiyins (price * 100)
-                if (response.status === 500) {
-                  console.log(`Retrying with tiyins for shop ${shopId}...`);
-                  const tiyinItems = validItems.map((i: any) => ({ ...i, price: Math.round(i.price * 100) }));
-                  const retryResp = await fetch(
-                    `${uzumBaseUrl}/v1/product/${shopId}/sendPriceData`,
-                    {
-                      method: 'POST',
-                      headers: { ...uzumHeaders, "Content-Type": "application/json" },
-                      body: JSON.stringify({ skuPriceList: tiyinItems }),
-                    }
-                  );
-                  if (retryResp.ok) {
-                    totalUpdated += validItems.length;
-                    console.log(`Uzum price update succeeded with tiyins for shop ${shopId}`);
-                    lastError = '';
-                  } else {
-                    const retryErr = await retryResp.text();
-                    console.error(`Uzum price update (tiyins) also failed: ${retryResp.status}, ${retryErr}`);
-                  }
-                }
+                lastError = `Narx yangilash xato: ${response.status} (do'kon ${shopId})`;
               }
             }
 
@@ -3502,7 +3484,7 @@ serve(async (req) => {
         }
 
       } else if (dataType === "update-stock") {
-        // POST /v2/fbs/sku/stocks
+        // POST /v2/fbs/sku/stocks — FBS stock only (FBO is managed by Uzum warehouse)
         try {
           const { stocks, stockUpdates } = requestBody;
           const updates = stocks || stockUpdates;
@@ -3510,22 +3492,27 @@ serve(async (req) => {
           if (!updates || updates.length === 0) {
             result = { success: false, error: "No stock updates provided" };
           } else {
-            // CRITICAL: Uzum API needs skuId (numeric SKU identifier), NOT productId
-            // The client sends: { skuId, offerId (=productId), sku, quantity }
-            // We must use skuId first, then fall back to others
-            const skuAmountList = updates.map((s: any) => ({
-              skuId: parseInt(s.skuId || s.offerId || s.sku || '0'),
-              amount: s.amount || s.quantity || s.stock || 0,
-            }));
-            
-            // Validate: filter out entries where skuId is 0 or NaN
-            const validEntries = skuAmountList.filter((e: any) => e.skuId > 0);
-            
-            if (validEntries.length === 0) {
-              result = { success: false, error: "No valid skuId found for stock update. Ensure products have numeric skuId." };
-            } else {
-              console.log(`Uzum stock update: ${validEntries.length} valid SKUs, sample: ${JSON.stringify(validEntries[0])}`);
-              
+            // Group by shopId for multi-shop support (same as price updates)
+            const byShop = new Map<string, any[]>();
+            for (const s of updates) {
+              const shopId = String(s.shopId || uzumShopId || '');
+              const list = byShop.get(shopId) || [];
+              list.push({
+                skuId: parseInt(s.skuId || s.offerId || s.sku || '0'),
+                amount: s.amount || s.quantity || s.stock || 0,
+              });
+              byShop.set(shopId, list);
+            }
+
+            let totalUpdated = 0;
+            let lastError = '';
+
+            for (const [shopId, items] of byShop) {
+              const validEntries = items.filter((e: any) => e.skuId > 0);
+              if (validEntries.length === 0) continue;
+
+              console.log(`Uzum stock update: ${validEntries.length} SKUs, shopId: ${shopId}, sample: ${JSON.stringify(validEntries[0])}`);
+
               // Retry with backoff for rate limits (429)
               let response: Response | null = null;
               for (let attempt = 0; attempt < 3; attempt++) {
@@ -3550,15 +3537,22 @@ serve(async (req) => {
               }
 
               if (response && response.ok) {
-                const data = await safeJson(response, { success: true });
-                result = { success: true, data, updated: validEntries.length };
+                totalUpdated += validEntries.length;
               } else {
                 const errText = response ? await response.text() : 'No response';
                 const status = response ? response.status : 0;
-                console.error(`Uzum stock update failed: ${status}, body: ${errText}`);
-                result = { success: false, error: `Stock update failed: ${status}`, details: errText };
+                console.error(`Uzum stock update failed for shop ${shopId}: ${status}, body: ${errText}`);
+                if (status === 400) {
+                  lastError = `FBS ombori sozlanmagan yoki SKU FBS uchun ro'yxatdan o'tmagan. Uzum kabinetida FBS omborini yarating va qoldiqlarni Excel orqali yangilang.`;
+                } else {
+                  lastError = `Stock update failed: ${status} (shop ${shopId})`;
+                }
               }
             }
+
+            result = totalUpdated > 0
+              ? { success: true, updated: totalUpdated }
+              : { success: false, error: lastError || "No valid SKUs to update. FBO mahsulotlarga qoldiq qo'yib bo'lmaydi." };
           }
         } catch (e) {
           console.error("Uzum stock update error:", e);
