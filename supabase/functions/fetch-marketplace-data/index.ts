@@ -5111,6 +5111,16 @@ serve(async (req) => {
                   const item = order.items[0];
                   const rpFinance = getWbItemFinanceFields(reportRow);
                   
+                  // SANITY CHECK: reject enrichment if forPay is unreasonably high vs order price
+                  const itemPrice = item.finishedPrice || item.price || order.total || 0;
+                  const payoutSane = rpFinance.sellerAmount <= 0 || itemPrice <= 0 || 
+                    (rpFinance.sellerAmount / itemPrice) <= 5;
+                  
+                  if (!payoutSane) {
+                    console.warn(`[WB SANITY] Rejecting enrichment for ${item.offerId}: forPay=${rpFinance.sellerAmount} vs price=${itemPrice} (ratio=${(rpFinance.sellerAmount/itemPrice).toFixed(1)})`);
+                    continue; // Skip this order's enrichment
+                  }
+                  
                   if (rpFinance.commissionAmount > 0) {
                     item.commissionAmount = rpFinance.commissionAmount;
                     item.actualCommission = rpFinance.commissionAmount;
