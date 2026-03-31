@@ -2766,7 +2766,8 @@ serve(async (req) => {
           try {
             const finShopIds = allShopIds.length > 0 ? allShopIds : (uzumShopId ? [String(uzumShopId)] : []);
             console.log(`Uzum Finance orders: querying with ${finShopIds.length} shopIds: ${finShopIds.join(',')}`);
-            const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
+            // Use 365-day lookback for finance data (90 days was too short for some sellers)
+            const ninetyDaysAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
             let fboCount = 0;
 
             // Try multiple approaches to get finance data:
