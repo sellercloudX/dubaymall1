@@ -3418,45 +3418,72 @@ serve(async (req) => {
           
           if (!priceOffers || priceOffers.length === 0) {
             result = { success: false, error: "No offers provided" };
-          } else if (!uzumShopId) {
+          } else if (!uzumShopId && !allShopIds?.length) {
             result = { success: false, error: "Shop ID required for price updates" };
           } else {
-            // CRITICAL: Uzum sendPriceData needs numeric skuId, NOT productId
-            // Uzum API expects price in TIYINS (1 so'm = 100 tiyin)
-            const priceData = priceOffers.map((o: any) => ({
-              skuId: parseInt(o.skuId || o.offerId || '0'),
-              price: Math.round(o.price * 100), // Convert so'm to tiyins
-            }));
-            
-            // Filter out invalid entries
-            const validPriceData = priceData.filter((p: any) => p.skuId > 0 && p.price > 0);
-            
-            if (validPriceData.length === 0) {
-              result = { success: false, error: "No valid skuId found for price update" };
-            } else {
-              console.log(`Uzum price update: ${validPriceData.length} valid SKUs, shopId: ${uzumShopId}, sample: ${JSON.stringify(validPriceData[0])}`);
+            // Group offers by shopId (products may belong to different shops)
+            const byShop = new Map<string, any[]>();
+            for (const o of priceOffers) {
+              const shopId = o.shopId || uzumShopId;
+              const list = byShop.get(shopId) || [];
+              list.push({
+                skuId: parseInt(o.skuId || o.offerId || '0'),
+                price: o.price, // Uzum API expects so'm (same unit as fullPrice)
+              });
+              byShop.set(shopId, list);
+            }
+
+            let totalUpdated = 0;
+            let lastError = '';
+
+            for (const [shopId, items] of byShop) {
+              const validItems = items.filter((p: any) => p.skuId > 0 && p.price > 0);
+              if (validItems.length === 0) continue;
+
+              console.log(`Uzum price update: ${validItems.length} SKUs, shopId: ${shopId}, sample: ${JSON.stringify(validItems[0])}`);
 
               const response = await fetch(
-                `${uzumBaseUrl}/v1/product/${uzumShopId}/sendPriceData`,
+                `${uzumBaseUrl}/v1/product/${shopId}/sendPriceData`,
                 {
                   method: 'POST',
-                  headers: {
-                    ...uzumHeaders,
-                    "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify({ skuPriceList: validPriceData }),
+                  headers: { ...uzumHeaders, "Content-Type": "application/json" },
+                  body: JSON.stringify({ skuPriceList: validItems }),
                 }
               );
 
               if (response.ok) {
-                const data = await safeJson(response, { success: true });
-                result = { success: true, data, updated: validPriceData.length };
+                totalUpdated += validItems.length;
               } else {
                 const errText = await response.text();
-                console.error(`Uzum price update failed: ${response.status}, body: ${errText}`);
-                result = { success: false, error: `Price update failed: ${response.status}`, details: errText };
+                console.error(`Uzum price update failed for shop ${shopId}: ${response.status}, body: ${errText}`);
+                lastError = `Price update failed: ${response.status}`;
+                // If price is in wrong unit, try with tiyins (price * 100)
+                if (response.status === 500) {
+                  console.log(`Retrying with tiyins for shop ${shopId}...`);
+                  const tiyinItems = validItems.map((i: any) => ({ ...i, price: Math.round(i.price * 100) }));
+                  const retryResp = await fetch(
+                    `${uzumBaseUrl}/v1/product/${shopId}/sendPriceData`,
+                    {
+                      method: 'POST',
+                      headers: { ...uzumHeaders, "Content-Type": "application/json" },
+                      body: JSON.stringify({ skuPriceList: tiyinItems }),
+                    }
+                  );
+                  if (retryResp.ok) {
+                    totalUpdated += validItems.length;
+                    console.log(`Uzum price update succeeded with tiyins for shop ${shopId}`);
+                    lastError = '';
+                  } else {
+                    const retryErr = await retryResp.text();
+                    console.error(`Uzum price update (tiyins) also failed: ${retryResp.status}, ${retryErr}`);
+                  }
+                }
               }
             }
+
+            result = totalUpdated > 0
+              ? { success: true, updated: totalUpdated }
+              : { success: false, error: lastError || "No valid SKUs to update" };
           }
         } catch (e) {
           console.error("Uzum price update error:", e);
