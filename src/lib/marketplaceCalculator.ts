@@ -73,10 +73,12 @@ export function calcMarketplaceMetrics(input: CalcInput): MarketplaceMetrics {
   const { marketplace, priceNative, costNative, commissionPercent, logisticsNative, otherFeesNative, quantity } = input;
   
   const rate = isRubMarketplace(marketplace) ? getRubToUzs() : 1;
-  const minLogisticsNative = MIN_LOGISTICS[marketplace] || 0;
+  const step = LOGISTICS_STEP[marketplace] || 0;
   
-  // Enforce minimum logistics
-  const enforcedLogisticsNative = Math.max(logisticsNative, minLogisticsNative);
+  // Enforce step-based logistics (round UP to nearest multiple of step)
+  const enforcedLogisticsNative = step > 0
+    ? Math.max(step, Math.ceil(logisticsNative / step) * step)
+    : logisticsNative;
   
   // Convert to UZS
   const price = Math.round(priceNative * rate);
