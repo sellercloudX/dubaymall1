@@ -1359,6 +1359,14 @@ serve(async (req) => {
                 let other = 0;
                 let feePercentFromApi = 0;
                 
+                // Log tariff types for first item to debug commission discrepancies
+                if (idx === 0) {
+                  console.log(`[YANDEX TARIFF TYPES] Sample tariffs for first product:`, JSON.stringify(tariffs.map((t: any) => ({
+                    type: t.type, amount: t.amount,
+                    params: (t.parameters || []).map((p: any) => `${p.name}=${p.value}`)
+                  }))));
+                }
+
                 tariffs.forEach((tariff: any) => {
                   const amount = tariff.amount || 0;
                   const type = tariff.type || '';
@@ -1371,7 +1379,19 @@ serve(async (req) => {
                   // PAYMENT_TRANSFER can contain multiple alternative payout options
                   // (daily / weekly / delay weeks). Summing them inflated commissions badly.
                   // We keep seller payout/withdrawal as a separate client-side fee instead.
-                  if (type === 'FEE' || type === 'AGENCY_COMMISSION') {
+                  // ALL commission-like types must be summed together:
+                  // FEE, AGENCY_COMMISSION, FBS_COMMISSION, FBY_COMMISSION, FULFILLMENT
+                  const isCommissionType = (
+                    type === 'FEE' ||
+                    type === 'AGENCY_COMMISSION' ||
+                    type === 'FBS_COMMISSION' ||
+                    type === 'FBY_COMMISSION' ||
+                    type === 'FULFILLMENT' ||
+                    type.includes('_COMMISSION') ||
+                    type.includes('_FEE')
+                  );
+                  
+                  if (isCommissionType) {
                     agencyCommission += amount;
                     if (isRelative && valueParam?.value) {
                       feePercentFromApi += parseFloat(valueParam.value) || 0;
