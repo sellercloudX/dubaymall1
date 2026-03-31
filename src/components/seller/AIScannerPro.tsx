@@ -556,31 +556,6 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
         if (cardResult && !cardResult.success && cardResult.error) {
           throw new Error(`WB: ${cardResult.error}`);
         }
-      } else if (targetMarketplace === 'uzum') {
-        // Uzum API does NOT support product creation — only prepare data + offer extension auto-fill
-        const { data: cardResult, error } = await supabase.functions.invoke('create-uzum-card', {
-          body: {
-            product: {
-              name: normalizedProductName,
-              description: product.description || analyzed?.description,
-              price: pricingData.sellingPrice,
-              costPrice: pricingData.costPrice,
-              images: cardImages,
-              category: analyzed?.category,
-            },
-            skipImageGeneration: true,
-          },
-        });
-
-        if (error) {
-          const errDetail = cardResult?.error || error.message || 'Uzum xatosi';
-          throw new Error(`Uzum: ${errDetail}`);
-        }
-        if (cardResult && !cardResult.success && cardResult.error) {
-          throw new Error(`Uzum: ${cardResult.error}`);
-        }
-        // Uzum API doesn't support card creation — always "prepared" mode
-        // Card data saved for potential extension auto-fill use
       } else {
         // Yandex card creation — ALWAYS skip image gen since AIScannerPro already generated them
         const hasAiImages = generatedInfos.length >= 1;
