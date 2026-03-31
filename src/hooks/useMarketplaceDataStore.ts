@@ -84,6 +84,10 @@ export interface MarketplaceOrder {
     actualSoldPrice?: number;
     subsidyAmount?: number;
     financeSource?: string;
+    // Additional finance fields used in revenue calculations
+    ppvz_for_pay?: number;
+    bankSum?: number;
+    payoutAmount?: number;
   }>;
 }
 
