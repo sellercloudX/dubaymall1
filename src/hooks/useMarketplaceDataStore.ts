@@ -1,3 +1,4 @@
+import React from 'react';
 import { useQueries, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { marketplaceQueue } from '@/lib/requestQueue';
@@ -226,7 +227,7 @@ export function useMarketplaceDataStore(connectedMarketplaces: string[]) {
   const dataVersion = productQueries.reduce((v, q) => v + (q.dataUpdatedAt || 0), 0)
     + orderQueries.reduce((v, q) => v + (q.dataUpdatedAt || 0), 0);
 
-  // Products by marketplace
+  // Products by marketplace (stable reference via useCallback pattern)
   const getProducts = (mp: string): MarketplaceProduct[] => {
     const query = productQueries.find(q => q.data?.marketplace === mp);
     return query?.data?.data || [];
@@ -238,9 +239,15 @@ export function useMarketplaceDataStore(connectedMarketplaces: string[]) {
     return query?.data?.data || [];
   };
 
-  // All products combined
-  const allProducts = productQueries.flatMap(q => q.data?.data || []);
-  const allOrders = orderQueries.flatMap(q => q.data?.data || []);
+  // Memoized combined data — only recompute when dataVersion changes
+  const allProducts = React.useMemo(
+    () => productQueries.flatMap(q => q.data?.data || []),
+    [dataVersion]
+  );
+  const allOrders = React.useMemo(
+    () => orderQueries.flatMap(q => q.data?.data || []),
+    [dataVersion]
+  );
 
   // Total counts
   const totalProducts = allProducts.length;

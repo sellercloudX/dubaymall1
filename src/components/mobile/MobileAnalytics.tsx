@@ -27,28 +27,27 @@ export function MobileAnalytics({ connections, connectedMarketplaces, store }: M
     // Build order→marketplace map for efficient currency conversion
     const orderMpMap = buildOrderMarketplaceMap(store.getOrders, connectedMarketplaces);
     
-    const validOrders = allOrders.filter(o => !isExcludedOrder(o));
-    const totalRevenue = validOrders.reduce((sum, o) => {
-      return sum + getOrderRevenueUzs(o, orderMpMap.get(o.id) || '');
-    }, 0);
-    const avgCheck = validOrders.length > 0 ? Math.round(totalRevenue / validOrders.length) : 0;
-    const pendingOrders = allOrders.filter(o => {
-      const mp = orderMpMap.get(o.id) || '';
-      return getMarketplaceOrderStatusCategory(o, mp) === 'new';
-    }).length;
-    const processingOrders = allOrders.filter(o => {
+    // Single-pass: categorize all orders at once instead of filtering 5 times
+    let totalRevenue = 0;
+    let pendingOrders = 0;
+    let processingOrders = 0;
+    let deliveredOrders = 0;
+    let cancelledOrders = 0;
+
+    for (const o of allOrders) {
       const mp = orderMpMap.get(o.id) || '';
       const cat = getMarketplaceOrderStatusCategory(o, mp);
-      return cat === 'assembly' || cat === 'active';
-    }).length;
-    const deliveredOrders = allOrders.filter(o => {
-      const mp = orderMpMap.get(o.id) || '';
-      return getMarketplaceOrderStatusCategory(o, mp) === 'delivered';
-    }).length;
-    const cancelledOrders = allOrders.filter(o => {
-      const mp = orderMpMap.get(o.id) || '';
-      return getMarketplaceOrderStatusCategory(o, mp) === 'cancelled';
-    }).length;
+      if (cat === 'cancelled') { cancelledOrders++; continue; }
+      if (cat === 'new') pendingOrders++;
+      else if (cat === 'assembly' || cat === 'active') processingOrders++;
+      else if (cat === 'delivered') deliveredOrders++;
+      if (!isExcludedOrder(o)) {
+        totalRevenue += getOrderRevenueUzs(o, mp);
+      }
+    }
+
+    const validOrdersCount = allOrders.length - cancelledOrders;
+    const avgCheck = validOrdersCount > 0 ? Math.round(totalRevenue / validOrdersCount) : 0;
     const lowStockProducts = allProducts.filter(p => (p.stockCount || 0) > 0 && (p.stockCount || 0) < 5).length;
     const outOfStockProducts = allProducts.filter(p => (p.stockCount || 0) === 0).length;
 
