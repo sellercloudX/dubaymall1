@@ -1,5 +1,7 @@
 import { toDisplayUzs } from '@/lib/currency';
 
+export const MARKETPLACE_CACHE_VERSION = 'v23-finance-fallback-fixed';
+
 export interface NormalizedMarketplaceFinance {
   actualCommission: number;
   actualLogisticsFee: number;
@@ -20,16 +22,33 @@ function toPositiveNumber(value: unknown): number {
   return amount > 0 ? amount : 0;
 }
 
-function getFirstPositiveNumber(...values: unknown[]): number {
-  for (const value of values) {
-    const amount = toPositiveNumber(value);
-    if (amount > 0) return amount;
+/**
+ * Pick first positive number from a list of candidates.
+ * Checks both direct field and nested finance.field for each candidate.
+ */
+function pickFirst(item: any, ...fieldNames: string[]): number {
+  // First pass: direct fields
+  for (const field of fieldNames) {
+    const v = toPositiveNumber(item[field]);
+    if (v > 0) return v;
+  }
+  // Second pass: nested finance.* fields
+  const fin = item.finance || item.financeData || {};
+  for (const field of fieldNames) {
+    const v = toPositiveNumber(fin[field]);
+    if (v > 0) return v;
   }
   return 0;
 }
 
-function getPositiveSum(...values: unknown[]): number {
-  return values.reduce<number>((sum, value) => sum + toPositiveNumber(value), 0);
+function sumFields(item: any, ...fieldNames: string[]): number {
+  let total = 0;
+  const fin = item.finance || item.financeData || {};
+  for (const field of fieldNames) {
+    total += toPositiveNumber(item[field]);
+    total += toPositiveNumber(fin[field]);
+  }
+  return total;
 }
 
 function normalizeMarketplaceMoney(value: number, marketplace: string): number {
@@ -37,111 +56,116 @@ function normalizeMarketplaceMoney(value: number, marketplace: string): number {
 }
 
 export function parseUzumFinance(item: any): NormalizedMarketplaceFinance {
-  const actualCommission = getFirstPositiveNumber(
-    item.actualCommission,
-    item.commissionAmount,
-    item.commission?.amount,
-    item.commissionBase,
+  const actualCommission = pickFirst(item,
+    'actualCommission',
+    'commissionAmount',
+    'commissionBase',
   );
-  const actualLogisticsFee = getFirstPositiveNumber(
-    item.actualLogisticsFee,
-    item.deliveryAmount,
-    item.logisticsAmount,
-    item.deliveryCost,
-    item.logisticsFee,
+  // Also check commission.amount pattern
+  const commissionObj = item.commission || item.finance?.commission;
+  const commissionObjAmount = toPositiveNumber(
+    typeof commissionObj === 'object' ? commissionObj?.amount : 0
   );
-  const actualOtherFees = getFirstPositiveNumber(
-    item.actualOtherFees,
-    item.withdrawalAmount,
-    item.otherFees,
+  const finalCommission = actualCommission > 0 ? actualCommission : commissionObjAmount;
+
+  const actualLogisticsFee = pickFirst(item,
+    'actualLogisticsFee',
+    'deliveryAmount',
+    'logisticsAmount',
+    'deliveryCost',
+    'logisticsFee',
   );
-  const subsidyAmount = getPositiveSum(
-    item.subsidyAmount,
-    item.additionalPayment,
-    item.additional_payment,
-    item.compensationAmount,
-    item.compensation,
-    item.promoAmount,
+  const actualOtherFees = pickFirst(item,
+    'actualOtherFees',
+    'withdrawalAmount',
+    'otherFees',
   );
-  const sellerRevenue = getFirstPositiveNumber(
-    item.actualSoldPrice,
-    item.sellerAmount,
-    item.forPay,
-    item.payoutAmount,
-    item.sellerPayout,
+  const subsidyAmount = sumFields(item,
+    'subsidyAmount',
+    'additionalPayment',
+    'additional_payment',
+    'compensationAmount',
+    'compensation',
+    'promoAmount',
   );
-  const grossPrice = getFirstPositiveNumber(
-    item.grossPrice,
-    item.totalPrice,
-    item.buyerPrice,
+  const sellerRevenue = pickFirst(item,
+    'actualSoldPrice',
+    'sellerAmount',
+    'forPay',
+    'payoutAmount',
+    'sellerPayout',
+  );
+  const grossPrice = pickFirst(item,
+    'grossPrice',
+    'totalPrice',
+    'buyerPrice',
   );
 
+  const hasAnyData = finalCommission > 0 || actualLogisticsFee > 0 || actualOtherFees > 0 || sellerRevenue > 0 || subsidyAmount > 0;
+
   return {
-    actualCommission,
+    actualCommission: finalCommission,
     actualLogisticsFee,
     actualOtherFees,
     actualSoldPrice: sellerRevenue > 0 || subsidyAmount > 0 ? sellerRevenue + subsidyAmount : 0,
     grossPrice,
     subsidyAmount,
-    isExact:
-      actualCommission > 0 ||
-      actualLogisticsFee > 0 ||
-      actualOtherFees > 0 ||
-      sellerRevenue > 0 ||
-      subsidyAmount > 0,
+    isExact: hasAnyData,
   };
 }
 
 export function parseYandexFinance(item: any): NormalizedMarketplaceFinance {
-  const actualCommission = getFirstPositiveNumber(
-    item.actualCommission,
-    item.commission,
-    item.sales_commission,
-    item.salesCommission,
-    item.commissionAmount,
-    item.feeAmount,
+  const actualCommission = pickFirst(item,
+    'actualCommission',
+    'commission',
+    'sales_commission',
+    'salesCommission',
+    'commissionAmount',
+    'feeAmount',
   );
-  const actualLogisticsFee = getPositiveSum(
-    item.actualLogisticsFee,
-    item.logistics,
-    item.delivery,
-    item.transfer_fee,
-    item.transferFee,
-    item.shipping_cost,
-    item.shippingCost,
-    item.deliveryAmount,
-    item.deliveryCost,
+  const actualLogisticsFee = sumFields(item,
+    'actualLogisticsFee',
+    'logistics',
+    'delivery',
+    'transfer_fee',
+    'transferFee',
+    'shipping_cost',
+    'shippingCost',
+    'deliveryAmount',
+    'deliveryCost',
   );
-  const actualOtherFees = getPositiveSum(
-    item.actualOtherFees,
-    item.otherFees,
-    item.withdrawalAmount,
-    item.paymentTransferAmount,
+  const actualOtherFees = sumFields(item,
+    'actualOtherFees',
+    'otherFees',
+    'withdrawalAmount',
+    'paymentTransferAmount',
   );
-  const subsidyAmount = getPositiveSum(
-    item.subsidyAmount,
-    item.subsidy,
-    item.promoAmount,
-    item.PROMO_AMOUNT,
-    item.compensation,
-    item.compensationAmount,
-    item.additionalPayment,
+  const subsidyAmount = sumFields(item,
+    'subsidyAmount',
+    'subsidy',
+    'promoAmount',
+    'PROMO_AMOUNT',
+    'compensation',
+    'compensationAmount',
+    'additionalPayment',
   );
-  const sellerRevenue = getFirstPositiveNumber(
-    item.actualSoldPrice,
-    item.bankSum,
-    item.sellerAmount,
-    item.transactionSum,
-    item.forPay,
+  const sellerRevenue = pickFirst(item,
+    'actualSoldPrice',
+    'bankSum',
+    'sellerAmount',
+    'transactionSum',
+    'forPay',
   );
-  const grossPrice = getFirstPositiveNumber(
-    item.grossPrice,
-    item.customer_payment_amount,
-    item.customerPaymentAmount,
-    item.buyerPaymentAmount,
-    item.totalPrice,
-    item.buyerPrice,
+  const grossPrice = pickFirst(item,
+    'grossPrice',
+    'customer_payment_amount',
+    'customerPaymentAmount',
+    'buyerPaymentAmount',
+    'totalPrice',
+    'buyerPrice',
   );
+
+  const hasAnyData = actualCommission > 0 || actualLogisticsFee > 0 || actualOtherFees > 0 || sellerRevenue > 0 || subsidyAmount > 0;
 
   return {
     actualCommission,
@@ -150,59 +174,56 @@ export function parseYandexFinance(item: any): NormalizedMarketplaceFinance {
     actualSoldPrice: sellerRevenue > 0 || subsidyAmount > 0 ? sellerRevenue + subsidyAmount : 0,
     grossPrice,
     subsidyAmount,
-    isExact:
-      actualCommission > 0 ||
-      actualLogisticsFee > 0 ||
-      actualOtherFees > 0 ||
-      sellerRevenue > 0 ||
-      subsidyAmount > 0,
+    isExact: hasAnyData,
   };
 }
 
 export function parseWildberriesFinance(item: any): NormalizedMarketplaceFinance {
-  const actualCommissionRub = getFirstPositiveNumber(
-    item.actualCommission,
-    item.ppvz_sales_commission,
-    item.commissionAmount,
-    item.commission,
+  const actualCommissionRub = pickFirst(item,
+    'actualCommission',
+    'ppvz_sales_commission',
+    'commissionAmount',
+    'commission',
   );
-  const actualLogisticsRub = getPositiveSum(
-    item.actualLogisticsFee,
-    item.logistics,
-    item.delivery_rub,
-    item.deliveryAmount,
-    item.logisticsAmount,
+  const actualLogisticsRub = sumFields(item,
+    'actualLogisticsFee',
+    'logistics',
+    'delivery_rub',
+    'deliveryAmount',
+    'logisticsAmount',
   );
-  const actualOtherFeesRub = getPositiveSum(
-    item.actualOtherFees,
-    item.payment_sale_amount,
-    item.payment_schedule,
-    item.storage_fee,
-    item.penalty,
-    item.acceptance,
-    item.withdrawalAmount,
+  const actualOtherFeesRub = sumFields(item,
+    'actualOtherFees',
+    'payment_sale_amount',
+    'payment_schedule',
+    'storage_fee',
+    'penalty',
+    'acceptance',
+    'withdrawalAmount',
   );
-  const subsidyRub = getPositiveSum(
-    item.subsidyAmount,
-    item.supplier_promo,
-    item.product_discount_for_report,
-    item.additional_payment,
-    item.additionalPayment,
+  const subsidyRub = sumFields(item,
+    'subsidyAmount',
+    'supplier_promo',
+    'product_discount_for_report',
+    'additional_payment',
+    'additionalPayment',
   );
-  const sellerRevenueRub = getFirstPositiveNumber(
-    item.actualSoldPrice,
-    item.forPay,
-    item.ppvz_for_pay,
-    item.sellerAmount,
+  const sellerRevenueRub = pickFirst(item,
+    'actualSoldPrice',
+    'forPay',
+    'ppvz_for_pay',
+    'sellerAmount',
   );
-  const grossPriceRub = getFirstPositiveNumber(
-    item.grossPrice,
-    item.finishedPrice,
-    item.retail_price_withdisc_rub,
-    item.priceWithDisc,
-    item.totalPrice,
-    item.price,
+  const grossPriceRub = pickFirst(item,
+    'grossPrice',
+    'finishedPrice',
+    'retail_price_withdisc_rub',
+    'priceWithDisc',
+    'totalPrice',
+    'price',
   );
+
+  const hasAnyData = actualCommissionRub > 0 || actualLogisticsRub > 0 || actualOtherFeesRub > 0 || sellerRevenueRub > 0 || subsidyRub > 0;
 
   return {
     actualCommission: normalizeMarketplaceMoney(actualCommissionRub, 'wildberries'),
@@ -214,18 +235,13 @@ export function parseWildberriesFinance(item: any): NormalizedMarketplaceFinance
     ),
     grossPrice: normalizeMarketplaceMoney(grossPriceRub, 'wildberries'),
     subsidyAmount: normalizeMarketplaceMoney(subsidyRub, 'wildberries'),
-    isExact:
-      actualCommissionRub > 0 ||
-      actualLogisticsRub > 0 ||
-      actualOtherFeesRub > 0 ||
-      sellerRevenueRub > 0 ||
-      subsidyRub > 0,
+    isExact: hasAnyData,
   };
 }
 
 // Debug counter — log first N items per marketplace per session to avoid console spam
 const _debugCounts: Record<string, number> = {};
-const DEBUG_LOG_LIMIT = 5; // log first 5 items per marketplace
+const DEBUG_LOG_LIMIT = 5;
 
 export function normalizeMarketplaceFinance(item: any, marketplace: string): NormalizedMarketplaceFinance {
   let result: NormalizedMarketplaceFinance;
@@ -248,10 +264,10 @@ export function normalizeMarketplaceFinance(item: any, marketplace: string): Nor
   // Debug logging for verification
   const key = marketplace;
   _debugCounts[key] = (_debugCounts[key] || 0) + 1;
-  if (_debugCounts[key] <= DEBUG_LOG_LIMIT && result.isExact) {
+  if (_debugCounts[key] <= DEBUG_LOG_LIMIT) {
     const offerId = item.offerId || item.skuId || item.id || '?';
     console.log(
-      `[NORMALIZER_DEBUG] ${marketplace} #${_debugCounts[key]} offerId=${offerId}`,
+      `[NORMALIZER_DEBUG] ${marketplace} #${_debugCounts[key]} offerId=${offerId} isExact=${result.isExact}`,
       '\n  RAW fields:',
       {
         commissionAmount: item.commissionAmount,
@@ -275,15 +291,7 @@ export function normalizeMarketplaceFinance(item: any, marketplace: string): Nor
         financeSource: item.financeSource,
       },
       '\n  NORMALIZED:',
-      {
-        actualCommission: result.actualCommission,
-        actualLogisticsFee: result.actualLogisticsFee,
-        actualOtherFees: result.actualOtherFees,
-        actualSoldPrice: result.actualSoldPrice,
-        grossPrice: result.grossPrice,
-        subsidyAmount: result.subsidyAmount,
-        isExact: result.isExact,
-      },
+      result,
     );
   }
 

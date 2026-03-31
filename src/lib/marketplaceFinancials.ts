@@ -122,7 +122,7 @@ export function calculateOrderFinancialBreakdown(
   tariffMap: Map<string, TariffInfo> | undefined,
 ): OrderFinancialBreakdown {
   const lines: OrderItemFinancialLine[] = [];
-  const items = order.items || [];
+      const items = order.items || [];
 
   let revenue = 0;
   let costTotal = 0;
@@ -158,6 +158,7 @@ export function calculateOrderFinancialBreakdown(
       let itemTotalFees = 0;
       let hasRealFees = false;
 
+      // Try extracting exact fees from normalizer (checks direct + finance.* fields)
       const exactFees = extractExactFees(item, marketplace);
 
       if (exactFees) {
