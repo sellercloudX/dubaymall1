@@ -41,12 +41,31 @@ export interface OrderFinancialBreakdown {
 }
 
 /**
- * STRICT exact fees extraction — hech qanday taxmin yo'q
+ * STRICT exact fees extraction
+ * Hech qanday taxmin yo'q — faqat normalizerdan kelgan qiymatlar
  */
 function extractExactFees(item: any, marketplace: string) {
   const normalized = normalizeMarketplaceFinance(item, marketplace);
 
-  // Agar normalizer hech narsa topmasa ham, hech bo'lmaganda 0 qiymatlarni qaytarish
+  const hasAnyRealData = 
+    normalized.actualCommission > 0 || 
+    normalized.actualLogisticsFee > 0 || 
+    normalized.actualSoldPrice > 0;
+
+  // Debug — har bir item uchun aniq ko'rsatadi
+  console.log(`[EXACT_FEES_DEBUG] ${marketplace} | item=${item.offerId || item.id || 'unknown'}`, {
+    isExact: normalized.isExact,
+    hasAnyRealData,
+    commission: normalized.actualCommission,
+    logistics: normalized.actualLogisticsFee,
+    soldPrice: normalized.actualSoldPrice,
+    subsidy: normalized.subsidyAmount,
+    financeSource: normalized.financeSource || 'unknown',
+    rawKeys: Object.keys(item).filter(k => 
+      /commission|delivery|logistics|forPay|seller|bankSum|ppvz/i.test(k)
+    ).slice(0, 15)
+  });
+
   return {
     commission: normalized.actualCommission,
     logistics: normalized.actualLogisticsFee,
@@ -55,7 +74,7 @@ function extractExactFees(item: any, marketplace: string) {
     actualSoldPrice: normalized.actualSoldPrice || 0,
     grossPrice: normalized.grossPrice || 0,
     subsidyAmount: normalized.subsidyAmount || 0,
-    isReal: normalized.isExact || normalized.actualCommission > 0 || normalized.actualLogisticsFee > 0,
+    isReal: hasAnyRealData,
     financeSource: normalized.financeSource || "unknown",
   };
 }
@@ -79,19 +98,20 @@ export function calculateOrderFinancialBreakdown(
   let costCoveredItems = 0;
   let realTariffItems = 0;
 
-  const shouldDebugLog = true; // birinchi marta debugni yoqamiz
+  const shouldDebugLog = true;
 
   for (const item of items) {
     const quantity = item.count || 1;
-    const itemPrice = toDisplayUzs(item.price || 0, marketplace);
     const rawCostPrice = getCostPrice(marketplace, item.offerId);
     const costPriceUzs = rawCostPrice !== null ? toDisplayUzs(rawCostPrice, marketplace) : 0;
     const itemCostTotal = costPriceUzs * quantity;
 
-    // === ASOSIY O'ZGARISH: Hech qachon null qaytarmaslik ===
     const fees = extractExactFees(item, marketplace);
 
-    const itemRevenue = fees.actualSoldPrice > 0 ? fees.actualSoldPrice : toDisplayUzs(item.price || 0, marketplace); // fallback faqat narx
+    // Eng muhim: actualSoldPrice mavjud bo'lsa uni ishlat, bo'lmasa oddiy price
+    const itemRevenue = fees.actualSoldPrice > 0 
+      ? fees.actualSoldPrice 
+      : toDisplayUzs(item.price || 0, marketplace);
 
     const itemCommission = fees.commission;
     const itemLogistics = fees.logistics;
@@ -101,13 +121,14 @@ export function calculateOrderFinancialBreakdown(
     const hasRealFees = fees.isReal || itemCommission > 0 || itemLogistics > 0;
 
     if (shouldDebugLog) {
-      console.log(`[ORDER_FINANCE_DEBUG] ${marketplace} | item=${item.offerId}`, {
-        source: hasRealFees ? "EXACT_API" : "FALLBACK",
+      console.log(`[ORDER_FINANCE_DEBUG] ${marketplace} | item=${item.offerId || item.id}`, {
+        source: hasRealFees ? "EXACT_API" : "TARIFF_FALLBACK",
         financeSource: fees.financeSource,
         itemRevenue,
         commission: itemCommission,
         logistics: itemLogistics,
         totalFees: itemTotalFees,
+        hasRealFees,
         rawFields: {
           actualSoldPrice: item.actualSoldPrice,
           sellerAmount: item.sellerAmount,
@@ -115,6 +136,7 @@ export function calculateOrderFinancialBreakdown(
           ppvz_for_pay: item.ppvz_for_pay,
           commissionAmount: item.commissionAmount,
           deliveryAmount: item.deliveryAmount,
+          logisticsAmount: item.logisticsAmount,
         },
       });
     }
@@ -139,6 +161,39 @@ export function calculateOrderFinancialBreakdown(
       quantity,
       revenue: itemRevenue,
       costTotal: itemCostTotal,
+      commission: itemCommission,
+      logistics: itemLogistics,
+      withdrawal: itemWithdrawal,
+      totalFees: itemTotalFees,
+      tax: itemTax,
+      hasCostPrice: rawCostPrice !== null,
+      hasRealTariff: hasRealFees,
+      fulfillmentType: order.fulfillmentType,
+    });
+  }
+
+  const taxAmount = revenue * UZB_TAX_RATE;
+  const grossProfit = revenue - costTotal;
+  const netProfit = grossProfit - totalFees - taxAmount;
+  const margin = revenue > 0 ? (netProfit / revenue) * 100 : 0;
+
+  return {
+    revenue,
+    costTotal,
+    commission,
+    logistics,
+    withdrawal,
+    totalFees,
+    taxAmount,
+    grossProfit,
+    netProfit,
+    margin,
+    itemCount,
+    costCoveredItems,
+    realTariffItems,
+    lines,
+  };
+}      costTotal: itemCostTotal,
       commission: itemCommission,
       logistics: itemLogistics,
       withdrawal: itemWithdrawal,
