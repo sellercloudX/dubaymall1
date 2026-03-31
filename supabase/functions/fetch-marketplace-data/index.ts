@@ -3205,7 +3205,7 @@ serve(async (req) => {
                 const { data: cachedProducts } = await supabase
                   .from('marketplace_products_cache')
                   .select('offer_id, data')
-                  .eq('user_id', userId)
+                  .eq('user_id', user.id)
                   .eq('marketplace', 'uzum');
                 
                 if (cachedProducts && cachedProducts.length > 0) {
