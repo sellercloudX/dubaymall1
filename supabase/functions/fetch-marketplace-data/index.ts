@@ -6494,9 +6494,10 @@ serve(async (req) => {
       }
     }
 
+    const body = JSON.stringify(result);
     return new Response(
-      JSON.stringify(result),
-      { headers: { ...corsHeaders, "Content-Type": "application/json", "X-Cache": "MISS" } }
+      body,
+      { headers: { ...corsHeaders, "Content-Type": "application/json", "X-Cache": "MISS", "Cache-Control": "private, max-age=300" } }
     );
   } catch (error) {
     console.error("Fetch marketplace data error:", error);
