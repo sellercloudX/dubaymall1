@@ -5087,7 +5087,7 @@ serve(async (req) => {
                     const rDate = (r.rr_dt || r.date_from || '').substring(0, 10);
                     if (rDate !== orderDate) return false;
                     // Validate price proximity: report's retail_price_withdisc_rub should be within 2x of order price
-                    const reportPrice = r.retail_price_withdisc_rub || r.ppvz_office_name ? r.retail_price_withdisc_rub : 0;
+                    const reportPrice = r.retail_price_withdisc_rub || 0;
                     if (reportPrice > 0 && orderPrice > 0) {
                       const ratio = reportPrice / orderPrice;
                       if (ratio > 3 || ratio < 0.2) return false; // Too far apart — wrong match
