@@ -223,18 +223,69 @@ export function parseWildberriesFinance(item: any): NormalizedMarketplaceFinance
   };
 }
 
-export function normalizeMarketplaceFinance(item: any, marketplace: string): NormalizedMarketplaceFinance {
-  if (marketplace === 'uzum') return parseUzumFinance(item);
-  if (marketplace === 'yandex') return parseYandexFinance(item);
-  if (marketplace === 'wildberries') return parseWildberriesFinance(item);
+// Debug counter — log first N items per marketplace per session to avoid console spam
+const _debugCounts: Record<string, number> = {};
+const DEBUG_LOG_LIMIT = 5; // log first 5 items per marketplace
 
-  return {
-    actualCommission: 0,
-    actualLogisticsFee: 0,
-    actualOtherFees: 0,
-    actualSoldPrice: 0,
-    grossPrice: 0,
-    subsidyAmount: 0,
-    isExact: false,
-  };
+export function normalizeMarketplaceFinance(item: any, marketplace: string): NormalizedMarketplaceFinance {
+  let result: NormalizedMarketplaceFinance;
+
+  if (marketplace === 'uzum') result = parseUzumFinance(item);
+  else if (marketplace === 'yandex') result = parseYandexFinance(item);
+  else if (marketplace === 'wildberries') result = parseWildberriesFinance(item);
+  else {
+    return {
+      actualCommission: 0,
+      actualLogisticsFee: 0,
+      actualOtherFees: 0,
+      actualSoldPrice: 0,
+      grossPrice: 0,
+      subsidyAmount: 0,
+      isExact: false,
+    };
+  }
+
+  // Debug logging for verification
+  const key = marketplace;
+  _debugCounts[key] = (_debugCounts[key] || 0) + 1;
+  if (_debugCounts[key] <= DEBUG_LOG_LIMIT && result.isExact) {
+    const offerId = item.offerId || item.skuId || item.id || '?';
+    console.log(
+      `[NORMALIZER_DEBUG] ${marketplace} #${_debugCounts[key]} offerId=${offerId}`,
+      '\n  RAW fields:',
+      {
+        commissionAmount: item.commissionAmount,
+        'commission?.amount': item.commission?.amount,
+        commissionBase: item.commissionBase,
+        actualCommission: item.actualCommission,
+        deliveryAmount: item.deliveryAmount,
+        logisticsAmount: item.logisticsAmount,
+        deliveryCost: item.deliveryCost,
+        logisticsFee: item.logisticsFee,
+        actualLogisticsFee: item.actualLogisticsFee,
+        sellerAmount: item.sellerAmount,
+        forPay: item.forPay,
+        ppvz_for_pay: item.ppvz_for_pay,
+        bankSum: item.bankSum,
+        subsidyAmount: item.subsidyAmount,
+        additionalPayment: item.additionalPayment,
+        promoAmount: item.promoAmount,
+        ppvz_sales_commission: item.ppvz_sales_commission,
+        logistics: item.logistics,
+        financeSource: item.financeSource,
+      },
+      '\n  NORMALIZED:',
+      {
+        actualCommission: result.actualCommission,
+        actualLogisticsFee: result.actualLogisticsFee,
+        actualOtherFees: result.actualOtherFees,
+        actualSoldPrice: result.actualSoldPrice,
+        grossPrice: result.grossPrice,
+        subsidyAmount: result.subsidyAmount,
+        isExact: result.isExact,
+      },
+    );
+  }
+
+  return result;
 }
