@@ -1,0 +1,3 @@
+TRUNCATE TABLE public.marketplace_orders_cache;
+TRUNCATE TABLE public.marketplace_products_cache;
+TRUNCATE TABLE public.marketplace_stats_cache;
