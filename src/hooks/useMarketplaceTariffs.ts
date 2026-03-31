@@ -415,12 +415,13 @@ function safeMapValues(map: any): TariffInfo[] {
  */
 /**
  * Minimum logistics fees per marketplace (in UZS).
- * Used when tariff map has zero logistics to ensure realistic floor.
+ * Uses dynamic RUB→UZS rate for WB.
  */
 function getMinimumLogistics(marketplace?: string): number {
   switch (marketplace) {
     case 'yandex': return 2000;
     case 'uzum': return 5000;
+    case 'wildberries': return Math.round(46 * getRubToUzs()); // 46 RUB minimum
     default: return 0;
   }
 }
