@@ -250,9 +250,13 @@ async function fetchWBRealTariffs(headers: Record<string, string>): Promise<{
         const subjectName = (r.subjectName || '').trim();
         const parentName = (r.parentName || '').trim();
         // Use proper null check — kgvpMarketplace can be 0
+        // WB API returns Uz-suffixed fields for Uzbekistan sellers
         const commission = typeof r.kgvpMarketplace === 'number' ? r.kgvpMarketplace
+          : typeof r.kgvpMarketplaceUz === 'number' ? r.kgvpMarketplaceUz
           : typeof r.kgvpSupplier === 'number' ? r.kgvpSupplier
+          : typeof r.kgvpSupplierUz === 'number' ? r.kgvpSupplierUz
           : typeof r.kgvpSupplierExpress === 'number' ? r.kgvpSupplierExpress
+          : typeof r.kgvpPaidStorageUz === 'number' ? r.kgvpPaidStorageUz
           : 15;
         if (subjectName) {
           commissionMap.set(subjectName.toLowerCase(), commission);
