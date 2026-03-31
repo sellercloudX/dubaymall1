@@ -412,25 +412,44 @@ function safeMapValues(map: any): TariffInfo[] {
  * Always prefer finance/report endpoints first.
  * Tariff map is only a fallback and MUST use the sold-time order price, not the current catalog price.
  */
+/**
+ * Minimum logistics fees per marketplace (in UZS).
+ * Used when tariff map has zero logistics to ensure realistic floor.
+ */
+function getMinimumLogistics(marketplace?: string): number {
+  switch (marketplace) {
+    case 'yandex': return 2000;
+    case 'uzum': return 5000;
+    default: return 0;
+  }
+}
+
 export function getTariffForProduct(
   tariffMap: Map<string, TariffInfo> | undefined,
   offerId: string,
-  _price: number,
-  _marketplace?: string,
+  orderPrice: number,
+  marketplace?: string,
 ): { commission: number; logistics: number; withdrawal: number; totalFee: number; isReal: boolean } {
   const tariff = safeMapGet(tariffMap, offerId);
   
   if (tariff && tariff.totalTariff > 0) {
+    // Re-calculate commission using ORDER-TIME price and the commission PERCENT
+    // instead of using pre-computed amounts based on catalog price
+    const commissionPercent = (tariff.commissionPercent || 0) / 100;
+    const commission = orderPrice > 0 && commissionPercent > 0
+      ? orderPrice * commissionPercent
+      : tariff.agencyCommission;
+
     const extraFees = tariff.otherFees || 0;
-    const commission = tariff.agencyCommission;
-    const logistics = tariff.fulfillment + tariff.delivery + extraFees;
-    const withdrawalFee = 0;
+    const rawLogistics = tariff.fulfillment + tariff.delivery + extraFees;
+    const minLogistics = getMinimumLogistics(marketplace);
+    const logistics = Math.max(rawLogistics, minLogistics);
     const totalFee = commission + logistics;
     
     return {
       commission,
       logistics,
-      withdrawal: withdrawalFee,
+      withdrawal: 0,
       totalFee,
       isReal: true,
     };
