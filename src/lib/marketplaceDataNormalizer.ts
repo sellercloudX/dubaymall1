@@ -29,7 +29,7 @@ function getFirstPositiveNumber(...values: unknown[]): number {
 }
 
 function getPositiveSum(...values: unknown[]): number {
-  return values.reduce((sum, value) => sum + toPositiveNumber(value), 0);
+  return values.reduce<number>((sum, value) => sum + toPositiveNumber(value), 0);
 }
 
 function normalizeMarketplaceMoney(value: number, marketplace: string): number {

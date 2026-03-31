@@ -99,6 +99,75 @@ interface YandexOrder {
   }>;
 }
 
+function toFiniteAmount(value: unknown): number {
+  const amount = Number(value ?? 0);
+  return Number.isFinite(amount) ? amount : 0;
+}
+
+function toPositiveAmount(value: unknown): number {
+  const amount = toFiniteAmount(value);
+  return amount > 0 ? amount : 0;
+}
+
+function pickPositiveAmount(...values: unknown[]): number {
+  for (const value of values) {
+    const amount = toPositiveAmount(value);
+    if (amount > 0) return amount;
+  }
+  return 0;
+}
+
+function sumPositiveAmounts(...values: unknown[]): number {
+  return values.reduce<number>((sum, value) => sum + toPositiveAmount(value), 0);
+}
+
+function getWbItemFinanceFields(source: any) {
+  const commissionAmount = Math.abs(pickPositiveAmount(
+    source.ppvz_sales_commission,
+    source.commissionAmount,
+    source.commission,
+  ));
+  const deliveryAmount = Math.abs(sumPositiveAmounts(
+    source.logistics,
+    source.delivery_rub,
+    source.deliveryAmount,
+    source.logisticsAmount,
+  ));
+  const withdrawalAmount = Math.abs(sumPositiveAmounts(
+    source.payment_sale_amount,
+    source.payment_schedule,
+    source.storage_fee,
+    source.penalty,
+    source.acceptance,
+    source.withdrawalAmount,
+  ));
+  const subsidyAmount = sumPositiveAmounts(
+    source.supplier_promo,
+    source.product_discount_for_report,
+    source.additional_payment,
+    source.additionalPayment,
+  );
+  const sellerAmount = pickPositiveAmount(source.ppvz_for_pay, source.forPay, source.sellerAmount);
+  const grossPrice = pickPositiveAmount(
+    source.finishedPrice,
+    source.retail_price_withdisc_rub,
+    source.priceWithDisc,
+    source.totalPrice,
+    source.price,
+    source.salePrice,
+  );
+
+  return {
+    commissionAmount,
+    deliveryAmount,
+    withdrawalAmount,
+    subsidyAmount,
+    sellerAmount,
+    actualSoldPrice: sellerAmount > 0 || subsidyAmount > 0 ? sellerAmount + subsidyAmount : 0,
+    grossPrice,
+  };
+}
+
 // Helper to map WB order object to unified format
 // New Orders API returns prices in "сотые доли копеек" (hundredths of kopecks = value × 10000)
 // Statistics/Sales APIs return prices directly in RUB
@@ -107,6 +176,11 @@ function mapWBOrder(o: any, defaultStatus: string, fromNewApi = false) {
   const rawPrice = o.convertedPrice || o.price || o.salePrice || 0;
   // New orders: divide by 10000 (hundredths of kopecks → RUB)
   const price = fromNewApi ? rawPrice / 10000 : rawPrice;
+  const wbFinance = getWbItemFinanceFields({
+    ...o,
+    price,
+    totalPrice: o.totalPrice || price,
+  });
   
   // IMPORTANT: convertedFinalPrice is in SELLER'S LOCAL CURRENCY (UZS for UZ sellers) × 100.
   // We must NOT use it as the main price because all WB prices in our system are normalized to RUB.
@@ -132,15 +206,9 @@ function mapWBOrder(o: any, defaultStatus: string, fromNewApi = false) {
   const forPay = o.forPay || 0;
   // finishedPrice: price buyer actually paid (after WB discount) — always in RUB
   const finishedPrice = o.finishedPrice || 0;
-  const commissionAmount = Math.abs(o.ppvz_sales_commission || o.commissionAmount || o.commission || 0);
-  const deliveryAmount = Math.abs(o.delivery_rub || o.deliveryAmount || o.logisticsAmount || 0);
-  const withdrawalAmount = Math.abs(o.payment_sale_amount || o.payment_schedule || 0);
-  const additionalPayment = o.additional_payment || o.additionalPayment || 0;
-  const sellerAmount = o.ppvz_for_pay || forPay || 0;
-
   // Use best available RUB price: finishedPrice > priceWithDisc > raw price
   // DO NOT use convertedFinalPrice here — it's in seller's local currency (UZS), not RUB
-  const bestPrice = finishedPrice > 0 ? finishedPrice : price;
+  const bestPrice = wbFinance.grossPrice > 0 ? wbFinance.grossPrice : price;
 
   // Determine fulfillment type:
   const dt = (o.deliveryType || '').toLowerCase();
@@ -170,13 +238,20 @@ function mapWBOrder(o: any, defaultStatus: string, fromNewApi = false) {
       priceUZS: bestPrice,
       nmID: o.nmId || undefined,
       spp: spp > 0 ? spp : undefined,
-      finishedPrice: finishedPrice > 0 ? finishedPrice : undefined,
+       finishedPrice: finishedPrice > 0 ? finishedPrice : undefined,
       forPay: forPay > 0 ? forPay : undefined,
-      commissionAmount: commissionAmount > 0 ? commissionAmount : undefined,
-      deliveryAmount: deliveryAmount > 0 ? deliveryAmount : undefined,
-      withdrawalAmount: withdrawalAmount > 0 ? withdrawalAmount : undefined,
-      additionalPayment: additionalPayment !== 0 ? additionalPayment : undefined,
-      sellerAmount: sellerAmount > 0 ? sellerAmount : undefined,
+       commissionAmount: wbFinance.commissionAmount > 0 ? wbFinance.commissionAmount : undefined,
+       deliveryAmount: wbFinance.deliveryAmount > 0 ? wbFinance.deliveryAmount : undefined,
+       withdrawalAmount: wbFinance.withdrawalAmount > 0 ? wbFinance.withdrawalAmount : undefined,
+       additionalPayment: wbFinance.subsidyAmount > 0 ? wbFinance.subsidyAmount : undefined,
+       sellerAmount: wbFinance.sellerAmount > 0 ? wbFinance.sellerAmount : undefined,
+       actualCommission: wbFinance.commissionAmount > 0 ? wbFinance.commissionAmount : undefined,
+       actualLogisticsFee: wbFinance.deliveryAmount > 0 ? wbFinance.deliveryAmount : undefined,
+       actualOtherFees: wbFinance.withdrawalAmount > 0 ? wbFinance.withdrawalAmount : undefined,
+       actualSoldPrice: wbFinance.actualSoldPrice > 0 ? wbFinance.actualSoldPrice : undefined,
+       subsidyAmount: wbFinance.subsidyAmount > 0 ? wbFinance.subsidyAmount : undefined,
+       grossPrice: wbFinance.grossPrice > 0 ? wbFinance.grossPrice : undefined,
+       financeSource: 'wb-report-detail',
     }],
     buyer: { firstName: buyerLocation, lastName: "" },
     nmID: o.nmId,
@@ -830,18 +905,67 @@ serve(async (req) => {
                 // not on the pre-discount catalog price which can be 2-4x higher.
                 // Yandex subsidies are handled separately via revenue adjustment.
                 
+                const subsidyAmount = sumPositiveAmounts(
+                  item.promoAmount,
+                  item.compensationAmount,
+                  item.subsidyAmount,
+                  item.additionalPayment,
+                );
+                const actualCommission = pickPositiveAmount(
+                  item.commission,
+                  item.sales_commission,
+                  item.salesCommission,
+                  item.commissionAmount,
+                  item.feeAmount,
+                );
+                const actualLogisticsFee = sumPositiveAmounts(
+                  item.logistics,
+                  item.delivery,
+                  item.transfer_fee,
+                  item.transferFee,
+                  item.shipping_cost,
+                  item.shippingCost,
+                  item.deliveryAmount,
+                  item.deliveryCost,
+                );
+                const actualOtherFees = sumPositiveAmounts(
+                  item.paymentTransferAmount,
+                  item.withdrawalAmount,
+                  item.otherFees,
+                );
+                const sellerAmount = pickPositiveAmount(
+                  item.bankSum,
+                  item.transactionSum,
+                  item.sellerAmount,
+                  item.forPay,
+                );
+
                 return {
                   offerId: item.offerId,
                   offerName: item.offerName,
                   count,
                   price: unitPrice,
                   priceUZS: unitPrice,
+                  grossPrice: pickPositiveAmount(
+                    item.customer_payment_amount,
+                    item.customerPaymentAmount,
+                    item.buyerPaymentAmount,
+                    item.totalPrice,
+                    item.buyerPrice,
+                    unitPrice,
+                  ) || unitPrice,
                   categoryId: item.marketCategoryId,
-                  commissionAmount: Number(item.commissionAmount || item.feeAmount || 0) || undefined,
-                  deliveryAmount: Number(item.deliveryAmount || item.deliveryCost || 0) || undefined,
-                  withdrawalAmount: Number(item.paymentTransferAmount || item.withdrawalAmount || 0) || undefined,
-                  additionalPayment: Number(item.promoAmount || item.compensationAmount || item.subsidyAmount || 0) || undefined,
-                  sellerAmount: Number(item.bankSum || item.transactionSum || item.sellerAmount || 0) || undefined,
+                  commissionAmount: actualCommission || undefined,
+                  deliveryAmount: actualLogisticsFee || undefined,
+                  withdrawalAmount: actualOtherFees || undefined,
+                  additionalPayment: subsidyAmount || undefined,
+                  sellerAmount: sellerAmount || undefined,
+                  actualCommission: actualCommission || undefined,
+                  actualLogisticsFee: actualLogisticsFee || undefined,
+                  actualOtherFees: actualOtherFees || undefined,
+                  subsidyAmount: subsidyAmount || undefined,
+                  actualSoldPrice: (sellerAmount > 0 || subsidyAmount > 0) ? sellerAmount + subsidyAmount : undefined,
+                  financeSource: 'yandex-order-finance',
                 };
               });
 
@@ -2562,6 +2686,31 @@ serve(async (req) => {
                      }
                   } catch (photoErr) { /* skip */ }
                   
+                  const commissionAmount = pickPositiveAmount(
+                    item.commissionAmount,
+                    item.commission?.amount,
+                    item.commissionBase,
+                  );
+                  const logisticsAmount = pickPositiveAmount(
+                    item.deliveryAmount,
+                    item.logisticsAmount,
+                    item.deliveryCost,
+                    item.logisticsFee,
+                  );
+                  const otherFees = pickPositiveAmount(item.withdrawalAmount, item.otherFees);
+                  const subsidyAmount = sumPositiveAmounts(
+                    item.additionalPayment,
+                    item.additional_payment,
+                    item.compensationAmount,
+                    item.subsidyAmount,
+                  );
+                  const sellerAmount = pickPositiveAmount(
+                    item.sellerAmount,
+                    item.forPay,
+                    item.payoutAmount,
+                    item.sellerPayout,
+                  );
+
                   return {
                     offerId,
                     skuId: String(item.id || ''),
@@ -2570,13 +2719,20 @@ serve(async (req) => {
                     count: item.quantity || item.count || item.amount || 1,
                     price: item.totalPrice || item.buyerPrice || item.accrualAmount || item.price || item.amount || item.sellerAmount || 0,
                     priceUZS: item.totalPrice || item.buyerPrice || item.accrualAmount || item.price || item.amount || item.sellerAmount || 0,
+                    grossPrice: item.totalPrice || item.buyerPrice || 0,
                     photo: itemPhoto,
                     // Carry ALL available finance fields from FBS order items
                     commissionPercent: item.commissionPercent || item.commission?.percent || 0,
-                    commissionBase: item.commissionBase || item.commissionAmount || item.commission?.amount || 0,
-                    deliveryAmount: item.deliveryAmount || item.logisticsAmount || item.deliveryCost || 0,
-                    sellerAmount: item.sellerAmount || item.payoutAmount || 0,
-                    additionalPayment: item.additionalPayment || item.additional_payment || 0,
+                    commissionBase: commissionAmount,
+                    deliveryAmount: logisticsAmount,
+                    sellerAmount: sellerAmount || 0,
+                    additionalPayment: subsidyAmount || 0,
+                    actualCommission: commissionAmount || undefined,
+                    actualLogisticsFee: logisticsAmount || undefined,
+                    actualOtherFees: otherFees || undefined,
+                    actualSoldPrice: (sellerAmount > 0 || subsidyAmount > 0) ? sellerAmount + subsidyAmount : undefined,
+                    subsidyAmount: subsidyAmount || undefined,
+                    financeSource: 'uzum-finance-fbs',
                   };
                 }),
               };
@@ -2755,6 +2911,12 @@ serve(async (req) => {
                       const logisticsAmt = item.deliveryAmount || item.logisticsAmount || item.deliveryCost || item.logistics || 0;
                       // Seller payout (net after all deductions)
                       const sellerPayout = item.sellerAmount || item.payoutAmount || item.forPay || 0;
+                      const subsidyAmount = sumPositiveAmounts(
+                        item.additionalPayment,
+                        item.additional_payment,
+                        item.compensationAmount,
+                        item.subsidyAmount,
+                      );
                       return {
                       offerId: numericId ? String(numericId) : String(item.barcode || item.skuTitle || ''),
                       skuId: String(item.skuId || item.id || ''),
@@ -2763,12 +2925,19 @@ serve(async (req) => {
                       count: item.quantity || item.count || 1,
                       price: grossPrice,
                       priceUZS: grossPrice,
+                      grossPrice,
                       // Carry ALL finance fields from Uzum Finance API for accurate PnL
                       commissionPercent: item.commissionPercent || item.commission?.percent || 0,
                       commissionBase: commissionAmt,
                       deliveryAmount: logisticsAmt,
                       sellerAmount: sellerPayout,
-                      additionalPayment: item.additionalPayment || item.additional_payment || 0,
+                      additionalPayment: subsidyAmount || 0,
+                      actualCommission: commissionAmt || undefined,
+                      actualLogisticsFee: logisticsAmt || undefined,
+                      actualOtherFees: pickPositiveAmount(item.withdrawalAmount, item.otherFees) || undefined,
+                      actualSoldPrice: (sellerPayout > 0 || subsidyAmount > 0) ? sellerPayout + subsidyAmount : undefined,
+                      subsidyAmount: subsidyAmount || undefined,
+                      financeSource: 'uzum-finance-fbo',
                     };
                     }),
                   });
@@ -2849,10 +3018,29 @@ serve(async (req) => {
                   const finSeller = matchedFin.sellerAmount || matchedFin.payoutAmount || matchedFin.forPay || 0;
                   const finCommPercent = matchedFin.commissionPercent || matchedFin.commission?.percent || 0;
 
-                  if (finCommission > 0) orderItem.commissionBase = finCommission;
-                  if (finDelivery > 0) orderItem.deliveryAmount = finDelivery;
-                  if (finSeller > 0) orderItem.sellerAmount = finSeller;
+                  const finSubsidy = sumPositiveAmounts(
+                    matchedFin.additionalPayment,
+                    matchedFin.additional_payment,
+                    matchedFin.compensationAmount,
+                    matchedFin.subsidyAmount,
+                  );
+
+                  if (finCommission > 0) {
+                    orderItem.commissionBase = finCommission;
+                    orderItem.actualCommission = finCommission;
+                  }
+                  if (finDelivery > 0) {
+                    orderItem.deliveryAmount = finDelivery;
+                    orderItem.actualLogisticsFee = finDelivery;
+                  }
+                  if (finSeller > 0) {
+                    orderItem.sellerAmount = finSeller;
+                  }
                   if (finCommPercent > 0) orderItem.commissionPercent = finCommPercent;
+                  orderItem.actualOtherFees = pickPositiveAmount(matchedFin.withdrawalAmount, matchedFin.otherFees) || orderItem.actualOtherFees;
+                  orderItem.subsidyAmount = finSubsidy || orderItem.subsidyAmount;
+                  orderItem.actualSoldPrice = (finSeller > 0 || finSubsidy > 0) ? finSeller + finSubsidy : orderItem.actualSoldPrice;
+                  orderItem.financeSource = 'uzum-finance-enriched';
                   enrichedCount++;
                 }
               }
@@ -4505,15 +4693,22 @@ serve(async (req) => {
                   count: 1,
                   price: price,
                   priceUZS: price,
+                  grossPrice: wbFinance.grossPrice > 0 ? wbFinance.grossPrice : undefined,
                   nmID: o.nmId || undefined,
                   spp: spp > 0 ? spp : undefined,
                   finishedPrice: o.finishedPrice || undefined,
                   forPay: forPay > 0 ? forPay : undefined,
-                  commissionAmount: Math.abs(o.ppvz_sales_commission || o.commissionAmount || 0) || undefined,
-                  deliveryAmount: Math.abs(o.delivery_rub || o.deliveryAmount || 0) || undefined,
-                  withdrawalAmount: Math.abs(o.payment_sale_amount || o.payment_schedule || 0) || undefined,
-                  additionalPayment: (o.additional_payment || 0) || undefined,
-                  sellerAmount: (o.ppvz_for_pay || forPay || 0) || undefined,
+                  commissionAmount: wbFinance.commissionAmount || undefined,
+                  deliveryAmount: wbFinance.deliveryAmount || undefined,
+                  withdrawalAmount: wbFinance.withdrawalAmount || undefined,
+                  additionalPayment: wbFinance.subsidyAmount || undefined,
+                  sellerAmount: wbFinance.sellerAmount || undefined,
+                  actualCommission: wbFinance.commissionAmount || undefined,
+                  actualLogisticsFee: wbFinance.deliveryAmount || undefined,
+                  actualOtherFees: wbFinance.withdrawalAmount || undefined,
+                  actualSoldPrice: wbFinance.actualSoldPrice || undefined,
+                  subsidyAmount: wbFinance.subsidyAmount || undefined,
+                  financeSource: 'wb-stats-orders',
                 }],
                 buyer: { firstName: buyerRegion, lastName: "" },
                 nmID: o.nmId,
@@ -4562,6 +4757,7 @@ serve(async (req) => {
               const saleIsFBO = saleFboKw.some(kw => saleWh.includes(kw));
 
               salesAdded++;
+              const saleFinance = getWbItemFinanceFields(sale);
               allOrders.push({
                 id: sale.odid || sale.saleID || sale.srid,
                 status: sale.saleID?.startsWith("R") ? "RETURNED" : "DELIVERED",
@@ -4581,15 +4777,22 @@ serve(async (req) => {
                   count: 1,
                   price: price,
                   priceUZS: price,
+                  grossPrice: saleFinance.grossPrice > 0 ? saleFinance.grossPrice : undefined,
                   nmID: sale.nmId || undefined,
                   spp: spp > 0 ? spp : undefined,
                   finishedPrice: sale.finishedPrice || undefined,
                   forPay: forPay > 0 ? forPay : undefined,
-                  commissionAmount: Math.abs(sale.ppvz_sales_commission || sale.commissionAmount || 0) || undefined,
-                  deliveryAmount: Math.abs(sale.delivery_rub || sale.deliveryAmount || 0) || undefined,
-                  withdrawalAmount: Math.abs(sale.payment_sale_amount || sale.payment_schedule || 0) || undefined,
-                  additionalPayment: (sale.additional_payment || 0) || undefined,
-                  sellerAmount: (sale.ppvz_for_pay || forPay || 0) || undefined,
+                  commissionAmount: saleFinance.commissionAmount || undefined,
+                  deliveryAmount: saleFinance.deliveryAmount || undefined,
+                  withdrawalAmount: saleFinance.withdrawalAmount || undefined,
+                  additionalPayment: saleFinance.subsidyAmount || undefined,
+                  sellerAmount: saleFinance.sellerAmount || undefined,
+                  actualCommission: saleFinance.commissionAmount || undefined,
+                  actualLogisticsFee: saleFinance.deliveryAmount || undefined,
+                  actualOtherFees: saleFinance.withdrawalAmount || undefined,
+                  actualSoldPrice: saleFinance.actualSoldPrice || undefined,
+                  subsidyAmount: saleFinance.subsidyAmount || undefined,
+                  financeSource: 'wb-stats-sales',
                 }],
                 buyer: { firstName: sale.regionName || sale.oblast || "", lastName: "" },
               });
