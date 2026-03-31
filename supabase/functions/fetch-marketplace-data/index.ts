@@ -2765,12 +2765,23 @@ serve(async (req) => {
           // statuses: TO_WITHDRAW, PROCESSING, CANCELED, PARTIALLY_CANCELLED
           try {
             const finShopIds = allShopIds.length > 0 ? allShopIds : (uzumShopId ? [String(uzumShopId)] : []);
-            console.log(`Uzum Finance orders: querying with ${finShopIds.length} shopIds`);
+            console.log(`Uzum Finance orders: querying with ${finShopIds.length} shopIds: ${finShopIds.join(',')}`);
             const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
             let fboCount = 0;
 
-            // Query ALL finance statuses to get complete FBO picture
-            const financeStatuses = ['TO_WITHDRAW', 'PROCESSING', 'CANCELED', 'PARTIALLY_CANCELLED'];
+            // Try multiple approaches to get finance data:
+            // Approach 1: Without statuses filter (gets ALL finance items)
+            // Approach 2: With specific statuses if approach 1 fails
+            const financeApproaches = [
+              { label: 'no-status-filter', statuses: [] },
+              { label: 'all-statuses', statuses: ['TO_WITHDRAW', 'PROCESSING', 'CANCELED', 'PARTIALLY_CANCELLED'] },
+            ];
+
+            let financeDataFound = false;
+
+            for (const approach of financeApproaches) {
+              if (financeDataFound) break;
+              console.log(`[UZUM FINANCE] Trying approach: ${approach.label}`);
 
             let finPage = 0;
             let finHasMore = true;
@@ -2781,8 +2792,8 @@ serve(async (req) => {
               finParams.append('dateTo', String(Date.now()));
               finParams.append('size', '100');
               finParams.append('page', String(finPage));
-              // Add ALL statuses to get complete data
-              for (const st of financeStatuses) {
+              // Add statuses only if specified
+              for (const st of approach.statuses) {
                 finParams.append('statuses', st);
               }
               // Add ALL shopIds as array params: shopIds=40852&shopIds=71592...
@@ -2792,7 +2803,7 @@ serve(async (req) => {
 
               try {
                 const finUrl = `${uzumBaseUrl}/v1/finance/orders?${finParams.toString()}`;
-                console.log(`Uzum Finance orders page ${finPage}, shops=${finShopIds.join(',')}`);
+                console.log(`Uzum Finance orders page ${finPage} (${approach.label}), shops=${finShopIds.join(',')}`);
                 
                 const finResp = await fetch(finUrl, { headers: uzumHeaders });
 
