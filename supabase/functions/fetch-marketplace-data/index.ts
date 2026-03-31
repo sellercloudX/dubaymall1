@@ -4800,6 +4800,144 @@ serve(async (req) => {
             console.log(`WB sales: ${salesAdded} added, ${salesSkipped} skipped (dedup)`);
           }
 
+          // ===== 4. ENRICH with reportDetailByPeriod (real commission, logistics, forPay) =====
+          // This is the ONLY WB endpoint that returns actual financial breakdowns per sale
+          try {
+            await sleep(300);
+            const reportDateFrom = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+            const reportDateTo = new Date().toISOString().split('T')[0];
+            
+            let allReportRows: any[] = [];
+            let rrdid = 0;
+            let reportHasMore = true;
+            let reportPage = 0;
+            
+            while (reportHasMore && reportPage < 30) {
+              const reportUrl = `https://statistics-api.wildberries.ru/api/v5/supplier/reportDetailByPeriod?dateFrom=${reportDateFrom}&dateTo=${reportDateTo}&rrdid=${rrdid}&limit=100000`;
+              const reportResp = await fetch(reportUrl, { headers: wbHeaders });
+              
+              if (!reportResp.ok && reportResp.status !== 204) {
+                const errText = await reportResp.text();
+                console.warn(`WB reportDetailByPeriod failed: ${reportResp.status}, ${errText.substring(0, 300)}`);
+                break;
+              }
+              
+              const reportData = await safeJson(reportResp, []);
+              const reportRows = Array.isArray(reportData) ? reportData : [];
+              
+              if (reportRows.length === 0) {
+                reportHasMore = false;
+                break;
+              }
+              
+              allReportRows.push(...reportRows);
+              
+              // Get last rrdid for pagination
+              const lastRow = reportRows[reportRows.length - 1];
+              rrdid = lastRow.rrd_id || lastRow.rrdid || 0;
+              reportPage++;
+              
+              if (reportRows.length < 100000) reportHasMore = false;
+              else await sleep(500);
+            }
+            
+            console.log(`WB reportDetailByPeriod: ${allReportRows.length} rows fetched`);
+            
+            if (allReportRows.length > 0) {
+              // Log sample row structure
+              const sampleRow = allReportRows[0];
+              console.log(`[WB REPORT KEYS] ${JSON.stringify(Object.keys(sampleRow))}`);
+              console.log(`[WB REPORT SAMPLE] ppvz_for_pay=${sampleRow.ppvz_for_pay}, ppvz_sales_commission=${sampleRow.ppvz_sales_commission}, logistics=${sampleRow.delivery_rub}, supplier_oper_name=${sampleRow.supplier_oper_name}, sa_name=${sampleRow.sa_name}`);
+              
+              // Build enrichment map: srid → report row (most accurate match)
+              // Also build by supplierArticle+nmId for fallback
+              const reportBySrid = new Map<string, any>();
+              const reportByNmId = new Map<number, any[]>();
+              
+              for (const row of allReportRows) {
+                // Only use "Продажа" (sale) rows, not returns/penalties
+                const opName = (row.supplier_oper_name || '').toLowerCase();
+                if (!opName.includes('продажа') && !opName.includes('sale')) continue;
+                
+                if (row.srid) {
+                  const sridKey = String(row.srid);
+                  // Clean srid: strip ".0.0" suffix
+                  const cleanSrid = sridKey.endsWith('.0.0') ? sridKey.slice(0, -4) : sridKey;
+                  reportBySrid.set(cleanSrid, row);
+                  reportBySrid.set(sridKey, row);
+                }
+                if (row.nm_id) {
+                  if (!reportByNmId.has(row.nm_id)) reportByNmId.set(row.nm_id, []);
+                  reportByNmId.get(row.nm_id)!.push(row);
+                }
+              }
+              
+              console.log(`WB report enrichment map: ${reportBySrid.size} by srid, ${reportByNmId.size} by nmId`);
+              
+              // Enrich existing orders with report data
+              let wbEnrichedCount = 0;
+              for (const order of allOrders) {
+                const orderId = String(order.id || '');
+                const nmId = order.nmID;
+                
+                // Try srid match first
+                let reportRow = reportBySrid.get(orderId);
+                
+                // Fallback: match by nmId (use first matching row)
+                if (!reportRow && nmId && reportByNmId.has(nmId)) {
+                  const candidates = reportByNmId.get(nmId)!;
+                  // Try to match by date too
+                  const orderDate = order.createdAt ? order.createdAt.substring(0, 10) : '';
+                  reportRow = candidates.find((r: any) => {
+                    const rDate = (r.rr_dt || r.date_from || '').substring(0, 10);
+                    return rDate === orderDate;
+                  }) || candidates[0];
+                }
+                
+                if (reportRow && order.items && order.items.length > 0) {
+                  const item = order.items[0];
+                  const rpFinance = getWbItemFinanceFields(reportRow);
+                  
+                  if (rpFinance.commissionAmount > 0) {
+                    item.commissionAmount = rpFinance.commissionAmount;
+                    item.actualCommission = rpFinance.commissionAmount;
+                  }
+                  if (rpFinance.deliveryAmount > 0) {
+                    item.deliveryAmount = rpFinance.deliveryAmount;
+                    item.actualLogisticsFee = rpFinance.deliveryAmount;
+                  }
+                  if (rpFinance.withdrawalAmount > 0) {
+                    item.withdrawalAmount = rpFinance.withdrawalAmount;
+                    item.actualOtherFees = rpFinance.withdrawalAmount;
+                  }
+                  if (rpFinance.sellerAmount > 0) {
+                    item.sellerAmount = rpFinance.sellerAmount;
+                    item.forPay = rpFinance.sellerAmount;
+                  }
+                  if (rpFinance.subsidyAmount > 0) {
+                    item.additionalPayment = rpFinance.subsidyAmount;
+                    item.subsidyAmount = rpFinance.subsidyAmount;
+                  }
+                  if (rpFinance.actualSoldPrice > 0) {
+                    item.actualSoldPrice = rpFinance.actualSoldPrice;
+                  }
+                  if (rpFinance.grossPrice > 0) {
+                    item.grossPrice = rpFinance.grossPrice;
+                  }
+                  item.financeSource = 'wb-report-enriched';
+                  
+                  // Also update order-level forPay
+                  if (rpFinance.sellerAmount > 0) order.forPay = rpFinance.sellerAmount;
+                  
+                  wbEnrichedCount++;
+                }
+              }
+              console.log(`WB enriched ${wbEnrichedCount} orders with reportDetailByPeriod data`);
+            }
+          } catch (reportErr) {
+            console.warn("WB reportDetailByPeriod enrichment error (non-fatal):", reportErr);
+          }
+
           console.log(`WB total orders: ${allOrders.length}`);
 
           result = {
