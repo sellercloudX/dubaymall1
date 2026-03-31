@@ -2983,9 +2983,9 @@ serve(async (req) => {
               let enrichHasMore = true;
               while (enrichHasMore && enrichPage < 30) {
                 const enrichParams = new URLSearchParams();
-                // Use same 365-day lookback for enrichment
-                enrichParams.append('dateFrom', String(Date.now() - 365 * 24 * 60 * 60 * 1000));
-                enrichParams.append('dateTo', String(Date.now()));
+                // Use same 365-day lookback for enrichment with ISO date format
+                enrichParams.append('dateFrom', finDateFrom);
+                enrichParams.append('dateTo', finDateTo);
                 enrichParams.append('size', '100');
                 enrichParams.append('page', String(enrichPage));
                 for (const st of statuses) enrichParams.append('statuses', st);
