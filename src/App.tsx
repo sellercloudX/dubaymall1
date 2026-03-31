@@ -40,6 +40,7 @@ const SellerCloudMobile = lazy(() => import("./pages/SellerCloudMobile"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const TelegramAdminApp = lazy(() => import("./pages/TelegramAdminApp"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const ExtensionDownload = lazy(() => import("./pages/ExtensionDownload"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
  // Create persister for offline cache
