@@ -3426,9 +3426,13 @@ serve(async (req) => {
             for (const o of priceOffers) {
               const shopId = o.shopId || uzumShopId;
               const list = byShop.get(shopId) || [];
+              // Uzum API expects price in TIYINS (so'm × 100)
+              // Client sends price in so'm, so we convert here
+              const priceInSom = o.price;
+              const priceInTiyins = Math.round(priceInSom * 100);
               list.push({
                 skuId: parseInt(o.skuId || o.offerId || '0'),
-                price: o.price, // Uzum API expects so'm (same unit as fullPrice)
+                price: priceInTiyins,
               });
               byShop.set(shopId, list);
             }
@@ -3440,7 +3444,7 @@ serve(async (req) => {
               const validItems = items.filter((p: any) => p.skuId > 0 && p.price > 0);
               if (validItems.length === 0) continue;
 
-              console.log(`Uzum price update: ${validItems.length} SKUs, shopId: ${shopId}, sample: ${JSON.stringify(validItems[0])}`);
+              console.log(`Uzum price update: ${validItems.length} SKUs, shopId: ${shopId}, sample: ${JSON.stringify(validItems[0])} (tiyins)`);
 
               // Retry with backoff for rate limits (429)
               let response: Response | null = null;
@@ -3464,31 +3468,11 @@ serve(async (req) => {
 
               if (response && response.ok) {
                 totalUpdated += validItems.length;
+                console.log(`Uzum price update succeeded for shop ${shopId}: ${validItems.length} SKUs`);
               } else if (response) {
                 const errText = await response.text();
                 console.error(`Uzum price update failed for shop ${shopId}: ${response.status}, body: ${errText}`);
-                lastError = `Price update failed: ${response.status}`;
-                // If price is in wrong unit, try with tiyins (price * 100)
-                if (response.status === 500) {
-                  console.log(`Retrying with tiyins for shop ${shopId}...`);
-                  const tiyinItems = validItems.map((i: any) => ({ ...i, price: Math.round(i.price * 100) }));
-                  const retryResp = await fetch(
-                    `${uzumBaseUrl}/v1/product/${shopId}/sendPriceData`,
-                    {
-                      method: 'POST',
-                      headers: { ...uzumHeaders, "Content-Type": "application/json" },
-                      body: JSON.stringify({ skuPriceList: tiyinItems }),
-                    }
-                  );
-                  if (retryResp.ok) {
-                    totalUpdated += validItems.length;
-                    console.log(`Uzum price update succeeded with tiyins for shop ${shopId}`);
-                    lastError = '';
-                  } else {
-                    const retryErr = await retryResp.text();
-                    console.error(`Uzum price update (tiyins) also failed: ${retryResp.status}, ${retryErr}`);
-                  }
-                }
+                lastError = `Narx yangilash xato: ${response.status} (do'kon ${shopId})`;
               }
             }
 
