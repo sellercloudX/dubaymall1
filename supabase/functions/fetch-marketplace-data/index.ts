@@ -1514,13 +1514,23 @@ serve(async (req) => {
                   commissionPercent = 0;
                 }
 
-                const totalTariff = agencyCommission + fulfillment + delivery + sorting + other;
+                // Enforce minimum logistics: Yandex UZ min 2000 so'm
+                const MIN_YANDEX_LOGISTICS = 2000;
+                const rawDelivery = delivery + sorting;
+                const enforcedDelivery = Math.max(rawDelivery, MIN_YANDEX_LOGISTICS);
+                // Redistribute enforced minimum back to delivery
+                if (rawDelivery < MIN_YANDEX_LOGISTICS) {
+                  delivery = MIN_YANDEX_LOGISTICS;
+                  sorting = 0;
+                }
+
+                const totalTariff = agencyCommission + fulfillment + enforcedDelivery + other;
                 
                 // tariffPercent = ONLY percentage-based fees (commission + payment transfer)
                 const tariffPercent = commissionPercent + minPaymentTransferPct;
                 
                 if (idx < 3) {
-                  console.log(`[YANDEX TARIFF CALC] #${idx} commission%=${commissionPercent}, paymentTransfer%=${minPaymentTransferPct}, tariffPercent=${tariffPercent}%, delivery=${delivery}(fixed), price=${price}`);
+                  console.log(`[YANDEX TARIFF CALC] #${idx} commission%=${commissionPercent}, paymentTransfer%=${minPaymentTransferPct}, tariffPercent=${tariffPercent}%, delivery=${enforcedDelivery}(min=${MIN_YANDEX_LOGISTICS}), price=${price}`);
                 }
                 
                 return {
@@ -1535,7 +1545,7 @@ serve(async (req) => {
                   other,
                   totalTariff,
                   tariffPercent: Math.round(tariffPercent * 100) / 100,
-                  deliveryAmount: delivery + sorting,
+                  deliveryAmount: enforcedDelivery,
                   paymentTransferPercent: minPaymentTransferPct,
                   source,
                   suspiciousRecoveredCommission,
@@ -1734,13 +1744,16 @@ serve(async (req) => {
                         const paymentPct = fbsData?.paymentPct || KNOWN_PAYMENT_TRANSFER_PCT;
                         const price = o.price || 0;
                         const commAmount = Math.round(price * commPct / 100);
-                        const delivery = fbsData?.delivery || 0;
-                        const sorting = fbsData?.sorting || 0;
+                        const rawDelivery = (fbsData?.delivery || 0) + (fbsData?.sorting || 0);
+                        const MIN_LOGISTICS = 2000;
+                        const enforcedDelivery = Math.max(rawDelivery, MIN_LOGISTICS);
+                        const delivery = enforcedDelivery;
+                        const sorting = 0;
                         const other = fbsData?.other || 0;
                         const tariffPercent = commPct + paymentPct;
                         
                         const source = knownRate ? 'knownRate' : (fbsData ? 'fbsEstimate' : 'default');
-                        console.log(`[RESTRICTED] cat=${catId} (${knownRate?.label || source}), comm=${commPct}%, payment=${paymentPct}%, price=${price}`);
+                        console.log(`[RESTRICTED] cat=${catId} (${knownRate?.label || source}), comm=${commPct}%, payment=${paymentPct}%, delivery=${enforcedDelivery}, price=${price}`);
                         
                         return {
                           index: o._originalIndex,
@@ -1752,9 +1765,9 @@ serve(async (req) => {
                           delivery,
                           sorting,
                           other,
-                          totalTariff: commAmount + delivery + sorting + other,
+                          totalTariff: commAmount + delivery + other,
                           tariffPercent: Math.round(tariffPercent * 100) / 100,
-                          deliveryAmount: delivery + sorting,
+                          deliveryAmount: enforcedDelivery,
                           paymentTransferPercent: paymentPct,
                           source,
                           restricted: true,
