@@ -3617,7 +3617,7 @@ serve(async (req) => {
                 response = await fetch(
                   `${uzumBaseUrl}/v2/fbs/sku/stocks`,
                   {
-                    method: 'POST',
+                    method: 'PUT',
                     headers: { ...uzumHeaders, "Content-Type": "application/json" },
                     body: JSON.stringify({ skuAmountList }),
                   }
