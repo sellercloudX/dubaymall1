@@ -1526,8 +1526,8 @@ serve(async (req) => {
               const tariffData = await tariffResponse.json();
               const tariffResults = tariffData.result?.offers || [];
               
-              console.log(`Got ${tariffResults.length} tariff results via sellingProgram=FBS`);
-              const parsed = parseTariffResults(tariffResults, offersForCalc, 'sellingProgram');
+              console.log(`Got ${tariffResults.length} tariff results via campaignId=${campaignId}`);
+              const parsed = parseTariffResults(tariffResults, offersForCalc, 'campaign');
               
               // Check if some got 0% commission — these might be restricted
               const zeroComm = parsed.filter((p: any) => p.commissionPercent === 0);
