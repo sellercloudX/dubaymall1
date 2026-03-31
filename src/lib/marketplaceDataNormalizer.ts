@@ -1,6 +1,6 @@
 import { toDisplayUzs } from '@/lib/currency';
 
-export const MARKETPLACE_CACHE_VERSION = 'v26-real-finance-enrichment';
+export const MARKETPLACE_CACHE_VERSION = 'v27-subsidy-dedup-fix';
 
 export interface NormalizedMarketplaceFinance {
   actualCommission: number;
