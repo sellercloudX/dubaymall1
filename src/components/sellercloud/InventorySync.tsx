@@ -12,7 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { 
   RefreshCw, Package, AlertTriangle, Check, 
   ArrowDownUp, Settings, Search, TrendingDown,
-  AlertOctagon, FileWarning, BarChart3, Filter
+  AlertOctagon, FileWarning, BarChart3, Filter,
+  Plus, Minus
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
