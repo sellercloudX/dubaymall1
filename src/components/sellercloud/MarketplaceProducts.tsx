@@ -243,7 +243,7 @@ export function MarketplaceProducts({ connectedMarketplaces, store }: Marketplac
                           const price = product.price || 0;
                           const priceUzs = toDisplayUzs(price, selectedMarketplace);
                           const tariff = getTariffForProduct(tariffMap, product.offerId, priceUzs, selectedMarketplace);
-                          const tariffInfo = tariffMap?.get(product.offerId);
+                          const tariffInfo = tariffMap instanceof Map ? tariffMap?.get(product.offerId) : (tariffMap as any)?.[product.offerId];
                           const commPct = tariffInfo?.commissionPercent;
                           return (
                             <div className="flex flex-col items-end">
