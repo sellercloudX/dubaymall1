@@ -1417,14 +1417,21 @@ serve(async (req) => {
                   const valueType = params.find((p: any) => p.name === 'valueType');
                   const isRelative = valueType?.value === 'relative';
                   
+                  // ONLY pure marketplace commission types — NOT logistics/fulfillment
                   const isCommissionType = (
                     type === 'FEE' ||
-                    type === 'AGENCY_COMMISSION' ||
+                    type === 'AGENCY_COMMISSION'
+                  );
+                  
+                  // Logistics-related types go to delivery/fulfillment buckets
+                  const isLogisticsType = (
+                    type === 'FULFILLMENT' ||
                     type === 'FBS_COMMISSION' ||
                     type === 'FBY_COMMISSION' ||
-                    type === 'FULFILLMENT' ||
-                    type.includes('_COMMISSION') ||
-                    type.includes('_FEE')
+                    type === 'DELIVERY_TO_CUSTOMER' ||
+                    type === 'CROSSREGIONAL_DELIVERY' ||
+                    type === 'EXPRESS_DELIVERY' ||
+                    type === 'MIDDLE_MILE'
                   );
                   
                   if (isCommissionType) {
@@ -1432,10 +1439,10 @@ serve(async (req) => {
                     if (isRelative && valueParam?.value) {
                       feePercentFromApi += parseFloat(valueParam.value) || 0;
                     }
-                  } else if (type === 'DELIVERY_TO_CUSTOMER' || type === 'CROSSREGIONAL_DELIVERY' || type === 'EXPRESS_DELIVERY' || type === 'MIDDLE_MILE') {
-                    delivery += amount;
                   } else if (type === 'SORTING') {
                     sorting += amount;
+                  } else if (isLogisticsType) {
+                    delivery += amount;
                   } else if (type === 'PAYMENT_TRANSFER') {
                     if (amount > 0) {
                       paymentTransferAmounts.push(amount);
