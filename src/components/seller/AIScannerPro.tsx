@@ -371,7 +371,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
 
     try {
       // ═══ BILLING: One check for the entire scanner pipeline ═══
-      const scannerFeatureKey = targetMarketplace === 'wildberries' ? 'wb-card-create' : targetMarketplace === 'uzum' ? 'uzum-card-create' : 'yandex-card-create';
+      const scannerFeatureKey = targetMarketplace === 'wildberries' ? 'wb-card-create' : 'yandex-card-create';
       if (!(await checkBillingAccess(scannerFeatureKey))) {
         updateTaskStatus('failed');
         return;
