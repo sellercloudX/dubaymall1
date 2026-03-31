@@ -348,6 +348,39 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
     store.refetchProducts();
   }, [bulkStockValue, stockUpdateFilter, stockSelectedIds, filteredProducts, store]);
 
+  const handleIndividualStockSave = useCallback(async (product: ProductStock) => {
+    const key = `${product.id}-${product.marketplace}`;
+    const newQty = individualStockChanges[key];
+    if (newQty === undefined || newQty < 0) return;
+
+    setSavingStockIds(prev => new Set(prev).add(key));
+    try {
+      const { data, error } = await supabase.functions.invoke('fetch-marketplace-data', {
+        body: {
+          marketplace: product.marketplace,
+          dataType: 'update-stock',
+          stocks: [{
+            sku: product.sku,
+            offerId: product.id,
+            skuId: product.skuId,
+            quantity: newQty,
+          }],
+        },
+      });
+      if (!error && data?.success) {
+        toast.success(`${product.name}: qoldiq ${newQty} ga o'zgartirildi`);
+        setIndividualStockChanges(prev => { const n = { ...prev }; delete n[key]; return n; });
+        store.refetchProducts();
+      } else {
+        toast.error(`${product.name}: xatolik`);
+      }
+    } catch {
+      toast.error(`Qoldiq yangilashda xato`);
+    } finally {
+      setSavingStockIds(prev => { const n = new Set(prev); n.delete(key); return n; });
+    }
+  }, [individualStockChanges, store]);
+
   if (connectedMarketplaces.length === 0) {
     return (
       <Card>
