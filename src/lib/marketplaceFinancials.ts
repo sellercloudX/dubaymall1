@@ -1,7 +1,7 @@
 import { toDisplayUzs } from "@/lib/currency";
 import { getOrderRevenueUzs } from "@/lib/revenueCalculations";
 import { getTariffForProduct, type TariffInfo } from "@/hooks/useMarketplaceTariffs";
-import { getMinLogisticsUzs } from "@/lib/marketplaceCalculator";
+import { getMinLogisticsUzs, normalizeLogistics } from "@/lib/marketplaceCalculator";
 import type { MarketplaceOrder } from "@/hooks/useMarketplaceDataStore";
 import { normalizeMarketplaceFinance } from "@/lib/marketplaceDataNormalizer";
 
