@@ -79,6 +79,9 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
   const [lossFilter, setLossFilter] = useState<LossFilter>('all');
   const [stockSelectedIds, setStockSelectedIds] = useState<Set<string>>(new Set());
   const [bulkStockValue, setBulkStockValue] = useState<string>('');
+  // Per-product stock adjustments: key = "offerId-marketplace", value = new stock quantity
+  const [individualStockChanges, setIndividualStockChanges] = useState<Record<string, number>>({});
+  const [savingStockIds, setSavingStockIds] = useState<Set<string>>(new Set());
   const [stockUpdateFilter, setStockUpdateFilter] = useState<'selected' | 'out_of_stock' | 'all'>('selected');
   const [isUpdatingStock, setIsUpdatingStock] = useState(false);
   const isLoading = store.isLoadingProducts;
