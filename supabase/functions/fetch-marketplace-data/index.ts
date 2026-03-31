@@ -1342,23 +1342,45 @@ serve(async (req) => {
         // Calculate real Yandex Market tariffs per product
         // KNOWN RESTRICTED CATEGORY COMMISSION RATES (Yandex Market UZ)
         // These categories return 400 from /v2/tariffs/calculate for UZ campaigns
-        // Rates are from official Yandex Market tariff tables
+        // ALL restricted category IDs from API error response are mapped here
         const KNOWN_RESTRICTED_TARIFFS: Record<number, { commissionPercent: number; label: string }> = {
-          // Парфюмерия (Perfumery) - all sub-categories
+          // Парфюмерия (Perfumery) - all sub-categories (old + new IDs)
           90509: { commissionPercent: 18.5, label: 'Парфюмерия' },
           90510: { commissionPercent: 18.5, label: 'Женская парфюмерия' },
           90511: { commissionPercent: 18.5, label: 'Мужская парфюмерия' },
           90512: { commissionPercent: 18.5, label: 'Унисекс парфюмерия' },
           15685458: { commissionPercent: 18.5, label: 'Парфюмерия' },
+          // Restricted categories from API (UZ campaign 148650502)
+          // Parfyumeriya va kosmetika sub-kategoriyalari
+          4748072: { commissionPercent: 18.5, label: 'Парфюмерия' },
+          64228758: { commissionPercent: 18.5, label: 'Парфюмерия' },
+          14994695: { commissionPercent: 18.5, label: 'Парфюмерия' },
+          64363346: { commissionPercent: 18.5, label: 'Парфюмерия' },
+          8476101: { commissionPercent: 18.5, label: 'Парфюмерия' },
+          64756570: { commissionPercent: 18.5, label: 'Парфюмерия' },
+          14995788: { commissionPercent: 18.5, label: 'Парфюмерия' },
+          15927546: { commissionPercent: 18.5, label: 'Парфюмерия' },
+          64119037: { commissionPercent: 18.5, label: 'Парфюмерия' },
+          4852773: { commissionPercent: 18.5, label: 'Парфюмерия' },
+          64375654: { commissionPercent: 18.5, label: 'Парфюмерия' },
+          64438503: { commissionPercent: 18.5, label: 'Парфюмерия' },
+          13276667: { commissionPercent: 18.5, label: 'Парфюмерия' },
+          8475955: { commissionPercent: 18.5, label: 'Парфюмерия' },
+          64380707: { commissionPercent: 18.5, label: 'Парфюмерия' },
+          4748062: { commissionPercent: 18.5, label: 'Парфюмерия' },
+          64207592: { commissionPercent: 18.5, label: 'Парфюмерия' },
+          64260168: { commissionPercent: 18.5, label: 'Парфюмерия' },
+          91167: { commissionPercent: 18.5, label: 'Парфюмерия' },
+          64671845: { commissionPercent: 18.5, label: 'Парфюмерия' },
+          // Табачные изделия
+          91183: { commissionPercent: 20, label: 'Табак' },
           // БАД, витамины
           15724734: { commissionPercent: 15, label: 'БАД' },
           91307: { commissionPercent: 15, label: 'Витамины' },
           // Ювелирные изделия
           91298: { commissionPercent: 15, label: 'Ювелирные изделия' },
-          // Алкоголь (usually fully restricted)
+          // Алкоголь
           91184: { commissionPercent: 20, label: 'Алкоголь' },
-          // Табачные изделия
-          91183: { commissionPercent: 20, label: 'Табак' },
           // Лекарственные средства
           91192: { commissionPercent: 12, label: 'Лекарства' },
         };
