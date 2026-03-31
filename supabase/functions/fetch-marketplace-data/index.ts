@@ -1359,6 +1359,9 @@ serve(async (req) => {
                 let other = 0;
                 let feePercentFromApi = 0;
                 
+                // Collect all PAYMENT_TRANSFER options to pick the minimum (cheapest payout option)
+                const paymentTransferAmounts: number[] = [];
+                
                 // Log tariff types for first item to debug commission discrepancies
                 if (idx === 0) {
                   console.log(`[YANDEX TARIFF TYPES] Sample tariffs for first product:`, JSON.stringify(tariffs.map((t: any) => ({
@@ -1376,9 +1379,6 @@ serve(async (req) => {
                   const valueType = params.find((p: any) => p.name === 'valueType');
                   const isRelative = valueType?.value === 'relative';
                   
-                  // PAYMENT_TRANSFER can contain multiple alternative payout options
-                  // (daily / weekly / delay weeks). Summing them inflated commissions badly.
-                  // We keep seller payout/withdrawal as a separate client-side fee instead.
                   // ALL commission-like types must be summed together:
                   // FEE, AGENCY_COMMISSION, FBS_COMMISSION, FBY_COMMISSION, FULFILLMENT
                   const isCommissionType = (
@@ -1401,12 +1401,23 @@ serve(async (req) => {
                   } else if (type === 'SORTING') {
                     sorting += amount;
                   } else if (type === 'PAYMENT_TRANSFER') {
-                    // handled separately in UI as withdrawal/payout fee; do not merge into commission
-                    return;
+                    // PAYMENT_TRANSFER has multiple alternative payout frequency options.
+                    // Yandex dashboard includes the MINIMUM option (cheapest) in total deductions.
+                    // Collect all and pick the minimum below.
+                    if (amount > 0) {
+                      paymentTransferAmounts.push(amount);
+                    }
                   } else {
                     other += amount;
                   }
                 });
+                
+                // Include the cheapest PAYMENT_TRANSFER option in 'other' fees
+                // This matches what Yandex Seller Cabinet shows as total удержания
+                const minPaymentTransfer = paymentTransferAmounts.length > 0
+                  ? Math.min(...paymentTransferAmounts)
+                  : 0;
+                other += minPaymentTransfer;
                 
                 const price = sourceOffers[idx]?.price || 0;
                 let commissionPercent = feePercentFromApi > 0
@@ -1420,6 +1431,10 @@ serve(async (req) => {
                 }
 
                 const totalTariff = agencyCommission + fulfillment + delivery + sorting + other;
+                
+                if (idx === 0) {
+                  console.log(`[YANDEX TARIFF CALC] commission=${agencyCommission}, delivery=${delivery}, paymentTransfer=${minPaymentTransfer}, other=${other}, total=${totalTariff}, price=${price}, tariffPct=${price > 0 ? ((totalTariff/price)*100).toFixed(2) : 0}%`);
+                }
                 
                 return {
                   index: sourceOffers[idx]?._originalIndex ?? idx,
