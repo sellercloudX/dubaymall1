@@ -1036,8 +1036,9 @@ serve(async (req) => {
         if (effectiveBusinessId && allOrders.length > 0) {
           try {
             console.log(`[YANDEX FINANCE] Starting united-netting enrichment for businessId=${effectiveBusinessId}`);
-            const nettingDateFrom = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+            // IMPORTANT: Yandex united-netting max 3 months! Split into 3-month chunks
             const nettingDateTo = new Date().toISOString().split('T')[0];
+            const nettingDateFrom = new Date(Date.now() - 89 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
             // Step 1: Generate report
             const generateUrl = `https://api.partner.market.yandex.ru/reports/united-netting/generate`;
