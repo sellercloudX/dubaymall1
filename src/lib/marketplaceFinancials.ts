@@ -45,114 +45,45 @@ export function getMarketplaceTaxRate(_marketplace: string): number {
   return UZB_TAX_RATE;
 }
 
-function getPositiveAmount(value: unknown): number {
-  const amount = Number(value || 0);
-  return Number.isFinite(amount) && amount > 0 ? amount : 0;
-}
-
-function getSignedAmount(value: unknown): number {
-  const amount = Number(value || 0);
-  return Number.isFinite(amount) ? amount : 0;
-}
-
-function normalizeMarketplaceMoney(value: number, marketplace: string): number {
-  return marketplace === 'wildberries' ? toDisplayUzs(value, marketplace) : value;
-}
-
-function extractWildberriesActualFees(item: any, marketplace: string): {
-  commission: number;
-  logistics: number;
-  withdrawal: number;
-  totalFees: number;
-  actualSoldPrice: number;
-  isReal: boolean;
-} | null {
-  if (marketplace !== 'wildberries') return null;
-
-  const normalized = normalizeMarketplaceFinance(item, marketplace);
-  if (!normalized.isExact) return null;
-
-  return {
-    commission: normalized.actualCommission,
-    logistics: normalized.actualLogisticsFee,
-    withdrawal: normalized.actualOtherFees,
-    totalFees: normalized.actualCommission + normalized.actualLogisticsFee + normalized.actualOtherFees,
-    actualSoldPrice: normalized.actualSoldPrice,
-    isReal: true,
-  };
-}
-
 /**
- * Extract fees from Uzum order item using item-level finance data.
- * Uzum Finance API (/v1/finance/orders) returns per-item:
- *   - commissionPercent / commissionBase (commissionAmount) = actual commission
- *   - deliveryAmount / logisticsAmount = actual logistics/delivery fee
- *   - sellerAmount = net payout after all deductions
- *   - totalPrice / buyerPrice = gross sale price
- * 
- * Priority: 1) Absolute commissionBase amount  2) commissionPercent × price  3) null (fallback)
- * Logistics: deliveryAmount from finance API (NEVER hardcode defaults)
+ * Extract exact fees from any marketplace order item using the unified normalizer.
+ * Returns null if no real finance data is present — caller should fall back to tariff estimates.
+ *
+ * STRICT RULES:
+ * - No hardcoded defaults (no 500, 1000, 5000 so'm floors)
+ * - No % estimation or tariff/calculate calls
+ * - If a field is missing/0 → 0
+ * - actual_sold_price = sellerAmount + subsidyAmount
  */
-function extractUzumActualFees(item: any, _itemPriceUzs: number, marketplace: string): {
+function extractExactFees(item: any, marketplace: string): {
   commission: number;
   logistics: number;
   withdrawal: number;
   totalFees: number;
   actualSoldPrice: number;
+  grossPrice: number;
+  subsidyAmount: number;
   isReal: boolean;
 } | null {
-  if (marketplace !== 'uzum') return null;
-
   const normalized = normalizeMarketplaceFinance(item, marketplace);
   if (!normalized.isExact) return null;
 
+  // For WB, the normalizer already converts RUB→UZS via normalizeMarketplaceMoney
   return {
     commission: normalized.actualCommission,
     logistics: normalized.actualLogisticsFee,
     withdrawal: normalized.actualOtherFees,
     totalFees: normalized.actualCommission + normalized.actualLogisticsFee + normalized.actualOtherFees,
     actualSoldPrice: normalized.actualSoldPrice,
+    grossPrice: normalized.grossPrice,
+    subsidyAmount: normalized.subsidyAmount,
     isReal: true,
   };
-}
-
-function extractYandexActualFees(item: any, marketplace: string): {
-  commission: number;
-  logistics: number;
-  withdrawal: number;
-  totalFees: number;
-  actualSoldPrice: number;
-  isReal: boolean;
-} | null {
-  if (marketplace !== 'yandex') return null;
-
-  const normalized = normalizeMarketplaceFinance(item, marketplace);
-  if (!normalized.isExact) return null;
-
-  return {
-    commission: normalized.actualCommission,
-    logistics: normalized.actualLogisticsFee,
-    withdrawal: normalized.actualOtherFees,
-    totalFees: normalized.actualCommission + normalized.actualLogisticsFee + normalized.actualOtherFees,
-    actualSoldPrice: normalized.actualSoldPrice,
-    isReal: true,
-  };
-}
-
-/**
- * Extract Yandex subsidy — DISABLED.
- * commissionBase was removed from order items because it caused
- * commission inflation (commission > sold price). Subsidies will be
- * handled when/if we integrate the united-netting finance report.
- */
-function extractYandexSubsidy(_item: any, _marketplace: string): number {
-  return 0;
 }
 
 /**
  * Validate fees — log warnings but DO NOT artificially cap.
  * Real marketplace API data must be passed through as-is.
- * The 80% cap was removed because it distorted real finance report values.
  */
 function validateFees(
   commission: number,
@@ -210,20 +141,15 @@ export function calculateOrderFinancialBreakdown(
       const costPriceUzs = rawCostPrice !== null ? toDisplayUzs(rawCostPrice, marketplace) : 0;
       const itemCostTotal = costPriceUzs * quantity;
 
-      // ===== MARKETPLACE-SUBSIDIZED PROMOTION HANDLING =====
-      // Add Yandex subsidy (PROMO_AMOUNT / compensation) to revenue
       // ===== MARKETPLACE-SPECIFIC ACTUAL FEE EXTRACTION =====
-      // Strict exact mode: use only official finance/report fields. No tariff fallback.
+      // Single unified path via normalizer — no marketplace-specific branches needed
       let itemCommission = 0;
       let itemLogistics = 0;
       let itemWithdrawal = 0;
       let itemTotalFees = 0;
       let hasRealFees = false;
 
-      const wbFees = extractWildberriesActualFees(item, marketplace);
-      const uzumFees = extractUzumActualFees(item, itemPrice, marketplace);
-      const yandexFees = extractYandexActualFees(item, marketplace);
-      const exactFees = wbFees ?? uzumFees ?? yandexFees;
+      const exactFees = extractExactFees(item, marketplace);
 
       if (exactFees) {
         itemRevenue = exactFees.actualSoldPrice;
@@ -233,6 +159,7 @@ export function calculateOrderFinancialBreakdown(
         itemTotalFees = exactFees.totalFees;
         hasRealFees = true;
       } else {
+        // Fallback: tariff map (only used when finance data is unavailable)
         const tariff = getTariffForProduct(tariffMap, item.offerId, itemPrice, marketplace);
         itemCommission = tariff.commission;
         itemLogistics = tariff.logistics;
