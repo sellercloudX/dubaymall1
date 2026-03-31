@@ -1087,9 +1087,13 @@ JAVOB FAQAT JSON array: [{"parameterId":123,"valueId":456}]`;
   // Final stats
   const finalFilled = new Set((result.parameterValues || []).map((p: any) => Number(p.parameterId)));
   const finalMissingReq = requiredParams.filter(p => !finalFilled.has(Number(p.id)));
-  console.log(`📊 YAKUNIY: ${result.parameterValues?.length || 0}/${allParams.length} to'ldirildi. MAJBURIY bo'sh: ${finalMissingReq.length}/${requiredParams.length}`);
+  const finalMissingRec = recommendedParams.filter(p => !finalFilled.has(Number(p.id)));
+  console.log(`📊 YAKUNIY: ${result.parameterValues?.length || 0}/${allParams.length} to'ldirildi. MAJBURIY bo'sh: ${finalMissingReq.length}/${requiredParams.length}, FILTR bo'sh: ${finalMissingRec.length}/${recommendedParams.length}`);
   if (finalMissingReq.length > 0) {
     console.log(`⚠️ Bo'sh MAJBURIY: ${finalMissingReq.map(p => `"${p.name}"(${p.id})`).join(', ')}`);
+  }
+  if (finalMissingRec.length > 0) {
+    console.log(`⚠️ Bo'sh FILTR: ${finalMissingRec.map(p => `"${p.name}"(${p.id})`).join(', ')}`);
   }
 
   return result;
