@@ -3534,10 +3534,12 @@ serve(async (req) => {
               // Retry with backoff for rate limits (429)
               let response: Response | null = null;
               for (let attempt = 0; attempt < 3; attempt++) {
+                // Try PUT first, then POST if PUT fails
+                const method = attempt === 0 ? 'PUT' : 'POST';
                 response = await fetch(
                   `${uzumBaseUrl}/v2/fbs/sku/stocks`,
                   {
-                    method: 'POST',
+                    method,
                     headers: {
                       ...uzumHeaders,
                       "Content-Type": "application/json",
@@ -3550,6 +3552,14 @@ serve(async (req) => {
                   const waitMs = Math.min(2000 * Math.pow(2, attempt), 10000);
                   console.warn(`Uzum stock update 429, waiting ${waitMs}ms (attempt ${attempt + 1}/3)`);
                   await sleep(waitMs);
+                  continue;
+                }
+                if (response.ok) break;
+                // If PUT got 400/405, try POST
+                if ((response.status === 400 || response.status === 405) && method === 'PUT') {
+                  console.log(`Uzum stock update: PUT failed with ${response.status}, trying POST...`);
+                  const errBody = await response.text();
+                  console.log(`PUT error body: ${errBody}`);
                   continue;
                 }
                 break;
