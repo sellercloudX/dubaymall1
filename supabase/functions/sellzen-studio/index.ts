@@ -9,9 +9,8 @@ const corsHeaders = {
 const SELLZEN_URL = "https://qqqzkrldaaqogwjvfgcg.supabase.co/functions/v1/api-generate";
 
 const STYLE_PRESETS: Record<string, { style: string; scene: string; label: string }> = {
-  infographic: { style: 'infografika', scene: 'premium', label: 'Infografika' },
-  lifestyle: { style: 'lifestyle', scene: 'tabiat', label: 'Lifestyle' },
-  minimalist: { style: 'tabiiy', scene: 'minimalist', label: 'Minimalist' },
+  infographic: { style: 'infografika', scene: 'premium', label: 'Modelli Infografika' },
+  lifestyle: { style: 'lifestyle', scene: 'tabiat', label: 'Lifestyle / Ishlatilish' },
 };
 
 async function checkRateLimit(supabase: any, userId: string): Promise<boolean> {
@@ -81,7 +80,8 @@ serve(async (req) => {
 
     if (action === "generate_images") {
       // Generate multiple styled images from one source image
-      const selectedStyles = styles || ['infographic', 'lifestyle', 'minimalist'];
+      // Always generate exactly 2 images: infographic + lifestyle
+      const selectedStyles = ['infographic', 'lifestyle'];
       const results: Array<{ style: string; label: string; url: string | null; error?: string }> = [];
 
       const promises = selectedStyles.map(async (styleKey: string) => {
