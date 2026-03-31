@@ -1372,7 +1372,6 @@ serve(async (req) => {
                 body: JSON.stringify({
                   parameters: { 
                     campaignId: Number(campaignId),
-                    currency: 'UZS',
                   },
                   offers: offersForCalc,
                 }),
@@ -1541,7 +1540,7 @@ serve(async (req) => {
                             method: 'POST',
                             headers,
                             body: JSON.stringify({
-                              parameters: { campaignId: Number(campaignId), currency: 'UZS' },
+                              parameters: { campaignId: Number(campaignId) },
                               offers: cleanOffers,
                             }),
                           }
@@ -1573,7 +1572,7 @@ serve(async (req) => {
                             method: 'POST',
                             headers,
                             body: JSON.stringify({
-                              parameters: { campaignId: Number(campaignId), currency: 'UZS' },
+                              parameters: { campaignId: Number(campaignId) },
                               offers: fallbackOffers,
                             }),
                           }
