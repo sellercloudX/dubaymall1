@@ -5076,15 +5076,35 @@ serve(async (req) => {
                 // Try srid match first
                 let reportRow = reportBySrid.get(orderId);
                 
-                // Fallback: match by nmId (use first matching row)
+                // Fallback: match by nmId — STRICT: date + price proximity required
                 if (!reportRow && nmId && reportByNmId.has(nmId)) {
                   const candidates = reportByNmId.get(nmId)!;
-                  // Try to match by date too
                   const orderDate = order.createdAt ? order.createdAt.substring(0, 10) : '';
+                  const orderPrice = order.items?.[0]?.finishedPrice || order.items?.[0]?.price || order.total || 0;
+                  
+                  // 1. Try exact date + price proximity match
                   reportRow = candidates.find((r: any) => {
                     const rDate = (r.rr_dt || r.date_from || '').substring(0, 10);
-                    return rDate === orderDate;
-                  }) || candidates[0];
+                    if (rDate !== orderDate) return false;
+                    // Validate price proximity: report's retail_price_withdisc_rub should be within 2x of order price
+                    const reportPrice = r.retail_price_withdisc_rub || r.ppvz_office_name ? r.retail_price_withdisc_rub : 0;
+                    if (reportPrice > 0 && orderPrice > 0) {
+                      const ratio = reportPrice / orderPrice;
+                      if (ratio > 3 || ratio < 0.2) return false; // Too far apart — wrong match
+                    }
+                    return true;
+                  });
+                  
+                  // 2. If no date match, try price-only match (ONLY if prices are close)
+                  if (!reportRow && orderPrice > 0) {
+                    reportRow = candidates.find((r: any) => {
+                      const rPrice = r.retail_price_withdisc_rub || 0;
+                      if (rPrice <= 0) return false;
+                      const ratio = rPrice / orderPrice;
+                      return ratio >= 0.5 && ratio <= 2.0;
+                    });
+                  }
+                  // Do NOT fall back to candidates[0] — mismatches cause inflated revenue
                 }
                 
                 if (reportRow && order.items && order.items.length > 0) {
