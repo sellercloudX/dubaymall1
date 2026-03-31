@@ -49,14 +49,7 @@ function extractExactFees(item: any, marketplace: string) {
   const hasAnyRealData =
     normalized.actualCommission > 0 || normalized.actualLogisticsFee > 0 || normalized.actualSoldPrice > 0;
 
-  console.log(`[EXACT_FEES_DEBUG] ${marketplace} | ${item.offerId || item.id || "unknown"}`, {
-    isExact: normalized.isExact,
-    hasRealData: hasAnyRealData,
-    commission: normalized.actualCommission,
-    logistics: normalized.actualLogisticsFee,
-    soldPrice: normalized.actualSoldPrice,
-    financeSource: normalized.financeSource || "unknown",
-  });
+  // Debug logs removed for production
 
   return {
     commission: normalized.actualCommission,
@@ -107,15 +100,7 @@ export function calculateOrderFinancialBreakdown(
 
     const hasRealFees = fees.isReal || itemCommission > 0 || itemLogistics > 0;
 
-    console.log(`[ORDER_FINANCE_DEBUG] ${marketplace} | item=${item.offerId}`, {
-      source: hasRealFees ? "EXACT_API" : "TARIFF_FALLBACK",
-      financeSource: fees.financeSource,
-      itemRevenue,
-      commission: itemCommission,
-      logistics: itemLogistics,
-      totalFees: itemTotalFees,
-      hasRealFees,
-    });
+    // Debug logs removed for production
 
     const itemTax = itemRevenue * UZB_TAX_RATE;
 
