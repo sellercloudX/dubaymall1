@@ -107,7 +107,7 @@ export function calculateOrderFinancialBreakdown(
 
     const hasRealFees = fees.isReal || itemCommission > 0 || itemLogistics > 0;
 
-    console.log(`[ORDER_FINANCE_DEBUG] ${marketplace} | item=${item.offerId || item.id}`, {
+    console.log(`[ORDER_FINANCE_DEBUG] ${marketplace} | item=${item.offerId}`, {
       source: hasRealFees ? "EXACT_API" : "TARIFF_FALLBACK",
       financeSource: fees.financeSource,
       itemRevenue,
