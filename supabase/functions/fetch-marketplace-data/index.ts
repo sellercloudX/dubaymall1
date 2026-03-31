@@ -1372,6 +1372,7 @@ serve(async (req) => {
                 
                 // Collect all PAYMENT_TRANSFER options to pick the minimum (cheapest payout option)
                 const paymentTransferAmounts: number[] = [];
+                const paymentTransferPercents: number[] = [];
                 
                 // Log tariff types for first item to debug commission discrepancies
                 if (idx === 0) {
@@ -1413,20 +1414,25 @@ serve(async (req) => {
                     sorting += amount;
                   } else if (type === 'PAYMENT_TRANSFER') {
                     // PAYMENT_TRANSFER has multiple alternative payout frequency options.
-                    // Yandex dashboard includes the MINIMUM option (cheapest) in total deductions.
-                    // Collect all and pick the minimum below.
+                    // Collect both amounts and percentages.
                     if (amount > 0) {
                       paymentTransferAmounts.push(amount);
+                    }
+                    if (isRelative && valueParam?.value) {
+                      paymentTransferPercents.push(parseFloat(valueParam.value) || 0);
                     }
                   } else {
                     other += amount;
                   }
                 });
                 
-                // Include the cheapest PAYMENT_TRANSFER option in 'other' fees
-                // This matches what Yandex Seller Cabinet shows as total удержания
+                // Pick minimum PAYMENT_TRANSFER amount for absolute total
                 const minPaymentTransfer = paymentTransferAmounts.length > 0
                   ? Math.min(...paymentTransferAmounts)
+                  : 0;
+                // Pick minimum PAYMENT_TRANSFER percent for display
+                const minPaymentTransferPct = paymentTransferPercents.length > 0
+                  ? Math.min(...paymentTransferPercents)
                   : 0;
                 other += minPaymentTransfer;
                 
@@ -1437,18 +1443,20 @@ serve(async (req) => {
 
                 const suspiciousRecoveredCommission = source !== 'campaign' && commissionPercent > 35;
                 if (suspiciousRecoveredCommission) {
-                  // Only zero truly suspicious (>35%) non-campaign commissions
                   agencyCommission = 0;
                   commissionPercent = 0;
                 }
-                // NOTE: fallbackCategory commissions are kept as estimates (previously zeroed).
-                // The FEE from fallback category may differ from the real category commission,
-                // but it's better than 0%. Finance enrichment should override with real data.
 
+                // totalTariff = all fees combined (absolute amounts in currency)
                 const totalTariff = agencyCommission + fulfillment + delivery + sorting + other;
                 
+                // tariffPercent = ONLY percentage-based fees (commission % + payment transfer %)
+                // Logistics (delivery, sorting, fulfillment) is a fixed amount based on dimensions,
+                // NOT a percentage — so it must NOT be converted to % and added here.
+                const tariffPercent = commissionPercent + minPaymentTransferPct;
+                
                 if (idx === 0) {
-                  console.log(`[YANDEX TARIFF CALC] commission=${agencyCommission}, delivery=${delivery}, paymentTransfer=${minPaymentTransfer}, other=${other}, total=${totalTariff}, price=${price}, tariffPct=${price > 0 ? ((totalTariff/price)*100).toFixed(2) : 0}%`);
+                  console.log(`[YANDEX TARIFF CALC] commission%=${commissionPercent}, paymentTransfer%=${minPaymentTransferPct}, tariffPercent=${tariffPercent}%, delivery=${delivery}(fixed), price=${price}`);
                 }
                 
                 return {
@@ -1462,7 +1470,9 @@ serve(async (req) => {
                   sorting,
                   other,
                   totalTariff,
-                  tariffPercent: price > 0 ? Math.round((totalTariff / price) * 10000) / 100 : 0,
+                  tariffPercent: Math.round(tariffPercent * 100) / 100,
+                  deliveryAmount: delivery + sorting, // fixed logistics amount for display
+                  paymentTransferPercent: minPaymentTransferPct,
                   source,
                   suspiciousRecoveredCommission,
                   rawTariffs: tariffs,
@@ -1722,7 +1732,8 @@ serve(async (req) => {
                       t.agencyCommission = Math.round(realCommAmount);
                       t.commissionPercent = Math.round(realCommPercent * 100) / 100;
                       t.totalTariff = t.agencyCommission + (t.fulfillment || 0) + (t.delivery || 0) + (t.sorting || 0) + (t.other || 0);
-                      t.tariffPercent = t.price > 0 ? Math.round((t.totalTariff / t.price) * 10000) / 100 : 0;
+                      // tariffPercent = commission% + paymentTransfer% only (no logistics conversion)
+                      t.tariffPercent = Math.round((t.commissionPercent + (t.paymentTransferPercent || 0)) * 100) / 100;
                       t.source = 'finance-enriched';
                       enriched++;
                     }
