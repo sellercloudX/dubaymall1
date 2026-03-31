@@ -3422,9 +3422,10 @@ serve(async (req) => {
             result = { success: false, error: "Shop ID required for price updates" };
           } else {
             // CRITICAL: Uzum sendPriceData needs numeric skuId, NOT productId
+            // Uzum API expects price in TIYINS (1 so'm = 100 tiyin)
             const priceData = priceOffers.map((o: any) => ({
               skuId: parseInt(o.skuId || o.offerId || '0'),
-              price: o.price,
+              price: Math.round(o.price * 100), // Convert so'm to tiyins
             }));
             
             // Filter out invalid entries
