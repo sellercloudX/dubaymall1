@@ -110,6 +110,7 @@ export function InventorySync({ connectedMarketplaces, store }: InventorySyncPro
           name: product.name || 'Nomsiz',
           sku: product.shopSku || product.offerId,
           skuId: product.skuId, // Uzum numeric SKU ID
+          shopId: product.shopId, // Uzum shop ID for multi-shop
           stockFBO, stockFBS, totalStock,
           lowStockAlert: totalStock < LOW_STOCK_THRESHOLD,
           marketplace,
