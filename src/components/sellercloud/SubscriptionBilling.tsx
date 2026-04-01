@@ -218,6 +218,7 @@ export const SubscriptionBilling = forwardRef<HTMLDivElement, SubscriptionBillin
   const [isPayingActivation, setIsPayingActivation] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState<string | null>(null);
   const [selectedPlanForTerms, setSelectedPlanForTerms] = useState<SubscriptionPlan | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('click');
 
   const formatPrice = (price: number) => price >= 1000000 ? (price / 1000000).toFixed(1) + ' mln so\'m' : new Intl.NumberFormat('uz-UZ').format(price) + ' so\'m';
 
