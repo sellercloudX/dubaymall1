@@ -265,9 +265,11 @@ export const SubscriptionBilling = forwardRef<HTMLDivElement, SubscriptionBillin
         if (selectedPlanForTerms.onetime_price_uzs > 0 && user?.id) {
           try {
             const data = await invokePayment(paymentMethod, 'prepare', payBody);
-            window.open(data.payment_url, '_blank');
-            if (paymentMethod === 'payme' && data.receipt_id) {
-              pollPaymeStatus(data.receipt_id, data.order_number, user.id);
+            if (paymentMethod === 'payme') {
+              window.open(data.payment_url, 'payme_checkout', 'width=450,height=700,scrollbars=yes');
+              pollPaymeStatus(data.order_number, user.id);
+            } else {
+              window.open(data.payment_url, '_blank');
             }
           } catch {}
         }
