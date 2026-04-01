@@ -280,10 +280,11 @@ export const SubscriptionBilling = forwardRef<HTMLDivElement, SubscriptionBillin
         try {
           const data = await invokePayment(paymentMethod, 'prepare', payBody);
           toast.success("To'lov sahifasiga yo'naltirilmoqda...");
-          window.open(data.payment_url, '_blank');
-          setShowTermsDialog(false);
-          if (paymentMethod === 'payme' && data.receipt_id) {
-            pollPaymeStatus(data.receipt_id, data.order_number, user.id);
+          if (paymentMethod === 'payme') {
+            window.open(data.payment_url, 'payme_checkout', 'width=450,height=700,scrollbars=yes');
+            pollPaymeStatus(data.order_number, user.id);
+          } else {
+            window.open(data.payment_url, '_blank');
           }
         } catch (err: any) {
           toast.error('To\'lov xatoligi: ' + (err.message || 'Qaytadan urinib ko\'ring'));
