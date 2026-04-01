@@ -67,6 +67,10 @@ verify_jwt = false
 [functions.track-order]
 verify_jwt = false
 
+[functions.yandex-market-create-card]
+verify_jwt = false
+wall_clock_timeout = 300
+
 [functions.wildberries-create-card]
 verify_jwt = false
 wall_clock_timeout = 180

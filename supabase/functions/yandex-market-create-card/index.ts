@@ -1499,7 +1499,7 @@ serve(async (req) => {
               else if (catLower.includes('auto') || catLower.includes('mashina') || catLower.includes('avto') || catLower.includes('авто')) sellzenCategory = 'auto';
               else if (catLower.includes('sport') || catLower.includes('fitness') || catLower.includes('спорт')) sellzenCategory = 'sport';
               
-              const SELLZEN_URL = "https://qqqzkrldaaqogwjvfgcg.supabase.co/functions/v1/api-generate";
+              const SELLZEN_URL = "https://yyrlkbbnemimflbeddzq.supabase.co/functions/v1/webhook-generate";
               const productDetails = (product.name || '').substring(0, 500);
               
               // Generate 4 carousel variants in parallel via SellZen
