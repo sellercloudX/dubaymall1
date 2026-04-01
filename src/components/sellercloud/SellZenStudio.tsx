@@ -299,6 +299,17 @@ export function SellZenStudio() {
               />
             </div>
 
+            {/* Product description */}
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Tavsif (ixtiyoriy — sifatni oshiradi)</label>
+              <Input
+                value={productDescription}
+                onChange={(e) => setProductDescription(e.target.value)}
+                placeholder="Xususiyatlar, ranglar, o'lchamlar..."
+                className="text-sm"
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Marketplace</label>
