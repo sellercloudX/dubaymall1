@@ -1499,80 +1499,64 @@ serve(async (req) => {
               else if (catLower.includes('auto') || catLower.includes('mashina') || catLower.includes('avto') || catLower.includes('авто')) sellzenCategory = 'auto';
               else if (catLower.includes('sport') || catLower.includes('fitness') || catLower.includes('спорт')) sellzenCategory = 'sport';
               
-              const SELLZEN_URL = "https://qqqzkrldaaqogwjvfgcg.supabase.co/functions/v1/api-generate";
+              const SELLZEN_URL = "https://yyrlkbbnemimflbeddzq.supabase.co/functions/v1/webhook-generate";
               const productDetails = (product.name || '').substring(0, 500);
               
-              // Generate 4 carousel variants in parallel via SellZen
-              const sellzenConfigs = [
-                { mode: 'modelli', style: 'infografika', scene: 'premium', label: 'Hero Infographic' },
-                { mode: 'modelsiz', style: 'lifestyle', scene: 'tabiat', label: 'Lifestyle' },
-                { mode: 'modelli', style: 'tabiiy', scene: 'minimalist', label: 'Natural Model' },
-                { mode: 'modelsiz', style: 'infografika', scene: 'studiya', label: 'Studio Infographic' },
-              ];
-              
-              console.log(`🖼️ Generating ${sellzenConfigs.length} SellZen carousel images...`);
-              
-              const sellzenPromises = sellzenConfigs.map(async (config, i) => {
-                try {
-                  const response = await fetch(SELLZEN_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'x-api-key': SELLZEN_API_KEY },
-                    body: JSON.stringify({
-                      imageBase64: imgBase64,
-                      mode: config.mode,
-                      style: config.style,
-                      scene: config.scene,
-                      language: 'ru',
-                      category: sellzenCategory,
-                      productDetails,
-                    }),
-                  });
-                  
-                  if (!response.ok) {
-                    const errText = await response.text();
-                    console.error(`SellZen ${config.label} error ${response.status}: ${errText.substring(0, 150)}`);
-                    return null;
-                  }
-                  
+              // Generate 2 images via SellZen v2 API (infographic + lifestyle)
+              console.log(`🖼️ Generating SellZen v2 images...`);
+
+              try {
+                const response = await fetch(SELLZEN_URL, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'x-api-key': SELLZEN_API_KEY },
+                  body: JSON.stringify({
+                    product_name: (product.name || 'Product').substring(0, 500),
+                    product_image_base64: imgBase64,
+                    category: sellzenCategory,
+                    marketplace: 'yandex',
+                    style: 'commercial',
+                  }),
+                });
+
+                if (response.ok) {
                   const data = await response.json();
-                  if (data.status === 'success') {
-                    const imageUrl = data.imageUrl || data.generatedImage;
-                    if (imageUrl) {
-                      // Upload to storage
-                      let bytes: Uint8Array;
-                      if (imageUrl.startsWith('data:')) {
-                        const base64Content = imageUrl.replace(/^data:image\/\w+;base64,/, '');
-                        bytes = Uint8Array.from(atob(base64Content), c => c.charCodeAt(0));
-                      } else {
-                        const dlResp = await fetch(imageUrl);
-                        if (!dlResp.ok) return null;
-                        bytes = new Uint8Array(await dlResp.arrayBuffer());
-                      }
-                      
-                      const fileName = `${user.id}/ym-sellzen-${Date.now()}-${i}.png`;
-                      const { error } = await supabase.storage.from('product-images').upload(fileName, bytes, {
-                        contentType: 'image/png', cacheControl: '31536000', upsert: false,
-                      });
-                      if (!error) {
-                        const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(fileName);
-                        if (urlData?.publicUrl) {
-                          console.log(`✅ SellZen ${config.label} image generated`);
-                          return urlData.publicUrl;
+                  if (data.success && data.images?.length > 0) {
+                    for (let i = 0; i < data.images.length; i++) {
+                      const img = data.images[i];
+                      if (!img.image_url) continue;
+                      try {
+                        const dlResp = await fetch(img.image_url);
+                        if (!dlResp.ok) { images.push(img.image_url); continue; }
+                        const bytes = new Uint8Array(await dlResp.arrayBuffer());
+                        const fileName = `${user.id}/ym-sellzen-${Date.now()}-${i}.png`;
+                        const { error } = await supabase.storage.from('product-images').upload(fileName, bytes, {
+                          contentType: 'image/png', cacheControl: '31536000', upsert: false,
+                        });
+                        if (!error) {
+                          const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(fileName);
+                          if (urlData?.publicUrl) {
+                            console.log(`✅ SellZen v2 ${img.variant} image stored`);
+                            images.push(urlData.publicUrl);
+                          }
+                        } else {
+                          images.push(img.image_url);
                         }
+                      } catch (dlErr) {
+                        console.warn(`SellZen image download error:`, dlErr);
+                        images.push(img.image_url);
                       }
                     }
+                    console.log(`✅ SellZen v2 generated ${images.length} images`);
+                  } else {
+                    console.warn(`SellZen v2: no images returned`, data.error);
                   }
-                  console.warn(`SellZen ${config.label}: no image in response`);
-                  return null;
-                } catch (e) {
-                  console.error(`SellZen ${config.label} error:`, e);
-                  return null;
+                } else {
+                  const errText = await response.text();
+                  console.error(`SellZen v2 error ${response.status}: ${errText.substring(0, 200)}`);
                 }
-              });
-              
-              const sellzenResults = await Promise.all(sellzenPromises);
-              images = sellzenResults.filter(Boolean) as string[];
-              console.log(`✅ SellZen generated ${images.length}/${sellzenConfigs.length} carousel images`);
+              } catch (e) {
+                console.error('SellZen v2 exception:', e);
+              }
             }
           } else if (!SELLZEN_API_KEY) {
             console.warn("⚠️ SELLZEN_API_KEY not configured, using source images");
