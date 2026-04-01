@@ -934,15 +934,29 @@ async function aiOptimize(
         newRequired.push(p);
       } else if (filterNames.test(name)) {
         newRecommended.push(p);
+      }
+      // Unclassified params will be distributed below
+    }
+    
+    // Distribute remaining unclassified params — ensure balanced split between REQUIRED and RECOMMENDED
+    const unclassified = allParams.filter(p => {
+      const id = Number(p.id);
+      return !classifiedIds.has(id) && !newRequired.some(r => Number(r.id) === id) && !newRecommended.some(r => Number(r.id) === id);
+    });
+    
+    // Target: at least 40% of total params should be RECOMMENDED (filters)
+    const totalClassified = newRequired.length + newRecommended.length + unclassified.length;
+    const targetRecommended = Math.max(Math.ceil(totalClassified * 0.4), 3);
+    const recommendedDeficit = Math.max(0, targetRecommended - newRecommended.length);
+    
+    for (let i = 0; i < unclassified.length; i++) {
+      const p = unclassified[i];
+      if (newRequired.length < 12 && i < unclassified.length - recommendedDeficit) {
+        newRequired.push(p);
+      } else if (newRecommended.length < 15) {
+        newRecommended.push(p);
       } else {
-        // For categories with many params, treat first ~15 as required-like, next ~15 as filter-like
-        if (newRequired.length < 15) {
-          newRequired.push(p);
-        } else if (newRecommended.length < 15) {
-          newRecommended.push(p);
-        } else {
-          newOptional.push(p);
-        }
+        newOptional.push(p);
       }
     }
     
