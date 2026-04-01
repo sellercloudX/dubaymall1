@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { format, addDays, addMonths } from 'date-fns';
 
-const USD_TO_UZS = 12800;
+
 
 export function SellerCloudManagement() {
   const { 
@@ -45,8 +45,6 @@ export function SellerCloudManagement() {
 
   // Tariff editing state
   const [editingSub, setEditingSub] = useState<any>(null);
-  const [editMonthlyFee, setEditMonthlyFee] = useState('');
-  const [editCommission, setEditCommission] = useState('');
   const [editPlanType, setEditPlanType] = useState<string>('starter');
 
   // Activation state  
@@ -64,18 +62,10 @@ export function SellerCloudManagement() {
 
   const handleEditTariff = async () => {
     if (!editingSub) return;
-    const fee = parseFloat(editMonthlyFee);
-    const comm = parseFloat(editCommission);
-    if (isNaN(fee) || isNaN(comm) || fee < 0 || comm < 0 || comm > 100) {
-      toast.error('Noto\'g\'ri qiymatlar');
-      return;
-    }
 
     const { error } = await supabase
       .from('sellercloud_subscriptions')
       .update({
-        monthly_fee: fee,
-        commission_percent: comm,
         plan_type: editPlanType,
         plan_slug: editPlanType,
         updated_at: new Date().toISOString(),
@@ -308,8 +298,16 @@ export function SellerCloudManagement() {
                           })()}
                         </TableCell>
                         <TableCell>
-                          <div className="text-sm font-medium">${sub.monthly_fee}/oy</div>
-                          <div className="text-xs text-muted-foreground">Balans modeli</div>
+                          {(() => {
+                            const slug = sub.plan_slug || sub.plan_type || 'starter';
+                            const plan = allPlans?.find((p: any) => p.slug === slug);
+                            return (
+                              <div className="text-xs">
+                                <div className="font-medium">{formatPrice(plan?.onetime_price_uzs || 0)}</div>
+                                <div className="text-muted-foreground">{formatPrice(plan?.monthly_fee_uzs || 0)}/oy</div>
+                              </div>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell>
                           {sub.activated_until ? (
@@ -347,8 +345,6 @@ export function SellerCloudManagement() {
                             {/* Edit Tariff */}
                             <Button size="sm" variant="outline" onClick={() => {
                               setEditingSub(sub);
-                              setEditMonthlyFee(String(sub.monthly_fee));
-                              setEditCommission(String(sub.commission_percent));
                               setEditPlanType(sub.plan_slug || sub.plan_type || 'starter');
                             }}>
                               <Edit className="h-3 w-3" />
@@ -608,19 +604,19 @@ export function SellerCloudManagement() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label>Oylik to'lov (USD)</Label>
-              <Input type="number" value={editMonthlyFee} onChange={(e) => setEditMonthlyFee(e.target.value)} placeholder="499" />
-              {editMonthlyFee && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  ≈ {formatPrice(parseFloat(editMonthlyFee || '0') * USD_TO_UZS)}
-                </p>
-              )}
-            </div>
-            <div>
-              <Label>Savdo komissiyasi (%)</Label>
-              <Input type="number" value={editCommission} onChange={(e) => setEditCommission(e.target.value)} placeholder="4" step="0.5" min="0" max="100" />
-            </div>
+            {editPlanType && (() => {
+              const plan = activePlans.find(p => p.slug === editPlanType);
+              if (!plan) return null;
+              return (
+                <div className="bg-muted p-3 rounded-lg text-sm space-y-1">
+                  <p>Bir martalik: <strong>{formatPrice(plan.onetime_price_uzs)}</strong></p>
+                  <p>Oylik: <strong>{formatPrice(plan.monthly_fee_uzs)}</strong></p>
+                  <p>Chegirma: <strong>{plan.balance_discount_percent}%</strong></p>
+                  <p>Bepul karta: <strong>{plan.free_card_creation_monthly}/oy</strong></p>
+                  <p>Bepul klon: <strong>{plan.free_cloning_monthly}/oy</strong></p>
+                </div>
+              );
+            })()}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingSub(null)}>Bekor qilish</Button>
@@ -646,7 +642,11 @@ export function SellerCloudManagement() {
                   const plan = allPlans?.find((p: any) => p.slug === slug);
                   return <p>Tarif: <strong>{plan?.name_uz || plan?.name || slug}</strong></p>;
                 })()}
-                <p>To'lov: <strong>${activatingSub.monthly_fee}/oy</strong></p>
+                {(() => {
+                  const slug = activatingSub.plan_slug || activatingSub.plan_type || 'starter';
+                  const plan = allPlans?.find((p: any) => p.slug === slug);
+                  return plan ? <p>Narx: <strong>{formatPrice(plan.onetime_price_uzs)} (bir martalik) + {formatPrice(plan.monthly_fee_uzs)}/oy</strong></p> : null;
+                })()}
               </div>
             )}
             <div className="grid grid-cols-2 gap-3">
