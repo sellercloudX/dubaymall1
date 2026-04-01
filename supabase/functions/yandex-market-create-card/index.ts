@@ -62,6 +62,24 @@ interface CreateCardRequest {
 
 // ============ HELPERS ============
 
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+function base64ToUint8Array(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
 function generateEAN13(): string {
   let code = "200";
   for (let i = 0; i < 9; i++) code += Math.floor(Math.random() * 10).toString();
@@ -857,36 +875,42 @@ async function aiOptimize(
   let optionalParams = allParams.filter(p => !isRequired(p) && !isRecommended(p));
 
   // ═══ HEURISTIC RECLASSIFICATION ═══
-  // When Yandex API returns 0 required + 0 recommended (common!), classify by param name
-  // Apply heuristic classification when API returns too few required/recommended
-  if ((requiredParams.length + recommendedParams.length) < 3 && allParams.length > 0) {
+  // When Yandex API returns few required/recommended params, classify by param name
+  // CRITICAL: Also trigger when filter (recommended) params are missing — needed for "Filtrlar uchun qo'shimcha xususiyatlar" section
+  const needsHeuristic = (requiredParams.length + recommendedParams.length) < 3 
+    || recommendedParams.length < 2 
+    || (requiredParams.length < 5 && allParams.length > 10);
+  
+  if (needsHeuristic && allParams.length > 0) {
     console.log(`⚠️ API returned ${requiredParams.length} REQUIRED + ${recommendedParams.length} RECOMMENDED — applying heuristic classification`);
     
     // Common "Asosiy xususiyatlar" (main characteristics) param names
-    const requiredNames = /^(тип|бренд|брэнд|торговая марка|марка|форма выпуска|вид|материал|состав|пол|возраст|размер|страна|назначение|цвет товара|цвет|вес|объем|объём|количество|комплектация|модель|серия|способ применения|диагональ|разрешение|мощность|напряжение|частота|температур|скорость|режим|питание|подключение|тип подключения|тип конструкции|формат|класс|категория|группа)/i;
+    const requiredNames = /^(тип|бренд|брэнд|торговая марка|марка|форма выпуска|вид|материал|состав|пол|возраст|размер|страна|назначение|цвет товара|цвет|вес|объем|объём|количество|комплектация|модель|серия|способ применения|диагональ|разрешение|мощность|напряжение|частота|температур|скорость|режим|питание|подключение|тип подключения|тип конструкции|формат|класс|категория|группа|тип товара|тип изделия|тип продукта|основной цвет)/i;
     
-    // Common "Filtrlar uchun qo'shimcha xususiyatlar" (filter characteristics)
-    const filterNames = /^(особенности|содержит|не содержит|эффект|аромат|вкус|текстура|покрытие|тип кожи|тип волос|spf|водостойкость|гипоаллергенный|форм-фактор|интерфейс|технология|совместим|подходит для|сезон|стиль|узор|принт|застёжка|длина|ширина|высота|глубина|диаметр|плотность|жёсткость|функци|дополнительн|насадк|в комплект|комплект поставки|индикат|защит|управлени|дисплей|экран|ёмкость|аккумулятор|гарантия производител)/i;
+    // Common "Filtrlar uchun qo'shimcha xususiyatlar" (filter characteristics) — EXPANDED
+    const filterNames = /^(особенности|содержит|не содержит|эффект|аромат|вкус|текстура|покрытие|тип кожи|тип волос|spf|водостойкость|гипоаллергенный|форм-фактор|интерфейс|технология|совместим|подходит для|сезон|стиль|узор|принт|застёжка|длина|ширина|высота|глубина|диаметр|плотность|жёсткость|функци|дополнительн|насадк|в комплект|комплект поставки|индикат|защит|управлени|дисплей|экран|ёмкость|аккумулятор|гарантия производител|максимальн|минимальн|уровень шума|потребляем|частота вращени|регулировк|таймер|автоотключени|число.*скорост|число.*режим|ионизаци|холодный обдув|складн|вращени|петля|крепл|вес.*товар|страна.*производ|срок.*службы|упаковк)/i;
     
-    const newRequired: any[] = [...requiredParams];
-    const newRecommended: any[] = [...recommendedParams];
+    const newRequired: any[] = [];
+    const newRecommended: any[] = [];
     const newOptional: any[] = [];
     
-    // IDs already classified
-    const classifiedIds = new Set([...requiredParams, ...recommendedParams].map(p => p.id));
+    // Keep existing classifications
+    const classifiedIds = new Set<number>();
+    for (const p of requiredParams) { newRequired.push(p); classifiedIds.add(Number(p.id)); }
+    for (const p of recommendedParams) { newRecommended.push(p); classifiedIds.add(Number(p.id)); }
     
     for (const p of allParams) {
-      if (classifiedIds.has(p.id)) continue;
+      if (classifiedIds.has(Number(p.id))) continue;
       const name = (p.name || '').trim();
       if (requiredNames.test(name)) {
         newRequired.push(p);
       } else if (filterNames.test(name)) {
         newRecommended.push(p);
       } else {
-        // For categories with many params, treat first ~12 as required-like, next ~10 as filter-like
-        if (newRequired.length < 12) {
+        // For categories with many params, treat first ~15 as required-like, next ~15 as filter-like
+        if (newRequired.length < 15) {
           newRequired.push(p);
-        } else if (newRecommended.length < 10) {
+        } else if (newRecommended.length < 15) {
           newRecommended.push(p);
         } else {
           newOptional.push(p);
@@ -1569,14 +1593,54 @@ serve(async (req) => {
                     const dlResp = await fetch(img.image_url);
                     if (!dlResp.ok) { result.push(img.image_url); continue; }
                     const bytes = new Uint8Array(await dlResp.arrayBuffer());
-                    const fileName = `${user.id}/ym-sellzen-${Date.now()}-${i}.png`;
-                    const { error } = await supabase.storage.from('product-images').upload(fileName, bytes, {
-                      contentType: 'image/png', cacheControl: '31536000', upsert: false,
+                    
+                    // ═══ PORTRAIT RESIZE: Convert SellZen landscape to 1080x1440 portrait ═══
+                    // SellZen often returns landscape images; we need portrait 3:4 (1080x1440)
+                    let finalBytes = bytes;
+                    let finalContentType = 'image/png';
+                    try {
+                      const imgDataUri = `data:image/png;base64,${arrayBufferToBase64(bytes.buffer)}`;
+                      console.log(`🔄 Resizing SellZen image ${i} to 1080x1440 portrait via AI...`);
+                      const resizeResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+                        method: "POST",
+                        headers: { Authorization: `Bearer ${LOVABLE_KEY}`, "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          model: "google/gemini-3.1-flash-image-preview",
+                          messages: [{
+                            role: "user",
+                            content: [
+                              { type: "text", text: "Resize this product infographic image to EXACTLY 1080x1440 pixels (portrait orientation, 3:4 aspect ratio). Keep all text, graphics, and product details intact. If the image is landscape, recompose it into a vertical/portrait layout. Maintain high quality. The output MUST be exactly 1080 pixels wide and 1440 pixels tall." },
+                              { type: "image_url", image_url: { url: imgDataUri } }
+                            ]
+                          }],
+                          modalities: ["image", "text"]
+                        }),
+                      });
+                      if (resizeResp.ok) {
+                        const resizeData = await resizeResp.json();
+                        const resizedUrl = resizeData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+                        if (resizedUrl && resizedUrl.startsWith('data:image/')) {
+                          const base64Part = resizedUrl.split(',')[1];
+                          if (base64Part) {
+                            finalBytes = base64ToUint8Array(base64Part);
+                            finalContentType = resizedUrl.split(';')[0].split(':')[1] || 'image/png';
+                            console.log(`✅ Image ${i} resized to portrait 1080x1440`);
+                          }
+                        }
+                      }
+                    } catch (resizeErr) {
+                      console.warn(`⚠️ Portrait resize failed for image ${i}, using original:`, resizeErr);
+                    }
+                    
+                    const ext = finalContentType.includes('jpeg') ? 'jpg' : 'png';
+                    const fileName = `${user.id}/ym-sellzen-${Date.now()}-${i}.${ext}`;
+                    const { error } = await supabase.storage.from('product-images').upload(fileName, finalBytes, {
+                      contentType: finalContentType, cacheControl: '31536000', upsert: false,
                     });
                     if (!error) {
                       const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(fileName);
                       if (urlData?.publicUrl) {
-                        console.log(`✅ SellZen v2 ${img.variant} image stored`);
+                        console.log(`✅ SellZen v2 ${img.variant} image stored (portrait)`);
                         result.push(urlData.publicUrl);
                       }
                     } else {
@@ -1587,7 +1651,7 @@ serve(async (req) => {
                     result.push(img.image_url);
                   }
                 }
-                console.log(`✅ SellZen v2 generated ${result.length} images`);
+                console.log(`✅ SellZen v2 generated ${result.length} portrait images`);
               } else {
                 console.warn(`SellZen v2: no images returned`, data.error);
               }
