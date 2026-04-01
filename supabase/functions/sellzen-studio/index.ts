@@ -6,11 +6,13 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const SELLZEN_URL = "https://qqqzkrldaaqogwjvfgcg.supabase.co/functions/v1/api-generate";
+const SELLZEN_URL = "https://yyrlkbbnemimflbeddzq.supabase.co/functions/v1/webhook-generate";
 
-const STYLE_PRESETS: Record<string, { style: string; scene: string; label: string }> = {
-  infographic: { style: 'infografika', scene: 'premium', label: 'Modelli Infografika' },
-  lifestyle: { style: 'lifestyle', scene: 'tabiat', label: 'Lifestyle / Ishlatilish' },
+const MARKETPLACE_MAP: Record<string, string> = {
+  uzum: "uzum",
+  wildberries: "wildberries",
+  ozon: "ozon",
+  yandex: "yandex",
 };
 
 async function checkRateLimit(supabase: any, userId: string): Promise<boolean> {
@@ -76,116 +78,104 @@ serve(async (req) => {
       });
     }
 
-    const { action, imageBase64, category, productName, styles, template, mode } = await req.json();
+    const { action, imageBase64, productName, category, marketplace, style } = await req.json();
 
     if (action === "generate_images") {
-      // Generate multiple styled images from one source image
-      // Always generate exactly 2 images: infographic + lifestyle
-      const selectedStyles = ['infographic', 'lifestyle'];
-      const results: Array<{ style: string; label: string; url: string | null; error?: string }> = [];
+      // Build request for new SellZen API v2
+      const body: Record<string, any> = {
+        product_name: productName || "Mahsulot",
+        marketplace: MARKETPLACE_MAP[marketplace || "wildberries"] || "wildberries",
+        style: style || "commercial",
+      };
 
-      const promises = selectedStyles.map(async (styleKey: string) => {
-        const preset = STYLE_PRESETS[styleKey];
-        if (!preset) return { style: styleKey, label: styleKey, url: null, error: 'Unknown style' };
-
-        try {
-          const body = {
-            imageBase64,
-            mode: mode || 'modelsiz',
-            style: preset.style,
-            scene: preset.scene,
-            language: 'uz',
-            category: category || 'home',
-            productDetails: (productName || '').substring(0, 500),
-            ...(template ? { template } : {}),
-          };
-
-          const response = await fetch(SELLZEN_URL, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-api-key': sellzenKey,
-            },
-            body: JSON.stringify(body),
-          });
-
-          if (!response.ok) {
-            const errText = await response.text();
-            console.error(`SellZen ${styleKey} error ${response.status}: ${errText}`);
-            return { style: styleKey, label: preset.label, url: null, error: `SellZen xatosi: ${response.status}` };
-          }
-
-          const data = await response.json();
-          if (data.status === 'success') {
-            const imageUrl = data.imageUrl || data.generatedImage;
-            if (imageUrl) {
-              return { style: styleKey, label: preset.label, url: imageUrl };
-            }
-          }
-          return { style: styleKey, label: preset.label, url: null, error: 'Rasm generatsiya qilinmadi' };
-        } catch (e) {
-          console.error(`SellZen ${styleKey} exception:`, e);
-          return { style: styleKey, label: preset.label, url: null, error: String(e) };
+      // Send image as base64 or URL
+      if (imageBase64) {
+        // Ensure proper data URI prefix
+        if (imageBase64.startsWith("data:image/")) {
+          body.product_image_base64 = imageBase64;
+        } else {
+          body.product_image_base64 = `data:image/jpeg;base64,${imageBase64}`;
         }
-      });
+      }
 
-      const settled = await Promise.all(promises);
-      results.push(...settled);
+      if (category) body.category = category;
 
-      await logUsage(supabase, userId, 'sellzen_studio', 'sellzen-image');
+      console.log(`SellZen v2 request: marketplace=${body.marketplace}, style=${body.style}`);
 
-      return new Response(JSON.stringify({ results }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    if (action === "generate_video") {
-      // Video generation from image via SellZen
       try {
-        const response = await fetch(
-          "https://qqqzkrldaaqogwjvfgcg.supabase.co/functions/v1/api-video",
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-api-key': sellzenKey,
-            },
-            body: JSON.stringify({
-              imageBase64,
-              productName: (productName || '').substring(0, 300),
-              template: template || 'product_showcase',
-              category: category || 'home',
-            }),
-          }
-        );
+        const response = await fetch(SELLZEN_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': sellzenKey,
+          },
+          body: JSON.stringify(body),
+        });
 
         if (!response.ok) {
           const errText = await response.text();
-          console.error(`SellZen video error ${response.status}: ${errText}`);
-          return new Response(JSON.stringify({ error: `Video generatsiya xatosi: ${response.status}` }), {
-            status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          console.error(`SellZen v2 error ${response.status}: ${errText}`);
+          return new Response(JSON.stringify({ 
+            error: `SellZen xatosi: ${response.status}`,
+            details: errText,
+          }), {
+            status: response.status, 
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
 
         const data = await response.json();
-        await logUsage(supabase, userId, 'sellzen_studio_video', 'sellzen-video');
+        console.log(`SellZen v2 response: success=${data.success}, images=${data.images?.length}`);
 
-        return new Response(JSON.stringify({
-          videoUrl: data.videoUrl || data.url,
-          status: data.status,
-          taskId: data.taskId,
+        if (data.success && data.images?.length > 0) {
+          // Map new API response to our format
+          const results = data.images.map((img: any) => ({
+            style: img.variant,
+            label: img.variant === 'infographic' ? 'Infografika' : 'Lifestyle',
+            url: img.image_url,
+            format: img.format,
+          }));
+
+          // Include any errors
+          if (data.errors?.length > 0) {
+            data.errors.forEach((err: any) => {
+              results.push({
+                style: err.variant,
+                label: err.variant === 'infographic' ? 'Infografika' : 'Lifestyle',
+                url: null,
+                error: err.error,
+              });
+            });
+          }
+
+          await logUsage(supabase, userId, 'sellzen_studio', 'sellzen-v2');
+
+          return new Response(JSON.stringify({ 
+            results,
+            summary: data.summary,
+            job_id: data.job_id,
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        // No images generated
+        return new Response(JSON.stringify({ 
+          results: [],
+          error: data.error || 'Rasm generatsiya qilinmadi',
         }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
+
       } catch (e) {
-        console.error('Video generation error:', e);
+        console.error('SellZen v2 exception:', e);
         return new Response(JSON.stringify({ error: String(e) }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
     }
 
-    return new Response(JSON.stringify({ error: "Invalid action" }), {
+    return new Response(JSON.stringify({ error: "Invalid action. Use: generate_images" }), {
       status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
