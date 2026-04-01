@@ -834,8 +834,8 @@ async function aiOptimize(
   // REQUIRED = "Основные характеристики" (12 ball)
   // RECOMMENDED = "Фильтры" (8 ball) — Yandex uses these for search filters
   // OPTIONAL = everything else
-  const isRequired = (p: any) => p.required === true || p.constraintType === "REQUIRED" || p.mandatory === true;
-  const isRecommended = (p: any) => p.constraintType === "RECOMMENDED";
+  const isRequired = (p: any) => p.required === true || p.constraintType === "REQUIRED" || p.mandatory === true || p.importance === "REQUIRED";
+  const isRecommended = (p: any) => p.constraintType === "RECOMMENDED" || p.importance === "RECOMMENDED" || p.filterGroup === true || p.isFilter === true;
   const requiredParams = allParams.filter(isRequired);
   const recommendedParams = allParams.filter(p => !isRequired(p) && isRecommended(p));
   const optionalParams = allParams.filter(p => !isRequired(p) && !isRecommended(p));
