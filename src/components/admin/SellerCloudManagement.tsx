@@ -298,8 +298,16 @@ export function SellerCloudManagement() {
                           })()}
                         </TableCell>
                         <TableCell>
-                          <div className="text-sm font-medium">${sub.monthly_fee}/oy</div>
-                          <div className="text-xs text-muted-foreground">Balans modeli</div>
+                          {(() => {
+                            const slug = sub.plan_slug || sub.plan_type || 'starter';
+                            const plan = allPlans?.find((p: any) => p.slug === slug);
+                            return (
+                              <div className="text-xs">
+                                <div className="font-medium">{formatPrice(plan?.onetime_price_uzs || 0)}</div>
+                                <div className="text-muted-foreground">{formatPrice(plan?.monthly_fee_uzs || 0)}/oy</div>
+                              </div>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell>
                           {sub.activated_until ? (
