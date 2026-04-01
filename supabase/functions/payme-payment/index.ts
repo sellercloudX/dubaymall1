@@ -72,7 +72,8 @@ function getPaymeAuth(): string {
 }
 
 function getPaymeBaseUrl(): string {
-  const isTest = Deno.env.get("PAYME_TEST_MODE") === "true";
+  // TODO: Realga o'tganda "true" ni "false" ga o'zgartiring
+  const isTest = true;
   return isTest
     ? "https://checkout.test.paycom.uz"
     : "https://checkout.paycom.uz";
