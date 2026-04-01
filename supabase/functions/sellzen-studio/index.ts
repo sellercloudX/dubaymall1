@@ -78,15 +78,17 @@ serve(async (req) => {
       });
     }
 
-    const { action, imageBase64, productName, category, marketplace, style } = await req.json();
+    const { action, imageBase64, productName, productDescription, category, marketplace, style } = await req.json();
 
     if (action === "generate_images") {
-      // Build request for new SellZen API v2
+      // Build request for SellZen API v3
       const body: Record<string, any> = {
         product_name: productName || "Mahsulot",
         marketplace: MARKETPLACE_MAP[marketplace || "wildberries"] || "wildberries",
         style: style || "commercial",
       };
+
+      if (productDescription) body.product_description = productDescription;
 
       // Send image as base64 or URL
       if (imageBase64) {
