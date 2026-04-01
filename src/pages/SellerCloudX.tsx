@@ -46,15 +46,11 @@ const MxikLookup = lazy(() => import('@/components/sellercloud/MxikLookup').then
 const CostPriceManager = lazy(() => import('@/components/sellercloud/CostPriceManager').then(m => ({ default: m.CostPriceManager })));
 const AIScannerPro = lazy(() => import('@/components/seller/AIScannerPro').then(m => ({ default: m.AIScannerPro })));
 const MarketplaceReviews = lazy(() => import('@/components/sellercloud/MarketplaceReviews').then(m => ({ default: m.MarketplaceReviews })));
-const MarketplaceSellerAnalytics = lazy(() => import('@/components/sellercloud/MarketplaceSellerAnalytics').then(m => ({ default: m.MarketplaceSellerAnalytics })));
 const MarketplaceAdsCampaigns = lazy(() => import('@/components/sellercloud/MarketplaceAdsCampaigns').then(m => ({ default: m.MarketplaceAdsCampaigns })));
 const SupportChat = lazy(() => import('@/components/sellercloud/SupportChat').then(m => ({ default: m.SupportChat })));
 const SalesDashboard = lazy(() => import('@/components/sellercloud/SalesDashboard').then(m => ({ default: m.SalesDashboard })));
 const MultiStoreManager = lazy(() => import('@/components/sellercloud/MultiStoreManager').then(m => ({ default: m.MultiStoreManager })));
-const CompetitorPriceMonitor = lazy(() => import('@/components/sellercloud/CompetitorPriceMonitor').then(m => ({ default: m.CompetitorPriceMonitor })));
 const UnitEconomyDashboard = lazy(() => import('@/components/sellercloud/UnitEconomyDashboard').then(m => ({ default: m.UnitEconomyDashboard })));
-const SEOMonitor = lazy(() => import('@/components/sellercloud/SEOMonitor').then(m => ({ default: m.SEOMonitor })));
-const MarketplaceProductAnalytics = lazy(() => import('@/components/sellercloud/MarketplaceProductAnalytics').then(m => ({ default: m.MarketplaceProductAnalytics })));
 const TeamManager = lazy(() => import('@/components/sellercloud/TeamManager').then(m => ({ default: m.TeamManager })));
 const ProfilePasswordSetup = lazy(() => import('@/components/sellercloud/ProfilePasswordSetup').then(m => ({ default: m.ProfilePasswordSetup })));
 const TutorialVideos = lazy(() => import('@/components/sellercloud/TutorialVideos').then(m => ({ default: m.TutorialVideos })));
@@ -75,10 +71,7 @@ const pageTitles: Record<string, string> = {
   products: 'Mahsulotlar',
   orders: 'Buyurtmalar',
   sales: 'Sotuvlar hisoboti',
-  'product-analytics': 'Mahsulot analitika',
   analytics: 'Umumiy analitika',
-  'wb-analytics': 'Sotuvchi analitikasi',
-  'seo-monitor': 'SEO & Kalit so\'zlar',
   financials: 'Moliyaviy dashboard',
   abc: 'ABC-analiz',
   'cost-prices': 'Tannarx boshqaruvi',
@@ -93,7 +86,7 @@ const pageTitles: Record<string, string> = {
   subscription: 'Obuna va to\'lov',
   reports: 'Hisobotlar',
   notifications: 'Bildirishnomalar',
-  competitor: 'Raqobat narx monitoring',
+  
   support: 'Yordam markazi',
   'unit-economy': 'Unit-economy (SKU)',
   team: 'Jamoa boshqaruvi',
@@ -258,20 +251,12 @@ export default function SellerCloudX() {
         return <SalesDashboard connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'analytics':
         return <MarketplaceAnalytics connectedMarketplaces={connectedMarketplaces} store={store} />;
-      case 'product-analytics':
-        return <MarketplaceProductAnalytics connectedMarketplaces={connectedMarketplaces} store={store} />;
-      case 'wb-analytics':
-        return <MarketplaceSellerAnalytics connectedMarketplaces={connectedMarketplaces} store={store} />;
-      case 'seo-monitor':
-        return <SEOMonitor connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'financials':
         return <FinancialDashboard connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'abc':
         return <ABCAnalysis connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'cost-prices':
         return <CostPriceManager connectedMarketplaces={connectedMarketplaces} store={store} />;
-      case 'competitor':
-        return <CompetitorPriceMonitor connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'unit-economy':
         return <UnitEconomyDashboard connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'stock-forecast':

@@ -38,14 +38,12 @@ const SubscriptionBilling = lazy(() => import('@/components/sellercloud/Subscrip
 const CostPriceManager = lazy(() => import('@/components/sellercloud/CostPriceManager').then(m => ({ default: m.CostPriceManager })));
 const MxikImport = lazy(() => import('@/components/sellercloud/MxikImport').then(m => ({ default: m.MxikImport })));
 const MarketplaceReviews = lazy(() => import('@/components/sellercloud/MarketplaceReviews').then(m => ({ default: m.MarketplaceReviews })));
-const MarketplaceSellerAnalytics = lazy(() => import('@/components/sellercloud/MarketplaceSellerAnalytics').then(m => ({ default: m.MarketplaceSellerAnalytics })));
 const MarketplaceAdsCampaigns = lazy(() => import('@/components/sellercloud/MarketplaceAdsCampaigns').then(m => ({ default: m.MarketplaceAdsCampaigns })));
-const CompetitorPriceMonitor = lazy(() => import('@/components/sellercloud/CompetitorPriceMonitor').then(m => ({ default: m.CompetitorPriceMonitor })));
 const SalesDashboard = lazy(() => import('@/components/sellercloud/SalesDashboard').then(m => ({ default: m.SalesDashboard })));
 const SupportChat = lazy(() => import('@/components/sellercloud/SupportChat').then(m => ({ default: m.SupportChat })));
 const MultiStoreManager = lazy(() => import('@/components/sellercloud/MultiStoreManager').then(m => ({ default: m.MultiStoreManager })));
 const ProfilePasswordSetup = lazy(() => import('@/components/sellercloud/ProfilePasswordSetup').then(m => ({ default: m.ProfilePasswordSetup })));
-const SEOMonitor = lazy(() => import('@/components/sellercloud/SEOMonitor').then(m => ({ default: m.SEOMonitor })));
+
 const TutorialVideos = lazy(() => import('@/components/sellercloud/TutorialVideos').then(m => ({ default: m.TutorialVideos })));
 // Consolidated hub components
 const InventoryControlHub = lazy(() => import('@/components/sellercloud/InventoryControlHub').then(m => ({ default: m.InventoryControlHub })));
@@ -237,14 +235,8 @@ export default function SellerCloudMobile() {
         return <div className="p-4"><MxikImport /></div>;
       case 'reviews':
         return <div className="p-4"><MarketplaceReviews connectedMarketplaces={connectedMarketplaces} /></div>;
-      case 'seller-analytics':
-        return <div className="p-4"><MarketplaceSellerAnalytics connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
-      case 'seo-keywords':
-        return <div className="p-4"><SEOMonitor connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'ads':
         return <div className="p-4"><MarketplaceAdsCampaigns connectedMarketplaces={connectedMarketplaces} /></div>;
-      case 'competitor':
-        return <div className="p-4"><CompetitorPriceMonitor connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'sales':
         return <div className="p-4"><SalesDashboard connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'support':
@@ -278,12 +270,12 @@ export default function SellerCloudMobile() {
             {(() => {
               const labels: Record<string, string> = {
                 'financials': '💰 Moliya', 'cost-prices': '💲 Tannarx',
-                'pricing': '🏷 Narxlar', 'abc-analysis': '📊 ABC-analiz', 'seller-analytics': '📈 Sotuvchi',
-                'seo-keywords': '🔍 SEO', 'reviews': '💬 Sharhlar', 'ads': '📢 Reklama',
+                'pricing': '🏷 Narxlar', 'abc-analysis': '📊 ABC-analiz',
+                'reviews': '💬 Sharhlar', 'ads': '📢 Reklama',
                 'stock-forecast': '📦 Zaxira', 'card-clone': '📋 Klonlash',
                 'problems': '⚠️ Muammolar', 'mxik': '📄 MXIK baza',
                 'reports': '📑 Hisobotlar', 'notifications': '🔔 Bildirishnoma', 'subscription': '💳 Obuna',
-                'competitor': '🎯 Raqobat', 'sales': '📊 Sotuvlar', 'support': '💬 Yordam', 'stores': '🏪 Do\'konlar',
+                'sales': '📊 Sotuvlar', 'support': '💬 Yordam', 'stores': '🏪 Do\'konlar',
                 'tutorials': '📖 Qo\'llanma', 'profile': '👤 Profil',
                 'trend-hunter': '🔥 Trend Hunter', 'sellzen-studio': '✨ SellZen AI',
                 'unit-economy': '💵 Unit-econ',
