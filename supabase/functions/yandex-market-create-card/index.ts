@@ -1084,7 +1084,7 @@ JAVOB FAQAT JSON:
   
   console.log(`📊 Pass 1 natija: ${result.parameterValues?.length || 0} to'ldirildi. Bo'sh: ${missingRequired.length} MAJBURIY + ${missingRecommended.length} FILTR + ${missingOptional.length} optional`);
   
-  if (allMissing.length > 0 && allMissing.length <= 80) {
+  if (allMissing.length > 0 && allMissing.length <= 120) {
     console.log(`🔄 Pass 2: ${missingRequired.length} MAJBURIY + ${missingRecommended.length} FILTR + ${missingOptional.length} optional to'ldirish...`);
     
     const pass2Prompt = `VAZIFA: Quyidagi BO'SH parametrlarni to'ldir!
