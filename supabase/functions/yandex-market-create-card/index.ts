@@ -844,9 +844,9 @@ async function aiOptimize(
     let s = `  - id:${p.id}, "${p.name}", type:${p.type || "TEXT"}`;
     if (p.unit) s += `, unit:"${p.unit}"`;
     if (p.values?.length) {
-      const vals = p.values.slice(0, 25).map((v: any) => `{id:${v.id},"${v.value}"}`).join(", ");
+      const vals = p.values.slice(0, 15).map((v: any) => `{id:${v.id},"${v.value}"}`).join(", ");
       s += `\n    OPTIONS:[${vals}]`;
-      if (p.values.length > 25) s += ` +${p.values.length - 25}`;
+      if (p.values.length > 15) s += ` +${p.values.length - 15}`;
     }
     return s;
   };
@@ -951,8 +951,60 @@ JAVOB FAQAT JSON:
     const content = data.choices?.[0]?.message?.content || "";
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      result = JSON.parse(jsonMatch[0]);
-      console.log(`🤖 Pass 1: name_ru=${result.name_ru?.length}ch, desc=${result.description_ru?.length}ch, params=${result.parameterValues?.length}, weight=${result.weightKg}kg`);
+      let jsonStr = jsonMatch[0];
+      try {
+        result = JSON.parse(jsonStr);
+      } catch (parseErr) {
+        // Try to fix truncated JSON — find last valid parameterValues entry
+        console.warn("AI Pass 1: JSON truncated, attempting repair...");
+        // Close unclosed arrays and objects
+        const lastValidBracket = jsonStr.lastIndexOf('}');
+        if (lastValidBracket > 0) {
+          let repaired = jsonStr.substring(0, lastValidBracket + 1);
+          // Count open brackets
+          const opens = (repaired.match(/\[/g) || []).length;
+          const closes = (repaired.match(/\]/g) || []).length;
+          const openBraces = (repaired.match(/\{/g) || []).length;
+          const closeBraces = (repaired.match(/\}/g) || []).length;
+          repaired += ']'.repeat(Math.max(0, opens - closes));
+          repaired += '}'.repeat(Math.max(0, openBraces - closeBraces));
+          try {
+            result = JSON.parse(repaired);
+            console.log(`✅ Pass 1 JSON repaired successfully`);
+          } catch (e2) {
+            // Last resort: extract fields manually
+            console.error("JSON repair failed, extracting fields manually...");
+            result = {};
+            const nameRuMatch = content.match(/"name_ru"\s*:\s*"([^"]+)"/);
+            const nameUzMatch = content.match(/"name_uz"\s*:\s*"([^"]+)"/);
+            const descMatch = content.match(/"description_ru"\s*:\s*"([\s\S]*?)(?:","description_uz|","vendor)/);
+            const vendorMatch = content.match(/"vendor"\s*:\s*"([^"]+)"/);
+            const countryMatch = content.match(/"manufacturerCountry"\s*:\s*"([^"]+)"/);
+            if (nameRuMatch) result.name_ru = nameRuMatch[1];
+            if (nameUzMatch) result.name_uz = nameUzMatch[1];
+            if (descMatch) result.description_ru = descMatch[1];
+            if (vendorMatch) result.vendor = vendorMatch[1];
+            if (countryMatch) result.manufacturerCountry = countryMatch[1];
+            // Try to extract parameterValues array
+            const pvMatch = content.match(/"parameterValues"\s*:\s*\[([\s\S]*)/);
+            if (pvMatch) {
+              try {
+                // Find last complete object in the array
+                const pvContent = pvMatch[1];
+                const lastObj = pvContent.lastIndexOf('}');
+                if (lastObj > 0) {
+                  const pvStr = '[' + pvContent.substring(0, lastObj + 1) + ']';
+                  result.parameterValues = JSON.parse(pvStr);
+                }
+              } catch { result.parameterValues = []; }
+            }
+            console.log(`⚠️ Pass 1 manual extraction: params=${result.parameterValues?.length || 0}`);
+          }
+        }
+      }
+      if (result) {
+        console.log(`🤖 Pass 1: name_ru=${result.name_ru?.length}ch, desc=${result.description_ru?.length}ch, params=${result.parameterValues?.length}, weight=${result.weightKg}kg`);
+      }
     }
   } catch (e) { console.error("AI Pass 1 error:", e); }
   
@@ -1020,7 +1072,16 @@ JAVOB FAQAT JSON array:
         const content2 = data2.choices?.[0]?.message?.content || "";
         const arrMatch = content2.match(/\[[\s\S]*\]/);
         if (arrMatch) {
-          const extraParams = JSON.parse(arrMatch[0]);
+          let extraParams: any[] = [];
+          try {
+            extraParams = JSON.parse(arrMatch[0]);
+          } catch {
+            // Try to repair truncated array
+            const lastObj = arrMatch[0].lastIndexOf('}');
+            if (lastObj > 0) {
+              try { extraParams = JSON.parse(arrMatch[0].substring(0, lastObj + 1) + ']'); } catch {}
+            }
+          }
           if (Array.isArray(extraParams) && extraParams.length > 0) {
             result.parameterValues = [...(result.parameterValues || []), ...extraParams];
             console.log(`✅ Pass 2: +${extraParams.length} params. Jami: ${result.parameterValues.length}`);
@@ -1072,7 +1133,15 @@ JAVOB FAQAT JSON array: [{"parameterId":123,"valueId":456}]`;
           const content3 = data3.choices?.[0]?.message?.content || "";
           const arrMatch3 = content3.match(/\[[\s\S]*\]/);
           if (arrMatch3) {
-            const p3Params = JSON.parse(arrMatch3[0]);
+            let p3Params: any[] = [];
+            try {
+              p3Params = JSON.parse(arrMatch3[0]);
+            } catch {
+              const lastObj = arrMatch3[0].lastIndexOf('}');
+              if (lastObj > 0) {
+                try { p3Params = JSON.parse(arrMatch3[0].substring(0, lastObj + 1) + ']'); } catch {}
+              }
+            }
             if (Array.isArray(p3Params) && p3Params.length > 0) {
               result.parameterValues = [...(result.parameterValues || []), ...p3Params];
               console.log(`✅ Pass 3: +${p3Params.length} MAJBURIY params. Jami: ${result.parameterValues.length}`);

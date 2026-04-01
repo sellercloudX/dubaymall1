@@ -442,7 +442,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
       }
       updateTaskProgress(3, 'completed');
 
-      // Step 5: AI Agent Image Pipeline — SellZen (primary) + OpenAI/Gemini (fallback)
+      // Step 5: Image generation via SellZen Studio (direct, faster than ai-agent-images)
       // NON-BLOCKING: Start image generation, but don't wait — card creation proceeds immediately
       let generatedInfos: string[] = [];
       const bestImageForInfographic = referenceImageUrl;
@@ -455,40 +455,64 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
         
         imagePromise = (async (): Promise<string[]> => {
           try {
-            
-            const { data: imgData, error: imgError } = await supabase.functions.invoke('ai-agent-images', {
-              body: {
-                action: 'scanner-generate',
-                referenceImageUrl: bestImageForInfographic,
-                productName: normalizedProductName,
-                category: analyzed?.category || '',
-                features: analyzed?.features || [],
-                skipBilling: true,
-              },
-            });
-
-            if (!imgError && imgData?.success && imgData.images?.length > 0) {
-              setBackgroundTasks(prev => prev.map(task => 
-                task.id === taskId ? { ...task, generatedImages: [...imgData.images] } : task
-              ));
-              
-              updateTaskProgress(4, 'completed');
-              return imgData.images;
-            } else if (!imgError && imgData?.success && imgData.images?.length === 0) {
-              console.warn('AI Agent images: 0 images returned, proceeding with reference');
-              toast.warning('Rasmlar yaratilmadi (limit), kartochka reference rasm bilan yaratiladi');
-              updateTaskProgress(4, 'completed');
-              return [];
+            // Fetch the reference image as base64 for SellZen
+            let imageBase64: string | null = null;
+            if (bestImageForInfographic.startsWith('data:')) {
+              imageBase64 = bestImageForInfographic;
             } else {
-              const errMsg = imgError?.message || imgData?.error || 'Unknown image error';
-              console.warn('AI Agent images failed:', errMsg);
-              toast.error(`Rasm yaratish xatosi: ${errMsg}`);
+              try {
+                const imgResp = await fetch(bestImageForInfographic);
+                if (imgResp.ok) {
+                  const buffer = await imgResp.arrayBuffer();
+                  const bytes = new Uint8Array(buffer);
+                  let binary = '';
+                  for (let i = 0; i < bytes.length; i++) {
+                    binary += String.fromCharCode(bytes[i]);
+                  }
+                  imageBase64 = `data:image/jpeg;base64,${btoa(binary)}`;
+                }
+              } catch (e) {
+                console.warn('Failed to fetch reference image for SellZen:', e);
+              }
+            }
+
+            if (!imageBase64) {
+              console.warn('No base64 image for SellZen, skipping');
               updateTaskProgress(4, 'failed');
               return [];
             }
+
+            // Call sellzen-studio directly — much faster than ai-agent-images pipeline
+            const { data: imgData, error: imgError } = await supabase.functions.invoke('sellzen-studio', {
+              body: {
+                action: 'generate_images',
+                imageBase64,
+                productName: normalizedProductName,
+                category: analyzed?.category || '',
+              },
+            });
+
+            if (!imgError && imgData?.results) {
+              const successUrls = imgData.results
+                .filter((r: any) => r.url)
+                .map((r: any) => r.url);
+              
+              if (successUrls.length > 0) {
+                setBackgroundTasks(prev => prev.map(task => 
+                  task.id === taskId ? { ...task, generatedImages: [...successUrls] } : task
+                ));
+                updateTaskProgress(4, 'completed');
+                return successUrls;
+              }
+            }
+            
+            const errMsg = imgError?.message || imgData?.error || 'SellZen returned no images';
+            console.warn('SellZen Studio failed:', errMsg);
+            toast.warning('Rasmlar yaratilmadi, kartochka reference rasm bilan yaratiladi');
+            updateTaskProgress(4, 'failed');
+            return [];
           } catch (imgErr: any) {
-            console.error('AI Agent images error:', imgErr);
-            toast.error(`Rasm yaratish xatosi: ${imgErr?.message || 'Noma\'lum xato'}`);
+            console.error('SellZen Studio error:', imgErr);
             updateTaskProgress(4, 'failed');
             return [];
           }
