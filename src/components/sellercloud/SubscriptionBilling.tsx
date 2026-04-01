@@ -131,8 +131,8 @@ function BalanceTopup({ userId }: { userId?: string }) {
   );
 }
 
-/** Poll Payme receipt status every 5 seconds for up to 10 minutes */
-function pollPaymeStatus(receiptId: string, orderNumber: string, userId: string) {
+/** Poll Payme payment status every 5 seconds for up to 10 minutes */
+function pollPaymeStatus(orderNumber: string, userId: string) {
   let attempts = 0;
   const maxAttempts = 120; // 10 minutes
   const interval = setInterval(async () => {
@@ -140,7 +140,7 @@ function pollPaymeStatus(receiptId: string, orderNumber: string, userId: string)
     if (attempts > maxAttempts) { clearInterval(interval); return; }
     try {
       const { data } = await supabase.functions.invoke('payme-payment', {
-        body: { action: 'check', receipt_id: receiptId, order_number: orderNumber, user_id: userId },
+        body: { action: 'check', order_number: orderNumber, user_id: userId },
       });
       if (data?.paid) {
         clearInterval(interval);
