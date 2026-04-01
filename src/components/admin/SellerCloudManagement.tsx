@@ -596,19 +596,19 @@ export function SellerCloudManagement() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label>Oylik to'lov (USD)</Label>
-              <Input type="number" value={editMonthlyFee} onChange={(e) => setEditMonthlyFee(e.target.value)} placeholder="499" />
-              {editMonthlyFee && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  ≈ {formatPrice(parseFloat(editMonthlyFee || '0') * USD_TO_UZS)}
-                </p>
-              )}
-            </div>
-            <div>
-              <Label>Savdo komissiyasi (%)</Label>
-              <Input type="number" value={editCommission} onChange={(e) => setEditCommission(e.target.value)} placeholder="4" step="0.5" min="0" max="100" />
-            </div>
+            {editPlanType && (() => {
+              const plan = activePlans.find(p => p.slug === editPlanType);
+              if (!plan) return null;
+              return (
+                <div className="bg-muted p-3 rounded-lg text-sm space-y-1">
+                  <p>Bir martalik: <strong>{formatPrice(plan.onetime_price_uzs)}</strong></p>
+                  <p>Oylik: <strong>{formatPrice(plan.monthly_fee_uzs)}</strong></p>
+                  <p>Chegirma: <strong>{plan.balance_discount_percent}%</strong></p>
+                  <p>Bepul karta: <strong>{plan.free_card_creation_monthly}/oy</strong></p>
+                  <p>Bepul klon: <strong>{plan.free_cloning_monthly}/oy</strong></p>
+                </div>
+              );
+            })()}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingSub(null)}>Bekor qilish</Button>
