@@ -1072,7 +1072,16 @@ JAVOB FAQAT JSON array:
         const content2 = data2.choices?.[0]?.message?.content || "";
         const arrMatch = content2.match(/\[[\s\S]*\]/);
         if (arrMatch) {
-          const extraParams = JSON.parse(arrMatch[0]);
+          let extraParams: any[] = [];
+          try {
+            extraParams = JSON.parse(arrMatch[0]);
+          } catch {
+            // Try to repair truncated array
+            const lastObj = arrMatch[0].lastIndexOf('}');
+            if (lastObj > 0) {
+              try { extraParams = JSON.parse(arrMatch[0].substring(0, lastObj + 1) + ']'); } catch {}
+            }
+          }
           if (Array.isArray(extraParams) && extraParams.length > 0) {
             result.parameterValues = [...(result.parameterValues || []), ...extraParams];
             console.log(`✅ Pass 2: +${extraParams.length} params. Jami: ${result.parameterValues.length}`);
