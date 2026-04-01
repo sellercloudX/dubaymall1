@@ -45,8 +45,6 @@ export function SellerCloudManagement() {
 
   // Tariff editing state
   const [editingSub, setEditingSub] = useState<any>(null);
-  const [editMonthlyFee, setEditMonthlyFee] = useState('');
-  const [editCommission, setEditCommission] = useState('');
   const [editPlanType, setEditPlanType] = useState<string>('starter');
 
   // Activation state  
