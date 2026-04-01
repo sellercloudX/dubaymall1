@@ -56,6 +56,7 @@ export function SellZenStudio() {
   const [marketplace, setMarketplace] = useState('wildberries');
   const [imageStyle, setImageStyle] = useState('commercial');
   const [productName, setProductName] = useState('');
+  const [productDescription, setProductDescription] = useState('');
 
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
   const [carouselIndex, setCarouselIndex] = useState(0);
