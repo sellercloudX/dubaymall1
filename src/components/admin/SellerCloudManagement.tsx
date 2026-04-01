@@ -337,8 +337,6 @@ export function SellerCloudManagement() {
                             {/* Edit Tariff */}
                             <Button size="sm" variant="outline" onClick={() => {
                               setEditingSub(sub);
-                              setEditMonthlyFee(String(sub.monthly_fee));
-                              setEditCommission(String(sub.commission_percent));
                               setEditPlanType(sub.plan_slug || sub.plan_type || 'starter');
                             }}>
                               <Edit className="h-3 w-3" />
