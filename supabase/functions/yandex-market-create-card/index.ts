@@ -1062,10 +1062,10 @@ JAVOB FAQAT JSON array:
         method: "POST",
         headers: { Authorization: `Bearer ${lovableApiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
+          model: "google/gemini-2.5-pro",
           messages: [{ role: "user", content: pass2Prompt }],
           temperature: 0.1,
-          max_tokens: 6000,
+          max_tokens: 12000,
         }),
       });
 
