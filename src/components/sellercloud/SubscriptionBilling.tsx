@@ -41,11 +41,39 @@ const categoryNames: Record<string, string> = {
 
 const TOPUP_OPTIONS = [300_000, 500_000, 1_000_000, 2_000_000, 5_000_000];
 
+type PaymentMethod = 'click' | 'payme';
+
+function PaymentMethodSelector({ value, onChange }: { value: PaymentMethod; onChange: (v: PaymentMethod) => void }) {
+  return (
+    <div className="flex gap-2">
+      <button onClick={() => onChange('click')}
+        className={cn('flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border text-sm font-medium transition-colors',
+          value === 'click' ? 'border-primary bg-primary/10 text-primary' : 'border-border hover:border-primary/50')}>
+        <CreditCard className="h-4 w-4" /> Click
+      </button>
+      <button onClick={() => onChange('payme')}
+        className={cn('flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border text-sm font-medium transition-colors',
+          value === 'payme' ? 'border-[#00CCCC] bg-[#00CCCC]/10 text-[#00CCCC]' : 'border-border hover:border-[#00CCCC]/50')}>
+        <Wallet className="h-4 w-4" /> Payme
+      </button>
+    </div>
+  );
+}
+
+async function invokePayment(method: PaymentMethod, action: string, body: Record<string, unknown>) {
+  const fnName = method === 'payme' ? 'payme-payment' : 'click-payment';
+  const { data, error } = await supabase.functions.invoke(fnName, { body: { action, ...body } });
+  if (error) throw error;
+  if (!data?.success) throw new Error(data?.error || 'Xatolik');
+  return data;
+}
+
 function BalanceTopup({ userId }: { userId?: string }) {
   const [selectedAmount, setSelectedAmount] = useState<number>(TOPUP_OPTIONS[0]);
   const [customAmount, setCustomAmount] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [useCustom, setUseCustom] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('click');
 
   const formatP = (p: number) => p >= 1_000_000 ? (p / 1_000_000).toFixed(1) + ' mln' : (p / 1_000).toFixed(0) + ' ming';
   const amount = useCustom ? Number(customAmount) : selectedAmount;
@@ -55,13 +83,17 @@ function BalanceTopup({ userId }: { userId?: string }) {
     if (!amount || amount < MIN_TOPUP_UZS) { toast.error(`Minimal summa: ${MIN_TOPUP_UZS.toLocaleString()} so'm`); return; }
     setIsProcessing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('click-payment', {
-        body: { action: 'topup', user_id: userId, amount_uzs: amount, return_url: window.location.origin + '/seller-cloud?tab=balance' },
+      const data = await invokePayment(paymentMethod, 'topup', {
+        user_id: userId, amount_uzs: amount,
+        return_url: window.location.origin + '/seller-cloud?tab=balance',
       });
-      if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || 'Xatolik');
       toast.success("To'lov sahifasiga yo'naltirilmoqda...");
       window.open(data.payment_url, '_blank');
+
+      // For Payme, start polling for payment status
+      if (paymentMethod === 'payme' && data.receipt_id) {
+        pollPaymeStatus(data.receipt_id, data.order_number, userId);
+      }
     } catch (err: any) {
       toast.error("To'lov xatoligi: " + (err.message || "Qaytadan urinib ko'ring"));
     } finally { setIsProcessing(false); }
@@ -70,6 +102,7 @@ function BalanceTopup({ userId }: { userId?: string }) {
   return (
     <div className="mt-6 p-4 rounded-xl border border-border bg-muted/30 space-y-4">
       <h4 className="text-sm font-semibold flex items-center gap-2"><DollarSign className="h-4 w-4" /> Balansni to'ldirish</h4>
+      <PaymentMethodSelector value={paymentMethod} onChange={setPaymentMethod} />
       <p className="text-xs text-muted-foreground">Minimal: <strong>{MIN_TOPUP_UZS.toLocaleString()} so'm</strong></p>
       <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
         {TOPUP_OPTIONS.map((opt) => (
@@ -83,16 +116,37 @@ function BalanceTopup({ userId }: { userId?: string }) {
         <button onClick={() => setUseCustom(!useCustom)} className={`text-xs underline ${useCustom ? 'text-primary' : 'text-muted-foreground'}`}>Boshqa summa</button>
         {useCustom && <input type="number" value={customAmount} onChange={(e) => setCustomAmount(e.target.value)} placeholder="Summa kiriting" min={MIN_TOPUP_UZS} className="flex-1 h-9 rounded-lg border border-border bg-background px-3 text-sm" />}
       </div>
-      <Button className="w-full" size="lg" onClick={handleTopup} disabled={isProcessing || !amount || amount < MIN_TOPUP_UZS}>
+      <Button className="w-full" size="lg" onClick={handleTopup} disabled={isProcessing || !amount || amount < MIN_TOPUP_UZS}
+        style={paymentMethod === 'payme' ? { backgroundColor: '#00CCCC' } : undefined}>
         {isProcessing ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Yuklanmoqda...</> : (
           <span className="flex items-center gap-1.5 truncate">
-            <CreditCard className="h-4 w-4 shrink-0" />
-            <span className="truncate">Click · {amount >= MIN_TOPUP_UZS ? `${amount.toLocaleString()} so'm` : "To'ldirish"}</span>
+            {paymentMethod === 'payme' ? <Wallet className="h-4 w-4 shrink-0" /> : <CreditCard className="h-4 w-4 shrink-0" />}
+            <span className="truncate">{paymentMethod === 'payme' ? 'Payme' : 'Click'} · {amount >= MIN_TOPUP_UZS ? `${amount.toLocaleString()} so'm` : "To'ldirish"}</span>
           </span>
         )}
       </Button>
     </div>
   );
+}
+
+/** Poll Payme receipt status every 5 seconds for up to 10 minutes */
+function pollPaymeStatus(receiptId: string, orderNumber: string, userId: string) {
+  let attempts = 0;
+  const maxAttempts = 120; // 10 minutes
+  const interval = setInterval(async () => {
+    attempts++;
+    if (attempts > maxAttempts) { clearInterval(interval); return; }
+    try {
+      const { data } = await supabase.functions.invoke('payme-payment', {
+        body: { action: 'check', receipt_id: receiptId, order_number: orderNumber, user_id: userId },
+      });
+      if (data?.paid) {
+        clearInterval(interval);
+        toast.success("To'lov muvaffaqiyatli qabul qilindi! ✅");
+        window.location.reload();
+      }
+    } catch {}
+  }, 5000);
 }
 
 // ─── Dynamic Plan Card ───
