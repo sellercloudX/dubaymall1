@@ -87,12 +87,14 @@ function BalanceTopup({ userId }: { userId?: string }) {
         user_id: userId, amount_uzs: amount,
         return_url: window.location.origin + '/seller-cloud?tab=balance',
       });
-      toast.success("To'lov sahifasiga yo'naltirilmoqda...");
-      window.open(data.payment_url, '_blank');
-
-      // For Payme, start polling for payment status
-      if (paymentMethod === 'payme' && data.receipt_id) {
-        pollPaymeStatus(data.receipt_id, data.order_number, userId);
+      if (paymentMethod === 'payme') {
+        // Open Payme checkout in popup
+        const popup = window.open(data.payment_url, 'payme_checkout', 'width=450,height=700,scrollbars=yes');
+        toast.info("Payme oynasida to'lovni amalga oshiring", { duration: 10000 });
+        pollPaymeStatus(data.order_number, userId);
+      } else {
+        toast.success("To'lov sahifasiga yo'naltirilmoqda...");
+        window.open(data.payment_url, '_blank');
       }
     } catch (err: any) {
       toast.error("To'lov xatoligi: " + (err.message || "Qaytadan urinib ko'ring"));
@@ -129,8 +131,8 @@ function BalanceTopup({ userId }: { userId?: string }) {
   );
 }
 
-/** Poll Payme receipt status every 5 seconds for up to 10 minutes */
-function pollPaymeStatus(receiptId: string, orderNumber: string, userId: string) {
+/** Poll Payme payment status every 5 seconds for up to 10 minutes */
+function pollPaymeStatus(orderNumber: string, userId: string) {
   let attempts = 0;
   const maxAttempts = 120; // 10 minutes
   const interval = setInterval(async () => {
@@ -138,7 +140,7 @@ function pollPaymeStatus(receiptId: string, orderNumber: string, userId: string)
     if (attempts > maxAttempts) { clearInterval(interval); return; }
     try {
       const { data } = await supabase.functions.invoke('payme-payment', {
-        body: { action: 'check', receipt_id: receiptId, order_number: orderNumber, user_id: userId },
+        body: { action: 'check', order_number: orderNumber, user_id: userId },
       });
       if (data?.paid) {
         clearInterval(interval);
@@ -263,9 +265,11 @@ export const SubscriptionBilling = forwardRef<HTMLDivElement, SubscriptionBillin
         if (selectedPlanForTerms.onetime_price_uzs > 0 && user?.id) {
           try {
             const data = await invokePayment(paymentMethod, 'prepare', payBody);
-            window.open(data.payment_url, '_blank');
-            if (paymentMethod === 'payme' && data.receipt_id) {
-              pollPaymeStatus(data.receipt_id, data.order_number, user.id);
+            if (paymentMethod === 'payme') {
+              window.open(data.payment_url, 'payme_checkout', 'width=450,height=700,scrollbars=yes');
+              pollPaymeStatus(data.order_number, user.id);
+            } else {
+              window.open(data.payment_url, '_blank');
             }
           } catch {}
         }
@@ -276,10 +280,11 @@ export const SubscriptionBilling = forwardRef<HTMLDivElement, SubscriptionBillin
         try {
           const data = await invokePayment(paymentMethod, 'prepare', payBody);
           toast.success("To'lov sahifasiga yo'naltirilmoqda...");
-          window.open(data.payment_url, '_blank');
-          setShowTermsDialog(false);
-          if (paymentMethod === 'payme' && data.receipt_id) {
-            pollPaymeStatus(data.receipt_id, data.order_number, user.id);
+          if (paymentMethod === 'payme') {
+            window.open(data.payment_url, 'payme_checkout', 'width=450,height=700,scrollbars=yes');
+            pollPaymeStatus(data.order_number, user.id);
+          } else {
+            window.open(data.payment_url, '_blank');
           }
         } catch (err: any) {
           toast.error('To\'lov xatoligi: ' + (err.message || 'Qaytadan urinib ko\'ring'));

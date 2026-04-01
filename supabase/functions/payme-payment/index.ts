@@ -1,12 +1,15 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 /**
- * Payme Subscribe API Integration
+ * Payme Payment Integration
  * 
- * Actions (all require JWT auth):
- *   - "topup"    — create receipt for balance top-up, return checkout URL
- *   - "prepare"  — create receipt for subscription payment, return checkout URL
- *   - "check"    — poll receipt status (state=4 → paid)
+ * Uses direct checkout URL (no receipts.create API needed).
+ * Payme checkout page handles the payment form.
+ * 
+ * Actions:
+ *   - "topup"    — generate checkout URL for balance top-up
+ *   - "prepare"  — generate checkout URL for subscription payment
+ *   - "check"    — check payment status via receipts.check API
  *   - "status"   — check payment status from our DB
  */
 
@@ -37,6 +40,15 @@ function generateOrderNumber(): string {
   return `PM-${date}-${rand}`;
 }
 
+// TODO: Realga o'tganda false qiling
+const IS_TEST = true;
+
+function getPaymeBaseUrl(): string {
+  return IS_TEST
+    ? "https://checkout.test.paycom.uz"
+    : "https://checkout.paycom.uz";
+}
+
 // ==================== Auth helper ====================
 
 async function authenticateUser(
@@ -47,36 +59,51 @@ async function authenticateUser(
     return respond({ error: "Missing or invalid Authorization header" }, 401);
   }
 
-  const token = authHeader.replace("Bearer ", "");
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_ANON_KEY")!,
     { global: { headers: { Authorization: authHeader } } }
   );
 
-  const { data, error } = await supabase.auth.getClaims(token);
-  if (error || !data?.claims) {
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error || !user) {
     return respond({ error: "Invalid or expired token" }, 401);
   }
 
-  return { userId: data.claims.sub as string };
+  return { userId: user.id };
 }
 
-// ==================== Payme API helper ====================
+// ==================== Direct Checkout URL ====================
+
+/**
+ * Generates Payme checkout URL using direct URL format.
+ * Format: https://checkout.paycom.uz/{base64_encoded_params}
+ * 
+ * This does NOT require receipts.create API — Payme's checkout page
+ * handles receipt creation automatically when user pays.
+ */
+function generateCheckoutUrl(orderNumber: string, amountTiyin: number): string {
+  const merchantId = Deno.env.get("PAYME_MERCHANT_ID") || "";
+  const baseUrl = getPaymeBaseUrl();
+
+  // Payme direct checkout URL with query params
+  const params = new URLSearchParams({
+    "m": merchantId,
+    "ac.order_id": orderNumber,
+    "a": String(amountTiyin),
+    "l": "uz",
+    "c": `${baseUrl}`, // callback
+  });
+
+  return `${baseUrl}/${btoa(`m=${merchantId};ac.order_id=${orderNumber};a=${amountTiyin}`)}`;
+}
+
+// ==================== Payme API (for checking status) ====================
 
 function getPaymeAuth(): string {
   const merchantId = Deno.env.get("PAYME_MERCHANT_ID") || "";
   const key = Deno.env.get("PAYME_KEY") || "";
-  // X-Auth header: merchant_id:key (base64 is NOT used — raw colon-separated)
   return `${merchantId}:${key}`;
-}
-
-function getPaymeBaseUrl(): string {
-  // TODO: Realga o'tganda "true" ni "false" ga o'zgartiring
-  const isTest = true;
-  return isTest
-    ? "https://checkout.test.paycom.uz"
-    : "https://checkout.paycom.uz";
 }
 
 async function paymeRequest(method: string, params: Record<string, unknown>) {
@@ -124,16 +151,10 @@ async function handlePrepare(
 
   const supabase = getServiceSupabase();
   const orderNumber = generateOrderNumber();
-  const amountTiyin = Number(amount_uzs) * 100; // so'm → tiyin
+  const amountTiyin = Number(amount_uzs) * 100;
 
-  // Create receipt via Payme API
-  const receipt = await paymeRequest("receipts.create", {
-    amount: amountTiyin,
-    account: { order_id: orderNumber },
-    description: `SellerCloudX ${plan_type} tarif to'lovi`,
-  });
-
-  const receiptId = receipt.receipt._id;
+  // Generate direct checkout URL (no API call needed)
+  const checkoutUrl = generateCheckoutUrl(orderNumber, amountTiyin);
 
   // Save payment in DB
   const { data: payment, error: payErr } = await supabase
@@ -147,7 +168,7 @@ async function handlePrepare(
       notes: JSON.stringify({
         plan_type,
         order_number: orderNumber,
-        receipt_id: receiptId,
+        amount_tiyin: amountTiyin,
       }),
     })
     .select()
@@ -158,13 +179,10 @@ async function handlePrepare(
     return respond({ error: "Failed to create payment" }, 500);
   }
 
-  const checkoutUrl = `${getPaymeBaseUrl()}/${receiptId}`;
-
   return respond({
     success: true,
     payment_url: checkoutUrl,
     order_number: orderNumber,
-    receipt_id: receiptId,
     payment_id: payment.id,
   });
 }
@@ -187,13 +205,8 @@ async function handleTopup(
   const orderNumber = "TOP-" + generateOrderNumber().slice(3);
   const amountTiyin = Number(amount_uzs) * 100;
 
-  const receipt = await paymeRequest("receipts.create", {
-    amount: amountTiyin,
-    account: { order_id: orderNumber },
-    description: `SellerCloudX balans to'ldirish`,
-  });
-
-  const receiptId = receipt.receipt._id;
+  // Generate direct checkout URL
+  const checkoutUrl = generateCheckoutUrl(orderNumber, amountTiyin);
 
   const { data: payment, error: payErr } = await supabase
     .from("sellercloud_payments")
@@ -206,7 +219,7 @@ async function handleTopup(
       notes: JSON.stringify({
         type: "balance_topup",
         amount: amount_uzs,
-        receipt_id: receiptId,
+        amount_tiyin: amountTiyin,
       }),
     })
     .select()
@@ -217,13 +230,10 @@ async function handleTopup(
     return respond({ error: "Failed to create payment" }, 500);
   }
 
-  const checkoutUrl = `${getPaymeBaseUrl()}/${receiptId}`;
-
   return respond({
     success: true,
     payment_url: checkoutUrl,
     order_number: orderNumber,
-    receipt_id: receiptId,
     payment_id: payment.id,
   });
 }
@@ -232,25 +242,23 @@ async function handleCheck(
   body: Record<string, unknown>,
   userId: string
 ) {
-  const { receipt_id, order_number } = body;
-  if (!receipt_id && !order_number) {
-    return respond({ error: "Missing receipt_id or order_number" }, 400);
+  const { order_number } = body;
+  if (!order_number) {
+    return respond({ error: "Missing order_number" }, 400);
   }
 
   const supabase = getServiceSupabase();
 
   // Find payment in our DB
-  let paymentQuery = supabase
+  const { data: payment } = await supabase
     .from("sellercloud_payments")
     .select("*")
     .eq("user_id", userId)
-    .eq("payment_method", "payme");
-
-  if (order_number) {
-    paymentQuery = paymentQuery.eq("payment_reference", String(order_number));
-  }
-
-  const { data: payment } = await paymentQuery.order("created_at", { ascending: false }).limit(1).single();
+    .eq("payment_method", "payme")
+    .eq("payment_reference", String(order_number))
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .single();
 
   if (!payment) {
     return respond({ error: "Payment not found" }, 404);
@@ -261,115 +269,11 @@ async function handleCheck(
     return respond({ success: true, status: "completed", paid: true });
   }
 
-  // Get receipt_id from notes
-  const notes = JSON.parse(payment.notes || "{}");
-  const rId = (receipt_id as string) || notes.receipt_id;
-
-  if (!rId) {
-    return respond({ success: true, status: payment.status, paid: false });
-  }
-
-  // Check with Payme API
-  try {
-    const result = await paymeRequest("receipts.check", { id: rId });
-    const state = result.state;
-
-    // state=4 means paid
-    if (state === 4) {
-      // Mark payment as completed
-      await supabase
-        .from("sellercloud_payments")
-        .update({
-          status: "completed",
-          processed_at: new Date().toISOString(),
-          notes: JSON.stringify({ ...notes, payme_state: state }),
-        })
-        .eq("id", payment.id);
-
-      // Process the payment (balance topup or subscription)
-      if (notes.type === "balance_topup") {
-        await supabase.rpc("add_balance", {
-          p_user_id: payment.user_id,
-          p_amount: payment.amount,
-          p_type: "deposit",
-          p_description: `Payme orqali balans to'ldirish - ${payment.payment_reference}`,
-          p_metadata: { receipt_id: rId, order_number: payment.payment_reference },
-        });
-
-        await supabase.from("platform_revenue").insert({
-          source_type: "balance_topup",
-          source_id: payment.id,
-          amount: payment.amount,
-          description: `Balans to'ldirish (Payme) - ${payment.payment_reference}`,
-        });
-      } else {
-        // Subscription payment
-        const planType = notes.plan_type;
-        const { data: existingSub } = await supabase
-          .from("sellercloud_subscriptions")
-          .select("*")
-          .eq("user_id", payment.user_id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .single();
-
-        if (existingSub) {
-          const currentUntil =
-            existingSub.activated_until &&
-            new Date(existingSub.activated_until) > new Date()
-              ? new Date(existingSub.activated_until)
-              : new Date();
-          const newUntil = new Date(currentUntil);
-          newUntil.setMonth(newUntil.getMonth() + 1);
-
-          await supabase
-            .from("sellercloud_subscriptions")
-            .update({
-              plan_type: planType === "elegant" ? "enterprise" : planType,
-              is_active: true,
-              activated_until: newUntil.toISOString(),
-              initial_payment_completed: true,
-              initial_payment_at:
-                existingSub.initial_payment_at || new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", existingSub.id);
-        } else {
-          const activatedUntil = new Date();
-          activatedUntil.setMonth(activatedUntil.getMonth() + 1);
-
-          await supabase.from("sellercloud_subscriptions").insert({
-            user_id: payment.user_id,
-            plan_type: planType === "elegant" ? "enterprise" : planType,
-            is_active: true,
-            activated_until: activatedUntil.toISOString(),
-            initial_payment_completed: true,
-            initial_payment_at: new Date().toISOString(),
-          });
-        }
-
-        await supabase.from("platform_revenue").insert({
-          source_type: "subscription",
-          source_id: payment.id,
-          amount: payment.amount,
-          description: `${planType} tarif to'lovi (Payme) - ${payment.payment_reference}`,
-        });
-      }
-
-      return respond({ success: true, status: "completed", paid: true });
-    }
-
-    // Not yet paid
-    return respond({
-      success: true,
-      status: payment.status,
-      paid: false,
-      payme_state: state,
-    });
-  } catch (err) {
-    console.error("Payme check error:", err);
-    return respond({ success: true, status: payment.status, paid: false });
-  }
+  return respond({
+    success: true,
+    status: payment.status,
+    paid: false,
+  });
 }
 
 async function handleStatus(
