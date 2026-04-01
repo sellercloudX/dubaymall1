@@ -1395,8 +1395,8 @@ export function AIAgentDashboard() {
   const [scanResults, setScanResults] = useState<ScanResult[]>([]);
   const [priceData, setPriceData] = useState<any>(null);
 
-  const { data: partners } = useQuery({
-    queryKey: ['ai-agent-partners'],
+  const { data: partners, isLoading: partnersLoading } = useQuery({
+    queryKey: ['ai-agent-partners-v2'],
     queryFn: async () => {
       // Fetch ALL marketplace connections (admins have RLS access to all)
       let allConnections: any[] = [];
