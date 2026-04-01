@@ -884,13 +884,15 @@ ${categoryInstructions}
 
 ═══════════════════════════════════════════════════════
 ⚠️⚠️⚠️ BIRINCHI NAVBATDA: "ASOSIY XUSUSIYATLAR" (${requiredParams.length} ta MAJBURIY parametr) — 12 BALL ⚠️⚠️⚠️
-Bu parametrlar TO'LDIRILMASA ball PAST bo'ladi! HAR BIRINI ALBATTA TO'LDIR!
+Bu parametrlar TO'LDIRILMASA kartochka sifati JUDA PAST bo'ladi! HAR BIRINI ALBATTA TO'LDIR!
 "Maydonlarni ko'rsatish" tugmasi ortidagi YASHIRIN parametrlar HAM shu yerda!
+Тип, Форма выпуска, Поводом работы, Назначение — BARCHASI MAJBURIY!
 ═══════════════════════════════════════════════════════
 ${requiredParams.map(formatParam).join("\n")}
 
 ═══ "FILTRLAR UCHUN QO'SHIMCHA XUSUSIYATLAR" (${recommendedParams.length} ta RECOMMENDED) — 8 BALL ═══
-⚠️ Bu parametrlar FILTR sifatida ishlaydi! Qidiruv natijalarida chiqish uchun ALBATTA TO'LDIR!
+⚠️ Bu parametrlar FILTR sifatida ishlaydi! Qidiruv natijalarida chiqish uchun ALBATTA HAR BIRINI TO'LDIR!
+Назначение, Особенности, Содержит, Не содержит, Объём, Цвет — BARCHASI FILTR!
 ${recommendedParams.map(formatParam).join("\n")}
 
 ═══ QO'SHIMCHA PARAMETRLAR (${optionalParams.length} ta) — IMKON QADAR TO'LDIR ═══
