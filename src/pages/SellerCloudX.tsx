@@ -86,7 +86,7 @@ const pageTitles: Record<string, string> = {
   subscription: 'Obuna va to\'lov',
   reports: 'Hisobotlar',
   notifications: 'Bildirishnomalar',
-  competitor: 'Raqobat narx monitoring',
+  
   support: 'Yordam markazi',
   'unit-economy': 'Unit-economy (SKU)',
   team: 'Jamoa boshqaruvi',
