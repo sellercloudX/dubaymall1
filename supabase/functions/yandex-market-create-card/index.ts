@@ -1620,6 +1620,10 @@ serve(async (req) => {
         console.log(`🖼️ Total ${images.length} images ready`);
         console.log(`📂 Category: ${leafCat.name} (${leafCat.id})`);
 
+        // ═══ STEP 5b: Fetch category params & AI content fill ═══
+        const categoryParams = await fetchCategoryParameters(creds.apiKey, leafCat.id);
+        const ai = await aiOptimize(product, leafCat.name, categoryParams, LOVABLE_KEY, !!body.cloneMode);
+
         // ═══ STEP 6: Build & send offer ═══
         const offer = buildOffer(product, ai, sku, barcode, leafCat, mxik, pricing.recommendedPrice, images);
 
