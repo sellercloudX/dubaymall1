@@ -87,12 +87,14 @@ function BalanceTopup({ userId }: { userId?: string }) {
         user_id: userId, amount_uzs: amount,
         return_url: window.location.origin + '/seller-cloud?tab=balance',
       });
-      toast.success("To'lov sahifasiga yo'naltirilmoqda...");
-      window.open(data.payment_url, '_blank');
-
-      // For Payme, start polling for payment status
-      if (paymentMethod === 'payme' && data.receipt_id) {
-        pollPaymeStatus(data.receipt_id, data.order_number, userId);
+      if (paymentMethod === 'payme') {
+        // Open Payme checkout in popup
+        const popup = window.open(data.payment_url, 'payme_checkout', 'width=450,height=700,scrollbars=yes');
+        toast.info("Payme oynasida to'lovni amalga oshiring", { duration: 10000 });
+        pollPaymeStatus(data.order_number, userId);
+      } else {
+        toast.success("To'lov sahifasiga yo'naltirilmoqda...");
+        window.open(data.payment_url, '_blank');
       }
     } catch (err: any) {
       toast.error("To'lov xatoligi: " + (err.message || "Qaytadan urinib ko'ring"));
