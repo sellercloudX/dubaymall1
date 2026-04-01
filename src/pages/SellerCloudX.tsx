@@ -251,12 +251,6 @@ export default function SellerCloudX() {
         return <SalesDashboard connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'analytics':
         return <MarketplaceAnalytics connectedMarketplaces={connectedMarketplaces} store={store} />;
-      case 'product-analytics':
-        return <MarketplaceProductAnalytics connectedMarketplaces={connectedMarketplaces} store={store} />;
-      case 'wb-analytics':
-        return <MarketplaceSellerAnalytics connectedMarketplaces={connectedMarketplaces} store={store} />;
-      case 'seo-monitor':
-        return <SEOMonitor connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'financials':
         return <FinancialDashboard connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'abc':
