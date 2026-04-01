@@ -1133,7 +1133,15 @@ JAVOB FAQAT JSON array: [{"parameterId":123,"valueId":456}]`;
           const content3 = data3.choices?.[0]?.message?.content || "";
           const arrMatch3 = content3.match(/\[[\s\S]*\]/);
           if (arrMatch3) {
-            const p3Params = JSON.parse(arrMatch3[0]);
+            let p3Params: any[] = [];
+            try {
+              p3Params = JSON.parse(arrMatch3[0]);
+            } catch {
+              const lastObj = arrMatch3[0].lastIndexOf('}');
+              if (lastObj > 0) {
+                try { p3Params = JSON.parse(arrMatch3[0].substring(0, lastObj + 1) + ']'); } catch {}
+              }
+            }
             if (Array.isArray(p3Params) && p3Params.length > 0) {
               result.parameterValues = [...(result.parameterValues || []), ...p3Params];
               console.log(`✅ Pass 3: +${p3Params.length} MAJBURIY params. Jami: ${result.parameterValues.length}`);
