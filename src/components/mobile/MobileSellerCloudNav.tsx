@@ -1,4 +1,4 @@
-import { BarChart3, Package, ShoppingCart, MoreHorizontal, Globe } from 'lucide-react';
+import { BarChart3, Package, ShoppingCart, MoreHorizontal, ScanLine } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export type MobileTabType = 
@@ -20,12 +20,12 @@ interface MobileSellerCloudNavProps {
 const navItems = [
   { id: 'orders' as const, icon: ShoppingCart, label: 'Buyurtma' },
   { id: 'products' as const, icon: Package, label: 'Mahsulot' },
+  { id: 'scanner' as const, icon: ScanLine, label: 'AI Skaner' },
   { id: 'financials' as const, icon: BarChart3, label: 'Moliya' },
-  { id: 'marketplaces' as const, icon: Globe, label: 'Marketplace' },
   { id: 'more' as const, icon: MoreHorizontal, label: "Ko'proq" },
 ];
 
-const primaryTabIds: MobileTabType[] = ['orders', 'products', 'financials', 'marketplaces'];
+const primaryTabIds: MobileTabType[] = ['orders', 'products', 'scanner', 'financials'];
 
 export function MobileSellerCloudNav({ activeTab, onTabChange, onMorePress }: MobileSellerCloudNavProps) {
   const isMoreActive = !primaryTabIds.includes(activeTab);

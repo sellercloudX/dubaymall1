@@ -834,8 +834,8 @@ async function aiOptimize(
   // REQUIRED = "Основные характеристики" (12 ball)
   // RECOMMENDED = "Фильтры" (8 ball) — Yandex uses these for search filters
   // OPTIONAL = everything else
-  const isRequired = (p: any) => p.required === true || p.constraintType === "REQUIRED" || p.mandatory === true;
-  const isRecommended = (p: any) => p.constraintType === "RECOMMENDED";
+  const isRequired = (p: any) => p.required === true || p.constraintType === "REQUIRED" || p.mandatory === true || p.importance === "REQUIRED";
+  const isRecommended = (p: any) => p.constraintType === "RECOMMENDED" || p.importance === "RECOMMENDED" || p.filterGroup === true || p.isFilter === true;
   const requiredParams = allParams.filter(isRequired);
   const recommendedParams = allParams.filter(p => !isRequired(p) && isRecommended(p));
   const optionalParams = allParams.filter(p => !isRequired(p) && !isRecommended(p));
@@ -884,13 +884,15 @@ ${categoryInstructions}
 
 ═══════════════════════════════════════════════════════
 ⚠️⚠️⚠️ BIRINCHI NAVBATDA: "ASOSIY XUSUSIYATLAR" (${requiredParams.length} ta MAJBURIY parametr) — 12 BALL ⚠️⚠️⚠️
-Bu parametrlar TO'LDIRILMASA ball PAST bo'ladi! HAR BIRINI ALBATTA TO'LDIR!
+Bu parametrlar TO'LDIRILMASA kartochka sifati JUDA PAST bo'ladi! HAR BIRINI ALBATTA TO'LDIR!
 "Maydonlarni ko'rsatish" tugmasi ortidagi YASHIRIN parametrlar HAM shu yerda!
+Тип, Форма выпуска, Поводом работы, Назначение — BARCHASI MAJBURIY!
 ═══════════════════════════════════════════════════════
 ${requiredParams.map(formatParam).join("\n")}
 
 ═══ "FILTRLAR UCHUN QO'SHIMCHA XUSUSIYATLAR" (${recommendedParams.length} ta RECOMMENDED) — 8 BALL ═══
-⚠️ Bu parametrlar FILTR sifatida ishlaydi! Qidiruv natijalarida chiqish uchun ALBATTA TO'LDIR!
+⚠️ Bu parametrlar FILTR sifatida ishlaydi! Qidiruv natijalarida chiqish uchun ALBATTA HAR BIRINI TO'LDIR!
+Назначение, Особенности, Содержит, Не содержит, Объём, Цвет — BARCHASI FILTR!
 ${recommendedParams.map(formatParam).join("\n")}
 
 ═══ QO'SHIMCHA PARAMETRLAR (${optionalParams.length} ta) — IMKON QADAR TO'LDIR ═══
@@ -927,8 +929,8 @@ QOIDALAR:
 JAVOB FAQAT JSON:
 {"name_ru":"...","name_uz":"...","description_ru":"...","description_uz":"...","vendor":"...","vendorCode":"...","manufacturerCountry":"...","shelfLife":null,"lifeTime":null,"parameterValues":[{"parameterId":123,"valueId":456},{"parameterId":789,"value":"qiymat"}],"warranty":"1 год","adult":false,"weightKg":0.15,"lengthCm":10,"widthCm":8,"heightCm":5}`;
 
-  // Use stronger model for better parameter filling
-  const aiModel = "google/gemini-2.5-flash";
+  // Use stronger model for better parameter filling — Pro for accuracy
+  const aiModel = "google/gemini-2.5-pro";
   
   let result: any = null;
   
@@ -941,7 +943,7 @@ JAVOB FAQAT JSON:
         model: aiModel,
         messages: [{ role: "user", content: prompt }],
         temperature: 0.1,
-        max_tokens: cloneMode ? 8000 : 16000,
+        max_tokens: cloneMode ? 12000 : 32000,
       }),
     });
 
@@ -1060,10 +1062,10 @@ JAVOB FAQAT JSON array:
         method: "POST",
         headers: { Authorization: `Bearer ${lovableApiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
+          model: "google/gemini-2.5-pro",
           messages: [{ role: "user", content: pass2Prompt }],
           temperature: 0.1,
-          max_tokens: 6000,
+          max_tokens: 12000,
         }),
       });
 
