@@ -1609,12 +1609,13 @@ serve(async (req) => {
           : lookupMXIK(supabase, mxikSearchName || product.name, mxikSearchCategory, LOVABLE_KEY);
         
         // --- Run all three in parallel ---
-        const [images, leafCat, mxik] = await Promise.all([imageTask, categoryTask, mxikTask]);
+        const [generatedImages, leafCat, mxik] = await Promise.all([imageTask, categoryTask, mxikTask]);
+        let images = generatedImages;
         
         // If no images at all, fall back to source
         if (images.length === 0 && sourceImages.length > 0) {
           console.warn("⚠️ No AI images, using source as fallback");
-          images.push(...sourceImages);
+          images = [...sourceImages];
         }
         console.log(`🖼️ Total ${images.length} images ready`);
         console.log(`📂 Category: ${leafCat.name} (${leafCat.id})`);
