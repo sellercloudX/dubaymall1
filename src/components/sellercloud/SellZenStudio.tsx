@@ -5,11 +5,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import {
-  Upload, Image, Video, Sparkles, Download, ChevronLeft,
-  ChevronRight, Loader2, Wallet, X, ImagePlus, Film,
+  Upload, Image, Sparkles, Download, ChevronLeft,
+  ChevronRight, Loader2, Wallet, X,
   Wand2, History, Eye,
 } from 'lucide-react';
 
@@ -33,17 +34,16 @@ interface GeneratedImage {
   label: string;
   url: string | null;
   error?: string;
+  format?: string;
 }
 
 interface HistoryItem {
   id: string;
   timestamp: number;
   sourceImage: string;
-  type: 'images' | 'video';
   results: GeneratedImage[];
-  videoUrl?: string;
-  mode: string;
-  styleType: string;
+  marketplace: string;
+  style: string;
 }
 
 export function SellZenStudio() {
@@ -77,22 +77,19 @@ export function SellZenStudio() {
     reader.onload = () => {
       setUploadedImage(reader.result as string);
       setGeneratedImages([]);
-      setGeneratedVideo(null);
     };
     reader.readAsDataURL(file);
   }, []);
 
-  const addToHistory = (type: 'images' | 'video', results: GeneratedImage[], videoUrl?: string) => {
+  const addToHistory = (results: GeneratedImage[]) => {
     if (!uploadedImage) return;
     const item: HistoryItem = {
       id: Date.now().toString(),
       timestamp: Date.now(),
       sourceImage: uploadedImage,
-      type,
       results,
-      videoUrl,
-      mode,
-      styleType,
+      marketplace,
+      style: imageStyle,
     };
     setHistory(prev => [item, ...prev].slice(0, 20));
   };
@@ -111,7 +108,7 @@ export function SellZenStudio() {
 
     setIsGeneratingImages(true);
     try {
-      const result = await deductBalance('sellzen-image-generate', `SellZen Studio: ${mode} ${styleType}`);
+      const result = await deductBalance('sellzen-image-generate', `SellZen Studio: ${marketplace} ${imageStyle}`);
       if (!result.success) {
         toast.error(result.error || 'Balans yechishda xatolik');
         setIsGeneratingImages(false);
@@ -122,8 +119,9 @@ export function SellZenStudio() {
         body: {
           action: 'generate_images',
           imageBase64: uploadedImage,
-          styles: [styleType],
-          mode,
+          productName: productName || undefined,
+          marketplace,
+          style: imageStyle,
         },
       });
 
@@ -131,7 +129,7 @@ export function SellZenStudio() {
       if (data?.results) {
         setGeneratedImages(data.results);
         setCarouselIndex(0);
-        addToHistory('images', data.results);
+        addToHistory(data.results);
         const successCount = data.results.filter((r: GeneratedImage) => r.url).length;
         if (successCount > 0) toast.success(`${successCount} ta rasm generatsiya qilindi!`);
         else toast.error('Rasm generatsiya qilinmadi');
@@ -141,52 +139,6 @@ export function SellZenStudio() {
       toast.error(e.message || 'Rasm generatsiya xatosi');
     } finally {
       setIsGeneratingImages(false);
-    }
-  };
-
-  const handleGenerateVideo = async () => {
-    if (!uploadedImage) {
-      toast.error('Avval rasm yuklang');
-      return;
-    }
-
-    if (balance && (balance.balance_uzs || 0) < videoPrice) {
-      toast.error(`Balans yetarli emas. Kerak: ${videoPrice.toLocaleString()} so'm`);
-      return;
-    }
-
-    setIsGeneratingVideo(true);
-    try {
-      const result = await deductBalance('ai-video-generation', 'SellZen Studio: video generatsiya');
-      if (!result.success) {
-        toast.error(result.error || 'Balans yechishda xatolik');
-        setIsGeneratingVideo(false);
-        return;
-      }
-
-      const { data, error } = await supabase.functions.invoke('sellzen-studio', {
-        body: {
-          action: 'generate_video',
-          imageBase64: uploadedImage,
-          template: videoTemplate,
-        },
-      });
-
-      if (error) throw error;
-      if (data?.videoUrl) {
-        setGeneratedVideo(data.videoUrl);
-        addToHistory('video', [], data.videoUrl);
-        toast.success('Video tayyor!');
-      } else if (data?.taskId) {
-        toast.info('Video generatsiya jarayonda. Biroz kuting...');
-      } else {
-        toast.error('Video generatsiya qilinmadi');
-      }
-    } catch (e: any) {
-      console.error('Generate video error:', e);
-      toast.error(e.message || 'Video generatsiya xatosi');
-    } finally {
-      setIsGeneratingVideo(false);
     }
   };
 
@@ -206,7 +158,6 @@ export function SellZenStudio() {
       URL.revokeObjectURL(blobUrl);
       toast.success('Yuklab olindi!');
     } catch {
-      // Fallback: open in new tab
       window.open(url, '_blank');
       toast.info('Yangi oynada ochildi');
     }
@@ -224,7 +175,7 @@ export function SellZenStudio() {
           </div>
           <div className="min-w-0">
             <h2 className="text-base sm:text-lg font-bold truncate">SellZen AI Studio</h2>
-            <p className="text-[10px] sm:text-xs text-muted-foreground">Rasm va video generatsiya</p>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">Professional rasm generatsiya</p>
           </div>
         </div>
         <div className="flex items-center gap-2 self-end sm:self-auto">
@@ -264,29 +215,23 @@ export function SellZenStudio() {
                     className="flex items-center gap-3 p-2 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
                     onClick={() => {
                       setUploadedImage(item.sourceImage);
-                      if (item.type === 'images') {
-                        setGeneratedImages(item.results);
-                        setActiveTab('images');
-                      } else if (item.videoUrl) {
-                        setGeneratedVideo(item.videoUrl);
-                        setActiveTab('video');
-                      }
+                      setGeneratedImages(item.results);
                       setShowHistory(false);
                     }}
                   >
                     <img src={item.sourceImage} alt="" className="w-10 h-10 rounded object-cover shrink-0" />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
-                        {item.type === 'images' ? <Image className="h-3 w-3 text-primary" /> : <Video className="h-3 w-3 text-primary" />}
+                        <Image className="h-3 w-3 text-primary" />
                         <span className="text-xs font-medium truncate">
-                          {item.mode} · {item.styleType}
+                          {item.marketplace} · {item.style}
                         </span>
                       </div>
                       <p className="text-[10px] text-muted-foreground">
                         {new Date(item.timestamp).toLocaleString('uz')}
                       </p>
                     </div>
-                    {item.type === 'images' && item.results.filter(r => r.url).length > 0 && (
+                    {item.results.filter(r => r.url).length > 0 && (
                       <div className="flex -space-x-2">
                         {item.results.filter(r => r.url).slice(0, 3).map((r, i) => (
                           <img key={i} src={r.url!} alt="" className="w-8 h-8 rounded border-2 border-background object-cover" />
@@ -300,28 +245,6 @@ export function SellZenStudio() {
           </CardContent>
         </Card>
       )}
-
-      {/* Tab switcher */}
-      <div className="flex gap-2">
-        <Button
-          variant={activeTab === 'images' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setActiveTab('images')}
-          className="gap-1 text-xs sm:text-sm flex-1 sm:flex-initial"
-        >
-          <ImagePlus className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
-          <span className="truncate">Rasm ({imagePrice.toLocaleString()})</span>
-        </Button>
-        <Button
-          variant={activeTab === 'video' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setActiveTab('video')}
-          className="gap-1 text-xs sm:text-sm flex-1 sm:flex-initial"
-        >
-          <Film className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
-          <span className="truncate">Video ({videoPrice.toLocaleString()})</span>
-        </Button>
-      </div>
 
       {/* Upload + Settings */}
       <Card>
@@ -340,7 +263,6 @@ export function SellZenStudio() {
                     e.stopPropagation();
                     setUploadedImage(null);
                     setGeneratedImages([]);
-                    setGeneratedVideo(null);
                   }}
                 >
                   <X className="h-3 w-3" />
@@ -362,89 +284,68 @@ export function SellZenStudio() {
             />
           </div>
 
-          {/* Style options */}
+          {/* Settings */}
           <div className="mt-4 space-y-3">
-            {activeTab === 'images' && (
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Rejim</label>
-                  <Select value={mode} onValueChange={setMode}>
-                    <SelectTrigger className="text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {MODES.map(m => (
-                        <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Uslub</label>
-                  <Select value={styleType} onValueChange={setStyleType}>
-                    <SelectTrigger className="text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STYLE_TYPES.map(s => (
-                        <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            )}
+            {/* Product name */}
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Mahsulot nomi (ixtiyoriy)</label>
+              <Input
+                value={productName}
+                onChange={(e) => setProductName(e.target.value)}
+                placeholder="Masalan: Samsung 65W zaryadlovchi"
+                className="text-sm"
+              />
+            </div>
 
-            {activeTab === 'video' && (
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Shablon</label>
-                <Select value={videoTemplate} onValueChange={setVideoTemplate}>
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Marketplace</label>
+                <Select value={marketplace} onValueChange={setMarketplace}>
                   <SelectTrigger className="text-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {VIDEO_TEMPLATES.map(t => (
-                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                    {MARKETPLACES.map(m => (
+                      <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-            )}
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Uslub</label>
+                <Select value={imageStyle} onValueChange={setImageStyle}>
+                  <SelectTrigger className="text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STYLES.map(s => (
+                      <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </div>
 
           {/* Generate button */}
           <div className="mt-4">
-            {activeTab === 'images' ? (
-              <Button
-                onClick={handleGenerateImages}
-                disabled={!uploadedImage || isGeneratingImages}
-                className="w-full gap-2 bg-gradient-to-r from-fuchsia-500 to-violet-600 hover:from-fuchsia-600 hover:to-violet-700 text-white"
-              >
-                {isGeneratingImages ? (
-                  <><Loader2 className="h-4 w-4 animate-spin" /> Generatsiya qilinmoqda...</>
-                ) : (
-                  <><Sparkles className="h-4 w-4" /> Rasm generatsiya ({imagePrice.toLocaleString()} so'm)</>
-                )}
-              </Button>
-            ) : (
-              <Button
-                onClick={handleGenerateVideo}
-                disabled={!uploadedImage || isGeneratingVideo}
-                className="w-full gap-2 bg-gradient-to-r from-fuchsia-500 to-violet-600 hover:from-fuchsia-600 hover:to-violet-700 text-white"
-              >
-                {isGeneratingVideo ? (
-                  <><Loader2 className="h-4 w-4 animate-spin" /> Video generatsiya qilinmoqda...</>
-                ) : (
-                  <><Film className="h-4 w-4" /> Video generatsiya ({videoPrice.toLocaleString()} so'm)</>
-                )}
-              </Button>
-            )}
+            <Button
+              onClick={handleGenerateImages}
+              disabled={!uploadedImage || isGeneratingImages}
+              className="w-full gap-2 bg-gradient-to-r from-fuchsia-500 to-violet-600 hover:from-fuchsia-600 hover:to-violet-700 text-white"
+            >
+              {isGeneratingImages ? (
+                <><Loader2 className="h-4 w-4 animate-spin" /> Generatsiya qilinmoqda...</>
+              ) : (
+                <><Sparkles className="h-4 w-4" /> Rasm generatsiya ({imagePrice.toLocaleString()} so'm)</>
+              )}
+            </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Results - Side by side: Source + Generated */}
-      {successImages.length > 0 && activeTab === 'images' && (
+      {/* Results */}
+      {successImages.length > 0 && (
         <Card>
           <CardHeader className="p-4 pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
@@ -535,51 +436,11 @@ export function SellZenStudio() {
         </Card>
       )}
 
-      {/* Results - Video */}
-      {generatedVideo && activeTab === 'video' && (
-        <Card>
-          <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Video className="h-4 w-4 text-primary" />
-              Video natija
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 pt-0">
-            {/* Side by side: source + video */}
-            <div className="grid grid-cols-2 gap-2 mb-3">
-              <div className="rounded-lg overflow-hidden border bg-muted/30 aspect-square">
-                <div className="text-[9px] text-center py-0.5 bg-muted/50 text-muted-foreground font-medium">Asl rasm</div>
-                {uploadedImage && (
-                  <img src={uploadedImage} alt="Asl" className="w-full h-full object-contain p-1" />
-                )}
-              </div>
-              <div className="rounded-lg overflow-hidden border bg-muted/30 aspect-square">
-                <div className="text-[9px] text-center py-0.5 bg-primary/10 text-primary font-medium">Video</div>
-                <video
-                  src={generatedVideo}
-                  controls
-                  className="w-full h-full object-contain"
-                />
-              </div>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 w-full"
-              onClick={() => downloadFile(generatedVideo!, `sellzen-video-${Date.now()}.mp4`)}
-            >
-              <Download className="h-3 w-3" />
-              Videoni yuklab olish
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Pricing info */}
       <Card className="border-dashed">
         <CardContent className="p-3 flex items-center justify-between text-xs text-muted-foreground">
           <span>Narxlar admin tomonidan boshqariladi · Balansdan avtomatik yechiladi</span>
-          <Badge variant="secondary" className="text-[10px]">SellZen API</Badge>
+          <Badge variant="secondary" className="text-[10px]">SellZen v2</Badge>
         </CardContent>
       </Card>
     </div>
