@@ -858,30 +858,35 @@ async function aiOptimize(
 
   // ═══ HEURISTIC RECLASSIFICATION ═══
   // When Yandex API returns 0 required + 0 recommended (common!), classify by param name
-  if (requiredParams.length === 0 && recommendedParams.length === 0 && allParams.length > 0) {
-    console.log(`⚠️ API returned 0 REQUIRED + 0 RECOMMENDED — applying heuristic classification`);
+  // Apply heuristic classification when API returns too few required/recommended
+  if ((requiredParams.length + recommendedParams.length) < 3 && allParams.length > 0) {
+    console.log(`⚠️ API returned ${requiredParams.length} REQUIRED + ${recommendedParams.length} RECOMMENDED — applying heuristic classification`);
     
     // Common "Asosiy xususiyatlar" (main characteristics) param names
-    const requiredNames = /^(тип|бренд|брэнд|торговая марка|марка|форма выпуска|вид|материал|состав|пол|возраст|размер|страна|назначение|цвет товара|цвет|вес|объем|объём|количество|комплектация|модель|серия|способ применения|диагональ|разрешение|мощность)/i;
+    const requiredNames = /^(тип|бренд|брэнд|торговая марка|марка|форма выпуска|вид|материал|состав|пол|возраст|размер|страна|назначение|цвет товара|цвет|вес|объем|объём|количество|комплектация|модель|серия|способ применения|диагональ|разрешение|мощность|напряжение|частота|температур|скорость|режим|питание|подключение|тип подключения|тип конструкции|формат|класс|категория|группа)/i;
     
     // Common "Filtrlar uchun qo'shimcha xususiyatlar" (filter characteristics)
-    const filterNames = /^(особенности|содержит|не содержит|эффект|аромат|вкус|текстура|покрытие|тип кожи|тип волос|spf|водостойкость|гипоаллергенный|форм-фактор|интерфейс|технология|совместим|подходит для|сезон|стиль|узор|принт|застёжка|длина|ширина|высота|глубина|диаметр|плотность|жёсткость)/i;
+    const filterNames = /^(особенности|содержит|не содержит|эффект|аромат|вкус|текстура|покрытие|тип кожи|тип волос|spf|водостойкость|гипоаллергенный|форм-фактор|интерфейс|технология|совместим|подходит для|сезон|стиль|узор|принт|застёжка|длина|ширина|высота|глубина|диаметр|плотность|жёсткость|функци|дополнительн|насадк|в комплект|комплект поставки|индикат|защит|управлени|дисплей|экран|ёмкость|аккумулятор|гарантия производител)/i;
     
-    const newRequired: any[] = [];
-    const newRecommended: any[] = [];
+    const newRequired: any[] = [...requiredParams];
+    const newRecommended: any[] = [...recommendedParams];
     const newOptional: any[] = [];
     
+    // IDs already classified
+    const classifiedIds = new Set([...requiredParams, ...recommendedParams].map(p => p.id));
+    
     for (const p of allParams) {
+      if (classifiedIds.has(p.id)) continue;
       const name = (p.name || '').trim();
       if (requiredNames.test(name)) {
         newRequired.push(p);
       } else if (filterNames.test(name)) {
         newRecommended.push(p);
       } else {
-        // For categories with many params, treat first ~8 as required-like, next ~6 as filter-like
-        if (newRequired.length < 8 && !filterNames.test(name)) {
+        // For categories with many params, treat first ~12 as required-like, next ~10 as filter-like
+        if (newRequired.length < 12) {
           newRequired.push(p);
-        } else if (newRecommended.length < 6) {
+        } else if (newRecommended.length < 10) {
           newRecommended.push(p);
         } else {
           newOptional.push(p);
