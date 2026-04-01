@@ -62,18 +62,10 @@ export function SellerCloudManagement() {
 
   const handleEditTariff = async () => {
     if (!editingSub) return;
-    const fee = parseFloat(editMonthlyFee);
-    const comm = parseFloat(editCommission);
-    if (isNaN(fee) || isNaN(comm) || fee < 0 || comm < 0 || comm > 100) {
-      toast.error('Noto\'g\'ri qiymatlar');
-      return;
-    }
 
     const { error } = await supabase
       .from('sellercloud_subscriptions')
       .update({
-        monthly_fee: fee,
-        commission_percent: comm,
         plan_type: editPlanType,
         plan_slug: editPlanType,
         updated_at: new Date().toISOString(),
