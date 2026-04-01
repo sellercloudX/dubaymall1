@@ -1395,8 +1395,8 @@ export function AIAgentDashboard() {
   const [scanResults, setScanResults] = useState<ScanResult[]>([]);
   const [priceData, setPriceData] = useState<any>(null);
 
-  const { data: partners } = useQuery({
-    queryKey: ['ai-agent-partners'],
+  const { data: partners, isLoading: partnersLoading } = useQuery({
+    queryKey: ['ai-agent-partners-v2'],
     queryFn: async () => {
       // Fetch ALL marketplace connections (admins have RLS access to all)
       let allConnections: any[] = [];
@@ -1457,6 +1457,7 @@ export function AIAgentDashboard() {
             <Bot className="h-6 w-6 text-primary" />
             AI Agent — Marketplace Manager
             <Badge variant="outline" className="ml-2 text-xs">Self-Healing v3</Badge>
+            {partners && <Badge variant="secondary" className="ml-1 text-xs">{partners.length} hamkor</Badge>}
           </CardTitle>
           <CardDescription>
             Real API orqali kartochka audit, rasm generatsiya, narx optimallashtirish va agent chat
