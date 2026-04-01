@@ -483,12 +483,17 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
             }
 
             // Call sellzen-studio directly — much faster than ai-agent-images pipeline
+            // Map target marketplace to SellZen format
+            const sellzenMarketplace = targetMarketplace === 'yandex' ? 'yandex' : targetMarketplace;
+            
             const { data: imgData, error: imgError } = await supabase.functions.invoke('sellzen-studio', {
               body: {
                 action: 'generate_images',
                 imageBase64,
                 productName: normalizedProductName,
                 category: analyzed?.category || '',
+                marketplace: sellzenMarketplace,
+                style: 'commercial',
               },
             });
 
