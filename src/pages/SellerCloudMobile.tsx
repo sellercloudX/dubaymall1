@@ -235,10 +235,6 @@ export default function SellerCloudMobile() {
         return <div className="p-4"><MxikImport /></div>;
       case 'reviews':
         return <div className="p-4"><MarketplaceReviews connectedMarketplaces={connectedMarketplaces} /></div>;
-      case 'seller-analytics':
-        return <div className="p-4"><MarketplaceSellerAnalytics connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
-      case 'seo-keywords':
-        return <div className="p-4"><SEOMonitor connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'ads':
         return <div className="p-4"><MarketplaceAdsCampaigns connectedMarketplaces={connectedMarketplaces} /></div>;
       case 'competitor':
