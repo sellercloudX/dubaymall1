@@ -327,12 +327,22 @@ export const SubscriptionBilling = forwardRef<HTMLDivElement, SubscriptionBillin
               <li>Balansni to'ldirish: kamida {MIN_TOPUP_UZS.toLocaleString()} so'm</li>
             </ul>
           </div>
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">To'lov usulini tanlang:</p>
+            <PaymentMethodSelector value={paymentMethod} onChange={setPaymentMethod} />
+          </div>
           <div className="flex items-start gap-3 p-3 border rounded-lg">
             <Checkbox id="terms" checked={termsAccepted} onCheckedChange={(checked) => setTermsAccepted(checked === true)} />
             <Label htmlFor="terms" className="text-sm cursor-pointer">Men shartlarni qabul qilaman</Label>
           </div>
-          <Button onClick={handleAcceptTerms} className="w-full" disabled={!termsAccepted || isCreating}>
-            {isCreating ? 'Yuklanmoqda...' : <><CreditCard className="h-4 w-4 mr-2" /> Davom etish</>}
+          <Button onClick={handleAcceptTerms} className="w-full" disabled={!termsAccepted || isCreating}
+            style={paymentMethod === 'payme' ? { backgroundColor: '#00CCCC' } : undefined}>
+            {isCreating ? 'Yuklanmoqda...' : (
+              <span className="flex items-center gap-1.5">
+                {paymentMethod === 'payme' ? <Wallet className="h-4 w-4" /> : <CreditCard className="h-4 w-4" />}
+                {paymentMethod === 'payme' ? 'Payme orqali to\'lash' : 'Click orqali to\'lash'}
+              </span>
+            )}
           </Button>
         </div>
       </DialogContent>
