@@ -62,30 +62,40 @@ export function MinPriceProtection({
 
         // Use real tariff data — tariffs are already in UZS (converted in useMarketplaceTariffs)
         const tariff = getTariffForProduct(tariffMap, product.offerId, currentPrice, marketplace);
-        const tariffPercent = tariff.isReal && currentPrice > 0
-          ? tariff.totalFee / currentPrice
+        
+        // IMPORTANT: Separate commission (%) from logistics (fixed amount)
+        // Commission scales with price, logistics is a fixed cost per order
+        const rawCommissionShare = tariff.isReal && currentPrice > 0
+          ? tariff.commission / currentPrice
+          : 0;
+        const commissionPercent = rawCommissionShare > 0 && rawCommissionShare < 0.8
+          ? rawCommissionShare
           : (marketplace === 'uzum' ? 0.17 : marketplace === 'wildberries' ? 0.18 : 0.15);
+        
+        // Logistics as fixed cost (not percentage)
+        const logisticsCost = tariff.isReal && tariff.logistics > 0 && tariff.logistics < currentPrice * 0.9
+          ? tariff.logistics
+          : (marketplace === 'wildberries'
+            ? (currentPrice > 700000 ? 14000 : currentPrice > 140000 ? 7000 : 4200)
+            : marketplace === 'uzum' ? 5000 : 3000);
+
         const taxPercent = 0.04;
         const marginPercent = defaultMargin / 100;
 
         let minPrice = 0;
         if (hasCostPrice) {
-          // Cost-based formula: minPrice = costPrice / (1 - tariffPercent - taxPercent - marginPercent)
-          const denominator = 1 - tariffPercent - taxPercent - marginPercent;
+          // Correct formula: minPrice = (tannarx + logistika) / (1 - komissiya% - soliq% - foyda%)
+          // Foyda% = sotuv narxiga nisbatan foyda foizi
+          const denominator = 1 - commissionPercent - taxPercent - marginPercent;
           if (denominator > 0.05) {
-            minPrice = Math.ceil(costPrice / denominator);
-          }
-        } else {
-          // No cost price entered — use reverse check: 
-          // Check if at current price, after fees+tax, the margin is below target
-          // minPrice based on estimated cost (tariff+tax eat into price, remainder is cost+margin)
-          // If no cost price, show warning but still calculate based on tariff exposure
-          const totalFeePercent = tariffPercent + taxPercent;
-          // Estimate: if seller needs at least marginPercent profit, then:
-          // costPrice must be <= price * (1 - tariffPercent - taxPercent - marginPercent)
-          // Without cost data, we flag if fee structure is dangerous (>60% of price)
-          if (totalFeePercent > 0.5) {
-            minPrice = Math.ceil(currentPrice * 1.2); // Flag as dangerous
+            minPrice = Math.ceil((costPrice + logisticsCost) / denominator);
+          } else {
+            // Fallback markup approach
+            const costBase = costPrice + logisticsCost;
+            const feesDenom = 1 - commissionPercent - taxPercent;
+            if (feesDenom > 0.05) {
+              minPrice = Math.ceil(costBase * (1 + marginPercent) / feesDenom);
+            }
           }
         }
 
