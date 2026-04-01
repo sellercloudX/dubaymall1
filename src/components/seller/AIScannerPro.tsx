@@ -589,42 +589,72 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
         // Yandex card creation — ALWAYS skip image gen since AIScannerPro already generated them
         const hasAiImages = generatedInfos.length >= 1;
         
-        // Use AbortController for extended timeout (4 min) since card creation can be slow
+        // Use direct fetch with AbortController for extended timeout (5 min)
         const cardController = new AbortController();
-        const cardTimeout = setTimeout(() => cardController.abort(), 240000);
+        const cardTimeout = setTimeout(() => cardController.abort(), 300000);
         
-        const { data: cardResult, error } = await supabase.functions.invoke('yandex-market-create-card', {
-          body: {
-            shopId,
-            product: {
-              name: normalizedProductName,
-              nameRu: analyzed?.name || normalizedProductName,
-              description: product.description || analyzed?.description,
-              descriptionRu: product.description || analyzed?.description,
-              category: analyzed?.category,
-              brand: analyzed?.brand,
-              price: pricingData.sellingPrice,
-              costPrice: pricingData.costPrice,
-              image: referenceImageUrl,
-              images: cardImages,
-              sourceUrl: product.url,
-              specifications: analyzed?.specifications,
-              mxikCode: mxikResult?.mxik_code,
-              mxikName: mxikResult?.mxik_name,
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+        const session = (await supabase.auth.getSession()).data.session;
+        
+        let cardResult: any = null;
+        let error: any = null;
+        
+        try {
+          const fetchRes = await fetch(`${supabaseUrl}/functions/v1/yandex-market-create-card`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session?.access_token || supabaseKey}`,
+              'apikey': supabaseKey,
             },
-            skipImageGeneration: true,
-            skipBilling: true,
-            pricing: {
-              costPrice: pricingData.costPrice,
-              recommendedPrice: pricingData.sellingPrice,
-              marketplaceCommission: pricingData.marketplaceCommission,
-              logisticsCost: pricingData.logisticsCost,
-              taxRate: pricingData.taxPercent,
-              targetProfit: pricingData.netProfit,
-              netProfit: pricingData.netProfit,
-            },
-          },
-        }).finally(() => clearTimeout(cardTimeout));
+            body: JSON.stringify({
+              shopId,
+              product: {
+                name: normalizedProductName,
+                nameRu: analyzed?.name || normalizedProductName,
+                description: product.description || analyzed?.description,
+                descriptionRu: product.description || analyzed?.description,
+                category: analyzed?.category,
+                brand: analyzed?.brand,
+                price: pricingData.sellingPrice,
+                costPrice: pricingData.costPrice,
+                image: referenceImageUrl,
+                images: cardImages,
+                sourceUrl: product.url,
+                specifications: analyzed?.specifications,
+                mxikCode: mxikResult?.mxik_code,
+                mxikName: mxikResult?.mxik_name,
+              },
+              skipImageGeneration: true,
+              skipBilling: true,
+              pricing: {
+                costPrice: pricingData.costPrice,
+                recommendedPrice: pricingData.sellingPrice,
+                marketplaceCommission: pricingData.marketplaceCommission,
+                logisticsCost: pricingData.logisticsCost,
+                taxRate: pricingData.taxPercent,
+                targetProfit: pricingData.netProfit,
+                netProfit: pricingData.netProfit,
+              },
+            }),
+            signal: cardController.signal,
+          });
+          
+          clearTimeout(cardTimeout);
+          cardResult = await fetchRes.json();
+          
+          if (!fetchRes.ok) {
+            error = new Error(cardResult?.error || `HTTP ${fetchRes.status}`);
+          }
+        } catch (e: any) {
+          clearTimeout(cardTimeout);
+          if (e.name === 'AbortError') {
+            error = new Error('Kartochka yaratish vaqti tugadi (5 daqiqa). Keyinroq urinib ko\'ring.');
+          } else {
+            error = e;
+          }
+        }
 
         if (error) {
           const errDetail = cardResult?.error || error.message || 'Yandex xatosi';
