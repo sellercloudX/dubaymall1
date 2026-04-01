@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { Image } from "https://deno.land/x/imagescript@1.3.0/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1636,42 +1637,38 @@ serve(async (req) => {
                     if (!dlResp.ok) { result.push(img.image_url); continue; }
                     const bytes = new Uint8Array(await dlResp.arrayBuffer());
                     
-                    // ═══ PORTRAIT RESIZE: Convert SellZen landscape to 1080x1440 portrait ═══
-                    // SellZen often returns landscape images; we need portrait 3:4 (1080x1440)
+                    // ═══ PORTRAIT RESIZE: Programmatic 1080x1440 (3:4 ratio) ═══
                     let finalBytes = bytes;
                     let finalContentType = 'image/png';
                     try {
-                      const imgDataUri = `data:image/png;base64,${arrayBufferToBase64(bytes.buffer)}`;
-                      console.log(`🔄 Resizing SellZen image ${i} to 1080x1440 portrait via AI...`);
-                      const resizeResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-                        method: "POST",
-                        headers: { Authorization: `Bearer ${LOVABLE_KEY}`, "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          model: "google/gemini-3.1-flash-image-preview",
-                          messages: [{
-                            role: "user",
-                            content: [
-                              { type: "text", text: "Resize this product infographic image to EXACTLY 1080x1440 pixels (portrait orientation, 3:4 aspect ratio). Keep all text, graphics, and product details intact. If the image is landscape, recompose it into a vertical/portrait layout. Maintain high quality. The output MUST be exactly 1080 pixels wide and 1440 pixels tall." },
-                              { type: "image_url", image_url: { url: imgDataUri } }
-                            ]
-                          }],
-                          modalities: ["image", "text"]
-                        }),
-                      });
-                      if (resizeResp.ok) {
-                        const resizeData = await resizeResp.json();
-                        const resizedUrl = resizeData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-                        if (resizedUrl && resizedUrl.startsWith('data:image/')) {
-                          const base64Part = resizedUrl.split(',')[1];
-                          if (base64Part) {
-                            finalBytes = base64ToUint8Array(base64Part);
-                            finalContentType = resizedUrl.split(';')[0].split(':')[1] || 'image/png';
-                            console.log(`✅ Image ${i} resized to portrait 1080x1440`);
-                          }
-                        }
+                      console.log(`🔄 Resizing SellZen image ${i} to 1080x1440 portrait (programmatic)...`);
+                      const decoded = await Image.decode(bytes);
+                      const srcW = decoded.width;
+                      const srcH = decoded.height;
+                      const TARGET_W = 1080;
+                      const TARGET_H = 1440;
+                      const dstRatio = TARGET_W / TARGET_H; // 0.75
+                      const srcRatio = srcW / srcH;
+                      
+                      let cropped: any;
+                      if (srcRatio > dstRatio) {
+                        // Image is wider — crop sides
+                        const newW = Math.round(srcH * dstRatio);
+                        const offsetX = Math.round((srcW - newW) / 2);
+                        cropped = decoded.crop(offsetX, 0, newW, srcH);
+                      } else {
+                        // Image is taller — crop top/bottom
+                        const newH = Math.round(srcW / dstRatio);
+                        const offsetY = Math.round((srcH - newH) / 2);
+                        cropped = decoded.crop(0, offsetY, srcW, newH);
                       }
+                      
+                      const resized = cropped.resize(TARGET_W, TARGET_H);
+                      finalBytes = await resized.encode(1); // PNG format (lossless)
+                      finalContentType = 'image/png';
+                      console.log(`✅ Image ${i} resized: ${srcW}x${srcH} → ${TARGET_W}x${TARGET_H} (portrait)`);
                     } catch (resizeErr) {
-                      console.warn(`⚠️ Portrait resize failed for image ${i}, using original:`, resizeErr);
+                      console.warn(`⚠️ Programmatic resize failed for image ${i}, using original:`, resizeErr);
                     }
                     
                     const ext = finalContentType.includes('jpeg') ? 'jpg' : 'png';
