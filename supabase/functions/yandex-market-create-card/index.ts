@@ -857,36 +857,42 @@ async function aiOptimize(
   let optionalParams = allParams.filter(p => !isRequired(p) && !isRecommended(p));
 
   // ═══ HEURISTIC RECLASSIFICATION ═══
-  // When Yandex API returns 0 required + 0 recommended (common!), classify by param name
-  // Apply heuristic classification when API returns too few required/recommended
-  if ((requiredParams.length + recommendedParams.length) < 3 && allParams.length > 0) {
+  // When Yandex API returns few required/recommended params, classify by param name
+  // CRITICAL: Also trigger when filter (recommended) params are missing — needed for "Filtrlar uchun qo'shimcha xususiyatlar" section
+  const needsHeuristic = (requiredParams.length + recommendedParams.length) < 3 
+    || recommendedParams.length < 2 
+    || (requiredParams.length < 5 && allParams.length > 10);
+  
+  if (needsHeuristic && allParams.length > 0) {
     console.log(`⚠️ API returned ${requiredParams.length} REQUIRED + ${recommendedParams.length} RECOMMENDED — applying heuristic classification`);
     
     // Common "Asosiy xususiyatlar" (main characteristics) param names
-    const requiredNames = /^(тип|бренд|брэнд|торговая марка|марка|форма выпуска|вид|материал|состав|пол|возраст|размер|страна|назначение|цвет товара|цвет|вес|объем|объём|количество|комплектация|модель|серия|способ применения|диагональ|разрешение|мощность|напряжение|частота|температур|скорость|режим|питание|подключение|тип подключения|тип конструкции|формат|класс|категория|группа)/i;
+    const requiredNames = /^(тип|бренд|брэнд|торговая марка|марка|форма выпуска|вид|материал|состав|пол|возраст|размер|страна|назначение|цвет товара|цвет|вес|объем|объём|количество|комплектация|модель|серия|способ применения|диагональ|разрешение|мощность|напряжение|частота|температур|скорость|режим|питание|подключение|тип подключения|тип конструкции|формат|класс|категория|группа|тип товара|тип изделия|тип продукта|основной цвет)/i;
     
-    // Common "Filtrlar uchun qo'shimcha xususiyatlar" (filter characteristics)
-    const filterNames = /^(особенности|содержит|не содержит|эффект|аромат|вкус|текстура|покрытие|тип кожи|тип волос|spf|водостойкость|гипоаллергенный|форм-фактор|интерфейс|технология|совместим|подходит для|сезон|стиль|узор|принт|застёжка|длина|ширина|высота|глубина|диаметр|плотность|жёсткость|функци|дополнительн|насадк|в комплект|комплект поставки|индикат|защит|управлени|дисплей|экран|ёмкость|аккумулятор|гарантия производител)/i;
+    // Common "Filtrlar uchun qo'shimcha xususiyatlar" (filter characteristics) — EXPANDED
+    const filterNames = /^(особенности|содержит|не содержит|эффект|аромат|вкус|текстура|покрытие|тип кожи|тип волос|spf|водостойкость|гипоаллергенный|форм-фактор|интерфейс|технология|совместим|подходит для|сезон|стиль|узор|принт|застёжка|длина|ширина|высота|глубина|диаметр|плотность|жёсткость|функци|дополнительн|насадк|в комплект|комплект поставки|индикат|защит|управлени|дисплей|экран|ёмкость|аккумулятор|гарантия производител|максимальн|минимальн|уровень шума|потребляем|частота вращени|регулировк|таймер|автоотключени|число.*скорост|число.*режим|ионизаци|холодный обдув|складн|вращени|петля|крепл|вес.*товар|страна.*производ|срок.*службы|упаковк)/i;
     
-    const newRequired: any[] = [...requiredParams];
-    const newRecommended: any[] = [...recommendedParams];
+    const newRequired: any[] = [];
+    const newRecommended: any[] = [];
     const newOptional: any[] = [];
     
-    // IDs already classified
-    const classifiedIds = new Set([...requiredParams, ...recommendedParams].map(p => p.id));
+    // Keep existing classifications
+    const classifiedIds = new Set<number>();
+    for (const p of requiredParams) { newRequired.push(p); classifiedIds.add(Number(p.id)); }
+    for (const p of recommendedParams) { newRecommended.push(p); classifiedIds.add(Number(p.id)); }
     
     for (const p of allParams) {
-      if (classifiedIds.has(p.id)) continue;
+      if (classifiedIds.has(Number(p.id))) continue;
       const name = (p.name || '').trim();
       if (requiredNames.test(name)) {
         newRequired.push(p);
       } else if (filterNames.test(name)) {
         newRecommended.push(p);
       } else {
-        // For categories with many params, treat first ~12 as required-like, next ~10 as filter-like
-        if (newRequired.length < 12) {
+        // For categories with many params, treat first ~15 as required-like, next ~15 as filter-like
+        if (newRequired.length < 15) {
           newRequired.push(p);
-        } else if (newRecommended.length < 10) {
+        } else if (newRecommended.length < 15) {
           newRecommended.push(p);
         } else {
           newOptional.push(p);
