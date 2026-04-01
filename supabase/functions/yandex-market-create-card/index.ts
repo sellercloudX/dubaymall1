@@ -951,8 +951,60 @@ JAVOB FAQAT JSON:
     const content = data.choices?.[0]?.message?.content || "";
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      result = JSON.parse(jsonMatch[0]);
-      console.log(`🤖 Pass 1: name_ru=${result.name_ru?.length}ch, desc=${result.description_ru?.length}ch, params=${result.parameterValues?.length}, weight=${result.weightKg}kg`);
+      let jsonStr = jsonMatch[0];
+      try {
+        result = JSON.parse(jsonStr);
+      } catch (parseErr) {
+        // Try to fix truncated JSON — find last valid parameterValues entry
+        console.warn("AI Pass 1: JSON truncated, attempting repair...");
+        // Close unclosed arrays and objects
+        const lastValidBracket = jsonStr.lastIndexOf('}');
+        if (lastValidBracket > 0) {
+          let repaired = jsonStr.substring(0, lastValidBracket + 1);
+          // Count open brackets
+          const opens = (repaired.match(/\[/g) || []).length;
+          const closes = (repaired.match(/\]/g) || []).length;
+          const openBraces = (repaired.match(/\{/g) || []).length;
+          const closeBraces = (repaired.match(/\}/g) || []).length;
+          repaired += ']'.repeat(Math.max(0, opens - closes));
+          repaired += '}'.repeat(Math.max(0, openBraces - closeBraces));
+          try {
+            result = JSON.parse(repaired);
+            console.log(`✅ Pass 1 JSON repaired successfully`);
+          } catch (e2) {
+            // Last resort: extract fields manually
+            console.error("JSON repair failed, extracting fields manually...");
+            result = {};
+            const nameRuMatch = content.match(/"name_ru"\s*:\s*"([^"]+)"/);
+            const nameUzMatch = content.match(/"name_uz"\s*:\s*"([^"]+)"/);
+            const descMatch = content.match(/"description_ru"\s*:\s*"([\s\S]*?)(?:","description_uz|","vendor)/);
+            const vendorMatch = content.match(/"vendor"\s*:\s*"([^"]+)"/);
+            const countryMatch = content.match(/"manufacturerCountry"\s*:\s*"([^"]+)"/);
+            if (nameRuMatch) result.name_ru = nameRuMatch[1];
+            if (nameUzMatch) result.name_uz = nameUzMatch[1];
+            if (descMatch) result.description_ru = descMatch[1];
+            if (vendorMatch) result.vendor = vendorMatch[1];
+            if (countryMatch) result.manufacturerCountry = countryMatch[1];
+            // Try to extract parameterValues array
+            const pvMatch = content.match(/"parameterValues"\s*:\s*\[([\s\S]*)/);
+            if (pvMatch) {
+              try {
+                // Find last complete object in the array
+                const pvContent = pvMatch[1];
+                const lastObj = pvContent.lastIndexOf('}');
+                if (lastObj > 0) {
+                  const pvStr = '[' + pvContent.substring(0, lastObj + 1) + ']';
+                  result.parameterValues = JSON.parse(pvStr);
+                }
+              } catch { result.parameterValues = []; }
+            }
+            console.log(`⚠️ Pass 1 manual extraction: params=${result.parameterValues?.length || 0}`);
+          }
+        }
+      }
+      if (result) {
+        console.log(`🤖 Pass 1: name_ru=${result.name_ru?.length}ch, desc=${result.description_ru?.length}ch, params=${result.parameterValues?.length}, weight=${result.weightKg}kg`);
+      }
     }
   } catch (e) { console.error("AI Pass 1 error:", e); }
   
