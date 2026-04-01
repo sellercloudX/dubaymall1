@@ -4375,6 +4375,7 @@ export type Database = {
         }
         Returns: Json
       }
+      assign_buyer_role: { Args: { p_user_id: string }; Returns: undefined }
       calculate_order_financials: {
         Args: { p_order_id: string; p_platform_commission_percent?: number }
         Returns: Json
