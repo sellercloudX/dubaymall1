@@ -568,9 +568,12 @@ Javob FAQAT JSON array: ["so'z1", "so'z2", ...]` }],
     const isAutoProduct = searchKeywords.some(k => /авто|машин|автомобил|car |vehicle/.test(k));
     if (!isAutoProduct && /автомагнитол|автомобил|авто аксессуар|автозвук/.test(leafText)) score -= 15;
     
-    // Penalize hair/beauty products being matched to electronics/auto
-    const isHairProduct = searchKeywords.some(k => /волос|выпрямител|стайлер|утюжок|фен|укладк|шампун/.test(k));
-    if (isHairProduct && /авто|магнитол|компьют|телефон|смартфон/.test(leafText)) score -= 20;
+    // Penalize hair/beauty products being matched to electronics/auto/construction
+    const isHairProduct = searchKeywords.some(k => /волос|выпрямител|стайлер|утюжок|фен|укладк|шампун|мультистайлер|airwrap|щипц|плойк/.test(k));
+    if (isHairProduct && /авто|магнитол|компьют|телефон|смартфон|строител|аккумулятор|сварочн|насадк/.test(leafText)) score -= 25;
+    // Penalize construction tools being matched to beauty
+    const isConstructionProduct = searchKeywords.some(k => /строител|сварочн|перфоратор|болгарк|дрель/.test(k));
+    if (isConstructionProduct && /волос|красот|косметик|маникюр/.test(leafText)) score -= 25;
     
     // Boost exact category name matches
     for (const kw of searchKeywords) {
