@@ -588,6 +588,11 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
       } else {
         // Yandex card creation — ALWAYS skip image gen since AIScannerPro already generated them
         const hasAiImages = generatedInfos.length >= 1;
+        
+        // Use AbortController for extended timeout (4 min) since card creation can be slow
+        const cardController = new AbortController();
+        const cardTimeout = setTimeout(() => cardController.abort(), 240000);
+        
         const { data: cardResult, error } = await supabase.functions.invoke('yandex-market-create-card', {
           body: {
             shopId,
@@ -619,7 +624,7 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
               netProfit: pricingData.netProfit,
             },
           },
-        });
+        }).finally(() => clearTimeout(cardTimeout));
 
         if (error) {
           const errDetail = cardResult?.error || error.message || 'Yandex xatosi';
