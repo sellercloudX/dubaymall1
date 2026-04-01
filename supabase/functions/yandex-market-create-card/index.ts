@@ -1575,14 +1575,54 @@ serve(async (req) => {
                     const dlResp = await fetch(img.image_url);
                     if (!dlResp.ok) { result.push(img.image_url); continue; }
                     const bytes = new Uint8Array(await dlResp.arrayBuffer());
-                    const fileName = `${user.id}/ym-sellzen-${Date.now()}-${i}.png`;
-                    const { error } = await supabase.storage.from('product-images').upload(fileName, bytes, {
-                      contentType: 'image/png', cacheControl: '31536000', upsert: false,
+                    
+                    // ═══ PORTRAIT RESIZE: Convert SellZen landscape to 1080x1440 portrait ═══
+                    // SellZen often returns landscape images; we need portrait 3:4 (1080x1440)
+                    let finalBytes = bytes;
+                    let finalContentType = 'image/png';
+                    try {
+                      const imgDataUri = `data:image/png;base64,${arrayBufferToBase64(bytes.buffer)}`;
+                      console.log(`🔄 Resizing SellZen image ${i} to 1080x1440 portrait via AI...`);
+                      const resizeResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+                        method: "POST",
+                        headers: { Authorization: `Bearer ${LOVABLE_KEY}`, "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          model: "google/gemini-3.1-flash-image-preview",
+                          messages: [{
+                            role: "user",
+                            content: [
+                              { type: "text", text: "Resize this product infographic image to EXACTLY 1080x1440 pixels (portrait orientation, 3:4 aspect ratio). Keep all text, graphics, and product details intact. If the image is landscape, recompose it into a vertical/portrait layout. Maintain high quality. The output MUST be exactly 1080 pixels wide and 1440 pixels tall." },
+                              { type: "image_url", image_url: { url: imgDataUri } }
+                            ]
+                          }],
+                          modalities: ["image", "text"]
+                        }),
+                      });
+                      if (resizeResp.ok) {
+                        const resizeData = await resizeResp.json();
+                        const resizedUrl = resizeData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+                        if (resizedUrl && resizedUrl.startsWith('data:image/')) {
+                          const base64Part = resizedUrl.split(',')[1];
+                          if (base64Part) {
+                            finalBytes = base64ToUint8Array(base64Part);
+                            finalContentType = resizedUrl.split(';')[0].split(':')[1] || 'image/png';
+                            console.log(`✅ Image ${i} resized to portrait 1080x1440`);
+                          }
+                        }
+                      }
+                    } catch (resizeErr) {
+                      console.warn(`⚠️ Portrait resize failed for image ${i}, using original:`, resizeErr);
+                    }
+                    
+                    const ext = finalContentType.includes('jpeg') ? 'jpg' : 'png';
+                    const fileName = `${user.id}/ym-sellzen-${Date.now()}-${i}.${ext}`;
+                    const { error } = await supabase.storage.from('product-images').upload(fileName, finalBytes, {
+                      contentType: finalContentType, cacheControl: '31536000', upsert: false,
                     });
                     if (!error) {
                       const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(fileName);
                       if (urlData?.publicUrl) {
-                        console.log(`✅ SellZen v2 ${img.variant} image stored`);
+                        console.log(`✅ SellZen v2 ${img.variant} image stored (portrait)`);
                         result.push(urlData.publicUrl);
                       }
                     } else {
@@ -1593,7 +1633,7 @@ serve(async (req) => {
                     result.push(img.image_url);
                   }
                 }
-                console.log(`✅ SellZen v2 generated ${result.length} images`);
+                console.log(`✅ SellZen v2 generated ${result.length} portrait images`);
               } else {
                 console.warn(`SellZen v2: no images returned`, data.error);
               }
