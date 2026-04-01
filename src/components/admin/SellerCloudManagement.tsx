@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { format, addDays, addMonths } from 'date-fns';
 
-const USD_TO_UZS = 12800;
+
 
 export function SellerCloudManagement() {
   const { 
