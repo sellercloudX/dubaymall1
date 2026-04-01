@@ -53,22 +53,18 @@ export function SellZenStudio() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
-  const [mode, setMode] = useState('modelsiz');
-  const [styleType, setStyleType] = useState('infographic');
-  const [videoTemplate, setVideoTemplate] = useState('product_showcase');
+  const [marketplace, setMarketplace] = useState('wildberries');
+  const [imageStyle, setImageStyle] = useState('commercial');
+  const [productName, setProductName] = useState('');
 
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
-  const [generatedVideo, setGeneratedVideo] = useState<string | null>(null);
   const [carouselIndex, setCarouselIndex] = useState(0);
 
   const [isGeneratingImages, setIsGeneratingImages] = useState(false);
-  const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
-  const [activeTab, setActiveTab] = useState<'images' | 'video'>('images');
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
 
   const imagePrice = getFeaturePrice('sellzen-image-generate')?.base_price_uzs || 8000;
-  const videoPrice = getFeaturePrice('ai-video-generation')?.base_price_uzs || 18000;
 
   const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
