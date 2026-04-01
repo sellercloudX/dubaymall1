@@ -200,7 +200,7 @@ function DynamicPlanCard({ plan, isCurrentPlan, onSelect, isProcessing }: {
         onClick={() => onSelect(plan)} disabled={isProcessing}>
         {isProcessing
           ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Yuklanmoqda...</>
-          : <span className="flex items-center gap-1.5 truncate"><CreditCard className="h-4 w-4 shrink-0" /><span className="truncate">{isCurrentPlan ? 'Uzaytirish' : "Click · To'lash"}</span></span>}
+          : <span className="flex items-center gap-1.5 truncate"><CreditCard className="h-4 w-4 shrink-0" /><span className="truncate">{isCurrentPlan ? 'Uzaytirish' : "To'lash"}</span></span>}
       </Button>
     </div>
   );
