@@ -56,6 +56,7 @@ export function SellZenStudio() {
   const [marketplace, setMarketplace] = useState('wildberries');
   const [imageStyle, setImageStyle] = useState('commercial');
   const [productName, setProductName] = useState('');
+  const [productDescription, setProductDescription] = useState('');
 
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
   const [carouselIndex, setCarouselIndex] = useState(0);
@@ -120,6 +121,7 @@ export function SellZenStudio() {
           action: 'generate_images',
           imageBase64: uploadedImage,
           productName: productName || undefined,
+          productDescription: productDescription || undefined,
           marketplace,
           style: imageStyle,
         },
@@ -293,6 +295,17 @@ export function SellZenStudio() {
                 value={productName}
                 onChange={(e) => setProductName(e.target.value)}
                 placeholder="Masalan: Samsung 65W zaryadlovchi"
+                className="text-sm"
+              />
+            </div>
+
+            {/* Product description */}
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Tavsif (ixtiyoriy — sifatni oshiradi)</label>
+              <Input
+                value={productDescription}
+                onChange={(e) => setProductDescription(e.target.value)}
+                placeholder="Xususiyatlar, ranglar, o'lchamlar..."
                 className="text-sm"
               />
             </div>
