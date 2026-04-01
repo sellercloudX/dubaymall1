@@ -560,9 +560,22 @@ Javob FAQAT JSON array: ["so'z1", "so'z2", ...]` }],
       if (kwLower.length > 4 && leafText.includes(kwLower.substring(0, kwLower.length - 2))) score += isPhrase ? 2 : 1;
     }
 
-    // Penalize obvious domain mismatches for phone accessories
+    // Penalize obvious domain mismatches
     const phoneAccessoryIntent = searchKeywords.some(k => /чехол|смартфон|телефон|защитн|micro sd|карта памяти/.test(k));
-    if (phoneAccessoryIntent && /авто|мебел|рычаг|сидень/.test(leafText)) score -= 8;
+    if (phoneAccessoryIntent && /авто|мебел|рычаг|сидень|магнитол/.test(leafText)) score -= 15;
+    
+    // Penalize auto-related categories for non-auto products
+    const isAutoProduct = searchKeywords.some(k => /авто|машин|автомобил|car |vehicle/.test(k));
+    if (!isAutoProduct && /автомагнитол|автомобил|авто аксессуар|автозвук/.test(leafText)) score -= 15;
+    
+    // Penalize hair/beauty products being matched to electronics/auto
+    const isHairProduct = searchKeywords.some(k => /волос|выпрямител|стайлер|утюжок|фен|укладк|шампун/.test(k));
+    if (isHairProduct && /авто|магнитол|компьют|телефон|смартфон/.test(leafText)) score -= 20;
+    
+    // Boost exact category name matches
+    for (const kw of searchKeywords) {
+      if (leaf.name.toLowerCase() === kw) score += 10;
+    }
 
     return { ...leaf, score };
   }).filter(l => l.score > 0).sort((a, b) => b.score - a.score).slice(0, 50);
