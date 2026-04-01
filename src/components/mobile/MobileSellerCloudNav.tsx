@@ -6,8 +6,8 @@ export type MobileTabType =
   | 'abc-analysis' | 'card-clone' | 'problems' 
   | 'financials' | 'pricing' | 'mxik'
   | 'reports' | 'notifications' | 'subscription' | 'cost-prices'
-  | 'reviews' | 'seller-analytics' | 'ads' | 'seo-keywords'
-  | 'competitor' | 'sales' | 'support' | 'stores' | 'profile'
+  | 'reviews' | 'ads'
+  | 'sales' | 'support' | 'stores' | 'profile'
   | 'stock-forecast' | 'tutorials' | 'sellzen-studio' | 'unit-economy'
   | 'trend-hunter';
 

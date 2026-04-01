@@ -237,8 +237,6 @@ export default function SellerCloudMobile() {
         return <div className="p-4"><MarketplaceReviews connectedMarketplaces={connectedMarketplaces} /></div>;
       case 'ads':
         return <div className="p-4"><MarketplaceAdsCampaigns connectedMarketplaces={connectedMarketplaces} /></div>;
-      case 'competitor':
-        return <div className="p-4"><CompetitorPriceMonitor connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'sales':
         return <div className="p-4"><SalesDashboard connectedMarketplaces={connectedMarketplaces} store={store} /></div>;
       case 'support':

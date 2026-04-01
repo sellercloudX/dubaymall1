@@ -257,8 +257,6 @@ export default function SellerCloudX() {
         return <ABCAnalysis connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'cost-prices':
         return <CostPriceManager connectedMarketplaces={connectedMarketplaces} store={store} />;
-      case 'competitor':
-        return <CompetitorPriceMonitor connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'unit-economy':
         return <UnitEconomyDashboard connectedMarketplaces={connectedMarketplaces} store={store} />;
       case 'stock-forecast':

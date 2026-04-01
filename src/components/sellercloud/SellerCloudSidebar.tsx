@@ -39,11 +39,7 @@ export const sellerMenuItems: SellerMenuItem[] = [
   { id: 'stock-forecast', label: 'Zaxira nazorat', icon: Activity, group: 'main' },
   // Analitika
   { id: 'unit-economy', label: 'Unit-economy', icon: Receipt, group: 'analytics' },
-  { id: 'product-analytics', label: 'Mahsulot analitika', icon: BarChart3, group: 'analytics' },
   { id: 'abc', label: 'ABC-analiz', icon: BarChart3, group: 'analytics' },
-  { id: 'wb-analytics', label: 'Sotuvchi analitika', icon: Activity, group: 'analytics' },
-  { id: 'seo-monitor', label: 'SEO & Kalit so\'zlar', icon: Search, group: 'analytics' },
-  { id: 'competitor', label: 'Raqobat narx', icon: ArrowDownUp, group: 'analytics' },
   { id: 'reviews', label: 'Sharhlar', icon: MessageCircle, group: 'analytics' },
   { id: 'ads', label: 'Reklama', icon: Megaphone, group: 'analytics' },
   // AI & Asboblar
