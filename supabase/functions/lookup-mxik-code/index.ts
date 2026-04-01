@@ -401,16 +401,20 @@ async function aiSelectBestCode(
       const fbContent = fbData.choices?.[0]?.message?.content?.trim() || '';
       const fbMatch = fbContent.match(/\{[\s\S]*\}/);
       if (fbMatch) {
-        const fbClean = fbMatch[0].replace(/,\s*([}\]])/g, '$1').replace(/'/g, '"').replace(/[\x00-\x1F\x7F]/g, ' ');
-        const fbResult = JSON.parse(fbClean);
-        const code = String(fbResult.mxik_code || '').replace(/\D/g, '').padEnd(17, '0').slice(0, 17);
-        return {
-          mxik_code: code,
-          mxik_name: fbResult.mxik_name || productName,
-          vat_rate: fbResult.vat_rate ?? 12,
-          confidence: Math.min(fbResult.confidence || 40, 60),
-          alternatives: [],
-        };
+        try {
+          const fbClean = fbMatch[0].replace(/,\s*([}\]])/g, '$1').replace(/'/g, '"').replace(/[\x00-\x1F\x7F]/g, ' ');
+          const fbResult = JSON.parse(fbClean);
+          const code = String(fbResult.mxik_code || '').replace(/\D/g, '').padEnd(17, '0').slice(0, 17);
+          return {
+            mxik_code: code,
+            mxik_name: fbResult.mxik_name || productName,
+            vat_rate: fbResult.vat_rate ?? 12,
+            confidence: Math.min(fbResult.confidence || 40, 60),
+            alternatives: [],
+          };
+        } catch (parseErr) {
+          console.warn('[MXIK] Fallback AI JSON parse failed:', parseErr);
+        }
       }
     }
     
