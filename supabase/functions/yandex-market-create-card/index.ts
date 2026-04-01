@@ -1461,177 +1461,163 @@ serve(async (req) => {
         const sku = product.shopSku || generateSKU(product.name);
         const barcode = product.barcode || generateEAN13();
 
-        // ═══ STEP 1: Handle images ═══
+        // ═══ PARALLEL PIPELINE: Images + Category + MXIK run concurrently ═══
         const rawImgs: string[] = [];
         if (product.images?.length) rawImgs.push(...product.images);
-        // Reference/camera image is NOT added to card — only AI-generated images are used
         
         // Proxy all images to storage first
         const sourceImages = await proxyImagesToStorage(supabase, user.id, rawImgs, SUPABASE_URL);
         
-        let images: string[] = [];
+        // --- Define async tasks ---
         
-        // Determine if we should generate images via SellZen
-        const shouldGenerateImages = (() => {
-          if (body.cloneMode) return false; // Clones reuse source images
-          if (body.skipImageGeneration && sourceImages.length > 0) return false; // Pre-generated images exist
-          if (body.skipImageGeneration && sourceImages.length === 0) return true; // Scanner said skip but sent 0 images — generate server-side!
-          return true; // Default: generate
-        })();
-        
-        if (!shouldGenerateImages) {
-          console.log(`⚡ Using ${sourceImages.length} source images (skipImageGeneration=${body.skipImageGeneration}, cloneMode=${body.cloneMode})`);
-          images = [...sourceImages];
-        } else {
-          // Generate images via SellZen API
+        // Task A: Generate images (SellZen) — longest step (~60-90s)
+        const imageTask = (async (): Promise<string[]> => {
+          const shouldGenerateImages = (() => {
+            if (body.cloneMode) return false;
+            if (body.skipImageGeneration && sourceImages.length > 0) return false;
+            if (body.skipImageGeneration && sourceImages.length === 0) return true;
+            return true;
+          })();
+          
+          if (!shouldGenerateImages) {
+            console.log(`⚡ Using ${sourceImages.length} source images (skipImageGeneration=${body.skipImageGeneration}, cloneMode=${body.cloneMode})`);
+            return [...sourceImages];
+          }
+          
           const SELLZEN_API_KEY = Deno.env.get("SELLZEN_API_KEY");
-          // Use source image OR reference image from product.image
           const sourceImg = sourceImages[0] || null;
           const referenceImg = product.image || null;
           const imgSource = sourceImg || referenceImg;
           
-          if (SELLZEN_API_KEY && imgSource) {
-            console.log("🎨 Generating images via SellZen API (server-side fallback)...");
-            
-            // Convert source image to base64 for SellZen
-            let imgBase64: string | null = null;
-            try {
-              if (imgSource.startsWith('data:')) {
-                imgBase64 = imgSource;
-              } else {
-                const imgResp = await fetch(imgSource, {
-                  headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                    'Accept': 'image/*,*/*;q=0.8',
-                  },
-                });
-                if (imgResp.ok) {
-                  const buffer = await imgResp.arrayBuffer();
-                  const bytes = new Uint8Array(buffer);
-                  const contentType = imgResp.headers.get('content-type') || 'image/jpeg';
-                  let binary = '';
-                  for (let i = 0; i < bytes.length; i++) {
-                    binary += String.fromCharCode(bytes[i]);
-                  }
-                  imgBase64 = `data:${contentType};base64,${btoa(binary)}`;
-                }
-              }
-            } catch (e) {
-              console.error("Image to base64 error:", e);
-            }
-            
-            if (imgBase64) {
-              const catLower = (product.category || product.name || "").toLowerCase();
-              let sellzenCategory = 'home';
-              if (catLower.includes('elektr') || catLower.includes('techni') || catLower.includes('электрон') || catLower.includes('gadget') || catLower.includes('телефон') || catLower.includes('наушник') || catLower.includes('phone') || catLower.includes('audio') || catLower.includes('kompyuter')) sellzenCategory = 'electronics';
-              else if (catLower.includes('kiyim') || catLower.includes('fashion') || catLower.includes('одежд') || catLower.includes('обувь') || catLower.includes('poyabzal')) sellzenCategory = 'clothing';
-              else if (catLower.includes('kosmet') || catLower.includes('beauty') || catLower.includes('parfum') || catLower.includes('косметик') || catLower.includes('go\'zallik')) sellzenCategory = 'cosmetics';
-              else if (catLower.includes('auto') || catLower.includes('mashina') || catLower.includes('avto') || catLower.includes('авто')) sellzenCategory = 'auto';
-              else if (catLower.includes('sport') || catLower.includes('fitness') || catLower.includes('спорт')) sellzenCategory = 'sport';
-              
-              const SELLZEN_URL = "https://yyrlkbbnemimflbeddzq.supabase.co/functions/v1/webhook-generate";
-              
-              console.log(`🖼️ Generating SellZen v2 images (category=${sellzenCategory})...`);
-
-              try {
-                const response = await fetch(SELLZEN_URL, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json', 'x-api-key': SELLZEN_API_KEY },
-                  body: JSON.stringify({
-                    product_name: (product.name || 'Product').substring(0, 500),
-                    product_image_base64: imgBase64,
-                    category: sellzenCategory,
-                    marketplace: 'yandex',
-                    style: 'commercial',
-                  }),
-                });
-
-                if (response.ok) {
-                  const data = await response.json();
-                  if (data.success && data.images?.length > 0) {
-                    for (let i = 0; i < data.images.length; i++) {
-                      const img = data.images[i];
-                      if (!img.image_url) continue;
-                      try {
-                        const dlResp = await fetch(img.image_url);
-                        if (!dlResp.ok) { images.push(img.image_url); continue; }
-                        const bytes = new Uint8Array(await dlResp.arrayBuffer());
-                        const fileName = `${user.id}/ym-sellzen-${Date.now()}-${i}.png`;
-                        const { error } = await supabase.storage.from('product-images').upload(fileName, bytes, {
-                          contentType: 'image/png', cacheControl: '31536000', upsert: false,
-                        });
-                        if (!error) {
-                          const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(fileName);
-                          if (urlData?.publicUrl) {
-                            console.log(`✅ SellZen v2 ${img.variant} image stored`);
-                            images.push(urlData.publicUrl);
-                          }
-                        } else {
-                          images.push(img.image_url);
-                        }
-                      } catch (dlErr) {
-                        console.warn(`SellZen image download error:`, dlErr);
-                        images.push(img.image_url);
-                      }
-                    }
-                    console.log(`✅ SellZen v2 generated ${images.length} images`);
-                  } else {
-                    console.warn(`SellZen v2: no images returned`, data.error);
-                  }
-                } else {
-                  const errText = await response.text();
-                  console.error(`SellZen v2 error ${response.status}: ${errText.substring(0, 200)}`);
-                }
-              } catch (e) {
-                console.error('SellZen v2 exception:', e);
-              }
-            }
-          } else if (!SELLZEN_API_KEY) {
+          if (!SELLZEN_API_KEY) {
             console.warn("⚠️ SELLZEN_API_KEY not configured, using source images");
-            images = [...sourceImages];
+            return [...sourceImages];
           }
-        }
+          if (!imgSource) return [...sourceImages];
+          
+          console.log("🎨 Generating images via SellZen API (parallel)...");
+          
+          let imgBase64: string | null = null;
+          try {
+            if (imgSource.startsWith('data:')) {
+              imgBase64 = imgSource;
+            } else {
+              const imgResp = await fetch(imgSource, {
+                headers: {
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                  'Accept': 'image/*,*/*;q=0.8',
+                },
+              });
+              if (imgResp.ok) {
+                const buffer = await imgResp.arrayBuffer();
+                const bytes = new Uint8Array(buffer);
+                const contentType = imgResp.headers.get('content-type') || 'image/jpeg';
+                let binary = '';
+                for (let i = 0; i < bytes.length; i++) {
+                  binary += String.fromCharCode(bytes[i]);
+                }
+                imgBase64 = `data:${contentType};base64,${btoa(binary)}`;
+              }
+            }
+          } catch (e) {
+            console.error("Image to base64 error:", e);
+          }
+          
+          if (!imgBase64) return [...sourceImages];
+          
+          const catLower = (product.category || product.name || "").toLowerCase();
+          let sellzenCategory = 'home';
+          if (catLower.includes('elektr') || catLower.includes('techni') || catLower.includes('электрон') || catLower.includes('gadget') || catLower.includes('телефон') || catLower.includes('наушник') || catLower.includes('phone') || catLower.includes('audio') || catLower.includes('kompyuter')) sellzenCategory = 'electronics';
+          else if (catLower.includes('kiyim') || catLower.includes('fashion') || catLower.includes('одежд') || catLower.includes('обувь') || catLower.includes('poyabzal')) sellzenCategory = 'clothing';
+          else if (catLower.includes('kosmet') || catLower.includes('beauty') || catLower.includes('parfum') || catLower.includes('косметик') || catLower.includes('go\'zallik')) sellzenCategory = 'cosmetics';
+          else if (catLower.includes('auto') || catLower.includes('mashina') || catLower.includes('avto') || catLower.includes('авто')) sellzenCategory = 'auto';
+          else if (catLower.includes('sport') || catLower.includes('fitness') || catLower.includes('спорт')) sellzenCategory = 'sport';
+          
+          const SELLZEN_URL = "https://yyrlkbbnemimflbeddzq.supabase.co/functions/v1/webhook-generate";
+          console.log(`🖼️ Generating SellZen v2 images (category=${sellzenCategory})...`);
+          
+          const result: string[] = [];
+          try {
+            const response = await fetch(SELLZEN_URL, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'x-api-key': SELLZEN_API_KEY },
+              body: JSON.stringify({
+                product_name: (product.name || 'Product').substring(0, 500),
+                product_image_base64: imgBase64,
+                category: sellzenCategory,
+                marketplace: 'yandex',
+                style: 'commercial',
+              }),
+            });
+            
+            if (response.ok) {
+              const data = await response.json();
+              if (data.success && data.images?.length > 0) {
+                for (let i = 0; i < data.images.length; i++) {
+                  const img = data.images[i];
+                  if (!img.image_url) continue;
+                  try {
+                    const dlResp = await fetch(img.image_url);
+                    if (!dlResp.ok) { result.push(img.image_url); continue; }
+                    const bytes = new Uint8Array(await dlResp.arrayBuffer());
+                    const fileName = `${user.id}/ym-sellzen-${Date.now()}-${i}.png`;
+                    const { error } = await supabase.storage.from('product-images').upload(fileName, bytes, {
+                      contentType: 'image/png', cacheControl: '31536000', upsert: false,
+                    });
+                    if (!error) {
+                      const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(fileName);
+                      if (urlData?.publicUrl) {
+                        console.log(`✅ SellZen v2 ${img.variant} image stored`);
+                        result.push(urlData.publicUrl);
+                      }
+                    } else {
+                      result.push(img.image_url);
+                    }
+                  } catch (dlErr) {
+                    console.warn(`SellZen image download error:`, dlErr);
+                    result.push(img.image_url);
+                  }
+                }
+                console.log(`✅ SellZen v2 generated ${result.length} images`);
+              } else {
+                console.warn(`SellZen v2: no images returned`, data.error);
+              }
+            } else {
+              const errText = await response.text();
+              console.error(`SellZen v2 error ${response.status}: ${errText.substring(0, 200)}`);
+            }
+          } catch (e) {
+            console.error('SellZen v2 exception:', e);
+          }
+          
+          return result.length > 0 ? result : [...sourceImages];
+        })();
         
-        // If no images at all, fall back to source
-        if (images.length === 0 && sourceImages.length > 0) {
-          console.warn("⚠️ No AI images, using source as fallback");
-          images = sourceImages;
-        }
-        console.log(`🖼️ Total ${images.length} images ready`);
-
-        // ═══ STEP 2: Find LEAF category from Yandex tree ═══
-        // Pass source subject/parent for much better category matching in clone mode
-        const leafCat = await findLeafCategory(
+        // Task B: Find LEAF category
+        const categoryTask = findLeafCategory(
           creds.apiKey, product.name, product.description || "", LOVABLE_KEY,
           product.sourceCategory || product.category, product.sourceMarketplace,
           product.sourceSubject, product.sourceParent
         );
-        console.log(`📂 Category: ${leafCat.name} (${leafCat.id})`);
-
-        // ═══ STEP 3: Fetch category parameters ═══
-        const params = await fetchCategoryParameters(creds.apiKey, leafCat.id);
-        console.log(`📋 ${params.length} params for category ${leafCat.id}`);
-
-        // ═══ STEP 4: AI optimization ═══
-        // Pass source characteristics for better parameter filling
-        let ai: any = null;
-        if (LOVABLE_KEY) {
-          const isClone = !!body.cloneMode || !!body.skipImageGeneration;
-          if (isClone) {
-            console.log(`💰 Clone mode: using Flash for AI optimization`);
-          }
-          ai = await aiOptimize(product, leafCat.name, params, LOVABLE_KEY, isClone);
-        }
-
-        // ═══ STEP 5: MXIK lookup (AI-powered) ═══
-        // Priority: exact source MXIK code from source marketplace (if valid)
+        
+        // Task C: MXIK lookup
         const sourceMxikCode = normalizeMxikCode(product.mxikCode);
         const mxikSearchName = [product.name, product.model, product.brand].filter(Boolean).join(' ');
         const mxikSearchCategory = product.sourceSubject || product.sourceCategory || product.sourceParent || product.category;
-
-        const mxik = sourceMxikCode
-          ? { code: sourceMxikCode, name_uz: product.mxikName || 'Manba MXIK kodi' }
-          : await lookupMXIK(supabase, mxikSearchName || product.name, mxikSearchCategory, LOVABLE_KEY);
+        const mxikTask = sourceMxikCode
+          ? Promise.resolve({ code: sourceMxikCode, name_uz: product.mxikName || 'Manba MXIK kodi' })
+          : lookupMXIK(supabase, mxikSearchName || product.name, mxikSearchCategory, LOVABLE_KEY);
+        
+        // --- Run all three in parallel ---
+        const [images, leafCat, mxik] = await Promise.all([imageTask, categoryTask, mxikTask]);
+        
+        // If no images at all, fall back to source
+        if (images.length === 0 && sourceImages.length > 0) {
+          console.warn("⚠️ No AI images, using source as fallback");
+          images.push(...sourceImages);
+        }
+        console.log(`🖼️ Total ${images.length} images ready`);
+        console.log(`📂 Category: ${leafCat.name} (${leafCat.id})`);
 
         // ═══ STEP 6: Build & send offer ═══
         const offer = buildOffer(product, ai, sku, barcode, leafCat, mxik, pricing.recommendedPrice, images);
