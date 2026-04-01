@@ -270,12 +270,12 @@ export default function SellerCloudMobile() {
             {(() => {
               const labels: Record<string, string> = {
                 'financials': '💰 Moliya', 'cost-prices': '💲 Tannarx',
-                'pricing': '🏷 Narxlar', 'abc-analysis': '📊 ABC-analiz', 'seller-analytics': '📈 Sotuvchi',
-                'seo-keywords': '🔍 SEO', 'reviews': '💬 Sharhlar', 'ads': '📢 Reklama',
+                'pricing': '🏷 Narxlar', 'abc-analysis': '📊 ABC-analiz',
+                'reviews': '💬 Sharhlar', 'ads': '📢 Reklama',
                 'stock-forecast': '📦 Zaxira', 'card-clone': '📋 Klonlash',
                 'problems': '⚠️ Muammolar', 'mxik': '📄 MXIK baza',
                 'reports': '📑 Hisobotlar', 'notifications': '🔔 Bildirishnoma', 'subscription': '💳 Obuna',
-                'competitor': '🎯 Raqobat', 'sales': '📊 Sotuvlar', 'support': '💬 Yordam', 'stores': '🏪 Do\'konlar',
+                'sales': '📊 Sotuvlar', 'support': '💬 Yordam', 'stores': '🏪 Do\'konlar',
                 'tutorials': '📖 Qo\'llanma', 'profile': '👤 Profil',
                 'trend-hunter': '🔥 Trend Hunter', 'sellzen-studio': '✨ SellZen AI',
                 'unit-economy': '💵 Unit-econ',
