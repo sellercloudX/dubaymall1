@@ -1547,6 +1547,10 @@ serve(async (req) => {
                 category: sellzenCategory,
                 marketplace: 'yandex',
                 style: 'commercial',
+                aspect_ratio: '3:4',
+                target_width: 1080,
+                target_height: 1440,
+                orientation: 'portrait',
               }),
             });
             
