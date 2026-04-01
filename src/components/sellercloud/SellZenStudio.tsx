@@ -121,6 +121,7 @@ export function SellZenStudio() {
           action: 'generate_images',
           imageBase64: uploadedImage,
           productName: productName || undefined,
+          productDescription: productDescription || undefined,
           marketplace,
           style: imageStyle,
         },
