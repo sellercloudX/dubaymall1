@@ -249,43 +249,38 @@ export const SubscriptionBilling = forwardRef<HTMLDivElement, SubscriptionBillin
     if (!termsAccepted || !selectedPlanForTerms) { toast.error('Shartlarni qabul qilishingiz kerak'); return; }
     setIsCreating(true);
 
+    const payBody = {
+      user_id: user?.id, plan_type: selectedPlanForTerms.slug,
+      amount_uzs: selectedPlanForTerms.onetime_price_uzs || selectedPlanForTerms.monthly_fee_uzs,
+      return_url: window.location.origin + '/seller-cloud?tab=subscription',
+    };
+
     if (!subscription) {
-      // New subscription
       const result = await createSubscription(selectedPlanForTerms.slug, selectedPlanForTerms.monthly_fee_uzs);
       if (result.success) {
         setShowTermsDialog(false);
         toast.success('Tabriklaymiz! Akkauntingiz faollashtirildi.');
-        // If plan has onetime price > 0, redirect to payment
         if (selectedPlanForTerms.onetime_price_uzs > 0 && user?.id) {
           try {
-            const { data, error } = await supabase.functions.invoke('click-payment', {
-              body: {
-                action: 'prepare', user_id: user.id, plan_type: selectedPlanForTerms.slug,
-                amount_uzs: selectedPlanForTerms.onetime_price_uzs,
-                return_url: window.location.origin + '/seller-cloud?tab=subscription',
-              },
-            });
-            if (!error && data?.success) window.open(data.payment_url, '_blank');
+            const data = await invokePayment(paymentMethod, 'prepare', payBody);
+            window.open(data.payment_url, '_blank');
+            if (paymentMethod === 'payme' && data.receipt_id) {
+              pollPaymeStatus(data.receipt_id, data.order_number, user.id);
+            }
           } catch {}
         }
       } else { toast.error(result.error || 'Xatolik yuz berdi'); }
     } else {
-      // Upgrade existing — go to payment
       if (user?.id) {
         setIsProcessingPayment(selectedPlanForTerms.slug);
         try {
-          const { data, error } = await supabase.functions.invoke('click-payment', {
-            body: {
-              action: 'prepare', user_id: user.id, plan_type: selectedPlanForTerms.slug,
-              amount_uzs: selectedPlanForTerms.onetime_price_uzs || selectedPlanForTerms.monthly_fee_uzs,
-              return_url: window.location.origin + '/seller-cloud?tab=subscription',
-            },
-          });
-          if (error) throw error;
-          if (!data?.success) throw new Error(data?.error || 'Xatolik');
+          const data = await invokePayment(paymentMethod, 'prepare', payBody);
           toast.success("To'lov sahifasiga yo'naltirilmoqda...");
           window.open(data.payment_url, '_blank');
           setShowTermsDialog(false);
+          if (paymentMethod === 'payme' && data.receipt_id) {
+            pollPaymeStatus(data.receipt_id, data.order_number, user.id);
+          }
         } catch (err: any) {
           toast.error('To\'lov xatoligi: ' + (err.message || 'Qaytadan urinib ko\'ring'));
         } finally { setIsProcessingPayment(null); }
