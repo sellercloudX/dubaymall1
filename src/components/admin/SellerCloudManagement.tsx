@@ -642,7 +642,11 @@ export function SellerCloudManagement() {
                   const plan = allPlans?.find((p: any) => p.slug === slug);
                   return <p>Tarif: <strong>{plan?.name_uz || plan?.name || slug}</strong></p>;
                 })()}
-                <p>To'lov: <strong>${activatingSub.monthly_fee}/oy</strong></p>
+                {(() => {
+                  const slug = activatingSub.plan_slug || activatingSub.plan_type || 'starter';
+                  const plan = allPlans?.find((p: any) => p.slug === slug);
+                  return plan ? <p>Narx: <strong>{formatPrice(plan.onetime_price_uzs)} (bir martalik) + {formatPrice(plan.monthly_fee_uzs)}/oy</strong></p> : null;
+                })()}
               </div>
             )}
             <div className="grid grid-cols-2 gap-3">
