@@ -71,7 +71,7 @@ export function SellZenStudio() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
 
   const imagePrice = getFeaturePrice('sellzen-image-generate')?.base_price_uzs || 8000;
-  const videoPrice = getFeaturePrice('ai_video_generation')?.base_price_uzs || 18000;
+  const videoPrice = getFeaturePrice('ai-video-generation')?.base_price_uzs || 18000;
 
   const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
