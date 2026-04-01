@@ -94,7 +94,7 @@ export function CardQualityAudit({ connectedMarketplaces, store }: CardQualityAu
     const mp = marketplace || (connectedMarketplaces.length === 1 ? connectedMarketplaces[0] : 'yandex');
     
     // Pre-flight billing check
-    if (!(await checkBillingAccess('card-quality-audit'))) return;
+    if (!(await checkBillingAccess('ai-card-audit'))) return;
     
     setIsAuditing(true);
     setAuditResults([]);
@@ -129,7 +129,7 @@ export function CardQualityAudit({ connectedMarketplaces, store }: CardQualityAu
     if (!auditedMarketplace) return;
     
     // Pre-flight billing check
-    if (!(await checkBillingAccess('card-auto-fix'))) return;
+    if (!(await checkBillingAccess('ai-card-fix'))) return;
     
     setFixResults(prev => new Map(prev).set(offerId, { offerId, status: 'fixing' }));
 
