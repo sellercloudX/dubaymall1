@@ -607,7 +607,7 @@ JAVOB: Faqat bitta ID raqam yoz, hech narsa qo'shma:`;
         method: "POST",
         headers: { Authorization: `Bearer ${lovableApiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
+          model: "google/gemini-2.5-pro",
           messages: [{ role: "user", content: prompt }],
           temperature: 0,
           max_tokens: 50,
