@@ -1345,7 +1345,7 @@ function FinancialOverviewTab({ selectedPartnerId }: any) {
     queryFn: async () => {
       const [subsRes, connectionsRes, aiUsageRes] = await Promise.all([
         supabase.from('sellercloud_subscriptions').select('*').eq('user_id', selectedPartnerId).order('created_at', { ascending: false }).limit(1),
-        supabase.from('marketplace_connections_safe').select('marketplace, total_revenue, orders_count, products_count').eq('user_id', selectedPartnerId).eq('is_active', true),
+        supabase.from('marketplace_connections').select('marketplace, total_revenue, orders_count, products_count').eq('user_id', selectedPartnerId).eq('is_active', true),
         supabase.from('ai_usage_log').select('*').eq('user_id', selectedPartnerId).order('created_at', { ascending: false }).limit(50),
       ]);
       const subscription = subsRes.data?.[0];
@@ -1398,13 +1398,13 @@ export function AIAgentDashboard() {
   const { data: partners } = useQuery({
     queryKey: ['ai-agent-partners'],
     queryFn: async () => {
-      // Fetch ALL marketplace connections (paginate to avoid 1000 row limit)
+      // Fetch ALL marketplace connections (admins have RLS access to all)
       let allConnections: any[] = [];
       let from = 0;
       const pageSize = 500;
       while (true) {
         const { data: batch } = await supabase
-          .from('marketplace_connections_safe')
+          .from('marketplace_connections')
           .select('user_id, marketplace, is_active')
           .eq('is_active', true)
           .range(from, from + pageSize - 1);
