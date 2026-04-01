@@ -43,7 +43,7 @@ const SalesDashboard = lazy(() => import('@/components/sellercloud/SalesDashboar
 const SupportChat = lazy(() => import('@/components/sellercloud/SupportChat').then(m => ({ default: m.SupportChat })));
 const MultiStoreManager = lazy(() => import('@/components/sellercloud/MultiStoreManager').then(m => ({ default: m.MultiStoreManager })));
 const ProfilePasswordSetup = lazy(() => import('@/components/sellercloud/ProfilePasswordSetup').then(m => ({ default: m.ProfilePasswordSetup })));
-const SEOMonitor = lazy(() => import('@/components/sellercloud/SEOMonitor').then(m => ({ default: m.SEOMonitor })));
+
 const TutorialVideos = lazy(() => import('@/components/sellercloud/TutorialVideos').then(m => ({ default: m.TutorialVideos })));
 // Consolidated hub components
 const InventoryControlHub = lazy(() => import('@/components/sellercloud/InventoryControlHub').then(m => ({ default: m.InventoryControlHub })));
