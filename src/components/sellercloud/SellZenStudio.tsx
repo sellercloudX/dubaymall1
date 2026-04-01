@@ -13,22 +13,19 @@ import {
   Wand2, History, Eye,
 } from 'lucide-react';
 
-const MODES = [
-  { value: 'modelli', label: 'Modelli' },
-  { value: 'modelsiz', label: 'Modelsiz' },
+const MARKETPLACES = [
+  { value: 'wildberries', label: 'Wildberries (3:4)' },
+  { value: 'uzum', label: 'Uzum (3:4)' },
+  { value: 'ozon', label: 'Ozon (1:1)' },
+  { value: 'yandex', label: 'Yandex (4:3)' },
+  { value: 'all', label: 'Barchasi (3:4)' },
 ];
 
-const STYLE_TYPES = [
-  { key: 'infographic', label: 'Infografika' },
-  { key: 'lifestyle', label: 'Lifestyle' },
-  { key: 'minimalist', label: 'Minimalist' },
-];
-
-const VIDEO_TEMPLATES = [
-  { value: 'product_showcase', label: 'Mahsulot ko\'rsatish' },
-  { value: 'promo', label: 'Promo video' },
-  { value: 'story', label: 'Instagram Story' },
-  { value: 'review', label: 'Obzor formati' },
+const STYLES = [
+  { value: 'commercial', label: 'Commercial' },
+  { value: 'minimalist', label: 'Minimalist' },
+  { value: 'luxury', label: 'Luxury' },
+  { value: 'vibrant', label: 'Vibrant' },
 ];
 
 interface GeneratedImage {
