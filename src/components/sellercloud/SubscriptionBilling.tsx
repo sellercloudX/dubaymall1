@@ -475,7 +475,7 @@ export const SubscriptionBilling = forwardRef<HTMLDivElement, SubscriptionBillin
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><Crown className="h-5 w-5" /> Tarifni almashtirish</CardTitle>
-              <CardDescription>Click orqali to'lab, tarifni faollashtiring yoki muddatni uzaytiring</CardDescription>
+              <CardDescription>Click yoki Payme orqali to'lab, tarifni faollashtiring yoki uzaytiring</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
