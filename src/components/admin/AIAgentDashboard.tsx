@@ -1457,6 +1457,7 @@ export function AIAgentDashboard() {
             <Bot className="h-6 w-6 text-primary" />
             AI Agent — Marketplace Manager
             <Badge variant="outline" className="ml-2 text-xs">Self-Healing v3</Badge>
+            {partners && <Badge variant="secondary" className="ml-1 text-xs">{partners.length} hamkor</Badge>}
           </CardTitle>
           <CardDescription>
             Real API orqali kartochka audit, rasm generatsiya, narx optimallashtirish va agent chat
