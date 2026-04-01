@@ -164,7 +164,7 @@ export function SellZenStudio() {
 
     setIsGeneratingVideo(true);
     try {
-      const result = await deductBalance('ai_video_generation', 'SellZen Studio: video generatsiya');
+      const result = await deductBalance('ai-video-generation', 'SellZen Studio: video generatsiya');
       if (!result.success) {
         toast.error(result.error || 'Balans yechishda xatolik');
         setIsGeneratingVideo(false);
