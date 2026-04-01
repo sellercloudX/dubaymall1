@@ -941,7 +941,7 @@ JAVOB FAQAT JSON:
         model: aiModel,
         messages: [{ role: "user", content: prompt }],
         temperature: 0.1,
-        max_tokens: cloneMode ? 8000 : 16000,
+        max_tokens: cloneMode ? 12000 : 32000,
       }),
     });
 
