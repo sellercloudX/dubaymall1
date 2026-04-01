@@ -560,9 +560,22 @@ Javob FAQAT JSON array: ["so'z1", "so'z2", ...]` }],
       if (kwLower.length > 4 && leafText.includes(kwLower.substring(0, kwLower.length - 2))) score += isPhrase ? 2 : 1;
     }
 
-    // Penalize obvious domain mismatches for phone accessories
+    // Penalize obvious domain mismatches
     const phoneAccessoryIntent = searchKeywords.some(k => /чехол|смартфон|телефон|защитн|micro sd|карта памяти/.test(k));
-    if (phoneAccessoryIntent && /авто|мебел|рычаг|сидень/.test(leafText)) score -= 8;
+    if (phoneAccessoryIntent && /авто|мебел|рычаг|сидень|магнитол/.test(leafText)) score -= 15;
+    
+    // Penalize auto-related categories for non-auto products
+    const isAutoProduct = searchKeywords.some(k => /авто|машин|автомобил|car |vehicle/.test(k));
+    if (!isAutoProduct && /автомагнитол|автомобил|авто аксессуар|автозвук/.test(leafText)) score -= 15;
+    
+    // Penalize hair/beauty products being matched to electronics/auto
+    const isHairProduct = searchKeywords.some(k => /волос|выпрямител|стайлер|утюжок|фен|укладк|шампун/.test(k));
+    if (isHairProduct && /авто|магнитол|компьют|телефон|смартфон/.test(leafText)) score -= 20;
+    
+    // Boost exact category name matches
+    for (const kw of searchKeywords) {
+      if (leaf.name.toLowerCase() === kw) score += 10;
+    }
 
     return { ...leaf, score };
   }).filter(l => l.score > 0).sort((a, b) => b.score - a.score).slice(0, 50);
@@ -607,7 +620,7 @@ JAVOB: Faqat bitta ID raqam yoz, hech narsa qo'shma:`;
         method: "POST",
         headers: { Authorization: `Bearer ${lovableApiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
+          model: "google/gemini-2.5-pro",
           messages: [{ role: "user", content: prompt }],
           temperature: 0,
           max_tokens: 50,
@@ -1455,25 +1468,40 @@ serve(async (req) => {
         
         let images: string[] = [];
         
-        if (body.skipImageGeneration || body.cloneMode) {
-          // Clone mode or pre-generated: reuse source images directly, no AI generation
+        // Determine if we should generate images via SellZen
+        const shouldGenerateImages = (() => {
+          if (body.cloneMode) return false; // Clones reuse source images
+          if (body.skipImageGeneration && sourceImages.length > 0) return false; // Pre-generated images exist
+          if (body.skipImageGeneration && sourceImages.length === 0) return true; // Scanner said skip but sent 0 images — generate server-side!
+          return true; // Default: generate
+        })();
+        
+        if (!shouldGenerateImages) {
           console.log(`⚡ Using ${sourceImages.length} source images (skipImageGeneration=${body.skipImageGeneration}, cloneMode=${body.cloneMode})`);
           images = [...sourceImages];
         } else {
-          // Generate images via SellZen API (carousel variants: modelli + modelsiz)
+          // Generate images via SellZen API
           const SELLZEN_API_KEY = Deno.env.get("SELLZEN_API_KEY");
+          // Use source image OR reference image from product.image
           const sourceImg = sourceImages[0] || null;
+          const referenceImg = product.image || null;
+          const imgSource = sourceImg || referenceImg;
           
-          if (SELLZEN_API_KEY && sourceImg) {
-            console.log("🎨 Generating carousel images via SellZen API...");
+          if (SELLZEN_API_KEY && imgSource) {
+            console.log("🎨 Generating images via SellZen API (server-side fallback)...");
             
             // Convert source image to base64 for SellZen
             let imgBase64: string | null = null;
             try {
-              if (sourceImg.startsWith('data:')) {
-                imgBase64 = sourceImg;
+              if (imgSource.startsWith('data:')) {
+                imgBase64 = imgSource;
               } else {
-                const imgResp = await fetch(sourceImg);
+                const imgResp = await fetch(imgSource, {
+                  headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Accept': 'image/*,*/*;q=0.8',
+                  },
+                });
                 if (imgResp.ok) {
                   const buffer = await imgResp.arrayBuffer();
                   const bytes = new Uint8Array(buffer);
@@ -1490,7 +1518,6 @@ serve(async (req) => {
             }
             
             if (imgBase64) {
-              // Map category to SellZen category
               const catLower = (product.category || product.name || "").toLowerCase();
               let sellzenCategory = 'home';
               if (catLower.includes('elektr') || catLower.includes('techni') || catLower.includes('электрон') || catLower.includes('gadget') || catLower.includes('телефон') || catLower.includes('наушник') || catLower.includes('phone') || catLower.includes('audio') || catLower.includes('kompyuter')) sellzenCategory = 'electronics';
@@ -1500,10 +1527,8 @@ serve(async (req) => {
               else if (catLower.includes('sport') || catLower.includes('fitness') || catLower.includes('спорт')) sellzenCategory = 'sport';
               
               const SELLZEN_URL = "https://yyrlkbbnemimflbeddzq.supabase.co/functions/v1/webhook-generate";
-              const productDetails = (product.name || '').substring(0, 500);
               
-              // Generate 2 images via SellZen v2 API (infographic + lifestyle)
-              console.log(`🖼️ Generating SellZen v2 images...`);
+              console.log(`🖼️ Generating SellZen v2 images (category=${sellzenCategory})...`);
 
               try {
                 const response = await fetch(SELLZEN_URL, {
