@@ -836,9 +836,48 @@ async function aiOptimize(
   // OPTIONAL = everything else
   const isRequired = (p: any) => p.required === true || p.constraintType === "REQUIRED" || p.mandatory === true || p.importance === "REQUIRED";
   const isRecommended = (p: any) => p.constraintType === "RECOMMENDED" || p.importance === "RECOMMENDED" || p.filterGroup === true || p.isFilter === true;
-  const requiredParams = allParams.filter(isRequired);
-  const recommendedParams = allParams.filter(p => !isRequired(p) && isRecommended(p));
-  const optionalParams = allParams.filter(p => !isRequired(p) && !isRecommended(p));
+  let requiredParams = allParams.filter(isRequired);
+  let recommendedParams = allParams.filter(p => !isRequired(p) && isRecommended(p));
+  let optionalParams = allParams.filter(p => !isRequired(p) && !isRecommended(p));
+
+  // ═══ HEURISTIC RECLASSIFICATION ═══
+  // When Yandex API returns 0 required + 0 recommended (common!), classify by param name
+  if (requiredParams.length === 0 && recommendedParams.length === 0 && allParams.length > 0) {
+    console.log(`⚠️ API returned 0 REQUIRED + 0 RECOMMENDED — applying heuristic classification`);
+    
+    // Common "Asosiy xususiyatlar" (main characteristics) param names
+    const requiredNames = /^(тип|бренд|брэнд|торговая марка|марка|форма выпуска|вид|материал|состав|пол|возраст|размер|страна|назначение|цвет товара|цвет|вес|объем|объём|количество|комплектация|модель|серия|способ применения|диагональ|разрешение|мощность)/i;
+    
+    // Common "Filtrlar uchun qo'shimcha xususiyatlar" (filter characteristics)
+    const filterNames = /^(особенности|содержит|не содержит|эффект|аромат|вкус|текстура|покрытие|тип кожи|тип волос|spf|водостойкость|гипоаллергенный|форм-фактор|интерфейс|технология|совместим|подходит для|сезон|стиль|узор|принт|застёжка|длина|ширина|высота|глубина|диаметр|плотность|жёсткость)/i;
+    
+    const newRequired: any[] = [];
+    const newRecommended: any[] = [];
+    const newOptional: any[] = [];
+    
+    for (const p of allParams) {
+      const name = (p.name || '').trim();
+      if (requiredNames.test(name)) {
+        newRequired.push(p);
+      } else if (filterNames.test(name)) {
+        newRecommended.push(p);
+      } else {
+        // For categories with many params, treat first ~8 as required-like, next ~6 as filter-like
+        if (newRequired.length < 8 && !filterNames.test(name)) {
+          newRequired.push(p);
+        } else if (newRecommended.length < 6) {
+          newRecommended.push(p);
+        } else {
+          newOptional.push(p);
+        }
+      }
+    }
+    
+    requiredParams = newRequired;
+    recommendedParams = newRecommended;
+    optionalParams = newOptional;
+    console.log(`📊 Heuristic: ${requiredParams.length} REQUIRED, ${recommendedParams.length} RECOMMENDED, ${optionalParams.length} optional`);
+  }
 
   const formatParam = (p: any) => {
     let s = `  - id:${p.id}, "${p.name}", type:${p.type || "TEXT"}`;

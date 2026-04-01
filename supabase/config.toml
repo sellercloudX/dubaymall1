@@ -128,3 +128,7 @@ verify_jwt = false
 
 [functions.ai-trend-predict]
 verify_jwt = false
+
+[functions.sellzen-studio]
+verify_jwt = false
+wall_clock_timeout = 180
