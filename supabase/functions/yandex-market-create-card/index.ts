@@ -844,9 +844,9 @@ async function aiOptimize(
     let s = `  - id:${p.id}, "${p.name}", type:${p.type || "TEXT"}`;
     if (p.unit) s += `, unit:"${p.unit}"`;
     if (p.values?.length) {
-      const vals = p.values.slice(0, 25).map((v: any) => `{id:${v.id},"${v.value}"}`).join(", ");
+      const vals = p.values.slice(0, 15).map((v: any) => `{id:${v.id},"${v.value}"}`).join(", ");
       s += `\n    OPTIONS:[${vals}]`;
-      if (p.values.length > 25) s += ` +${p.values.length - 25}`;
+      if (p.values.length > 15) s += ` +${p.values.length - 15}`;
     }
     return s;
   };
