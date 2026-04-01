@@ -327,17 +327,15 @@ MUHIM QOIDALAR:
 1. Mahsulot TURINI aniq solishtir — "чехол" = telefon aksessuari, "водка" = spirtli ichimlik — BULAR BOSHQA!
 2. Kategoriya bo'yicha mos kelmaydigan kodlarni TANLAMA
 3. Eng ANIQ mos keladigan kodni tanla
-4. Agar hech biri mos kelmasa, 0 yoz
+4. Agar hech biri MUTLAQO mos kelmasa, 0 yoz — LEKIN taxminiy mos kelsa TANLASH MAJBURIY!
 5. DIQQAT: "alkogol", "tamaki", "dori-darmon", "qurol" kategoriyalariga KIRMAYDIGAN mahsulotlar uchun BU kategoriyalardagi kodlarni TANLAMA!
-6. Mahsulot nomidagi ASOSIY so'zga e'tibor ber:
-   - "Чехол для iPhone" → "чехол" (telefon aksessuari), "пластмассовые изделия" EMAS
-   - "Кроссовки Nike" → "обувь спортивная", "полимерные материалы" EMAS
-   - "Шампунь" → "средства для волос", "химические реактивы" EMAS
+6. Mahsulot nomidagi ASOSIY so'zga e'tibor ber
+7. YUMSHOQROQ BO'L — agar kod mahsulot TURIGA yaqin bo'lsa (masalan "kosmetika" kategoriyasidagi kod "kosmetik mahsulot" uchun), UNI TANLA!
 
 Variantlar:
 ${options}
 
-Javob faqat raqam (1-${Math.min(unique.length, 15)}) yoki 0 (mos kelmasa):` }],
+Javob faqat raqam (1-${Math.min(unique.length, 15)}) yoki 0 (MUTLAQO mos kelmasa):` }],
             temperature: 0, max_tokens: 10,
           }),
         });
@@ -346,7 +344,37 @@ Javob faqat raqam (1-${Math.min(unique.length, 15)}) yoki 0 (mos kelmasa):` }],
           const content = data.choices?.[0]?.message?.content?.trim() || "";
           const num = parseInt(content.match(/\d+/)?.[0] || "0");
           if (num === 0) {
-            console.warn("[MXIK] AI rejected all options — using generic fallback");
+            console.warn("[MXIK] AI rejected all options — trying broader search...");
+            // Broader retry: use AI to suggest a Russian search term
+            try {
+              const broadResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+                method: "POST",
+                headers: { Authorization: `Bearer ${lovableApiKey}`, "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  model: "google/gemini-2.5-flash-lite",
+                  messages: [{ role: "user", content: `Mahsulot: "${name}". Bu mahsulotning UMUMIY toifa nomi ruscha nima? Faqat 1-2 so'z javob ber (masalan: "косметика", "обувь", "электроника", "одежда", "аксессуары", "бытовая техника"). Javob:` }],
+                  temperature: 0, max_tokens: 20,
+                }),
+              });
+              if (broadResp.ok) {
+                const broadData = await broadResp.json();
+                const broadTerm = (broadData.choices?.[0]?.message?.content?.trim() || "").replace(/[^а-яёА-ЯЁ\s]/g, '').trim();
+                if (broadTerm && broadTerm.length > 2) {
+                  console.log(`[MXIK] Broad search: "${broadTerm}"`);
+                  const { data: broadMatches } = await supabase
+                    .from('mxik_codes')
+                    .select('code, name_uz, name_ru, group_name')
+                    .or(`name_uz.ilike.%${broadTerm}%,name_ru.ilike.%${broadTerm}%,group_name.ilike.%${broadTerm}%`)
+                    .eq('is_active', true)
+                    .limit(5);
+                  if (broadMatches?.length) {
+                    console.log(`[MXIK] Broad search found ${broadMatches.length} matches, using first: ${broadMatches[0].name_uz}`);
+                    return { code: broadMatches[0].code, name_uz: broadMatches[0].name_uz };
+                  }
+                }
+              }
+            } catch (e2) { console.error("[MXIK] Broad search error:", e2); }
+            // Final fallback
             return { code: "46901100001000000", name_uz: "Boshqa tovarlar" };
           }
           const idx = num - 1;
@@ -906,15 +934,29 @@ async function aiOptimize(
         newRequired.push(p);
       } else if (filterNames.test(name)) {
         newRecommended.push(p);
+      }
+      // Unclassified params will be distributed below
+    }
+    
+    // Distribute remaining unclassified params — ensure balanced split between REQUIRED and RECOMMENDED
+    const unclassified = allParams.filter(p => {
+      const id = Number(p.id);
+      return !classifiedIds.has(id) && !newRequired.some(r => Number(r.id) === id) && !newRecommended.some(r => Number(r.id) === id);
+    });
+    
+    // Target: at least 40% of total params should be RECOMMENDED (filters)
+    const totalClassified = newRequired.length + newRecommended.length + unclassified.length;
+    const targetRecommended = Math.max(Math.ceil(totalClassified * 0.4), 3);
+    const recommendedDeficit = Math.max(0, targetRecommended - newRecommended.length);
+    
+    for (let i = 0; i < unclassified.length; i++) {
+      const p = unclassified[i];
+      if (newRequired.length < 12 && i < unclassified.length - recommendedDeficit) {
+        newRequired.push(p);
+      } else if (newRecommended.length < 15) {
+        newRecommended.push(p);
       } else {
-        // For categories with many params, treat first ~15 as required-like, next ~15 as filter-like
-        if (newRequired.length < 15) {
-          newRequired.push(p);
-        } else if (newRecommended.length < 15) {
-          newRecommended.push(p);
-        } else {
-          newOptional.push(p);
-        }
+        newOptional.push(p);
       }
     }
     
