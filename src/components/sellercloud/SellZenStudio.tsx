@@ -23,10 +23,9 @@ const MARKETPLACES = [
 ];
 
 const STYLES = [
-  { value: 'commercial', label: 'Commercial' },
-  { value: 'minimalist', label: 'Minimalist' },
-  { value: 'luxury', label: 'Luxury' },
-  { value: 'vibrant', label: 'Vibrant' },
+  { value: 'both', label: 'Infografika + Lifestyle' },
+  { value: 'infographic', label: 'Faqat Infografika' },
+  { value: 'lifestyle', label: 'Faqat Lifestyle' },
 ];
 
 interface GeneratedImage {
@@ -54,7 +53,7 @@ export function SellZenStudio() {
 
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [marketplace, setMarketplace] = useState('wildberries');
-  const [imageStyle, setImageStyle] = useState('commercial');
+  const [imageStyle, setImageStyle] = useState('both');
   const [productName, setProductName] = useState('');
   const [productDescription, setProductDescription] = useState('');
 
@@ -63,7 +62,12 @@ export function SellZenStudio() {
 
   const [isGeneratingImages, setIsGeneratingImages] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [history, setHistory] = useState<HistoryItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('sellzen-history');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
 
   const imagePrice = getFeaturePrice('sellzen-image-generate')?.base_price_uzs || 8000;
 
@@ -87,12 +91,16 @@ export function SellZenStudio() {
     const item: HistoryItem = {
       id: Date.now().toString(),
       timestamp: Date.now(),
-      sourceImage: uploadedImage,
+      sourceImage: '', // don't store large base64 in localStorage
       results,
       marketplace,
       style: imageStyle,
     };
-    setHistory(prev => [item, ...prev].slice(0, 20));
+    setHistory(prev => {
+      const next = [item, ...prev].slice(0, 20);
+      try { localStorage.setItem('sellzen-history', JSON.stringify(next)); } catch {}
+      return next;
+    });
   };
 
   const handleGenerateImages = async () => {
@@ -123,8 +131,7 @@ export function SellZenStudio() {
           productName: productName || undefined,
           productDescription: productDescription || undefined,
           marketplace,
-          variants: imageStyle === 'all' ? ['infographic', 'lifestyle'] 
-            : imageStyle === 'infographic' ? ['infographic'] 
+          variants: imageStyle === 'infographic' ? ['infographic'] 
             : imageStyle === 'lifestyle' ? ['lifestyle']
             : ['infographic', 'lifestyle'],
         },
@@ -219,12 +226,18 @@ export function SellZenStudio() {
                     key={item.id}
                     className="flex items-center gap-3 p-2 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
                     onClick={() => {
-                      setUploadedImage(item.sourceImage);
                       setGeneratedImages(item.results);
+                      setCarouselIndex(0);
                       setShowHistory(false);
                     }}
                   >
-                    <img src={item.sourceImage} alt="" className="w-10 h-10 rounded object-cover shrink-0" />
+                    {item.results.filter(r => r.url)[0]?.url ? (
+                      <img src={item.results.filter(r => r.url)[0].url!} alt="" className="w-10 h-10 rounded object-cover shrink-0" />
+                    ) : (
+                      <div className="w-10 h-10 rounded bg-muted flex items-center justify-center shrink-0">
+                        <Image className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    )}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
                         <Image className="h-3 w-3 text-primary" />
