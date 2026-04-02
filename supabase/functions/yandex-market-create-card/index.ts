@@ -704,21 +704,198 @@ JAVOB: Faqat bitta ID raqam yoz, hech narsa qo'shma:`;
 // ============ STEP 2: FETCH CATEGORY PARAMETERS ============
 
 async function fetchCategoryParameters(apiKey: string, categoryId: number): Promise<any[]> {
+  // Try NEW API first (returns more params including filter params), then fallback to v2
+  const endpoints = [
+    `${YANDEX_API}/category/${categoryId}/parameters`,
+    `${YANDEX_API}/v2/category/${categoryId}/parameters`,
+  ];
+  
+  for (const url of endpoints) {
+    try {
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: { "Api-Key": apiKey, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (!resp.ok) {
+        console.warn(`Params fetch from ${url.includes('/v2/') ? 'v2' : 'v1'} failed: ${resp.status}`);
+        continue;
+      }
+      const data = await resp.json();
+      const params = data.result?.parameters || data.parameters || [];
+      console.log(`📋 Category ${categoryId} params from ${url.includes('/v2/') ? 'v2' : 'v1'} API: ${params.length} total`);
+      
+      // Log param types breakdown
+      const required = params.filter((p: any) => p.required === true || p.constraintType === "REQUIRED" || p.mandatory === true || p.importance === "REQUIRED" || p.constraint === "REQUIRED");
+      const recommended = params.filter((p: any) => p.constraintType === "RECOMMENDED" || p.importance === "RECOMMENDED" || p.constraint === "RECOMMENDED");
+      console.log(`📋 Breakdown: ${required.length} REQUIRED, ${recommended.length} RECOMMENDED, ${params.length - required.length - recommended.length} other`);
+      
+      if (params.length > 0) return params;
+    } catch (e) {
+      console.warn(`Params fetch error (${url.includes('/v2/') ? 'v2' : 'v1'}):`, e);
+    }
+  }
+  
+  console.error(`❌ No params fetched for category ${categoryId} from any endpoint`);
+  return [];
+}
+
+// ============ POST-CREATION: Fetch content recommendations & fill missing ============
+
+async function fetchContentRecommendations(
+  apiKey: string, businessId: string, offerId: string
+): Promise<{ missingParams: any[]; contentScore: number | null }> {
   try {
-    const resp = await fetch(`${YANDEX_API}/v2/category/${categoryId}/parameters`, {
+    // Wait for Yandex to process the offer
+    await new Promise(r => setTimeout(r, 2000));
+    
+    const resp = await fetch(`${YANDEX_API}/businesses/${businessId}/offer-cards/updates`, {
       method: "POST",
       headers: { "Api-Key": apiKey, "Content-Type": "application/json" },
-      body: JSON.stringify({}),
+      body: JSON.stringify({
+        offerIds: [offerId],
+        cardStatuses: ["HAS_CARD_CAN_NOT_UPDATE", "NO_CARD_NEED_CONTENT", "HAS_CARD_CAN_UPDATE"],
+      }),
     });
+    
     if (!resp.ok) {
-      console.error(`Params fetch failed: ${resp.status}`);
-      return [];
+      console.warn(`Content recommendations fetch failed: ${resp.status}`);
+      return { missingParams: [], contentScore: null };
     }
+    
     const data = await resp.json();
-    return data.result?.parameters || [];
+    const offerResult = data.result?.offerCards?.[0] || data.offerCards?.[0];
+    if (!offerResult) return { missingParams: [], contentScore: null };
+    
+    const recommendations = offerResult.cardRecommendations || offerResult.recommendations || [];
+    const missingParams: any[] = [];
+    
+    for (const rec of recommendations) {
+      if (rec.type === "PARAMETER" && rec.parameter) {
+        missingParams.push({
+          id: rec.parameter.id,
+          name: rec.parameter.name,
+          type: rec.parameter.type || "TEXT",
+          required: rec.importance === "REQUIRED" || rec.constraintType === "REQUIRED",
+          recommended: rec.importance === "RECOMMENDED" || rec.constraintType === "RECOMMENDED",
+          values: rec.parameter.values || [],
+        });
+      }
+    }
+    
+    const contentScore = offerResult.contentScore || offerResult.rating || null;
+    console.log(`📊 Content recommendations: ${missingParams.length} missing params, score: ${contentScore || 'N/A'}`);
+    
+    return { missingParams, contentScore };
   } catch (e) {
-    console.error("Params fetch error:", e);
-    return [];
+    console.warn("Content recommendations error:", e);
+    return { missingParams: [], contentScore: null };
+  }
+}
+
+async function fillMissingContentParams(
+  apiKey: string, businessId: string, offerId: string, offer: any,
+  missingParams: any[], product: any, categoryName: string, lovableApiKey: string
+): Promise<{ filled: number; updatedOffer: boolean }> {
+  if (missingParams.length === 0 || !lovableApiKey) return { filled: 0, updatedOffer: false };
+  
+  const formatParam = (p: any) => {
+    let s = `  - id:${p.id}, "${p.name}", type:${p.type || "TEXT"}`;
+    if (p.values?.length) {
+      const vals = p.values.slice(0, 10).map((v: any) => `{id:${v.id},"${v.value}"}`).join(", ");
+      s += `\n    OPTIONS:[${vals}]`;
+    }
+    return s;
+  };
+  
+  const requiredMissing = missingParams.filter(p => p.required);
+  const recommendedMissing = missingParams.filter(p => p.recommended);
+  const otherMissing = missingParams.filter(p => !p.required && !p.recommended);
+  
+  console.log(`🔄 Post-creation fill: ${requiredMissing.length} REQUIRED + ${recommendedMissing.length} RECOMMENDED + ${otherMissing.length} other missing`);
+  
+  const prompt = `VAZIFA: Yandex Market kartochkasi uchun BO'SH qolgan parametrlarni to'ldir!
+Bu parametrlar to'ldirilmasa kartochka sifat balli PAST qoladi!
+
+Mahsulot: "${product.name}" (${categoryName})
+Brend: ${offer.vendor || "OEM"}
+
+⛔ "ПРОЧИЕ ХАРАКТЕРИСТИКИ" / "ПРОЧЕЕ" parametrni TO'LDIRMA!
+
+${requiredMissing.length > 0 ? `⚠️⚠️⚠️ MAJBURIY — "ASOSIY XUSUSIYATLAR" (${requiredMissing.length} ta):
+${requiredMissing.map(formatParam).join("\n")}
+` : ''}
+${recommendedMissing.length > 0 ? `⚠️ FILTRLAR — "QO'SHIMCHA XUSUSIYATLAR" (${recommendedMissing.length} ta):
+${recommendedMissing.map(formatParam).join("\n")}
+` : ''}
+${otherMissing.length > 0 ? `QO'SHIMCHA (${otherMissing.length} ta):
+${otherMissing.map(formatParam).join("\n")}
+` : ''}
+
+QOIDALAR:
+- OPTIONS bor → valueId (raqam) tanla
+- TEXT → FAQAT qiymat
+- BOOLEAN → "true"/"false"
+- Bilmasang taxminiy yoz!
+JAVOB FAQAT JSON array: [{"parameterId":123,"valueId":456}]`;
+
+  try {
+    const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${lovableApiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.1,
+        max_tokens: 8000,
+      }),
+    });
+    
+    if (!resp.ok) return { filled: 0, updatedOffer: false };
+    
+    const data = await resp.json();
+    const content = data.choices?.[0]?.message?.content || "";
+    const arrMatch = content.match(/\[[\s\S]*\]/);
+    if (!arrMatch) return { filled: 0, updatedOffer: false };
+    
+    let extraParams: any[] = [];
+    try {
+      extraParams = JSON.parse(arrMatch[0]);
+    } catch {
+      const lastObj = arrMatch[0].lastIndexOf('}');
+      if (lastObj > 0) {
+        try { extraParams = JSON.parse(arrMatch[0].substring(0, lastObj + 1) + ']'); } catch {}
+      }
+    }
+    
+    if (!Array.isArray(extraParams) || extraParams.length === 0) return { filled: 0, updatedOffer: false };
+    
+    // Merge with existing params
+    const existingMap = new Map((offer.parameterValues || []).map((p: any) => [Number(p.parameterId), p]));
+    for (const ep of extraParams) {
+      if (ep.parameterId) {
+        const pv: any = { parameterId: Number(ep.parameterId) };
+        if (ep.valueId !== undefined) pv.valueId = Number(ep.valueId);
+        else if (ep.value !== undefined) pv.value = String(ep.value);
+        else continue;
+        existingMap.set(Number(ep.parameterId), pv);
+      }
+    }
+    offer.parameterValues = Array.from(existingMap.values());
+    
+    // Send updated offer
+    const updateResp = await fetch(`${YANDEX_API}/businesses/${businessId}/offer-mappings/update`, {
+      method: "POST",
+      headers: { "Api-Key": apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({ offerMappings: [{ offer }] }),
+    });
+    
+    const updated = updateResp.ok;
+    console.log(`✅ Post-creation fill: +${extraParams.length} params, update ${updated ? 'OK' : 'FAILED'}`);
+    return { filled: extraParams.length, updatedOffer: updated };
+  } catch (e) {
+    console.error("Post-creation fill error:", e);
+    return { filled: 0, updatedOffer: false };
   }
 }
 
@@ -1837,6 +2014,25 @@ serve(async (req) => {
           }
         }
 
+        // ═══ STEP 7.7: Post-creation content fill — fetch Yandex recommendations & fill missing params ═══
+        let contentFillResult: any = null;
+        if (yResp.ok && LOVABLE_KEY) {
+          try {
+            const { missingParams, contentScore } = await fetchContentRecommendations(creds.apiKey, creds.businessId, sku);
+            if (missingParams.length > 0) {
+              contentFillResult = await fillMissingContentParams(
+                creds.apiKey, creds.businessId, sku, offer,
+                missingParams, product, leafCat.name, LOVABLE_KEY
+              );
+              console.log(`📊 Post-creation fill: +${contentFillResult.filled} params, score before: ${contentScore || 'N/A'}`);
+            } else {
+              console.log(`✅ No missing params from Yandex recommendations (score: ${contentScore || 'N/A'})`);
+            }
+          } catch (e) {
+            console.warn("Post-creation content fill error:", e);
+          }
+        }
+
         // ═══ STEP 8: Save locally ═══
         let saved = null;
         if (shopId) {
@@ -1872,6 +2068,7 @@ serve(async (req) => {
           mxikCode: mxik.code,
           uzContentSent: uzSent,
           qualityCheck,
+          contentFill: contentFillResult,
           yandexResponse: yResult,
           localProductId: saved?.id,
           error: yResp.ok ? null : (yResult?.errors?.map((e: any) => e.message || e.code).join('; ') || `HTTP ${yResp.status}: ${respText.substring(0, 200)}`),
