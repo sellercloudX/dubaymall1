@@ -2014,6 +2014,25 @@ serve(async (req) => {
           }
         }
 
+        // ═══ STEP 7.7: Post-creation content fill — fetch Yandex recommendations & fill missing params ═══
+        let contentFillResult: any = null;
+        if (yResp.ok && LOVABLE_KEY) {
+          try {
+            const { missingParams, contentScore } = await fetchContentRecommendations(creds.apiKey, creds.businessId, sku);
+            if (missingParams.length > 0) {
+              contentFillResult = await fillMissingContentParams(
+                creds.apiKey, creds.businessId, sku, offer,
+                missingParams, product, leafCat.name, LOVABLE_KEY
+              );
+              console.log(`📊 Post-creation fill: +${contentFillResult.filled} params, score before: ${contentScore || 'N/A'}`);
+            } else {
+              console.log(`✅ No missing params from Yandex recommendations (score: ${contentScore || 'N/A'})`);
+            }
+          } catch (e) {
+            console.warn("Post-creation content fill error:", e);
+          }
+        }
+
         // ═══ STEP 8: Save locally ═══
         let saved = null;
         if (shopId) {
