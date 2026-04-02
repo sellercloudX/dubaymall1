@@ -23,10 +23,9 @@ const MARKETPLACES = [
 ];
 
 const STYLES = [
-  { value: 'commercial', label: 'Commercial' },
-  { value: 'minimalist', label: 'Minimalist' },
-  { value: 'luxury', label: 'Luxury' },
-  { value: 'vibrant', label: 'Vibrant' },
+  { value: 'both', label: 'Infografika + Lifestyle' },
+  { value: 'infographic', label: 'Faqat Infografika' },
+  { value: 'lifestyle', label: 'Faqat Lifestyle' },
 ];
 
 interface GeneratedImage {
