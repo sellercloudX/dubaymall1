@@ -226,12 +226,18 @@ export function SellZenStudio() {
                     key={item.id}
                     className="flex items-center gap-3 p-2 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
                     onClick={() => {
-                      setUploadedImage(item.sourceImage);
                       setGeneratedImages(item.results);
+                      setCarouselIndex(0);
                       setShowHistory(false);
                     }}
                   >
-                    <img src={item.sourceImage} alt="" className="w-10 h-10 rounded object-cover shrink-0" />
+                    {item.results.filter(r => r.url)[0]?.url ? (
+                      <img src={item.results.filter(r => r.url)[0].url!} alt="" className="w-10 h-10 rounded object-cover shrink-0" />
+                    ) : (
+                      <div className="w-10 h-10 rounded bg-muted flex items-center justify-center shrink-0">
+                        <Image className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    )}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
                         <Image className="h-3 w-3 text-primary" />
