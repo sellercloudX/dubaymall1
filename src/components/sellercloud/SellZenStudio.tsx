@@ -91,12 +91,16 @@ export function SellZenStudio() {
     const item: HistoryItem = {
       id: Date.now().toString(),
       timestamp: Date.now(),
-      sourceImage: uploadedImage,
+      sourceImage: '', // don't store large base64 in localStorage
       results,
       marketplace,
       style: imageStyle,
     };
-    setHistory(prev => [item, ...prev].slice(0, 20));
+    setHistory(prev => {
+      const next = [item, ...prev].slice(0, 20);
+      try { localStorage.setItem('sellzen-history', JSON.stringify(next)); } catch {}
+      return next;
+    });
   };
 
   const handleGenerateImages = async () => {
