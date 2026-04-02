@@ -123,7 +123,10 @@ export function SellZenStudio() {
           productName: productName || undefined,
           productDescription: productDescription || undefined,
           marketplace,
-          style: imageStyle,
+          variants: imageStyle === 'all' ? ['infographic', 'lifestyle'] 
+            : imageStyle === 'infographic' ? ['infographic'] 
+            : imageStyle === 'lifestyle' ? ['lifestyle']
+            : ['infographic', 'lifestyle'],
         },
       });
 
