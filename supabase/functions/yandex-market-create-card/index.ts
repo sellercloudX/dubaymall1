@@ -2068,6 +2068,7 @@ serve(async (req) => {
           mxikCode: mxik.code,
           uzContentSent: uzSent,
           qualityCheck,
+          contentFill: contentFillResult,
           yandexResponse: yResult,
           localProductId: saved?.id,
           error: yResp.ok ? null : (yResult?.errors?.map((e: any) => e.message || e.code).join('; ') || `HTTP ${yResp.status}: ${respText.substring(0, 200)}`),
