@@ -131,8 +131,7 @@ export function SellZenStudio() {
           productName: productName || undefined,
           productDescription: productDescription || undefined,
           marketplace,
-          variants: imageStyle === 'all' ? ['infographic', 'lifestyle'] 
-            : imageStyle === 'infographic' ? ['infographic'] 
+          variants: imageStyle === 'infographic' ? ['infographic'] 
             : imageStyle === 'lifestyle' ? ['lifestyle']
             : ['infographic', 'lifestyle'],
         },
