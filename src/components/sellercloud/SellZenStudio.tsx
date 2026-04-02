@@ -62,7 +62,12 @@ export function SellZenStudio() {
 
   const [isGeneratingImages, setIsGeneratingImages] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [history, setHistory] = useState<HistoryItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('sellzen-history');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
 
   const imagePrice = getFeaturePrice('sellzen-image-generate')?.base_price_uzs || 8000;
 
