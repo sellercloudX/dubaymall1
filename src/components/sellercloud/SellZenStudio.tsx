@@ -53,7 +53,7 @@ export function SellZenStudio() {
 
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [marketplace, setMarketplace] = useState('wildberries');
-  const [imageStyle, setImageStyle] = useState('commercial');
+  const [imageStyle, setImageStyle] = useState('both');
   const [productName, setProductName] = useState('');
   const [productDescription, setProductDescription] = useState('');
 
