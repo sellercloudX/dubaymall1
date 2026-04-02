@@ -295,25 +295,34 @@ serve(async (req) => {
     const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Validate JWT via getClaims (local verification, no server roundtrip)
+    // Validate JWT via getUser (reliable server-side verification)
     const token = authHeader.replace("Bearer ", "");
-    const anonClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(token);
-    
-    if (claimsError || !claimsData?.claims?.sub) {
-      // Fallback to getUser if getClaims fails
+    let user: any;
+    try {
+      // Try getClaims first for speed (local JWT verification)
+      const anonClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      if (typeof anonClient.auth.getClaims === 'function') {
+        const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(token);
+        if (!claimsError && claimsData?.claims?.sub) {
+          user = { id: claimsData.claims.sub as string, email: claimsData.claims.email as string };
+        }
+      }
+    } catch (e) {
+      console.warn("getClaims not available, using getUser fallback:", e?.message);
+    }
+
+    if (!user) {
       const { data: { user: fallbackUser }, error: fallbackError } = await supabase.auth.getUser(token);
       if (fallbackError || !fallbackUser) {
+        console.error("Auth failed:", fallbackError?.message);
         return new Response(
           JSON.stringify({ error: "Invalid authentication" }),
           { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      var user = fallbackUser;
-    } else {
-      var user = { id: claimsData.claims.sub as string, email: claimsData.claims.email as string } as any;
+      user = fallbackUser;
     }
 
     // Get marketplace connection
