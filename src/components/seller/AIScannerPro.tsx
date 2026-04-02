@@ -491,9 +491,10 @@ export function AIScannerPro({ shopId, onSuccess }: AIScannerProProps) {
                 action: 'generate_images',
                 imageBase64,
                 productName: normalizedProductName,
+                productDescription: analyzed?.description || '',
                 category: analyzed?.category || '',
                 marketplace: sellzenMarketplace,
-                style: 'commercial',
+                variants: ['infographic', 'lifestyle'],
               },
             });
 

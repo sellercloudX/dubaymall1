@@ -78,21 +78,27 @@ serve(async (req) => {
       });
     }
 
-    const { action, imageBase64, productName, productDescription, category, marketplace, style } = await req.json();
+    const { action, imageBase64, productName, productDescription, category, marketplace, style, variants } = await req.json();
 
     if (action === "generate_images") {
       // Build request for SellZen API v3
       const body: Record<string, any> = {
         product_name: productName || "Mahsulot",
         marketplace: MARKETPLACE_MAP[marketplace || "wildberries"] || "wildberries",
-        style: style || "commercial",
       };
+
+      // v3: use variants array (default both infographic + lifestyle)
+      if (variants && Array.isArray(variants) && variants.length > 0) {
+        body.variants = variants;
+      } else {
+        // Default: generate both variants
+        body.variants = ["infographic", "lifestyle"];
+      }
 
       if (productDescription) body.product_description = productDescription;
 
-      // Send image as base64 or URL
+      // Send image as base64
       if (imageBase64) {
-        // Ensure proper data URI prefix
         if (imageBase64.startsWith("data:image/")) {
           body.product_image_base64 = imageBase64;
         } else {
@@ -102,7 +108,7 @@ serve(async (req) => {
 
       if (category) body.category = category;
 
-      console.log(`SellZen v2 request: marketplace=${body.marketplace}, style=${body.style}`);
+      console.log(`SellZen v3 request: marketplace=${body.marketplace}, variants=${JSON.stringify(body.variants)}`);
 
       try {
         const response = await fetch(SELLZEN_URL, {
@@ -116,7 +122,7 @@ serve(async (req) => {
 
         if (!response.ok) {
           const errText = await response.text();
-          console.error(`SellZen v2 error ${response.status}: ${errText}`);
+          console.error(`SellZen v3 error ${response.status}: ${errText}`);
           return new Response(JSON.stringify({ 
             error: `SellZen xatosi: ${response.status}`,
             details: errText,
@@ -127,18 +133,18 @@ serve(async (req) => {
         }
 
         const data = await response.json();
-        console.log(`SellZen v2 response: success=${data.success}, images=${data.images?.length}`);
+        console.log(`SellZen v3 response: success=${data.success}, images=${data.images?.length}, job_id=${data.job_id}`);
 
         if (data.success && data.images?.length > 0) {
-          // Map new API response to our format
+          // Map v3 API response to our format
           const results = data.images.map((img: any) => ({
             style: img.variant,
             label: img.variant === 'infographic' ? 'Infografika' : 'Lifestyle',
             url: img.image_url,
-            format: img.format,
+            format: img.format || 'png',
           }));
 
-          // Include any errors
+          // Include any partial errors from v3
           if (data.errors?.length > 0) {
             data.errors.forEach((err: any) => {
               results.push({
@@ -150,7 +156,7 @@ serve(async (req) => {
             });
           }
 
-          await logUsage(supabase, userId, 'sellzen_studio', 'sellzen-v2');
+          await logUsage(supabase, userId, 'sellzen_studio', 'sellzen-v3');
 
           return new Response(JSON.stringify({ 
             results,
@@ -170,7 +176,7 @@ serve(async (req) => {
         });
 
       } catch (e) {
-        console.error('SellZen v2 exception:', e);
+        console.error('SellZen v3 exception:', e);
         return new Response(JSON.stringify({ error: String(e) }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
