@@ -231,6 +231,24 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 });
 
 // ===== Command Handler =====
+function getCommandFailureMessage(commandType, response) {
+  if (commandType === 'create_product') {
+    return response?.result?.validationErrors
+      || response?.result?.message
+      || response?.error
+      || 'Mahsulot Uzum kabinetida saqlanmadi';
+  }
+  return response?.result?.message || response?.error || 'Buyruq bajarilmadi';
+}
+
+function isCommandSuccessful(commandType, response) {
+  if (!response?.success) return false;
+  if (commandType === 'create_product') {
+    return response?.result?.saved === true;
+  }
+  return true;
+}
+
 async function handleCommand(command) {
   const { id, command_type, payload, status } = command;
   if (status !== 'pending') return;
@@ -250,21 +268,21 @@ async function handleCommand(command) {
 
       console.log('[SCX] Content script response:', JSON.stringify(response));
 
-      if (response?.success) {
-        await updateCommandStatus(id, 'completed', response.result || { saved: false, message: 'No result details' });
+      if (isCommandSuccessful(command_type, response)) {
+        await updateCommandStatus(id, 'completed', response.result || { saved: true });
         chrome.notifications.create({
           type: 'basic', iconUrl: 'icons/icon128.png',
           title: 'SellerCloudX',
           message: getSuccessMessage(command_type),
         });
-        return; // Success — exit
-      } else {
-        lastError = response?.error || 'Content script error';
-        if (attempt < 2) {
-          console.warn('[SCX] Attempt', attempt, 'failed, retrying...');
-          await new Promise(r => setTimeout(r, 3000));
-          continue;
-        }
+        return;
+      }
+
+      lastError = getCommandFailureMessage(command_type, response);
+      if (attempt < 2) {
+        console.warn('[SCX] Attempt', attempt, 'failed, retrying...');
+        await new Promise(r => setTimeout(r, 3000));
+        continue;
       }
     } catch (err) {
       console.error('[SCX] Command attempt', attempt, 'error:', err);
