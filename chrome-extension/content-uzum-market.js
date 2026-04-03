@@ -173,8 +173,53 @@ function cloneCurrentProduct() {
     return;
   }
   // Open dashboard with clone intent
-  window.open(`https://sellercloudx.lovable.app/seller-cloud-mobile?clone_url=${encodeURIComponent(url)}`, '_blank');
-  scxShowToast('📋 Klonlash uchun dashboard ochilmoqda...', 'info');
+  // Scrape product data and save, then open dashboard
+  scxShowToast('📋 Mahsulot ma\'lumotlari yig\'ilmoqda...', 'info');
+  
+  const productData = {
+    url,
+    title: document.querySelector('h1, [class*="title"], [class*="ProductTitle"]')?.textContent?.trim(),
+    price: null,
+    images: [],
+    characteristics: [],
+    description: '',
+    seller: null,
+  };
+  
+  // Scrape price
+  const priceEls = document.querySelectorAll('[class*="price"], [class*="Price"]');
+  priceEls.forEach(el => {
+    const num = scxParseNumber(el.textContent);
+    if (num > 100 && !productData.price) productData.price = num;
+  });
+  
+  // Scrape images
+  document.querySelectorAll('[class*="gallery"] img, [class*="slider"] img, [class*="image"] img, [class*="magnifier"] img, picture img').forEach(img => {
+    const src = img.src || img.dataset?.src;
+    if (src && src.includes('http') && !productData.images.includes(src)) {
+      productData.images.push(src);
+    }
+  });
+  
+  // Scrape description
+  const descEl = document.querySelector('[class*="description"], [class*="Description"]');
+  if (descEl) productData.description = descEl.textContent?.trim()?.substring(0, 2000);
+  
+  // Scrape characteristics
+  document.querySelectorAll('[class*="characteristic"] tr, [class*="spec"] tr, [class*="param"] tr, [class*="Attribute"] tr').forEach(tr => {
+    const cells = [...tr.querySelectorAll('td, th')].map(c => c.textContent.trim());
+    if (cells.length >= 2) productData.characteristics.push({ key: cells[0], value: cells[1] });
+  });
+  
+  // Seller
+  const sellerEl = document.querySelector('[class*="seller"], [class*="Seller"], [class*="shop"]');
+  if (sellerEl) productData.seller = sellerEl.textContent.trim();
+  
+  // Save scraped data
+  await scxSaveScrapedData('uzum', 'competitor_product', productData, url);
+  
+  scxShowToast('✅ Ma\'lumotlar saqlandi! Dashboard ochilmoqda...', 'success');
+  window.open(`https://sellercloudx.lovable.app/seller-cloud-x?clone_source=uzum_market&clone_url=${encodeURIComponent(url)}`, '_blank');
 }
 
 // ===== Inject marketplace overlays =====
