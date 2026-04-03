@@ -400,6 +400,37 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
       }
       
       if (targetMp === 'uzum') {
+        // Get full product data from store for richer context
+        const storeProducts = store.getProducts(product.marketplace);
+        const fullProduct: any = storeProducts.find(p => p.offerId === product.offerId);
+        
+        // Extract source metadata for Uzum — universal for all source marketplaces
+        let uzumSourceBrand = '';
+        let uzumSourceBarcode = '';
+        let uzumSourceColor = '';
+        let uzumSourceModel = '';
+        let uzumSourceChars: any[] = [];
+        let uzumSourceWeight: number | undefined;
+        
+        if (product.marketplace === 'yandex' || product.marketplace === 'wildberries') {
+          uzumSourceBrand = fullProduct?.brand || fullProduct?.vendor || fullProduct?.brandName || '';
+          uzumSourceBarcode = fullProduct?.barcode || fullProduct?.barcodes?.[0] || '';
+          uzumSourceColor = fullProduct?.color || '';
+          uzumSourceModel = fullProduct?.vendorCode || fullProduct?.model || '';
+          uzumSourceChars = fullProduct?.characteristics || fullProduct?.charcs || [];
+          uzumSourceWeight = fullProduct?.weightKg || fullProduct?.weightDimensions?.weight;
+        } else {
+          // Uzum to Uzum (self) or other
+          uzumSourceBrand = fullProduct?.brandName || fullProduct?.brand || '';
+          uzumSourceBarcode = fullProduct?.barcode || fullProduct?.ean || '';
+          uzumSourceColor = fullProduct?.color || '';
+          uzumSourceModel = fullProduct?.vendorCode || fullProduct?.article || '';
+          uzumSourceChars = fullProduct?.characteristicValues || fullProduct?.characteristics || [];
+        }
+        
+        const sourceMxikCode = product.mxikCode || fullProduct?.mxikCode;
+        const sourceMxikName = product.mxikName || fullProduct?.mxikName;
+        
         const { data, error } = await supabase.functions.invoke('create-uzum-card', {
           body: {
             product: {
@@ -409,7 +440,16 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
               costPrice: costPrice,
               images: validImages,
               category: productCategory,
-              shopSku: product.shopSku, // Preserve original SKU
+              shopSku: product.shopSku,
+              sourceMarketplace: product.marketplace,
+              brand: uzumSourceBrand,
+              barcode: uzumSourceBarcode,
+              color: uzumSourceColor,
+              model: uzumSourceModel,
+              mxikCode: sourceMxikCode,
+              mxikName: sourceMxikName,
+              weight: uzumSourceWeight,
+              sourceCharacteristics: uzumSourceChars,
             },
             cloneMode: true,
           },
@@ -427,9 +467,10 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
           toast.error(`${product.name.slice(0, 30)}: ${data?.error || 'API xatosi'}`);
           return false;
         }
-        if (data.method === 'prepared' || data.method === 'extension_autofill') {
-          toast.success(`${product.name.slice(0, 25)}: AI kontent tayyor ✨ Extension avtomatik to'ldiradi`, { duration: 5000 });
-        }
+        
+        const score = data.qualityScore || 0;
+        const scoreEmoji = score >= 80 ? '🟢' : score >= 60 ? '🟡' : '🔴';
+        toast.success(`${product.name.slice(0, 25)}: ${scoreEmoji} ${score}/100 ball — Extension avtomatik to'ldiradi ✨`, { duration: 5000 });
         return true;
       }
       

@@ -429,82 +429,364 @@ async function enhanceOrders() {
 }
 
 // ===== 5. Command Handlers =====
+
+// Helper: wait for selector to appear
+function waitFor(selector, timeout = 10000) {
+  return new Promise((resolve) => {
+    const el = document.querySelector(selector);
+    if (el) return resolve(el);
+    const observer = new MutationObserver(() => {
+      const el = document.querySelector(selector);
+      if (el) { observer.disconnect(); resolve(el); }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    setTimeout(() => { observer.disconnect(); resolve(null); }, timeout);
+  });
+}
+
+// Helper: find input by nearby label text
+function findFieldByLabel(labelText, tag = 'input') {
+  const labels = document.querySelectorAll('label, [class*="label"], [class*="Label"], [class*="field-name"], [class*="FieldName"]');
+  for (const label of labels) {
+    const text = label.textContent?.toLowerCase().trim() || '';
+    if (text.includes(labelText.toLowerCase())) {
+      // Try: label's for attribute, or nearby input
+      const forId = label.getAttribute('for');
+      if (forId) {
+        const el = document.getElementById(forId);
+        if (el) return el;
+      }
+      // Sibling or child input
+      const parent = label.closest('[class*="field"], [class*="Field"], [class*="form-group"], [class*="FormGroup"], [class*="row"], [class*="Row"]') || label.parentElement;
+      if (parent) {
+        const el = parent.querySelector(`${tag}, [contenteditable="true"]`);
+        if (el) return el;
+      }
+    }
+  }
+  return null;
+}
+
+// Helper: find and click dropdown option
+async function selectDropdownOption(text) {
+  await sleep(500);
+  const options = document.querySelectorAll('[class*="option"], [class*="Option"], [class*="menu-item"], [class*="MenuItem"], [role="option"], li');
+  for (const opt of options) {
+    if (opt.textContent?.trim().toLowerCase().includes(text.toLowerCase())) {
+      clickEl(opt);
+      return true;
+    }
+  }
+  return false;
+}
+
+// Helper: fill contenteditable (rich text editors)
+function fillContentEditable(el, text) {
+  if (!el) return false;
+  el.focus();
+  el.innerHTML = text.replace(/\n/g, '<br>');
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+  el.dispatchEvent(new Event('blur', { bubbles: true }));
+  return true;
+}
+
 async function handleCreateProduct(payload) {
-  console.log('[SCX] Creating product:', payload.title);
-  showToast('📦 Kartochka ma\'lumotlari kiritilmoqda...', 'info');
+  console.log('[SCX v3] Creating product with FULL data:', Object.keys(payload));
+  showToast('📦 Kartochka yaratilmoqda — to\'liq rejim...', 'info');
 
-  if (!window.location.href.includes('/goods/create')) {
+  // Step 1: Navigate to create page
+  if (!window.location.href.includes('/goods/create') && !window.location.href.includes('/product/create')) {
     window.location.href = 'https://seller.uzum.uz/goods/create';
-    await sleep(3000);
-  }
-  await sleep(2000);
-
-  // Title
-  for (const input of document.querySelectorAll('input[type="text"]')) {
-    const ctx = (input.placeholder + ' ' + (input.closest('label, .form-group, [class*="field"]')?.textContent || '')).toLowerCase();
-    if (ctx.includes('назван') || ctx.includes('nomi') || ctx.includes('название товара')) {
-      fillInput(input, payload.titleRu || payload.title);
-      break;
-    }
+    await sleep(4000);
+    await waitFor('[class*="create"], [class*="Create"], form', 8000);
+    await sleep(2000);
+  } else {
+    await sleep(1500);
   }
 
-  // Description
-  for (const ta of document.querySelectorAll('textarea')) {
-    const ctx = (ta.closest('label, .form-group, [class*="field"]')?.textContent || '').toLowerCase();
-    if (ctx.includes('описан') || ctx.includes('tavsif')) {
-      fillInput(ta, payload.descriptionRu || payload.description);
-      break;
-    }
-  }
+  let filledFields = 0;
+  let totalFields = 0;
 
-  // Price
-  for (const input of document.querySelectorAll('input[type="number"]')) {
-    const ctx = (input.placeholder + ' ' + (input.closest('label, .form-group, [class*="field"]')?.textContent || '')).toLowerCase();
-    if (ctx.includes('цена') || ctx.includes('narx') || ctx.includes('price')) {
-      fillInput(input, String(payload.price));
-      break;
-    }
-  }
+  // Step 2: Category selection (navigate tree)
+  totalFields++;
+  if (payload.categoryPath?.length > 0) {
+    showToast('📂 Kategoriya tanlanmoqda...', 'info');
+    const categoryBtn = document.querySelector('[class*="category"], [class*="Category"], button[class*="select"]');
+    if (categoryBtn) {
+      clickEl(categoryBtn);
+      await sleep(1000);
 
-  // SKU
-  if (payload.sku) {
-    for (const input of document.querySelectorAll('input')) {
-      const ctx = (input.placeholder || '').toLowerCase();
-      if (ctx.includes('sku') || ctx.includes('артикул')) { fillInput(input, payload.sku); break; }
-    }
-  }
-
-  // Images
-  if (payload.images?.length > 0) {
-    for (const url of payload.images) {
-      try {
-        const resp = await fetch(url);
-        const blob = await resp.blob();
-        const file = new File([blob], `uzum-${Date.now()}.jpg`, { type: 'image/jpeg' });
-        const fi = document.querySelector('input[type="file"][accept*="image"]') || document.querySelector('input[type="file"]');
-        if (fi) {
-          const dt = new DataTransfer();
-          dt.items.add(file);
-          fi.files = dt.files;
-          fi.dispatchEvent(new Event('change', { bubbles: true }));
-          await sleep(1500);
+      for (const cat of payload.categoryPath) {
+        const found = await selectDropdownOption(cat);
+        if (found) {
+          await sleep(800);
+          filledFields++;
         }
-      } catch {}
+      }
+      // Close category dialog if still open
+      await sleep(500);
     }
   }
 
-  // Attributes
-  if (payload.attributes?.length > 0) {
-    for (const attr of payload.attributes) {
-      for (const input of document.querySelectorAll('input[type="text"]')) {
-        const label = input.closest('[class*="field"], [class*="attribute"]')?.textContent || '';
-        if (label.toLowerCase().includes(attr.name.toLowerCase())) { fillInput(input, attr.value); break; }
+  // Step 3: Product name (UZ + RU)
+  totalFields += 2;
+  // Try to find UZ name field
+  const nameFields = document.querySelectorAll('input[type="text"]');
+  for (const input of nameFields) {
+    const ctx = ((input.placeholder || '') + ' ' + (input.closest('[class*="field"], label, [class*="Field"]')?.textContent || '')).toLowerCase();
+    if (ctx.includes('назван') || ctx.includes('nomi') || ctx.includes('название') || ctx.includes('наименование')) {
+      // Check if it's UZ or RU field
+      if (ctx.includes('узб') || ctx.includes("o'zbek") || ctx.includes('uz')) {
+        if (fillInput(input, payload.titleUz || payload.titleRu || payload.title)) filledFields++;
+      } else {
+        if (fillInput(input, payload.titleRu || payload.title)) filledFields++;
       }
     }
   }
 
-  showToast('✅ Kartochka ma\'lumotlari kiritildi!', 'success');
-  return { success: true, result: 'Product form filled' };
+  // Alternative: fill name by finding first text input in form
+  if (filledFields < 1) {
+    const firstInput = document.querySelector('form input[type="text"], [class*="create"] input[type="text"]');
+    if (firstInput && fillInput(firstInput, payload.titleRu || payload.titleUz || payload.title)) {
+      filledFields++;
+    }
+  }
+
+  await sleep(500);
+
+  // Step 4: Description (UZ + RU)
+  totalFields += 2;
+  const textareas = document.querySelectorAll('textarea, [contenteditable="true"]');
+  let descFilled = 0;
+  for (const ta of textareas) {
+    const ctx = (ta.closest('[class*="field"], label, [class*="Field"]')?.textContent || '').toLowerCase();
+    if (ctx.includes('описан') || ctx.includes('tavsif') || ctx.includes('description')) {
+      const isUz = ctx.includes('узб') || ctx.includes("o'zbek") || ctx.includes('uz');
+      const text = isUz ? (payload.descriptionUz || payload.descriptionRu) : (payload.descriptionRu || payload.descriptionUz);
+      if (ta.contentEditable === 'true') {
+        if (fillContentEditable(ta, text)) { filledFields++; descFilled++; }
+      } else {
+        if (fillInput(ta, text)) { filledFields++; descFilled++; }
+      }
+    }
+  }
+  // Fallback: fill all textareas if none matched
+  if (descFilled === 0 && textareas.length > 0) {
+    for (const ta of textareas) {
+      if (ta.closest('[class*="description"], [class*="Description"]')) {
+        const text = payload.descriptionRu || payload.descriptionUz || payload.description || '';
+        if (ta.contentEditable === 'true') {
+          fillContentEditable(ta, text);
+        } else {
+          fillInput(ta, text);
+        }
+        filledFields++;
+        break;
+      }
+    }
+  }
+
+  await sleep(500);
+
+  // Step 5: Brand
+  totalFields++;
+  const brandField = findFieldByLabel('бренд') || findFieldByLabel('brand') || findFieldByLabel('Бренд');
+  if (brandField && payload.brand) {
+    fillInput(brandField, payload.brand);
+    filledFields++;
+    await sleep(300);
+    // If dropdown appears, select matching option
+    await selectDropdownOption(payload.brand);
+  }
+
+  // Step 6: Price
+  totalFields++;
+  const priceInputs = document.querySelectorAll('input[type="number"], input[inputmode="numeric"]');
+  for (const input of priceInputs) {
+    const ctx = ((input.placeholder || '') + ' ' + (input.closest('[class*="field"], label')?.textContent || '')).toLowerCase();
+    if (ctx.includes('цена') || ctx.includes('narx') || ctx.includes('price') || ctx.includes('стоимость')) {
+      if (fillInput(input, String(payload.price || 0))) { filledFields++; break; }
+    }
+  }
+
+  // Step 7: SKU / Article
+  totalFields++;
+  if (payload.sku) {
+    const skuField = findFieldByLabel('артикул') || findFieldByLabel('sku') || findFieldByLabel('SKU');
+    if (skuField) {
+      fillInput(skuField, payload.sku);
+      filledFields++;
+    }
+  }
+
+  // Step 8: Barcode
+  totalFields++;
+  if (payload.barcode) {
+    const barcodeField = findFieldByLabel('штрих') || findFieldByLabel('barcode') || findFieldByLabel('EAN');
+    if (barcodeField) {
+      fillInput(barcodeField, payload.barcode);
+      filledFields++;
+    }
+  }
+
+  // Step 9: MXIK (IKPU) code
+  totalFields++;
+  if (payload.mxikCode) {
+    showToast('🏷️ MXIK kodi kiritilmoqda...', 'info');
+    const mxikField = findFieldByLabel('МХИК') || findFieldByLabel('IKPU') || findFieldByLabel('ТНВЭД') || findFieldByLabel('mxik') || findFieldByLabel('икпу');
+    if (mxikField) {
+      fillInput(mxikField, payload.mxikCode);
+      filledFields++;
+      await sleep(500);
+      // Auto-select from dropdown if appears
+      if (payload.mxikName) {
+        await selectDropdownOption(payload.mxikCode);
+      }
+    }
+  }
+
+  // Step 10: VGH — Weight, Height, Length, Width
+  totalFields += 4;
+  const vghMap = [
+    { labels: ['вес', 'og\'irlik', 'weight', 'масса'], value: payload.weight },
+    { labels: ['высот', 'balandlik', 'height'], value: payload.height },
+    { labels: ['длин', 'uzunlik', 'length'], value: payload.length },
+    { labels: ['ширин', 'kenglik', 'width'], value: payload.width },
+  ];
+  for (const vgh of vghMap) {
+    if (!vgh.value) continue;
+    for (const label of vgh.labels) {
+      const field = findFieldByLabel(label);
+      if (field) {
+        fillInput(field, String(vgh.value));
+        filledFields++;
+        break;
+      }
+    }
+  }
+
+  // Step 11: Characteristics / Attributes
+  totalFields++;
+  if (payload.characteristics?.length > 0) {
+    showToast(`📋 ${payload.characteristics.length} ta xususiyat kiritilmoqda...`, 'info');
+    for (const attr of payload.characteristics) {
+      // Try to find matching field by characteristic name
+      const field = findFieldByLabel(attr.name) || findFieldByLabel(attr.name.toLowerCase());
+      if (field) {
+        if (field.tagName === 'SELECT') {
+          // Try to select option
+          const options = field.querySelectorAll('option');
+          for (const opt of options) {
+            if (opt.textContent?.toLowerCase().includes(attr.value.toLowerCase())) {
+              field.value = opt.value;
+              field.dispatchEvent(new Event('change', { bubbles: true }));
+              break;
+            }
+          }
+        } else {
+          fillInput(field, attr.value);
+        }
+        await sleep(200);
+        // If dropdown appears, try to select
+        await selectDropdownOption(attr.value);
+      }
+    }
+    filledFields++;
+  }
+
+  // Step 12: Color
+  if (payload.color) {
+    const colorField = findFieldByLabel('цвет') || findFieldByLabel('rang') || findFieldByLabel('color');
+    if (colorField) {
+      fillInput(colorField, payload.color);
+      await sleep(300);
+      await selectDropdownOption(payload.color);
+    }
+  }
+
+  // Step 13: Images upload
+  totalFields++;
+  if (payload.images?.length > 0) {
+    showToast(`🖼️ ${payload.images.length} ta rasm yuklanmoqda...`, 'info');
+    
+    // Find file input
+    const fileInputs = document.querySelectorAll('input[type="file"]');
+    const imgInput = Array.from(fileInputs).find(fi => {
+      const accept = fi.getAttribute('accept') || '';
+      return accept.includes('image') || accept === '' || accept.includes('*');
+    }) || fileInputs[0];
+
+    if (imgInput) {
+      const dt = new DataTransfer();
+      let uploaded = 0;
+      
+      for (const url of payload.images.slice(0, 10)) {
+        try {
+          const resp = await fetch(url, { mode: 'cors' });
+          if (!resp.ok) continue;
+          const blob = await resp.blob();
+          if (blob.size < 1000) continue;
+          const ext = blob.type.includes('png') ? 'png' : blob.type.includes('webp') ? 'webp' : 'jpg';
+          const file = new File([blob], `product-${Date.now()}-${uploaded}.${ext}`, { type: blob.type || 'image/jpeg' });
+          dt.items.add(file);
+          uploaded++;
+          await sleep(300);
+        } catch (e) {
+          console.warn('[SCX] Image fetch failed:', url, e);
+        }
+      }
+      
+      if (uploaded > 0) {
+        imgInput.files = dt.files;
+        imgInput.dispatchEvent(new Event('change', { bubbles: true }));
+        imgInput.dispatchEvent(new Event('input', { bubbles: true }));
+        filledFields++;
+        showToast(`✅ ${uploaded} ta rasm yuklandi`, 'success');
+        await sleep(2000);
+      }
+    } else {
+      // Alternative: try drag-and-drop zone
+      const dropZone = document.querySelector('[class*="upload"], [class*="Upload"], [class*="dropzone"], [class*="DropZone"]');
+      if (dropZone) {
+        for (const url of payload.images.slice(0, 5)) {
+          try {
+            const resp = await fetch(url, { mode: 'cors' });
+            const blob = await resp.blob();
+            const file = new File([blob], `product-${Date.now()}.jpg`, { type: 'image/jpeg' });
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            const dropEvent = new DragEvent('drop', { dataTransfer: dt, bubbles: true });
+            dropZone.dispatchEvent(dropEvent);
+            await sleep(1500);
+          } catch {}
+        }
+        filledFields++;
+      }
+    }
+  }
+
+  // Step 14: Country of origin
+  if (payload.country) {
+    const countryField = findFieldByLabel('страна') || findFieldByLabel('mamlakat') || findFieldByLabel('country');
+    if (countryField) {
+      fillInput(countryField, payload.country);
+      await sleep(300);
+      await selectDropdownOption(payload.country);
+    }
+  }
+
+  const quality = Math.round((filledFields / Math.max(totalFields, 1)) * 100);
+  console.log(`[SCX v3] Filled ${filledFields}/${totalFields} fields (${quality}%)`);
+  showToast(`✅ Kartochka to'ldirildi: ${filledFields}/${totalFields} maydon (${quality}%)`, 'success');
+  
+  return { 
+    success: true, 
+    result: `Product form filled: ${filledFields}/${totalFields} fields (${quality}%)`,
+    filledFields,
+    totalFields,
+    quality,
+  };
 }
 
 async function handleToggleBoost(payload) {
