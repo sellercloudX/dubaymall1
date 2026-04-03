@@ -19,7 +19,10 @@
     "https://partner.market.yandex.ru/*",
     "https://mpstats.io/*",
     "https://zoomselling.io/*",
-    "https://*.supabase.co/*"
+    "https://*.supabase.co/*",
+    "https://sellercloudx.com/*",
+    "https://sellercloudx.lovable.app/*",
+    "https://*--af1b8d1e-f9cb-42f3-8678-575d0e45e819.lovable.app/*"
   ],
   "background": {
     "service_worker": "background.js",
