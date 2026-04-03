@@ -111,13 +111,15 @@ chrome.alarms.create('scx-heartbeat', { periodInMinutes: 5 });
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === 'scx-keepalive') {
-    // Ensure WebSocket is connected
     const config = await getConfig();
     if (config.accessToken && config.userId) {
       if (!ws || ws.readyState !== WebSocket.OPEN) {
         const validToken = await refreshToken();
         if (validToken) connectRealtime(validToken, config.userId);
       }
+      // Also check for pending commands that WebSocket might have missed
+      userId = config.userId;
+      await fetchPendingCommands();
     }
   }
 
