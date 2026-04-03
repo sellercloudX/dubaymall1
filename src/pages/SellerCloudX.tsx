@@ -103,7 +103,7 @@ export default function SellerCloudX() {
   useExchangeRate();
   
   const getInitialTab = () => {
-    const hash = window.location.hash.replace('#', '');
+    const hash = window.location.hash.replace('#', '').split('?')[0];
     return hash || 'marketplaces';
   };
   const [activeTab, setActiveTab] = useState(getInitialTab);
@@ -115,7 +115,7 @@ export default function SellerCloudX() {
   
   useEffect(() => {
     const onHashChange = () => {
-      const hash = window.location.hash.replace('#', '');
+      const hash = window.location.hash.replace('#', '').split('?')[0];
       if (hash) setActiveTab(hash);
     };
     window.addEventListener('hashchange', onHashChange);

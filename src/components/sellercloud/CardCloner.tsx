@@ -36,6 +36,12 @@ interface CloneableProduct {
   selected: boolean;
   mxikCode?: string;
   mxikName?: string;
+  brand?: string;
+  barcode?: string;
+  model?: string;
+  breadcrumbs?: string[];
+  characteristics?: Array<{ name: string; value: string }>;
+  sourceUrl?: string;
 }
 
 const MARKETPLACE_INFO = MARKETPLACE_CONFIG;
@@ -45,11 +51,98 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
   const { tasks } = useBackgroundTasks();
   const { getCostPrice, setCostPrice } = useCostPrices();
 
-  const [sourceMarketplace, setSourceMarketplace] = useState(connectedMarketplaces[0] || '');
+  const searchParams = useMemo(() => new URLSearchParams(window.location.search), []);
+  const externalSourceMarketplace = searchParams.get('source') || '';
+  const externalProductId = searchParams.get('productId') || '';
+
+  const [sourceMarketplace, setSourceMarketplace] = useState(
+    externalSourceMarketplace || connectedMarketplaces[0] || ''
+  );
   const [targetMarketplaces, setTargetMarketplaces] = useState<string[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [filterTab, setFilterTab] = useState<'all' | 'not_cloned' | 'cloned'>('all');
+  const [externalSourceProduct, setExternalSourceProduct] = useState<CloneableProduct | null>(null);
+  const [externalSourceLoading, setExternalSourceLoading] = useState(false);
+
+  useEffect(() => {
+    if (!user || !externalSourceMarketplace || !externalProductId) {
+      setExternalSourceProduct(null);
+      setExternalSourceLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadExternalSource = async () => {
+      setExternalSourceLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('marketplace_scraped_data')
+          .select('scraped_data, created_at')
+          .eq('user_id', user.id)
+          .eq('marketplace', externalSourceMarketplace)
+          .eq('data_type', 'competitor_product')
+          .contains('scraped_data', { productId: externalProductId })
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (error) throw error;
+        if (cancelled) return;
+
+        const scraped = (data?.scraped_data as any) || null;
+        if (!scraped) {
+          setExternalSourceProduct(null);
+          return;
+        }
+
+        const title = String(scraped.title || scraped.name || 'Raqobatchi mahsulot').trim();
+        const pictures = Array.isArray(scraped.images)
+          ? scraped.images.filter((img: unknown): img is string => typeof img === 'string' && img.startsWith('http'))
+          : Array.isArray(scraped.pictures)
+            ? scraped.pictures.filter((img: unknown): img is string => typeof img === 'string' && img.startsWith('http'))
+            : [];
+
+        const mapped: CloneableProduct = {
+          offerId: String(scraped.productId || externalProductId),
+          name: title,
+          price: Number(scraped.sellPrice || scraped.price || 0),
+          shopSku: String(scraped.productId || externalProductId),
+          pictures,
+          category: String(scraped.category || scraped.breadcrumbs?.slice?.(-1)?.[0] || 'Uzum Market'),
+          description: String(scraped.description || title),
+          marketplace: externalSourceMarketplace,
+          selected: false,
+          brand: String(scraped.brand || ''),
+          barcode: String(scraped.barcode || ''),
+          model: String(scraped.model || ''),
+          breadcrumbs: Array.isArray(scraped.breadcrumbs)
+            ? scraped.breadcrumbs.filter((item: unknown): item is string => typeof item === 'string')
+            : [],
+          characteristics: Array.isArray(scraped.characteristics)
+            ? scraped.characteristics
+                .filter((item: any) => item?.name && item?.value)
+                .map((item: any) => ({ name: String(item.name), value: String(item.value) }))
+            : [],
+          sourceUrl: String(scraped.sourceUrl || ''),
+        };
+
+        setExternalSourceProduct(mapped);
+      } catch (err) {
+        console.error('External clone source load error:', err);
+        if (!cancelled) setExternalSourceProduct(null);
+      } finally {
+        if (!cancelled) setExternalSourceLoading(false);
+      }
+    };
+
+    loadExternalSource();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user, externalSourceMarketplace, externalProductId]);
 
   // Clone history from DB: Set of "sourceMarketplace:offerId:targetMarketplace"
   const [cloneHistoryKeys, setCloneHistoryKeys] = useState<Set<string>>(new Set());
@@ -91,7 +184,8 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
   const isCloning = !!activeCloneTask;
   const cloneProgress = activeCloneTask?.progress || 0;
 
-  const isLoading = store.isLoadingProducts;
+  const isExternalSourceActive = !!externalSourceProduct && sourceMarketplace === externalSourceMarketplace;
+  const isLoading = store.isLoadingProducts || externalSourceLoading;
 
   useEffect(() => {
     setSelectedIds(new Set());
@@ -101,14 +195,22 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
 
   // Set default source when marketplaces change
   useEffect(() => {
+    const currentIsExternal = !!externalSourceProduct && sourceMarketplace === externalSourceMarketplace;
+    if (currentIsExternal) return;
     if (connectedMarketplaces.length > 0 && !connectedMarketplaces.includes(sourceMarketplace)) {
       setSourceMarketplace(connectedMarketplaces[0]);
     }
-  }, [connectedMarketplaces]);
+  }, [connectedMarketplaces, sourceMarketplace, externalSourceMarketplace, externalSourceProduct]);
 
   // Get products for selected source
   const products = useMemo((): CloneableProduct[] => {
     if (!sourceMarketplace) return [];
+    if (externalSourceProduct && sourceMarketplace === externalSourceMarketplace) {
+      return [{
+        ...externalSourceProduct,
+        selected: selectedIds.has(externalSourceProduct.offerId),
+      }];
+    }
     // Filter out only truly deleted/archived products — keep NO_STOCKS and INACTIVE for cloning
     const HIDDEN_STATUSES = ['ARCHIVED', 'DELISTED', 'DELETED', 'REMOVED'];
     return store.getProducts(sourceMarketplace)
@@ -128,14 +230,43 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
         selected: selectedIds.has(p.offerId),
         mxikCode: p.mxikCode,
         mxikName: p.mxikName,
+        brand: p.brandName,
+        barcode: p.barcode,
+        model: p.shopSku,
+        characteristics: Array.isArray(p.characteristics)
+          ? p.characteristics
+              .filter((item: any) => item?.name && item?.value)
+              .map((item: any) => ({ name: String(item.name), value: String(item.value) }))
+          : [],
       }));
-  }, [sourceMarketplace, store.dataVersion, selectedIds]);
+  }, [sourceMarketplace, externalSourceMarketplace, externalSourceProduct, store.dataVersion, selectedIds]);
 
   const getProductCount = useCallback((mp: string) => {
+    if (externalSourceProduct && mp === externalSourceMarketplace) return 1;
     return store.getProducts(mp).length;
-  }, [store.dataVersion]);
+  }, [store.dataVersion, externalSourceMarketplace, externalSourceProduct]);
 
-  const availableTargets = connectedMarketplaces.filter(mp => mp !== sourceMarketplace);
+  const availableTargets = isExternalSourceActive
+    ? connectedMarketplaces
+    : connectedMarketplaces.filter(mp => mp !== sourceMarketplace);
+
+  const sourceOptions = useMemo(() => {
+    const options = [...connectedMarketplaces];
+    if (externalSourceProduct && externalSourceMarketplace && !options.includes(externalSourceMarketplace)) {
+      options.unshift(externalSourceMarketplace);
+    }
+    return options;
+  }, [connectedMarketplaces, externalSourceMarketplace, externalSourceProduct]);
+
+  const getMarketplaceInfo = useCallback((marketplace: string) => {
+    if (marketplace === 'uzum_market') {
+      return {
+        ...(MARKETPLACE_INFO.uzum || { name: 'Uzum Market', logo: '', color: 'from-purple-500 to-violet-500' }),
+        name: 'Uzum Market source',
+      };
+    }
+    return MARKETPLACE_INFO[marketplace] || { name: marketplace, logo: '', color: 'from-gray-500 to-gray-600' };
+  }, []);
 
   const toggleTarget = (mp: string) => {
     setTargetMarketplaces(prev => prev.includes(mp) ? prev.filter(m => m !== mp) : [...prev, mp]);
@@ -240,16 +371,16 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
         let sourceColor = '';
         let sourceModel = '';
         
-        if (product.marketplace === 'uzum') {
+         if (product.marketplace === 'uzum' || product.marketplace === 'uzum_market') {
           // Uzum-specific field extraction
-          sourceBrand = fullProduct?.brandName || fullProduct?.brand || '';
+           sourceBrand = product.brand || fullProduct?.brandName || fullProduct?.brand || '';
           // Uzum category is the best subject equivalent
           sourceSubject = fullProduct?.category || product.category || '';
           sourceParent = fullProduct?.categoryTitle || fullProduct?.parentCategory || '';
-          sourceBarcode = fullProduct?.barcode || fullProduct?.ean || '';
-          sourceCharacteristics = fullProduct?.characteristicValues || fullProduct?.characteristics || fullProduct?.attributes || [];
+           sourceBarcode = product.barcode || fullProduct?.barcode || fullProduct?.ean || '';
+           sourceCharacteristics = product.characteristics || fullProduct?.characteristicValues || fullProduct?.characteristics || fullProduct?.attributes || [];
           sourceColor = fullProduct?.color || '';
-          sourceModel = fullProduct?.vendorCode || fullProduct?.model || fullProduct?.article || '';
+           sourceModel = product.model || fullProduct?.vendorCode || fullProduct?.model || fullProduct?.article || '';
           // Try to extract brand from product name if not available
           if (!sourceBrand && product.name) {
             // Common pattern: "BrandName ProductType..." - first capitalized word often is brand
@@ -347,8 +478,8 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
         let wbSourceBrand = '';
         let wbSourceCategory = productCategory;
         
-        if (product.marketplace === 'uzum') {
-          wbSourceBrand = fullProduct?.brandName || '';
+         if (product.marketplace === 'uzum' || product.marketplace === 'uzum_market') {
+           wbSourceBrand = product.brand || fullProduct?.brandName || '';
           // Uzum category is in Uzbek — pass it so AI can translate
           wbSourceCategory = fullProduct?.category || product.category || '';
           if (!wbSourceBrand && product.name) {
@@ -421,11 +552,11 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
           uzumSourceWeight = fullProduct?.weightKg || fullProduct?.weightDimensions?.weight;
         } else {
           // Uzum to Uzum (self) or other
-          uzumSourceBrand = fullProduct?.brandName || fullProduct?.brand || '';
-          uzumSourceBarcode = fullProduct?.barcode || fullProduct?.ean || '';
+           uzumSourceBrand = product.brand || fullProduct?.brandName || fullProduct?.brand || '';
+           uzumSourceBarcode = product.barcode || fullProduct?.barcode || fullProduct?.ean || '';
           uzumSourceColor = fullProduct?.color || '';
-          uzumSourceModel = fullProduct?.vendorCode || fullProduct?.article || '';
-          uzumSourceChars = fullProduct?.characteristicValues || fullProduct?.characteristics || [];
+           uzumSourceModel = product.model || fullProduct?.vendorCode || fullProduct?.article || '';
+           uzumSourceChars = product.characteristics || fullProduct?.characteristicValues || fullProduct?.characteristics || [];
         }
         
         const sourceMxikCode = product.mxikCode || fullProduct?.mxikCode;
@@ -632,7 +763,7 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
 
   const actualCloneCount = (selectedProducts.length * targetMarketplaces.length) - skippedCount;
 
-  if (connectedMarketplaces.length < 2) {
+  if (!externalSourceProduct && connectedMarketplaces.length < 2) {
     return (
       <Card><CardContent className="py-12 text-center">
         <Copy className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
@@ -644,6 +775,25 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
 
   return (
     <div className="space-y-4 overflow-hidden pb-20">
+      {isExternalSourceActive && externalSourceProduct && (
+        <Card className="border-primary/30 bg-primary/5 overflow-hidden">
+          <CardContent className="py-4 px-4 flex items-start gap-3">
+            <Globe className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+            <div className="min-w-0">
+              <div className="font-medium text-sm text-foreground">Uzum public source pack yuklandi</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Endi shu mahsulotni o'zingiz ulagan Uzum, WB yoki Yandex do'koniga klonlashingiz mumkin.
+              </p>
+              <div className="flex flex-wrap gap-2 mt-2">
+                <Badge variant="secondary">{externalSourceProduct.pictures.length} rasm</Badge>
+                <Badge variant="secondary">{externalSourceProduct.characteristics?.length || 0} xususiyat</Badge>
+                {externalSourceProduct.brand && <Badge variant="secondary">{externalSourceProduct.brand}</Badge>}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Source/Target Selection */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Card className="overflow-hidden">
@@ -653,13 +803,13 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
           </CardHeader>
           <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0">
             <div className="space-y-2">
-              {connectedMarketplaces.map(mp => {
-                const info = MARKETPLACE_INFO[mp] || { name: mp, logo: '📦', color: 'from-gray-500 to-gray-600' };
+              {sourceOptions.map(mp => {
+                const info = getMarketplaceInfo(mp);
                 const count = getProductCount(mp);
                 return (
                   <button key={mp} onClick={() => setSourceMarketplace(mp)}
                     className={`w-full flex items-center gap-3 p-2.5 rounded-lg border-2 transition-all ${sourceMarketplace === mp ? 'border-primary bg-primary/5' : 'border-transparent hover:bg-muted'}`}>
-                    <MarketplaceLogo marketplace={mp} size={24} className="shrink-0" />
+                    <MarketplaceLogo marketplace={mp === 'uzum_market' ? 'uzum' : mp} size={24} className="shrink-0" />
                     <div className="text-left min-w-0">
                       <div className="font-medium text-sm truncate">{info.name}</div>
                       <div className="text-xs text-muted-foreground">{count} mahsulot</div>
@@ -682,7 +832,7 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
               {availableTargets.length === 0
                 ? <p className="text-xs text-muted-foreground">Boshqa marketplace yo'q</p>
                 : availableTargets.map(mp => {
-                  const info = MARKETPLACE_INFO[mp] || { name: mp, logo: '📦', color: 'from-gray-500 to-gray-600' };
+                  const info = getMarketplaceInfo(mp);
                   const isSelected = targetMarketplaces.includes(mp);
                   return (
                     <button key={mp} onClick={() => toggleTarget(mp)}
