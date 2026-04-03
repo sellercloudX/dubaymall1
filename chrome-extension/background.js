@@ -188,14 +188,18 @@ async function updateCommandStatus(id, status, result = null, error = null) {
   const { accessToken } = await getConfig();
   if (!accessToken) return;
   const body = { status, processed_at: new Date().toISOString() };
-  if (result) body.result = result;
-  if (error) body.error_message = error;
+  if (status === 'completed') body.completed_at = new Date().toISOString();
+  if (result !== null && result !== undefined) body.result = typeof result === 'object' ? result : { value: result };
+  if (error) body.error_message = String(error);
+  console.log('[SCX] Updating command', id, 'to', status, 'result:', JSON.stringify(result));
   try {
-    await fetch(`${SUPABASE_URL}/rest/v1/uzum_extension_commands?id=eq.${id}`, {
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/uzum_extension_commands?id=eq.${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${accessToken}`, Prefer: 'return=minimal' },
       body: JSON.stringify(body),
     });
+    if (!resp.ok) console.error('[SCX] Status update HTTP error:', resp.status, await resp.text());
+    else console.log('[SCX] Command status updated successfully');
   } catch (e) { console.error('[SCX] Status update error:', e); }
 }
 
