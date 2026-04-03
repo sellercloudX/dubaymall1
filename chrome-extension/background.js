@@ -46,53 +46,67 @@ async function waitForTabComplete(tabId, timeout = 15000) {
 }
 
 async function injectUzumSellerScripts(tabId) {
-  await chrome.scripting.insertCSS({ target: { tabId }, files: ['content.css'] }).catch(() => {});
-  await chrome.scripting.executeScript({
-    target: { tabId },
-    files: ['shared.js', 'content-uzum-seller.js'],
-  });
+  try {
+    await chrome.scripting.insertCSS({ target: { tabId }, files: ['content.css'] });
+  } catch (e) { console.warn('[SCX] CSS inject warning:', e.message); }
+  try {
+    await chrome.scripting.executeScript({ target: { tabId }, files: ['shared.js'] });
+  } catch (e) { console.warn('[SCX] shared.js inject warning:', e.message); }
+  try {
+    await chrome.scripting.executeScript({ target: { tabId }, files: ['content-uzum-seller.js'] });
+  } catch (e) { console.warn('[SCX] content-uzum-seller.js inject warning:', e.message); }
+  // Give scripts time to initialize
+  await new Promise(r => setTimeout(r, 2000));
 }
 
-async function ensureUzumSellerReceiver(tabId) {
+async function ensureUzumSellerReceiver(tabId, retries = 3) {
   await waitForTabComplete(tabId);
 
-  let response = null;
-  try {
-    response = await chrome.tabs.sendMessage(tabId, { type: 'SCX_PING' });
-  } catch (error) {
-    if (!isNoReceiverError(error)) throw error;
-  }
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const response = await chrome.tabs.sendMessage(tabId, { type: 'SCX_PING' });
+      if (response?.pong === true) {
+        console.log('[SCX] Content script ready on attempt', attempt);
+        return;
+      }
+    } catch (error) {
+      if (!isNoReceiverError(error)) throw error;
+    }
 
-  if (response?.pong === true) return;
+    console.warn(`[SCX] Content script not ready, injecting (attempt ${attempt}/${retries})`);
+    await injectUzumSellerScripts(tabId);
 
-  console.warn('[SCX] Uzum content script topilmadi yoki eski versiya, qayta inject qilinmoqda');
-  await injectUzumSellerScripts(tabId);
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-
-  const secondResponse = await chrome.tabs.sendMessage(tabId, { type: 'SCX_PING' });
-  if (secondResponse?.pong !== true) {
-    throw new Error('Uzum seller content script javob bermadi');
+    // Verify after injection
+    try {
+      const resp = await chrome.tabs.sendMessage(tabId, { type: 'SCX_PING' });
+      if (resp?.pong === true) return;
+    } catch (e) {
+      if (attempt === retries) throw new Error('Content script 3 urinishdan keyin ham javob bermadi');
+    }
   }
 }
 
 async function getOrCreateUzumSellerTab() {
   const tabs = await chrome.tabs.query({ url: UZUM_SELLER_URL_PATTERNS });
-  let tab = tabs.find((item) => item.active) || tabs.find((item) => item.status === 'complete') || tabs[0];
+  let tab = tabs.find(t => t.active) || tabs.find(t => t.status === 'complete') || tabs[0];
 
   if (tab?.id) {
-    if (!/(\/products\/create|\/goods\/create|\/product\/create)/.test(tab.url || '')) {
+    const needsNavigate = !/(\/products\/create|\/goods\/create|\/product\/create)/.test(tab.url || '');
+    if (needsNavigate) {
       const createUrl = getCreateUrlForTab(tab.url || '');
-      tab = await chrome.tabs.update(tab.id, { url: createUrl });
+      await chrome.tabs.update(tab.id, { url: createUrl });
+      // Wait for full page load after navigation
+      await waitForTabComplete(tab.id, 20000);
     }
-
     await ensureUzumSellerReceiver(tab.id);
-    return tab;
+    return { id: tab.id, url: tab.url };
   }
 
-  console.log('[SCX] No Uzum seller tab open, creating one...');
-  const createdTab = await chrome.tabs.create({ url: UZUM_CREATE_URL });
-  await ensureUzumSellerReceiver(createdTab.id);
-  return createdTab;
+  console.log('[SCX] No Uzum seller tab, creating...');
+  const created = await chrome.tabs.create({ url: UZUM_CREATE_URL });
+  await waitForTabComplete(created.id, 20000);
+  await ensureUzumSellerReceiver(created.id);
+  return created;
 }
 
 // ===== Storage =====
@@ -224,34 +238,47 @@ async function handleCommand(command) {
   console.log('[SCX] Processing command:', id, command_type);
   await updateCommandStatus(id, 'processing');
 
-  try {
-    const tab = await getOrCreateUzumSellerTab();
+  let lastError = null;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const tab = await getOrCreateUzumSellerTab();
+      console.log('[SCX] Sending command to tab:', tab.id, 'attempt:', attempt);
 
-    console.log('[SCX] Sending command to tab:', tab.id);
-    const response = await chrome.tabs.sendMessage(tab.id, {
-      type: 'SCX_COMMAND', command_type, payload, commandId: id,
-    });
-
-    console.log('[SCX] Content script response:', JSON.stringify(response));
-
-    if (response?.success) {
-      // Pass the full result object so dashboard can check saved/submitted flags
-      await updateCommandStatus(id, 'completed', response.result || { saved: false, message: 'No result details' });
-      chrome.notifications.create({
-        type: 'basic', iconUrl: 'icons/icon128.png',
-        title: 'SellerCloudX',
-        message: getSuccessMessage(command_type),
+      const response = await chrome.tabs.sendMessage(tab.id, {
+        type: 'SCX_COMMAND', command_type, payload, commandId: id,
       });
-    } else {
-      await updateCommandStatus(id, 'failed', null, response?.error || 'Content script error');
+
+      console.log('[SCX] Content script response:', JSON.stringify(response));
+
+      if (response?.success) {
+        await updateCommandStatus(id, 'completed', response.result || { saved: false, message: 'No result details' });
+        chrome.notifications.create({
+          type: 'basic', iconUrl: 'icons/icon128.png',
+          title: 'SellerCloudX',
+          message: getSuccessMessage(command_type),
+        });
+        return; // Success — exit
+      } else {
+        lastError = response?.error || 'Content script error';
+        if (attempt < 2) {
+          console.warn('[SCX] Attempt', attempt, 'failed, retrying...');
+          await new Promise(r => setTimeout(r, 3000));
+          continue;
+        }
+      }
+    } catch (err) {
+      console.error('[SCX] Command attempt', attempt, 'error:', err);
+      lastError = isNoReceiverError(err)
+        ? 'Uzum seller sahifasida extension script topilmadi. Sahifani yangilang va qayta urinib ko\'ring.'
+        : err.message;
+      if (attempt < 2) {
+        await new Promise(r => setTimeout(r, 3000));
+        continue;
+      }
     }
-  } catch (err) {
-    console.error('[SCX] Command error:', err);
-    const errorMessage = isNoReceiverError(err)
-      ? 'Uzum seller sahifasida extension script topilmadi. Sahifani yangilang va qayta urinib ko\'ring.'
-      : err.message;
-    await updateCommandStatus(id, 'failed', null, errorMessage);
   }
+
+  await updateCommandStatus(id, 'failed', null, lastError || 'Noma\'lum xato');
 }
 
 function getSuccessMessage(type) {
