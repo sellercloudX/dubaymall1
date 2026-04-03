@@ -210,6 +210,31 @@ async function updateCommandStatus(id, status, result = null, error = null) {
   }
 }
 
+// Send heartbeat command to let dashboard know extension is alive
+async function sendHeartbeat(accessToken, uid) {
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/uzum_extension_commands`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${accessToken}`,
+        'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify({
+        user_id: uid,
+        command_type: 'heartbeat',
+        status: 'completed',
+        payload: { source: 'extension', version: '2.0' },
+        processed_at: new Date().toISOString(),
+      }),
+    });
+    console.log('[SCX] Heartbeat sent');
+  } catch (e) {
+    console.error('[SCX] Heartbeat error:', e);
+  }
+}
+
 // Fetch pending commands on startup
 async function fetchPendingCommands() {
   const { accessToken } = await getConfig();
