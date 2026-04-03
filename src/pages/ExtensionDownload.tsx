@@ -1,14 +1,18 @@
 import React from "react";
-import { ArrowLeft, Download, Chrome, Shield, Zap, BarChart3, Calculator, Settings, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Download, Chrome, Shield, Zap, BarChart3, Calculator, Settings, CheckCircle2, Globe, TrendingUp, DollarSign, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
 
 const features = [
-  { icon: BarChart3, title: "Inline Analitika", desc: "Uzum Seller sahifasida bevosita mahsulot statistikasi, foyda hisoblash" },
-  { icon: Calculator, title: "Foyda Kalkulyator", desc: "Real-time ROI, marja, sof foyda — sahifa ichida hisoblang" },
-  { icon: Zap, title: "Avtomatik kartochka", desc: "AI yordamida mahsulot kartochkasini bir klikda yarating" },
-  { icon: Shield, title: "Boost boshqarish", desc: "Dashboard'dan turib reklama yoqish/o'chirish" },
+  { icon: BarChart3, title: "Multi-Marketplace Analitika", desc: "Uzum, WB, Yandex seller panellarida bevosita statistika" },
+  { icon: DollarSign, title: "Moliya Scraping", desc: "API bermagan komissiya, logistika xarajatlarini DOM orqali olish" },
+  { icon: Calculator, title: "Foyda Kalkulyator", desc: "Real-time ROI, marja — har bir marketplace uchun" },
+  { icon: Zap, title: "Avtomatik kartochka", desc: "AI yordamida Uzum'da kartochka yaratish" },
+  { icon: TrendingUp, title: "Raqobatchi Monitoring", desc: "mpstats.io va zoomselling.io dan trend va narx yig'ish" },
+  { icon: Globe, title: "Marketplace Front", desc: "uzum.uz sahifasida mahsulot tahlili va klonlash" },
+  { icon: Package, title: "Buyurtmalar Boshqarish", desc: "Seller panellarida buyurtmalarni qayta ishlash" },
+  { icon: Shield, title: "Narx Himoyasi", desc: "Seller kabinetlarida DOM orqali narx yangilash" },
 ];
 
 const steps = [
