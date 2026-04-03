@@ -1282,6 +1282,39 @@ export type Database = {
         }
         Relationships: []
       }
+      marketplace_scraped_data: {
+        Row: {
+          created_at: string
+          data_type: string
+          id: string
+          marketplace: string
+          scraped_at: string
+          scraped_data: Json
+          source_url: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data_type: string
+          id?: string
+          marketplace: string
+          scraped_at?: string
+          scraped_data?: Json
+          source_url?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          data_type?: string
+          id?: string
+          marketplace?: string
+          scraped_at?: string
+          scraped_data?: Json
+          source_url?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       marketplace_stats_cache: {
         Row: {
           data: Json
