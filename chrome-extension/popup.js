@@ -1,5 +1,5 @@
 /**
- * SellerCloudX Extension v4.1.1 — Popup Script
+ * SellerCloudX Extension v4.2.0 — Popup Script
  */
 
 const SUPABASE_URL = 'https://idcshubgqrzdvkttnslz.supabase.co';
