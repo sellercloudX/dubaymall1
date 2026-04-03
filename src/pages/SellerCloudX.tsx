@@ -14,6 +14,7 @@ import { useMarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 import { calculateTotalRevenue } from '@/lib/revenueCalculations';
 import { useAutoNotifications } from '@/hooks/useAutoNotifications';
 import { useAutoSync } from '@/hooks/useAutoSync';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useExchangeRate } from '@/hooks/useExchangeRate';
 import { 
