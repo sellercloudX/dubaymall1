@@ -1,5 +1,5 @@
 /**
- * SellerCloudX Extension v4.0 — Popup Script
+ * SellerCloudX Extension v4.1.1 — Popup Script
  */
 
 const SUPABASE_URL = 'https://idcshubgqrzdvkttnslz.supabase.co';
@@ -12,7 +12,7 @@ const $$ = (s) => document.querySelectorAll(s);
 
 function renderExtensionVersion() {
   try {
-    const version = chrome.runtime?.getManifest?.()?.version || '4.1.0';
+    const version = chrome.runtime?.getManifest?.()?.version || '4.1.1';
     $('#extension-version').textContent = `v${version}`;
     $('#extension-version-footer').textContent = `SellerCloudX Pro v${version}`;
   } catch {}
