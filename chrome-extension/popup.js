@@ -1,9 +1,10 @@
 /**
- * SellerCloudX Extension v2.0 — Popup Script
+ * SellerCloudX Extension v4.0 — Popup Script
  */
 
 const SUPABASE_URL = 'https://idcshubgqrzdvkttnslz.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlkY3NodWJncXJ6ZHZrdHRuc2x6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxMzE4NjksImV4cCI6MjA4NTcwNzg2OX0.7am0dzPKSQXLXhOwNHRZbHqxi8pRQLkwO-XQDt-_DI8';
+const DASHBOARD_URL = 'https://sellercloudx.com/seller-cloud';
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => document.querySelectorAll(s);
@@ -47,11 +48,29 @@ async function notifyContent(msg) {
   } catch {}
 }
 
+// ===== Ensure background service worker is connected =====
+async function ensureBackgroundConnection(config) {
+  if (!config?.accessToken || !config?.userId) return;
+  try {
+    await new Promise((resolve) => {
+      chrome.runtime.sendMessage(
+        { type: 'SCX_LOGIN', accessToken: config.accessToken, userId: config.userId },
+        () => { void chrome.runtime.lastError; resolve(); }
+      );
+    });
+  } catch {}
+}
+
 // ===== Init =====
 async function init() {
   const config = await chrome.storage.local.get(['accessToken', 'userId', 'userEmail']);
-  if (config.accessToken && config.userId) showDashboard(config);
-  else showLogin();
+  if (config.accessToken && config.userId) {
+    // Always ensure background SW is alive and connected
+    await ensureBackgroundConnection(config);
+    showDashboard(config);
+  } else {
+    showLogin();
+  }
   loadToggles();
 }
 
@@ -113,6 +132,7 @@ $('#logout-btn').addEventListener('click', async () => {
 // ===== Status =====
 function checkConnection() {
   chrome.runtime.sendMessage({ type: 'SCX_STATUS' }, (r) => {
+    void chrome.runtime.lastError;
     $('#connection-status').innerHTML = r?.isConnected
       ? '<span class="dot dot-green"></span> Ulangan'
       : '<span class="dot dot-red"></span> Ulanmagan';
@@ -173,8 +193,8 @@ function renderCommands(cmds) {
     list.innerHTML = '<div class="empty-state"><div class="icon">📋</div><div class="text">Hali buyruqlar yo\'q</div></div>';
     return;
   }
-  const icons = { create_product: '📦', toggle_boost: '🚀', generate_label: '🏷️', batch_labels: '📋', update_price: '💰', update_stock: '📊' };
-  const names = { create_product: 'Kartochka yaratish', toggle_boost: 'Boost', generate_label: 'Etiketka', batch_labels: 'Ommaviy etiketka', update_price: 'Narx yangilash', update_stock: 'Zaxira' };
+  const icons = { create_product: '📦', toggle_boost: '🚀', generate_label: '🏷️', batch_labels: '📋', update_price: '💰', update_stock: '📊', heartbeat: '💓' };
+  const names = { create_product: 'Kartochka yaratish', toggle_boost: 'Boost', generate_label: 'Etiketka', batch_labels: 'Ommaviy etiketka', update_price: 'Narx yangilash', update_stock: 'Zaxira', heartbeat: 'Heartbeat' };
   const statusText = { pending: 'Kutilmoqda', processing: 'Bajarilmoqda', completed: 'Tayyor', failed: 'Xato' };
 
   list.innerHTML = cmds.map(c => `
@@ -190,21 +210,22 @@ function renderCommands(cmds) {
 
 // ===== Actions =====
 $('#open-seller-btn').addEventListener('click', () => chrome.tabs.create({ url: 'https://seller.uzum.uz/' }));
-$('#open-dashboard-btn').addEventListener('click', () => chrome.tabs.create({ url: 'https://sellercloudx.lovable.app/seller-cloud' }));
+$('#open-dashboard-btn').addEventListener('click', () => chrome.tabs.create({ url: DASHBOARD_URL }));
 
 $('#refresh-btn').addEventListener('click', async () => {
   $('#refresh-btn').textContent = '⏳ Yangilanmoqda...';
   const config = await chrome.storage.local.get(['accessToken', 'userId', 'userEmail']);
+  await ensureBackgroundConnection(config);
   await Promise.all([loadStats(config), loadHistory(config)]);
   checkConnection(); checkSellerTab();
   $('#refresh-btn').innerHTML = '🔄 Ma\'lumotlarni yangilash';
 });
 
-$('#action-create-product')?.addEventListener('click', () => chrome.tabs.create({ url: 'https://sellercloudx.lovable.app/seller-cloud' }));
+$('#action-create-product')?.addEventListener('click', () => chrome.tabs.create({ url: DASHBOARD_URL }));
 $('#action-boost')?.addEventListener('click', () => chrome.tabs.create({ url: 'https://seller.uzum.uz/advertising' }));
 $('#action-labels')?.addEventListener('click', () => chrome.tabs.create({ url: 'https://seller.uzum.uz/orders' }));
-$('#action-price')?.addEventListener('click', () => chrome.tabs.create({ url: 'https://sellercloudx.lovable.app/seller-cloud' }));
-$('#action-stock')?.addEventListener('click', () => chrome.tabs.create({ url: 'https://sellercloudx.lovable.app/seller-cloud' }));
+$('#action-price')?.addEventListener('click', () => chrome.tabs.create({ url: DASHBOARD_URL }));
+$('#action-stock')?.addEventListener('click', () => chrome.tabs.create({ url: DASHBOARD_URL }));
 $('#action-analytics')?.addEventListener('click', async () => {
   await notifyContent({ type: 'SCX_SETTING', setting: 'overlay', value: true });
   const tabs = await chrome.tabs.query({ url: 'https://seller.uzum.uz/*' });

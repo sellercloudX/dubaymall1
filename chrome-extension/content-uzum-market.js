@@ -34,7 +34,7 @@ function initUzumMarket() {
   document.body.appendChild(toolbar);
   
   document.getElementById('scx-btn-dashboard')?.addEventListener('click', () => {
-    window.open('https://sellercloudx.lovable.app/seller-cloud', '_blank');
+    window.open('https://sellercloudx.com/seller-cloud', '_blank');
   });
   document.getElementById('scx-btn-minimize')?.addEventListener('click', () => {
     toolbar.classList.toggle('scx-minimized');
@@ -161,7 +161,7 @@ function showProductAnalysisOverlay(data) {
   
   document.getElementById('scx-overlay-close')?.addEventListener('click', () => overlay.remove());
   document.getElementById('scx-clone-from-overlay')?.addEventListener('click', () => {
-    window.open(`https://sellercloudx.lovable.app/seller-cloud?clone_source=uzum_market&clone_url=${encodeURIComponent(window.location.href)}`, '_blank');
+    window.open(`https://sellercloudx.com/seller-cloud?clone_source=uzum_market&clone_url=${encodeURIComponent(window.location.href)}`, '_blank');
   });
 }
 
@@ -219,7 +219,7 @@ async function cloneCurrentProduct() {
   await scxSaveScrapedData('uzum', 'competitor_product', productData, url);
   
   scxShowToast('✅ Ma\'lumotlar saqlandi! Dashboard ochilmoqda...', 'success');
-  window.open(`https://sellercloudx.lovable.app/seller-cloud?clone_source=uzum_market&clone_url=${encodeURIComponent(url)}`, '_blank');
+  window.open(`https://sellercloudx.com/seller-cloud?clone_source=uzum_market&clone_url=${encodeURIComponent(url)}`, '_blank');
 }
 
 // ===== Inject marketplace overlays =====
