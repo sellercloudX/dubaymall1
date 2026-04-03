@@ -111,13 +111,15 @@ chrome.alarms.create('scx-heartbeat', { periodInMinutes: 5 });
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === 'scx-keepalive') {
-    // Ensure WebSocket is connected
     const config = await getConfig();
     if (config.accessToken && config.userId) {
       if (!ws || ws.readyState !== WebSocket.OPEN) {
         const validToken = await refreshToken();
         if (validToken) connectRealtime(validToken, config.userId);
       }
+      // Also check for pending commands that WebSocket might have missed
+      userId = config.userId;
+      await fetchPendingCommands();
     }
   }
 
@@ -134,12 +136,14 @@ async function handleCommand(command) {
   const { id, command_type, payload, status } = command;
   if (status !== 'pending') return;
 
+  console.log('[SCX] Processing command:', id, command_type);
   await updateCommandStatus(id, 'processing');
 
   try {
     const tabs = await chrome.tabs.query({ url: 'https://seller.uzum.uz/*' });
     if (tabs.length === 0) {
-      const tab = await chrome.tabs.create({ url: 'https://seller.uzum.uz/' });
+      console.log('[SCX] No Uzum seller tab open, creating one...');
+      const tab = await chrome.tabs.create({ url: 'https://seller.uzum.uz/products' });
       await new Promise(resolve => {
         chrome.tabs.onUpdated.addListener(function listener(tabId, info) {
           if (tabId === tab.id && info.status === 'complete') {
@@ -148,15 +152,21 @@ async function handleCommand(command) {
           }
         });
       });
+      // Wait extra for content script to load
+      await new Promise(r => setTimeout(r, 3000));
       tabs.push(tab);
     }
 
+    console.log('[SCX] Sending command to tab:', tabs[0].id);
     const response = await chrome.tabs.sendMessage(tabs[0].id, {
       type: 'SCX_COMMAND', command_type, payload, commandId: id,
     });
 
+    console.log('[SCX] Content script response:', JSON.stringify(response));
+
     if (response?.success) {
-      await updateCommandStatus(id, 'completed', response.result);
+      // Pass the full result object so dashboard can check saved/submitted flags
+      await updateCommandStatus(id, 'completed', response.result || { saved: false, message: 'No result details' });
       chrome.notifications.create({
         type: 'basic', iconUrl: 'icons/icon128.png',
         title: 'SellerCloudX',
@@ -188,14 +198,18 @@ async function updateCommandStatus(id, status, result = null, error = null) {
   const { accessToken } = await getConfig();
   if (!accessToken) return;
   const body = { status, processed_at: new Date().toISOString() };
-  if (result) body.result = result;
-  if (error) body.error_message = error;
+  if (status === 'completed') body.completed_at = new Date().toISOString();
+  if (result !== null && result !== undefined) body.result = typeof result === 'object' ? result : { value: result };
+  if (error) body.error_message = String(error);
+  console.log('[SCX] Updating command', id, 'to', status, 'result:', JSON.stringify(result));
   try {
-    await fetch(`${SUPABASE_URL}/rest/v1/uzum_extension_commands?id=eq.${id}`, {
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/uzum_extension_commands?id=eq.${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${accessToken}`, Prefer: 'return=minimal' },
       body: JSON.stringify(body),
     });
+    if (!resp.ok) console.error('[SCX] Status update HTTP error:', resp.status, await resp.text());
+    else console.log('[SCX] Command status updated successfully');
   } catch (e) { console.error('[SCX] Status update error:', e); }
 }
 
