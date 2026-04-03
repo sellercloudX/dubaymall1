@@ -53,7 +53,7 @@ export default function ExtensionDownload() {
           </Button>
           <div>
             <h1 className="text-base font-bold text-foreground">Chrome Extension</h1>
-            <p className="text-xs text-muted-foreground">SellerCloudX Multi-Marketplace v4.1.0</p>
+            <p className="text-xs text-muted-foreground">SellerCloudX Multi-Marketplace v4.1.1</p>
           </div>
         </div>
       </div>
@@ -64,7 +64,7 @@ export default function ExtensionDownload() {
           <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20">
             <Chrome className="w-10 h-10 text-primary" />
           </div>
-          <h2 className="text-xl font-bold text-foreground">SellerCloudX Multi-Marketplace Extension v4.1.0</h2>
+          <h2 className="text-xl font-bold text-foreground">SellerCloudX Multi-Marketplace Extension v4.1.1</h2>
           <p className="text-sm text-muted-foreground max-w-md mx-auto">
             Uzum, Wildberries, Yandex Market seller panellarida + mpstats.io, zoomselling.io da bevosita analitika, moliya scraping va avtomatlashtirish
           </p>

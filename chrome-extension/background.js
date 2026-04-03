@@ -1,5 +1,5 @@
 /**
- * SellerCloudX Chrome Extension — Background Service Worker v3.0
+ * SellerCloudX Chrome Extension — Background Service Worker v4.1.1
  * chrome.alarms bilan barqaror ulanish
  */
 
@@ -231,6 +231,24 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 });
 
 // ===== Command Handler =====
+function getCommandFailureMessage(commandType, response) {
+  if (commandType === 'create_product') {
+    return response?.result?.validationErrors
+      || response?.result?.message
+      || response?.error
+      || 'Mahsulot Uzum kabinetida saqlanmadi';
+  }
+  return response?.result?.message || response?.error || 'Buyruq bajarilmadi';
+}
+
+function isCommandSuccessful(commandType, response) {
+  if (!response?.success) return false;
+  if (commandType === 'create_product') {
+    return response?.result?.saved === true;
+  }
+  return true;
+}
+
 async function handleCommand(command) {
   const { id, command_type, payload, status } = command;
   if (status !== 'pending') return;
@@ -250,21 +268,21 @@ async function handleCommand(command) {
 
       console.log('[SCX] Content script response:', JSON.stringify(response));
 
-      if (response?.success) {
-        await updateCommandStatus(id, 'completed', response.result || { saved: false, message: 'No result details' });
+      if (isCommandSuccessful(command_type, response)) {
+        await updateCommandStatus(id, 'completed', response.result || { saved: true });
         chrome.notifications.create({
           type: 'basic', iconUrl: 'icons/icon128.png',
           title: 'SellerCloudX',
           message: getSuccessMessage(command_type),
         });
-        return; // Success — exit
-      } else {
-        lastError = response?.error || 'Content script error';
-        if (attempt < 2) {
-          console.warn('[SCX] Attempt', attempt, 'failed, retrying...');
-          await new Promise(r => setTimeout(r, 3000));
-          continue;
-        }
+        return;
+      }
+
+      lastError = getCommandFailureMessage(command_type, response);
+      if (attempt < 2) {
+        console.warn('[SCX] Attempt', attempt, 'failed, retrying...');
+        await new Promise(r => setTimeout(r, 3000));
+        continue;
       }
     } catch (err) {
       console.error('[SCX] Command attempt', attempt, 'error:', err);
@@ -320,7 +338,7 @@ async function sendHeartbeat(accessToken, uid) {
       headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${accessToken}`, Prefer: 'return=minimal' },
       body: JSON.stringify({
         user_id: uid, command_type: 'heartbeat', status: 'completed',
-        payload: { source: 'extension', version: '3.0' },
+        payload: { source: 'extension', version: chrome.runtime?.getManifest?.()?.version || '4.1.0' },
         processed_at: new Date().toISOString(),
       }),
     });
