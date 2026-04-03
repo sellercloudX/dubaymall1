@@ -173,7 +173,7 @@ async function showScrapedDataPanel() {
         </div>
       `).join('') : '<div style="text-align:center;color:#64748b;font-size:11px;padding:16px;">Ma\'lumot yo\'q. 🔍 tugmasini bosing</div>'}
       <div style="text-align:center;margin-top:10px;">
-        <button onclick="window.open('https://sellercloudx.lovable.app/seller-cloud-mobile','_blank')" style="
+        <button onclick="window.open('https://sellercloudx.lovable.app/seller-cloud-x','_blank')" style="
           padding:6px 12px;background:linear-gradient(135deg,#7c3aed,#4f46e5);
           color:white;border:none;border-radius:6px;font-size:11px;cursor:pointer;
         ">📊 Dashboard'da ko'rish</button>
