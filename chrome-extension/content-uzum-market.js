@@ -5,7 +5,7 @@
 
 console.log('[SCX v5.0] Uzum Market content script loaded (DOM Scraping)');
 
-const DASHBOARD_BASE = 'https://sellercloudx.lovable.app';
+const DASHBOARD_BASE = 'https://sellercloudx.com';
 
 function getPageType() {
   const path = window.location.pathname;
