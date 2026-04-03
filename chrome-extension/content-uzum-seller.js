@@ -1,9 +1,10 @@
 /**
  * SellerCloudX Content Script — Uzum Seller Panel
  * seller.uzum.uz uchun maxsus funksiyalar
+ * v5.0 — Mukammal klonlash + real DOM avtomatizatsiya
  */
 
-console.log('[SCX v4.0] Uzum Seller content script loaded');
+console.log('[SCX v5.0] Uzum Seller content script loaded');
 
 // ===== Settings =====
 const uzumSettings = { overlayEnabled: true, profitEnabled: true };
@@ -16,14 +17,12 @@ chrome.storage.local.get(['setting_overlay', 'setting_profit'], (r) => {
 function initUzumSeller() {
   scxCreateToolbar('Uzum Seller', '🟣');
   
-  // Add Uzum-specific buttons
   const scrapeBtn = document.getElementById('scx-btn-scrape');
   scrapeBtn?.addEventListener('click', scrapeUzumFinance);
   
   const panelBtn = document.getElementById('scx-btn-panel');
   panelBtn?.addEventListener('click', toggleUzumPanel);
   
-  // Add profit calculator button
   const actionsDiv = document.querySelector('.scx-toolbar-actions');
   if (actionsDiv) {
     const profitBtn = document.createElement('button');
@@ -34,13 +33,114 @@ function initUzumSeller() {
     actionsDiv.insertBefore(profitBtn, actionsDiv.lastElementChild);
   }
   
-  // Observe navigation for SPA
   scxObserveNavigation(() => {
     injectUzumOverlays();
   });
   
-  // Initial overlays
   setTimeout(injectUzumOverlays, 2000);
+}
+
+// ===== DOM Utility Helpers =====
+
+/** Wait for a selector to appear in DOM */
+function waitForSelector(selector, timeout = 10000) {
+  return new Promise((resolve, reject) => {
+    const el = document.querySelector(selector);
+    if (el) return resolve(el);
+    const observer = new MutationObserver(() => {
+      const found = document.querySelector(selector);
+      if (found) { observer.disconnect(); resolve(found); }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    setTimeout(() => { observer.disconnect(); reject(new Error('waitForSelector timeout: ' + selector)); }, timeout);
+  });
+}
+
+/** Find input by nearby label text (case-insensitive, partial match) */
+function findInputByLabel(labelTexts, inputSelector = 'input, textarea, [contenteditable="true"]') {
+  const labels = document.querySelectorAll('label, [class*="label"], [class*="Label"], .field-label, .form-label');
+  for (const label of labels) {
+    const text = label.textContent.trim().toLowerCase();
+    for (const searchText of labelTexts) {
+      if (text.includes(searchText.toLowerCase())) {
+        // Check if label has for="" pointing to an input
+        const forId = label.getAttribute('for');
+        if (forId) {
+          const input = document.getElementById(forId);
+          if (input) return input;
+        }
+        // Check parent/sibling for input
+        const container = label.closest('[class*="field"], [class*="form-group"], [class*="FormField"], [class*="row"], [class*="item"]') || label.parentElement;
+        if (container) {
+          const input = container.querySelector(inputSelector);
+          if (input) return input;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+/** Fill a React-controlled input */
+function fillReactInput(el, value) {
+  if (!el || !value) return false;
+  const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+    el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype, 'value'
+  )?.set;
+  if (nativeInputValueSetter) {
+    nativeInputValueSetter.call(el, value);
+  } else {
+    el.value = value;
+  }
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+  el.dispatchEvent(new Event('blur', { bubbles: true }));
+  return true;
+}
+
+/** Fill contentEditable div */
+function fillContentEditable(el, html) {
+  if (!el) return false;
+  el.focus();
+  el.innerHTML = html;
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+  el.dispatchEvent(new Event('blur', { bubbles: true }));
+  return true;
+}
+
+/** Click a button by text content */
+function clickButtonByText(texts) {
+  const buttons = document.querySelectorAll('button, [role="button"], a.btn, [class*="Button"], [class*="button"]');
+  for (const btn of buttons) {
+    const btnText = btn.textContent.trim().toLowerCase();
+    for (const t of texts) {
+      if (btnText.includes(t.toLowerCase()) && !btn.disabled) {
+        btn.click();
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/** Select dropdown option by text */
+async function selectDropdownOption(triggerTexts, optionText) {
+  // Find and click the dropdown trigger
+  const trigger = findInputByLabel(triggerTexts, 'select, [class*="select"], [role="combobox"], [class*="dropdown"], button');
+  if (trigger) {
+    trigger.click();
+    await scxSleep(500);
+    // Look for option in dropdown menu
+    const options = document.querySelectorAll('[role="option"], [class*="option"], [class*="menu-item"], li');
+    for (const opt of options) {
+      if (opt.textContent.trim().toLowerCase().includes(optionText.toLowerCase())) {
+        opt.click();
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 // ===== Finance Scraping =====
@@ -51,11 +151,8 @@ async function scrapeUzumFinance() {
   const data = {};
   
   try {
-    // Komissiya sahifasi
     if (url.includes('/finance') || url.includes('/settlements') || url.includes('/billing')) {
       data.type = 'finance_settlement';
-      
-      // Jadval ma'lumotlarini yig'ish
       const tables = document.querySelectorAll('table');
       for (const table of tables) {
         const headers = [...table.querySelectorAll('thead th')].map(h => h.textContent.trim());
@@ -69,24 +166,17 @@ async function scrapeUzumFinance() {
           data.tables.push({ headers, rows });
         }
       }
-      
-      // Yig'indi kartochkalarni yig'ish
       const summaryCards = document.querySelectorAll('[class*="summary"], [class*="card"], [class*="stat"], [class*="total"]');
       data.summaryValues = [];
       summaryCards.forEach(card => {
         const text = card.textContent.trim();
-        if (text && text.length < 200) {
-          data.summaryValues.push(text);
-        }
+        if (text && text.length < 200) data.summaryValues.push(text);
       });
     }
     
-    // Buyurtmalar sahifasi
     if (url.includes('/orders') || url.includes('/fbs') || url.includes('/fbo')) {
       data.type = 'orders';
       data.orderRows = scxParseTableRows('table', {});
-      
-      // Pending buyurtmalar soni
       const badges = document.querySelectorAll('[class*="badge"], [class*="count"]');
       data.pendingCounts = [];
       badges.forEach(b => {
@@ -95,14 +185,12 @@ async function scrapeUzumFinance() {
       });
     }
     
-    // Mahsulotlar sahifasi
     if (url.includes('/products') || url.includes('/goods') || url.includes('/catalog')) {
       data.type = 'products';
       const productCards = document.querySelectorAll('[class*="product"], [class*="item"], tr');
       data.productCount = productCards.length;
     }
     
-    // Save to DB
     if (Object.keys(data).length > 1) {
       await scxSaveScrapedData('uzum', data.type || 'general', data, url);
       scxShowToast(`✅ ${data.type || 'Ma\'lumotlar'} saqlandi (${JSON.stringify(data).length} bayt)`, 'success');
@@ -267,7 +355,6 @@ function toggleUzumProfitCalc() {
 // ===== Inline Overlays =====
 function injectUzumOverlays() {
   if (!uzumSettings.overlayEnabled) return;
-  // Inject profit badges on product rows
   const rows = document.querySelectorAll('tr[class*="row"], [class*="product-card"], [class*="ProductItem"]');
   rows.forEach(row => {
     if (row.querySelector('.scx-badge')) return;
@@ -296,7 +383,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
 async function handleUzumCommand(msg) {
   const { command_type, payload } = msg;
-  console.log('[SCX] Uzum command:', command_type);
+  console.log('[SCX] Uzum command:', command_type, payload);
   
   try {
     switch (command_type) {
@@ -314,97 +401,393 @@ async function handleUzumCommand(msg) {
         return { success: false, error: 'Noma\'lum buyruq: ' + command_type };
     }
   } catch (err) {
+    console.error('[SCX] Command error:', err);
     return { success: false, error: err.message };
   }
 }
 
-// ===== Create Product (DOM Automation) =====
+// ===== Create Product — Full DOM Automation =====
 async function handleCreateProduct(payload) {
-  scxShowToast('📦 Kartochka yaratish boshlanmoqda...', 'info');
+  console.log('[SCX] === CREATE PRODUCT START ===');
+  console.log('[SCX] Payload keys:', Object.keys(payload || {}));
   
-  // Navigate to product creation if not there
-  if (!window.location.href.includes('/products/create') && !window.location.href.includes('/goods/create')) {
-    window.location.href = 'https://seller.uzum.uz/products/create';
-    await scxSleep(3000);
+  // Get normalized fields (support both camelCase and snake_case)
+  const title = payload.title || payload.title_uz || payload.titleUz || payload.title_ru || payload.titleRu || '';
+  const description = payload.description || payload.description_uz || payload.descriptionUz || payload.description_ru || payload.descriptionRu || '';
+  const brand = payload.brand || '';
+  const barcode = payload.barcode || '';
+  const mxikCode = payload.mxik_code || payload.mxikCode || '';
+  const price = payload.price || 0;
+  const images = payload.images || payload.pictures || [];
+  const categoryPath = payload.categoryPath || payload.category_path || payload.breadcrumbs || [];
+  const characteristics = payload.characteristics || [];
+  const variantGroups = payload.variantGroups || payload.variant_groups || [];
+  
+  scxShowToast('📦 Mahsulot yaratish boshlanmoqda...', 'info');
+  
+  // Step 1: Navigate to create page if not there
+  const currentUrl = window.location.href;
+  if (!currentUrl.includes('/products/create') && !currentUrl.includes('/goods/create') && !currentUrl.includes('/product/create')) {
+    console.log('[SCX] Navigating to product creation page...');
+    
+    // Try to find "Create product" button on current page first
+    const createBtnClicked = clickButtonByText([
+      'добавить товар', 'tovar qo\'shish', 'yangi tovar', 'создать товар',
+      'создать карточку', 'добавить', 'create product', 'add product'
+    ]);
+    
+    if (!createBtnClicked) {
+      // Direct navigation
+      window.location.href = 'https://seller.uzum.uz/products/create';
+    }
+    
+    await scxSleep(4000);
   }
   
   await scxSleep(2000);
+  console.log('[SCX] On creation page, starting form fill...');
   
-  // Fill title
-  if (payload.title_uz || payload.title) {
-    const titleInputs = document.querySelectorAll('input[type="text"], input[name*="title"], input[name*="name"]');
-    for (const inp of titleInputs) {
-      const label = inp.closest('[class*="field"], [class*="form"]')?.querySelector('label');
-      if (label && (label.textContent.includes('назван') || label.textContent.includes('nomi') || label.textContent.includes('Номи'))) {
-        scxFillInput(inp, payload.title_uz || payload.title);
-        break;
+  let filledFields = [];
+  let failedFields = [];
+
+  // Step 2: Fill Title/Name
+  if (title) {
+    const titleInput = findInputByLabel(
+      ['название', 'nomi', 'номи', 'наименование', 'mahsulot nomi', 'товар', 'name', 'title'],
+      'input[type="text"], input:not([type])'
+    );
+    if (titleInput) {
+      fillReactInput(titleInput, title);
+      filledFields.push('title');
+      console.log('[SCX] ✅ Title filled:', title.substring(0, 50));
+    } else {
+      // Fallback: try first visible text input
+      const allInputs = document.querySelectorAll('input[type="text"], input:not([type="hidden"]):not([type="file"]):not([type="checkbox"]):not([type="radio"]):not([type="number"])');
+      if (allInputs.length > 0) {
+        fillReactInput(allInputs[0], title);
+        filledFields.push('title(fallback)');
+        console.log('[SCX] ✅ Title filled (fallback):', title.substring(0, 50));
+      } else {
+        failedFields.push('title');
       }
     }
+    await scxSleep(500);
   }
-  
-  // Fill description
-  if (payload.description_uz || payload.description) {
-    const descAreas = document.querySelectorAll('textarea, [contenteditable="true"]');
-    for (const area of descAreas) {
-      const label = area.closest('[class*="field"], [class*="form"]')?.querySelector('label');
-      if (label && (label.textContent.includes('описан') || label.textContent.includes('tavsif') || label.textContent.includes('Tavsif'))) {
-        if (area.contentEditable === 'true') {
-          area.innerHTML = payload.description_uz || payload.description;
-          area.dispatchEvent(new Event('input', { bubbles: true }));
-        } else {
-          scxFillInput(area, payload.description_uz || payload.description);
-        }
-        break;
-      }
-    }
-  }
-  
-  // Fill MXIK code
-  if (payload.mxik_code) {
-    const allInputs = document.querySelectorAll('input');
-    for (const inp of allInputs) {
-      const nearby = inp.closest('[class*="field"], [class*="form"], [class*="row"]');
-      const text = nearby?.textContent || '';
-      if (text.includes('МХИК') || text.includes('MXIK') || text.includes('IKPU') || text.includes('mxik')) {
-        scxFillInput(inp, payload.mxik_code);
+
+  // Step 3: Fill MXIK/IKPU code
+  if (mxikCode) {
+    const mxikInput = findInputByLabel(
+      ['мхик', 'mxik', 'ikpu', 'ИК', 'код товара', 'tovar kodi', 'классификатор'],
+      'input'
+    );
+    if (mxikInput) {
+      fillReactInput(mxikInput, mxikCode);
+      filledFields.push('mxik');
+      console.log('[SCX] ✅ MXIK filled:', mxikCode);
+      await scxSleep(1000); // Wait for MXIK search results
+      
+      // Try to select first result from MXIK dropdown
+      const mxikOptions = document.querySelectorAll('[class*="option"], [class*="suggestion"], [class*="dropdown-item"], [role="option"]');
+      if (mxikOptions.length > 0) {
+        mxikOptions[0].click();
+        console.log('[SCX] ✅ MXIK option selected');
         await scxSleep(500);
-        break;
       }
+    } else {
+      failedFields.push('mxik');
     }
   }
-  
-  // Upload images
-  if (payload.images && payload.images.length > 0) {
-    const imgInput = document.querySelector('input[type="file"][accept*="image"]');
+
+  // Step 4: Fill Brand
+  if (brand) {
+    const brandInput = findInputByLabel(
+      ['бренд', 'brand', 'brend', 'торговая марка', 'производитель', 'ishlab chiqaruvchi'],
+      'input, select, [role="combobox"]'
+    );
+    if (brandInput) {
+      if (brandInput.tagName === 'SELECT' || brandInput.getAttribute('role') === 'combobox') {
+        brandInput.click();
+        await scxSleep(500);
+        // Type to search
+        const searchInput = document.querySelector('[class*="search"] input, [role="combobox"] input, input[placeholder*="поиск"], input[placeholder*="qidirish"]');
+        if (searchInput) {
+          fillReactInput(searchInput, brand);
+          await scxSleep(800);
+          const opts = document.querySelectorAll('[role="option"], [class*="option"]');
+          if (opts.length > 0) {
+            opts[0].click();
+            filledFields.push('brand');
+            console.log('[SCX] ✅ Brand selected:', brand);
+          }
+        }
+      } else {
+        fillReactInput(brandInput, brand);
+        filledFields.push('brand');
+        console.log('[SCX] ✅ Brand filled:', brand);
+      }
+      await scxSleep(500);
+    } else {
+      failedFields.push('brand');
+    }
+  }
+
+  // Step 5: Fill Description
+  if (description) {
+    const descArea = findInputByLabel(
+      ['описание', 'tavsif', 'тавсиф', 'description', 'подробное', 'to\'liq'],
+      'textarea, [contenteditable="true"], .ql-editor, .ProseMirror, [class*="editor"]'
+    );
+    if (descArea) {
+      if (descArea.contentEditable === 'true' || descArea.classList.contains('ql-editor') || descArea.classList.contains('ProseMirror')) {
+        fillContentEditable(descArea, description);
+      } else {
+        fillReactInput(descArea, description);
+      }
+      filledFields.push('description');
+      console.log('[SCX] ✅ Description filled');
+    } else {
+      // Fallback: find any textarea
+      const textareas = document.querySelectorAll('textarea');
+      if (textareas.length > 0) {
+        fillReactInput(textareas[0], description);
+        filledFields.push('description(fallback)');
+        console.log('[SCX] ✅ Description filled (fallback)');
+      } else {
+        failedFields.push('description');
+      }
+    }
+    await scxSleep(500);
+  }
+
+  // Step 6: Fill Price
+  if (price > 0) {
+    const priceInput = findInputByLabel(
+      ['цена', 'narx', 'нарх', 'стоимость', 'price', 'sotuv narxi', 'розничная'],
+      'input[type="number"], input'
+    );
+    if (priceInput) {
+      fillReactInput(priceInput, String(price));
+      filledFields.push('price');
+      console.log('[SCX] ✅ Price filled:', price);
+    } else {
+      failedFields.push('price');
+    }
+    await scxSleep(300);
+  }
+
+  // Step 7: Fill Barcode
+  if (barcode) {
+    const barcodeInput = findInputByLabel(
+      ['штрихкод', 'barcode', 'shtrix', 'ean', 'штрих-код', 'бар-код'],
+      'input'
+    );
+    if (barcodeInput) {
+      fillReactInput(barcodeInput, barcode);
+      filledFields.push('barcode');
+      console.log('[SCX] ✅ Barcode filled:', barcode);
+    }
+    await scxSleep(300);
+  }
+
+  // Step 8: Fill Characteristics (rang, razmer, etc.)
+  if (characteristics.length > 0) {
+    let charsFilled = 0;
+    for (const char of characteristics) {
+      const charInput = findInputByLabel(
+        [char.name, char.name.toLowerCase()],
+        'input, select, [role="combobox"]'
+      );
+      if (charInput) {
+        if (charInput.tagName === 'SELECT') {
+          // Try to find matching option
+          const options = charInput.querySelectorAll('option');
+          for (const opt of options) {
+            if (opt.textContent.trim().toLowerCase().includes(char.value.toLowerCase())) {
+              charInput.value = opt.value;
+              charInput.dispatchEvent(new Event('change', { bubbles: true }));
+              charsFilled++;
+              break;
+            }
+          }
+        } else {
+          fillReactInput(charInput, char.value);
+          charsFilled++;
+        }
+        await scxSleep(300);
+      }
+    }
+    if (charsFilled > 0) {
+      filledFields.push(`characteristics(${charsFilled}/${characteristics.length})`);
+      console.log(`[SCX] ✅ ${charsFilled}/${characteristics.length} characteristics filled`);
+    }
+  }
+
+  // Step 9: Upload Images
+  if (images.length > 0) {
+    const imgInput = document.querySelector('input[type="file"][accept*="image"], input[type="file"]');
     if (imgInput) {
       try {
+        console.log(`[SCX] Uploading ${images.length} images...`);
+        scxShowToast(`📷 ${images.length} ta rasm yuklanmoqda...`, 'info');
+        
         const dt = new DataTransfer();
-        for (const imgUrl of payload.images.slice(0, 10)) {
-          const resp = await fetch(imgUrl);
-          const blob = await resp.blob();
-          const file = new File([blob], `product_${Date.now()}.jpg`, { type: 'image/jpeg' });
-          dt.items.add(file);
+        let uploadedCount = 0;
+        
+        for (const imgUrl of images.slice(0, 10)) {
+          try {
+            const resp = await fetch(imgUrl, { mode: 'cors' });
+            if (!resp.ok) continue;
+            const blob = await resp.blob();
+            const ext = blob.type.includes('png') ? 'png' : 'jpg';
+            const file = new File([blob], `product_${Date.now()}_${uploadedCount}.${ext}`, { type: blob.type || 'image/jpeg' });
+            dt.items.add(file);
+            uploadedCount++;
+          } catch (e) {
+            console.warn('[SCX] Image fetch failed:', imgUrl, e.message);
+          }
         }
-        imgInput.files = dt.files;
-        imgInput.dispatchEvent(new Event('change', { bubbles: true }));
+        
+        if (uploadedCount > 0) {
+          imgInput.files = dt.files;
+          imgInput.dispatchEvent(new Event('change', { bubbles: true }));
+          imgInput.dispatchEvent(new Event('input', { bubbles: true }));
+          filledFields.push(`images(${uploadedCount})`);
+          console.log(`[SCX] ✅ ${uploadedCount} images uploaded`);
+          await scxSleep(2000); // Wait for image upload processing
+        }
       } catch (e) {
         console.warn('[SCX] Image upload error:', e);
+        failedFields.push('images');
+      }
+    } else {
+      // Try drag-and-drop zone
+      const dropZone = document.querySelector('[class*="upload"], [class*="dropzone"], [class*="drop-zone"], [class*="image-upload"]');
+      if (dropZone) {
+        console.log('[SCX] Found drop zone, images need manual upload');
+        failedFields.push('images(manual)');
+      } else {
+        failedFields.push('images');
       }
     }
   }
-  
-  scxShowToast('✅ Ma\'lumotlar to\'ldirildi. Iltimos, tekshirib saqlang!', 'success');
-  return { success: true, result: { filled: true } };
+
+  // Step 10: Try to submit the form
+  console.log('[SCX] Form fill complete. Attempting submit...');
+  console.log('[SCX] Filled:', filledFields.join(', '));
+  console.log('[SCX] Failed:', failedFields.join(', '));
+
+  await scxSleep(1000);
+
+  // Try to click the submit/save/publish button
+  const submitClicked = clickButtonByText([
+    'сохранить', 'saqlash', 'опубликовать', 'nashr', 'создать', 'yaratish',
+    'добавить товар', 'tovar qo\'shish', 'submit', 'save', 'publish',
+    'создать карточку', 'kartochka yaratish'
+  ]);
+
+  if (submitClicked) {
+    console.log('[SCX] ✅ Submit button clicked');
+    scxShowToast('⏳ Saqlanmoqda...', 'info');
+    
+    // Wait and check for success indicators
+    await scxSleep(3000);
+    
+    // Check if we got redirected (success) or if there are errors
+    const newUrl = window.location.href;
+    const hasErrors = document.querySelectorAll('[class*="error"], [class*="Error"], .field-error, [class*="invalid"]');
+    const visibleErrors = [...hasErrors].filter(el => {
+      const style = window.getComputedStyle(el);
+      return style.display !== 'none' && style.visibility !== 'hidden' && el.textContent.trim().length > 0;
+    });
+
+    // Check for success toast/alert from Uzum
+    const successIndicators = document.querySelectorAll('[class*="success"], [class*="Success"], [class*="toast"]');
+    const hasSuccessToast = [...successIndicators].some(el => {
+      const text = el.textContent.toLowerCase();
+      return text.includes('успешно') || text.includes('muvaffaqiyatli') || text.includes('сохранен') || text.includes('saqlandi') || text.includes('создан');
+    });
+
+    if (hasSuccessToast || (!currentUrl.includes('/create') && newUrl !== currentUrl && !newUrl.includes('/create'))) {
+      console.log('[SCX] ✅ Product saved successfully!');
+      scxShowToast('✅ Mahsulot muvaffaqiyatli yaratildi!', 'success');
+      return { 
+        success: true, 
+        result: { 
+          saved: true, 
+          submitted: true,
+          filledFields, 
+          failedFields,
+          redirectedTo: newUrl !== currentUrl ? newUrl : undefined
+        } 
+      };
+    }
+
+    if (visibleErrors.length > 0) {
+      const errorTexts = [...visibleErrors].slice(0, 3).map(el => el.textContent.trim()).join('; ');
+      console.log('[SCX] ⚠️ Form has validation errors:', errorTexts);
+      scxShowToast(`⚠️ Forma xatoliklari: ${errorTexts.substring(0, 100)}`, 'warning');
+      return { 
+        success: true, 
+        result: { 
+          saved: false, 
+          submitted: true,
+          filledFields, 
+          failedFields,
+          validationErrors: errorTexts,
+          message: 'Forma to\'ldirildi lekin validatsiya xatoliklari bor: ' + errorTexts.substring(0, 200)
+        } 
+      };
+    }
+
+    // Ambiguous - button was clicked but can't confirm result
+    // Wait a bit more and check again
+    await scxSleep(3000);
+    const finalUrl = window.location.href;
+    if (finalUrl !== currentUrl && !finalUrl.includes('/create')) {
+      console.log('[SCX] ✅ Redirected after save — product likely created');
+      return { 
+        success: true, 
+        result: { saved: true, submitted: true, filledFields, failedFields, redirectedTo: finalUrl } 
+      };
+    }
+
+    // Still on create page — might have saved or might have errors
+    console.log('[SCX] ℹ️ Still on create page after submit');
+    return { 
+      success: true, 
+      result: { 
+        saved: false, 
+        submitted: true,
+        filledFields, 
+        failedFields,
+        message: 'Forma yuborildi, lekin saqlangan-saqlanmaganligini aniqlab bo\'lmadi. Iltimos, tekshiring.'
+      } 
+    };
+  } else {
+    // Could not find submit button
+    console.log('[SCX] ⚠️ Submit button not found');
+    scxShowToast('⚠️ Ma\'lumotlar to\'ldirildi. Saqlash tugmasini topa olmadik — iltimos, qo\'lda saqlang!', 'warning');
+    return { 
+      success: true, 
+      result: { 
+        saved: false, 
+        submitted: false,
+        filledFields, 
+        failedFields,
+        message: 'Forma to\'ldirildi, lekin saqlash tugmasi topilmadi. Qo\'lda saqlang.'
+      } 
+    };
+  }
 }
 
 async function handleUpdatePrice(payload) {
   scxShowToast('💰 Narx yangilash...', 'info');
-  return { success: true, result: { message: 'Narx yangilash API orqali amalga oshiriladi' } };
+  return { success: true, result: { saved: false, message: 'Narx yangilash API orqali amalga oshiriladi' } };
 }
 
 async function handleUpdateStock(payload) {
   scxShowToast('📊 Zaxira yangilash...', 'info');
-  return { success: true, result: { message: 'Zaxira yangilash API orqali amalga oshiriladi' } };
+  return { success: true, result: { saved: false, message: 'Zaxira yangilash API orqali amalga oshiriladi' } };
 }
 
 // ===== Start =====
