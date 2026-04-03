@@ -121,7 +121,7 @@ export default function ExtensionDownload() {
 
         {/* CTA */}
         <div className="text-center pb-8">
-          <Button variant="outline" size="sm" onClick={() => navigate('/seller-cloud-mobile')} className="gap-2">
+          <Button variant="outline" size="sm" onClick={() => navigate(window.innerWidth < 768 ? '/seller-cloud-mobile' : '/seller-cloud')} className="gap-2">
             <Settings className="w-4 h-4" /> Dashboard'ga qaytish
           </Button>
         </div>
