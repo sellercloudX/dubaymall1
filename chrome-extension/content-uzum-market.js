@@ -154,7 +154,7 @@ function showProductAnalysisOverlay(data) {
       <button id="scx-clone-from-overlay" style="
         width:100%;margin-top:10px;padding:8px;background:linear-gradient(135deg,#7c3aed,#4f46e5);
         color:white;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;
-      ">📋 Klonlash uchun dashboard'ga o'tish</button>
+      ">📋 O'z do'konimga klonlash</button>
     </div>
   `;
   document.body.appendChild(overlay);
