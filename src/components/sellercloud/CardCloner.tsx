@@ -46,6 +46,78 @@ interface CloneableProduct {
 }
 
 const MARKETPLACE_INFO = MARKETPLACE_CONFIG;
+const MAX_REASONABLE_MARKETPLACE_PRICE = 500_000_000;
+
+function sanitizeMarketplacePrice(value: unknown): number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const rounded = Math.round(value);
+    if (rounded >= 100 && rounded <= MAX_REASONABLE_MARKETPLACE_PRICE) return rounded;
+    return sanitizeMarketplacePrice(String(Math.trunc(value)));
+  }
+
+  const text = String(value || '').replace(/\u00A0/g, ' ');
+  const digitsOnly = text.replace(/[^\d]/g, '');
+
+  if (digitsOnly.length > 9) {
+    const prefixCandidates = [6, 7, 5, 8]
+      .filter((length) => digitsOnly.length >= length)
+      .map((length) => {
+        const amount = Number(digitsOnly.slice(0, length));
+        let score = 0;
+        if (amount % 1000 === 0) score += 3;
+        else if (amount % 100 === 0) score += 2;
+        else if (amount % 10 === 0) score += 1;
+        if (amount >= 10000 && amount <= 5000000) score += 1;
+        return { amount, length, score };
+      })
+      .filter((item) => Number.isFinite(item.amount) && item.amount >= 100 && item.amount <= MAX_REASONABLE_MARKETPLACE_PRICE)
+      .sort((a, b) => (b.score - a.score) || (b.length - a.length));
+
+    if (prefixCandidates.length > 0) {
+      return prefixCandidates[0].amount;
+    }
+  }
+
+  const groupedMatches = text.match(/\d{1,3}(?:[\s,]\d{3}){1,3}/g) ?? [];
+  const compactMatches = text.match(/\d{4,9}/g) ?? [];
+  const candidates = [...groupedMatches, ...compactMatches]
+    .map((match) => Number(match.replace(/[^\d]/g, '')))
+    .filter((amount) => Number.isFinite(amount) && amount >= 100 && amount <= MAX_REASONABLE_MARKETPLACE_PRICE)
+    .sort((a, b) => a - b);
+
+  return candidates[0] || 0;
+}
+
+function normalizeCloneImageUrl(url: string): string {
+  return url
+    .replace(/\/t_product_\d+/i, '/t_product_540')
+    .replace(/\/w_\d+/i, '/w_540');
+}
+
+function isLikelyCloneImageUrl(value: unknown): value is string {
+  if (typeof value !== 'string' || !value.startsWith('http')) return false;
+  const lower = value.toLowerCase();
+
+  return !(
+    lower.includes('/baner/') ||
+    lower.includes('/banner') ||
+    lower.includes('/banners/') ||
+    lower.includes('badge-icon') ||
+    lower.includes('placeholder') ||
+    lower.includes('/icons/') ||
+    lower.includes('static.uzum.uz')
+  );
+}
+
+function sanitizeCloneImages(values: unknown[]): string[] {
+  return Array.from(new Set(values.filter(isLikelyCloneImageUrl).map(normalizeCloneImageUrl))).slice(0, 10);
+}
+
+function sanitizeCloneDescription(value: unknown, fallback = ''): string {
+  const text = String(value || fallback || '').replace(/\s+/g, ' ').trim();
+  const cleaned = text.replace(/^(описание|tavsif)\s*[:\-]?\s*/i, '').trim();
+  return cleaned || fallback;
+}
 
 export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
   const { user } = useAuth();
@@ -105,20 +177,21 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
         }
 
         const title = String(scraped.title || scraped.name || 'Raqobatchi mahsulot').trim();
-        const pictures = Array.isArray(scraped.images)
-          ? scraped.images.filter((img: unknown): img is string => typeof img === 'string' && img.startsWith('http'))
-          : Array.isArray(scraped.pictures)
-            ? scraped.pictures.filter((img: unknown): img is string => typeof img === 'string' && img.startsWith('http'))
-            : [];
+        const pictures = sanitizeCloneImages([
+          ...(Array.isArray(scraped.images) ? scraped.images : []),
+          ...(Array.isArray(scraped.pictures) ? scraped.pictures : []),
+          scraped.image,
+        ]);
+        const price = sanitizeMarketplacePrice(scraped.sellPrice ?? scraped.price);
 
         const mapped: CloneableProduct = {
           offerId: String(scraped.productId || externalProductId),
           name: title,
-          price: Number(scraped.sellPrice || scraped.price || 0),
+          price,
           shopSku: String(scraped.productId || externalProductId),
           pictures,
           category: String(scraped.category || scraped.breadcrumbs?.slice?.(-1)?.[0] || 'Uzum Market'),
-          description: String(scraped.description || title),
+          description: sanitizeCloneDescription(scraped.description, title),
           marketplace: externalSourceMarketplace,
           selected: false,
           brand: String(scraped.brand || ''),
@@ -497,11 +570,22 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
   // Clone product to external marketplace
   const cloneToMarketplace = async (product: CloneableProduct, targetMp: string): Promise<boolean> => {
     try {
-      const validImages = (product.pictures || []).filter(p => p && p.startsWith('http'));
-      const convertedPrice = convertPrice(product.price, product.marketplace, targetMp);
+      const validImages = sanitizeCloneImages(product.pictures || []);
+      const sourcePrice = sanitizeMarketplacePrice(product.price);
+      const convertedPrice = sanitizeMarketplacePrice(convertPrice(sourcePrice, product.marketplace, targetMp));
       const costPrice = Math.round(convertedPrice * 0.6);
-      const productDescription = product.description || product.name;
+      const productDescription = sanitizeCloneDescription(product.description, product.name);
       const productCategory = product.category || '';
+
+      if (!sourcePrice || !convertedPrice) {
+        toast.error(`${product.name.slice(0, 30)}: narx noto'g'ri o'qilgan, mahsulot sahifasidan qayta klonlang`);
+        return false;
+      }
+
+      if (validImages.length === 0) {
+        toast.error(`${product.name.slice(0, 30)}: real rasmlar topilmadi, mahsulot sahifasidan qayta klonlang`);
+        return false;
+      }
       
       
       if (targetMp === 'yandex') {

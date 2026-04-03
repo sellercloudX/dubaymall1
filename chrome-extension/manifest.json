@@ -1,14 +1,15 @@
 {
   "manifest_version": 3,
   "name": "SellerCloudX — Multi-Marketplace Pro",
-  "version": "4.0.0",
+  "version": "4.1.0",
   "description": "Uzum, Wildberries, Yandex Market seller panellarini SellerCloudX bilan bog'laydi. Moliya, buyurtmalar, raqobatchilar — hammasi avtomatik.",
   "permissions": [
     "activeTab",
     "storage",
     "alarms",
     "notifications",
-    "tabs"
+    "tabs",
+    "scripting"
   ],
   "host_permissions": [
     "https://seller.uzum.uz/*",
@@ -26,33 +27,70 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://seller.uzum.uz/*", "https://seller-edu.uzum.uz/*"],
-      "js": ["shared.js", "content-uzum-seller.js"],
-      "css": ["content.css"],
+      "matches": [
+        "https://seller.uzum.uz/*",
+        "https://seller-edu.uzum.uz/*"
+      ],
+      "js": [
+        "shared.js",
+        "content-uzum-seller.js"
+      ],
+      "css": [
+        "content.css"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://uzum.uz/*"],
-      "js": ["shared.js", "content-uzum-market.js"],
-      "css": ["content.css"],
+      "matches": [
+        "https://uzum.uz/*"
+      ],
+      "js": [
+        "shared.js",
+        "content-uzum-market.js"
+      ],
+      "css": [
+        "content.css"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://seller.wildberries.ru/*"],
-      "js": ["shared.js", "content-wb-seller.js"],
-      "css": ["content.css"],
+      "matches": [
+        "https://seller.wildberries.ru/*"
+      ],
+      "js": [
+        "shared.js",
+        "content-wb-seller.js"
+      ],
+      "css": [
+        "content.css"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://partner.market.yandex.ru/*"],
-      "js": ["shared.js", "content-yandex-seller.js"],
-      "css": ["content.css"],
+      "matches": [
+        "https://partner.market.yandex.ru/*"
+      ],
+      "js": [
+        "shared.js",
+        "content-yandex-seller.js"
+      ],
+      "css": [
+        "content.css"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://mpstats.io/*", "https://zoomselling.io/*"],
-      "js": ["shared.js", "content-analytics.js"],
-      "css": ["content.css"],
+      "matches": [
+        "https://mpstats.io/*",
+        "https://zoomselling.io/*"
+      ],
+      "js": [
+        "shared.js",
+        "content-analytics.js"
+      ],
+      "css": [
+        "content.css"
+      ],
       "run_at": "document_idle"
     }
   ],

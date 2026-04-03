@@ -5,9 +5,18 @@
 const SUPABASE_URL = 'https://idcshubgqrzdvkttnslz.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlkY3NodWJncXJ6ZHZrdHRuc2x6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxMzE4NjksImV4cCI6MjA4NTcwNzg2OX0.7am0dzPKSQXLXhOwNHRZbHqxi8pRQLkwO-XQDt-_DI8';
 const DASHBOARD_URL = 'https://sellercloudx.com/seller-cloud';
+const UZUM_SELLER_URL_PATTERNS = ['https://seller.uzum.uz/*', 'https://seller-edu.uzum.uz/*'];
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => document.querySelectorAll(s);
+
+function renderExtensionVersion() {
+  try {
+    const version = chrome.runtime?.getManifest?.()?.version || '4.1.0';
+    $('#extension-version').textContent = `v${version}`;
+    $('#extension-version-footer').textContent = `SellerCloudX Pro v${version}`;
+  } catch {}
+}
 
 // ===== Tabs =====
 $$('.tab').forEach(tab => {
@@ -43,7 +52,7 @@ async function loadToggles() {
 
 async function notifyContent(msg) {
   try {
-    const tabs = await chrome.tabs.query({ url: 'https://seller.uzum.uz/*' });
+    const tabs = await chrome.tabs.query({ url: UZUM_SELLER_URL_PATTERNS });
     for (const tab of tabs) chrome.tabs.sendMessage(tab.id, msg).catch(() => {});
   } catch {}
 }
@@ -63,6 +72,7 @@ async function ensureBackgroundConnection(config) {
 
 // ===== Init =====
 async function init() {
+  renderExtensionVersion();
   const config = await chrome.storage.local.get(['accessToken', 'userId', 'userEmail']);
   if (config.accessToken && config.userId) {
     // Always ensure background SW is alive and connected
@@ -140,7 +150,7 @@ function checkConnection() {
 }
 
 async function checkSellerTab() {
-  const tabs = await chrome.tabs.query({ url: 'https://seller.uzum.uz/*' });
+  const tabs = await chrome.tabs.query({ url: UZUM_SELLER_URL_PATTERNS });
   $('#seller-status').innerHTML = tabs.length > 0
     ? '<span class="dot dot-green"></span> Ochiq'
     : '<span class="dot dot-red"></span> Yopiq';
@@ -228,7 +238,7 @@ $('#action-price')?.addEventListener('click', () => chrome.tabs.create({ url: DA
 $('#action-stock')?.addEventListener('click', () => chrome.tabs.create({ url: DASHBOARD_URL }));
 $('#action-analytics')?.addEventListener('click', async () => {
   await notifyContent({ type: 'SCX_SETTING', setting: 'overlay', value: true });
-  const tabs = await chrome.tabs.query({ url: 'https://seller.uzum.uz/*' });
+  const tabs = await chrome.tabs.query({ url: UZUM_SELLER_URL_PATTERNS });
   if (tabs.length > 0) chrome.tabs.update(tabs[0].id, { active: true });
   else chrome.tabs.create({ url: 'https://seller.uzum.uz/' });
 });

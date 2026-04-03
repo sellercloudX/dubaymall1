@@ -1,10 +1,12 @@
 /**
  * SellerCloudX Content Script — Uzum Seller Panel
  * seller.uzum.uz uchun maxsus funksiyalar
- * v5.0 — Mukammal klonlash + real DOM avtomatizatsiya
+ * v5.1 — Mukammal klonlash + real DOM avtomatizatsiya
  */
 
-console.log('[SCX v5.0] Uzum Seller content script loaded');
+const SCX_UZUM_SELLER_VERSION = '5.1.0';
+
+console.log(`[SCX v${SCX_UZUM_SELLER_VERSION}] Uzum Seller content script loaded`);
 
 // ===== Settings =====
 const uzumSettings = { overlayEnabled: true, profitEnabled: true };
@@ -371,6 +373,10 @@ function injectUzumOverlays() {
 
 // ===== Command Handler (from background) =====
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.type === 'SCX_PING') {
+    sendResponse({ pong: true, page: 'uzum-seller', version: SCX_UZUM_SELLER_VERSION });
+    return true;
+  }
   if (msg.type === 'SCX_COMMAND') {
     handleUzumCommand(msg).then(sendResponse);
     return true;
