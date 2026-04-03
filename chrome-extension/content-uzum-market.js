@@ -166,7 +166,7 @@ function showProductAnalysisOverlay(data) {
 }
 
 // ===== Clone current product =====
-function cloneCurrentProduct() {
+async function cloneCurrentProduct() {
   const url = window.location.href;
   if (!url.includes('/product/') && !url.includes('/p/')) {
     scxShowToast('⚠️ Mahsulot sahifasiga o\'ting', 'warning');
