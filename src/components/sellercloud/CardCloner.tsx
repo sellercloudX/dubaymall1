@@ -539,7 +539,7 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
 
       if (data?.status === 'completed') {
         const result = (data.result as Record<string, any> | null) ?? null;
-        const saved = result?.saved === true || result?.submitted === true;
+        const saved = result?.saved === true;
 
         if (!saved) {
           return {
