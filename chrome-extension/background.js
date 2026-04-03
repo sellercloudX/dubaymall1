@@ -11,8 +11,10 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 let realtimeChannel = null;
 let userId = null;
 let ws = null;
-let reconnectTimer = null;
-const HEARTBEAT_INTERVAL = 25000;
+let websocketHeartbeatTimer = null;
+let backendHeartbeatTimer = null;
+const WEBSOCKET_HEARTBEAT_INTERVAL = 25000;
+const BACKEND_HEARTBEAT_INTERVAL = 5 * 60 * 1000;
 
 // ===== Storage Helpers =====
 async function getConfig() {
@@ -28,6 +30,7 @@ async function setConfig(data) {
 function connectRealtime(accessToken, uid) {
   if (ws && ws.readyState === WebSocket.OPEN) {
     console.log('[SCX] WebSocket already connected');
+    sendHeartbeat(accessToken, uid);
     return;
   }
 
@@ -63,9 +66,11 @@ function connectRealtime(accessToken, uid) {
     chrome.action.setBadgeText({ text: '●' });
     chrome.action.setBadgeBackgroundColor({ color: '#22c55e' });
 
-    // Heartbeat to keep connection alive
-    if (reconnectTimer) clearInterval(reconnectTimer);
-    reconnectTimer = setInterval(() => {
+    // Keep websocket alive and refresh backend heartbeat
+    if (websocketHeartbeatTimer) clearInterval(websocketHeartbeatTimer);
+    if (backendHeartbeatTimer) clearInterval(backendHeartbeatTimer);
+
+    websocketHeartbeatTimer = setInterval(() => {
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({
           topic: 'phoenix',
@@ -74,7 +79,12 @@ function connectRealtime(accessToken, uid) {
           ref: Date.now().toString(),
         }));
       }
-    }, HEARTBEAT_INTERVAL);
+    }, WEBSOCKET_HEARTBEAT_INTERVAL);
+
+    sendHeartbeat(accessToken, uid);
+    backendHeartbeatTimer = setInterval(() => {
+      sendHeartbeat(accessToken, uid);
+    }, BACKEND_HEARTBEAT_INTERVAL);
   };
 
   ws.onmessage = async (event) => {
@@ -108,7 +118,8 @@ function connectRealtime(accessToken, uid) {
     chrome.action.setBadgeText({ text: '✕' });
     chrome.action.setBadgeBackgroundColor({ color: '#ef4444' });
     
-    if (reconnectTimer) clearInterval(reconnectTimer);
+    if (websocketHeartbeatTimer) clearInterval(websocketHeartbeatTimer);
+    if (backendHeartbeatTimer) clearInterval(backendHeartbeatTimer);
     setTimeout(() => connectRealtime(accessToken, uid), 5000);
   };
 
@@ -268,8 +279,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     setConfig({ accessToken, userId: uid, isConnected: false });
     connectRealtime(accessToken, uid);
     fetchPendingCommands();
-    // Send heartbeat so dashboard knows extension is connected
-    sendHeartbeat(accessToken, uid);
     sendResponse({ success: true });
     return true;
   }
