@@ -51,9 +51,15 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
   const { tasks } = useBackgroundTasks();
   const { getCostPrice, setCostPrice } = useCostPrices();
 
-  const searchParams = useMemo(() => new URLSearchParams(window.location.search), []);
-  const externalSourceMarketplace = searchParams.get('source') || '';
-  const externalProductId = searchParams.get('productId') || '';
+  // Read clone params from hash query: #clone?source=uzum_market&productId=123
+  const hashParams = useMemo(() => {
+    const hash = window.location.hash;
+    const qIdx = hash.indexOf('?');
+    if (qIdx === -1) return new URLSearchParams();
+    return new URLSearchParams(hash.substring(qIdx + 1));
+  }, []);
+  const externalSourceMarketplace = hashParams.get('source') || '';
+  const externalProductId = hashParams.get('productId') || '';
 
   const [sourceMarketplace, setSourceMarketplace] = useState(
     externalSourceMarketplace || connectedMarketplaces[0] || ''
