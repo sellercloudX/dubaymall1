@@ -190,7 +190,7 @@ function renderCommands(cmds) {
 
 // ===== Actions =====
 $('#open-seller-btn').addEventListener('click', () => chrome.tabs.create({ url: 'https://seller.uzum.uz/' }));
-$('#open-dashboard-btn').addEventListener('click', () => chrome.tabs.create({ url: 'https://sellercloudx.lovable.app/seller-cloud-x' }));
+$('#open-dashboard-btn').addEventListener('click', () => chrome.tabs.create({ url: 'https://sellercloudx.lovable.app/seller-cloud' }));
 
 $('#refresh-btn').addEventListener('click', async () => {
   $('#refresh-btn').textContent = '⏳ Yangilanmoqda...';
@@ -200,11 +200,11 @@ $('#refresh-btn').addEventListener('click', async () => {
   $('#refresh-btn').innerHTML = '🔄 Ma\'lumotlarni yangilash';
 });
 
-$('#action-create-product')?.addEventListener('click', () => chrome.tabs.create({ url: 'https://sellercloudx.lovable.app/seller-cloud-x' }));
+$('#action-create-product')?.addEventListener('click', () => chrome.tabs.create({ url: 'https://sellercloudx.lovable.app/seller-cloud' }));
 $('#action-boost')?.addEventListener('click', () => chrome.tabs.create({ url: 'https://seller.uzum.uz/advertising' }));
 $('#action-labels')?.addEventListener('click', () => chrome.tabs.create({ url: 'https://seller.uzum.uz/orders' }));
-$('#action-price')?.addEventListener('click', () => chrome.tabs.create({ url: 'https://sellercloudx.lovable.app/seller-cloud-x' }));
-$('#action-stock')?.addEventListener('click', () => chrome.tabs.create({ url: 'https://sellercloudx.lovable.app/seller-cloud-x' }));
+$('#action-price')?.addEventListener('click', () => chrome.tabs.create({ url: 'https://sellercloudx.lovable.app/seller-cloud' }));
+$('#action-stock')?.addEventListener('click', () => chrome.tabs.create({ url: 'https://sellercloudx.lovable.app/seller-cloud' }));
 $('#action-analytics')?.addEventListener('click', async () => {
   await notifyContent({ type: 'SCX_SETTING', setting: 'overlay', value: true });
   const tabs = await chrome.tabs.query({ url: 'https://seller.uzum.uz/*' });
