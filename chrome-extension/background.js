@@ -243,6 +243,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     setConfig({ accessToken, userId: uid, isConnected: false });
     connectRealtime(accessToken, uid);
     fetchPendingCommands();
+    // Send heartbeat so dashboard knows extension is connected
+    sendHeartbeat(accessToken, uid);
     sendResponse({ success: true });
     return true;
   }
