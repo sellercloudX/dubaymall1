@@ -34,7 +34,7 @@ function initUzumMarket() {
   document.body.appendChild(toolbar);
   
   document.getElementById('scx-btn-dashboard')?.addEventListener('click', () => {
-    window.open('https://sellercloudx.lovable.app/seller-cloud-mobile', '_blank');
+    window.open('https://sellercloudx.lovable.app/seller-cloud-x', '_blank');
   });
   document.getElementById('scx-btn-minimize')?.addEventListener('click', () => {
     toolbar.classList.toggle('scx-minimized');
