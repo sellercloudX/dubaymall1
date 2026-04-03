@@ -162,6 +162,27 @@ export default function SellerCloudX() {
     }
   }, [isMobile, subscription, navigate]);
 
+  // Broadcast auth token to extension via postMessage
+  useEffect(() => {
+    if (!user) return;
+    const broadcastToken = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (data?.session?.access_token) {
+          window.postMessage({
+            type: 'SCX_AUTH_TOKEN',
+            accessToken: data.session.access_token,
+            userId: user.id,
+            userEmail: user.email || '',
+          }, '*');
+        }
+      } catch {}
+    };
+    broadcastToken();
+    const interval = setInterval(broadcastToken, 60000);
+    return () => clearInterval(interval);
+  }, [user]);
+
   useEffect(() => {
     if (!authLoading && !user) {
       navigate('/auth?redirect=/seller-cloud');
