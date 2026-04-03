@@ -188,7 +188,7 @@ function injectProductPageAnalytics() {
       // Open dashboard with clone params in URL search (not hash)
       setTimeout(() => {
         window.open(
-          `${DASHBOARD_BASE}/seller-cloud-x#clone?source=uzum_market&productId=${productId}`,
+          `${DASHBOARD_BASE}/seller-cloud#clone?source=uzum_market&productId=${productId}`,
           '_blank'
         );
       }, 500);
@@ -238,7 +238,7 @@ function showProductPanel(productId, anchor) {
     scraped.sourceUrl = window.location.href;
     await scxSaveScrapedData('uzum_market', 'competitor_product', scraped, window.location.href);
     scxShowToast('✅ Dashboard ochilmoqda...', 'success');
-    window.open(`${DASHBOARD_BASE}/seller-cloud-x#clone?source=uzum_market&productId=${productId}`, '_blank');
+    window.open(`${DASHBOARD_BASE}/seller-cloud#clone?source=uzum_market&productId=${productId}`, '_blank');
   });
 }
 
@@ -265,7 +265,7 @@ function injectShopPageAnalytics() {
       </div>
     </div>`;
     if (h1.parentElement) h1.parentElement.insertBefore(panel, h1.nextSibling);
-    panel.querySelector('#scx-shop-dash-btn')?.addEventListener('click', () => { window.open(DASHBOARD_BASE + '/seller-cloud-x', '_blank'); });
+    panel.querySelector('#scx-shop-dash-btn')?.addEventListener('click', () => { window.open(DASHBOARD_BASE + '/seller-cloud', '_blank'); });
     scxSaveScrapedData('uzum_market', 'shop_analysis', s, window.location.href).catch(() => { });
   };
   wait();
