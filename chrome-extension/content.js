@@ -124,7 +124,7 @@ function createToolbar() {
   document.getElementById('scx-btn-panel').addEventListener('click', toggleAnalyticsPanel);
   document.getElementById('scx-btn-profit').addEventListener('click', toggleProfitCalculator);
   document.getElementById('scx-btn-dashboard').addEventListener('click', () => {
-    window.open('https://sellercloudx.lovable.app/seller-cloud-mobile', '_blank');
+    window.open('https://sellercloudx.lovable.app/seller-cloud-x', '_blank');
   });
   document.getElementById('scx-btn-refresh').addEventListener('click', () => {
     injectProductOverlays();
@@ -237,7 +237,7 @@ async function toggleAnalyticsPanel() {
 
   document.getElementById('scx-panel-close').addEventListener('click', toggleAnalyticsPanel);
   document.getElementById('scx-panel-dashboard').addEventListener('click', () => {
-    window.open('https://sellercloudx.lovable.app/seller-cloud-mobile', '_blank');
+    window.open('https://sellercloudx.lovable.app/seller-cloud-x', '_blank');
   });
 }
 

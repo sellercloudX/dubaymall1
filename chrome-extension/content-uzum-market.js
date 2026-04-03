@@ -34,7 +34,7 @@ function initUzumMarket() {
   document.body.appendChild(toolbar);
   
   document.getElementById('scx-btn-dashboard')?.addEventListener('click', () => {
-    window.open('https://sellercloudx.lovable.app/seller-cloud-mobile', '_blank');
+    window.open('https://sellercloudx.lovable.app/seller-cloud-x', '_blank');
   });
   document.getElementById('scx-btn-minimize')?.addEventListener('click', () => {
     toolbar.classList.toggle('scx-minimized');
@@ -154,27 +154,72 @@ function showProductAnalysisOverlay(data) {
       <button id="scx-clone-from-overlay" style="
         width:100%;margin-top:10px;padding:8px;background:linear-gradient(135deg,#7c3aed,#4f46e5);
         color:white;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;
-      ">📋 Klonlash uchun dashboard'ga o'tish</button>
+      ">📋 O'z do'konimga klonlash</button>
     </div>
   `;
   document.body.appendChild(overlay);
   
   document.getElementById('scx-overlay-close')?.addEventListener('click', () => overlay.remove());
   document.getElementById('scx-clone-from-overlay')?.addEventListener('click', () => {
-    window.open('https://sellercloudx.lovable.app/seller-cloud-mobile', '_blank');
+    window.open(`https://sellercloudx.lovable.app/seller-cloud-x?clone_source=uzum_market&clone_url=${encodeURIComponent(window.location.href)}`, '_blank');
   });
 }
 
 // ===== Clone current product =====
-function cloneCurrentProduct() {
+async function cloneCurrentProduct() {
   const url = window.location.href;
   if (!url.includes('/product/') && !url.includes('/p/')) {
     scxShowToast('⚠️ Mahsulot sahifasiga o\'ting', 'warning');
     return;
   }
   // Open dashboard with clone intent
-  window.open(`https://sellercloudx.lovable.app/seller-cloud-mobile?clone_url=${encodeURIComponent(url)}`, '_blank');
-  scxShowToast('📋 Klonlash uchun dashboard ochilmoqda...', 'info');
+  // Scrape product data and save, then open dashboard
+  scxShowToast('📋 Mahsulot ma\'lumotlari yig\'ilmoqda...', 'info');
+  
+  const productData = {
+    url,
+    title: document.querySelector('h1, [class*="title"], [class*="ProductTitle"]')?.textContent?.trim(),
+    price: null,
+    images: [],
+    characteristics: [],
+    description: '',
+    seller: null,
+  };
+  
+  // Scrape price
+  const priceEls = document.querySelectorAll('[class*="price"], [class*="Price"]');
+  priceEls.forEach(el => {
+    const num = scxParseNumber(el.textContent);
+    if (num > 100 && !productData.price) productData.price = num;
+  });
+  
+  // Scrape images
+  document.querySelectorAll('[class*="gallery"] img, [class*="slider"] img, [class*="image"] img, [class*="magnifier"] img, picture img').forEach(img => {
+    const src = img.src || img.dataset?.src;
+    if (src && src.includes('http') && !productData.images.includes(src)) {
+      productData.images.push(src);
+    }
+  });
+  
+  // Scrape description
+  const descEl = document.querySelector('[class*="description"], [class*="Description"]');
+  if (descEl) productData.description = descEl.textContent?.trim()?.substring(0, 2000);
+  
+  // Scrape characteristics
+  document.querySelectorAll('[class*="characteristic"] tr, [class*="spec"] tr, [class*="param"] tr, [class*="Attribute"] tr').forEach(tr => {
+    const cells = [...tr.querySelectorAll('td, th')].map(c => c.textContent.trim());
+    if (cells.length >= 2) productData.characteristics.push({ key: cells[0], value: cells[1] });
+  });
+  
+  // Seller
+  const sellerEl = document.querySelector('[class*="seller"], [class*="Seller"], [class*="shop"]');
+  if (sellerEl) productData.seller = sellerEl.textContent.trim();
+  
+  // Save scraped data
+  await scxSaveScrapedData('uzum', 'competitor_product', productData, url);
+  
+  scxShowToast('✅ Ma\'lumotlar saqlandi! Dashboard ochilmoqda...', 'success');
+  window.open(`https://sellercloudx.lovable.app/seller-cloud-x?clone_source=uzum_market&clone_url=${encodeURIComponent(url)}`, '_blank');
 }
 
 // ===== Inject marketplace overlays =====
