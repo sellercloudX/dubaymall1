@@ -84,22 +84,31 @@ export default function UzumManagerInvite() {
         .eq('user_id', user.id)
         .eq('status', 'pending');
 
-      // Check latest extension activity (completed/processing commands)
+      // Check latest extension activity (heartbeat, completed, or processing commands)
       const { data: lastActivity } = await supabase
         .from('uzum_extension_commands')
-        .select('status, processed_at, created_at')
+        .select('status, processed_at, created_at, command_type, payload')
         .eq('user_id', user.id)
         .in('status', ['processing', 'completed'])
-        .order('processed_at', { ascending: false, nullsFirst: false })
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
+      // Consider connected if activity within last 24 hours
+      const isRecent = lastActivity && (
+        new Date().getTime() - new Date(lastActivity.processed_at || lastActivity.created_at).getTime() < 24 * 60 * 60 * 1000
+      );
+
+      const version = lastActivity?.command_type === 'heartbeat' 
+        ? (lastActivity.payload as any)?.version || null 
+        : null;
+
       setExtensionStatus(prev => ({
         ...prev,
         pendingCommands: count || 0,
-        connected: !!lastActivity,
+        connected: !!isRecent,
         lastPing: (lastActivity?.processed_at as string | null) || (lastActivity?.created_at as string | null) || null,
+        version,
       }));
     } catch (err) {
       console.error('Failed to load account:', err);
