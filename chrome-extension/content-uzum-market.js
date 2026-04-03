@@ -161,7 +161,7 @@ function showProductAnalysisOverlay(data) {
   
   document.getElementById('scx-overlay-close')?.addEventListener('click', () => overlay.remove());
   document.getElementById('scx-clone-from-overlay')?.addEventListener('click', () => {
-    window.open('https://sellercloudx.lovable.app/seller-cloud-mobile', '_blank');
+    window.open(`https://sellercloudx.lovable.app/seller-cloud-x?clone_source=uzum_market&clone_url=${encodeURIComponent(window.location.href)}`, '_blank');
   });
 }
 
