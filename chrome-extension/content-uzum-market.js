@@ -6,6 +6,49 @@
 console.log('[SCX v6.0] Uzum Market content script loaded');
 
 const DASHBOARD_BASE = 'https://sellercloudx.com';
+const MAX_REASONABLE_PRICE_UZS = 500000000;
+
+function normalizeUzumMoney(value) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const rounded = Math.round(value);
+    return rounded >= 100 && rounded <= MAX_REASONABLE_PRICE_UZS ? rounded : 0;
+  }
+
+  const text = String(value || '').replace(/\u00A0/g, ' ');
+  const direct = Number(text.replace(/[^\d]/g, ''));
+  if (Number.isFinite(direct) && direct >= 100 && direct <= MAX_REASONABLE_PRICE_UZS) return Math.round(direct);
+
+  return 0;
+}
+
+function parseUzumPrice(text) {
+  const normalizedText = String(text || '').replace(/\u00A0/g, ' ');
+  const match = normalizedText.match(/\b(\d{1,3}(?:[\s,]\d{3}){1,3}|\d{4,9})\s*(?:сум|so['’`]?m)\b/i);
+  return normalizeUzumMoney(match?.[1] || '');
+}
+
+function normalizeProductImageUrl(url) {
+  return String(url || '')
+    .replace(/\/t_product_\d+/i, '/t_product_540')
+    .replace(/\/w_\d+/i, '/w_540');
+}
+
+function isLikelyProductImageUrl(url) {
+  if (!url || typeof url !== 'string' || !url.startsWith('http')) return false;
+  const lower = url.toLowerCase();
+  if (
+    lower.includes('/baner/') ||
+    lower.includes('/banner') ||
+    lower.includes('/banners/') ||
+    lower.includes('badge-icon') ||
+    lower.includes('placeholder') ||
+    lower.includes('/icons/') ||
+    lower.includes('static.uzum.uz')
+  ) {
+    return false;
+  }
+  return lower.includes('images.uzum.uz') || lower.includes('/t_product_') || lower.includes('/w_');
+}
 
 // ===== Page Detection =====
 function getPageType() {
@@ -33,13 +76,17 @@ function scrapeProductPage() {
   // Price — look for price elements
   const priceEls = document.querySelectorAll('[class*="rice"], [class*="cost"], [class*="Price"]');
   for (const el of priceEls) {
-    const m = el.textContent.match(/([\d\s]{3,})\s*сум/i);
-    if (m) { d.sellPrice = parseInt(m[1].replace(/\s/g, '')); break; }
+    const candidate = parseUzumPrice(el.textContent || '');
+    if (candidate) {
+      d.sellPrice = candidate;
+      break;
+    }
   }
   if (!d.sellPrice) {
-    const m = txt.match(/([\d\s]{4,})\s*сум/i);
-    if (m) d.sellPrice = parseInt(m[1].replace(/\s/g, ''));
+    const candidate = parseUzumPrice(txt);
+    if (candidate) d.sellPrice = candidate;
   }
+  if (d.sellPrice) d.price = d.sellPrice;
 
   // Orders
   const om = txt.match(/([\d\s]+)\+?\s*заказ/i);
@@ -65,19 +112,20 @@ function scrapeProductPage() {
 
   // Old price (discount)
   for (const el of document.querySelectorAll('del, s, [class*="old"], [class*="cross"]')) {
-    const m = el.textContent.match(/([\d\s]+)\s*сум?/i);
-    if (m) { const op = parseInt(m[1].replace(/\s/g, '')); if (op > (d.sellPrice || 0)) { d.fullPrice = op; break; } }
+    const op = parseUzumPrice(el.textContent || '');
+    if (op > (d.sellPrice || 0)) { d.fullPrice = op; break; }
   }
 
   // Images
   d.images = [];
-  document.querySelectorAll('img[src*="uzum"], img[src*="cdn"]').forEach(img => {
-    const src = img.src || img.dataset.src;
-    if (src && src.startsWith('http') && !d.images.includes(src) && d.images.length < 15) {
-      // Get highest quality version
-      const hq = src.replace(/\/t_product_\d+/, '/t_product_540').replace(/\/w_\d+/, '/w_540');
-      d.images.push(hq);
+  const pushImage = (src) => {
+    const normalized = normalizeProductImageUrl(src);
+    if (isLikelyProductImageUrl(normalized) && !d.images.includes(normalized) && d.images.length < 15) {
+      d.images.push(normalized);
     }
+  };
+  document.querySelectorAll('img[src], img[data-src]').forEach(img => {
+    pushImage(img.currentSrc || img.src || img.dataset.src);
   });
 
   // Description

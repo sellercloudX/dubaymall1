@@ -9,6 +9,91 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 let ws = null;
 let userId = null;
 let websocketHeartbeatTimer = null;
+const UZUM_SELLER_URL_PATTERNS = ['https://seller.uzum.uz/*', 'https://seller-edu.uzum.uz/*'];
+const UZUM_CREATE_URL = 'https://seller.uzum.uz/products/create';
+
+function isNoReceiverError(error) {
+  return /Receiving end does not exist/i.test(String(error?.message || error || ''));
+}
+
+function getCreateUrlForTab(tabUrl = '') {
+  return String(tabUrl).includes('seller-edu.uzum.uz')
+    ? 'https://seller-edu.uzum.uz/products/create'
+    : UZUM_CREATE_URL;
+}
+
+async function waitForTabComplete(tabId, timeout = 15000) {
+  if (!tabId) throw new Error('Uzum seller tabi topilmadi');
+  const tab = await chrome.tabs.get(tabId).catch(() => null);
+  if (tab?.status === 'complete') return;
+
+  await new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      chrome.tabs.onUpdated.removeListener(listener);
+      reject(new Error('Uzum seller tabi yuklanishi kutildi, ammo timeout bo\'ldi'));
+    }, timeout);
+
+    function listener(updatedTabId, changeInfo) {
+      if (updatedTabId === tabId && changeInfo.status === 'complete') {
+        clearTimeout(timeoutId);
+        chrome.tabs.onUpdated.removeListener(listener);
+        resolve();
+      }
+    }
+
+    chrome.tabs.onUpdated.addListener(listener);
+  });
+}
+
+async function injectUzumSellerScripts(tabId) {
+  await chrome.scripting.insertCSS({ target: { tabId }, files: ['content.css'] }).catch(() => {});
+  await chrome.scripting.executeScript({
+    target: { tabId },
+    files: ['shared.js', 'content-uzum-seller.js'],
+  });
+}
+
+async function ensureUzumSellerReceiver(tabId) {
+  await waitForTabComplete(tabId);
+
+  let response = null;
+  try {
+    response = await chrome.tabs.sendMessage(tabId, { type: 'SCX_PING' });
+  } catch (error) {
+    if (!isNoReceiverError(error)) throw error;
+  }
+
+  if (response?.pong === true) return;
+
+  console.warn('[SCX] Uzum content script topilmadi yoki eski versiya, qayta inject qilinmoqda');
+  await injectUzumSellerScripts(tabId);
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+
+  const secondResponse = await chrome.tabs.sendMessage(tabId, { type: 'SCX_PING' });
+  if (secondResponse?.pong !== true) {
+    throw new Error('Uzum seller content script javob bermadi');
+  }
+}
+
+async function getOrCreateUzumSellerTab() {
+  const tabs = await chrome.tabs.query({ url: UZUM_SELLER_URL_PATTERNS });
+  let tab = tabs.find((item) => item.active) || tabs.find((item) => item.status === 'complete') || tabs[0];
+
+  if (tab?.id) {
+    if (!/(\/products\/create|\/goods\/create|\/product\/create)/.test(tab.url || '')) {
+      const createUrl = getCreateUrlForTab(tab.url || '');
+      tab = await chrome.tabs.update(tab.id, { url: createUrl });
+    }
+
+    await ensureUzumSellerReceiver(tab.id);
+    return tab;
+  }
+
+  console.log('[SCX] No Uzum seller tab open, creating one...');
+  const createdTab = await chrome.tabs.create({ url: UZUM_CREATE_URL });
+  await ensureUzumSellerReceiver(createdTab.id);
+  return createdTab;
+}
 
 // ===== Storage =====
 const getConfig = () => chrome.storage.local.get(['userId', 'accessToken', 'isConnected', 'tokenExpiry']);
@@ -140,25 +225,10 @@ async function handleCommand(command) {
   await updateCommandStatus(id, 'processing');
 
   try {
-    const tabs = await chrome.tabs.query({ url: 'https://seller.uzum.uz/*' });
-    if (tabs.length === 0) {
-      console.log('[SCX] No Uzum seller tab open, creating one...');
-      const tab = await chrome.tabs.create({ url: 'https://seller.uzum.uz/products' });
-      await new Promise(resolve => {
-        chrome.tabs.onUpdated.addListener(function listener(tabId, info) {
-          if (tabId === tab.id && info.status === 'complete') {
-            chrome.tabs.onUpdated.removeListener(listener);
-            resolve();
-          }
-        });
-      });
-      // Wait extra for content script to load
-      await new Promise(r => setTimeout(r, 3000));
-      tabs.push(tab);
-    }
+    const tab = await getOrCreateUzumSellerTab();
 
-    console.log('[SCX] Sending command to tab:', tabs[0].id);
-    const response = await chrome.tabs.sendMessage(tabs[0].id, {
+    console.log('[SCX] Sending command to tab:', tab.id);
+    const response = await chrome.tabs.sendMessage(tab.id, {
       type: 'SCX_COMMAND', command_type, payload, commandId: id,
     });
 
@@ -177,7 +247,10 @@ async function handleCommand(command) {
     }
   } catch (err) {
     console.error('[SCX] Command error:', err);
-    await updateCommandStatus(id, 'failed', null, err.message);
+    const errorMessage = isNoReceiverError(err)
+      ? 'Uzum seller sahifasida extension script topilmadi. Sahifani yangilang va qayta urinib ko\'ring.'
+      : err.message;
+    await updateCommandStatus(id, 'failed', null, errorMessage);
   }
 }
 
