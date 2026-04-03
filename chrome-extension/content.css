@@ -691,3 +691,113 @@
   padding: 8px 0 0 !important;
   text-align: center !important;
 }
+
+/* ===== New: Data accuracy indicators ===== */
+.scx-pp-source-badge {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 8px 14px !important;
+  background: #f0fdf4 !important;
+  border-bottom: 1px solid #bbf7d0 !important;
+  font-size: 11px !important;
+  color: #15803d !important;
+  font-weight: 500 !important;
+}
+
+.scx-pp-source-verified {
+  font-weight: 700 !important;
+  color: #16a34a !important;
+}
+
+.scx-pp-summary {
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: 8px !important;
+  padding: 12px 14px !important;
+}
+
+.scx-pp-stat {
+  background: #f9fafb !important;
+  border: 1px solid #f3f4f6 !important;
+  border-radius: 8px !important;
+  padding: 10px !important;
+  text-align: center !important;
+}
+
+.scx-pp-stat-label {
+  font-size: 10px !important;
+  color: #6b7280 !important;
+  font-weight: 500 !important;
+  margin-bottom: 4px !important;
+}
+
+.scx-pp-stat-value {
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  color: #111827 !important;
+}
+
+.scx-pp-stat-note {
+  font-size: 9px !important;
+  color: #9ca3af !important;
+  margin-top: 2px !important;
+}
+
+.scx-pp-table-title {
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  color: #374151 !important;
+  padding: 10px 14px 6px !important;
+}
+
+.scx-pp-chars {
+  padding: 0 14px 8px !important;
+}
+
+.scx-pp-char-row {
+  display: flex !important;
+  justify-content: space-between !important;
+  padding: 4px 0 !important;
+  border-bottom: 1px solid #f3f4f6 !important;
+  font-size: 11px !important;
+}
+
+.scx-pp-char-label {
+  color: #6b7280 !important;
+  font-weight: 500 !important;
+}
+
+.scx-pp-char-value {
+  color: #111827 !important;
+  font-weight: 600 !important;
+  max-width: 60% !important;
+  text-align: right !important;
+}
+
+.scx-pp-disclaimer {
+  margin: 8px 14px !important;
+  padding: 8px 10px !important;
+  background: #fffbeb !important;
+  border: 1px solid #fde68a !important;
+  border-radius: 6px !important;
+  font-size: 10px !important;
+  color: #92400e !important;
+  line-height: 1.5 !important;
+}
+
+.scx-val-red { color: #dc2626 !important; }
+
+.scx-card-stats-note {
+  padding: 4px 8px !important;
+  font-size: 9px !important;
+  color: #9ca3af !important;
+  border-top: 1px solid #f3f4f6 !important;
+  text-align: center !important;
+}
+
+.scx-shop-stat-source {
+  font-size: 9px !important;
+  color: #16a34a !important;
+  margin-top: 2px !important;
+}
