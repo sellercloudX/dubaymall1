@@ -41,6 +41,7 @@ interface CloneableProduct {
   model?: string;
   breadcrumbs?: string[];
   characteristics?: Array<{ name: string; value: string }>;
+  variantGroups?: Array<{ name: string; values: string[]; selected?: string }>;
   sourceUrl?: string;
 }
 
@@ -351,6 +352,148 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
     });
   }, [filteredProducts, filterTab, targetMarketplaces, isAlreadyCloned]);
 
+  const normalizeUzumExtensionPayload = useCallback((rawPayload: any, sourceProduct?: CloneableProduct) => {
+    const title = String(
+      rawPayload?.title ??
+      rawPayload?.titleRu ??
+      rawPayload?.titleUz ??
+      rawPayload?.title_ru ??
+      rawPayload?.title_uz ??
+      sourceProduct?.name ??
+      ''
+    ).trim();
+
+    const description = String(
+      rawPayload?.description ??
+      rawPayload?.descriptionRu ??
+      rawPayload?.descriptionUz ??
+      rawPayload?.description_ru ??
+      rawPayload?.description_uz ??
+      rawPayload?.fullDescriptionRu ??
+      rawPayload?.fullDescriptionUz ??
+      sourceProduct?.description ??
+      title
+    ).trim();
+
+    const categoryPath = (
+      Array.isArray(rawPayload?.categoryPath) ? rawPayload.categoryPath :
+      Array.isArray(rawPayload?.category_path) ? rawPayload.category_path :
+      Array.isArray(rawPayload?.breadcrumbs) ? rawPayload.breadcrumbs :
+      Array.isArray(sourceProduct?.breadcrumbs) ? sourceProduct.breadcrumbs :
+      sourceProduct?.category ? [sourceProduct.category] : []
+    )
+      .filter((item: unknown): item is string => typeof item === 'string' && item.trim().length > 0)
+      .map((item) => item.trim());
+
+    const characteristics = (
+      Array.isArray(rawPayload?.characteristics) ? rawPayload.characteristics :
+      Array.isArray(sourceProduct?.characteristics) ? sourceProduct.characteristics : []
+    )
+      .filter((item: any) => item?.name && item?.value)
+      .map((item: any) => ({
+        name: String(item.name).trim(),
+        value: String(item.value).trim(),
+      }));
+
+    const variantGroups = (
+      Array.isArray(rawPayload?.variantGroups) ? rawPayload.variantGroups :
+      Array.isArray(rawPayload?.variant_groups) ? rawPayload.variant_groups :
+      Array.isArray(sourceProduct?.variantGroups) ? sourceProduct.variantGroups : []
+    )
+      .filter((item: any) => item?.name && Array.isArray(item?.values))
+      .map((item: any) => ({
+        name: String(item.name).trim(),
+        values: item.values
+          .filter((value: unknown): value is string => typeof value === 'string' && value.trim().length > 0)
+          .map((value: string) => value.trim()),
+        selected: typeof item.selected === 'string' ? item.selected.trim() : undefined,
+      }))
+      .filter((item: { values: string[] }) => item.values.length > 0);
+
+    const pictures = Array.from(new Set([
+      ...(Array.isArray(rawPayload?.images) ? rawPayload.images : []),
+      ...(Array.isArray(rawPayload?.pictures) ? rawPayload.pictures : []),
+      ...(Array.isArray(sourceProduct?.pictures) ? sourceProduct.pictures : []),
+    ].filter((item: unknown): item is string => typeof item === 'string' && item.startsWith('http'))));
+
+    const normalized = {
+      ...rawPayload,
+      title,
+      titleUz: String(rawPayload?.titleUz ?? rawPayload?.title_uz ?? title).trim(),
+      titleRu: String(rawPayload?.titleRu ?? rawPayload?.title_ru ?? title).trim(),
+      title_uz: String(rawPayload?.title_uz ?? rawPayload?.titleUz ?? title).trim(),
+      title_ru: String(rawPayload?.title_ru ?? rawPayload?.titleRu ?? title).trim(),
+      description,
+      descriptionUz: String(rawPayload?.descriptionUz ?? rawPayload?.description_uz ?? description).trim(),
+      descriptionRu: String(rawPayload?.descriptionRu ?? rawPayload?.description_ru ?? description).trim(),
+      description_uz: String(rawPayload?.description_uz ?? rawPayload?.descriptionUz ?? description).trim(),
+      description_ru: String(rawPayload?.description_ru ?? rawPayload?.descriptionRu ?? description).trim(),
+      brand: String(rawPayload?.brand ?? sourceProduct?.brand ?? '').trim(),
+      barcode: String(rawPayload?.barcode ?? sourceProduct?.barcode ?? '').trim(),
+      mxikCode: String(rawPayload?.mxikCode ?? rawPayload?.mxik_code ?? sourceProduct?.mxikCode ?? '').trim(),
+      mxik_code: String(rawPayload?.mxik_code ?? rawPayload?.mxikCode ?? sourceProduct?.mxikCode ?? '').trim(),
+      mxikName: String(rawPayload?.mxikName ?? rawPayload?.mxik_name ?? sourceProduct?.mxikName ?? '').trim(),
+      mxik_name: String(rawPayload?.mxik_name ?? rawPayload?.mxikName ?? sourceProduct?.mxikName ?? '').trim(),
+      model: String(rawPayload?.model ?? sourceProduct?.model ?? '').trim(),
+      price: Number(rawPayload?.price ?? sourceProduct?.price ?? 0),
+      categoryPath,
+      category_path: categoryPath,
+      breadcrumbs: categoryPath,
+      characteristics,
+      variantGroups,
+      variant_groups: variantGroups,
+      images: pictures,
+      pictures,
+      sourceUrl: String(rawPayload?.sourceUrl ?? sourceProduct?.sourceUrl ?? '').trim(),
+    };
+
+    return normalized;
+  }, []);
+
+  const waitForUzumCommandResult = useCallback(async (commandId: string, timeoutMs = 180000) => {
+    const startedAt = Date.now();
+
+    while (Date.now() - startedAt < timeoutMs) {
+      const { data, error } = await supabase
+        .from('uzum_extension_commands')
+        .select('status, error_message, result, processed_at, completed_at')
+        .eq('id', commandId)
+        .maybeSingle();
+
+      if (error) {
+        throw error;
+      }
+
+      if (data?.status === 'completed') {
+        const result = (data.result as Record<string, any> | null) ?? null;
+        const saved = result?.saved ?? result?.submitted ?? true;
+
+        if (!saved) {
+          return {
+            ok: false,
+            error: typeof result?.message === 'string' ? result.message : 'Mahsulot Uzum kabinetida saqlanmadi',
+          };
+        }
+
+        return { ok: true, result };
+      }
+
+      if (data?.status === 'failed') {
+        return {
+          ok: false,
+          error: data.error_message || 'Extension buyruqni bajara olmadi',
+        };
+      }
+
+      await new Promise((resolve) => window.setTimeout(resolve, 2000));
+    }
+
+    return {
+      ok: false,
+      error: 'Extension javobi vaqtida kelmadi',
+    };
+  }, []);
+
   // Clone product to external marketplace
   const cloneToMarketplace = async (product: CloneableProduct, targetMp: string): Promise<boolean> => {
     try {
@@ -537,6 +680,11 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
       }
       
       if (targetMp === 'uzum') {
+        if (!user) {
+          toast.error('Uzum klonlash uchun login kerak');
+          return false;
+        }
+
         // Get full product data from store for richer context
         const storeProducts = store.getProducts(product.marketplace);
         const fullProduct: any = storeProducts.find(p => p.offerId === product.offerId);
@@ -567,47 +715,114 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
         
         const sourceMxikCode = product.mxikCode || fullProduct?.mxikCode;
         const sourceMxikName = product.mxikName || fullProduct?.mxikName;
-        
-        const { data, error } = await supabase.functions.invoke('create-uzum-card', {
-          body: {
-            product: {
-              name: product.name,
-              description: productDescription,
-              price: convertedPrice,
-              costPrice: costPrice,
-              images: validImages,
-              category: productCategory,
-              shopSku: product.shopSku,
-              sourceMarketplace: product.marketplace,
-              brand: uzumSourceBrand,
-              barcode: uzumSourceBarcode,
-              color: uzumSourceColor,
-              model: uzumSourceModel,
-              mxikCode: sourceMxikCode,
-              mxikName: sourceMxikName,
-              weight: uzumSourceWeight,
-              sourceCharacteristics: uzumSourceChars,
+
+        const isExactUzumClone = product.marketplace === 'uzum_market';
+
+        let extensionPayload: Record<string, any>;
+        let qualityScore = 100;
+
+        if (isExactUzumClone) {
+          extensionPayload = normalizeUzumExtensionPayload({
+            title: product.name,
+            description: productDescription,
+            price: convertedPrice,
+            costPrice,
+            images: validImages,
+            categoryPath: product.breadcrumbs || (product.category ? [product.category] : []),
+            brand: uzumSourceBrand,
+            barcode: uzumSourceBarcode,
+            color: uzumSourceColor,
+            model: uzumSourceModel,
+            mxikCode: sourceMxikCode,
+            mxikName: sourceMxikName,
+            characteristics: uzumSourceChars,
+            sourceUrl: product.sourceUrl,
+            exactClone: true,
+            sourceMarketplace: product.marketplace,
+          }, product);
+        } else {
+          const { data, error } = await supabase.functions.invoke('create-uzum-card', {
+            body: {
+              product: {
+                name: product.name,
+                description: productDescription,
+                price: convertedPrice,
+                costPrice: costPrice,
+                images: validImages,
+                category: productCategory,
+                shopSku: product.shopSku,
+                sourceMarketplace: product.marketplace,
+                brand: uzumSourceBrand,
+                barcode: uzumSourceBarcode,
+                color: uzumSourceColor,
+                model: uzumSourceModel,
+                mxikCode: sourceMxikCode,
+                mxikName: sourceMxikName,
+                weight: uzumSourceWeight,
+                sourceCharacteristics: uzumSourceChars,
+              },
+              cloneMode: true,
             },
-            cloneMode: true,
-          },
-        });
-        
-        if (error) {
-          console.error(`Uzum clone error for "${product.name}":`, error);
-          if (handleEdgeFunctionBillingError(error, data)) throw new Error('billing_error');
-          const errorBody = data || error?.context || {};
-          toast.error(`${product.name.slice(0, 30)}: ${errorBody?.error || error.message || 'Xatolik'}`);
+          });
+
+          if (error) {
+            console.error(`Uzum clone error for "${product.name}":`, error);
+            if (handleEdgeFunctionBillingError(error, data)) throw new Error('billing_error');
+            const errorBody = data || error?.context || {};
+            toast.error(`${product.name.slice(0, 30)}: ${errorBody?.error || error.message || 'Xatolik'}`);
+            return false;
+          }
+
+          if (!data?.success || !data?.card) {
+            console.error(`Uzum API error for "${product.name}":`, JSON.stringify(data));
+            toast.error(`${product.name.slice(0, 30)}: ${data?.error || 'API xatosi'}`);
+            return false;
+          }
+
+          qualityScore = Number(data.qualityScore || 0);
+          extensionPayload = normalizeUzumExtensionPayload(data.card, product);
+        }
+
+        const { data: account } = await supabase
+          .from('uzum_accounts')
+          .select('id')
+          .eq('user_id', user.id)
+          .limit(1)
+          .maybeSingle();
+
+        const { data: commandRow, error: commandError } = await supabase
+          .from('uzum_extension_commands')
+          .insert({
+            user_id: user.id,
+            uzum_account_id: account?.id ?? null,
+            command_type: 'create_product',
+            payload: extensionPayload,
+            status: 'pending',
+          } as any)
+          .select('id')
+          .single();
+
+        if (commandError || !commandRow?.id) {
+          console.error(`Uzum command queue error for "${product.name}":`, commandError);
+          toast.error(`${product.name.slice(0, 30)}: Buyruq extension navbatiga yuborilmadi`);
           return false;
         }
-        if (!data?.success) {
-          console.error(`Uzum API error for "${product.name}":`, JSON.stringify(data));
-          toast.error(`${product.name.slice(0, 30)}: ${data?.error || 'API xatosi'}`);
+
+        toast.info(`${product.name.slice(0, 25)}: Uzum kabinetga yuborildi, saqlanishi kutilmoqda...`, { duration: 5000 });
+
+        const commandResult = await waitForUzumCommandResult(commandRow.id);
+        if (!commandResult.ok) {
+          toast.error(`${product.name.slice(0, 30)}: ${commandResult.error || 'Uzum kabinetda saqlanmadi'}`);
           return false;
         }
-        
-        const score = data.qualityScore || 0;
-        const scoreEmoji = score >= 80 ? '🟢' : score >= 60 ? '🟡' : '🔴';
-        toast.success(`${product.name.slice(0, 25)}: ${scoreEmoji} ${score}/100 ball — Extension avtomatik to'ldiradi ✨`, { duration: 5000 });
+
+        if (isExactUzumClone) {
+          toast.success(`${product.name.slice(0, 25)}: Uzumdagi real ma'lumotlar bilan kabinetda yaratildi ✅`, { duration: 5000 });
+        } else {
+          const scoreEmoji = qualityScore >= 80 ? '🟢' : qualityScore >= 60 ? '🟡' : '🔴';
+          toast.success(`${product.name.slice(0, 25)}: ${scoreEmoji} ${qualityScore}/100 — Uzum kabinetda saqlandi ✅`, { duration: 5000 });
+        }
+
         return true;
       }
       
@@ -669,7 +884,7 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
       backgroundTaskManager.updateTask(taskId, { status: 'running' });
       let success = 0;
       let failed = 0;
-      const BATCH_SIZE = 3;
+      const BATCH_SIZE = cloneTasks.some(task => task.target === 'uzum') ? 1 : 3;
 
       for (let i = 0; i < cloneTasks.length; i += BATCH_SIZE) {
         // Check if cancelled
@@ -701,6 +916,7 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
                 source_marketplace: r.value.product.marketplace,
                 source_offer_id: r.value.product.offerId,
                 target_marketplace: r.value.target,
+                status: 'success',
               }, { onConflict: 'user_id,source_marketplace,source_offer_id,target_marketplace' }).then(() => {});
               
               // Auto-copy cost price from source marketplace to target
