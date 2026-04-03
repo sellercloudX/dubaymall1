@@ -64,9 +64,9 @@ export default function ExtensionDownload() {
           <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20">
             <Chrome className="w-10 h-10 text-primary" />
           </div>
-          <h2 className="text-xl font-bold text-foreground">SellerCloudX Pro Extension</h2>
+          <h2 className="text-xl font-bold text-foreground">SellerCloudX Multi-Marketplace Extension v4.0</h2>
           <p className="text-sm text-muted-foreground max-w-md mx-auto">
-            Uzum Seller kabinetida bevosita analitika, foyda kalkulyator va avtomatlashtirish vositalarini ishlatib, vaqtingizni tejang
+            Uzum, Wildberries, Yandex Market seller panellarida + mpstats.io, zoomselling.io da bevosita analitika, moliya scraping va avtomatlashtirish
           </p>
         </div>
 
