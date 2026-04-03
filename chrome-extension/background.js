@@ -238,34 +238,47 @@ async function handleCommand(command) {
   console.log('[SCX] Processing command:', id, command_type);
   await updateCommandStatus(id, 'processing');
 
-  try {
-    const tab = await getOrCreateUzumSellerTab();
+  let lastError = null;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const tab = await getOrCreateUzumSellerTab();
+      console.log('[SCX] Sending command to tab:', tab.id, 'attempt:', attempt);
 
-    console.log('[SCX] Sending command to tab:', tab.id);
-    const response = await chrome.tabs.sendMessage(tab.id, {
-      type: 'SCX_COMMAND', command_type, payload, commandId: id,
-    });
-
-    console.log('[SCX] Content script response:', JSON.stringify(response));
-
-    if (response?.success) {
-      // Pass the full result object so dashboard can check saved/submitted flags
-      await updateCommandStatus(id, 'completed', response.result || { saved: false, message: 'No result details' });
-      chrome.notifications.create({
-        type: 'basic', iconUrl: 'icons/icon128.png',
-        title: 'SellerCloudX',
-        message: getSuccessMessage(command_type),
+      const response = await chrome.tabs.sendMessage(tab.id, {
+        type: 'SCX_COMMAND', command_type, payload, commandId: id,
       });
-    } else {
-      await updateCommandStatus(id, 'failed', null, response?.error || 'Content script error');
+
+      console.log('[SCX] Content script response:', JSON.stringify(response));
+
+      if (response?.success) {
+        await updateCommandStatus(id, 'completed', response.result || { saved: false, message: 'No result details' });
+        chrome.notifications.create({
+          type: 'basic', iconUrl: 'icons/icon128.png',
+          title: 'SellerCloudX',
+          message: getSuccessMessage(command_type),
+        });
+        return; // Success — exit
+      } else {
+        lastError = response?.error || 'Content script error';
+        if (attempt < 2) {
+          console.warn('[SCX] Attempt', attempt, 'failed, retrying...');
+          await new Promise(r => setTimeout(r, 3000));
+          continue;
+        }
+      }
+    } catch (err) {
+      console.error('[SCX] Command attempt', attempt, 'error:', err);
+      lastError = isNoReceiverError(err)
+        ? 'Uzum seller sahifasida extension script topilmadi. Sahifani yangilang va qayta urinib ko\'ring.'
+        : err.message;
+      if (attempt < 2) {
+        await new Promise(r => setTimeout(r, 3000));
+        continue;
+      }
     }
-  } catch (err) {
-    console.error('[SCX] Command error:', err);
-    const errorMessage = isNoReceiverError(err)
-      ? 'Uzum seller sahifasida extension script topilmadi. Sahifani yangilang va qayta urinib ko\'ring.'
-      : err.message;
-    await updateCommandStatus(id, 'failed', null, errorMessage);
   }
+
+  await updateCommandStatus(id, 'failed', null, lastError || 'Noma\'lum xato');
 }
 
 function getSuccessMessage(type) {
