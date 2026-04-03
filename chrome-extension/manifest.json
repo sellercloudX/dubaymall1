@@ -1,15 +1,22 @@
 {
   "manifest_version": 3,
-  "name": "SellerCloudX — Uzum Market Pro",
-  "version": "1.0.0",
-  "description": "Uzum Market Seller panelini SellerCloudX bilan bog'laydi. Kartochka yaratish, boost boshqarish, etiketka chop etish — hammasi avtomatik.",
+  "name": "SellerCloudX — Multi-Marketplace Pro",
+  "version": "4.0.0",
+  "description": "Uzum, Wildberries, Yandex Market seller panellarini SellerCloudX bilan bog'laydi. Moliya, buyurtmalar, raqobatchilar — hammasi avtomatik.",
   "permissions": [
     "activeTab",
     "storage",
-    "notifications"
+    "notifications",
+    "tabs"
   ],
   "host_permissions": [
     "https://seller.uzum.uz/*",
+    "https://seller-edu.uzum.uz/*",
+    "https://uzum.uz/*",
+    "https://seller.wildberries.ru/*",
+    "https://partner.market.yandex.ru/*",
+    "https://mpstats.io/*",
+    "https://zoomselling.io/*",
     "https://*.supabase.co/*"
   ],
   "background": {
@@ -18,8 +25,32 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://seller.uzum.uz/*"],
-      "js": ["content.js"],
+      "matches": ["https://seller.uzum.uz/*", "https://seller-edu.uzum.uz/*"],
+      "js": ["shared.js", "content-uzum-seller.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://uzum.uz/*"],
+      "js": ["shared.js", "content-uzum-market.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://seller.wildberries.ru/*"],
+      "js": ["shared.js", "content-wb-seller.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://partner.market.yandex.ru/*"],
+      "js": ["shared.js", "content-yandex-seller.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://mpstats.io/*", "https://zoomselling.io/*"],
+      "js": ["shared.js", "content-analytics.js"],
       "css": ["content.css"],
       "run_at": "document_idle"
     }

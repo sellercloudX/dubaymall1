@@ -1,14 +1,18 @@
 import React from "react";
-import { ArrowLeft, Download, Chrome, Shield, Zap, BarChart3, Calculator, Settings, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Download, Chrome, Shield, Zap, BarChart3, Calculator, Settings, CheckCircle2, Globe, TrendingUp, DollarSign, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
 
 const features = [
-  { icon: BarChart3, title: "Inline Analitika", desc: "Uzum Seller sahifasida bevosita mahsulot statistikasi, foyda hisoblash" },
-  { icon: Calculator, title: "Foyda Kalkulyator", desc: "Real-time ROI, marja, sof foyda — sahifa ichida hisoblang" },
-  { icon: Zap, title: "Avtomatik kartochka", desc: "AI yordamida mahsulot kartochkasini bir klikda yarating" },
-  { icon: Shield, title: "Boost boshqarish", desc: "Dashboard'dan turib reklama yoqish/o'chirish" },
+  { icon: BarChart3, title: "Multi-Marketplace Analitika", desc: "Uzum, WB, Yandex seller panellarida bevosita statistika" },
+  { icon: DollarSign, title: "Moliya Scraping", desc: "API bermagan komissiya, logistika xarajatlarini DOM orqali olish" },
+  { icon: Calculator, title: "Foyda Kalkulyator", desc: "Real-time ROI, marja — har bir marketplace uchun" },
+  { icon: Zap, title: "Avtomatik kartochka", desc: "AI yordamida Uzum'da kartochka yaratish" },
+  { icon: TrendingUp, title: "Raqobatchi Monitoring", desc: "mpstats.io va zoomselling.io dan trend va narx yig'ish" },
+  { icon: Globe, title: "Marketplace Front", desc: "uzum.uz sahifasida mahsulot tahlili va klonlash" },
+  { icon: Package, title: "Buyurtmalar Boshqarish", desc: "Seller panellarida buyurtmalarni qayta ishlash" },
+  { icon: Shield, title: "Narx Himoyasi", desc: "Seller kabinetlarida DOM orqali narx yangilash" },
 ];
 
 const steps = [
@@ -49,7 +53,7 @@ export default function ExtensionDownload() {
           </Button>
           <div>
             <h1 className="text-base font-bold text-foreground">Chrome Extension</h1>
-            <p className="text-xs text-muted-foreground">SellerCloudX Pro v2.0</p>
+            <p className="text-xs text-muted-foreground">SellerCloudX Multi-Marketplace v4.0</p>
           </div>
         </div>
       </div>
@@ -60,9 +64,9 @@ export default function ExtensionDownload() {
           <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20">
             <Chrome className="w-10 h-10 text-primary" />
           </div>
-          <h2 className="text-xl font-bold text-foreground">SellerCloudX Pro Extension</h2>
+          <h2 className="text-xl font-bold text-foreground">SellerCloudX Multi-Marketplace Extension v4.0</h2>
           <p className="text-sm text-muted-foreground max-w-md mx-auto">
-            Uzum Seller kabinetida bevosita analitika, foyda kalkulyator va avtomatlashtirish vositalarini ishlatib, vaqtingizni tejang
+            Uzum, Wildberries, Yandex Market seller panellarida + mpstats.io, zoomselling.io da bevosita analitika, moliya scraping va avtomatlashtirish
           </p>
         </div>
 
