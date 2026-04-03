@@ -134,12 +134,14 @@ async function handleCommand(command) {
   const { id, command_type, payload, status } = command;
   if (status !== 'pending') return;
 
+  console.log('[SCX] Processing command:', id, command_type);
   await updateCommandStatus(id, 'processing');
 
   try {
     const tabs = await chrome.tabs.query({ url: 'https://seller.uzum.uz/*' });
     if (tabs.length === 0) {
-      const tab = await chrome.tabs.create({ url: 'https://seller.uzum.uz/' });
+      console.log('[SCX] No Uzum seller tab open, creating one...');
+      const tab = await chrome.tabs.create({ url: 'https://seller.uzum.uz/products' });
       await new Promise(resolve => {
         chrome.tabs.onUpdated.addListener(function listener(tabId, info) {
           if (tabId === tab.id && info.status === 'complete') {
@@ -148,15 +150,21 @@ async function handleCommand(command) {
           }
         });
       });
+      // Wait extra for content script to load
+      await new Promise(r => setTimeout(r, 3000));
       tabs.push(tab);
     }
 
+    console.log('[SCX] Sending command to tab:', tabs[0].id);
     const response = await chrome.tabs.sendMessage(tabs[0].id, {
       type: 'SCX_COMMAND', command_type, payload, commandId: id,
     });
 
+    console.log('[SCX] Content script response:', JSON.stringify(response));
+
     if (response?.success) {
-      await updateCommandStatus(id, 'completed', response.result);
+      // Pass the full result object so dashboard can check saved/submitted flags
+      await updateCommandStatus(id, 'completed', response.result || { saved: false, message: 'No result details' });
       chrome.notifications.create({
         type: 'basic', iconUrl: 'icons/icon128.png',
         title: 'SellerCloudX',
