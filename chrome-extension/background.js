@@ -1,5 +1,5 @@
 /**
- * SellerCloudX Chrome Extension — Background Service Worker v4.1.1
+ * SellerCloudX Chrome Extension — Background Service Worker v4.2.0
  * chrome.alarms bilan barqaror ulanish
  */
 
@@ -380,8 +380,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
   if (msg.type === 'SCX_STATUS') {
     getConfig().then(config => {
+      const wsConnected = ws && ws.readyState === WebSocket.OPEN;
+      const hasCredentials = !!config.accessToken && !!config.userId;
+      // If we have credentials but WS is not connected, try reconnecting
+      if (hasCredentials && !wsConnected) {
+        connectRealtime(config.accessToken, config.userId);
+      }
       sendResponse({
-        isConnected: config.isConnected || false,
+        isConnected: wsConnected || (config.isConnected || false),
+        hasCredentials,
         userId: config.userId || null,
         wsState: ws ? ws.readyState : -1,
       });

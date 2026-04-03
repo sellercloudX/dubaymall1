@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "SellerCloudX — Multi-Marketplace Pro",
-  "version": "4.1.1",
+  "version": "4.2.0",
   "description": "Uzum, Wildberries, Yandex Market seller panellarini SellerCloudX bilan bog'laydi. Moliya, buyurtmalar, raqobatchilar — hammasi avtomatik.",
   "permissions": [
     "activeTab",
@@ -19,7 +19,10 @@
     "https://partner.market.yandex.ru/*",
     "https://mpstats.io/*",
     "https://zoomselling.io/*",
-    "https://*.supabase.co/*"
+    "https://*.supabase.co/*",
+    "https://sellercloudx.com/*",
+    "https://sellercloudx.lovable.app/*",
+    "https://*--af1b8d1e-f9cb-42f3-8678-575d0e45e819.lovable.app/*"
   ],
   "background": {
     "service_worker": "background.js",
@@ -90,6 +93,17 @@
       ],
       "css": [
         "content.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://sellercloudx.com/*",
+        "https://sellercloudx.lovable.app/*",
+        "https://*--af1b8d1e-f9cb-42f3-8678-575d0e45e819.lovable.app/*"
+      ],
+      "js": [
+        "content-sellercloudx.js"
       ],
       "run_at": "document_idle"
     }

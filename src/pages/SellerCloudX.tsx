@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, lazy, Suspense } from 'react';
+import React, { useEffect, useState, useMemo, lazy, Suspense, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -14,6 +14,7 @@ import { useMarketplaceDataStore } from '@/hooks/useMarketplaceDataStore';
 import { calculateTotalRevenue } from '@/lib/revenueCalculations';
 import { useAutoNotifications } from '@/hooks/useAutoNotifications';
 import { useAutoSync } from '@/hooks/useAutoSync';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useExchangeRate } from '@/hooks/useExchangeRate';
 import { 
@@ -160,6 +161,27 @@ export default function SellerCloudX() {
       navigate('/seller-cloud-mobile', { replace: true });
     }
   }, [isMobile, subscription, navigate]);
+
+  // Broadcast auth token to extension via postMessage
+  useEffect(() => {
+    if (!user) return;
+    const broadcastToken = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (data?.session?.access_token) {
+          window.postMessage({
+            type: 'SCX_AUTH_TOKEN',
+            accessToken: data.session.access_token,
+            userId: user.id,
+            userEmail: user.email || '',
+          }, '*');
+        }
+      } catch {}
+    };
+    broadcastToken();
+    const interval = setInterval(broadcastToken, 60000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   useEffect(() => {
     if (!authLoading && !user) {
