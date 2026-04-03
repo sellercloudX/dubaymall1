@@ -338,7 +338,7 @@ async function sendHeartbeat(accessToken, uid) {
       headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${accessToken}`, Prefer: 'return=minimal' },
       body: JSON.stringify({
         user_id: uid, command_type: 'heartbeat', status: 'completed',
-        payload: { source: 'extension', version: '3.0' },
+        payload: { source: 'extension', version: chrome.runtime?.getManifest?.()?.version || '4.1.0' },
         processed_at: new Date().toISOString(),
       }),
     });
