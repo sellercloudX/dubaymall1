@@ -1,64 +1,25 @@
+## Chrome Web Store'ga joylash rejasi
 
-## 🚀 SellerCloudX Extension v4.0 — Multi-Marketplace Pro
+### 1. Privacy Policy sahifasi yaratish
+- `/privacy-policy` route qo'shish (CWS talab qiladi)
+- Extension qanday ma'lumot yig'ishi, saqlashi haqida
 
-### Qamrov kengaytirish
+### 2. Store uchun vizual materiallar
+- 128x128 icon (hozirda bor)
+- 1280x800 promo rasm (marquee)
+- 440x280 kichik promo rasm
+- 5 ta screenshot (1280x800 yoki 640x400)
 
-**Qo'llab-quvvatlanadigan saytlar:**
-1. `seller.uzum.uz` — kartochka yaratish, boost, etiketka, moliya scraping
-2. `seller.wildberries.ru` — moliya hisobotlar, buyurtmalar, narx boshqarish
-3. `partner.market.yandex.ru` — moliya, buyurtmalar, analitika
-4. `mpstats.io` / `zoomselling.io` — raqobatchi monitoring, trend scraping
-5. `uzum.uz` (marketplace front) — har bir mahsulot sahifasida statistika overlay
+### 3. Extension metadata yangilash
+- `manifest.json` da `description` ni yaxshilash
+- `homepage_url` qo'shish (`https://sellercloudx.com`)
 
-### Bosqich 1: Arxitektura (manifest + multi-site)
-- `manifest.json` ni 5 ta saytga kengaytirish
-- Har bir sayt uchun alohida content script
-- Background service worker — universal command router
+### 4. ZIP paketlash va yuklash ko'rsatmalari
+- Tayyor ZIP yaratish
+- CWS Developer Dashboard'ga yuklash bosqichlari
 
-### Bosqich 2: Moliyaviy scraping (API bermagan ma'lumotlar)
-- **Uzum:** Komissiya, logistika, to'lovlar jadvallarini DOM dan olish
-- **WB:** Moliya hisobotlari, xizmat haqlari, qaytarishlar
-- **Yandex:** Komissiya tafsilotlari, logistika xarajatlari
-- Barcha ma'lumotlar `marketplace_finance_scraped` jadvaliga saqlash
+### Natija
+Hamkorlar Chrome Web Store'dan bir tugma bilan o'rnatadi — "Add to Chrome" bosish yetarli.
 
-### Bosqich 3: Buyurtmalarni qayta ishlash
-- Seller kabinetlarida buyurtmalarni qabul qilish/rad etish
-- FBS yig'ish varaqlari va etiketkalarni avtomatik chop etish
-- Status o'zgartirish (API cheklovlarini chetlab o'tish)
-
-### Bosqich 4: Raqobatchi monitoring
-- mpstats.io dan narx, reyting, savdo hajmi scraping
-- zoomselling.io dan trend ma'lumotlari
-- uzum.uz marketplace sahifalarida inline statistika
-
-### Bosqich 5: Avtomatik narx yangilash (DOM orqali)
-- Seller kabinetida narxlarni bevosita o'zgartirish
-- API 403 bo'lganda ham ishlaydi
-- Min/Max narx himoyasi bilan
-
-### Bosqich 6: Chrome Web Store tayyorlash
-- Ikonkalar, screenshots, description
-- Privacy policy sahifasi
-- Review uchun topshirish
-
-### Texnik yechim:
-```
-chrome-extension/
-├── manifest.json (5 sayt)
-├── background.js (universal router)
-├── content-uzum-seller.js
-├── content-wb-seller.js  
-├── content-yandex-seller.js
-├── content-mpstats.js
-├── content-uzum-market.js (front overlay)
-├── popup.html/js
-└── icons/
-```
-
-### Ma'lumotlar oqimi:
-Extension → DOM scraping → Background → Supabase REST API → Dashboard
-
-### ⚠️ Muhim eslatma:
-- mpstats.io va zoomselling.io scraping ularning ToS ga zid bo'lishi mumkin
-- WB va Yandex seller panellarining DOM tuzilishi tez-tez o'zgaradi
-- Har bir content script mustaqil ishlashi kerak (bir sayt buzilsa boshqalari ishlab turadi)
+### Eslatma
+CWS review 1-3 kun davom etadi. Review'dan o'tgandan keyin extension hammaga ochiq bo'ladi.
