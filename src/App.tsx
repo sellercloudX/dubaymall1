@@ -114,6 +114,7 @@ function App() {
                     <Route path="/telegram-admin" element={<TelegramAdminApp />} />
                     <Route path="/reset-password" element={<ResetPassword />} />
                     <Route path="/extension" element={<ExtensionDownload />} />
+                    <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                     {/* Redirect old routes to landing */}
                     <Route path="/seller" element={<Navigate to="/seller-cloud" replace />} />
                     <Route path="/dashboard" element={<Navigate to="/seller-cloud" replace />} />
