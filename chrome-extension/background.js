@@ -53,10 +53,22 @@ async function injectUzumSellerScripts(tabId) {
     await chrome.scripting.executeScript({ target: { tabId }, files: ['shared.js'] });
   } catch (e) { console.warn('[SCX] shared.js inject warning:', e.message); }
   try {
+    // Check if content script already exists to avoid duplicate listeners
+    const [result] = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => !!window.__SCX_UZUM_SELLER_LOADED,
+    });
+    if (result?.result) {
+      console.log('[SCX] Content script already loaded, skipping re-injection');
+      await new Promise(r => setTimeout(r, 500));
+      return;
+    }
+  } catch (e) { /* ignore */ }
+  try {
     await chrome.scripting.executeScript({ target: { tabId }, files: ['content-uzum-seller.js'] });
   } catch (e) { console.warn('[SCX] content-uzum-seller.js inject warning:', e.message); }
   // Give scripts time to initialize
-  await new Promise(r => setTimeout(r, 2000));
+  await new Promise(r => setTimeout(r, 2500));
 }
 
 async function ensureUzumSellerReceiver(tabId, retries = 3) {
