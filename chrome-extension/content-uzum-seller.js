@@ -1,10 +1,16 @@
 /**
  * SellerCloudX Content Script — Uzum Seller Panel
  * seller.uzum.uz uchun maxsus funksiyalar
- * v5.1 — Mukammal klonlash + real DOM avtomatizatsiya
+ * v5.2 — Duplicate injection guard + improved reliability
  */
 
-const SCX_UZUM_SELLER_VERSION = '5.1.0';
+// Prevent duplicate injection
+if (window.__SCX_UZUM_SELLER_LOADED) {
+  console.log('[SCX] Content script already loaded, skipping duplicate');
+} else {
+  window.__SCX_UZUM_SELLER_LOADED = true;
+
+const SCX_UZUM_SELLER_VERSION = '5.2.0';
 
 console.log(`[SCX v${SCX_UZUM_SELLER_VERSION}] Uzum Seller content script loaded`);
 
