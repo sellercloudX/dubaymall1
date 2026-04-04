@@ -9,21 +9,37 @@
 
   function getSupabaseSession() {
     try {
-      // Supabase stores session in localStorage with a specific key pattern
+      // Supabase stores session in localStorage with key pattern: sb-{ref}-auth-token
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key && key.includes('sb-') && key.includes('auth-token')) {
+        if (!key) continue;
+        
+        // Match various Supabase key patterns
+        const isAuthKey = (
+          key.includes('auth-token') ||
+          key.includes('auth_token') ||
+          key.startsWith('sb-')
+        );
+        
+        if (!isAuthKey) continue;
+        
+        try {
           const raw = localStorage.getItem(key);
           if (!raw) continue;
           const parsed = JSON.parse(raw);
-          if (parsed?.access_token && parsed?.user?.id) {
+          
+          // Handle both direct token format and nested format
+          const accessToken = parsed?.access_token || parsed?.currentSession?.access_token;
+          const user = parsed?.user || parsed?.currentSession?.user;
+          
+          if (accessToken && user?.id) {
             return {
-              accessToken: parsed.access_token,
-              userId: parsed.user.id,
-              userEmail: parsed.user.email || '',
+              accessToken,
+              userId: user.id,
+              userEmail: user.email || '',
             };
           }
-        }
+        } catch { continue; }
       }
     } catch (e) {
       console.warn('[SCX] Failed to read Supabase session:', e);
