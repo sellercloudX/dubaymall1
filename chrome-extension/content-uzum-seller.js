@@ -804,3 +804,5 @@ async function handleUpdateStock(payload) {
 
 // ===== Start =====
 setTimeout(initUzumSeller, 1000);
+
+} // end of duplicate guard
