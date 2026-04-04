@@ -269,14 +269,18 @@ async function handleCommand(command) {
   await updateCommandStatus(id, 'processing');
 
   let lastError = null;
-  for (let attempt = 1; attempt <= 2; attempt++) {
+  for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       const tab = await getOrCreateUzumSellerTab();
       console.log('[SCX] Sending command to tab:', tab.id, 'attempt:', attempt);
 
-      const response = await chrome.tabs.sendMessage(tab.id, {
-        type: 'SCX_COMMAND', command_type, payload, commandId: id,
-      });
+      // Wrap sendMessage with timeout to prevent channel closed errors
+      const response = await Promise.race([
+        chrome.tabs.sendMessage(tab.id, {
+          type: 'SCX_COMMAND', command_type, payload, commandId: id,
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Content script javob bermadi (60s timeout)')), 60000)),
+      ]);
 
       console.log('[SCX] Content script response:', JSON.stringify(response));
 
@@ -291,18 +295,19 @@ async function handleCommand(command) {
       }
 
       lastError = getCommandFailureMessage(command_type, response);
-      if (attempt < 2) {
+      if (attempt < 3) {
         console.warn('[SCX] Attempt', attempt, 'failed, retrying...');
-        await new Promise(r => setTimeout(r, 3000));
+        await new Promise(r => setTimeout(r, 4000));
         continue;
       }
     } catch (err) {
       console.error('[SCX] Command attempt', attempt, 'error:', err);
       lastError = isNoReceiverError(err)
-        ? 'Uzum seller sahifasida extension script topilmadi. Sahifani yangilang va qayta urinib ko\'ring.'
+        ? 'Uzum seller sahifasi ochiq emas yoki extension script yuklanmagan. seller.uzum.uz ni oching va sahifani yangilang.'
         : err.message;
-      if (attempt < 2) {
-        await new Promise(r => setTimeout(r, 3000));
+      if (attempt < 3) {
+        // On receiver error, wait longer and let injection happen on next attempt
+        await new Promise(r => setTimeout(r, 5000));
         continue;
       }
     }
