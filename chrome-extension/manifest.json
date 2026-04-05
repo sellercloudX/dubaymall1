@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "SellerCloudX — Multi-Marketplace Pro",
   "version": "4.2.0",
-  "description": "All-in-one marketplace management: Uzum, Wildberries, Yandex Market analytics, orders, finances, competitor monitoring & product cloning.",
+  "description": "Uzum, Wildberries, Yandex Market: analytics, orders, finances, competitor monitoring & product cloning.",
   "homepage_url": "https://sellercloudx.com",
   "permissions": [
     "activeTab",
