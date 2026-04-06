@@ -139,6 +139,13 @@ async function proxyImagesToStorage(
     if (!url || typeof url !== 'string') continue;
     if (!url.startsWith('http')) continue;
 
+    // Block banner/static images from Uzum that were incorrectly scraped
+    const lowerUrl = url.toLowerCase();
+    if (lowerUrl.includes('static.uzum.uz') || lowerUrl.includes('/baner/') || lowerUrl.includes('/banner') || lowerUrl.includes('/promo/')) {
+      console.warn(`⚠️ Skipping non-product image: ${url.substring(0, 60)}`);
+      continue;
+    }
+
     // Already our storage URL
     if (url.includes(supabaseUrl) && url.includes('/storage/v1/object/public/')) {
       proxied.push(url);
