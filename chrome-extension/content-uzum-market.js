@@ -124,13 +124,59 @@ function scrapeProductPage() {
       d.images.push(normalized);
     }
   };
-  document.querySelectorAll('img[src], img[data-src]').forEach(img => {
-    pushImage(img.currentSrc || img.src || img.dataset.src);
-  });
+
+  // Priority 1: JSON-LD structured data (most reliable)
+  try {
+    const ldScripts = document.querySelectorAll('script[type="application/ld+json"]');
+    for (const script of ldScripts) {
+      try {
+        const ld = JSON.parse(script.textContent);
+        const graph = ld['@graph'] || [ld];
+        for (const item of graph) {
+          if (item['@type'] === 'Product' || item['@type'] === 'ProductGroup') {
+            const ldImages = Array.isArray(item.image) ? item.image : (item.image ? [item.image] : []);
+            ldImages.forEach(url => {
+              // Convert to high-quality version
+              const hq = String(url).replace('/t_product_low.jpg', '/t_product_540_high.jpg').replace('/original.jpg', '/t_product_540_high.jpg');
+              pushImage(hq);
+            });
+            // Also grab LD title/description if missing
+            if (!d.title && item.name) d.title = String(item.name).trim();
+            if (!d.description && item.description) d.description = String(item.description).replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').trim().substring(0, 2000);
+          }
+        }
+      } catch {}
+    }
+  } catch {}
+
+  // Priority 2: Product gallery slider images only (not all page images)
+  if (d.images.length === 0) {
+    const gallerySelectors = [
+      '.slider img', '.swiper img', '[class*="gallery"] img', '[class*="Gallery"] img',
+      '[class*="slider"] img', '[class*="Slider"] img', '[class*="product-image"] img',
+      '[class*="ProductImage"] img', '[class*="carousel"] img',
+      '[data-v-b2e5f1c4] img', '[data-v-6e7d02fc] img',
+    ];
+    for (const sel of gallerySelectors) {
+      document.querySelectorAll(sel).forEach(img => {
+        pushImage(img.currentSrc || img.src || img.dataset.src);
+      });
+      if (d.images.length > 0) break;
+    }
+  }
+
+  // Priority 3: All images on page that match product image URL pattern (fallback)
+  if (d.images.length === 0) {
+    document.querySelectorAll('img[src], img[data-src]').forEach(img => {
+      pushImage(img.currentSrc || img.src || img.dataset.src);
+    });
+  }
 
   // Description
-  const descEl = document.querySelector('[class*="escription"], [class*="detail-text"], [class*="product-info"]');
-  if (descEl) d.description = descEl.textContent.trim().substring(0, 2000);
+  if (!d.description) {
+    const descEl = document.querySelector('[class*="escription"], [class*="detail-text"], [class*="product-info"]');
+    if (descEl) d.description = descEl.textContent.trim().substring(0, 2000);
+  }
 
   // Characteristics
   d.characteristics = [];
