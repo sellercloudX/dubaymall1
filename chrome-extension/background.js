@@ -279,7 +279,7 @@ async function handleCommand(command) {
         chrome.tabs.sendMessage(tab.id, {
           type: 'SCX_COMMAND', command_type, payload, commandId: id,
         }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Content script javob bermadi (60s timeout)')), 60000)),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Content script javob bermadi (120s timeout)')), 120000)),
       ]);
 
       console.log('[SCX] Content script response:', JSON.stringify(response));
@@ -295,9 +295,14 @@ async function handleCommand(command) {
       }
 
       lastError = getCommandFailureMessage(command_type, response);
+      // For create_product, if form was filled but save failed, don't retry (avoid duplicate)
+      if (command_type === 'create_product' && response?.result?.submitted) {
+        console.warn('[SCX] Form was submitted but save uncertain — not retrying to avoid duplicate');
+        break;
+      }
       if (attempt < 3) {
         console.warn('[SCX] Attempt', attempt, 'failed, retrying...');
-        await new Promise(r => setTimeout(r, 4000));
+        await new Promise(r => setTimeout(r, 5000));
         continue;
       }
     } catch (err) {
@@ -307,7 +312,7 @@ async function handleCommand(command) {
         : err.message;
       if (attempt < 3) {
         // On receiver error, wait longer and let injection happen on next attempt
-        await new Promise(r => setTimeout(r, 5000));
+        await new Promise(r => setTimeout(r, 6000));
         continue;
       }
     }
