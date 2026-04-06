@@ -43,11 +43,18 @@ function isLikelyProductImageUrl(url) {
     lower.includes('badge-icon') ||
     lower.includes('placeholder') ||
     lower.includes('/icons/') ||
-    lower.includes('static.uzum.uz')
+    lower.includes('static.uzum.uz') ||
+    lower.includes('/promo/') ||
+    lower.includes('/logo') ||
+    lower.includes('favicon') ||
+    lower.includes('/user-avatar') ||
+    lower.includes('/seller-logo') ||
+    lower.includes('/category-icon')
   ) {
     return false;
   }
-  return lower.includes('images.uzum.uz') || lower.includes('/t_product_') || lower.includes('/w_');
+  // Must be from Uzum's product image CDN
+  return lower.includes('images.uzum.uz') && (lower.includes('/t_product_') || lower.includes('/original'));
 }
 
 // ===== Page Detection =====

@@ -105,7 +105,13 @@ function isLikelyCloneImageUrl(value: unknown): value is string {
     lower.includes('badge-icon') ||
     lower.includes('placeholder') ||
     lower.includes('/icons/') ||
-    lower.includes('static.uzum.uz')
+    lower.includes('static.uzum.uz') ||
+    lower.includes('/promo/') ||
+    lower.includes('/logo') ||
+    lower.includes('favicon') ||
+    lower.includes('/user-avatar') ||
+    lower.includes('/seller-logo') ||
+    lower.includes('/category-icon')
   );
 }
 
