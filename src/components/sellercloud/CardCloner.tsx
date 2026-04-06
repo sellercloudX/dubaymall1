@@ -119,6 +119,38 @@ function sanitizeCloneDescription(value: unknown, fallback = ''): string {
   return cleaned || fallback;
 }
 
+function isGenericCloneDescription(value: string): boolean {
+  const normalized = value.replace(/\s+/g, ' ').trim().toLowerCase();
+  return !normalized || normalized === 'описание' || normalized === 'tavsif';
+}
+
+function scoreScrapedCloneSource(
+  row: { scraped_data?: any; source_url?: string | null; created_at?: string | null },
+  expectedProductId: string
+): number {
+  const scraped = row?.scraped_data || {};
+  const title = String(scraped?.title || scraped?.name || '').trim();
+  const description = sanitizeCloneDescription(scraped?.description, '');
+  const images = sanitizeCloneImages([
+    ...(Array.isArray(scraped?.images) ? scraped.images : []),
+    ...(Array.isArray(scraped?.pictures) ? scraped.pictures : []),
+    scraped?.image,
+  ]);
+  const sourceUrl = String(row?.source_url || scraped?.sourceUrl || '').toLowerCase();
+
+  let score = 0;
+  if (String(scraped?.productId || '') === expectedProductId) score += 10;
+  if (sourceUrl.includes('/product/')) score += 6;
+  if (sourceUrl.includes('skuid=')) score += 2;
+  if (!sourceUrl.includes('/reviews')) score += 2;
+  if (title.length > 10 && !/^отзывы\s+на/i.test(title)) score += 5;
+  if (!isGenericCloneDescription(description) && description.length > 40) score += 3;
+  if (images.length > 0) score += Math.min(images.length, 5);
+  if (Array.isArray(scraped?.breadcrumbs) && scraped.breadcrumbs.length > 0) score += 2;
+
+  return score;
+}
+
 export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
   const { user } = useAuth();
   const { tasks } = useBackgroundTasks();
@@ -158,24 +190,36 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
       try {
         const { data, error } = await supabase
           .from('marketplace_scraped_data')
-          .select('scraped_data, created_at')
+          .select('scraped_data, created_at, source_url')
           .eq('user_id', user.id)
           .eq('marketplace', externalSourceMarketplace)
           .eq('data_type', 'competitor_product')
           .contains('scraped_data', { productId: externalProductId })
           .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+          .limit(5);
 
         if (error) throw error;
         if (cancelled) return;
 
-        const scraped = (data?.scraped_data as any) || null;
+        const rows = (data || []) as Array<{ scraped_data?: any; source_url?: string | null; created_at?: string | null }>;
+        const bestRow = [...rows].sort((a, b) => {
+          const scoreDiff = scoreScrapedCloneSource(b, externalProductId) - scoreScrapedCloneSource(a, externalProductId);
+          if (scoreDiff !== 0) return scoreDiff;
+          return new Date(String(b.created_at || 0)).getTime() - new Date(String(a.created_at || 0)).getTime();
+        })[0];
+
+        const scraped = (bestRow?.scraped_data as any) || null;
         if (!scraped) {
           setExternalSourceProduct(null);
           return;
         }
 
+        const breadcrumbs = Array.isArray(scraped.breadcrumbs)
+          ? scraped.breadcrumbs
+              .filter((item: unknown): item is string => typeof item === 'string' && item.trim().length > 0)
+              .map((item: string) => item.trim())
+              .filter((item: string, index: number, items: string[]) => index === 0 || item !== items[index - 1])
+          : [];
         const title = String(scraped.title || scraped.name || 'Raqobatchi mahsulot').trim();
         const pictures = sanitizeCloneImages([
           ...(Array.isArray(scraped.images) ? scraped.images : []),
@@ -190,22 +234,20 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
           price,
           shopSku: String(scraped.productId || externalProductId),
           pictures,
-          category: String(scraped.category || scraped.breadcrumbs?.slice?.(-1)?.[0] || 'Uzum Market'),
+          category: String(scraped.category || breadcrumbs[breadcrumbs.length - 1] || 'Uzum Market'),
           description: sanitizeCloneDescription(scraped.description, title),
           marketplace: externalSourceMarketplace,
           selected: false,
           brand: String(scraped.brand || ''),
           barcode: String(scraped.barcode || ''),
           model: String(scraped.model || ''),
-          breadcrumbs: Array.isArray(scraped.breadcrumbs)
-            ? scraped.breadcrumbs.filter((item: unknown): item is string => typeof item === 'string')
-            : [],
+          breadcrumbs,
           characteristics: Array.isArray(scraped.characteristics)
             ? scraped.characteristics
                 .filter((item: any) => item?.name && item?.value)
                 .map((item: any) => ({ name: String(item.name), value: String(item.value) }))
             : [],
-          sourceUrl: String(scraped.sourceUrl || ''),
+          sourceUrl: String(scraped.sourceUrl || bestRow?.source_url || '').trim(),
         };
 
         setExternalSourceProduct(mapped);
@@ -592,6 +634,9 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
         // Get full product data from store for richer context
         const storeProducts = store.getProducts(product.marketplace);
         const fullProduct: any = storeProducts.find(p => p.offerId === product.offerId);
+        const breadcrumbTrail = Array.isArray(product.breadcrumbs)
+          ? product.breadcrumbs.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+          : [];
         
         // Extract source marketplace data — universal for ALL source marketplaces
         let sourceBrand = '';
@@ -608,11 +653,11 @@ export function CardCloner({ connectedMarketplaces, store }: CardClonerProps) {
           // Uzum-specific field extraction
            sourceBrand = product.brand || fullProduct?.brandName || fullProduct?.brand || '';
           // Uzum category is the best subject equivalent
-          sourceSubject = fullProduct?.category || product.category || '';
-          sourceParent = fullProduct?.categoryTitle || fullProduct?.parentCategory || '';
+           sourceSubject = fullProduct?.category || product.category || breadcrumbTrail[breadcrumbTrail.length - 1] || '';
+           sourceParent = fullProduct?.categoryTitle || fullProduct?.parentCategory || breadcrumbTrail[breadcrumbTrail.length - 2] || '';
            sourceBarcode = product.barcode || fullProduct?.barcode || fullProduct?.ean || '';
            sourceCharacteristics = product.characteristics || fullProduct?.characteristicValues || fullProduct?.characteristics || fullProduct?.attributes || [];
-          sourceColor = fullProduct?.color || '';
+          sourceColor = fullProduct?.color || product.characteristics?.find((item) => /цвет|rang|color/i.test(String(item.name)))?.value || '';
            sourceModel = product.model || fullProduct?.vendorCode || fullProduct?.model || fullProduct?.article || '';
           // Try to extract brand from product name if not available
           if (!sourceBrand && product.name) {
