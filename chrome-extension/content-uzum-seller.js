@@ -647,9 +647,24 @@ async function handleCreateProduct(payload) {
         
         for (const imgUrl of images.slice(0, 10)) {
           try {
-            const resp = await fetch(imgUrl, { mode: 'cors' });
+            const resp = await fetch(imgUrl, { mode: 'no-cors' }).catch(() => null);
+            // no-cors returns opaque response, try cors first then no-cors
+            let actualResp = null;
+            try {
+              actualResp = await fetch(imgUrl);
+            } catch {
+              try {
+                // Proxy through background if direct fails
+                actualResp = await fetch(imgUrl, { mode: 'cors', credentials: 'omit' });
+              } catch {
+                console.warn('[SCX] Image CORS blocked:', imgUrl.substring(0, 60));
+                continue;
+              }
+            }
+            const resp = actualResp;
             if (!resp.ok) continue;
             const blob = await resp.blob();
+            if (blob.size < 1000) continue; // Skip tiny/broken images
             const ext = blob.type.includes('png') ? 'png' : 'jpg';
             const file = new File([blob], `product_${Date.now()}_${uploadedCount}.${ext}`, { type: blob.type || 'image/jpeg' });
             dt.items.add(file);
@@ -702,7 +717,7 @@ async function handleCreateProduct(payload) {
     scxShowToast('⏳ Saqlanmoqda...', 'info');
     
     // Wait and check for success indicators
-    await scxSleep(3000);
+    await scxSleep(4000);
     
     // Check if we got redirected (success) or if there are errors
     const newUrl = window.location.href;
@@ -739,7 +754,7 @@ async function handleCreateProduct(payload) {
       console.log('[SCX] ⚠️ Form has validation errors:', errorTexts);
       scxShowToast(`⚠️ Forma xatoliklari: ${errorTexts.substring(0, 100)}`, 'warning');
       return { 
-        success: true, 
+        success: false, 
         result: { 
           saved: false, 
           submitted: true,
@@ -747,13 +762,14 @@ async function handleCreateProduct(payload) {
           failedFields,
           validationErrors: errorTexts,
           message: 'Forma to\'ldirildi lekin validatsiya xatoliklari bor: ' + errorTexts.substring(0, 200)
-        } 
+        },
+        error: 'Validatsiya xatoliklari: ' + errorTexts.substring(0, 200)
       };
     }
 
     // Ambiguous - button was clicked but can't confirm result
     // Wait a bit more and check again
-    await scxSleep(3000);
+    await scxSleep(4000);
     const finalUrl = window.location.href;
     if (finalUrl !== currentUrl && !finalUrl.includes('/create')) {
       console.log('[SCX] ✅ Redirected after save — product likely created');
@@ -764,30 +780,43 @@ async function handleCreateProduct(payload) {
     }
 
     // Still on create page — might have saved or might have errors
+    // Check for success toast one more time
+    const lateSuccess = document.querySelectorAll('[class*="success"], [class*="Success"], [class*="toast"], [class*="notification"]');
+    const hasLateSuccess = [...lateSuccess].some(el => {
+      const text = el.textContent.toLowerCase();
+      return text.includes('успешно') || text.includes('muvaffaqiyatli') || text.includes('сохранен') || text.includes('saqlandi') || text.includes('создан');
+    });
+    if (hasLateSuccess) {
+      console.log('[SCX] ✅ Late success toast detected');
+      return { success: true, result: { saved: true, submitted: true, filledFields, failedFields } };
+    }
+
     console.log('[SCX] ℹ️ Still on create page after submit');
     return { 
-      success: true, 
+      success: false, 
       result: { 
         saved: false, 
         submitted: true,
         filledFields, 
         failedFields,
         message: 'Forma yuborildi, lekin saqlangan-saqlanmaganligini aniqlab bo\'lmadi. Iltimos, tekshiring.'
-      } 
+      },
+      error: 'Saqlash natijasi aniqlanmadi — forma to\'ldirildi (' + filledFields.join(', ') + '), lekin tasdiqlash yo\'q'
     };
   } else {
     // Could not find submit button
     console.log('[SCX] ⚠️ Submit button not found');
     scxShowToast('⚠️ Ma\'lumotlar to\'ldirildi. Saqlash tugmasini topa olmadik — iltimos, qo\'lda saqlang!', 'warning');
     return { 
-      success: true, 
+      success: false, 
       result: { 
         saved: false, 
         submitted: false,
         filledFields, 
         failedFields,
         message: 'Forma to\'ldirildi, lekin saqlash tugmasi topilmadi. Qo\'lda saqlang.'
-      } 
+      },
+      error: 'Saqlash tugmasi topilmadi — forma to\'ldirildi (' + filledFields.join(', ') + '), lekin avtomatik saqlab bo\'lmadi'
     };
   }
 }
