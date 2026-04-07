@@ -1599,6 +1599,33 @@ serve(async (req) => {
 
     console.log(`Audit action: ${action}, marketplace: ${mp}, user: ${user.id}`);
 
+    // ═══ BILLING for audit action ═══
+    if (action === 'audit') {
+      const { data: billingAccess } = await supabase.rpc('check_feature_access', {
+        p_user_id: user.id,
+        p_feature_key: 'ai-card-audit',
+      });
+      const ba = billingAccess as any;
+      if (ba && !ba.allowed) {
+        return new Response(JSON.stringify({ 
+          error: ba.message || 'Ruxsat berilmadi',
+          billingError: ba.error,
+          price: ba.price,
+          balance: ba.balance,
+        }), {
+          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (ba?.price > 0) {
+        await supabase.rpc('deduct_balance', {
+          p_user_id: user.id,
+          p_amount: ba.price,
+          p_feature_key: 'ai-card-audit',
+          p_description: `Kartochka audit: ${mp}`,
+        });
+      }
+    }
+
     // Get marketplace connection
     const { data: connections } = await supabase
       .from("marketplace_connections")
