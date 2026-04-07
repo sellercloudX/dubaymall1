@@ -156,7 +156,6 @@ function PlanCard({ plan, features, onUpdate, onDelete }: {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
     name_uz: plan.name_uz || '',
-    onetime_price_uzs: plan.onetime_price_uzs,
     monthly_fee_uzs: plan.monthly_fee_uzs,
     max_stores_per_marketplace: plan.max_stores_per_marketplace,
     free_card_creation_monthly: plan.free_card_creation_monthly,
@@ -215,7 +214,6 @@ function PlanCard({ plan, features, onUpdate, onDelete }: {
         {editing ? (
           <div className="grid grid-cols-2 gap-3">
             <div><Label className="text-[10px]">Nomi (UZ)</Label><Input value={form.name_uz} onChange={e => setForm({ ...form, name_uz: e.target.value })} className="h-8 text-xs" /></div>
-            <div><Label className="text-[10px]">Bir martalik narx</Label><Input type="number" value={form.onetime_price_uzs} onChange={e => setForm({ ...form, onetime_price_uzs: +e.target.value })} className="h-8 text-xs" /></div>
             <div><Label className="text-[10px]">Oylik to'lov</Label><Input type="number" value={form.monthly_fee_uzs} onChange={e => setForm({ ...form, monthly_fee_uzs: +e.target.value })} className="h-8 text-xs" /></div>
             <div><Label className="text-[10px]">Do'kon limiti/MP</Label><Input type="number" value={form.max_stores_per_marketplace} onChange={e => setForm({ ...form, max_stores_per_marketplace: +e.target.value })} className="h-8 text-xs" /></div>
             <div><Label className="text-[10px]">Bepul kartochka/oy</Label><Input type="number" value={form.free_card_creation_monthly} onChange={e => setForm({ ...form, free_card_creation_monthly: +e.target.value })} className="h-8 text-xs" /></div>
@@ -225,8 +223,7 @@ function PlanCard({ plan, features, onUpdate, onDelete }: {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="flex items-center gap-1.5 text-muted-foreground"><DollarSign className="h-3 w-3" /><span>{plan.onetime_price_uzs.toLocaleString()} so'm</span></div>
-            {plan.monthly_fee_uzs > 0 && <div className="flex items-center gap-1.5 text-muted-foreground"><Wallet className="h-3 w-3" /><span>+{plan.monthly_fee_uzs.toLocaleString()}/oy</span></div>}
+            <div className="flex items-center gap-1.5 text-muted-foreground"><Wallet className="h-3 w-3" /><span>{plan.monthly_fee_uzs > 0 ? plan.monthly_fee_uzs.toLocaleString() + ' so\'m/oy' : 'Bepul'}</span></div>
             <div className="flex items-center gap-1.5 text-muted-foreground"><Store className="h-3 w-3" /><span>{plan.max_stores_per_marketplace >= 999 ? '∞' : plan.max_stores_per_marketplace} do'kon/MP</span></div>
             <div className="flex items-center gap-1.5 text-muted-foreground"><Image className="h-3 w-3" /><span>{plan.free_card_creation_monthly} kartochka/oy</span></div>
             <div className="flex items-center gap-1.5 text-muted-foreground"><Copy className="h-3 w-3" /><span>{plan.free_cloning_monthly} klon/oy</span></div>
@@ -418,7 +415,7 @@ function AdminBalanceTopup({ allBalances }: { allBalances: any[] }) {
 function NewPlanDialog({ onCreated }: { onCreated: () => void }) {
   const { createPlan } = useAdminSubscriptionPlans();
   const [form, setForm] = useState({
-    slug: '', name: '', name_uz: '', onetime_price_uzs: 0, monthly_fee_uzs: 0,
+    slug: '', name: '', name_uz: '', monthly_fee_uzs: 0,
     max_stores_per_marketplace: 1, free_card_creation_monthly: 0, free_cloning_monthly: 0, balance_discount_percent: 0,
   });
 
@@ -438,7 +435,6 @@ function NewPlanDialog({ onCreated }: { onCreated: () => void }) {
           <div><Label className="text-xs">Slug (unikal)</Label><Input value={form.slug} onChange={e => setForm({ ...form, slug: e.target.value })} placeholder="gold" className="h-8 text-xs" /></div>
           <div><Label className="text-xs">Nomi</Label><Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Gold" className="h-8 text-xs" /></div>
           <div><Label className="text-xs">Nomi (UZ)</Label><Input value={form.name_uz} onChange={e => setForm({ ...form, name_uz: e.target.value })} placeholder="Oltin" className="h-8 text-xs" /></div>
-          <div><Label className="text-xs">Bir martalik narx</Label><Input type="number" value={form.onetime_price_uzs} onChange={e => setForm({ ...form, onetime_price_uzs: +e.target.value })} className="h-8 text-xs" /></div>
           <div><Label className="text-xs">Oylik to'lov</Label><Input type="number" value={form.monthly_fee_uzs} onChange={e => setForm({ ...form, monthly_fee_uzs: +e.target.value })} className="h-8 text-xs" /></div>
           <div><Label className="text-xs">Do'kon limiti/MP</Label><Input type="number" value={form.max_stores_per_marketplace} onChange={e => setForm({ ...form, max_stores_per_marketplace: +e.target.value })} className="h-8 text-xs" /></div>
           <div><Label className="text-xs">Kartochka/oy</Label><Input type="number" value={form.free_card_creation_monthly} onChange={e => setForm({ ...form, free_card_creation_monthly: +e.target.value })} className="h-8 text-xs" /></div>

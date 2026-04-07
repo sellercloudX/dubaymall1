@@ -170,12 +170,12 @@ function DynamicPlanCard({ plan, isCurrentPlan, onSelect, isProcessing }: {
       </div>
 
       <div>
-        <p className="text-2xl font-bold">{formatPrice(plan.onetime_price_uzs)}</p>
-        <p className="text-xs text-muted-foreground">
-          {plan.monthly_fee_uzs > 0
-            ? `Bir martalik + ${formatPrice(plan.monthly_fee_uzs)}/oy`
-            : 'Bir martalik to\'lov'}
+        <p className="text-2xl font-bold">
+          {plan.monthly_fee_uzs > 0 ? formatPrice(plan.monthly_fee_uzs) : 'Bepul'}
         </p>
+        {plan.monthly_fee_uzs > 0 && (
+          <p className="text-xs text-muted-foreground">oylik to'lov</p>
+        )}
       </div>
 
       <ul className="space-y-1.5 text-xs text-muted-foreground">
@@ -183,12 +183,6 @@ function DynamicPlanCard({ plan, isCurrentPlan, onSelect, isProcessing }: {
           <Store className="h-3.5 w-3.5 text-primary shrink-0" />
           {plan.max_stores_per_marketplace >= 999 ? 'Cheksiz' : plan.max_stores_per_marketplace} do'kon / marketplace
         </li>
-        {plan.free_card_creation_monthly > 0 && (
-          <li className="flex items-center gap-1.5"><Image className="h-3.5 w-3.5 text-primary shrink-0" /> {plan.free_card_creation_monthly} bepul kartochka / oy</li>
-        )}
-        {plan.free_cloning_monthly > 0 && (
-          <li className="flex items-center gap-1.5"><Copy className="h-3.5 w-3.5 text-primary shrink-0" /> {plan.free_cloning_monthly} bepul klonlash / oy</li>
-        )}
         {plan.balance_discount_percent > 0 && (
           <li className="flex items-center gap-1.5"><Percent className="h-3.5 w-3.5 text-primary shrink-0" /> Pullik xizmatlar {plan.balance_discount_percent}% arzon</li>
         )}
@@ -253,7 +247,7 @@ export const SubscriptionBilling = forwardRef<HTMLDivElement, SubscriptionBillin
 
     const payBody = {
       user_id: user?.id, plan_type: selectedPlanForTerms.slug,
-      amount_uzs: selectedPlanForTerms.onetime_price_uzs || selectedPlanForTerms.monthly_fee_uzs,
+      amount_uzs: selectedPlanForTerms.monthly_fee_uzs,
       return_url: window.location.origin + '/seller-cloud?tab=subscription',
     };
 
@@ -262,7 +256,7 @@ export const SubscriptionBilling = forwardRef<HTMLDivElement, SubscriptionBillin
       if (result.success) {
         setShowTermsDialog(false);
         toast.success('Tabriklaymiz! Akkauntingiz faollashtirildi.');
-        if (selectedPlanForTerms.onetime_price_uzs > 0 && user?.id) {
+        if (selectedPlanForTerms.monthly_fee_uzs > 0 && user?.id) {
           try {
             const data = await invokePayment(paymentMethod, 'prepare', payBody);
             if (paymentMethod === 'payme') {
@@ -314,19 +308,17 @@ export const SubscriptionBilling = forwardRef<HTMLDivElement, SubscriptionBillin
                 <Badge style={{ backgroundColor: (selectedPlanForTerms.color || '#3b82f6') + '15', color: selectedPlanForTerms.color || '#3b82f6' }}>
                   {selectedPlanForTerms.name_uz || selectedPlanForTerms.name}
                 </Badge>
-                <span className="font-bold">{formatPrice(selectedPlanForTerms.onetime_price_uzs)}</span>
+                <span className="font-bold">
+                  {selectedPlanForTerms.monthly_fee_uzs > 0 ? `${formatPrice(selectedPlanForTerms.monthly_fee_uzs)}/oy` : 'Bepul'}
+                </span>
               </div>
-              {selectedPlanForTerms.monthly_fee_uzs > 0 && (
-                <p className="text-xs text-muted-foreground">+ {formatPrice(selectedPlanForTerms.monthly_fee_uzs)} oylik to'lov</p>
-              )}
             </div>
           )}
           <div className="bg-muted p-4 rounded-lg max-h-60 overflow-y-auto text-sm space-y-2">
             <p className="font-medium">SellerCloudX xizmat shartlari:</p>
             <ul className="list-disc pl-4 space-y-1">
               <li>Tanlangan tarif: <strong>{selectedPlanForTerms?.name_uz || selectedPlanForTerms?.name}</strong></li>
-              <li>Bir martalik to'lov: {formatPrice(selectedPlanForTerms?.onetime_price_uzs || 0)}</li>
-              {(selectedPlanForTerms?.monthly_fee_uzs || 0) > 0 && <li>Oylik to'lov: {formatPrice(selectedPlanForTerms!.monthly_fee_uzs)}</li>}
+              <li>Oylik to'lov: {formatPrice(selectedPlanForTerms?.monthly_fee_uzs || 0)}</li>
               <li>Do'kon limiti: {(selectedPlanForTerms?.max_stores_per_marketplace || 1) >= 999 ? 'Cheksiz' : selectedPlanForTerms?.max_stores_per_marketplace} / marketplace</li>
               <li>AI xizmatlar — balans orqali ({selectedPlanForTerms?.balance_discount_percent || 0}% chegirma)</li>
               <li>Balansni to'ldirish: kamida {MIN_TOPUP_UZS.toLocaleString()} so'm</li>
@@ -592,15 +584,11 @@ export const SubscriptionBilling = forwardRef<HTMLDivElement, SubscriptionBillin
                   </thead>
                   <tbody className="divide-y divide-border">
                     <tr>
-                      <td className="py-2 pr-4 text-muted-foreground">Narx</td>
+                      <td className="py-2 pr-4 text-muted-foreground">Oylik narx</td>
                       {activePlans.map(p => (
-                        <td key={p.id} className="py-2 px-2 text-center font-bold">{(p.onetime_price_uzs / 1000).toFixed(0)}K</td>
-                      ))}
-                    </tr>
-                    <tr>
-                      <td className="py-2 pr-4 text-muted-foreground">Oylik</td>
-                      {activePlans.map(p => (
-                        <td key={p.id} className="py-2 px-2 text-center">{p.monthly_fee_uzs > 0 ? (p.monthly_fee_uzs / 1000).toFixed(0) + 'K' : '—'}</td>
+                        <td key={p.id} className="py-2 px-2 text-center font-bold">
+                          {p.monthly_fee_uzs > 0 ? (p.monthly_fee_uzs / 1000).toFixed(0) + 'K/oy' : 'Bepul'}
+                        </td>
                       ))}
                     </tr>
                     <tr>

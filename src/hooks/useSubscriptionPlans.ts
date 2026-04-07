@@ -11,7 +11,7 @@ export interface SubscriptionPlan {
   description: string | null;
   description_uz: string | null;
   description_ru: string | null;
-  onetime_price_uzs: number;
+  onetime_price_uzs?: number;
   monthly_fee_uzs: number;
   max_stores_per_marketplace: number;
   free_card_creation_monthly: number;
