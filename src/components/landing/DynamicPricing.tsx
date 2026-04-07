@@ -248,25 +248,16 @@ export const DynamicPricing = React.forwardRef<HTMLElement, DynamicPricingProps>
                       <div className="space-y-2 mb-4 p-3 rounded-lg bg-muted/50 border border-border/50">
                         <div className="flex items-center justify-between">
                           <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-                            <CreditCard className="h-3 w-3" />
-                            {txt.onetime}
-                          </span>
-                          <span className="text-sm sm:text-base font-bold">
-                            {formatPrice(plan.onetime_price_uzs)} <span className="text-[10px] font-normal text-muted-foreground">so'm</span>
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between border-t border-border/30 pt-2">
-                          <span className="text-[11px] text-muted-foreground flex items-center gap-1">
                             <Shield className="h-3 w-3" />
                             {txt.monthly}
                           </span>
                           {plan.monthly_fee_uzs > 0 ? (
-                            <span className="text-sm font-semibold">
+                            <span className="text-sm sm:text-base font-bold">
                               {formatPrice(plan.monthly_fee_uzs)} <span className="text-[10px] font-normal text-muted-foreground">so'm{txt.perMonth}</span>
                             </span>
                           ) : (
-                            <span className="text-xs font-medium text-green-600 dark:text-green-400">
-                              {txt.noMonthly}
+                            <span className="text-sm sm:text-base font-bold text-green-600 dark:text-green-400">
+                              {txt.free}
                             </span>
                           )}
                         </div>
