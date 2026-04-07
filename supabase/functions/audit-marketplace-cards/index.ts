@@ -30,6 +30,26 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3)
   return fetch(url, options);
 }
 
+// ===== DETECT LOW QUALITY / CAMERA IMAGES =====
+function detectLowQualityImage(url: string): boolean {
+  if (!url) return true;
+  const lower = url.toLowerCase();
+  // Camera uploads often have these patterns
+  if (lower.includes('/camera/') || lower.includes('/dcim/') || lower.includes('/photo_')) return true;
+  if (lower.includes('whatsapp') || lower.includes('telegram')) return true;
+  // Very small image indicators
+  if (lower.includes('_thumb') || lower.includes('_small') || lower.includes('_low')) return true;
+  if (lower.includes('/t_product_low')) return true;
+  // Data URIs (usually low quality screenshots/camera)
+  if (lower.startsWith('data:image/jpeg') && url.length < 5000) return true;
+  // Supabase storage uploads without ai-audit prefix (likely user camera uploads)
+  if (lower.includes('product-images/') && !lower.includes('ai-audit/') && !lower.includes('ai-gen/')) {
+    // These are likely raw camera uploads
+    return true;
+  }
+  return false;
+}
+
 // ===== TYPES =====
 interface QualityIssue {
   offerId: string;
