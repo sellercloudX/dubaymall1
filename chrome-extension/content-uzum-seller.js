@@ -430,6 +430,13 @@ async function handleCreateProduct(payload) {
   const barcode = payload.barcode || '';
   const mxikCode = payload.mxik_code || payload.mxikCode || '';
   const price = payload.price || 0;
+  const weight = Number(payload.weight ?? payload.weight_kg ?? 0);
+  const height = Number(payload.height ?? payload.height_cm ?? 0);
+  const length = Number(payload.length ?? payload.length_cm ?? 0);
+  const width = Number(payload.width ?? payload.width_cm ?? 0);
+  const color = payload.color || '';
+  const material = payload.material || '';
+  const country = payload.country || payload.originCountry || '';
   const images = payload.images || payload.pictures || [];
   const categoryPath = payload.categoryPath || payload.category_path || payload.breadcrumbs || [];
   const characteristics = payload.characteristics || [];
@@ -634,6 +641,60 @@ async function handleCreateProduct(payload) {
     }
   }
 
+  // Step 8.5: Fill extra metadata fields that AI already generated
+  const textMetaFields = [
+    { key: 'color', value: color, labels: ['цвет', 'rang', 'color'] },
+    { key: 'material', value: material, labels: ['материал', 'material'] },
+    { key: 'country', value: country, labels: ['страна производства', 'страна', 'country', 'mamlakat'] },
+  ];
+
+  for (const field of textMetaFields) {
+    if (!field.value) continue;
+    let filled = false;
+    const input = findInputByLabel(field.labels, 'input, textarea, select');
+    if (input) {
+      if (input.tagName === 'SELECT') {
+        const options = input.querySelectorAll('option');
+        for (const opt of options) {
+          if (opt.textContent.trim().toLowerCase().includes(String(field.value).toLowerCase())) {
+            input.value = opt.value;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+            filled = true;
+            break;
+          }
+        }
+      } else {
+        filled = fillReactInput(input, String(field.value));
+      }
+    }
+    if (!filled) {
+      filled = await selectDropdownOption(field.labels, String(field.value));
+    }
+    if (filled) {
+      filledFields.push(field.key);
+      console.log(`[SCX] ✅ ${field.key} filled:`, field.value);
+      await scxSleep(250);
+    }
+  }
+
+  const numericMetaFields = [
+    { key: 'weight', value: weight, labels: ['вес', 'og\'irlik', 'weight'] },
+    { key: 'height', value: height, labels: ['высота', 'balandlik', 'height'] },
+    { key: 'length', value: length, labels: ['длина', 'uzunlik', 'length'] },
+    { key: 'width', value: width, labels: ['ширина', 'kenglik', 'width'] },
+  ];
+
+  for (const field of numericMetaFields) {
+    if (!field.value || Number.isNaN(field.value)) continue;
+    const input = findInputByLabel(field.labels, 'input[type="number"], input');
+    if (input) {
+      fillReactInput(input, String(field.value));
+      filledFields.push(field.key);
+      console.log(`[SCX] ✅ ${field.key} filled:`, field.value);
+      await scxSleep(250);
+    }
+  }
+
   // Step 9: Upload Images
   if (images.length > 0) {
     const imgInput = document.querySelector('input[type="file"][accept*="image"], input[type="file"]');
@@ -647,23 +708,30 @@ async function handleCreateProduct(payload) {
         
         for (const imgUrl of images.slice(0, 10)) {
           try {
-            const resp = await fetch(imgUrl, { mode: 'no-cors' }).catch(() => null);
-            // no-cors returns opaque response, try cors first then no-cors
             let actualResp = null;
+
             try {
-              actualResp = await fetch(imgUrl);
+              const candidate = await fetch(imgUrl);
+              if (candidate?.ok) actualResp = candidate;
             } catch {
+              /* ignore first-pass fetch */
+            }
+
+            if (!actualResp) {
               try {
-                // Proxy through background if direct fails
-                actualResp = await fetch(imgUrl, { mode: 'cors', credentials: 'omit' });
+                const candidate = await fetch(imgUrl, { mode: 'cors', credentials: 'omit' });
+                if (candidate?.ok) actualResp = candidate;
               } catch {
-                console.warn('[SCX] Image CORS blocked:', imgUrl.substring(0, 60));
-                continue;
+                /* ignore cors fallback */
               }
             }
-            const resp = actualResp;
-            if (!resp.ok) continue;
-            const blob = await resp.blob();
+
+            if (!actualResp?.ok) {
+              console.warn('[SCX] Image fetch failed or blocked:', imgUrl.substring(0, 80));
+              continue;
+            }
+
+            const blob = await actualResp.blob();
             if (blob.size < 1000) continue; // Skip tiny/broken images
             const ext = blob.type.includes('png') ? 'png' : 'jpg';
             const file = new File([blob], `product_${Date.now()}_${uploadedCount}.${ext}`, { type: blob.type || 'image/jpeg' });
