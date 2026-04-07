@@ -439,7 +439,7 @@ const T = {
     faq3q: 'How does AI card generation work?',
     faq3a: 'Upload a product photo — AI automatically generates name, description, category and SEO texts in 3 languages (UZ, RU, EN).',
     faq4q: 'How do I pay for the subscription?',
-    faq4a: 'Pay via Click or bank transfer. 1-day free trial, then 99,000 UZS/month activation. AI services are billed via balance.',
+    faq4a: 'Pay via Click or bank transfer. Free plan available, paid plans start at 99,000 UZS/month. AI services are billed via balance.',
     faq5q: 'What is the 60-day guarantee?',
     faq5a: 'If your sales don\'t grow within 60 days, we refund the paid amount. That\'s our confidence in quality.',
     faq6q: 'Is my data secure?',

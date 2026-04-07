@@ -219,9 +219,7 @@ export const SubscriptionBilling = forwardRef<HTMLDivElement, SubscriptionBillin
   const formatPrice = (price: number) => price >= 1000000 ? (price / 1000000).toFixed(1) + ' mln so\'m' : new Intl.NumberFormat('uz-UZ').format(price) + ' so\'m';
 
   const activationPaidUntil = (subscription as any)?.activation_paid_until;
-  const activationTrialEnds = (subscription as any)?.activation_trial_ends;
   const isActivationActive = activationPaidUntil && new Date(activationPaidUntil) > new Date();
-  const isTrialActive = activationTrialEnds && new Date(activationTrialEnds) > new Date();
 
   const handlePayActivation = async () => {
     setIsPayingActivation(true);

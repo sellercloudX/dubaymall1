@@ -306,14 +306,6 @@ export const DynamicPricing = React.forwardRef<HTMLElement, DynamicPricingProps>
                         </ul>
                       </div>
 
-                      {/* Trial badge for starter only */}
-                      {idx === 0 && (
-                        <div className="text-center mb-3">
-                          <Badge variant="outline" className="text-[10px] border-green-300 text-green-600 dark:text-green-400">
-                            🎁 {txt.trial}
-                          </Badge>
-                        </div>
-                      )}
 
                       {/* CTA */}
                       {isLast ? (
