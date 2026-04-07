@@ -288,6 +288,16 @@ Kalit so'zlar URL-encoded bo'lishi kerak.
 
     console.log("Predictions count:", predictions.predictions.length);
 
+    // Deduct balance
+    if (billingPrice > 0) {
+      await adminSupabase.rpc('deduct_balance', {
+        p_user_id: user.id,
+        p_amount: billingPrice,
+        p_feature_key: 'ai-trend-predict',
+        p_description: `Trend bashorat: ${cat}`,
+      });
+    }
+
     // Log usage
     await supabase.from("ai_usage_log").insert({
       user_id: user.id,
