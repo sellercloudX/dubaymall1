@@ -78,6 +78,24 @@ serve(async (req) => {
       });
     }
 
+    // ═══ BILLING: check_feature_access + deduct_balance ═══
+    const { data: billingAccess } = await supabase.rpc('check_feature_access', {
+      p_user_id: userId,
+      p_feature_key: 'sellzen-image-generate',
+    });
+    const ba = billingAccess as any;
+    if (ba && !ba.allowed) {
+      return new Response(JSON.stringify({ 
+        error: ba.message || 'Ruxsat berilmadi',
+        billingError: ba.error,
+        price: ba.price,
+        balance: ba.balance,
+      }), {
+        status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const billingPrice = ba?.price || 0;
+
     const { action, imageBase64, productName, productDescription, category, marketplace, style, variants } = await req.json();
 
     if (action === "generate_images") {
