@@ -303,8 +303,7 @@ export function SellerCloudManagement() {
                             const plan = allPlans?.find((p: any) => p.slug === slug);
                             return (
                               <div className="text-xs">
-                                <div className="font-medium">{formatPrice(plan?.onetime_price_uzs || 0)}</div>
-                                <div className="text-muted-foreground">{formatPrice(plan?.monthly_fee_uzs || 0)}/oy</div>
+                                <div className="font-medium">{formatPrice(plan?.monthly_fee_uzs || 0)}/oy</div>
                               </div>
                             );
                           })()}
