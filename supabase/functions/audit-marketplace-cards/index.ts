@@ -1731,10 +1731,11 @@ serve(async (req) => {
           lastResult = { ...result, issue: { ...issue, currentData: undefined }, fixes: aiResult };
           totalFixes.push(`Bosqich ${round + 1}: ${result.message}`);
 
-          // === IMAGE GENERATION for Yandex ===
+          // === IMAGE GENERATION for Yandex (generate 2, replace bad ones) ===
           const currentPictures = issue.currentData?.pictures || [];
           const hasImageIssue = issue.issues.some(i => i.field === 'pictures');
-          if ((currentPictures.length < 3 || hasImageIssue) && round === 0) {
+          const hasLowQualityImages = currentPictures.some((p: string) => detectLowQualityImage(p));
+          if ((currentPictures.length < 2 || hasImageIssue || hasLowQualityImages) && round === 0) {
             console.log(`[ImageGen] Generating image for ${targetId} (current: ${currentPictures.length} pics)`);
             try {
               const imgResult = await generateYandexAuditImage(
