@@ -1445,7 +1445,7 @@ async function handleWildberriesAudit(action: string, apiKey: string, offerId?: 
   }
 }
 
-// ===== YANDEX IMAGE GENERATION FOR AUDIT =====
+// ===== YANDEX IMAGE GENERATION FOR AUDIT (2 images, replace bad ones) =====
 async function generateYandexAuditImage(
   adminClient: any, apiKey: string, businessId: string, offerId: string,
   productName: string, category: string, existingPictures: string[]
@@ -1454,84 +1454,97 @@ async function generateYandexAuditImage(
   if (!LOVABLE_API_KEY) return { success: false, message: 'AI kalit sozlanmagan' };
 
   try {
-    const referenceUrl = existingPictures.find(p => p && p.startsWith('http')) || null;
-    console.log(`[YandexImgGen] Product: "${productName}", ref: ${referenceUrl ? 'YES' : 'NO'}, existing: ${existingPictures.length}`);
+    // Separate good and bad images
+    const goodPics = existingPictures.filter(p => p && !detectLowQualityImage(p));
+    const badPics = existingPictures.filter(p => p && detectLowQualityImage(p));
+    const referenceUrl = goodPics.find(p => p.startsWith('http')) || existingPictures.find(p => p && p.startsWith('http')) || null;
+    
+    console.log(`[YandexImgGen] "${productName}" good:${goodPics.length} bad:${badPics.length} ref:${referenceUrl ? 'YES' : 'NO'}`);
 
-    let imageUrl: string | null = null;
+    // Determine how many images to generate (target: 2 total good images)
+    const neededImages = Math.max(1, 2 - goodPics.length);
+    const generatedUrls: string[] = [];
 
-    // Try editing existing image first
-    if (referenceUrl) {
-      const editPrompt = `Create a professional e-commerce product photo based on this exact product.
-Requirements:
-- Keep the SAME product, same shape, same design, same colors
-- Clean white or light gradient background
-- Professional studio lighting, high resolution, sharp focus
-- Product centered, large, with negative space around edges
-- Aspect ratio 3:4, portrait orientation
-- Remove any existing text, watermarks, logos from background
-- Photorealistic commercial marketplace quality`;
+    for (let imgIdx = 0; imgIdx < neededImages; imgIdx++) {
+      let imageUrl: string | null = null;
+      const variation = imgIdx === 0 ? 'main front view' : 'angled 3/4 view showing details';
 
-      try {
+      // Try editing existing reference first (only for first image)
+      if (referenceUrl && imgIdx === 0) {
+        const editPrompt = `Create a professional e-commerce product photo based on this exact product.
+Requirements: Keep the SAME product shape/design/colors. Clean white background.
+Professional studio lighting, high resolution, sharp focus. Product centered large.
+Aspect ratio 3:4 portrait. Remove text/watermarks. Photorealistic marketplace quality.
+View: ${variation}`;
+        try {
+          const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              model: "google/gemini-3.1-flash-image-preview",
+              messages: [{ role: "user", content: [{ type: "text", text: editPrompt }, { type: "image_url", image_url: { url: referenceUrl } }] }],
+              modalities: ["image", "text"],
+            }),
+          });
+          if (resp.ok) {
+            const data = await resp.json();
+            imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url || null;
+          }
+        } catch (e) { console.warn(`[YandexImgGen] Edit #${imgIdx} failed:`, e); }
+      }
+
+      // Fallback: generate from scratch
+      if (!imageUrl) {
+        const prompt = `Generate a professional e-commerce product photo of "${productName}" (category: ${category}).
+Clean white background, product centered large, studio lighting, sharp focus, 3:4 portrait aspect ratio.
+No text, no watermarks, photorealistic commercial quality.
+View: ${variation}`;
         const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
           method: "POST",
           headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: "google/gemini-3.1-flash-image-preview",
-            messages: [{ role: "user", content: [{ type: "text", text: editPrompt }, { type: "image_url", image_url: { url: referenceUrl } }] }],
-            modalities: ["image", "text"],
-          }),
+          body: JSON.stringify({ model: "google/gemini-3.1-flash-image-preview", messages: [{ role: "user", content: prompt }], modalities: ["image", "text"] }),
         });
         if (resp.ok) {
           const data = await resp.json();
           imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url || null;
         }
-      } catch (e) { console.warn('[YandexImgGen] Edit failed, trying generate:', e); }
+      }
+
+      if (!imageUrl) { console.warn(`[YandexImgGen] Image #${imgIdx} generation failed`); continue; }
+
+      // Convert to bytes and upload
+      let bytes: Uint8Array;
+      if (imageUrl.startsWith('data:')) {
+        const base64Content = imageUrl.replace(/^data:image\/\w+;base64,/, '');
+        bytes = Uint8Array.from(atob(base64Content), c => c.charCodeAt(0));
+      } else {
+        const imgResp = await fetch(imageUrl);
+        if (!imgResp.ok) continue;
+        bytes = new Uint8Array(await imgResp.arrayBuffer());
+      }
+
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const storageClient = createClient(supabaseUrl, supabaseKey);
+      const fileName = `ai-audit/yandex/${offerId}-${Date.now()}-${imgIdx}.png`;
+      const { error: uploadErr } = await storageClient.storage
+        .from('product-images')
+        .upload(fileName, bytes, { contentType: 'image/png', upsert: true });
+      if (uploadErr) { console.error(`Storage upload error:`, uploadErr); continue; }
+
+      const { data: urlData } = storageClient.storage.from('product-images').getPublicUrl(fileName);
+      if (urlData?.publicUrl) generatedUrls.push(urlData.publicUrl);
+      
+      // Delay between generations
+      if (imgIdx < neededImages - 1) await sleep(2000);
     }
 
-    // Fallback: generate from scratch
-    if (!imageUrl) {
-      const prompt = `Generate a professional e-commerce product photo of "${productName}" (category: ${category}).
-Clean white background, product centered, large, studio lighting, sharp focus, 3:4 aspect ratio, no text, no watermarks, photorealistic.`;
+    if (generatedUrls.length === 0) return { success: false, message: 'Rasm generatsiya qilinmadi' };
 
-      const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "google/gemini-3.1-flash-image-preview", messages: [{ role: "user", content: prompt }], modalities: ["image", "text"] }),
-      });
-      if (!resp.ok) return { success: false, message: `Rasm generatsiya: ${resp.status}` };
-      const data = await resp.json();
-      imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url || null;
-    }
+    // Build final picture list: AI-generated first, then good existing (remove bad ones)
+    const finalPictures = [...generatedUrls, ...goodPics];
 
-    if (!imageUrl) return { success: false, message: 'Rasm generatsiya qilinmadi' };
-
-    // Convert to bytes
-    let bytes: Uint8Array;
-    if (imageUrl.startsWith('data:')) {
-      const base64Content = imageUrl.replace(/^data:image\/\w+;base64,/, '');
-      bytes = Uint8Array.from(atob(base64Content), c => c.charCodeAt(0));
-    } else {
-      const imgResp = await fetch(imageUrl);
-      if (!imgResp.ok) return { success: false, message: 'Rasm yuklab bo\'lmadi' };
-      bytes = new Uint8Array(await imgResp.arrayBuffer());
-    }
-
-    // Upload to storage
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const storageClient = createClient(supabaseUrl, supabaseKey);
-
-    const fileName = `ai-audit/yandex/${offerId}-${Date.now()}.png`;
-    const { error: uploadErr } = await storageClient.storage
-      .from('product-images')
-      .upload(fileName, bytes, { contentType: 'image/png', upsert: true });
-    if (uploadErr) return { success: false, message: `Storage: ${uploadErr.message}` };
-
-    const { data: urlData } = storageClient.storage.from('product-images').getPublicUrl(fileName);
-    const publicUrl = urlData?.publicUrl;
-    if (!publicUrl) return { success: false, message: 'Public URL olinmadi' };
-
-    // Fetch existing offer and prepend new image
+    // Fetch existing offer for update
     const headers = { "Api-Key": apiKey, "Content-Type": "application/json" };
     let existingOffer: any = {};
     try {
@@ -1543,10 +1556,9 @@ Clean white background, product centered, large, studio lighting, sharp focus, 3
         const getData = await getResp.json();
         existingOffer = getData.result?.offerMappings?.[0]?.offer || {};
       }
-    } catch (e) { console.warn('Could not fetch existing offer for image update:', e); }
+    } catch (e) { console.warn('Could not fetch existing offer:', e); }
 
-    const allPictures = [publicUrl, ...(existingOffer.pictures || existingPictures)];
-    const offerUpdate: any = { ...existingOffer, offerId, pictures: allPictures };
+    const offerUpdate: any = { ...existingOffer, offerId, pictures: finalPictures };
     delete offerUpdate.archived; delete offerUpdate.cardStatus; delete offerUpdate.mapping;
     delete offerUpdate.awaitingModerationMapping; delete offerUpdate.rejectedMapping;
 
@@ -1556,7 +1568,9 @@ Clean white background, product centered, large, studio lighting, sharp focus, 3
     );
     if (!updateResp.ok) return { success: false, message: 'Yandex rasm yuklash xatosi' };
 
-    return { success: true, message: `AI rasm yaratildi va Yandex-ga yuklandi (jami ${allPictures.length} ta)` };
+    const removedCount = badPics.length;
+    const removedInfo = removedCount > 0 ? `, ${removedCount} sifatsiz rasm olib tashlandi` : '';
+    return { success: true, message: `${generatedUrls.length} ta AI rasm yaratildi${removedInfo} (jami ${finalPictures.length} ta)` };
   } catch (e: any) {
     console.error('[YandexImgGen] Error:', e);
     return { success: false, message: e.message || 'Rasm xatosi' };
