@@ -368,6 +368,11 @@ export default function SellerCloudX() {
             <StatCard label="Jami daromad (so'm)" value={formatRevenue(totalRevenue)} highlight />
           </div>
 
+          {/* Upgrade trigger */}
+          <div className="px-4 lg:px-6 pt-3">
+            <UpgradeTrigger onNavigateToSubscription={() => handleTabChange('subscription')} />
+          </div>
+
           {/* Alerts */}
           {accessStatus && !accessStatus.is_active && (
             <div className="px-6 pt-4">
