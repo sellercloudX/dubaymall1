@@ -156,7 +156,6 @@ function PlanCard({ plan, features, onUpdate, onDelete }: {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
     name_uz: plan.name_uz || '',
-    onetime_price_uzs: plan.onetime_price_uzs,
     monthly_fee_uzs: plan.monthly_fee_uzs,
     max_stores_per_marketplace: plan.max_stores_per_marketplace,
     free_card_creation_monthly: plan.free_card_creation_monthly,
