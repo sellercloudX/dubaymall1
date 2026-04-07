@@ -90,6 +90,36 @@ serve(async (req) => {
       );
     }
 
+    // Billing check — AI Chat is now paid (3,000 UZS base)
+    const { data: billingCheck } = await adminSupabase.rpc('check_feature_access', {
+      p_user_id: user.id,
+      p_feature_key: 'ai-chat',
+    });
+
+    const bc = billingCheck as any;
+    if (bc && !bc.allowed) {
+      return new Response(
+        JSON.stringify({ 
+          error: bc.error === 'insufficient_balance' 
+            ? `Balans yetarli emas (${bc.balance?.toLocaleString() || 0} so'm). AI Chat narxi: ${bc.price?.toLocaleString() || 3000} so'm`
+            : bc.message || 'Ruxsat berilmadi',
+          billingError: bc.error,
+          success: false 
+        }),
+        { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Deduct balance for AI Chat
+    if (bc?.price > 0) {
+      await adminSupabase.rpc('deduct_balance', {
+        p_user_id: user.id,
+        p_amount: bc.price,
+        p_feature_key: 'ai-chat',
+        p_description: 'AI Chat xabari',
+      });
+    }
+
     // Log usage
     await adminSupabase.from('ai_usage_log').insert({
       user_id: user.id,
