@@ -1414,6 +1414,124 @@ async function handleWildberriesAudit(action: string, apiKey: string, offerId?: 
   }
 }
 
+// ===== YANDEX IMAGE GENERATION FOR AUDIT =====
+async function generateYandexAuditImage(
+  adminClient: any, apiKey: string, businessId: string, offerId: string,
+  productName: string, category: string, existingPictures: string[]
+): Promise<{ success: boolean; message: string }> {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) return { success: false, message: 'AI kalit sozlanmagan' };
+
+  try {
+    const referenceUrl = existingPictures.find(p => p && p.startsWith('http')) || null;
+    console.log(`[YandexImgGen] Product: "${productName}", ref: ${referenceUrl ? 'YES' : 'NO'}, existing: ${existingPictures.length}`);
+
+    let imageUrl: string | null = null;
+
+    // Try editing existing image first
+    if (referenceUrl) {
+      const editPrompt = `Create a professional e-commerce product photo based on this exact product.
+Requirements:
+- Keep the SAME product, same shape, same design, same colors
+- Clean white or light gradient background
+- Professional studio lighting, high resolution, sharp focus
+- Product centered, large, with negative space around edges
+- Aspect ratio 3:4, portrait orientation
+- Remove any existing text, watermarks, logos from background
+- Photorealistic commercial marketplace quality`;
+
+      try {
+        const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "google/gemini-3.1-flash-image-preview",
+            messages: [{ role: "user", content: [{ type: "text", text: editPrompt }, { type: "image_url", image_url: { url: referenceUrl } }] }],
+            modalities: ["image", "text"],
+          }),
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url || null;
+        }
+      } catch (e) { console.warn('[YandexImgGen] Edit failed, trying generate:', e); }
+    }
+
+    // Fallback: generate from scratch
+    if (!imageUrl) {
+      const prompt = `Generate a professional e-commerce product photo of "${productName}" (category: ${category}).
+Clean white background, product centered, large, studio lighting, sharp focus, 3:4 aspect ratio, no text, no watermarks, photorealistic.`;
+
+      const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "google/gemini-3.1-flash-image-preview", messages: [{ role: "user", content: prompt }], modalities: ["image", "text"] }),
+      });
+      if (!resp.ok) return { success: false, message: `Rasm generatsiya: ${resp.status}` };
+      const data = await resp.json();
+      imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url || null;
+    }
+
+    if (!imageUrl) return { success: false, message: 'Rasm generatsiya qilinmadi' };
+
+    // Convert to bytes
+    let bytes: Uint8Array;
+    if (imageUrl.startsWith('data:')) {
+      const base64Content = imageUrl.replace(/^data:image\/\w+;base64,/, '');
+      bytes = Uint8Array.from(atob(base64Content), c => c.charCodeAt(0));
+    } else {
+      const imgResp = await fetch(imageUrl);
+      if (!imgResp.ok) return { success: false, message: 'Rasm yuklab bo\'lmadi' };
+      bytes = new Uint8Array(await imgResp.arrayBuffer());
+    }
+
+    // Upload to storage
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const storageClient = createClient(supabaseUrl, supabaseKey);
+
+    const fileName = `ai-audit/yandex/${offerId}-${Date.now()}.png`;
+    const { error: uploadErr } = await storageClient.storage
+      .from('product-images')
+      .upload(fileName, bytes, { contentType: 'image/png', upsert: true });
+    if (uploadErr) return { success: false, message: `Storage: ${uploadErr.message}` };
+
+    const { data: urlData } = storageClient.storage.from('product-images').getPublicUrl(fileName);
+    const publicUrl = urlData?.publicUrl;
+    if (!publicUrl) return { success: false, message: 'Public URL olinmadi' };
+
+    // Fetch existing offer and prepend new image
+    const headers = { "Api-Key": apiKey, "Content-Type": "application/json" };
+    let existingOffer: any = {};
+    try {
+      const getResp = await fetchWithRetry(
+        `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-mappings`,
+        { method: 'POST', headers, body: JSON.stringify({ offerIds: [offerId] }) }
+      );
+      if (getResp.ok) {
+        const getData = await getResp.json();
+        existingOffer = getData.result?.offerMappings?.[0]?.offer || {};
+      }
+    } catch (e) { console.warn('Could not fetch existing offer for image update:', e); }
+
+    const allPictures = [publicUrl, ...(existingOffer.pictures || existingPictures)];
+    const offerUpdate: any = { ...existingOffer, offerId, pictures: allPictures };
+    delete offerUpdate.archived; delete offerUpdate.cardStatus; delete offerUpdate.mapping;
+    delete offerUpdate.awaitingModerationMapping; delete offerUpdate.rejectedMapping;
+
+    const updateResp = await fetchWithRetry(
+      `https://api.partner.market.yandex.ru/v2/businesses/${businessId}/offer-mappings/update`,
+      { method: 'POST', headers, body: JSON.stringify({ offerMappings: [{ offer: offerUpdate }] }) }
+    );
+    if (!updateResp.ok) return { success: false, message: 'Yandex rasm yuklash xatosi' };
+
+    return { success: true, message: `AI rasm yaratildi va Yandex-ga yuklandi (jami ${allPictures.length} ta)` };
+  } catch (e: any) {
+    console.error('[YandexImgGen] Error:', e);
+    return { success: false, message: e.message || 'Rasm xatosi' };
+  }
+}
+
 // ===== MAIN HANDLER =====
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
