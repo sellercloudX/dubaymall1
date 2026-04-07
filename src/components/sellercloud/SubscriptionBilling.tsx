@@ -584,15 +584,11 @@ export const SubscriptionBilling = forwardRef<HTMLDivElement, SubscriptionBillin
                   </thead>
                   <tbody className="divide-y divide-border">
                     <tr>
-                      <td className="py-2 pr-4 text-muted-foreground">Narx</td>
+                      <td className="py-2 pr-4 text-muted-foreground">Oylik narx</td>
                       {activePlans.map(p => (
-                        <td key={p.id} className="py-2 px-2 text-center font-bold">{(p.onetime_price_uzs / 1000).toFixed(0)}K</td>
-                      ))}
-                    </tr>
-                    <tr>
-                      <td className="py-2 pr-4 text-muted-foreground">Oylik</td>
-                      {activePlans.map(p => (
-                        <td key={p.id} className="py-2 px-2 text-center">{p.monthly_fee_uzs > 0 ? (p.monthly_fee_uzs / 1000).toFixed(0) + 'K' : '—'}</td>
+                        <td key={p.id} className="py-2 px-2 text-center font-bold">
+                          {p.monthly_fee_uzs > 0 ? (p.monthly_fee_uzs / 1000).toFixed(0) + 'K/oy' : 'Bepul'}
+                        </td>
                       ))}
                     </tr>
                     <tr>

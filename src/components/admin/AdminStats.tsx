@@ -21,7 +21,7 @@ export function AdminStats() {
       // MRR: use real plan prices from subscription_plans table (admin-managed)
       const planPriceMap = new Map<string, number>();
       (plansRes.data || []).forEach((p: any) => {
-        planPriceMap.set(p.slug, p.monthly_fee_uzs || p.onetime_price_uzs || 0);
+        planPriceMap.set(p.slug, p.monthly_fee_uzs || 0);
       });
       const mrr = activeSubs.reduce((sum, s) => {
         const slug = (s as any).plan_slug || (s as any).plan_type || '';
