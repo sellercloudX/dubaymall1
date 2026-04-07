@@ -360,7 +360,7 @@ export function TutorialVideos() {
                     </span>
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground">✅ Bir martalik to'lov — papka doimiy ochiq qoladi</p>
+                <p className="text-xs text-muted-foreground">✅ Balansdan to'lov — papka doimiy ochiq qoladi</p>
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
