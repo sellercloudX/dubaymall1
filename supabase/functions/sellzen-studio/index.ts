@@ -174,6 +174,19 @@ serve(async (req) => {
             });
           }
 
+          // Deduct balance for each successfully generated image
+          const successfulImages = data.images.length;
+          if (billingPrice > 0 && successfulImages > 0) {
+            for (let i = 0; i < successfulImages; i++) {
+              await supabase.rpc('deduct_balance', {
+                p_user_id: userId,
+                p_amount: billingPrice,
+                p_feature_key: 'sellzen-image-generate',
+                p_description: `SellZen rasm (${i + 1}/${successfulImages}): ${body.product_name?.substring(0, 40) || 'N/A'}`,
+              });
+            }
+          }
+
           await logUsage(supabase, userId, 'sellzen_studio', 'sellzen-v3');
 
           return new Response(JSON.stringify({ 
