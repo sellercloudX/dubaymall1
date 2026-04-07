@@ -114,7 +114,6 @@ export const DynamicPricing = React.forwardRef<HTMLElement, DynamicPricingProps>
         discount: 'AI chegirma',
         unlimited: 'Cheksiz',
         features: 'Imkoniyatlar',
-        trial: '1 kunlik bepul sinov',
         paidFeatures: 'Tarifga kiritilmagan xizmatlar balansdan foydalaniladi',
         includedCount: 'ta funksiya kiritilgan',
       },
