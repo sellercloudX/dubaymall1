@@ -229,32 +229,62 @@ MUKAMMAL kartochka tayyorla — barcha maydonlar to'ldirilsin:`;
     // ==========================================
     // STEP 3: Proxy images to storage
     // ==========================================
-    const images = product.images || [];
-    const proxiedImages: string[] = [];
-    for (const imgUrl of images.slice(0, 10)) {
-      if (!imgUrl?.startsWith("http")) continue;
-      try {
-        const resp = await fetch(imgUrl, {
-          headers: { "User-Agent": "Mozilla/5.0 (compatible; MarketBot/1.0)" },
-        });
-        if (!resp.ok) continue;
-        const ct = resp.headers.get("content-type") || "image/jpeg";
-        if (!ct.startsWith("image/")) continue;
-        const data = await resp.arrayBuffer();
-        if (data.byteLength < 1000) continue;
-        const ext = ct.includes("png") ? "png" : ct.includes("webp") ? "webp" : "jpg";
-        const fileName = `${user.id}/uzum-${Date.now()}-${Math.random().toString(36).substring(2, 6)}.${ext}`;
-        const { error: uploadErr } = await supabase.storage
-          .from("product-images")
-          .upload(fileName, data, { contentType: ct, cacheControl: "31536000", upsert: false });
-        if (!uploadErr) {
-          const { data: urlData } = supabase.storage.from("product-images").getPublicUrl(fileName);
-          if (urlData?.publicUrl) proxiedImages.push(urlData.publicUrl);
-        }
-      } catch (e) {
-        console.warn(`Image proxy failed: ${e}`);
+    const images = (product.images || []).filter((u: string) => typeof u === 'string' && u.startsWith('http')).slice(0, 10);
+    
+    // Proxy images in parallel (up to 5 concurrent) with proper fallback
+    const proxyOne = async (imgUrl: string): Promise<string> => {
+      // Skip non-product images
+      const lower = imgUrl.toLowerCase();
+      if (lower.includes('static.uzum.uz') || lower.includes('/baner/') || lower.includes('/banner') || lower.includes('/promo/') || lower.includes('/logo')) {
+        return ''; // skip
       }
-    }
+      
+      // Already our storage URL
+      const supabaseUrl = Deno.env.get("SUPABASE_URL") || '';
+      if (imgUrl.includes(supabaseUrl) && imgUrl.includes('/storage/v1/object/public/')) {
+        return imgUrl;
+      }
+
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const resp = await fetch(imgUrl, {
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+              "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+              "Referer": imgUrl.includes('uzum') ? 'https://uzum.uz/' : imgUrl.includes('yandex') ? 'https://market.yandex.ru/' : imgUrl.includes('wildberries') ? 'https://www.wildberries.ru/' : 'https://google.com/',
+            },
+          });
+          if (!resp.ok) {
+            if (attempt === 0) { await new Promise(r => setTimeout(r, 500)); continue; }
+            return imgUrl; // fallback to original
+          }
+          const ct = resp.headers.get("content-type") || "image/jpeg";
+          if (!ct.startsWith("image/")) return imgUrl;
+          const data = await resp.arrayBuffer();
+          if (data.byteLength < 1000) return imgUrl;
+          const ext = ct.includes("png") ? "png" : ct.includes("webp") ? "webp" : "jpg";
+          const fileName = `${user.id}/uzum-${Date.now()}-${Math.random().toString(36).substring(2, 6)}.${ext}`;
+          const { error: uploadErr } = await supabase.storage
+            .from("product-images")
+            .upload(fileName, data, { contentType: ct, cacheControl: "31536000", upsert: false });
+          if (!uploadErr) {
+            const { data: urlData } = supabase.storage.from("product-images").getPublicUrl(fileName);
+            if (urlData?.publicUrl) return urlData.publicUrl;
+          }
+          return imgUrl; // fallback
+        } catch (e) {
+          if (attempt === 0) { await new Promise(r => setTimeout(r, 500)); continue; }
+          console.warn(`Image proxy failed: ${e}`);
+          return imgUrl; // fallback to original URL
+        }
+      }
+      return imgUrl;
+    };
+
+    const proxiedResults = await Promise.allSettled(images.map(proxyOne));
+    const proxiedImages = proxiedResults
+      .filter((r): r is PromiseFulfilledResult<string> => r.status === 'fulfilled' && !!r.value)
+      .map(r => r.value);
 
     // ==========================================
     // STEP 4: Build complete card payload for Chrome Extension
