@@ -1507,9 +1507,10 @@ serve(async (req) => {
         const targetId = offerId || body.offerId;
         if (!targetId) throw new Error("offerId kerak");
 
-        const maxRetries = 2;
+        const maxRetries = 3;
         let lastResult: any = null;
         let totalFixes: string[] = [];
+        let finalScore: number | undefined;
 
         for (let round = 0; round < maxRetries; round++) {
           console.log(`=== Fix round ${round + 1} for ${targetId} ===`);
@@ -1524,12 +1525,14 @@ serve(async (req) => {
                 message: totalFixes.length > 0 
                   ? `✅ Kartochka tuzatildi (${round} bosqich)\n${totalFixes.join('\n')}`
                   : "Bu kartochkada xatolik topilmadi ✅", 
-                applied: totalFixes.length > 0 
+                applied: totalFixes.length > 0,
+                newScore: finalScore,
               },
             }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
           }
 
           const issue = issues[0];
+          finalScore = issue.qualityScore;
           if (issue.qualityScore >= 90 && round > 0) { console.log(`Score >= 90, stopping.`); break; }
 
           // Detect category mismatch for this specific issue
@@ -1565,13 +1568,57 @@ serve(async (req) => {
           lastResult = { ...result, issue: { ...issue, currentData: undefined }, fixes: aiResult };
           totalFixes.push(`Bosqich ${round + 1}: ${result.message}`);
 
+          // === IMAGE GENERATION for Yandex ===
+          const currentPictures = issue.currentData?.pictures || [];
+          const hasImageIssue = issue.issues.some(i => i.field === 'pictures');
+          if ((currentPictures.length < 3 || hasImageIssue) && round === 0) {
+            console.log(`[ImageGen] Generating image for ${targetId} (current: ${currentPictures.length} pics)`);
+            try {
+              const imgResult = await generateYandexAuditImage(
+                supabase, apiKey, businessId, targetId,
+                issue.productName, issue.category || '', currentPictures
+              );
+              if (imgResult.success) {
+                totalFixes.push(`✅ ${imgResult.message}`);
+              } else {
+                totalFixes.push(`⚠️ Rasm: ${imgResult.message}`);
+              }
+            } catch (imgErr: any) {
+              console.error('[ImageGen] Error:', imgErr);
+              totalFixes.push(`⚠️ Rasm generatsiya xatosi`);
+            }
+          }
+
           if (round < maxRetries - 1 && issue.qualityScore < 90) {
             await sleep(3000);
           } else { break; }
         }
 
+        // === FINAL VERIFICATION ===
+        let verificationScore: number | undefined;
+        try {
+          await sleep(5000); // Wait for Yandex to process
+          const verifyQuality = await fetchCardQuality(apiKey, businessId, [targetId]);
+          const verifyCard = verifyQuality.get(targetId);
+          if (verifyCard?.contentRating?.rating != null) {
+            verificationScore = Math.round(verifyCard.contentRating.rating);
+            totalFixes.push(`\n📊 Yangi sifat balli: ${verificationScore}%`);
+            const remainingErrors = verifyCard.errors?.length || 0;
+            const remainingWarnings = verifyCard.warnings?.length || 0;
+            if (remainingErrors > 0) {
+              totalFixes.push(`⚠️ Qolgan xatoliklar: ${remainingErrors}, ogohlantirishlar: ${remainingWarnings}`);
+            }
+          }
+        } catch (vErr) {
+          console.warn('Verification check failed:', vErr);
+        }
+
         return new Response(JSON.stringify({
-          success: true, data: { ...lastResult, message: totalFixes.join('\n') },
+          success: true, data: { 
+            ...lastResult, 
+            message: totalFixes.join('\n'),
+            newScore: verificationScore || finalScore,
+          },
         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
