@@ -607,13 +607,10 @@ export function SellerCloudManagement() {
               const plan = activePlans.find(p => p.slug === editPlanType);
               if (!plan) return null;
               return (
-                <div className="bg-muted p-3 rounded-lg text-sm space-y-1">
-                  <p>Bir martalik: <strong>{formatPrice(plan.onetime_price_uzs)}</strong></p>
-                  <p>Oylik: <strong>{formatPrice(plan.monthly_fee_uzs)}</strong></p>
-                  <p>Chegirma: <strong>{plan.balance_discount_percent}%</strong></p>
-                  <p>Bepul karta: <strong>{plan.free_card_creation_monthly}/oy</strong></p>
-                  <p>Bepul klon: <strong>{plan.free_cloning_monthly}/oy</strong></p>
-                </div>
+                 <div className="bg-muted p-3 rounded-lg text-sm space-y-1">
+                   <p>Oylik: <strong>{formatPrice(plan.monthly_fee_uzs)}/oy</strong></p>
+                   <p>AI chegirma: <strong>{plan.balance_discount_percent}%</strong></p>
+                 </div>
               );
             })()}
           </div>
