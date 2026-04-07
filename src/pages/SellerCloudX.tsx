@@ -356,7 +356,7 @@ export default function SellerCloudX() {
                   <span className="hidden lg:inline">Yangilash</span>
                 </Button>
               )}
-              <Badge variant="secondary" className="text-xs">Pro</Badge>
+              <Badge variant="secondary" className="text-xs">{currentPlanName}</Badge>
             </div>
           </header>
 
