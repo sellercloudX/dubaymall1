@@ -404,7 +404,7 @@ const T = {
     step3: 'Manage Profits',
     step3d: 'Analytics, orders, and pricing in one unified panel',
     pricingTitle: 'Simple, Transparent Pricing',
-    pricingDesc: 'No hidden fees. 1-day free trial.',
+    pricingDesc: 'No hidden fees. Free plan available.',
     perMonth: '/mo',
     guarantee: '60-day guarantee',
     startPro: 'Get Started',
