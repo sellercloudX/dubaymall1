@@ -364,6 +364,16 @@ Only confident matches. Empty array if none.`;
       console.log(`Inserted ${insertEntries.length} cost prices for ${targetMarketplace}`);
     }
 
+    // Deduct balance after successful matching
+    if (billingPrice > 0 && newMatches.length > 0) {
+      await supabase.rpc('deduct_balance', {
+        p_user_id: user.id,
+        p_amount: billingPrice,
+        p_feature_key: 'ai-product-matching',
+        p_description: `AI tannarx moslashtirish: ${newMatches.length} ta mahsulot (${targetMarketplace} ← ${sourceMarketplace})`,
+      });
+    }
+
     return new Response(JSON.stringify({
       matches: newMatches.length,
       total_target: targetProducts.length,
