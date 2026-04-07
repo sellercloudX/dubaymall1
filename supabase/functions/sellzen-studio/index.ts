@@ -78,6 +78,24 @@ serve(async (req) => {
       });
     }
 
+    // ═══ BILLING: check_feature_access + deduct_balance ═══
+    const { data: billingAccess } = await supabase.rpc('check_feature_access', {
+      p_user_id: userId,
+      p_feature_key: 'sellzen-image-generate',
+    });
+    const ba = billingAccess as any;
+    if (ba && !ba.allowed) {
+      return new Response(JSON.stringify({ 
+        error: ba.message || 'Ruxsat berilmadi',
+        billingError: ba.error,
+        price: ba.price,
+        balance: ba.balance,
+      }), {
+        status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const billingPrice = ba?.price || 0;
+
     const { action, imageBase64, productName, productDescription, category, marketplace, style, variants } = await req.json();
 
     if (action === "generate_images") {
@@ -154,6 +172,19 @@ serve(async (req) => {
                 error: err.error,
               });
             });
+          }
+
+          // Deduct balance for each successfully generated image
+          const successfulImages = data.images.length;
+          if (billingPrice > 0 && successfulImages > 0) {
+            for (let i = 0; i < successfulImages; i++) {
+              await supabase.rpc('deduct_balance', {
+                p_user_id: userId,
+                p_amount: billingPrice,
+                p_feature_key: 'sellzen-image-generate',
+                p_description: `SellZen rasm (${i + 1}/${successfulImages}): ${body.product_name?.substring(0, 40) || 'N/A'}`,
+              });
+            }
           }
 
           await logUsage(supabase, userId, 'sellzen_studio', 'sellzen-v3');

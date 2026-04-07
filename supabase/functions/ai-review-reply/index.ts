@@ -39,6 +39,24 @@ serve(async (req) => {
       });
     }
 
+    // ═══ BILLING: check_feature_access + deduct_balance ═══
+    const { data: billingAccess } = await supabase.rpc('check_feature_access', {
+      p_user_id: user.id,
+      p_feature_key: 'ai-review-reply',
+    });
+    const ba = billingAccess as any;
+    if (ba && !ba.allowed) {
+      return new Response(JSON.stringify({ 
+        error: ba.message || 'Ruxsat berilmadi',
+        billingError: ba.error,
+        price: ba.price,
+        balance: ba.balance,
+      }), {
+        status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const billingPrice = ba?.price || 0;
+
     const cleanReview = String(reviewText).slice(0, 2000);
     const cleanUser = String(userName || "").slice(0, 100);
     const toneStyle = tone === "formal" ? "rasmiy va professional" : tone === "friendly" ? "samimiy va do'stona" : "qisqa va aniq";
@@ -215,6 +233,16 @@ JAVOB:`;
     if (!reply) {
       return new Response(JSON.stringify({ error: "AI returned empty response" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Deduct balance
+    if (billingPrice > 0) {
+      await supabase.rpc('deduct_balance', {
+        p_user_id: user.id,
+        p_amount: billingPrice,
+        p_feature_key: 'ai-review-reply',
+        p_description: `AI sharh javob: ${cleanReview.substring(0, 40)}...`,
       });
     }
 
