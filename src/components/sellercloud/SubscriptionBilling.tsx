@@ -247,7 +247,7 @@ export const SubscriptionBilling = forwardRef<HTMLDivElement, SubscriptionBillin
 
     const payBody = {
       user_id: user?.id, plan_type: selectedPlanForTerms.slug,
-      amount_uzs: selectedPlanForTerms.onetime_price_uzs || selectedPlanForTerms.monthly_fee_uzs,
+      amount_uzs: selectedPlanForTerms.monthly_fee_uzs,
       return_url: window.location.origin + '/seller-cloud?tab=subscription',
     };
 
