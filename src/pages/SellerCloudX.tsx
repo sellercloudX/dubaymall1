@@ -26,6 +26,8 @@ import { PlanSelector } from '@/components/sellercloud/PlanSelector';
 import { OnboardingWizard } from '@/components/sellercloud/OnboardingWizard';
 import { SellerCloudSidebar, sellerMenuItems } from '@/components/sellercloud/SellerCloudSidebar';
 import { FeatureGate } from '@/components/sellercloud/FeatureGate';
+import { UpgradeTrigger } from '@/components/sellercloud/UpgradeTrigger';
+import { useSubscriptionPlans } from '@/hooks/useSubscriptionPlans';
 import { useMarketplaceRealtime } from '@/hooks/useMarketplaceRealtime';
 
 
@@ -141,10 +143,17 @@ export default function SellerCloudX() {
     createSubscription,
   } = useSellerCloudSubscription();
   
+  const { data: allPlans } = useSubscriptionPlans();
   const connectedMarketplaces = useMemo(() => connections.map(c => c.marketplace), [connections]);
   const store = useMarketplaceDataStore(connectedMarketplaces);
   useAutoNotifications(connectedMarketplaces, store);
   useMarketplaceRealtime(connectedMarketplaces);
+
+  const currentPlanName = useMemo(() => {
+    if (!subscription || !allPlans) return 'Free';
+    const plan = allPlans.find(p => p.slug === subscription.plan_type);
+    return plan?.name || 'Free';
+  }, [subscription, allPlans]);
   
   const totalRevenue = useMemo(() => {
     if (store.allOrders.length === 0) return connections.reduce((sum, c) => sum + (c.total_revenue || 0), 0);
@@ -347,7 +356,7 @@ export default function SellerCloudX() {
                   <span className="hidden lg:inline">Yangilash</span>
                 </Button>
               )}
-              <Badge variant="secondary" className="text-xs">Pro</Badge>
+              <Badge variant="secondary" className="text-xs">{currentPlanName}</Badge>
             </div>
           </header>
 
@@ -357,6 +366,11 @@ export default function SellerCloudX() {
             <StatCard label="Jami mahsulotlar" value={store.totalProducts} />
             <StatCard label="Jami buyurtmalar" value={store.totalOrders} />
             <StatCard label="Jami daromad (so'm)" value={formatRevenue(totalRevenue)} highlight />
+          </div>
+
+          {/* Upgrade trigger */}
+          <div className="px-4 lg:px-6 pt-3">
+            <UpgradeTrigger onNavigateToSubscription={() => handleTabChange('subscription')} />
           </div>
 
           {/* Alerts */}
