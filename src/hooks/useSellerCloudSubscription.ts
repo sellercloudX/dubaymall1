@@ -9,8 +9,6 @@ interface SellerCloudSubscription {
   plan_type: string;
   monthly_fee: number;
   is_active: boolean;
-  is_trial: boolean;
-  trial_ends_at: string | null;
   started_at: string;
   expires_at: string | null;
   admin_override: boolean;
