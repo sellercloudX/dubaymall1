@@ -170,12 +170,12 @@ function DynamicPlanCard({ plan, isCurrentPlan, onSelect, isProcessing }: {
       </div>
 
       <div>
-        <p className="text-2xl font-bold">{formatPrice(plan.onetime_price_uzs)}</p>
-        <p className="text-xs text-muted-foreground">
-          {plan.monthly_fee_uzs > 0
-            ? `Bir martalik + ${formatPrice(plan.monthly_fee_uzs)}/oy`
-            : 'Bir martalik to\'lov'}
+        <p className="text-2xl font-bold">
+          {plan.monthly_fee_uzs > 0 ? formatPrice(plan.monthly_fee_uzs) : 'Bepul'}
         </p>
+        {plan.monthly_fee_uzs > 0 && (
+          <p className="text-xs text-muted-foreground">oylik to'lov</p>
+        )}
       </div>
 
       <ul className="space-y-1.5 text-xs text-muted-foreground">
