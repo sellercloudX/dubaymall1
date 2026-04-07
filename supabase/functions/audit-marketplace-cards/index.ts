@@ -418,19 +418,30 @@ function analyzeOffers(
       });
     }
 
-    // === Images check ===
-    const totalImages = (offer.pictures?.length || 0) + (offer.urls?.length || 0);
+    // === Images check (with quality detection) ===
+    const allPics = [...(offer.pictures || []), ...(offer.urls || [])];
+    const totalImages = allPics.length;
+    const lowQualityPics = allPics.filter(url => detectLowQualityImage(url));
+    const goodImages = totalImages - lowQualityPics.length;
+
     if (totalImages === 0) {
       issues.push({
         type: 'missing_content', severity: 'error', field: 'pictures',
         message: 'Rasmlar mavjud emas', currentValue: '0 ta',
-        suggestedFix: 'Kamida 3 ta sifatli rasm qo\'shish',
+        suggestedFix: 'AI yordamida 2 ta sifatli rasm yaratish',
       });
-    } else if (totalImages < 3) {
+    } else if (lowQualityPics.length > 0) {
+      issues.push({
+        type: 'low_quality_image', severity: 'error', field: 'pictures',
+        message: `${lowQualityPics.length} ta sifatsiz/kameradan olingan rasm aniqlandi`,
+        currentValue: `${totalImages} ta rasm (${lowQualityPics.length} sifatsiz)`,
+        suggestedFix: 'Sifatsiz rasmlarni AI professional rasmlar bilan almashtirish',
+      });
+    } else if (totalImages < 2) {
       issues.push({
         type: 'low_quality', severity: 'warning', field: 'pictures',
-        message: `Faqat ${totalImages} ta rasm (3+ tavsiya)`, currentValue: `${totalImages} ta`,
-        suggestedFix: 'Qo\'shimcha rasmlar qo\'shish',
+        message: `Faqat ${totalImages} ta rasm (2+ tavsiya)`, currentValue: `${totalImages} ta`,
+        suggestedFix: 'Qo\'shimcha rasm qo\'shish',
       });
     }
 
