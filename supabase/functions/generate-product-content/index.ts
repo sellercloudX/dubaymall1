@@ -71,6 +71,24 @@ serve(async (req) => {
       user_id: user.id, action_type: 'generate-product-content', model_used: 'claude/gemini',
     });
 
+    // ═══ BILLING: check_feature_access + deduct_balance ═══
+    const { data: billingAccess } = await adminSupabase.rpc('check_feature_access', {
+      p_user_id: user.id,
+      p_feature_key: 'generate-product-content',
+    });
+    const ba = billingAccess as any;
+    if (ba && !ba.allowed) {
+      return new Response(JSON.stringify({ 
+        error: ba.message || 'Ruxsat berilmadi',
+        billingError: ba.error,
+        price: ba.price,
+        balance: ba.balance,
+      }), {
+        status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const billingPrice = ba?.price || 0;
+
     const request: ContentRequest = await req.json();
     
     // Input validation

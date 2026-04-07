@@ -82,6 +82,24 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'No products provided' }), { status: 400, headers: corsHeaders });
     }
 
+    // ═══ BILLING: check_feature_access + deduct_balance ═══
+    const { data: billingAccess } = await supabase.rpc('check_feature_access', {
+      p_user_id: user.id,
+      p_feature_key: 'ai-product-matching',
+    });
+    const ba = billingAccess as any;
+    if (ba && !ba.allowed) {
+      return new Response(JSON.stringify({ 
+        error: ba.message || 'Ruxsat berilmadi',
+        billingError: ba.error,
+        price: ba.price,
+        balance: ba.balance,
+      }), {
+        status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const billingPrice = ba?.price || 0;
+
     // Get ALL cost prices for this user from ALL marketplaces (source will be filtered)
     const { data: costPrices } = await supabase
       .from('marketplace_cost_prices')
