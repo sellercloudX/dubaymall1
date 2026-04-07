@@ -8,7 +8,9 @@ import { Check, Zap, Briefcase, Crown, Building, Store, Image, Copy, Percent } f
 import { cn } from '@/lib/utils';
 
 const iconMap: Record<string, React.ElementType> = {
-  zap: Zap, briefcase: Briefcase, crown: Crown, building: Building, star: Crown,
+  Zap: Zap, zap: Zap, Briefcase: Briefcase, briefcase: Briefcase, 
+  Crown: Crown, crown: Crown, Building: Building, building: Building, 
+  star: Crown, Package: Store, TrendingUp: Zap,
 };
 
 interface PlanSelectorProps {
