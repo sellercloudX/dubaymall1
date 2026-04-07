@@ -26,6 +26,8 @@ import { PlanSelector } from '@/components/sellercloud/PlanSelector';
 import { OnboardingWizard } from '@/components/sellercloud/OnboardingWizard';
 import { SellerCloudSidebar, sellerMenuItems } from '@/components/sellercloud/SellerCloudSidebar';
 import { FeatureGate } from '@/components/sellercloud/FeatureGate';
+import { UpgradeTrigger } from '@/components/sellercloud/UpgradeTrigger';
+import { useSubscriptionPlans } from '@/hooks/useSubscriptionPlans';
 import { useMarketplaceRealtime } from '@/hooks/useMarketplaceRealtime';
 
 
