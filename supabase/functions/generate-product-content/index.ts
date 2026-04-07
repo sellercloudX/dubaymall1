@@ -89,6 +89,16 @@ serve(async (req) => {
     }
     const billingPrice = ba?.price || 0;
 
+    // Deduct upfront (content generation has multiple return paths)
+    if (billingPrice > 0) {
+      await adminSupabase.rpc('deduct_balance', {
+        p_user_id: user.id,
+        p_amount: billingPrice,
+        p_feature_key: 'generate-product-content',
+        p_description: 'AI kontent yaratish',
+      });
+    }
+
     const request: ContentRequest = await req.json();
     
     // Input validation

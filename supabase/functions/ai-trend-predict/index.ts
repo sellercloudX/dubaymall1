@@ -109,6 +109,25 @@ serve(async (req) => {
       });
     }
 
+    // ═══ BILLING: check_feature_access + deduct_balance ═══
+    const adminSupabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const { data: billingAccess } = await adminSupabase.rpc('check_feature_access', {
+      p_user_id: user.id,
+      p_feature_key: 'ai-trend-predict',
+    });
+    const ba = billingAccess as any;
+    if (ba && !ba.allowed) {
+      return new Response(JSON.stringify({ 
+        error: ba.message || 'Ruxsat berilmadi',
+        billingError: ba.error,
+        price: ba.price,
+        balance: ba.balance,
+      }), {
+        status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const billingPrice = ba?.price || 0;
+
     const { category, period = 14 } = await req.json();
     const cat = category || "all";
 
