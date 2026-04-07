@@ -223,8 +223,7 @@ function PlanCard({ plan, features, onUpdate, onDelete }: {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="flex items-center gap-1.5 text-muted-foreground"><DollarSign className="h-3 w-3" /><span>{plan.onetime_price_uzs.toLocaleString()} so'm</span></div>
-            {plan.monthly_fee_uzs > 0 && <div className="flex items-center gap-1.5 text-muted-foreground"><Wallet className="h-3 w-3" /><span>+{plan.monthly_fee_uzs.toLocaleString()}/oy</span></div>}
+            <div className="flex items-center gap-1.5 text-muted-foreground"><Wallet className="h-3 w-3" /><span>{plan.monthly_fee_uzs > 0 ? plan.monthly_fee_uzs.toLocaleString() + ' so\'m/oy' : 'Bepul'}</span></div>
             <div className="flex items-center gap-1.5 text-muted-foreground"><Store className="h-3 w-3" /><span>{plan.max_stores_per_marketplace >= 999 ? '∞' : plan.max_stores_per_marketplace} do'kon/MP</span></div>
             <div className="flex items-center gap-1.5 text-muted-foreground"><Image className="h-3 w-3" /><span>{plan.free_card_creation_monthly} kartochka/oy</span></div>
             <div className="flex items-center gap-1.5 text-muted-foreground"><Copy className="h-3 w-3" /><span>{plan.free_cloning_monthly} klon/oy</span></div>
