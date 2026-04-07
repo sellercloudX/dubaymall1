@@ -149,13 +149,15 @@ export function CardQualityAudit({ connectedMarketplaces, store }: CardQualityAu
 
       const msg = data.data.message || 'Tuzatildi ✅';
       const details = data.data.details || '';
+      const newScore = data.data.newScore;
+      const scoreInfo = newScore ? ` (yangi ball: ${newScore}%)` : '';
       setFixResults(prev => new Map(prev).set(offerId, {
         offerId, status: data.data.success === false ? 'error' : 'success',
-        message: details ? `${msg}\n${details}` : msg,
+        message: details ? `${msg}\n${details}${scoreInfo}` : `${msg}${scoreInfo}`,
         fixes: data.data.fixes,
       }));
       if (data.data.success !== false) {
-        toast.success(`${offerId} kartochkasi tuzatildi`);
+        toast.success(`${offerId} tuzatildi${scoreInfo}`);
       } else {
         toast.warning(`${offerId}: qisman tuzatildi`);
       }
