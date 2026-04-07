@@ -143,10 +143,17 @@ export default function SellerCloudX() {
     createSubscription,
   } = useSellerCloudSubscription();
   
+  const { data: allPlans } = useSubscriptionPlans();
   const connectedMarketplaces = useMemo(() => connections.map(c => c.marketplace), [connections]);
   const store = useMarketplaceDataStore(connectedMarketplaces);
   useAutoNotifications(connectedMarketplaces, store);
   useMarketplaceRealtime(connectedMarketplaces);
+
+  const currentPlanName = useMemo(() => {
+    if (!subscription || !allPlans) return 'Free';
+    const plan = allPlans.find(p => p.slug === subscription.plan_type);
+    return plan?.name || 'Free';
+  }, [subscription, allPlans]);
   
   const totalRevenue = useMemo(() => {
     if (store.allOrders.length === 0) return connections.reduce((sum, c) => sum + (c.total_revenue || 0), 0);
