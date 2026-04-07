@@ -14,7 +14,7 @@ export function AdminStats() {
         supabase.from('sellercloud_subscriptions').select('id, is_active, monthly_fee, plan_type, plan_slug'),
         supabase.from('ai_usage_log').select('estimated_cost_usd'),
         supabase.from('platform_revenue').select('amount').gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()),
-        supabase.from('subscription_plans').select('slug, onetime_price_uzs, monthly_fee_uzs'),
+        supabase.from('subscription_plans').select('slug, monthly_fee_uzs'),
       ]);
 
       const activeSubs = subsRes.data?.filter(s => s.is_active) || [];
