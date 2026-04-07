@@ -415,7 +415,7 @@ function AdminBalanceTopup({ allBalances }: { allBalances: any[] }) {
 function NewPlanDialog({ onCreated }: { onCreated: () => void }) {
   const { createPlan } = useAdminSubscriptionPlans();
   const [form, setForm] = useState({
-    slug: '', name: '', name_uz: '', onetime_price_uzs: 0, monthly_fee_uzs: 0,
+    slug: '', name: '', name_uz: '', monthly_fee_uzs: 0,
     max_stores_per_marketplace: 1, free_card_creation_monthly: 0, free_cloning_monthly: 0, balance_discount_percent: 0,
   });
 
