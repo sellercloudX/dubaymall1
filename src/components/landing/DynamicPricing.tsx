@@ -146,7 +146,6 @@ export const DynamicPricing = React.forwardRef<HTMLElement, DynamicPricingProps>
         discount: 'AI discount',
         unlimited: 'Unlimited',
         features: 'Features',
-        trial: '1-day free trial',
         paidFeatures: 'Features outside plan are pay-per-use from balance',
         includedCount: 'features included',
       },
