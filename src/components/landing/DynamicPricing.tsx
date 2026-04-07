@@ -130,7 +130,6 @@ export const DynamicPricing = React.forwardRef<HTMLElement, DynamicPricingProps>
         discount: 'AI скидка',
         unlimited: 'Безлимит',
         features: 'Возможности',
-        trial: '1 день бесплатно',
         paidFeatures: 'Функции вне тарифа — оплата с баланса',
         includedCount: 'функций включено',
       },
