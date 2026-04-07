@@ -256,7 +256,7 @@ export const SubscriptionBilling = forwardRef<HTMLDivElement, SubscriptionBillin
       if (result.success) {
         setShowTermsDialog(false);
         toast.success('Tabriklaymiz! Akkauntingiz faollashtirildi.');
-        if (selectedPlanForTerms.onetime_price_uzs > 0 && user?.id) {
+        if (selectedPlanForTerms.monthly_fee_uzs > 0 && user?.id) {
           try {
             const data = await invokePayment(paymentMethod, 'prepare', payBody);
             if (paymentMethod === 'payme') {
