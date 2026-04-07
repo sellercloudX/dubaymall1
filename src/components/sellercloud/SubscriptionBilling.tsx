@@ -308,11 +308,10 @@ export const SubscriptionBilling = forwardRef<HTMLDivElement, SubscriptionBillin
                 <Badge style={{ backgroundColor: (selectedPlanForTerms.color || '#3b82f6') + '15', color: selectedPlanForTerms.color || '#3b82f6' }}>
                   {selectedPlanForTerms.name_uz || selectedPlanForTerms.name}
                 </Badge>
-                <span className="font-bold">{formatPrice(selectedPlanForTerms.onetime_price_uzs)}</span>
+                <span className="font-bold">
+                  {selectedPlanForTerms.monthly_fee_uzs > 0 ? `${formatPrice(selectedPlanForTerms.monthly_fee_uzs)}/oy` : 'Bepul'}
+                </span>
               </div>
-              {selectedPlanForTerms.monthly_fee_uzs > 0 && (
-                <p className="text-xs text-muted-foreground">+ {formatPrice(selectedPlanForTerms.monthly_fee_uzs)} oylik to'lov</p>
-              )}
             </div>
           )}
           <div className="bg-muted p-4 rounded-lg max-h-60 overflow-y-auto text-sm space-y-2">
