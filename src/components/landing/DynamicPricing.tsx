@@ -269,14 +269,6 @@ export const DynamicPricing = React.forwardRef<HTMLElement, DynamicPricingProps>
                           <Store className="h-3 w-3 shrink-0 text-primary" />
                           <span>{plan.max_stores_per_marketplace >= 999 ? txt.unlimited : plan.max_stores_per_marketplace} {txt.stores}</span>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <Image className="h-3 w-3 shrink-0 text-primary" />
-                          <span>{plan.free_card_creation_monthly || 0} {txt.cards}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Copy className="h-3 w-3 shrink-0 text-primary" />
-                          <span>{plan.free_cloning_monthly || 0} {txt.clones}</span>
-                        </div>
                         {plan.balance_discount_percent > 0 && (
                           <div className="flex items-center gap-1">
                             <Percent className="h-3 w-3 shrink-0 text-primary" />

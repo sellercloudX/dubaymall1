@@ -641,7 +641,7 @@ export function SellerCloudManagement() {
                 {(() => {
                   const slug = activatingSub.plan_slug || activatingSub.plan_type || 'starter';
                   const plan = allPlans?.find((p: any) => p.slug === slug);
-                  return plan ? <p>Narx: <strong>{formatPrice(plan.onetime_price_uzs)} (bir martalik) + {formatPrice(plan.monthly_fee_uzs)}/oy</strong></p> : null;
+                  return plan ? <p>Narx: <strong>{formatPrice(plan.monthly_fee_uzs)}/oy</strong> ({plan.balance_discount_percent}% AI chegirma)</p> : null;
                 })()}
               </div>
             )}
