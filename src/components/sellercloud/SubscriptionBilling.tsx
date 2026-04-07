@@ -318,8 +318,7 @@ export const SubscriptionBilling = forwardRef<HTMLDivElement, SubscriptionBillin
             <p className="font-medium">SellerCloudX xizmat shartlari:</p>
             <ul className="list-disc pl-4 space-y-1">
               <li>Tanlangan tarif: <strong>{selectedPlanForTerms?.name_uz || selectedPlanForTerms?.name}</strong></li>
-              <li>Bir martalik to'lov: {formatPrice(selectedPlanForTerms?.onetime_price_uzs || 0)}</li>
-              {(selectedPlanForTerms?.monthly_fee_uzs || 0) > 0 && <li>Oylik to'lov: {formatPrice(selectedPlanForTerms!.monthly_fee_uzs)}</li>}
+              <li>Oylik to'lov: {formatPrice(selectedPlanForTerms?.monthly_fee_uzs || 0)}</li>
               <li>Do'kon limiti: {(selectedPlanForTerms?.max_stores_per_marketplace || 1) >= 999 ? 'Cheksiz' : selectedPlanForTerms?.max_stores_per_marketplace} / marketplace</li>
               <li>AI xizmatlar — balans orqali ({selectedPlanForTerms?.balance_discount_percent || 0}% chegirma)</li>
               <li>Balansni to'ldirish: kamida {MIN_TOPUP_UZS.toLocaleString()} so'm</li>
