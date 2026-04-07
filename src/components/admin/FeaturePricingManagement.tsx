@@ -214,7 +214,6 @@ function PlanCard({ plan, features, onUpdate, onDelete }: {
         {editing ? (
           <div className="grid grid-cols-2 gap-3">
             <div><Label className="text-[10px]">Nomi (UZ)</Label><Input value={form.name_uz} onChange={e => setForm({ ...form, name_uz: e.target.value })} className="h-8 text-xs" /></div>
-            <div><Label className="text-[10px]">Bir martalik narx</Label><Input type="number" value={form.onetime_price_uzs} onChange={e => setForm({ ...form, onetime_price_uzs: +e.target.value })} className="h-8 text-xs" /></div>
             <div><Label className="text-[10px]">Oylik to'lov</Label><Input type="number" value={form.monthly_fee_uzs} onChange={e => setForm({ ...form, monthly_fee_uzs: +e.target.value })} className="h-8 text-xs" /></div>
             <div><Label className="text-[10px]">Do'kon limiti/MP</Label><Input type="number" value={form.max_stores_per_marketplace} onChange={e => setForm({ ...form, max_stores_per_marketplace: +e.target.value })} className="h-8 text-xs" /></div>
             <div><Label className="text-[10px]">Bepul kartochka/oy</Label><Input type="number" value={form.free_card_creation_monthly} onChange={e => setForm({ ...form, free_card_creation_monthly: +e.target.value })} className="h-8 text-xs" /></div>
