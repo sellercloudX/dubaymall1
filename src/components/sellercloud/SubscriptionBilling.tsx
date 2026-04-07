@@ -183,12 +183,6 @@ function DynamicPlanCard({ plan, isCurrentPlan, onSelect, isProcessing }: {
           <Store className="h-3.5 w-3.5 text-primary shrink-0" />
           {plan.max_stores_per_marketplace >= 999 ? 'Cheksiz' : plan.max_stores_per_marketplace} do'kon / marketplace
         </li>
-        {plan.free_card_creation_monthly > 0 && (
-          <li className="flex items-center gap-1.5"><Image className="h-3.5 w-3.5 text-primary shrink-0" /> {plan.free_card_creation_monthly} bepul kartochka / oy</li>
-        )}
-        {plan.free_cloning_monthly > 0 && (
-          <li className="flex items-center gap-1.5"><Copy className="h-3.5 w-3.5 text-primary shrink-0" /> {plan.free_cloning_monthly} bepul klonlash / oy</li>
-        )}
         {plan.balance_discount_percent > 0 && (
           <li className="flex items-center gap-1.5"><Percent className="h-3.5 w-3.5 text-primary shrink-0" /> Pullik xizmatlar {plan.balance_discount_percent}% arzon</li>
         )}
