@@ -236,6 +236,16 @@ JAVOB:`;
       });
     }
 
+    // Deduct balance
+    if (billingPrice > 0) {
+      await supabase.rpc('deduct_balance', {
+        p_user_id: user.id,
+        p_amount: billingPrice,
+        p_feature_key: 'ai-review-reply',
+        p_description: `AI sharh javob: ${cleanReview.substring(0, 40)}...`,
+      });
+    }
+
     // Log AI usage
     await supabase.from("ai_usage_log").insert({
       user_id: user.id,
