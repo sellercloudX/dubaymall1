@@ -219,9 +219,7 @@ export const SubscriptionBilling = forwardRef<HTMLDivElement, SubscriptionBillin
   const formatPrice = (price: number) => price >= 1000000 ? (price / 1000000).toFixed(1) + ' mln so\'m' : new Intl.NumberFormat('uz-UZ').format(price) + ' so\'m';
 
   const activationPaidUntil = (subscription as any)?.activation_paid_until;
-  const activationTrialEnds = (subscription as any)?.activation_trial_ends;
   const isActivationActive = activationPaidUntil && new Date(activationPaidUntil) > new Date();
-  const isTrialActive = activationTrialEnds && new Date(activationTrialEnds) > new Date();
 
   const handlePayActivation = async () => {
     setIsPayingActivation(true);
@@ -385,7 +383,6 @@ export const SubscriptionBilling = forwardRef<HTMLDivElement, SubscriptionBillin
     const statusBadge = (() => {
       switch (accessStatus.reason) {
         case 'active': return <Badge className="bg-primary text-primary-foreground"><CheckCircle2 className="h-3 w-3 mr-1" /> Faol</Badge>;
-        case 'trial': return <Badge variant="secondary"><Clock className="h-3 w-3 mr-1" /> Sinov</Badge>;
         case 'admin_override': return <Badge className="bg-primary text-primary-foreground"><Crown className="h-3 w-3 mr-1" /> Faol</Badge>;
         default: return <Badge variant="secondary"><XCircle className="h-3 w-3 mr-1" /> Nofaol</Badge>;
       }

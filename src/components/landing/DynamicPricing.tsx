@@ -114,7 +114,6 @@ export const DynamicPricing = React.forwardRef<HTMLElement, DynamicPricingProps>
         discount: 'AI chegirma',
         unlimited: 'Cheksiz',
         features: 'Imkoniyatlar',
-        trial: '1 kunlik bepul sinov',
         paidFeatures: 'Tarifga kiritilmagan xizmatlar balansdan foydalaniladi',
         includedCount: 'ta funksiya kiritilgan',
       },
@@ -131,7 +130,6 @@ export const DynamicPricing = React.forwardRef<HTMLElement, DynamicPricingProps>
         discount: 'AI скидка',
         unlimited: 'Безлимит',
         features: 'Возможности',
-        trial: '1 день бесплатно',
         paidFeatures: 'Функции вне тарифа — оплата с баланса',
         includedCount: 'функций включено',
       },
@@ -148,7 +146,6 @@ export const DynamicPricing = React.forwardRef<HTMLElement, DynamicPricingProps>
         discount: 'AI discount',
         unlimited: 'Unlimited',
         features: 'Features',
-        trial: '1-day free trial',
         paidFeatures: 'Features outside plan are pay-per-use from balance',
         includedCount: 'features included',
       },
@@ -309,14 +306,6 @@ export const DynamicPricing = React.forwardRef<HTMLElement, DynamicPricingProps>
                         </ul>
                       </div>
 
-                      {/* Trial badge for starter only */}
-                      {idx === 0 && (
-                        <div className="text-center mb-3">
-                          <Badge variant="outline" className="text-[10px] border-green-300 text-green-600 dark:text-green-400">
-                            🎁 {txt.trial}
-                          </Badge>
-                        </div>
-                      )}
 
                       {/* CTA */}
                       {isLast ? (

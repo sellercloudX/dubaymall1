@@ -5,7 +5,6 @@ import { toast } from 'sonner';
 
 export const MIN_TOPUP_UZS = 300_000;
 export const ACTIVATION_FEE_UZS = 99_000;
-export const TRIAL_DAYS = 1;
 
 export interface FeaturePrice {
   id: string;

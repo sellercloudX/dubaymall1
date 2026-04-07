@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { TRIAL_DAYS, ACTIVATION_FEE_UZS } from '@/hooks/useFeaturePricing';
+import { ACTIVATION_FEE_UZS } from '@/hooks/useFeaturePricing';
 
 interface SellerCloudSubscription {
   id: string;
@@ -9,8 +9,6 @@ interface SellerCloudSubscription {
   plan_type: string;
   monthly_fee: number;
   is_active: boolean;
-  is_trial: boolean;
-  trial_ends_at: string | null;
   started_at: string;
   expires_at: string | null;
   admin_override: boolean;
@@ -39,10 +37,9 @@ interface SellerCloudBilling {
 
 interface AccessStatus {
   is_active: boolean;
-  reason: 'active' | 'trial' | 'admin_override' | 'debt' | 'inactive' | 'no_subscription' | 'expired';
+  reason: 'active' | 'admin_override' | 'debt' | 'inactive' | 'no_subscription' | 'expired';
   message: string;
   total_debt?: number;
-  trial_ends_at?: string;
   subscription?: SellerCloudSubscription;
   blocked?: boolean;
   expires_at?: string;
