@@ -187,11 +187,11 @@ export const DynamicPricing = React.forwardRef<HTMLElement, DynamicPricingProps>
               <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 font-display">{txt.title}</h2>
             </div>
             {shouldLoad ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 max-w-7xl mx-auto">
-                {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-[500px] rounded-xl" />)}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-6xl mx-auto">
+                {[1, 2, 3].map(i => <Skeleton key={i} className="h-[500px] rounded-xl" />)}
               </div>
             ) : (
-              <div className="h-[500px] max-w-7xl mx-auto" aria-hidden="true" />
+              <div className="h-[500px] max-w-6xl mx-auto" aria-hidden="true" />
             )}
           </div>
         </section>
