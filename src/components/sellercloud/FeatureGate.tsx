@@ -2,10 +2,12 @@ import { useSellerCloudSubscription } from '@/hooks/useSellerCloudSubscription';
 import { useSubscriptionPlans } from '@/hooks/useSubscriptionPlans';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Lock, TrendingUp, Crown, Zap } from 'lucide-react';
+import { Lock, TrendingUp, Crown, Zap, BarChart3, Shield } from 'lucide-react';
 
 /**
- * FeatureGate v3 — Tier-based feature gating.
+ * FeatureGate v4 — Tier-based feature gating (updated for current plan structure).
+ * 
+ * Plans: Free (starter) → Starter (business, 299k) → Growth (pro, 699k) → Pro (enterprise, 1.999M)
  * 
  * Checks if the user's current plan includes the feature (tab).
  * AI usage is still charged per-use from balance.
@@ -24,20 +26,34 @@ const TAB_FEATURE_MAP: Record<string, string> = {
   team: 'team-management',
   'stock-forecast': 'stock-forecast',
   reports: 'reports-export',
+  'min-price': 'min-price-protection',
+  'inventory-sync': 'inventory-sync',
+  'product-analytics': 'product-analytics',
+  'wb-analytics': 'wb-seller-analytics',
+  'search-keywords': 'search-keywords',
 };
 
-// Which plan unlocks which features (for upgrade messaging)
+// Which plan unlocks which features (matches current DB plan structure)
 const UPGRADE_SUGGESTIONS: Record<string, { planName: string; planSlug: string; icon: React.ElementType; color: string }> = {
-  'financial-dashboard': { planName: 'Starter (99k/oy)', planSlug: 'business', icon: Zap, color: 'text-blue-500' },
-  'stock-forecast': { planName: 'Starter (99k/oy)', planSlug: 'business', icon: Zap, color: 'text-blue-500' },
-  'reports-export': { planName: 'Starter (99k/oy)', planSlug: 'business', icon: Zap, color: 'text-blue-500' },
-  'abc-analysis': { planName: 'Growth (299k/oy)', planSlug: 'pro', icon: TrendingUp, color: 'text-amber-500' },
-  'unit-economy': { planName: 'Growth (299k/oy)', planSlug: 'pro', icon: TrendingUp, color: 'text-amber-500' },
-  'problematic-products': { planName: 'Growth (299k/oy)', planSlug: 'pro', icon: TrendingUp, color: 'text-amber-500' },
-  'marketplace-reviews': { planName: 'Growth (299k/oy)', planSlug: 'pro', icon: TrendingUp, color: 'text-amber-500' },
-  'wb-ads-campaigns': { planName: 'Growth (299k/oy)', planSlug: 'pro', icon: TrendingUp, color: 'text-amber-500' },
-  'multi-store': { planName: 'Pro (699k/oy)', planSlug: 'enterprise', icon: Crown, color: 'text-red-500' },
-  'team-management': { planName: 'Pro (699k/oy)', planSlug: 'enterprise', icon: Crown, color: 'text-red-500' },
+  // Starter (business) - 299,000 so'm/oy
+  'financial-dashboard': { planName: 'Starter (299k/oy)', planSlug: 'business', icon: Zap, color: 'text-blue-500' },
+  'stock-forecast': { planName: 'Starter (299k/oy)', planSlug: 'business', icon: Zap, color: 'text-blue-500' },
+  'reports-export': { planName: 'Starter (299k/oy)', planSlug: 'business', icon: Zap, color: 'text-blue-500' },
+  'min-price-protection': { planName: 'Starter (299k/oy)', planSlug: 'business', icon: Shield, color: 'text-blue-500' },
+  'inventory-sync': { planName: 'Starter (299k/oy)', planSlug: 'business', icon: Zap, color: 'text-blue-500' },
+  'product-analytics': { planName: 'Starter (299k/oy)', planSlug: 'business', icon: BarChart3, color: 'text-blue-500' },
+  // Growth (pro) - 699,000 so'm/oy
+  'abc-analysis': { planName: 'Growth (699k/oy)', planSlug: 'pro', icon: TrendingUp, color: 'text-amber-500' },
+  'unit-economy': { planName: 'Growth (699k/oy)', planSlug: 'pro', icon: TrendingUp, color: 'text-amber-500' },
+  'problematic-products': { planName: 'Growth (699k/oy)', planSlug: 'pro', icon: TrendingUp, color: 'text-amber-500' },
+  'marketplace-reviews': { planName: 'Growth (699k/oy)', planSlug: 'pro', icon: TrendingUp, color: 'text-amber-500' },
+  'wb-ads-campaigns': { planName: 'Growth (699k/oy)', planSlug: 'pro', icon: TrendingUp, color: 'text-amber-500' },
+  'wb-seller-analytics': { planName: 'Growth (699k/oy)', planSlug: 'pro', icon: TrendingUp, color: 'text-amber-500' },
+  'search-keywords': { planName: 'Growth (699k/oy)', planSlug: 'pro', icon: TrendingUp, color: 'text-amber-500' },
+  // Pro (enterprise) - 1,999,000 so'm/oy
+  'multi-store': { planName: 'Pro (1.999M/oy)', planSlug: 'enterprise', icon: Crown, color: 'text-red-500' },
+  'team-management': { planName: 'Pro (1.999M/oy)', planSlug: 'enterprise', icon: Crown, color: 'text-red-500' },
+  'auto-reorder': { planName: 'Pro (1.999M/oy)', planSlug: 'enterprise', icon: Crown, color: 'text-red-500' },
 };
 
 // Persuasion messages per feature
@@ -45,6 +61,22 @@ const PERSUASION: Record<string, { title: string; loss: string }> = {
   'financial-dashboard': {
     title: 'P&L tahlili — foydangizni bilib oling',
     loss: 'P&L ko\'rmasdan qaysi mahsulot zarar qilayotganini bilmayapsiz. Bu oyda 500k+ zarar bo\'lishi mumkin.',
+  },
+  'stock-forecast': {
+    title: 'Stok prognozi — sotuvdan qolmang',
+    loss: 'Stok tugab qolsa, kunlik 200k+ daromaddan mahrum bo\'lasiz.',
+  },
+  'reports-export': {
+    title: 'Hisobotlar eksport — buxgalteriyaga tayyor',
+    loss: 'Qo\'lda hisobot tayyorlash soatlab vaqtingizni oladi.',
+  },
+  'min-price-protection': {
+    title: 'Minimal narx himoyasi — zarardan saqlaning',
+    loss: 'Narx tushib ketsa, zarar sezmasdan sotishda davom etasiz.',
+  },
+  'product-analytics': {
+    title: 'Mahsulot tahlili — sotuvni optimallashtiring',
+    loss: 'Qaysi mahsulot o\'sish trendida ekanini bilmasdan imkoniyat yo\'qotasiz.',
   },
   'abc-analysis': {
     title: 'ABC-analiz — eng foydali mahsulotlaringiz',
@@ -57,6 +89,14 @@ const PERSUASION: Record<string, { title: string; loss: string }> = {
   'problematic-products': {
     title: 'Muammoli mahsulotlar — zararni toping',
     loss: 'Kam sotilayotgan va zararli mahsulotlar hisobingizdan pul yeyapti.',
+  },
+  'marketplace-reviews': {
+    title: 'Sharhlar boshqaruvi — reytingni oshiring',
+    loss: 'Salbiy sharhlarga javob bermasangiz, reyting tushadi va sotuvlar kamayadi.',
+  },
+  'wb-seller-analytics': {
+    title: 'WB Seller tahlili — raqobatchilarni kuzating',
+    loss: 'Raqobatchining strategiyasini bilmasangiz, bozorda orqada qolasiz.',
   },
   'multi-store': {
     title: 'Multi-Store — barcha do\'konlarni boshqaring',

@@ -15,14 +15,23 @@ const iconMap: Record<string, React.ElementType> = {
 
 // Feature labels for display
 const FEATURE_LABELS: Record<string, string> = {
+  'sales-dashboard': 'Sotuvlar paneli',
+  'orders-management': 'Buyurtmalar boshqaruvi',
+  'marketplace-sync': 'Marketplace sinxronizatsiya',
+  'cost-price-manager': 'Tannarx kiritish',
   'financial-dashboard': 'P&L Dashboard',
   'stock-forecast': 'Stok prognoz',
   'reports-export': 'Hisobotlar eksport',
+  'min-price-protection': 'Min narx himoyasi',
+  'inventory-sync': 'Inventar sinxronizatsiya',
+  'product-analytics': 'Mahsulot tahlili',
   'abc-analysis': 'ABC-analiz',
   'unit-economy': 'Unit-ekonomika',
   'problematic-products': 'Muammoli mahsulotlar',
   'marketplace-reviews': 'Sharhlar boshqaruvi',
+  'wb-seller-analytics': 'WB Seller tahlili',
   'wb-ads-campaigns': 'Reklama kampaniyalari',
+  'search-keywords': 'Qidiruv kalit so\'zlari',
   'multi-store': 'Multi-Store',
   'team-management': 'Jamoa boshqaruvi',
   'auto-reorder': 'Avto-buyurtma',
@@ -30,9 +39,9 @@ const FEATURE_LABELS: Record<string, string> = {
 
 // Features that differentiate each tier (only show NEW features per tier)
 const TIER_HIGHLIGHTS: Record<string, string[]> = {
-  starter: ['sales-dashboard', 'orders-management', 'marketplace-sync'],
-  business: ['financial-dashboard', 'stock-forecast', 'reports-export'],
-  pro: ['abc-analysis', 'unit-economy', 'problematic-products', 'marketplace-reviews'],
+  starter: ['sales-dashboard', 'orders-management', 'marketplace-sync', 'cost-price-manager'],
+  business: ['financial-dashboard', 'stock-forecast', 'reports-export', 'min-price-protection', 'inventory-sync', 'product-analytics'],
+  pro: ['abc-analysis', 'unit-economy', 'problematic-products', 'marketplace-reviews', 'wb-seller-analytics', 'wb-ads-campaigns'],
   enterprise: ['multi-store', 'team-management', 'auto-reorder'],
 };
 
