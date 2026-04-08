@@ -267,7 +267,7 @@ const T = {
     faq3q: 'AI kartochka yaratish qanday ishlaydi?',
     faq3a: 'Mahsulot rasmini yuklang — AI avtomatik nom, tavsif, kategoriya va SEO matnlarni 3 tilda (UZ, RU, EN) yaratadi.',
     faq4q: 'To\'lovni qanday amalga oshiraman?',
-    faq4a: 'Click yoki bank o\'tkazmasi orqali balansni to\'ldiring. Bepul tarif mavjud, pullik tariflar 99,000 so\'m/oydan boshlanadi. AI xizmatlari balans orqali.',
+    faq4a: 'Click yoki bank o\'tkazmasi orqali balansni to\'ldiring. Tariflar 299,000 so\'m/oydan boshlanadi. AI xizmatlari balans orqali.',
     faq5q: '60 kunlik kafolat nima?',
     faq5a: 'Agar 60 kun ichida savdolaringiz o\'smasa, to\'langan summani qaytarib olamiz. Bu bizning sifatga ishonchimiz.',
     faq6q: 'Ma\'lumotlarim xavfsizmi?',
