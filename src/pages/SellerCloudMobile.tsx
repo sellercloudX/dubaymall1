@@ -138,8 +138,11 @@ export default function SellerCloudMobile() {
 
   if (!subscription) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="min-h-screen bg-background p-4">
+        <PlanSelector onSelectPlan={async (planSlug, monthlyFee) => {
+          const result = await createSubscription(planSlug, monthlyFee);
+          if (result.success) toast.success('Tarif tanlandi!');
+        }} />
       </div>
     );
   }
