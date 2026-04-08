@@ -198,7 +198,7 @@ export const DynamicPricing = React.forwardRef<HTMLElement, DynamicPricingProps>
       );
     }
 
-    const activePlans = (plans?.filter(p => p.is_active) || []).sort((a, b) => a.sort_order - b.sort_order);
+    const activePlans = (plans?.filter(p => p.is_active && p.monthly_fee_uzs > 0) || []).sort((a, b) => a.sort_order - b.sort_order);
 
     return (
       <section ref={ref} id="pricing" className="py-16 sm:py-24 md:py-32 bg-muted/30">
@@ -209,10 +209,10 @@ export const DynamicPricing = React.forwardRef<HTMLElement, DynamicPricingProps>
             <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-2xl mx-auto">{txt.desc}</p>
           </FadeInSection>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 max-w-7xl mx-auto items-stretch">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 max-w-6xl mx-auto items-stretch">
             {activePlans.map((plan, idx) => {
-              const style = styleMap[Math.min(idx, 3)] || styleMap[0];
-              const isPopular = idx === 2;
+              const style = styleMap[Math.min(idx + 1, 3)] || styleMap[1];
+              const isPopular = idx === 1;
               const isLast = idx === activePlans.length - 1 && activePlans.length > 2;
               const Icon = iconMap[plan.icon || 'star'] || Crown;
               const includedKeys = plan.included_feature_keys || [];
