@@ -30,9 +30,9 @@ const FEATURE_LABELS: Record<string, string> = {
 
 // Features that differentiate each tier (only show NEW features per tier)
 const TIER_HIGHLIGHTS: Record<string, string[]> = {
-  starter: ['sales-dashboard', 'orders-management', 'marketplace-sync'],
-  business: ['financial-dashboard', 'stock-forecast', 'reports-export'],
-  pro: ['abc-analysis', 'unit-economy', 'problematic-products', 'marketplace-reviews'],
+  starter: ['sales-dashboard', 'orders-management', 'marketplace-sync', 'cost-price-manager'],
+  business: ['financial-dashboard', 'stock-forecast', 'reports-export', 'min-price-protection', 'inventory-sync', 'product-analytics'],
+  pro: ['abc-analysis', 'unit-economy', 'problematic-products', 'marketplace-reviews', 'wb-seller-analytics', 'wb-ads-campaigns'],
   enterprise: ['multi-store', 'team-management', 'auto-reorder'],
 };
 
