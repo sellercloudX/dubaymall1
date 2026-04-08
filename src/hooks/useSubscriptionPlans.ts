@@ -18,6 +18,7 @@ export interface SubscriptionPlan {
   free_cloning_monthly: number;
   balance_discount_percent: number;
   included_feature_keys: string[];
+  data_retention_days: number;
   is_active: boolean;
   sort_order: number;
   color: string | null;

@@ -1,19 +1,18 @@
 import { useSubscriptionPlans, type SubscriptionPlan } from '@/hooks/useSubscriptionPlans';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useActivityStreak } from '@/hooks/useActivityStreak';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Check, Zap, Briefcase, Crown, Building, Store, Percent, Lock, Unlock } from 'lucide-react';
+import { Check, Zap, Briefcase, Crown, Store, Percent, Calendar, Flame, Gift } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const iconMap: Record<string, React.ElementType> = {
-  Zap: Zap, zap: Zap, Briefcase: Briefcase, briefcase: Briefcase, 
-  Crown: Crown, crown: Crown, Building: Building, building: Building, 
+  Zap, zap: Zap, Briefcase, briefcase: Briefcase, Crown, crown: Crown,
   star: Crown, Package: Store, TrendingUp: Zap,
 };
 
-// Feature labels for display
 const FEATURE_LABELS: Record<string, string> = {
   'sales-dashboard': 'Sotuvlar paneli',
   'orders-management': 'Buyurtmalar boshqaruvi',
@@ -37,12 +36,19 @@ const FEATURE_LABELS: Record<string, string> = {
   'auto-reorder': 'Avto-buyurtma',
 };
 
-// Features that differentiate each tier (only show NEW features per tier)
-const TIER_HIGHLIGHTS: Record<string, string[]> = {
-  starter: ['sales-dashboard', 'orders-management', 'marketplace-sync', 'cost-price-manager'],
-  business: ['financial-dashboard', 'stock-forecast', 'reports-export', 'min-price-protection', 'inventory-sync', 'product-analytics'],
-  pro: ['abc-analysis', 'unit-economy', 'problematic-products', 'marketplace-reviews', 'wb-seller-analytics', 'wb-ads-campaigns'],
+// Features unique to each tier (what's NEW in this tier)
+const TIER_NEW_FEATURES: Record<string, string[]> = {
+  business: ['sales-dashboard', 'orders-management', 'marketplace-sync', 'cost-price-manager',
+    'financial-dashboard', 'stock-forecast', 'reports-export', 'min-price-protection',
+    'abc-analysis', 'unit-economy', 'problematic-products', 'marketplace-reviews'],
+  pro: ['wb-seller-analytics', 'wb-ads-campaigns', 'search-keywords'],
   enterprise: ['multi-store', 'team-management', 'auto-reorder'],
+};
+
+const DATA_RETENTION_LABELS: Record<number, string> = {
+  7: '7 kunlik tahlillar',
+  30: '30 kunlik tahlillar',
+  365: 'Yillik tahlillar',
 };
 
 interface PlanSelectorProps {
@@ -53,6 +59,7 @@ interface PlanSelectorProps {
 export function PlanSelector({ onSelectPlan, onGoHome }: PlanSelectorProps) {
   const { data: plans, isLoading } = useSubscriptionPlans();
   const { language } = useLanguage();
+  const { depositBonusRules, streak } = useActivityStreak();
   const lang = (language || 'uz') as 'uz' | 'ru' | 'en';
 
   const getName = (p: SubscriptionPlan) => {
@@ -70,12 +77,12 @@ export function PlanSelector({ onSelectPlan, onGoHome }: PlanSelectorProps) {
   if (isLoading) {
     return (
       <div className="space-y-4 py-8">
-        {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-40 rounded-2xl" />)}
+        {[1, 2, 3].map(i => <Skeleton key={i} className="h-48 rounded-2xl" />)}
       </div>
     );
   }
 
-  const activePlans = plans?.filter(p => p.is_active) || [];
+  const activePlans = plans?.filter(p => p.is_active && p.monthly_fee_uzs > 0) || [];
 
   return (
     <div className="py-6 space-y-6">
@@ -86,12 +93,30 @@ export function PlanSelector({ onSelectPlan, onGoHome }: PlanSelectorProps) {
         </p>
       </div>
 
+      {/* Deposit bonus hint */}
+      {depositBonusRules.length > 0 && (
+        <Card className="p-3 border-emerald-500/20 bg-emerald-500/5">
+          <div className="flex items-start gap-2">
+            <Gift className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
+            <div className="text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">Balans bonuslari:</span>{' '}
+              {depositBonusRules.map((r, i) => (
+                <span key={r.id}>
+                  {i > 0 ? ', ' : ''}
+                  {(r.min_amount / 1000).toFixed(0)}k+ → +{r.bonus_percent}%
+                </span>
+              ))}
+            </div>
+          </div>
+        </Card>
+      )}
+
       <div className="grid gap-4">
         {activePlans.map((plan, idx) => {
           const Icon = iconMap[plan.icon || 'star'] || Crown;
-          const isPopular = idx === 2;
-          const isFree = plan.monthly_fee_uzs === 0;
-          const highlights = TIER_HIGHLIGHTS[plan.slug] || [];
+          const isPopular = idx === 1; // Biznes
+          const newFeatures = TIER_NEW_FEATURES[plan.slug] || [];
+          const retentionLabel = DATA_RETENTION_LABELS[plan.data_retention_days] || `${plan.data_retention_days} kunlik`;
 
           return (
             <Card
@@ -122,23 +147,26 @@ export function PlanSelector({ onSelectPlan, onGoHome }: PlanSelectorProps) {
 
                   {/* Price */}
                   <div className="flex items-baseline gap-1 mb-3">
-                    {isFree ? (
-                      <span className="text-xl font-bold text-emerald-500">Bepul</span>
-                    ) : (
-                      <>
-                        <span className="text-xl font-bold text-foreground">
-                          {plan.monthly_fee_uzs.toLocaleString()}
-                        </span>
-                        <span className="text-xs text-muted-foreground">so'm/oy</span>
-                      </>
-                    )}
+                    <span className="text-xl font-bold text-foreground">
+                      {plan.monthly_fee_uzs >= 1000000
+                        ? (plan.monthly_fee_uzs / 1000000).toFixed(plan.monthly_fee_uzs % 1000000 === 0 ? 0 : 3).replace(/\.?0+$/, '')
+                        : plan.monthly_fee_uzs.toLocaleString()
+                      }
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {plan.monthly_fee_uzs >= 1000000 ? 'mln so\'m/oy' : 'so\'m/oy'}
+                    </span>
                   </div>
 
-                  {/* Key metrics */}
+                  {/* Key badges */}
                   <div className="flex flex-wrap gap-2 mb-3">
                     <Badge variant="secondary" className="text-[10px] gap-1">
                       <Store className="h-3 w-3" />
-                      {plan.max_stores_per_marketplace >= 999 ? 'Cheksiz' : plan.max_stores_per_marketplace} MP
+                      {plan.max_stores_per_marketplace >= 999 ? 'Cheksiz' : plan.max_stores_per_marketplace} do'kon/MP
+                    </Badge>
+                    <Badge variant="secondary" className="text-[10px] gap-1">
+                      <Calendar className="h-3 w-3" />
+                      {retentionLabel}
                     </Badge>
                     {plan.balance_discount_percent > 0 && (
                       <Badge variant="secondary" className="text-[10px] gap-1 bg-emerald-500/10 text-emerald-600">
@@ -148,17 +176,19 @@ export function PlanSelector({ onSelectPlan, onGoHome }: PlanSelectorProps) {
                     )}
                   </div>
 
-                  {/* Tier-specific features */}
+                  {/* Features */}
                   <div className="space-y-1 mb-2">
-                    {highlights.map(key => {
-                      const label = FEATURE_LABELS[key] || key;
-                      return (
-                        <div key={key} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                          <Unlock className="h-3 w-3 text-emerald-500 shrink-0" />
-                          <span>{label}</span>
-                        </div>
-                      );
-                    })}
+                    {newFeatures.slice(0, 6).map(key => (
+                      <div key={key} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Check className="h-3 w-3 text-emerald-500 shrink-0" />
+                        <span>{FEATURE_LABELS[key] || key}</span>
+                      </div>
+                    ))}
+                    {newFeatures.length > 6 && (
+                      <div className="text-[10px] text-muted-foreground pl-5">
+                        +{newFeatures.length - 6} ta boshqa funksiya
+                      </div>
+                    )}
                   </div>
 
                   <p className="text-xs text-muted-foreground">{getDesc(plan)}</p>
@@ -170,7 +200,7 @@ export function PlanSelector({ onSelectPlan, onGoHome }: PlanSelectorProps) {
                 variant={isPopular ? 'default' : 'outline'}
                 onClick={() => onSelectPlan(plan)}
               >
-                <Check className="h-4 w-4 mr-1.5" /> {isFree ? 'Boshlash' : 'Tanlash'}
+                <Check className="h-4 w-4 mr-1.5" /> Tanlash
               </Button>
             </Card>
           );

@@ -148,6 +148,39 @@ export type Database = {
         }
         Relationships: []
       }
+      balance_bonus_rules: {
+        Row: {
+          bonus_fixed: number | null
+          bonus_percent: number | null
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          min_amount: number | null
+          rule_type: string
+        }
+        Insert: {
+          bonus_fixed?: number | null
+          bonus_percent?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          min_amount?: number | null
+          rule_type: string
+        }
+        Update: {
+          bonus_fixed?: number | null
+          bonus_percent?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          min_amount?: number | null
+          rule_type?: string
+        }
+        Relationships: []
+      }
       balance_transactions: {
         Row: {
           amount: number
@@ -2850,6 +2883,7 @@ export type Database = {
           balance_discount_percent: number
           color: string | null
           created_at: string
+          data_retention_days: number | null
           description: string | null
           description_ru: string | null
           description_uz: string | null
@@ -2873,6 +2907,7 @@ export type Database = {
           balance_discount_percent?: number
           color?: string | null
           created_at?: string
+          data_retention_days?: number | null
           description?: string | null
           description_ru?: string | null
           description_uz?: string | null
@@ -2896,6 +2931,7 @@ export type Database = {
           balance_discount_percent?: number
           color?: string | null
           created_at?: string
+          data_retention_days?: number | null
           description?: string | null
           description_ru?: string | null
           description_uz?: string | null
@@ -3192,6 +3228,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_activity_streaks: {
+        Row: {
+          created_at: string | null
+          current_streak: number | null
+          id: string
+          last_active_date: string | null
+          longest_streak: number | null
+          total_bonus_earned: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          current_streak?: number | null
+          id?: string
+          last_active_date?: string | null
+          longest_streak?: number | null
+          total_bonus_earned?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          current_streak?: number | null
+          id?: string
+          last_active_date?: string | null
+          longest_streak?: number | null
+          total_bonus_earned?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
       user_addresses: {
         Row: {
@@ -4506,6 +4575,7 @@ export type Database = {
       }
       process_pending_payouts: { Args: never; Returns: number }
       purchase_tutorial_folder: { Args: { p_folder_id: string }; Returns: Json }
+      record_daily_activity: { Args: { p_user_id: string }; Returns: Json }
       search_mxik_fuzzy: {
         Args: { p_limit?: number; p_search_term: string }
         Returns: {
