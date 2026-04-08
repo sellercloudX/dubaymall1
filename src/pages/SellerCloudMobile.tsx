@@ -125,16 +125,7 @@ export default function SellerCloudMobile() {
     }
   }, [user, authLoading, navigate]);
 
-  // Auto-create starter subscription for new users (MUST be before any early return)
-  useEffect(() => {
-    if (!subscription && !subscriptionLoading && user) {
-      createSubscription('starter', 0).then(result => {
-        if (result.success) {
-          toast.success('Xush kelibsiz! 1 kunlik bepul sinov boshlandi.');
-        }
-      });
-    }
-  }, [subscription, subscriptionLoading, user]);
+  // If no subscription, show plan selector (removed legacy auto-starter)
 
   // Early returns AFTER all hooks
   if (authLoading || subscriptionLoading) {
