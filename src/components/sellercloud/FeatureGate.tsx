@@ -2,19 +2,17 @@ import { useSellerCloudSubscription } from '@/hooks/useSellerCloudSubscription';
 import { useSubscriptionPlans } from '@/hooks/useSubscriptionPlans';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Lock, TrendingUp, Crown, Zap, BarChart3, Shield } from 'lucide-react';
+import { Lock, TrendingUp, Crown, Zap, BarChart3, Shield, Briefcase, Calendar } from 'lucide-react';
 
 /**
- * FeatureGate v4 — Tier-based feature gating (updated for current plan structure).
+ * FeatureGate v5 — Tier-based feature gating + data retention limits.
  * 
- * Plans: Free (starter) → Starter (business, 299k) → Growth (pro, 699k) → Pro (enterprise, 1.999M)
+ * Plans: Boshlang'ich (299k) → Biznes (1.499M) → Professional (5.999M)
  * 
- * Checks if the user's current plan includes the feature (tab).
- * AI usage is still charged per-use from balance.
- * Pure DB/API features are gated by subscription tier.
+ * Data retention: 7 kun | 30 kun | 365 kun
+ * Checks plan inclusion AND data retention period.
  */
 
-// Map tab IDs to required feature_keys
 const TAB_FEATURE_MAP: Record<string, string> = {
   financials: 'financial-dashboard',
   abc: 'abc-analysis',
@@ -33,50 +31,25 @@ const TAB_FEATURE_MAP: Record<string, string> = {
   'search-keywords': 'search-keywords',
 };
 
-// Which plan unlocks which features (matches current DB plan structure)
 const UPGRADE_SUGGESTIONS: Record<string, { planName: string; planSlug: string; icon: React.ElementType; color: string }> = {
-  // Starter (business) - 299,000 so'm/oy
-  'financial-dashboard': { planName: 'Starter (299k/oy)', planSlug: 'business', icon: Zap, color: 'text-blue-500' },
-  'stock-forecast': { planName: 'Starter (299k/oy)', planSlug: 'business', icon: Zap, color: 'text-blue-500' },
-  'reports-export': { planName: 'Starter (299k/oy)', planSlug: 'business', icon: Zap, color: 'text-blue-500' },
-  'min-price-protection': { planName: 'Starter (299k/oy)', planSlug: 'business', icon: Shield, color: 'text-blue-500' },
-  'inventory-sync': { planName: 'Starter (299k/oy)', planSlug: 'business', icon: Zap, color: 'text-blue-500' },
-  'product-analytics': { planName: 'Starter (299k/oy)', planSlug: 'business', icon: BarChart3, color: 'text-blue-500' },
-  // Growth (pro) - 699,000 so'm/oy
-  'abc-analysis': { planName: 'Growth (699k/oy)', planSlug: 'pro', icon: TrendingUp, color: 'text-amber-500' },
-  'unit-economy': { planName: 'Growth (699k/oy)', planSlug: 'pro', icon: TrendingUp, color: 'text-amber-500' },
-  'problematic-products': { planName: 'Growth (699k/oy)', planSlug: 'pro', icon: TrendingUp, color: 'text-amber-500' },
-  'marketplace-reviews': { planName: 'Growth (699k/oy)', planSlug: 'pro', icon: TrendingUp, color: 'text-amber-500' },
-  'wb-ads-campaigns': { planName: 'Growth (699k/oy)', planSlug: 'pro', icon: TrendingUp, color: 'text-amber-500' },
-  'wb-seller-analytics': { planName: 'Growth (699k/oy)', planSlug: 'pro', icon: TrendingUp, color: 'text-amber-500' },
-  'search-keywords': { planName: 'Growth (699k/oy)', planSlug: 'pro', icon: TrendingUp, color: 'text-amber-500' },
-  // Pro (enterprise) - 1,999,000 so'm/oy
-  'multi-store': { planName: 'Pro (1.999M/oy)', planSlug: 'enterprise', icon: Crown, color: 'text-red-500' },
-  'team-management': { planName: 'Pro (1.999M/oy)', planSlug: 'enterprise', icon: Crown, color: 'text-red-500' },
-  'auto-reorder': { planName: 'Pro (1.999M/oy)', planSlug: 'enterprise', icon: Crown, color: 'text-red-500' },
+  // Biznes (1.499M)
+  'wb-seller-analytics': { planName: 'Biznes (1.499M/oy)', planSlug: 'pro', icon: Briefcase, color: 'text-amber-500' },
+  'wb-ads-campaigns': { planName: 'Biznes (1.499M/oy)', planSlug: 'pro', icon: Briefcase, color: 'text-amber-500' },
+  'search-keywords': { planName: 'Biznes (1.499M/oy)', planSlug: 'pro', icon: Briefcase, color: 'text-amber-500' },
+  // Professional (5.999M)
+  'multi-store': { planName: 'Professional (5.999M/oy)', planSlug: 'enterprise', icon: Crown, color: 'text-red-500' },
+  'team-management': { planName: 'Professional (5.999M/oy)', planSlug: 'enterprise', icon: Crown, color: 'text-red-500' },
+  'auto-reorder': { planName: 'Professional (5.999M/oy)', planSlug: 'enterprise', icon: Crown, color: 'text-red-500' },
 };
 
-// Persuasion messages per feature
 const PERSUASION: Record<string, { title: string; loss: string }> = {
   'financial-dashboard': {
     title: 'P&L tahlili — foydangizni bilib oling',
-    loss: 'P&L ko\'rmasdan qaysi mahsulot zarar qilayotganini bilmayapsiz. Bu oyda 500k+ zarar bo\'lishi mumkin.',
+    loss: 'P&L ko\'rmasdan qaysi mahsulot zarar qilayotganini bilmayapsiz.',
   },
   'stock-forecast': {
     title: 'Stok prognozi — sotuvdan qolmang',
     loss: 'Stok tugab qolsa, kunlik 200k+ daromaddan mahrum bo\'lasiz.',
-  },
-  'reports-export': {
-    title: 'Hisobotlar eksport — buxgalteriyaga tayyor',
-    loss: 'Qo\'lda hisobot tayyorlash soatlab vaqtingizni oladi.',
-  },
-  'min-price-protection': {
-    title: 'Minimal narx himoyasi — zarardan saqlaning',
-    loss: 'Narx tushib ketsa, zarar sezmasdan sotishda davom etasiz.',
-  },
-  'product-analytics': {
-    title: 'Mahsulot tahlili — sotuvni optimallashtiring',
-    loss: 'Qaysi mahsulot o\'sish trendida ekanini bilmasdan imkoniyat yo\'qotasiz.',
   },
   'abc-analysis': {
     title: 'ABC-analiz — eng foydali mahsulotlaringiz',
@@ -86,17 +59,9 @@ const PERSUASION: Record<string, { title: string; loss: string }> = {
     title: 'Unit-ekonomika — har bir SKU ning haqiqiy foydasi',
     loss: 'Qaysi mahsulot zarar keltiryapti, bilmasdan sotishda davom etyapsiz.',
   },
-  'problematic-products': {
-    title: 'Muammoli mahsulotlar — zararni toping',
-    loss: 'Kam sotilayotgan va zararli mahsulotlar hisobingizdan pul yeyapti.',
-  },
   'marketplace-reviews': {
     title: 'Sharhlar boshqaruvi — reytingni oshiring',
-    loss: 'Salbiy sharhlarga javob bermasangiz, reyting tushadi va sotuvlar kamayadi.',
-  },
-  'wb-seller-analytics': {
-    title: 'WB Seller tahlili — raqobatchilarni kuzating',
-    loss: 'Raqobatchining strategiyasini bilmasangiz, bozorda orqada qolasiz.',
+    loss: 'Salbiy sharhlarga javob bermasangiz, reyting tushadi.',
   },
   'multi-store': {
     title: 'Multi-Store — barcha do\'konlarni boshqaring',
@@ -105,6 +70,10 @@ const PERSUASION: Record<string, { title: string; loss: string }> = {
   'team-management': {
     title: 'Jamoa boshqaruvi — xodimlarni qo\'shing',
     loss: 'Yolg\'iz ishlash samaradorlikni 3x kamaytiradi.',
+  },
+  'wb-seller-analytics': {
+    title: 'WB Seller tahlili — raqobatchilarni kuzating',
+    loss: 'Raqobatchining strategiyasini bilmasangiz, bozorda orqada qolasiz.',
   },
 };
 
@@ -119,12 +88,9 @@ export function FeatureGate({ tabId, children, onNavigateToSubscription }: Featu
   const { data: plans } = useSubscriptionPlans();
 
   const requiredFeature = TAB_FEATURE_MAP[tabId];
-  
-  // If no feature mapping, tab is always accessible
   if (!requiredFeature) return <>{children}</>;
 
-  // Find user's current plan
-  const userPlanSlug = subscription?.plan_type || 'starter';
+  const userPlanSlug = subscription?.plan_type || 'business';
   const userPlan = plans?.find(p => p.slug === userPlanSlug);
   const includedFeatures = userPlan?.included_feature_keys || [];
 
@@ -160,7 +126,7 @@ export function FeatureGate({ tabId, children, onNavigateToSubscription }: Featu
               🔓 Ochish uchun: <span className="text-primary font-bold">{suggestion.planName}</span>
             </p>
             <p className="text-xs text-muted-foreground">
-              Tarifni oshirsangiz, AI xizmatlarga {suggestion.planSlug === 'business' ? '10%' : suggestion.planSlug === 'pro' ? '25%' : '50%'} chegirma ham olasiz
+              Tarifni oshirsangiz, AI xizmatlarga {suggestion.planSlug === 'pro' ? '15%' : '30%'} chegirma ham olasiz
             </p>
           </div>
         )}
@@ -171,4 +137,23 @@ export function FeatureGate({ tabId, children, onNavigateToSubscription }: Featu
       </CardContent>
     </Card>
   );
+}
+
+/**
+ * DataRetentionGate — wraps analytics components to enforce data period limits.
+ * Usage: <DataRetentionGate>{(maxDays) => <FinancialDashboard maxDays={maxDays} />}</DataRetentionGate>
+ */
+interface DataRetentionGateProps {
+  children: (maxDays: number) => React.ReactNode;
+}
+
+export function DataRetentionGate({ children }: DataRetentionGateProps) {
+  const { subscription } = useSellerCloudSubscription();
+  const { data: plans } = useSubscriptionPlans();
+
+  const userPlanSlug = subscription?.plan_type || 'business';
+  const userPlan = plans?.find(p => p.slug === userPlanSlug);
+  const maxDays = userPlan?.data_retention_days || 7;
+
+  return <>{children(maxDays)}</>;
 }
