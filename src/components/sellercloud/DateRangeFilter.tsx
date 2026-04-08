@@ -14,15 +14,17 @@ interface DateRangeFilterProps {
   to: Date | undefined;
   onRangeChange: (from: Date | undefined, to: Date | undefined, preset: DatePreset) => void;
   activePreset: DatePreset;
+  /** Max allowed days based on subscription plan data retention */
+  maxDays?: number;
 }
 
-const PRESETS: { id: DatePreset; label: string }[] = [
-  { id: '7d', label: '7 kun' },
-  { id: '30d', label: '30 kun' },
-  { id: '90d', label: '90 kun' },
-  { id: 'month', label: 'Bu oy' },
-  { id: 'year', label: 'Bu yil' },
-  { id: 'all', label: 'Hammasi' },
+const ALL_PRESETS: { id: DatePreset; label: string; days: number }[] = [
+  { id: '7d', label: '7 kun', days: 7 },
+  { id: '30d', label: '30 kun', days: 30 },
+  { id: '90d', label: '90 kun', days: 90 },
+  { id: 'month', label: 'Bu oy', days: 31 },
+  { id: 'year', label: 'Bu yil', days: 365 },
+  { id: 'all', label: 'Hammasi', days: 9999 },
 ];
 
 export function getPresetDates(preset: DatePreset): { from: Date | undefined; to: Date | undefined } {
