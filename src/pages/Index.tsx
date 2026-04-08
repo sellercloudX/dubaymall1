@@ -232,7 +232,7 @@ const T = {
     step3: 'Foydani kuzating',
     step3d: 'Analitika, buyurtmalar va narxlarni yagona paneldan boshqaring',
     pricingTitle: 'Oddiy va shaffof narxlar',
-    pricingDesc: 'Yashirin to\'lovlar yo\'q. Bepul tarif mavjud.',
+    pricingDesc: 'Yashirin to\'lovlar yo\'q. Shaffof narxlash.',
     perMonth: '/oyiga',
     guarantee: '60 kunlik kafolat',
     startPro: 'Boshlash',
