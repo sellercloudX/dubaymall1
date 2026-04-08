@@ -139,8 +139,8 @@ export default function SellerCloudMobile() {
   if (!subscription) {
     return (
       <div className="min-h-screen bg-background p-4">
-        <PlanSelector onSelectPlan={async (planSlug, monthlyFee) => {
-          const result = await createSubscription(planSlug, monthlyFee);
+        <PlanSelector onSelectPlan={async (plan) => {
+          const result = await createSubscription(plan.slug, plan.monthly_fee_uzs);
           if (result.success) toast.success('Tarif tanlandi!');
         }} />
       </div>

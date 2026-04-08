@@ -224,8 +224,8 @@ export default function SellerCloudX() {
       <>
         <Navbar />
         <div className="container max-w-5xl mx-auto py-8 px-4">
-          <PlanSelector onSelectPlan={async (planSlug, monthlyFee) => {
-            const result = await createSubscription(planSlug, monthlyFee);
+          <PlanSelector onSelectPlan={async (plan) => {
+            const result = await createSubscription(plan.slug, plan.monthly_fee_uzs);
             if (result.success) toast.success('Tarif tanlandi! Obunani faollashtiring.');
           }} />
         </div>
