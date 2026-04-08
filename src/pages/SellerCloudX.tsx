@@ -223,8 +223,11 @@ export default function SellerCloudX() {
     return (
       <>
         <Navbar />
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="container max-w-5xl mx-auto py-8 px-4">
+          <PlanSelector onSelectPlan={async (planSlug, monthlyFee) => {
+            const result = await createSubscription(planSlug, monthlyFee);
+            if (result.success) toast.success('Tarif tanlandi! Obunani faollashtiring.');
+          }} />
         </div>
         <Footer />
       </>
