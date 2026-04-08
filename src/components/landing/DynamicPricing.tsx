@@ -251,15 +251,9 @@ export const DynamicPricing = React.forwardRef<HTMLElement, DynamicPricingProps>
                             <Shield className="h-3 w-3" />
                             {txt.monthly}
                           </span>
-                          {plan.monthly_fee_uzs > 0 ? (
-                            <span className="text-sm sm:text-base font-bold">
-                              {formatPrice(plan.monthly_fee_uzs)} <span className="text-[10px] font-normal text-muted-foreground">so'm{txt.perMonth}</span>
-                            </span>
-                          ) : (
-                            <span className="text-sm sm:text-base font-bold text-green-600 dark:text-green-400">
-                              {txt.free}
-                            </span>
-                          )}
+                          <span className="text-sm sm:text-base font-bold">
+                            {formatPrice(plan.monthly_fee_uzs)} <span className="text-[10px] font-normal text-muted-foreground">so'm{txt.perMonth}</span>
+                          </span>
                         </div>
                       </div>
 
