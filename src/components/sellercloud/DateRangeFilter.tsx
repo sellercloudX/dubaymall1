@@ -3,9 +3,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { CalendarIcon } from 'lucide-react';
+import { CalendarIcon, Lock } from 'lucide-react';
 import { format, subDays, startOfMonth, startOfYear } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { useDataRetention } from '@/hooks/useDataRetention';
 
 export type DatePreset = '7d' | '30d' | '90d' | 'month' | 'year' | 'all' | 'custom';
 
@@ -14,15 +15,17 @@ interface DateRangeFilterProps {
   to: Date | undefined;
   onRangeChange: (from: Date | undefined, to: Date | undefined, preset: DatePreset) => void;
   activePreset: DatePreset;
+  /** Override max days (if not set, auto-detected from subscription) */
+  maxDays?: number;
 }
 
-const PRESETS: { id: DatePreset; label: string }[] = [
-  { id: '7d', label: '7 kun' },
-  { id: '30d', label: '30 kun' },
-  { id: '90d', label: '90 kun' },
-  { id: 'month', label: 'Bu oy' },
-  { id: 'year', label: 'Bu yil' },
-  { id: 'all', label: 'Hammasi' },
+const ALL_PRESETS: { id: DatePreset; label: string; days: number }[] = [
+  { id: '7d', label: '7 kun', days: 7 },
+  { id: '30d', label: '30 kun', days: 30 },
+  { id: '90d', label: '90 kun', days: 90 },
+  { id: 'month', label: 'Bu oy', days: 31 },
+  { id: 'year', label: 'Bu yil', days: 365 },
+  { id: 'all', label: 'Hammasi', days: 9999 },
 ];
 
 export function getPresetDates(preset: DatePreset): { from: Date | undefined; to: Date | undefined } {
@@ -38,22 +41,33 @@ export function getPresetDates(preset: DatePreset): { from: Date | undefined; to
   }
 }
 
-export function DateRangeFilter({ from, to, onRangeChange, activePreset }: DateRangeFilterProps) {
+export function DateRangeFilter({ from, to, onRangeChange, activePreset, maxDays: maxDaysProp }: DateRangeFilterProps) {
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [calendarMode, setCalendarMode] = useState<'from' | 'to'>('from');
+  const retentionDays = useDataRetention();
+  const maxDays = maxDaysProp ?? retentionDays;
+
+  // Split presets: allowed vs locked
+  const allowedPresets = ALL_PRESETS.filter(p => p.days <= maxDays);
+  const lockedPresets = ALL_PRESETS.filter(p => p.days > maxDays);
 
   const handlePreset = (preset: DatePreset) => {
     const { from: f, to: t } = getPresetDates(preset);
     onRangeChange(f, t, preset);
   };
 
+  // Enforce calendar min date based on retention
+  const minCalendarDate = subDays(new Date(), maxDays);
+
   const handleCalendarSelect = (date: Date | undefined) => {
     if (!date) return;
+    // Clamp to retention limit
+    const clamped = date < minCalendarDate ? minCalendarDate : date;
     if (calendarMode === 'from') {
-      onRangeChange(date, to || new Date(), 'custom');
+      onRangeChange(clamped, to || new Date(), 'custom');
       setCalendarMode('to');
     } else {
-      onRangeChange(from, date, 'custom');
+      onRangeChange(from, clamped, 'custom');
       setCalendarOpen(false);
       setCalendarMode('from');
     }
@@ -61,7 +75,7 @@ export function DateRangeFilter({ from, to, onRangeChange, activePreset }: DateR
 
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
-      {PRESETS.map(p => (
+      {allowedPresets.map(p => (
         <Button
           key={p.id}
           variant={activePreset === p.id ? 'default' : 'outline'}
@@ -72,6 +86,18 @@ export function DateRangeFilter({ from, to, onRangeChange, activePreset }: DateR
           {p.label}
         </Button>
       ))}
+      {lockedPresets.length > 0 && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 text-[11px] px-2.5 rounded-full opacity-50 cursor-not-allowed gap-1"
+          disabled
+          title="Tarifni oshiring — ko'proq tarixiy ma'lumot oling"
+        >
+          <Lock className="h-3 w-3" />
+          {lockedPresets[0].label}+
+        </Button>
+      )}
       <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
         <PopoverTrigger asChild>
           <Button
@@ -95,7 +121,7 @@ export function DateRangeFilter({ from, to, onRangeChange, activePreset }: DateR
             mode="single"
             selected={calendarMode === 'from' ? from : to}
             onSelect={handleCalendarSelect}
-            disabled={(date) => date > new Date()}
+            disabled={(date) => date > new Date() || date < minCalendarDate}
             initialFocus
             className={cn("p-3 pointer-events-auto")}
           />

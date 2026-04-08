@@ -86,11 +86,11 @@ serve(async (req) => {
       return jsonResponse({ error: 'Unauthorized' }, 401);
     }
     const token = authHeader.replace('Bearer ', '');
-    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims?.sub) {
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !authUser?.id) {
       return jsonResponse({ error: 'Unauthorized' }, 401);
     }
-    const callerId = claimsData.claims.sub as string;
+    const callerId = authUser.id;
 
     const body: DispatchRequest = await req.json();
     

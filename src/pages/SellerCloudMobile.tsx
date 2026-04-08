@@ -125,16 +125,7 @@ export default function SellerCloudMobile() {
     }
   }, [user, authLoading, navigate]);
 
-  // Auto-create starter subscription for new users (MUST be before any early return)
-  useEffect(() => {
-    if (!subscription && !subscriptionLoading && user) {
-      createSubscription('starter', 0).then(result => {
-        if (result.success) {
-          toast.success('Xush kelibsiz! 1 kunlik bepul sinov boshlandi.');
-        }
-      });
-    }
-  }, [subscription, subscriptionLoading, user]);
+  // If no subscription, show plan selector (removed legacy auto-starter)
 
   // Early returns AFTER all hooks
   if (authLoading || subscriptionLoading) {
@@ -147,8 +138,11 @@ export default function SellerCloudMobile() {
 
   if (!subscription) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="min-h-screen bg-background p-4">
+        <PlanSelector onSelectPlan={async (plan) => {
+          const result = await createSubscription(plan.slug, plan.monthly_fee_uzs);
+          if (result.success) toast.success('Tarif tanlandi!');
+        }} />
       </div>
     );
   }

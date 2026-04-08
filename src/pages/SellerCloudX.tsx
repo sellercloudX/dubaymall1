@@ -204,16 +204,8 @@ export default function SellerCloudX() {
   const expiryWarning = accessStatus?.warning === true;
   useAutoSync({ connectedMarketplaces, enabled: !!subscription && !isBlocked, onSyncComplete: refetch });
 
-  // Auto-create starter subscription for new users (no plan selection screen)
-  useEffect(() => {
-    if (!subscription && !subscriptionLoading && user) {
-      createSubscription('starter', 0).then(result => {
-        if (result.success) {
-          toast.success('Xush kelibsiz! 1 kunlik bepul sinov boshlandi.');
-        }
-      });
-    }
-  }, [subscription, subscriptionLoading, user]);
+  // If no subscription, show plan selector instead of auto-creating
+  // (removed legacy auto-starter creation)
 
   if (authLoading || subscriptionLoading) {
     return (
@@ -231,8 +223,11 @@ export default function SellerCloudX() {
     return (
       <>
         <Navbar />
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="container max-w-5xl mx-auto py-8 px-4">
+          <PlanSelector onSelectPlan={async (plan) => {
+            const result = await createSubscription(plan.slug, plan.monthly_fee_uzs);
+            if (result.success) toast.success('Tarif tanlandi! Obunani faollashtiring.');
+          }} />
         </div>
         <Footer />
       </>
@@ -374,18 +369,17 @@ export default function SellerCloudX() {
           </div>
 
           {/* Alerts */}
-          {accessStatus && !accessStatus.is_active && (
+          {expiryWarning && daysLeft !== undefined && daysLeft <= 5 && (
             <div className="px-6 pt-4">
               <Card className="border-yellow-500/50 bg-yellow-500/5">
                 <CardContent className="pt-4 pb-4">
                   <div className="flex items-start gap-4">
                     <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
-                      <h4 className="font-semibold text-yellow-700 dark:text-yellow-400 text-sm">Bepul rejada foydalanmoqdasiz</h4>
-                      <p className="text-xs text-muted-foreground mt-1">Bepul funksiyalardan foydalanishingiz mumkin. Pullik xizmatlar uchun aktivatsiya talab etiladi.</p>
-                      {totalDebt > 0 && <p className="font-medium text-sm mt-1">Qarzdorlik: {new Intl.NumberFormat('uz-UZ').format(totalDebt)} so'm</p>}
+                      <h4 className="font-semibold text-yellow-700 dark:text-yellow-400 text-sm">Obuna muddati tugayapti!</h4>
+                      <p className="text-xs text-muted-foreground mt-1">Obuna muddatingiz {daysLeft} kundan so'ng tugaydi. To'lovni amalga oshiring.</p>
                     </div>
-                    <Button variant="outline" size="sm" onClick={() => handleTabChange('subscription')}>Obuna</Button>
+                    <Button variant="outline" size="sm" onClick={() => handleTabChange('subscription')}>To'lov</Button>
                   </div>
                 </CardContent>
               </Card>
