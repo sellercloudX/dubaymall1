@@ -41,7 +41,7 @@ function generateOrderNumber(): string {
 }
 
 // TODO: Realga o'tganda false qiling
-const IS_TEST = true;
+const IS_TEST = false;
 
 function getPaymeBaseUrl(): string {
   return IS_TEST
