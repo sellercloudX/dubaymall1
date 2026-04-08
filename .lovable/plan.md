@@ -1,25 +1,48 @@
-## Chrome Web Store'ga joylash rejasi
 
-### 1. Privacy Policy sahifasi yaratish
-- `/privacy-policy` route qo'shish (CWS talab qiladi)
-- Extension qanday ma'lumot yig'ishi, saqlashi haqida
+## 📊 Yangi tarif tuzilmasi
 
-### 2. Store uchun vizual materiallar
-- 128x128 icon (hozirda bor)
-- 1280x800 promo rasm (marquee)
-- 440x280 kichik promo rasm
-- 5 ta screenshot (1280x800 yoki 640x400)
+### Tariflar (4 ta):
 
-### 3. Extension metadata yangilash
-- `manifest.json` da `description` ni yaxshilash
-- `homepage_url` qo'shish (`https://sellercloudx.com`)
+| | Boshlang'ich | Biznes | Professional | Enterprise |
+|---|---|---|---|---|
+| **Narx** | 299,000 so'm/oy | 1,499,000 so'm/oy | 5,999,000 so'm/oy | Kelishuv |
+| **Marketplace** | 1 ta MP | 1 ta MP | Cheksiz MP | Cheksiz |
+| **Do'konlar** | 1 ta do'kon | 3 tagacha do'kon | Cheksiz | Cheksiz |
+| **Tahlillar** | Faqat 7 kunlik data | 30 kunlik data | Yillik data | Cheksiz |
+| **P&L/ABC/Unit** | 7 kunlik | 30 kunlik | To'liq | To'liq |
+| **AI chegirma** | 0% | 15% | 30% | 40% (max) |
+| **Jamoa** | ❌ | ❌ | 3 ta xodim | Cheksiz |
+| **Multi-store** | ❌ | ❌ | ✅ | ✅ |
+| **Auto-reorder** | ❌ | ❌ | ❌ | ✅ |
 
-### 4. ZIP paketlash va yuklash ko'rsatmalari
-- Tayyor ZIP yaratish
-- CWS Developer Dashboard'ga yuklash bosqichlari
+### Free tarif → O'chiriladi
+- Bepul tarif o'rniga 1 oylik sinov (trial) beriladi — Boshlang'ich tarif sifatida
+- Trial tugagandan so'ng, to'lov qilinmasa — platforma bloklanadi
 
-### Natija
-Hamkorlar Chrome Web Store'dan bir tugma bilan o'rnatadi — "Add to Chrome" bosish yetarli.
+### 🎯 Gamifikatsiya & Retention tizimi
 
-### Eslatma
-CWS review 1-3 kun davom etadi. Review'dan o'tgandan keyin extension hammaga ochiq bo'ladi.
+1. **Balans bonuslari:**
+   - 100k+ to'ldirsa → +5% bonus
+   - 500k+ to'ldirsa → +10% bonus
+   - 1M+ to'ldirsa → +15% bonus
+
+2. **Kunlik faollik bonuslari:**
+   - Har kuni kirsa → streak counter
+   - 7 kun ketma-ket → 5,000 so'm bonus
+   - 30 kun ketma-ket → 25,000 so'm bonus
+
+3. **Upgrade triggers (UI):**
+   - "Bu oyda X so'm yo'qotdingiz — Growth tarifda buni oldini olish mumkin edi"
+   - "Sizning sotuvlaringiz o'sdi — Professional tarif sizga 3x foyda beradi"
+   - Balans past bo'lganda → "To'ldiring va +10% bonus oling"
+
+### 📝 Texnik ishlar:
+
+1. **DB:** `subscription_plans` ni yangilash (4 ta yangi tarif)
+2. **DB:** `user_activity_streaks` yangi jadval (streak tracking)  
+3. **DB:** `balance_bonus_rules` yangi jadval
+4. **DB:** `check_feature_access` funksiyasiga `data_retention_days` qo'shish
+5. **Frontend:** `PlanSelector` qayta yozish
+6. **Frontend:** `FeatureGate` ga data-retention cheklovi
+7. **Frontend:** `UpgradeTrigger` ni kuchaytirish
+8. **Frontend:** Streak/bonus UI komponenti
