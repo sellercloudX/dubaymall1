@@ -40,9 +40,14 @@ export function getPresetDates(preset: DatePreset): { from: Date | undefined; to
   }
 }
 
-export function DateRangeFilter({ from, to, onRangeChange, activePreset }: DateRangeFilterProps) {
+export function DateRangeFilter({ from, to, onRangeChange, activePreset, maxDays }: DateRangeFilterProps) {
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [calendarMode, setCalendarMode] = useState<'from' | 'to'>('from');
+
+  // Filter presets based on maxDays limit
+  const PRESETS = maxDays
+    ? ALL_PRESETS.filter(p => p.days <= maxDays)
+    : ALL_PRESETS;
 
   const handlePreset = (preset: DatePreset) => {
     const { from: f, to: t } = getPresetDates(preset);
