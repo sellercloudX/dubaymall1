@@ -1148,7 +1148,7 @@ export type Database = {
         Row: {
           account_info: Json | null
           created_at: string
-          credentials: Json
+          credentials: Json | null
           encrypted_credentials: string | null
           id: string
           is_active: boolean | null
@@ -1164,7 +1164,7 @@ export type Database = {
         Insert: {
           account_info?: Json | null
           created_at?: string
-          credentials?: Json
+          credentials?: Json | null
           encrypted_credentials?: string | null
           id?: string
           is_active?: boolean | null
@@ -1180,7 +1180,7 @@ export type Database = {
         Update: {
           account_info?: Json | null
           created_at?: string
-          credentials?: Json
+          credentials?: Json | null
           encrypted_credentials?: string | null
           id?: string
           is_active?: boolean | null
