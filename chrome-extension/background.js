@@ -7,8 +7,8 @@ const SUPABASE_URL = 'https://idcshubgqrzdvkttnslz.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlkY3NodWJncXJ6ZHZrdHRuc2x6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxMzE4NjksImV4cCI6MjA4NTcwNzg2OX0.7am0dzPKSQXLXhOwNHRZbHqxi8pRQLkwO-XQDt-_DI8';
 
 let ws = null;
+let wsConnecting = false;
 let userId = null;
-let websocketHeartbeatTimer = null;
 const UZUM_SELLER_URL_PATTERNS = ['https://seller.uzum.uz/*', 'https://seller-edu.uzum.uz/*'];
 const UZUM_CREATE_URL = 'https://seller.uzum.uz/products/create';
 
