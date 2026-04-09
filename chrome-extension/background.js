@@ -1,5 +1,5 @@
 /**
- * SellerCloudX Chrome Extension — Background Service Worker v4.2.0
+ * SellerCloudX Chrome Extension — Background Service Worker v4.3.0
  * chrome.alarms bilan barqaror ulanish
  */
 
