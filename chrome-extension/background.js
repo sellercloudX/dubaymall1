@@ -1,5 +1,5 @@
 /**
- * SellerCloudX Chrome Extension — Background Service Worker v4.2.0
+ * SellerCloudX Chrome Extension — Background Service Worker v4.3.0
  * chrome.alarms bilan barqaror ulanish
  */
 
@@ -7,8 +7,8 @@ const SUPABASE_URL = 'https://idcshubgqrzdvkttnslz.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlkY3NodWJncXJ6ZHZrdHRuc2x6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxMzE4NjksImV4cCI6MjA4NTcwNzg2OX0.7am0dzPKSQXLXhOwNHRZbHqxi8pRQLkwO-XQDt-_DI8';
 
 let ws = null;
+let wsConnecting = false;
 let userId = null;
-let websocketHeartbeatTimer = null;
 const UZUM_SELLER_URL_PATTERNS = ['https://seller.uzum.uz/*', 'https://seller-edu.uzum.uz/*'];
 const UZUM_CREATE_URL = 'https://seller.uzum.uz/products/create';
 
@@ -155,44 +155,62 @@ function connectRealtime(accessToken, uid) {
     console.log('[SCX] WebSocket already connected');
     return;
   }
+  if (wsConnecting) {
+    console.log('[SCX] WebSocket connection already in progress, skipping');
+    return;
+  }
 
+  // Close stale socket if exists
+  if (ws) {
+    try { ws.onclose = null; ws.onerror = null; ws.close(); } catch {}
+    ws = null;
+  }
+
+  wsConnecting = true;
   userId = uid;
   const wsUrl = SUPABASE_URL.replace('https://', 'wss://') + '/realtime/v1/websocket?apikey=' + SUPABASE_ANON_KEY + '&vsn=1.0.0';
-  ws = new WebSocket(wsUrl);
+  const socket = new WebSocket(wsUrl);
 
-  ws.onopen = () => {
+  socket.onopen = () => {
+    wsConnecting = false;
+    ws = socket;
     console.log('[SCX] WebSocket connected');
-    ws.send(JSON.stringify({
-      topic: `realtime:public:uzum_extension_commands:user_id=eq.${userId}`,
-      event: 'phx_join',
-      payload: {
-        config: {
-          broadcast: { self: false },
-          postgres_changes: [{
-            event: 'INSERT', schema: 'public',
-            table: 'uzum_extension_commands',
-            filter: `user_id=eq.${userId}`,
-          }],
+    try {
+      socket.send(JSON.stringify({
+        topic: `realtime:public:uzum_extension_commands:user_id=eq.${userId}`,
+        event: 'phx_join',
+        payload: {
+          config: {
+            broadcast: { self: false },
+            postgres_changes: [{
+              event: 'INSERT', schema: 'public',
+              table: 'uzum_extension_commands',
+              filter: `user_id=eq.${userId}`,
+            }],
+          },
+          access_token: accessToken,
         },
-        access_token: accessToken,
-      },
-      ref: '1',
-    }));
+        ref: '1',
+      }));
+    } catch (e) {
+      console.error('[SCX] WebSocket send error:', e);
+    }
 
     setConfig({ isConnected: true, tokenExpiry: decodeJwtExp(accessToken) });
     chrome.action.setBadgeText({ text: '●' });
     chrome.action.setBadgeBackgroundColor({ color: '#22c55e' });
 
-    // WebSocket-level heartbeat
     if (websocketHeartbeatTimer) clearInterval(websocketHeartbeatTimer);
     websocketHeartbeatTimer = setInterval(() => {
       if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ topic: 'phoenix', event: 'heartbeat', payload: {}, ref: String(Date.now()) }));
+        try {
+          ws.send(JSON.stringify({ topic: 'phoenix', event: 'heartbeat', payload: {}, ref: String(Date.now()) }));
+        } catch {}
       }
     }, 25000);
   };
 
-  ws.onmessage = async (event) => {
+  socket.onmessage = async (event) => {
     try {
       const msg = JSON.parse(event.data);
       if (msg.event === 'postgres_changes' && msg.payload?.data?.record) {
@@ -204,16 +222,20 @@ function connectRealtime(accessToken, uid) {
     } catch {}
   };
 
-  ws.onclose = () => {
+  socket.onclose = () => {
     console.log('[SCX] WebSocket disconnected');
+    wsConnecting = false;
+    if (ws === socket) ws = null;
     setConfig({ isConnected: false });
     chrome.action.setBadgeText({ text: '✕' });
     chrome.action.setBadgeBackgroundColor({ color: '#ef4444' });
     if (websocketHeartbeatTimer) clearInterval(websocketHeartbeatTimer);
-    // Reconnect via alarm
   };
 
-  ws.onerror = (err) => console.error('[SCX] WebSocket error:', err);
+  socket.onerror = (err) => {
+    console.error('[SCX] WebSocket error:', err);
+    wsConnecting = false;
+  };
 }
 
 // ===== chrome.alarms — keeps SW alive =====
