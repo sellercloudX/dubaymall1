@@ -53,7 +53,7 @@ export default function ExtensionDownload() {
           </Button>
           <div>
             <h1 className="text-base font-bold text-foreground">Chrome Extension</h1>
-            <p className="text-xs text-muted-foreground">SellerCloudX Multi-Marketplace v4.1.1</p>
+            <p className="text-xs text-muted-foreground">SellerCloudX Multi-Marketplace v5.2.0</p>
           </div>
         </div>
       </div>
