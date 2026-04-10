@@ -47,35 +47,42 @@
     return null;
   }
 
+  function isExtensionValid() {
+    try { return !!chrome.runtime?.id; } catch { return false; }
+  }
+
   function syncSession() {
+    if (!isExtensionValid()) return;
     const session = getSupabaseSession();
     if (!session) return;
 
-    // Check if extension already has this session
-    chrome.storage.local.get(['userId', 'accessToken'], (stored) => {
-      if (chrome.runtime.lastError) return;
-      
-      // Only update if different user or no session stored
-      if (stored.userId === session.userId && stored.accessToken === session.accessToken) {
-        return; // Already synced
-      }
+    try {
+      chrome.storage.local.get(['userId', 'accessToken'], (stored) => {
+        if (chrome.runtime.lastError || !isExtensionValid()) return;
+        
+        if (stored.userId === session.userId && stored.accessToken === session.accessToken) {
+          return;
+        }
 
-      console.log('[SCX] Auto-syncing session from web app for:', session.userEmail);
-      
-      // Save to extension storage
-      chrome.storage.local.set({
-        accessToken: session.accessToken,
-        userId: session.userId,
-        userEmail: session.userEmail,
+        console.log('[SCX] Auto-syncing session from web app for:', session.userEmail);
+        
+        chrome.storage.local.set({
+          accessToken: session.accessToken,
+          userId: session.userId,
+          userEmail: session.userEmail,
+        });
+
+        chrome.runtime.sendMessage({
+          type: 'SCX_LOGIN',
+          accessToken: session.accessToken,
+          userId: session.userId,
+        }, () => void chrome.runtime.lastError);
       });
-
-      // Notify background to connect WebSocket
-      chrome.runtime.sendMessage({
-        type: 'SCX_LOGIN',
-        accessToken: session.accessToken,
-        userId: session.userId,
-      }, () => void chrome.runtime.lastError);
-    });
+    } catch (e) {
+      if (!String(e).includes('Extension context invalidated')) {
+        console.warn('[SCX] syncSession error:', e);
+      }
+    }
   }
 
   // Also listen for postMessage from the web app (explicit token pass)
