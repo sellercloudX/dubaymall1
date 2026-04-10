@@ -8,6 +8,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 let ws = null;
 let wsConnecting = false;
+let websocketHeartbeatTimer = null;
 let userId = null;
 const UZUM_SELLER_URL_PATTERNS = ['https://seller.uzum.uz/*', 'https://seller-edu.uzum.uz/*'];
 const UZUM_CREATE_URL = 'https://seller.uzum.uz/products/create';
