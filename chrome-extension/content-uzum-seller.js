@@ -11,9 +11,12 @@ if (window.__SCX_UZUM_SELLER_LOADED) {
   window.__SCX_UZUM_SELLER_LOADED = true;
 
 const SCX_VERSION = '8.0.0';
+const SCX_VERSION_FULL = '8.1.0';
 const SCX_SUPABASE_URL = 'https://idcshubgqrzdvkttnslz.supabase.co';
+const SCX_CURRENT_DOMAIN = window.location.hostname; // seller.uzum.uz or seller-edu.uzum.uz
+const SCX_CREATE_URL = `https://${SCX_CURRENT_DOMAIN}/products/create`;
 
-console.log(`[SCX v${SCX_VERSION}] Uzum Seller content script loaded`);
+console.log(`[SCX v${SCX_VERSION_FULL}] Uzum Seller content script loaded on ${SCX_CURRENT_DOMAIN}`);
 
 // ===== DOM Utility Helpers =====
 function waitForSelector(selector, timeout = 10000) {
@@ -26,6 +29,24 @@ function waitForSelector(selector, timeout = 10000) {
     });
     observer.observe(document.body, { childList: true, subtree: true });
     setTimeout(() => { observer.disconnect(); reject(new Error('timeout: ' + selector)); }, timeout);
+  });
+}
+
+// ===== ROBUST ELEMENT WAIT =====
+function waitForAnySelector(selectors, timeout = 15000) {
+  return new Promise((resolve, reject) => {
+    for (const sel of selectors) {
+      const el = document.querySelector(sel);
+      if (el) return resolve(el);
+    }
+    const observer = new MutationObserver(() => {
+      for (const sel of selectors) {
+        const found = document.querySelector(sel);
+        if (found) { observer.disconnect(); resolve(found); return; }
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    setTimeout(() => { observer.disconnect(); reject(new Error('timeout waiting for: ' + selectors.join(', '))); }, timeout);
   });
 }
 
@@ -592,25 +613,104 @@ async function handleCloneAuto() {
 
 // ===== FULL AUTO: Navigate → Fill → Save =====
 async function autoFillAndSave(payload) {
-  const isOnCreatePage = /\/(products|goods|product)\/create/.test(window.location.href);
+  const isOnCreatePage = /\/(products|goods|product)\/(create|add|new)/.test(window.location.pathname);
   
   if (!isOnCreatePage) {
-    showAutomationStatus('📄 Yaratish sahifasiga o\'tilmoqda...');
-    // Store data and navigate
-    await chrome.storage.local.set({ scx_pending_autofill: payload });
-    window.location.href = 'https://seller.uzum.uz/products/create';
-    return;
+    showAutomationStatus('📄 Yaratish sahifasiga o\'tilmoqda...', 'info');
+    
+    // Strategy 1: Try SPA navigation — click "Add product" button if visible
+    const spaNavigated = await tryClickAddProduct();
+    if (spaNavigated) {
+      console.log('[SCX] SPA navigation successful, waiting for form...');
+      await scxSleep(3000);
+      // Check if we're now on the create page
+      if (/\/(products|goods|product)\/(create|add|new)/.test(window.location.pathname)) {
+        return await performAutoFill(payload);
+      }
+    }
+    
+    // Strategy 2: Navigate via URL (same domain!)
+    console.log('[SCX] SPA navigation failed, using URL redirect to:', SCX_CREATE_URL);
+    await chrome.storage.local.set({ scx_pending_autofill: JSON.parse(JSON.stringify(payload)) });
+    window.location.href = SCX_CREATE_URL;
+    return { success: true, result: { saved: false, message: 'Sahifaga o\'tilmoqda, autofill pending...' } };
   }
 
   // We're on the create page — fill the form
-  await performAutoFill(payload);
+  return await performAutoFill(payload);
+}
+
+// ===== SPA Navigation: Try to click "Add product" button =====
+async function tryClickAddProduct() {
+  // First, check if there's a direct "Add product" button on the current page
+  const addTexts = ['добавить товар', 'добавить', 'создать товар', 'tovar qo\'shish', 'yangi tovar', 'new product', 'создать', 'добавить продукт'];
+  
+  const allClickable = document.querySelectorAll('a, button, [role="button"], [class*="Button"], [class*="button"]');
+  for (const el of allClickable) {
+    if (el.closest('#scx-main-panel, #scx-fab, #scx-toolbar, #scx-auto-status')) continue;
+    const text = el.textContent.trim().toLowerCase();
+    for (const t of addTexts) {
+      if (text.includes(t) || (el.getAttribute('href') || '').includes('/create') || (el.getAttribute('href') || '').includes('/add')) {
+        console.log('[SCX] Found add product button:', text);
+        el.click();
+        await scxSleep(2000);
+        return true;
+      }
+    }
+  }
+  
+  // Strategy 2: Click sidebar "Products/Товары" nav item first, then find "Add" button
+  const navLinks = document.querySelectorAll('nav a, [class*="sidebar"] a, [class*="menu"] a, [class*="nav"] a, aside a');
+  for (const link of navLinks) {
+    if (link.closest('#scx-main-panel, #scx-fab, #scx-toolbar')) continue;
+    const text = link.textContent.trim().toLowerCase();
+    if (text.includes('товар') || text.includes('продукт') || text.includes('tovar') || text.includes('mahsulot') || text.includes('product')) {
+      console.log('[SCX] Found products nav item:', text);
+      link.click();
+      await scxSleep(2000);
+      
+      // Now find "Add" button on the products page
+      for (const btn of document.querySelectorAll('a, button, [role="button"]')) {
+        if (btn.closest('#scx-main-panel, #scx-fab, #scx-toolbar')) continue;
+        const btnText = btn.textContent.trim().toLowerCase();
+        if (btnText.includes('добавить') || btnText.includes('создать') || btnText.includes('qo\'shish') || btnText.includes('yaratish') || 
+            (btn.getAttribute('href') || '').includes('/create')) {
+          console.log('[SCX] Found add button after nav:', btnText);
+          btn.click();
+          await scxSleep(2000);
+          return true;
+        }
+      }
+      break;
+    }
+  }
+  
+  return false;
 }
 
 async function performAutoFill(payload) {
   const { title, description, brand, images, characteristics, price } = payload;
   
+  showAutomationStatus('📝 Forma yuklanishini kutmoqda...');
+  
+  // Wait for the form to actually appear (up to 15 seconds)
+  let formReady = false;
+  for (let i = 0; i < 15; i++) {
+    await scxSleep(1000);
+    const inputs = findAllInputs();
+    const hasForm = inputs.length > 0 || document.querySelector('form') || document.querySelector('[contenteditable="true"]');
+    if (hasForm) { formReady = true; break; }
+    showAutomationStatus(`📝 Forma kutilmoqda... (${i + 1}s)`);
+  }
+  
+  if (!formReady) {
+    showAutomationStatus('⚠️ Forma topilmadi. Sahifani tekshiring.', 'warning');
+    console.warn('[SCX] Form not found after 15s wait');
+    return { success: false, error: 'Forma topilmadi — sahifani qayta yuklang' };
+  }
+  
   showAutomationStatus('📝 Forma to\'ldirilmoqda...');
-  await scxSleep(2000);
+  await scxSleep(500);
 
   const filled = [], failed = [];
 
@@ -730,7 +830,7 @@ async function performAutoFill(payload) {
 
   // 7. AUTO-SAVE: Find and click save/submit button
   showAutomationStatus('💾 Saqlanmoqda...');
-  await scxSleep(1000);
+  await scxSleep(2000);
 
   const saved = await attemptAutoSave();
 
@@ -1189,21 +1289,44 @@ async function handleCommand(msg) {
 
 // ===== Pending auto-fill check (after page navigation) =====
 async function checkPendingAutoFill() {
-  const data = await chrome.storage.local.get(['scx_pending_autofill']);
-  if (data.scx_pending_autofill) {
-    await chrome.storage.local.remove('scx_pending_autofill');
-    await scxSleep(3000);
-    await performAutoFill(data.scx_pending_autofill);
+  try {
+    const data = await chrome.storage.local.get(['scx_pending_autofill']);
+    if (data.scx_pending_autofill) {
+      console.log('[SCX] Found pending autofill data, starting...');
+      await chrome.storage.local.remove('scx_pending_autofill');
+      showAutomationStatus('📝 Avvalgi so\'rov davom ettirilmoqda...');
+      // Wait longer for page to fully load after navigation
+      await scxSleep(5000);
+      const result = await performAutoFill(data.scx_pending_autofill);
+      console.log('[SCX] Pending autofill result:', result);
+    }
+  } catch (err) {
+    console.error('[SCX] checkPendingAutoFill error:', err);
   }
 }
 
 // ===== Init =====
 function initUzumSeller() {
+  console.log(`[SCX] Initializing on ${SCX_CURRENT_DOMAIN}, path: ${window.location.pathname}`);
   initToolbar();
   createFAB();
   checkPendingAutoFill();
+  
+  // Watch for SPA navigations and re-check pending autofill
+  let lastPath = window.location.pathname;
+  const navObserver = new MutationObserver(() => {
+    if (window.location.pathname !== lastPath) {
+      const newPath = window.location.pathname;
+      console.log('[SCX] SPA navigation detected:', lastPath, '->', newPath);
+      lastPath = newPath;
+      if (/\/(products|goods|product)\/(create|add|new)/.test(newPath)) {
+        setTimeout(() => checkPendingAutoFill(), 3000);
+      }
+    }
+  });
+  navObserver.observe(document.body, { childList: true, subtree: true });
 }
 
-setTimeout(initUzumSeller, 1000);
+setTimeout(initUzumSeller, 1500);
 
 } // end of duplicate guard
