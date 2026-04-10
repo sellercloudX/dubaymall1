@@ -129,10 +129,125 @@ function isCreateWizardVisible() {
   );
 }
 
+function isProductsSectionPath(pathname = window.location.pathname) {
+  const path = (pathname || '').toLowerCase().replace(/\/+$/, '');
+  return /\/(products|goods|assortment|catalog)(\/|$)/.test(path) && !isCreateFlowPath(path);
+}
+
+function isInteractableTarget(el) {
+  if (!el) return false;
+  if (el.closest('#scx-main-panel, #scx-fab, #scx-toolbar, #scx-auto-status')) return false;
+  if (el.offsetParent === null) return false;
+  if (typeof el.disabled === 'boolean' && el.disabled) return false;
+  return true;
+}
+
+function getElementDescriptor(el) {
+  const text = (el.textContent || '').trim().toLowerCase();
+  const href = (el.getAttribute('href') || '').toLowerCase();
+  const aria = (el.getAttribute('aria-label') || '').toLowerCase();
+  const title = (el.getAttribute('title') || '').toLowerCase();
+  const testId = (el.getAttribute('data-testid') || '').toLowerCase();
+  return {
+    text,
+    href,
+    aria,
+    title,
+    testId,
+    descriptor: `${text} ${href} ${aria} ${title} ${testId}`.trim(),
+  };
+}
+
+function findCreateButtonTarget() {
+  const directSelectors = [
+    'a[href*="/products/create"]',
+    'a[href*="/products/add"]',
+    'a[href*="/products/new"]',
+    'a[href*="/goods/create"]',
+    'a[href*="/goods/add"]',
+    'a[href*="/product/create"]',
+    'a[href*="/product/add"]',
+    'button[data-testid*="product"][data-testid*="create"]',
+    'button[data-testid*="product"][data-testid*="add"]',
+  ];
+
+  for (const selector of directSelectors) {
+    const directTarget = document.querySelector(selector);
+    if (isInteractableTarget(directTarget)) return directTarget;
+  }
+
+  const addTexts = ['добавить товар', 'создать товар', 'добавить продукт', 'tovar qo\'shish', 'mahsulot qo\'shish', 'yangi tovar', 'add product', 'create product'];
+  const productWords = ['товар', 'товары', 'продукт', 'mahsulot', 'tovar', 'product', 'products', 'goods'];
+  const createWords = ['добавить', 'создать', 'qo\'shish', 'yarat', 'add', 'create', 'new'];
+  const allClickable = document.querySelectorAll('a, button, [role="button"]');
+
+  for (const el of allClickable) {
+    if (!isInteractableTarget(el)) continue;
+
+    const { text, href, aria, descriptor } = getElementDescriptor(el);
+    const looksLikeCreateRoute = /\/(products|goods|product)\/(create|add|new|wizard|draft)/.test(href);
+    const hasProductContext = productWords.some((word) => descriptor.includes(word));
+    const hasCreateAction = addTexts.some((t) => text.includes(t) || aria.includes(t))
+      || (createWords.some((word) => descriptor.includes(word)) && hasProductContext);
+
+    if (looksLikeCreateRoute || (hasProductContext && hasCreateAction)) return el;
+  }
+
+  return null;
+}
+
+function findProductsSectionTarget() {
+  const directSelectors = [
+    'nav a[href="/products"]',
+    'nav a[href*="/products?"]',
+    'nav a[href*="/goods"]',
+    'aside a[href="/products"]',
+    'aside a[href*="/products?"]',
+    'aside a[href*="/goods"]',
+    '[role="navigation"] a[href="/products"]',
+    '[role="navigation"] a[href*="/products?"]',
+    '[role="navigation"] a[href*="/goods"]',
+  ];
+
+  for (const selector of directSelectors) {
+    const targets = document.querySelectorAll(selector);
+    for (const target of targets) {
+      if (isInteractableTarget(target)) return target;
+    }
+  }
+
+  const productSectionWords = ['товары', 'товарлар', 'mahsulotlar', 'mahsulot', 'products', 'goods', 'ассортимент', 'catalog'];
+  const createWords = ['добавить', 'создать', 'qo\'shish', 'yarat', 'add', 'create', 'new'];
+  const allClickable = document.querySelectorAll('nav a, nav button, aside a, aside button, [role="navigation"] a, [role="navigation"] button, [class*="sidebar"] a, [class*="sidebar"] button, [class*="menu"] a, [class*="menu"] button, a, button, [role="button"]');
+
+  for (const el of allClickable) {
+    if (!isInteractableTarget(el)) continue;
+
+    const { href, descriptor } = getElementDescriptor(el);
+    const looksLikeProductsRoute = /\/(products|goods|assortment|catalog)(\/|$|\?)/.test(href) && !/\/(create|add|new|wizard|draft)(\/|$|\?)/.test(href);
+    const isLikelyProductsNav = productSectionWords.some((word) => descriptor.includes(word));
+    const looksLikeCreateAction = createWords.some((word) => descriptor.includes(word));
+    const insideNavigation = Boolean(el.closest('nav, aside, [role="navigation"], [class*="sidebar"], [class*="menu"], [class*="nav"]'));
+
+    if (looksLikeProductsRoute || (insideNavigation && isLikelyProductsNav && !looksLikeCreateAction)) return el;
+  }
+
+  return null;
+}
+
 async function waitForCreateFlow(timeout = 10000) {
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeout) {
     if (isCreateFlowPath() || isCreateWizardVisible()) return true;
+    await sleep(400);
+  }
+  return false;
+}
+
+async function waitForProductsSection(timeout = 10000) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeout) {
+    if (isProductsSectionPath() || findCreateButtonTarget()) return true;
     await sleep(400);
   }
   return false;
@@ -655,51 +770,38 @@ async function startWizardAutomation(payload) {
 
 // ===== SPA Navigation: Try to click "Add product" =====
 async function tryClickAddProduct() {
-  const directSelectors = [
-    'a[href*="/products/create"]',
-    'a[href*="/products/add"]',
-    'a[href*="/products/new"]',
-    'a[href*="/goods/create"]',
-    'a[href*="/goods/add"]',
-    'a[href*="/product/create"]',
-    'a[href*="/product/add"]',
-    'button[data-testid*="product"][data-testid*="create"]',
-    'button[data-testid*="product"][data-testid*="add"]',
-  ];
-
-  for (const selector of directSelectors) {
-    const directTarget = document.querySelector(selector);
-    if (!directTarget || directTarget.closest('#scx-main-panel, #scx-fab, #scx-toolbar, #scx-auto-status')) continue;
-    if (directTarget.offsetParent === null) continue;
-    console.log('[SCX] Found direct add product control:', selector);
-    directTarget.click();
+  const createTarget = findCreateButtonTarget();
+  if (createTarget) {
+    const { text, href, aria } = getElementDescriptor(createTarget);
+    console.log('[SCX] Found add product button:', text || href || aria);
+    createTarget.click();
     await sleep(1200);
     return true;
   }
 
-  const addTexts = ['добавить товар', 'создать товар', 'добавить продукт', 'tovar qo\'shish', 'mahsulot qo\'shish', 'yangi tovar', 'add product', 'create product'];
-  const productWords = ['товар', 'товары', 'продукт', 'mahsulot', 'tovar', 'product', 'products', 'goods'];
-  const createWords = ['добавить', 'создать', 'qo\'shish', 'yarat', 'add', 'create', 'new'];
-  const allClickable = document.querySelectorAll('a, button, [role="button"]');
+  const productsTarget = findProductsSectionTarget();
+  if (productsTarget) {
+    const { text, href, aria } = getElementDescriptor(productsTarget);
+    console.log('[SCX] Opening products section first:', text || href || aria);
+    showStatus('📂 Avval Mahsulotlar bo‘limi ochilmoqda...');
+    productsTarget.click();
+    await sleep(1500);
 
-  for (const el of allClickable) {
-    if (el.closest('#scx-main-panel, #scx-fab, #scx-toolbar, #scx-auto-status')) continue;
-    if (el.disabled || el.offsetParent === null) continue;
+    const productsOpened = await waitForProductsSection(10000);
+    if (!productsOpened) return false;
 
-    const text = el.textContent.trim().toLowerCase();
-    const href = (el.getAttribute('href') || '').toLowerCase();
-    const aria = (el.getAttribute('aria-label') || '').toLowerCase();
-    const descriptor = `${text} ${href} ${aria}`;
-    const looksLikeCreateRoute = /\/(products|goods|product)\/(create|add|new|wizard|draft)/.test(href);
-    const hasProductContext = productWords.some((word) => descriptor.includes(word));
-    const hasCreateAction = addTexts.some((t) => text.includes(t) || aria.includes(t))
-      || (createWords.some((word) => descriptor.includes(word)) && hasProductContext);
+    for (let attempt = 0; attempt < 15; attempt++) {
+      const createAfterNav = findCreateButtonTarget();
+      if (createAfterNav) {
+        const info = getElementDescriptor(createAfterNav);
+        console.log('[SCX] Found create button after products navigation:', info.text || info.href || info.aria);
+        showStatus('➕ Mahsulot yaratish oynasi ochilmoqda...');
+        createAfterNav.click();
+        await sleep(1200);
+        return true;
+      }
 
-    if (looksLikeCreateRoute || (hasProductContext && hasCreateAction)) {
-      console.log('[SCX] Found add product button:', text || href || aria);
-      el.click();
-      await sleep(1200);
-      return true;
+      await sleep(500);
     }
   }
 
@@ -1374,7 +1476,14 @@ async function checkPendingAutoFill() {
     
     // Check for initial pending autofill (after redirect to create page)
     if (data.scx_pending_autofill) {
-      if (!isInCreateFlow) return;
+      if (!isInCreateFlow) {
+        const navigatedToCreate = await tryClickAddProduct();
+        if (!navigatedToCreate) return;
+
+        const createFlowOpened = await waitForCreateFlow(10000);
+        if (!createFlowOpened) return;
+      }
+
       console.log('[SCX] Found pending autofill data, starting wizard...');
       await chrome.storage.local.remove('scx_pending_autofill');
       showStatus('📝 Avvalgi so\'rov davom ettirilmoqda...');
