@@ -111,6 +111,33 @@ function findAllInputs() {
   return document.querySelectorAll('input[type="text"], input:not([type="hidden"]):not([type="file"]):not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]), textarea');
 }
 
+function clonePayload(payload) {
+  return JSON.parse(JSON.stringify(payload));
+}
+
+function isCreateFlowPath(pathname = window.location.pathname) {
+  const path = (pathname || '').toLowerCase().replace(/\/+$/, '');
+  return /\/(products|goods|product)\/(create|add|new|wizard|draft)(\/|$)/.test(path)
+    || /\/(products|goods|product)\/create-product(\/|$)/.test(path);
+}
+
+function isCreateWizardVisible() {
+  return Boolean(
+    findInputByLabel(['название товара', 'точное название', 'категория товара', 'на узбекском', 'на русском'], 'input, textarea')
+    || findInputByPlaceholder(['точное название', 'название товара', 'краткое описание', 'артикул', 'sku'])
+    || document.querySelector('input[type="file"]')
+  );
+}
+
+async function waitForCreateFlow(timeout = 10000) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeout) {
+    if (isCreateFlowPath() || isCreateWizardVisible()) return true;
+    await sleep(400);
+  }
+  return false;
+}
+
 // Click a button by matching text
 function clickButtonByText(texts) {
   const buttons = document.querySelectorAll('button, [role="button"], a.btn, [class*="Button"], [class*="button"]');
@@ -599,24 +626,27 @@ async function handleCloneAuto() {
  *            brand, images[], properties[], seo_keywords[], price, sku }
  */
 async function startWizardAutomation(payload) {
-  const isOnCreatePage = /\/(products|goods|product)\/(create|add|new)/.test(window.location.pathname);
+  const isOnCreatePage = isCreateFlowPath() || isCreateWizardVisible();
 
   if (!isOnCreatePage) {
-    showStatus('📄 Yaratish sahifasiga o\'tilmoqda...');
+    showStatus('📄 Mahsulot yaratish oynasi ochilmoqda...');
+    await chrome.storage.local.set({ scx_pending_autofill: clonePayload(payload) });
     
     // Try SPA navigation first
     const spaOk = await tryClickAddProduct();
     if (spaOk) {
-      await sleep(3000);
-      if (/\/(products|goods|product)\/(create|add|new)/.test(window.location.pathname)) {
+      const createFlowOpened = await waitForCreateFlow(10000);
+      if (createFlowOpened) {
+        await chrome.storage.local.remove('scx_pending_autofill');
         return await runWizardStep1(payload);
       }
+
+      showStatus('⏳ Yaratish sahifasi ochilishi kutilmoqda...', 'info');
+      return;
     }
-    
-    // Fallback: hard navigate (save payload for after reload)
-    console.log('[SCX] Using URL redirect to:', SCX_CREATE_URL);
-    await chrome.storage.local.set({ scx_pending_autofill: JSON.parse(JSON.stringify(payload)) });
-    window.location.href = SCX_CREATE_URL;
+
+    console.log('[SCX] Add product trigger not found; waiting for manual navigation');
+    showStatus('⚠️ "Tovar qo\'shish" sahifasini qo\'lda oching — AI avtomatik davom etadi', 'warning');
     return;
   }
 
@@ -625,21 +655,54 @@ async function startWizardAutomation(payload) {
 
 // ===== SPA Navigation: Try to click "Add product" =====
 async function tryClickAddProduct() {
-  const addTexts = ['добавить товар', 'добавить', 'создать товар', 'tovar qo\'shish', 'yangi tovar', 'создать', 'добавить продукт'];
+  const directSelectors = [
+    'a[href*="/products/create"]',
+    'a[href*="/products/add"]',
+    'a[href*="/products/new"]',
+    'a[href*="/goods/create"]',
+    'a[href*="/goods/add"]',
+    'a[href*="/product/create"]',
+    'a[href*="/product/add"]',
+    'button[data-testid*="product"][data-testid*="create"]',
+    'button[data-testid*="product"][data-testid*="add"]',
+  ];
+
+  for (const selector of directSelectors) {
+    const directTarget = document.querySelector(selector);
+    if (!directTarget || directTarget.closest('#scx-main-panel, #scx-fab, #scx-toolbar, #scx-auto-status')) continue;
+    if (directTarget.offsetParent === null) continue;
+    console.log('[SCX] Found direct add product control:', selector);
+    directTarget.click();
+    await sleep(1200);
+    return true;
+  }
+
+  const addTexts = ['добавить товар', 'создать товар', 'добавить продукт', 'tovar qo\'shish', 'mahsulot qo\'shish', 'yangi tovar', 'add product', 'create product'];
+  const productWords = ['товар', 'товары', 'продукт', 'mahsulot', 'tovar', 'product', 'products', 'goods'];
+  const createWords = ['добавить', 'создать', 'qo\'shish', 'yarat', 'add', 'create', 'new'];
   const allClickable = document.querySelectorAll('a, button, [role="button"]');
+
   for (const el of allClickable) {
     if (el.closest('#scx-main-panel, #scx-fab, #scx-toolbar, #scx-auto-status')) continue;
+    if (el.disabled || el.offsetParent === null) continue;
+
     const text = el.textContent.trim().toLowerCase();
     const href = (el.getAttribute('href') || '').toLowerCase();
-    for (const t of addTexts) {
-      if (text.includes(t) || href.includes('/create') || href.includes('/add')) {
-        console.log('[SCX] Found add product button:', text);
-        el.click();
-        await sleep(2000);
-        return true;
-      }
+    const aria = (el.getAttribute('aria-label') || '').toLowerCase();
+    const descriptor = `${text} ${href} ${aria}`;
+    const looksLikeCreateRoute = /\/(products|goods|product)\/(create|add|new|wizard|draft)/.test(href);
+    const hasProductContext = productWords.some((word) => descriptor.includes(word));
+    const hasCreateAction = addTexts.some((t) => text.includes(t) || aria.includes(t))
+      || (createWords.some((word) => descriptor.includes(word)) && hasProductContext);
+
+    if (looksLikeCreateRoute || (hasProductContext && hasCreateAction)) {
+      console.log('[SCX] Found add product button:', text || href || aria);
+      el.click();
+      await sleep(1200);
+      return true;
     }
   }
+
   return false;
 }
 
@@ -1291,9 +1354,11 @@ async function handleCommand(msg) {
 async function checkPendingAutoFill() {
   try {
     const data = await chrome.storage.local.get(['scx_pending_autofill', 'scx_wizard_step', 'scx_wizard_payload', 'scx_wizard_filled']);
+    const isInCreateFlow = isCreateFlowPath() || isCreateWizardVisible();
     
     // Check for wizard continuation (step 2 or 3)
     if (data.scx_wizard_step && data.scx_wizard_payload) {
+      if (!isInCreateFlow) return;
       const step = data.scx_wizard_step;
       const payload = data.scx_wizard_payload;
       const filled = data.scx_wizard_filled || [];
@@ -1309,6 +1374,7 @@ async function checkPendingAutoFill() {
     
     // Check for initial pending autofill (after redirect to create page)
     if (data.scx_pending_autofill) {
+      if (!isInCreateFlow) return;
       console.log('[SCX] Found pending autofill data, starting wizard...');
       await chrome.storage.local.remove('scx_pending_autofill');
       showStatus('📝 Avvalgi so\'rov davom ettirilmoqda...');
