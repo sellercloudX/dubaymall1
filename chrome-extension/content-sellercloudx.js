@@ -87,18 +87,23 @@
 
   // Also listen for postMessage from the web app (explicit token pass)
   window.addEventListener('message', (event) => {
+    if (!isExtensionValid()) return;
     if (event.data?.type === 'SCX_AUTH_TOKEN' && event.data?.accessToken && event.data?.userId) {
       console.log('[SCX] Received auth token via postMessage');
-      chrome.storage.local.set({
-        accessToken: event.data.accessToken,
-        userId: event.data.userId,
-        userEmail: event.data.userEmail || '',
-      });
-      chrome.runtime.sendMessage({
-        type: 'SCX_LOGIN',
-        accessToken: event.data.accessToken,
-        userId: event.data.userId,
-      }, () => void chrome.runtime.lastError);
+      try {
+        chrome.storage.local.set({
+          accessToken: event.data.accessToken,
+          userId: event.data.userId,
+          userEmail: event.data.userEmail || '',
+        });
+        chrome.runtime.sendMessage({
+          type: 'SCX_LOGIN',
+          accessToken: event.data.accessToken,
+          userId: event.data.userId,
+        }, () => void chrome.runtime.lastError);
+      } catch (e) {
+        // Extension was reloaded/updated — ignore silently
+      }
     }
   });
 
