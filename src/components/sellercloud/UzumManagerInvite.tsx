@@ -100,6 +100,21 @@ export default function UzumManagerInvite() {
     if (!user) return;
     setIsSaving(true);
     try {
+      // First verify the manager session actually works by listing shops
+      const { data: sessionData, error: sessionErr } = await supabase.functions.invoke('uzum-manager-auth', {
+        body: { action: 'list-shops' },
+      });
+
+      if (sessionErr) {
+        // Try login first
+        const { data: loginData, error: loginErr } = await supabase.functions.invoke('uzum-manager-auth', {
+          body: { action: 'login' },
+        });
+        if (loginErr || !loginData?.success) {
+          throw new Error('Manager sessiyasini yaratib bo\'lmadi. Admin bilan bog\'laning.');
+        }
+      }
+
       // 1. Create/update uzum_accounts
       if (!account) {
         const { data: newAcc, error: accErr } = await supabase
@@ -195,25 +210,30 @@ export default function UzumManagerInvite() {
     if (!user) return;
     setIsVerifying(true);
     try {
-      // Try to invoke uzum-manager-auth to verify the session works
+      // Actually test the session by listing shops
       const { data, error } = await supabase.functions.invoke('uzum-manager-auth', {
-        body: { action: 'verify', userId: user.id },
+        body: { action: 'list-shops' },
       });
 
       if (error) throw error;
       if (data?.success) {
-        toast({ title: '✅ Ulanish tasdiqlandi!', description: 'Manager sessiyasi ishlayapti.' });
+        const shopCount = data.shops?.length || 0;
+        toast({ 
+          title: '✅ Sessiya faol!', 
+          description: `Manager sessiyasi ishlayapti. ${shopCount} ta do'kon topildi.`,
+        });
       } else {
         toast({ 
-          title: '⚠️ Sessiya topilmadi', 
-          description: data?.message || 'Manager raqami hali qo\'shilmagan bo\'lishi mumkin.', 
+          title: '⚠️ Sessiya muddati o\'tgan', 
+          description: 'Qayta ulanish zarur.',
           variant: 'destructive',
         });
       }
     } catch {
       toast({ 
         title: 'Tekshirib bo\'lmadi', 
-        description: 'Backend funksiyasi hali sozlanmagan. Manager statusini qo\'lda tasdiqlang.',
+        description: 'Server bilan aloqa xatosi.',
+        variant: 'destructive',
       });
     } finally {
       setIsVerifying(false);
