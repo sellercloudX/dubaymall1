@@ -272,7 +272,7 @@ export default function UzumManagerInvite() {
       {/* Success state */}
       {isActive && (
         <Card className="border-success/30 bg-success/5">
-          <CardContent className="p-4 space-y-3">
+          <CardContent className="p-4 space-y-4">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-full bg-success/10 flex items-center justify-center shrink-0">
                 <CheckCircle2 className="w-5 h-5 text-success" />
@@ -280,14 +280,38 @@ export default function UzumManagerInvite() {
               <div className="space-y-1">
                 <div className="text-sm font-medium">Manager ulangan ✅</div>
                 <div className="text-[11px] text-muted-foreground">
-                  Uzum Market do'koningiz to'liq boshqarilmoqda. Mahsulot yaratish, buyurtmalar va hisobotlar avtomatik ishlaydi.
+                  API kalit va Chrome Extension shart emas — barcha operatsiyalar manager sessiyasi orqali ishlaydi.
                 </div>
               </div>
             </div>
+
+            {/* Capabilities grid */}
+            <div className="grid grid-cols-2 gap-1.5">
+              {[
+                { icon: '📦', label: 'Mahsulotlar', desc: 'Ko\'rish, yaratish, tahrirlash' },
+                { icon: '🛒', label: 'Buyurtmalar', desc: 'FBS/FBO, tasdiqlash, bekor qilish' },
+                { icon: '💰', label: 'Moliya', desc: 'Komissiya, xarajatlar, PnL' },
+                { icon: '📊', label: 'Hisobotlar', desc: 'Sotuvlar, qoldiq, ABC tahlili' },
+                { icon: '🏷️', label: 'Narx boshqaruv', desc: 'Narx yangilash, min-narx' },
+                { icon: '📋', label: 'Qoldiq', desc: 'FBS qoldiq yangilash' },
+                { icon: '🏷️', label: 'Etiketkalar', desc: 'FBS yorliq chop etish' },
+                { icon: '🚀', label: 'Boost/Reklama', desc: 'Reklama kampaniyalari' },
+              ].map((cap) => (
+                <div key={cap.label} className="flex items-center gap-2 bg-background/50 rounded-md px-2 py-1.5 border border-success/10">
+                  <span className="text-sm">{cap.icon}</span>
+                  <div>
+                    <div className="text-[10px] font-medium text-foreground">{cap.label}</div>
+                    <div className="text-[9px] text-muted-foreground">{cap.desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <Separator />
             <div className="flex gap-2">
               <Button variant="outline" size="sm" className="h-7 text-xs" onClick={verifyConnection} disabled={isVerifying}>
                 {isVerifying ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <RefreshCw className="w-3 h-3 mr-1" />}
-                Tekshirish
+                Sessiyani tekshirish
               </Button>
               <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:text-destructive" onClick={revokeManager} disabled={isSaving}>
                 <XCircle className="w-3 h-3 mr-1" />
