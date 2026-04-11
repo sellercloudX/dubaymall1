@@ -709,10 +709,11 @@ async function storeManagerSession(supabase: any, session: any) {
     .from("platform_settings")
     .upsert(
       {
-        key: "uzum_manager_session",
-        value: JSON.stringify(session),
+        setting_key: "uzum_manager_session",
+        setting_value: session,
+        updated_at: new Date().toISOString(),
       },
-      { onConflict: "key" }
+      { onConflict: "setting_key" }
     );
 
   if (error) {
@@ -723,14 +724,14 @@ async function storeManagerSession(supabase: any, session: any) {
 async function getManagerSession(supabase: any): Promise<any | null> {
   const { data } = await supabase
     .from("platform_settings")
-    .select("value")
-    .eq("key", "uzum_manager_session")
+    .select("setting_value")
+    .eq("setting_key", "uzum_manager_session")
     .maybeSingle();
 
-  if (!data?.value) return null;
+  if (!data?.setting_value) return null;
 
   try {
-    return typeof data.value === "string" ? JSON.parse(data.value) : data.value;
+    return typeof data.setting_value === "string" ? JSON.parse(data.setting_value) : data.setting_value;
   } catch {
     return null;
   }
