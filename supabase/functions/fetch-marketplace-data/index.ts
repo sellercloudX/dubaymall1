@@ -370,7 +370,35 @@ serve(async (req) => {
       credentials = connection.credentials as any;
     }
     
-    const { apiKey, campaignId, businessId } = credentials;
+    let { apiKey, campaignId, businessId } = credentials;
+
+    // ========== MANAGER SESSION FALLBACK FOR UZUM ==========
+    // If apiKey is 'manager_session' or empty for Uzum, try to get a real session token
+    // from the uzum-manager-auth function (platform's manager account)
+    if (marketplace === "uzum" && (!apiKey || apiKey === "manager_session")) {
+      console.log(`[Uzum] API key missing or manager_session — attempting manager auth fallback...`);
+      try {
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        const sessionResp = await fetch(`${supabaseUrl}/functions/v1/uzum-manager-auth`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${serviceRoleKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ action: "get-session" }),
+        });
+        const sessionData = await sessionResp.json();
+        if (sessionData.success && sessionData.accessToken) {
+          apiKey = `${sessionData.tokenType || "Bearer"} ${sessionData.accessToken}`;
+          console.log(`[Uzum] ✅ Manager session token acquired, proceeding with manager auth`);
+        } else {
+          console.warn(`[Uzum] ⚠️ Manager session not available: ${sessionData.error || "unknown"}`);
+        }
+      } catch (e: any) {
+        console.warn(`[Uzum] Manager auth fallback error: ${e.message}`);
+      }
+    }
 
     console.log(`Fetching ${dataType} from ${marketplace} for user ${user.id}, campaignId: ${campaignId}, businessId: ${businessId}`);
 
